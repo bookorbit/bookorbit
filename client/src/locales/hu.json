@@ -2346,7 +2346,7 @@
       },
       "searchCache": {
         "loadFailed": "A keresési gyorsítótár beállításainak betöltése sikertelen.",
-        "retry": "Próbáld újra",
+        "retry": "Újrapróbálás",
         "saved": "A keresési gyorsítótár beállításai elmentve",
         "saveFailed": "A keresési gyorsítótár beállításainak mentése sikertelen",
         "units": {
@@ -3020,8 +3020,8 @@
         "copyPreview": "{label} másolása",
         "copyExample": "{label} minta másolása",
         "invalidCharacters": "A minta érvénytelen karaktereket tartalmaz",
-        "fileAsBookSaved": "Fájl, mint könyv alapértelmezés elmentve",
-        "folderAsBookSaved": "Mappa, mint könyv alapértelmezés elmentve",
+        "fileAsBookSaved": "Fájl könyvként alapértelmezés elmentve",
+        "folderAsBookSaved": "Mappa könyvként alapértelmezés elmentve",
         "downloadPatternSaved": "Letöltési minta elmentve",
         "savePatternFailed": "Nem sikerült menteni a mintát",
         "saveDownloadPatternFailed": "Nem sikerült menteni a letöltési mintát",
@@ -3050,8 +3050,8 @@
         "browseTokensAndExamples": "Tokenek és példák böngészése",
         "subtitleShort": "Mappa- és fájlnév-minták a tárolt fájlokhoz.",
         "rule": {
-          "fileAsBook": "Fájl, mint könyv alapértelmezésként",
-          "folderAsBook": "Mappa, mint könyv alapértelmezésként",
+          "fileAsBook": "Fáj könyvként alapértelmezésként",
+          "folderAsBook": "Mappa könyvként alapértelmezésként",
           "download": "Letöltési fájlnév"
         },
         "howItWorks": {
@@ -3619,7 +3619,7 @@
           "enterMinChars": "Írj be legalább 2 karaktert.",
           "searching": "Keresés...",
           "noBooksFound": "Nem találhatók könyvek.",
-          "untitledBook": "Cím nélküli könyv",
+          "untitledBook": "Névtelen könyv",
           "selected": "Kiválasztva",
           "select": "Kiválaszt",
           "loadMore": "Több betöltése",
@@ -4416,7 +4416,7 @@
     "title": "Trófeák",
     "tiersCount": "{earned}/{total} szint",
     "loadFailed": "Nem sikerült betölteni a trófeákat",
-    "tryAgain": "Próbáld újra",
+    "tryAgain": "Újrapróbálás",
     "noMatchFilter": "Egyetlen trófea sem felel meg a szűrőnek",
     "secretAchievement": "Titkos trófea",
     "earnedOn": "Megszerezve {date}",
@@ -5767,7 +5767,7 @@
       "redirecting": "Átirányítás...",
       "signInWith": "Bejelentkezés ezzel: {provider}",
       "completingSignIn": "Bejelentkezés befejezése...",
-      "tryAgain": "Próbáld újra",
+      "tryAgain": "Újrapróbálás",
       "errors": {
         "stateExpired": "A bejelentkezési munkameneted lejárt. Kérjük, próbálj meg újra bejelentkezni.",
         "tokenExchangeFailed": "Nem sikerült befejezni a bejelentkezést a szolgáltatóddal. Kérjük, próbáld újra, vagy fordulj az adminisztrátorhoz.",
@@ -6187,7 +6187,7 @@
       "rereading": "Újraolvasás",
       "read": "Elolvasva",
       "skimmed": "Átfutva",
-      "abandoned": "Abbahagyva"
+      "abandoned": "Félbehagyva"
     },
     "download": {
       "action": "Letöltés",
@@ -6668,7 +6668,7 @@
           "chip": "Felolvasás",
           "title": "Felolvasás létrehozása EPUB-ból és hangoskönyvből"
         },
-        "finished": "Kész",
+        "finished": "Befejezve",
         "resetFileProgress": "Fájlhaladás visszaállítása",
         "resetEditionProgress": "A(z) {format} haladásának alaphelyzetbe állítása",
         "resetting": "Visszaállítás...",
@@ -7398,7 +7398,7 @@
             "noReport": "Ehhez a feladathoz nem maradt meg fejezetszintű jelentés. Futtasd le újra, hogy láthass egyet.",
             "loading": "Fejezetek betöltése…",
             "loadFailed": "A fejezetszintű jelentés betöltése sikertelen.",
-            "tryAgain": "Próbáld újra",
+            "tryAgain": "Újrapróbálás",
             "pending": "{count, plural, one {# módosítás még nincs alkalmazva.} other {# módosítás még nincs alkalmazva.}} Az újraszinkronizálás kizárólag a párosítási lépést futtatja le újra.",
             "resync": "Újraszinkronizálás",
             "publishAnyway": "Közzététel mindenképp",
@@ -7411,7 +7411,7 @@
             "empty": "Még nincs tevékenység.",
             "loading": "Tevékenység betöltése…",
             "loadFailed": "A tevékenységnapló betöltése sikertelen.",
-            "tryAgain": "Próbáld újra",
+            "tryAgain": "Újrapróbálás",
             "warn": "Figyelmeztetés",
             "error": "Hiba",
             "other": "Háttérfolyamat-tevékenység",
@@ -7693,10 +7693,12 @@
           "migration": "Audiobookshelfből importálva",
           "manual": "BookOrbitban szerkesztve",
           "manualBy": "{name} szerkesztette ekkor: {when}",
+          "readAlong": "Az EPUB felolvasós narrációjából, csak megtekintésre",
           "none": "Még nincsenek fejezetek"
         },
         "youAreHere": "Itt vagy",
         "playFrom": "Hallgatás innen: {title}",
+        "openInReader": "{title} megnyitása az olvasóban",
         "selectRow": "{index}. fejezet kiválasztása",
         "selectedCount": "{count, plural, one {# kiválasztva} other {# kiválasztva}}",
         "selectAll": "Összes kiválasztása",
@@ -7716,7 +7718,7 @@
         "export": "Exportálás",
         "saved": "Fejezetek elmentve",
         "reload": "Újratöltés",
-        "retry": "Próbáld újra",
+        "retry": "Újrapróbálás",
         "nudge": {
           "backSecond": "Kezdet eltolása vissza egy másodperccel",
           "backTenth": "Kezdet eltolása vissza egy tizedmásodperccel",
@@ -8245,7 +8247,7 @@
           "outcome": {
             "completed": "Befejezett",
             "skimmed": "Átfutva",
-            "abandoned": "Abbahagyva",
+            "abandoned": "Félbehagyva",
             "inProgress": "Folyamatban"
           },
           "spanRange": "{from} - {to}",
@@ -8374,7 +8376,7 @@
             "avgSession": "Átlag munkamenet",
             "lastRead": "Utoljára olvasva"
           },
-          "firstRead": "Először olvasva",
+          "firstRead": "Első olvasás",
           "lastRead": "Utoljára olvasva",
           "dateStarted": "Kezdés dátuma",
           "dateFinished": "Befejezés dátuma",
@@ -9366,7 +9368,7 @@
         "refused": "A(z) {client} visszautasította a kiadást",
         "refusedUnnamed": "A letöltőkliensed visszautasította a kiadást",
         "refusedHint": "Az ezt használó kiadások nem küldhetők el, amíg ez nincs javítva.",
-        "retry": "Próbáld újra"
+        "retry": "Újrapróbálás"
       },
       "singleFileNote": "Egy kiadás állhat egy könyv több formátumából, egy hangoskönyv részeiből vagy egy archívumból – ezek mind egyetlen könyvként importálódnak. Ha egy kiadás több különálló könyvet tartalmaz, a rendszer megkérdezi, melyiket szeretné megtartani.",
       "holdForReview": "A letöltés ellenőrzése a fájlba írás előtt",
@@ -10020,7 +10022,7 @@
       },
       "viewModes": {
         "grid": "Rácsnézet",
-        "list": "Lista nézet",
+        "list": "Listanézet",
         "table": "Táblázat nézet"
       }
     },
@@ -11284,7 +11286,7 @@
           },
           "seriesFolders": {
             "title": "Sorozatmappák",
-            "uses": "Fájl mint könyv"
+            "uses": "Fájl könyvként"
           }
         },
         "addedAt": {
@@ -11443,7 +11445,7 @@
           "validating": "Szabályok ellenőrzése…",
           "validationSuccess": "A szabály szintaxisa és a csoportok érvényesek. Az előnézet segítségével ellenőrizheted egy fájlútvonal egyezéseit.",
           "validationError": "A szabályok ellenőrzése nem sikerült. Próbáld újra az alkalmazásuk előtt.",
-          "validationRetry": "Ellenőrzés újra",
+          "validationRetry": "Újraellenőrzés",
           "validationRuleCount": "Adj hozzá {min} és {max} közötti számú szabályt.",
           "preview": "Előnézet",
           "previewing": "Szabályok tesztelése…",
@@ -11489,7 +11491,28 @@
             "action": "Szabályok alkalmazása a meglévő könyvekre",
             "applying": "Szabályok alkalmazása...",
             "hint": "Frissíti a könyvtárban már meglévő könyveket a szabályok által meghatározott mezőkkel. Semmi más nem változik, és a zárolt mezők megőrzik az értéküket.",
-            "saveFirst": "Előbb mentsd el a módosításokat, majd csak ezután alkalmazd a szabályokat a meglévő könyvekre."
+            "saveFirst": "Előbb mentsd el a módosításokat, majd csak ezután alkalmazd a szabályokat a meglévő könyvekre.",
+            "confirm": "Alkalmazod a mentett szabályokat a könyvtárban lévő összes könyvre? Ez a művelet a háttérben fut, így bezárhatod ezt a szerkesztőt. Csak a szabályok által meghatározott mezők kerülnek kiírásra; a zárolt mezők, valamint a fájlok saját metaadatai megőrzik az értéküket.",
+            "progressSummary": "{processed}/{total} feldolgozva: {updated} frissítve, {unchanged} változatlan, {skipped} kihagyva, {failed} sikertelen.",
+            "jobStatus": {
+              "running": "A szabályok alkalmazása a háttérben.",
+              "completed": "A szabályok alkalmazva lettek a meglévő könyvekre.",
+              "failed": "Az alkalmazás a befejezés előtt megszakadt. A már elvégzett módosítások megmaradtak; bátran újraindíthatod a folyamatot."
+            },
+            "errors": {
+              "notConfigured": "Mielőtt alkalmaznád, mentsd el a könyvtár útvonalszabályait.",
+              "alreadyRunning": "A szabályok alkalmazása már folyamatban van ezen a könyvtáron.",
+              "busy": "Más könyvtárakon éppen folyamatban van a szabályok alkalmazása. Próbáld újra hamarosan.",
+              "requestFailed": "Nem sikerült elérni a szervert. Az állapot ellenőrzéséhez zárd be, majd nyisd meg újra ezt a szerkesztőt.",
+              "interrupted": "A feladat állapota már nem érhető el. Lehetséges, hogy megszakadt egy szerverújraindítás miatt. Bátran újraindíthatod a folyamatot."
+            },
+            "failureSample": "Könyv {bookId}: {reason}",
+            "failureReasons": {
+              "rules_unavailable": "A szabályokat nem sikerült időben kiértékelni.",
+              "rules_invalid": "A mentett szabályokat nem sikerült lefuttatni. Nyisd meg a Beállításokat, ellenőrizd őket, majd mentsd el újra.",
+              "file_unavailable": "A könyv fájlját nem sikerült beolvasni, így semmi sem változott. Ellenőrizd, hogy a könyvtár mappája elérhető-e.",
+              "metadata_failed": "A könyv metaadatait nem sikerült elmenteni."
+            }
           }
         }
       },
@@ -11759,30 +11782,170 @@
       }
     },
     "folderBrowser": {
+      "title": "Mappák kiválasztása",
+      "subtitle": "{name} részére · {mode}",
+      "unnamedLibrary": "az új könyvtár",
       "close": "Bezárás",
       "mode": {
         "folder": "Mappa könyvként",
         "file": "Fájl könyvként"
       },
       "field": {
+        "placeholder": "Keress egy mappát, vagy illessz be egy útvonalat",
+        "label": "Keress egy mappát, vagy gépelj be egy útvonalat",
         "clear": "Törlés",
         "mounted": "Csatolva",
         "libraries": "Könyvtárak",
         "recent": "Legutóbbiak",
-        "thisLibrary": "{name} (ez a könyvtár)"
+        "thisLibrary": "{name} (ez a könyvtár)",
+        "jumpHint": "Gépeléssel keress egy mappát név alapján, vagy kezdd a(z) {key} karakterrel egy útvonal begépeléséhez",
+        "inFolder": "Itt: {path}",
+        "completeHint": "{tab} kiegészítés {enter} megtekintés a struktúrában",
+        "noCompletion": "A(z) {path} útvonalon egyetlen mappa sem kezdődik ezzel. A(z) {key} gombbal a beírt formában próbálhatod megnyitni az útvonalat.",
+        "pathMissing": "A(z) {path} útvonal nem létezik a szerveren.",
+        "pathMissingSuggest": "A(z) {path} útvonal nem létezik a szerveren. Erre gondoltál: {suggestion}?",
+        "pathBlocked": "A BookOrbit sosem nyitja meg a(z) {path} útvonalat: ez egy rendszermappa.",
+        "findSummary": "{count, plural, one {# egyező mappa} other {# egyező mappa}} erre: “{query}”, a {count, plural, one {körülötte} other {körülöttük}} lévő mappákkal együtt mutatva.",
+        "findEnter": "{key} ugrás a legelsőre.",
+        "findTruncated": "A legelső {count} találat megjelenítése.",
+        "findNone": "Egyetlen mappa sem egyezik a szerveren. Próbálkozz kevesebb betűvel."
       },
       "view": {
         "button": "Megtekintés",
         "label": "Megtekintés beállításai",
         "sort": "Rendezés",
         "sortName": "Név",
-        "show": "Megjelenítés"
+        "sortBooks": "Legtöbb könyv előre",
+        "show": "Megjelenítés",
+        "showEmpty": "Könyv nélküli mappák",
+        "showSystem": "Rendszermappák"
       },
       "newFolder": {
         "button": "Új mappa",
         "label": "Új mappa itt: {name}",
         "placeholder": "Új mappa itt: {name}",
-        "create": "Létrehozás"
+        "inputLabel": "Új mappa neve",
+        "hint": "{enter} létrehoz {escape} mégse",
+        "create": "Létrehozás",
+        "errors": {
+          "empty": "Add meg a mappa nevét.",
+          "invalid": "Egyetlen mappanevet használj, perjelek és kezdő pont nélkül.",
+          "exists": "A(z) {name} már létezik itt.",
+          "denied": "A BookOrbit nem tud írni ide.",
+          "failed": "A mappát nem sikerült létrehozni."
+        }
+      },
+      "tree": {
+        "label": "Szervermappák",
+        "expand": "{name} kibontása",
+        "collapse": "{name} összecsukása",
+        "select": "{name} kiválasztása",
+        "readsThis": "{name} beolvashatja ezt a mappát",
+        "thisLibrary": "Ez a könyvtár",
+        "librariesInside": "{names} {count, plural, one {beolvashat egy belső mappát} other {beolvashat belső mappákat}}",
+        "inside": "{count} belső",
+        "appData": "BookOrbit-adatok",
+        "noAccess": "Nincs hozzáférés",
+        "loading": "Mappák betöltése",
+        "systemHidden": "{count, plural, one {# rendszermappa} other {# rendszermappa}} elrejtve itt: {path}",
+        "moreFolders": "Csak az első {count} mappa látható itt. A többi eléréséhez keress név alapján, vagy gépelj be egy útvonalat.",
+        "unreadable": "A BookOrbit nem tudja beolvasni a(z) {path} útvonalat.",
+        "placesFailed": "A BookOrbitnak nem sikerült betölteni a szervermappákat.",
+        "retry": "Újrapróbálás"
+      },
+      "count": {
+        "books": "{count, plural, one {# könyv} other {# könyv}}",
+        "atLeast": "{count}+",
+        "more": "+ további {count}"
+      },
+      "plan": {
+        "label": "Amit ez a könyvtár beolvas",
+        "willRead": "{name} fogja beolvasni",
+        "newFolders": "{count, plural, one {# új mappa} other {# új mappa}}",
+        "already": "már meglévő · {books}",
+        "emptyTitle": "Még semmi sincs kiválasztva",
+        "emptyHint": "Jelöld be a mappákat a struktúrában. Egy bejelölt mappa a benne lévő összes tartalmat magával hozza.",
+        "rowSize": "{books} · {size}",
+        "show": "{name} megjelenítése a struktúrában",
+        "showTitle": "Megjelenítés a struktúrában",
+        "remove": "{name} törlése",
+        "fit": {
+          "folder": "Mappánként egy könyv.",
+          "file": "Fájlonként egy könyv.",
+          "empty": "Egyelőre üres."
+        },
+        "attention": {
+          "containsOne": "Tartalmazza a(z) {folder} mappát, amelyet a(z) {library} könyvtár beolvas. Azok a könyvek így két könyvtárban is szerepelnének.",
+          "containsMany": "Olyan mappákat tartalmaz, amelyeket a(z) {libraries} könyvtárak beolvasnak. Azok a könyvek így két könyvtárban is szerepelnének.",
+          "overlapExact": "A(z) {library} könyvtár már beolvassa ezt a mappát. Mindkét könyvtár ugyanazt a(z) {count, plural, one {# könyvet} other {# könyvet}} importálná.",
+          "overlapInside": "Ez a mappa a(z) {library} könyvtár mappáján belül található, így a könyvei mindkét könyvtárban szerepelnének.",
+          "merge": "{count, plural, one {# itt lévő mappa} other {# itt lévő mappa}} több könyvet is tartalmaz: Mappa könyvként elrendezés esetén mindegyikből 1 könyv lesz.",
+          "split": "{count, plural, one {# itt lévő hangoskönyv} other {# itt lévő hangoskönyv}} több részből áll: Fájl mint könyv elrendezés esetén minden rész egy külön könyv lesz.",
+          "locked": "A könyvtár létrehozása után az elrendezés már nem módosítható.",
+          "leaveOutOne": "{folder} kihagyása",
+          "leaveOutMany": "Hagyja ki őket",
+          "remove": "Eltávolítás",
+          "useFile": "Fájl könyvként használata",
+          "useFolder": "Mappa könyvként használata"
+        },
+        "suggestions": "Még egyetlen könyvtárban sincs benne",
+        "suggestionsMeta": "sehol be nem olvasott könyvek",
+        "add": "Hozzáadás",
+        "preview": {
+          "label": "Előnézet",
+          "ticks": "{key} bejelölés",
+          "wouldAdd": "Hozzáadandó {books} · {size}",
+          "empty": "Egyelőre üres",
+          "merge": "Több könyv osztozik egy mappán: Mappa könyvként elrendezés esetén minden ilyen mappából 1 könyv lesz.",
+          "split": "Részekre bontott hangoskönyvek: Fájl könyvként elrendezés esetén minden rész egy külön könyv lesz."
+        },
+        "totals": {
+          "books": "{count, plural, one {könyv} other {könyv}} · {size}",
+          "booksOnly": "{count, plural, one {könyv} other {könyv}}",
+          "shared": "{count} más könyvtárakban is szerepel",
+          "organize": "Rendezési elv",
+          "organizeLabel": "Elrendezés",
+          "segmentBooks": "{count, plural, one {# könyv} other {# könyv}}",
+          "folderTitle": "Minden könyveket tartalmazó mappa egy könyv",
+          "fileTitle": "Minden fájl egy könyv",
+          "locked": "{mode}, zárolva a(z) {name} létrehozása óta"
+        }
+      },
+      "reason": {
+        "denied": "A BookOrbit nem tudja beolvasni ezt a mappát. Adj olvasási jogot annak a felhasználónak, akinek a nevében a BookOrbit fut, majd nyisd meg újra.",
+        "appData": "A BookOrbit itt tárolja a borítókat, a gyorsítótárat és a bővítményeket. Ehelyett azt a mappát válaszd ki, amelyik a könyveidet tartalmazza.",
+        "own": "A(z) {name} már szerepel ebben a könyvtárban.",
+        "ownCovered": "Ez a könyvtár már beolvassa a(z) {path} útvonalat, amely tartalmazza ezt a mappát.",
+        "included": "Beemelve, mivel kiválasztottad a(z) {path} útvonalat."
+      },
+      "notice": {
+        "folded": "A(z) {path} útvonal tartalmazza a(z) {count, plural, one {{name} mappát}  other {# általad kiválasztott mappát}}, így {count, plural, one {be lett} other {be lettek}} emelve alá.",
+        "range": "Bejelölve {count, plural, one {# mappa} other {# mappa}}, {from} - {to}.",
+        "removed": "{name} eltávolítva",
+        "leftOut": "A(z) {name} {count, plural, one {# mappára} other {# mappára}} bomlott fel a többi könyvtár mellett",
+        "modeFile": "Fájl könyvként elrendezésre váltottál; a könyvtár letapogatási beállítása igazodik ehhez",
+        "modeFolder": "Mappa könyvként elrendezésre váltottál; a könyvtár letapogatási beállítása igazodik ehhez",
+        "created": "A(z) {path} útvonal létrehozva és bejelölve.",
+        "createdOnly": "A(z) {path} útvonal létrehozva.",
+        "undo": "Visszavon"
+      },
+      "keys": {
+        "space": "Szóköz",
+        "tab": "Tab",
+        "escape": "Esc"
+      },
+      "footer": {
+        "hints": "{move} mozgatás {fold} összevonás {tick} bejelölés {range} kattintás tartományhoz {find} keresés",
+        "add": "Mappák hozzáadása",
+        "addCount": "Add {count, plural, one {# mappa} other {# mappa}}",
+        "addShort": "Hozzáadás",
+        "addShortCount": "{count} hozzáadása",
+        "nothingPicked": "Még semmi sincs kiválasztva",
+        "seePlan": "Struktúraterv megtekintése"
+      },
+      "divider": {
+        "label": "Struktúraterv átméretezése",
+        "title": "Húzd a méretezéshez. Dupla kattintással visszaállíthatod."
       }
     },
     "destination": {
@@ -12253,6 +12416,15 @@
     "dismiss": "Értesítés elvetése",
     "occurrences": "{count} alkalommal történt meg",
     "occurrencesShort": "x{count}",
+    "readAloud": {
+      "readyTitle": "Felolvasás kész: {title}",
+      "needsReviewTitle": "A felolvasás ellenőrzést igényel: {title}",
+      "needsReviewMessage": "A szöveg egy részét nem sikerült a hanghoz párosítani. Ellenőrizd, mielőtt hozzáadod a könyvhöz.",
+      "failedTitle": "A felolvasás meghiúsult: {title}",
+      "reviewExpiringTitle": "A felolvasás felülvizsgálata hamarosan lejár: {title}",
+      "reviewExpiringMessage": "A generált felolvasás néhány napon belül törlődik, hacsak nem ellenőrzöd.",
+      "untitledBook": "Névtelen könyv"
+    },
     "preferences": {
       "title": "Értesítések",
       "subtitle": "Válaszd ki, milyen értesítési kategóriákat szeretnél kapni.",
@@ -12309,6 +12481,10 @@
         "bulkRename": {
           "label": "Csoportos átnevezés",
           "description": "Amikor a könyvek könyvtárak közötti csoportos átnevezése vagy áthelyezése befejeződik vagy sikertelen lesz."
+        },
+        "readAloud": {
+          "label": "Felolvasás generálása",
+          "description": "Ha egy általad indított felolvasás elkészül, ellenőrzést igényel vagy meghiúsul."
         },
         "migration": {
           "label": "Adatmigráció",
@@ -12763,6 +12939,248 @@
       "notePlaceholder": "Opcionális megjegyzés"
     }
   },
+  "readingHistory": {
+    "title": "Előzmények",
+    "listLabel": "Befejezett beolvasások, {period}",
+    "error": "Az olvasási előzményeidet nem sikerült betölteni.",
+    "retry": "Újrapróbálás",
+    "actions": {
+      "share": "Kép megosztása",
+      "export": "Exportálás"
+    },
+    "period": {
+      "year": "Év",
+      "allTime": "Mindenkori",
+      "newerYears": "Újabb évek megjelenítése",
+      "olderYears": "Régebbi évek megjelenítése",
+      "quarterGroup": "Negyedév",
+      "quarter": "{quarter}. negyedév",
+      "quarterYear": "{year}. {quarter}. negyedév"
+    },
+    "toolbar": {
+      "search": "Könyvek keresése",
+      "searchLabel": "Címek és szerzők keresése",
+      "clearSearch": "Keresés törlése",
+      "outcomes": "Eredmény",
+      "outcome": {
+        "completed": "Befejezve",
+        "skimmed": "Átfutva",
+        "abandoned": "Félbehagyva"
+      },
+      "order": "Sorrend",
+      "newest": "Legújabb elől",
+      "oldest": "Legrégebbi elől",
+      "view": "Megtekintés",
+      "list": "Lista",
+      "covers": "Borítók",
+      "listView": "Listanézet",
+      "coversView": "Borítónézet",
+      "oneBook": "Egy könyv",
+      "clearBook": "Minden könyv megjelenítése, nem csak a(z) {title}"
+    },
+    "month": {
+      "undated": "Nincs befejezési dátum",
+      "reads": "{count, plural, one {# olvasás} other {# olvasás}}",
+      "rereads": "{count, plural, one {# újraolvasás} other {# újraolvasás}}",
+      "hours": "{hours}ó"
+    },
+    "duration": {
+      "underMinute": "<1p",
+      "minutes": "{minutes}p",
+      "hoursMinutes": "{hours}ó {minutes}p"
+    },
+    "row": {
+      "untitled": "Névtelen",
+      "noDate": "Nincs dátum",
+      "readNumber": "{n, selectordinal, one {#. olvasás} two {#. olvasás} few {#. olvasás} other {#. olvasás}}",
+      "readNumberTitle": "{count, plural, one {Összesen 1 alkalommal befejezve} other {Összesen # alkalommal befejezve}}",
+      "abandoned": "Félbehagyva",
+      "abandonedAt": "Félbehagyva itt: {percent}",
+      "skimmed": "Átfutva",
+      "removed": "Eltávolítva a könyvtárból",
+      "removedShort": "Eltávolítva",
+      "removedTitle": "A könyvtárból törölve ekkor: {date}. Ez az olvasás megmarad az előzményeidben.",
+      "sameDay": "Ugyanazon a napon",
+      "startedSpan": "Elkezdve {date} · {count, plural, one {# nap} other {# nap}}",
+      "finishOnly": "Csak a befejezés dátuma",
+      "noDates": "Nincsenek rögzített dátumok",
+      "sessions": "{count, plural, one {# munkamenet} other {# munkamenet}}",
+      "sessionsTime": "{sessions} · {time}",
+      "sourcesMore": "{names} +{count}",
+      "highlights": "{count, plural, one {# kiemelés} other {# kiemelés}}",
+      "journal": "{count, plural, one {# naplóbejegyzés} other {# naplóbejegyzés}}",
+      "notesAndRating": "Jegyzetek és értékelés"
+    },
+    "tile": {
+      "label": "{title}, befejezve {date}",
+      "readNumber": "{n, selectordinal, one {#.} two {#.} few {#.} other {#.}}"
+    },
+    "notes": {
+      "loading": "Az ehhez az olvasáshoz tartozó jegyzetek betöltése",
+      "failed": "Az ehhez az olvasáshoz tartozó jegyzetek betöltése meghiúsult.",
+      "note": "Megjegyzés",
+      "journal": "Napló",
+      "thisRead": "Ez az olvasás",
+      "allHighlights": "{count, plural, one {Az ehhez az olvasáshoz tartozó kiemelés} other {Az ehhez az olvasáshoz tartozó mind a(z) # kiemelés}}",
+      "readingLog": "Olvasási napló"
+    },
+    "rating": {
+      "group": "Értékeld ezt az olvasást",
+      "rate": "{count, plural, one {# csillagos értékelés} other {# csillagos értékelés}}",
+      "clear": "Az olvasás értékelésének törlése",
+      "ofFive": "{rating}/5 csillag",
+      "notRated": "Nincs értékelve",
+      "failed": "Az értékelést nem sikerült elmenteni."
+    },
+    "panel": {
+      "label": "{title} olvasása",
+      "close": "Bezárás",
+      "firstRead": "Első olvasás",
+      "readOf": "{n, selectordinal, other {#.} one {#.}} olvasás az összesen {count} alkalomból",
+      "finished": "Befejezve",
+      "started": "Elkezdve",
+      "took": "Időtartam",
+      "timeRead": "Olvasással töltött idő",
+      "timeReadValue": "{time} összesen {count, plural, one {# alkalom} other {# alkalom}} alatt",
+      "where": "Hol",
+      "notRecorded": "Nincs rögzítve"
+    },
+    "rail": {
+      "label": "{period} számokban",
+      "inNumbers": "{period} számokban",
+      "totals": "Összesen",
+      "reads": "Olvasások",
+      "books": "Könyvek",
+      "rereads": "Újraolvasások",
+      "pagesLabel": "Oldalak",
+      "pages": "{count, plural, one {# oldal} other {# oldal}}",
+      "hours": "{hours}ó",
+      "daysRead": "{count, plural, one {# napnyi olvasás} other {# napnyi olvasás}}",
+      "rated": "{count, plural, one {# értékelt} other {# értékelt}}",
+      "averageRating": "{rating}★",
+      "notCounted": "Plusz {count} átfutott vagy félbehagyott, nincs beszámítva.",
+      "byMonth": "Hónap szerint",
+      "best": "Legjobb: {month} · {count}",
+      "monthBar": "{month}: {count, plural, one {# olvasás} other {# olvasás}}",
+      "firstReads": "Első olvasások",
+      "quarters": "Negyedévek",
+      "goal": "Olvasási cél {year}",
+      "goalProgress": "{reached}/{target} könyv.",
+      "goalMet": "Teljesítve {date}.",
+      "goalRereads": "Az újraolvasások is beszámítanak ebbe.",
+      "records": "Rekordok",
+      "fastest": "Leggyorsabb",
+      "pagesPerDay": "{count, plural, one {# oldal naponta} other {# oldal naponta}}",
+      "longestBook": "Leghosszabb könyv",
+      "mostReread": "Legtöbbször újraolvasott",
+      "times": "{count, plural, one {# alkalommal} other {# alkalommal}}",
+      "longestRead": "Leghosszabb olvasás",
+      "days": "{count, plural, one {# nap} other {# nap}}",
+      "formats": "Formátumok",
+      "whereYouRead": "Hol olvasol",
+      "undated": "{count, plural, one {# befejezett olvasásnak nincs dátuma} other {# befejezett olvasásnak nincs dátuma}}",
+      "showUndated": "Megjelenítés az összesített idővonalon"
+    },
+    "empty": {
+      "title": "Még nincsenek befejezett olvasásaid",
+      "body": "A könyvek ide kerülnek, amint befejezed őket bármelyik olvasóban vagy appban. Jelölj meg egy könyvet olvasottként, és az is meg fog jelenni itt.",
+      "filteredTitle": "Nincs egyező olvasás",
+      "filteredBody": "Próbálkozz egy másik időszakkal, kapcsolj be egy másik kimenetelt, vagy töröld a keresést."
+    },
+    "export": {
+      "title": "{period} exportálása",
+      "description": "{count, plural, one {# olvasás} other {# olvasás}} a jelenleg szűrt listában.",
+      "close": "Bezárás",
+      "format": "Formátum",
+      "formats": {
+        "md": {
+          "name": "Markdown",
+          "hint": "Jegyzetkezelő alkalmazásokhoz, mint az Obsidian. Olvasásonként egy sor, hónap szerint csoportosítva."
+        },
+        "csv": {
+          "name": "CSV",
+          "hint": "Táblázatkezelőkhöz. Olvasásonként egy sor dátumokkal, oldalszámokkal, időtartammal és értékeléssel."
+        },
+        "json": {
+          "name": "JSON",
+          "hint": "Minden mező, szkriptekhez és biztonsági mentésekhez."
+        }
+      },
+      "includes": "Tartalmazza",
+      "includesOthers": "Befejezett olvasások, plusz a listában látható átfutott és félbehagyott tételek.",
+      "finishedOnly": "Csak a befejezett olvasások. Ha hozzá szeretnéd adni őket, kapcsold be az Átfutott vagy Félbehagyott szűrőt a listában.",
+      "preview": "{file} előnézete",
+      "previewFailed": "Az előnézetet nem sikerült betölteni. A letöltés ettől függetlenül működik.",
+      "moreLines": "{count, plural, one {Még # sor} other {Még # sor}}",
+      "download": "Letöltés",
+      "preparing": "{done}/{total} előkészítése",
+      "saved": "{count, plural, one {# olvasás exportálva} other {# olvasás exportálva}}",
+      "failed": "Az exportálást nem sikerült előkészíteni.",
+      "fileHeading": "Olvasási előzmények, {period}"
+    },
+    "share": {
+      "title": "Kép megosztása",
+      "description": "Egy kép az olvasásaidról, amit posztolhatsz vagy elküldhetsz. Semmi sem hagyja el a BookOrbitot, amíg el nem mented vagy le nem másolod.",
+      "close": "Bezárás",
+      "loading": "A borítóid összegyűjtése",
+      "loadFailed": "A képet nem sikerült elkészíteni. Zárd be ezt az ablakot, és próbáld újra.",
+      "period": "Időszak",
+      "periods": {
+        "quarter": "Negyedév",
+        "month": "Hónap"
+      },
+      "periodSummary": "{period} · {count, plural, one {# olvasás} other {# olvasás}}",
+      "monthYear": "{year} {month}",
+      "shape": "Forma",
+      "shapes": {
+        "square": {
+          "name": "Négyzet",
+          "hint": "1080 × 1080, posztokhoz"
+        },
+        "story": {
+          "name": "Történet",
+          "hint": "1080 × 1920, történetekhez"
+        },
+        "wide": {
+          "name": "Széles",
+          "hint": "1600 × 900, csevegésekhez és blogokhoz"
+        }
+      },
+      "look": "Kinézet",
+      "looks": {
+        "dark": "Sötét",
+        "light": "Világos"
+      },
+      "show": "Megjelenítés",
+      "titles": "Címek a borítókon",
+      "rereads": "Újraolvasások száma",
+      "rereadsHint": "A háromszor elolvasott könyv egyszer jelenik meg, ×3 jelzéssel.",
+      "ratings": "Értékeléseid",
+      "fileHint": "{shape} · PNG · {width} × {height}",
+      "copy": "Kép másolása",
+      "save": "PNG mentése",
+      "copied": "Kép másolva",
+      "copyFailed": "A képet nem sikerült másolni. Mentsd el helyette.",
+      "saved": "Kép elmentve",
+      "saveFailed": "A képet nem sikerült elmenteni.",
+      "previewLabel": "Kép megosztása erről: {period}: {count, plural, one {# olvasás} other {# olvasás}}",
+      "poster": {
+        "eyebrowYear": "{name} éves olvasásai",
+        "eyebrowPeriod": "{name} {period} időszaki olvasásai",
+        "reads": "{count, plural, one {olvasás} other {olvasás}}",
+        "books": "{count, plural, one {könyv} other {könyv}}",
+        "hours": "{count, plural, one {óra} other {óra}}",
+        "pages": "{count, plural, one {oldal} other {oldal}}",
+        "busiestMonth": "Legaktívabb hónap",
+        "more": "+{count}"
+      }
+    },
+    "links": {
+      "goalReads": "{count, plural, one {A(z) # olvasás megtekintése} other {Mind a(z) # olvasás megtekintése}}",
+      "bookReads": "Minden olvasás megtekintése az előzményekben",
+      "chartHint": "Válassz ki egy hónapot a hozzá tartozó olvasások megtekintéséhez az előzményekben"
+    }
+  },
   "scanner": {
     "filesProgress": "{processed}/{total} fájl",
     "booksFound": "{count, plural, =0 {nem található könyv} one {# talált könyv} other {# talált könyv}}"
@@ -13108,10 +13526,10 @@
         "title": "Haladási tölcsér",
         "modePercent": "Százalék",
         "modeCounts": "Darabszámok",
-        "modeDropoff": "Abbahagyva",
+        "modeDropoff": "Félbehagyva",
         "started": "{count} elkezdve",
         "notEnoughData": "Legalább {count} elkezdett könyv szükséges ehhez a diagramhoz.",
-        "noDropOffTitle": "Nincs abbahagyott",
+        "noDropOffTitle": "Nincs félbehagyott",
         "noDropOffDescription": "Ebben az időszakban minden elkezdett könyv végighaladt a tölcsér összes szakaszán."
       },
       "readingClock": {
@@ -13156,7 +13574,8 @@
       "entityManager": "Entitáskezelő",
       "bulkRename": "Csoportos átnevezés",
       "duplicateBooks": "Duplikált könyvek",
-      "missingResources": "Hiányzó erőforrások"
+      "missingResources": "Hiányzó erőforrások",
+      "chapterHealth": "Fejezetek állapota"
     },
     "entityTypes": {
       "authors": "Szerzők",
@@ -13684,6 +14103,68 @@
         "list": "Nem sikerült betölteni ezeket a bejegyzéseket.",
         "clean": "A tisztítás sikertelen."
       }
+    },
+    "chapterHealth": {
+      "accessDenied": "Az eszköz használatához a metaadatok szerkesztésére vonatkozó jogosultság szükséges.",
+      "untitled": "Névtelen könyv",
+      "categoriesLabel": "Fejezethibák",
+      "categories": {
+        "no_chapters": "Nincsenek fejezetek",
+        "one_per_file": "Fájlonként egy",
+        "numbered_tracks": "Számozott sávok",
+        "needs_review": "Felülvizsgálat szükséges",
+        "edited": "Szerkesztve"
+      },
+      "hints": {
+        "no_chapters": "Egyetlen fájlból álló hangoskönyvek, egyetlen fejezettel vagy fejezet nélkül.",
+        "one_per_file": "Több fájlból álló hangoskönyvek belső fejezetek nélkül, így minden fájl egy fejezetként jelenik meg.",
+        "numbered_tracks": "Fájlok vagy hangsávok szerint elnevezett fejezetek, például „001” vagy „Track 03”, a valódi fejezetcímek helyett.",
+        "needs_review": "Olyan Audible-találatok, amelyek nem egyeztek eléggé a fájljaiddal ahhoz, hogy automatikusan érvénybe lépjenek. Az ellenőrzés megnyitja a könyv fejezeteit a találattal előkészítve.",
+        "edited": "Felhasználók által szerkesztett fejezetlisták, hivatkozásként megjelenítve."
+      },
+      "library": "Könyvtár",
+      "allLibraries": "Összes könyvtár",
+      "found": "{count, plural, =0 {Itt nincsenek könyvek} one {# könyv} other {# könyv}}",
+      "emptyTitle": "Nincs itt semmi",
+      "clearSelection": "Kiválasztás törlése",
+      "row": {
+        "select": "{title} kiválasztása",
+        "facts": "{files, plural, one {# fájl} other {# fájl}}; {chapters, plural, =0 {nincs fejezet} one {# fejezet} other {# fejezet}}; {library}",
+        "files": "{count, plural, one {# fájl} other {# fájl}}",
+        "chapters": "{count, plural, =0 {nincs fejezet} one {# fejezet} other {# fejezet}}",
+        "noAsin": "Nincs ASIN",
+        "review": "Áttekintés",
+        "dismiss": "Elvetés"
+      },
+      "reasons": {
+        "runtime_mismatch": "Az Audible-hossz {seconds} másodperccel eltér a fájljaidtól.",
+        "runtime_mismatch_long": "Az Audible-hossz {duration} idővel eltér a fájljaidtól, így ez valószínűleg egy másik kiadás.",
+        "runtime_unknown": "Az Audible nem ad meg hosszt ehhez a könyvhöz, így az időzítéseit nem sikerült ellenőrizni a fájljaidhoz képest.",
+        "not_exact": "Az Audible nem jelöli pontosként ezeket az időzítéseket.",
+        "implausible": "Az Audible listája nem tűnik fejezeteknek ehhez a könyvhöz.",
+        "unknown_length": "A könyv hossza ismeretlen.",
+        "locked": "A könyv fejezetei védettek, így semmi sem lett lecserélve."
+      },
+      "lookup": {
+        "title": "Fejezetek keresése az Audible-en",
+        "description": "Végigpásztáz minden olyan könyvet, amely rendelkezik Audible ASIN-azonosítóval. Ha az Audible pontosként jelöli meg az időzítéseket, és a játékidő megegyezik a fájljaiddal, a fejezetek érvényesítésre és zárolásra kerülnek, a régi jegyzék pedig megmarad a könyv előzményei között. Minden egyéb tétel az Ellenőrzés szükséges kategóriában várakozik.",
+        "lookUpCategory": "{count, plural, =0 {Nincs itt ASIN-azonosítóval rendelkező könyv} one {Az ASIN-azonosítóval rendelkező # könyv lekérdezése} other {Az ASIN-azonosítóval rendelkező # könyv lekérdezése}}",
+        "lookUpSelected": "{count, plural, one {A # kiválasztott könyv lekérdezése} other {A # kiválasztott könyv lekérdezése}}",
+        "waiting": "{count, plural, =0 {Befejezés} one {# könyv várakozik} other {# könyv várakozik}}",
+        "current": "{title} lekérdezése",
+        "idle": "Nincsenek várakozó lekérdezések.",
+        "finished": "Kész: {applied} érvényesítve, {review} ellenőrizendő, {notFound} nem található, {failed} sikertelen",
+        "stop": "Leállítás",
+        "clear": "Törlés",
+        "queued": "{count, plural, =0 {Egyetlen könyv sem került a várólistára} one {# könyv várólistára téve} other {# könyv várólistára téve}}",
+        "queuedWithSkipped": "{count, plural, =0 {Egyetlen könyv sem került a várólistára} one {# könyv várólistára téve} other {# könyv várólistára téve}}; {skipped, plural, one {# nem rendelkezett ASIN-nal} other {# nem rendelkezett ASIN-nal}}"
+      },
+      "errors": {
+        "load": "A fejezetek állapotát nem sikerült betölteni.",
+        "enqueue": "A lekérdezéseket nem sikerült a várólistára tenni.",
+        "cancel": "A lekérdezéseket nem sikerült módosítani.",
+        "dismiss": "Az ellenőrzést nem sikerült elvetni."
+      }
     }
   },
   "views": {
@@ -13739,6 +14220,7 @@
         "editMetadata": "Metaadatok szerkesztése · {base}",
         "edit": "Szerkesztés · {base}",
         "files": "Fájlok · {base}",
+        "chapters": "Fejezetek · {base}",
         "readingLog": "Olvasási napló · {base}",
         "highlights": "Kiemelések · {base}"
       }
@@ -13971,7 +14453,9 @@
     "bookRequests": "Kérések",
     "bookRequestDetail": "Kérés",
     "bookRequestReleases": "Válassz kiadást",
-    "tts": "Szövegfelolvasás"
+    "tts": "Szövegfelolvasás",
+    "chapterHealth": "Fejezetek állapota",
+    "readingHistory": "Olvasási előzmények"
   },
   "tts": {
     "readerControls": {
@@ -14140,5 +14624,394 @@
       "tab": "tab"
     },
     "resultCount": "{count, plural, =0 {Nincs találat} one {# találat} other {# találat}}"
+  },
+  "serverText": {
+    "achievements": {
+      "books_finished_1": {
+        "name": "Tintainiciálé",
+        "description": "Fejezd be az első könyvedet"
+      },
+      "books_finished_2": {
+        "name": "Könyvgerinc-felfedező",
+        "description": "Fejezz be 10 könyvet"
+      },
+      "books_finished_3": {
+        "name": "Történetbástya",
+        "description": "Fejezz be 35 könyvet"
+      },
+      "books_finished_4": {
+        "name": "Főlevéltáros",
+        "description": "Fejezz be 100 könyvet"
+      },
+      "pages_read_1": {
+        "name": "Első levélkék",
+        "description": "Olvass el 500 oldalt"
+      },
+      "pages_read_2": {
+        "name": "Fejezetszövő",
+        "description": "Olvass el 5 000 oldalt"
+      },
+      "pages_read_3": {
+        "name": "Kötettaktikus",
+        "description": "Olvass el 25 000 oldalt"
+      },
+      "pages_read_4": {
+        "name": "Nagylexikon",
+        "description": "Olvass el 100 000 oldalt"
+      },
+      "hours_read_1": {
+        "name": "Órainiciálé",
+        "description": "Olvass 10 órán át"
+      },
+      "hours_read_2": {
+        "name": "Időmérő olvasó",
+        "description": "Olvass 100 órán át"
+      },
+      "hours_read_3": {
+        "name": "Krónikaveterán",
+        "description": "Olvass 500 órán át"
+      },
+      "hours_read_4": {
+        "name": "Örök tudós",
+        "description": "Olvass 1 000 órán át"
+      },
+      "marathoner": {
+        "name": "Maratonista",
+        "description": "Teljesíts egy legalább 90 perces olvasási munkamenetet"
+      },
+      "all_nighter": {
+        "name": "Éjszakázó",
+        "description": "Olvass hajnali 1 és 4 óra között"
+      },
+      "early_bird": {
+        "name": "Korán kelő",
+        "description": "Indíts el egy olvasási munkamenetet reggel 5 és 7 óra között"
+      },
+      "long_book_1": {
+        "name": "Történethajrá",
+        "description": "Fejezz be egy legalább 300 oldalas könyvet"
+      },
+      "page_turner": {
+        "name": "Oldalútkereső",
+        "description": "Fejezz be egy legalább 500 oldalas könyvet"
+      },
+      "long_book_3": {
+        "name": "Eposzi utazó",
+        "description": "Fejezz be egy legalább 750 oldalas könyvet"
+      },
+      "tome_tamer": {
+        "name": "Köteturalkodó",
+        "description": "Fejezz be egy legalább 1 000 oldalas könyvet"
+      },
+      "sprint": {
+        "name": "Sprint",
+        "description": "Fejezz be egy könyvet egyetlen nap alatt"
+      },
+      "binge_reader": {
+        "name": "Sorozatfaló",
+        "description": "Fejezz be legalább 3 könyvet egyetlen hét alatt"
+      },
+      "library_builder_1": {
+        "name": "Polcmagocska",
+        "description": "Legyen 50 könyv a könyvtáradban"
+      },
+      "library_builder_2": {
+        "name": "Gyűjteményépítész",
+        "description": "Legyen 250 könyv a könyvtáradban"
+      },
+      "library_builder_3": {
+        "name": "Halomuralkodó",
+        "description": "Legyen 1 000 könyv a könyvtáradban"
+      },
+      "library_builder_4": {
+        "name": "Alexandriai könyvtár",
+        "description": "Legyen 5 000 könyv a könyvtáradban"
+      },
+      "annotator_1": {
+        "name": "Jegyzetelő",
+        "description": "Hozz létre 10 annotációt"
+      },
+      "annotator_2": {
+        "name": "Aktív széljegyzetelő",
+        "description": "Hozz létre 50 annotációt"
+      },
+      "annotator_3": {
+        "name": "Termékeny széljegyzetelő",
+        "description": "Hozz létre 200 annotációt"
+      },
+      "annotator_4": {
+        "name": "Mester-széljegyzetelő",
+        "description": "Hozz létre 500 annotációt"
+      },
+      "multi_format": {
+        "name": "Többformátumú",
+        "description": "Rendelkezz könyvekkel legalább 3 különböző formátumban"
+      },
+      "curator": {
+        "name": "Kurátor",
+        "description": "Hozz létre legalább 10 gyűjteményt"
+      },
+      "genre_explorer_1": {
+        "name": "Zsánerkutató",
+        "description": "Fejezz be könyveket 5 különböző zsánerben"
+      },
+      "genre_explorer_2": {
+        "name": "Zsánerkalandor",
+        "description": "Fejezz be könyveket 10 különböző zsánerben"
+      },
+      "genre_explorer_3": {
+        "name": "Zsánerértő",
+        "description": "Fejezz be könyveket 15 különböző zsánerben"
+      },
+      "genre_explorer_4": {
+        "name": "Zsánermester",
+        "description": "Fejezz be könyveket 20 különböző zsánerben"
+      },
+      "polyglot_1": {
+        "name": "Kétnyelvű",
+        "description": "Fejezz be könyveket 2 különböző nyelven"
+      },
+      "polyglot_2": {
+        "name": "Háromnyelvű",
+        "description": "Fejezz be könyveket 3 különböző nyelven"
+      },
+      "polyglot_3": {
+        "name": "Többnyelvű",
+        "description": "Fejezz be könyveket 5 különböző nyelven"
+      },
+      "polyglot_4": {
+        "name": "Poliglott",
+        "description": "Fejezz be könyveket 7 különböző nyelven"
+      },
+      "old_soul": {
+        "name": "Régi lélek",
+        "description": "Fejezz be egy 1900 előtt megjelent könyvet"
+      },
+      "new_release": {
+        "name": "Új megjelenés",
+        "description": "Fejezz be egy idei megjelenésű könyvet"
+      },
+      "century_span": {
+        "name": "Évszázadokon át",
+        "description": "Fejezz be könyveket legalább 3 különböző évszázadból"
+      },
+      "author_deep_dive": {
+        "name": "Szerzői mélymerülés",
+        "description": "Olvass el legalább 5 könyvet ugyanattól a szerzőtől"
+      },
+      "streak_1": {
+        "name": "Első lépések",
+        "description": "Tarts fenn egy 7 napos olvasási sorozatot"
+      },
+      "streak_2": {
+        "name": "Rutinos olvasó",
+        "description": "Tarts fenn egy 30 napos olvasási sorozatot"
+      },
+      "streak_3": {
+        "name": "Megállíthatatlan",
+        "description": "Tarts fenn egy 100 napos olvasási sorozatot"
+      },
+      "streak_4": {
+        "name": "Egész éves láng",
+        "description": "Tarts fenn egy 365 napos olvasási sorozatot"
+      },
+      "year_round_reader": {
+        "name": "Egész éves olvasó",
+        "description": "Olvass egy naptári év mind a 12 hónapjában"
+      },
+      "reborn": {
+        "name": "Újjászületés",
+        "description": "Fejezz be egy több mint 6 hónapja félretett könyvet"
+      },
+      "comeback_kid": {
+        "name": "Nagy visszatérő",
+        "description": "Folytasd az olvasást egy legalább 30 napos szünet után"
+      },
+      "bookmarked": {
+        "name": "Könyvjelzőzve",
+        "description": "Készítsd el az első annotációdat vagy kiemelésedet"
+      },
+      "new_year_reader": {
+        "name": "Újévi olvasó",
+        "description": "Teljesíts egy olvasási munkamenetet január 1-jén"
+      },
+      "monthly_reader_2": {
+        "name": "Havi gépezet",
+        "description": "Fejezz be 10 könyvet egyetlen naptári hónap alatt"
+      },
+      "slow_burn": {
+        "name": "Komótos olvasás",
+        "description": "Szánj több mint 90 napot egy könyv befejezésére a kezdéstől számítva"
+      },
+      "one_sitting": {
+        "name": "Egy szuszra",
+        "description": "Olvasd el egy könyv legalább 90%-át egyetlen olvasási munkamenet alatt"
+      },
+      "decade_sampler": {
+        "name": "Évtizedkóstolgató",
+        "description": "Fejezz be könyveket legalább 5 különböző évtizedből"
+      },
+      "short_story_fan": {
+        "name": "Novellarajongó",
+        "description": "Fejezz be 5 darab 100 oldalnál rövidebb könyvet"
+      },
+      "thick_and_thin": {
+        "name": "Tűzön-vízen át",
+        "description": "Fejezz be legalább egy 100 oldalnál rövidebb és egy 800 oldalnál hosszabb könyvet"
+      },
+      "trilogy_master": {
+        "name": "Trilógiamester",
+        "description": "Fejezz be egy teljes, 3 részes sorozatot"
+      },
+      "genre_devotee": {
+        "name": "Zsánerrajongó",
+        "description": "Fejezz be 10 könyvet ugyanabban a zsánerben"
+      },
+      "seasonal_reader": {
+        "name": "Négy évszak",
+        "description": "Olvass mind a 4 évszakban egyetlen éven belül"
+      },
+      "perfect_month": {
+        "name": "Tökéletes hónap",
+        "description": "Olvass egy naptári hónap minden napján"
+      },
+      "consistent_reader": {
+        "name": "A rendszeresség a kulcs",
+        "description": "Olvass legalább 30 percet mindennap 14 egymást követő napon át"
+      },
+      "weekend_rhythm": {
+        "name": "Hétvégi ritmus",
+        "description": "Olvass 8 egymást követő hétvégén"
+      },
+      "weekend_warrior": {
+        "name": "Hétvégi harcos",
+        "description": "Olvass legalább 5 órát egyetlen hétvége alatt"
+      },
+      "yearly_finisher_12": {
+        "name": "Évzáró olvasó",
+        "description": "Fejezz be 12 könyvet egyetlen naptári éven belül"
+      },
+      "note_keeper": {
+        "name": "Jegyzetőr",
+        "description": "Készíts 25 olyan annotációt, amely tartalmaz megjegyzést"
+      },
+      "deep_dive_session": {
+        "name": "Mélymerülés",
+        "description": "Készíts 10 annotációt egyetlen nap alatt"
+      },
+      "first_series": {
+        "name": "Sorozat elindítva",
+        "description": "Fejezd be az első olyan könyvedet, amely egy sorozathoz tartozik"
+      },
+      "category_sweeper": {
+        "name": "Kategóriasöprő",
+        "description": "Szerezz legalább egy trófeát mind a 4 kategóriában"
+      },
+      "power_hour": {
+        "name": "Intenzív óra",
+        "description": "Olvass el legalább 75 oldalt egyetlen olvasási munkamenet alatt"
+      },
+      "speed_reader": {
+        "name": "Gyorsolvasó",
+        "description": "Olvass el legalább 100 oldalt egyetlen nap alatt"
+      },
+      "old_friend": {
+        "name": "Régi barát",
+        "description": "Fejezz be egy olyan könyvet, amelyet újraolvastál"
+      },
+      "dnf_self_aware": {
+        "name": "Nem benned van a hiba",
+        "description": "Jelölj meg egy könyvet félretettként"
+      },
+      "first_verdict": {
+        "name": "Első ítélet",
+        "description": "Értékeld az első könyvedet"
+      },
+      "critic_1": {
+        "name": "Szárnybontogató kritikus",
+        "description": "Értékelj 10 könyvet"
+      },
+      "critic_2": {
+        "name": "Tapasztalt kritikus",
+        "description": "Értékelj 50 könyvet"
+      },
+      "critic_3": {
+        "name": "Elismert kritikus",
+        "description": "Értékelj 200 könyvet"
+      },
+      "critic_4": {
+        "name": "Meghatározó kritikus",
+        "description": "Értékelj 500 könyvet"
+      },
+      "standing_ovation": {
+        "name": "Vastaps",
+        "description": "Adj egy könyvnek 5 csillagos értékelést"
+      },
+      "across_the_board": {
+        "name": "Minden fronton",
+        "description": "Használd mind az öt csillagos értékelést legalább egyszer"
+      },
+      "tough_crowd": {
+        "name": "Szigorú kritikus",
+        "description": "Adj 10 könyvnek legfeljebb 2 csillagos értékelést"
+      },
+      "wordsmith": {
+        "name": "Szókovács",
+        "description": "Írj egy 280 karakternél hosszabb megjegyzést"
+      },
+      "box_of_crayons": {
+        "name": "Zsírkrétás doboz",
+        "description": "Használd mind az 5 kiemelőszínt"
+      },
+      "synced_up": {
+        "name": "Szinkronizálva",
+        "description": "Szinkronizáld az olvasási folyamatodat először egy Kobo vagy KOReader eszközről"
+      },
+      "full_orbit": {
+        "name": "Teljes pálya",
+        "description": "Rögzíts olvasást három különböző olvasási forrásból"
+      },
+      "two_worlds": {
+        "name": "Két világ",
+        "description": "Olvasd el ugyanazt a könyvet legalább két különböző forrásból"
+      }
+    },
+    "achievementCategories": {
+      "reading": "Olvasás",
+      "library": "Könyvtár",
+      "exploration": "Felfedezés",
+      "dedication": "Elkötelezettség",
+      "devices": "Eszközök"
+    },
+    "achievementSecret": {
+      "name": "Titkos trófea",
+      "description": "Olvass tovább a trófea felfedéséhez."
+    },
+    "monthlyChallenge": {
+      "short-read": {
+        "title": "Rövid olvasmány",
+        "description": "Fejezz be egy 200 oldalnál rövidebb könyvet ebben a hónapban"
+      },
+      "genre-explorer": {
+        "title": "Zsánerfelfedező",
+        "description": "Olvass el egy olyan könyvet ebben a hónapban, amelynek a zsánere új számodra"
+      },
+      "finish-oldest": {
+        "title": "Lemaradás pótlása",
+        "description": "Fejezd be a legrégebben folyamatban lévő könyvedet"
+      },
+      "streak-builder": {
+        "title": "Sorozatépítő",
+        "description": "Olvass 5 egymást követő napon át ebben a hónapban"
+      },
+      "new-author": {
+        "title": "Új hang",
+        "description": "Olvass el egy olyan könyvet ebben a hónapban, amelynek szerzője új számodra"
+      },
+      "page-milestone": {
+        "title": "Szenvedélyes lapozó",
+        "description": "Olvass el 500 oldalt ebben a hónapban"
+      }
+    }
   }
 }

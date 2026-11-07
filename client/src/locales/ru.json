@@ -1954,6 +1954,11 @@
         }
       },
       "providers": {
+        "tabs": {
+          "builtIn": "Встроенные",
+          "external": "Внешние провайдеры",
+          "attention": "Требует внимания"
+        },
         "availableSources": "Доступные источники",
         "saveChanges": "Сохранить изменения",
         "discard": "Сбросить",
@@ -2024,6 +2029,9 @@
           "comicvine": "ComicVine требует ключ API перед включением",
           "aladin": "Aladin требует TTB ключ перед его включением"
         }
+      },
+      "externalProviders": {
+        "description": "Сервисы метаданных, работающие за пределами BookOrbit - например, в отдельном контейнере или в виде внешнего облачного сервиса. Добавить такой сервис можно, указав его адрес; после активации он станет доступен в поиске, панели Book Dock и правилах для полей - точно так же, как и любой другой источник."
       },
       "fieldRules": {
         "clearAllProviders": "Очистить все провайдеры",
@@ -6380,7 +6388,7 @@
         "uploadingProgress": "{done} от {total} загружается...",
         "renameAfter": "Переименовать все файлы после загрузки",
         "uploadCount": "Загрузить ({count})",
-        "upload": "Выгрузить"
+        "upload": "Загрузить"
       },
       "addSession": {
         "errors": {
@@ -7854,7 +7862,7 @@
     "deselect": "Отменить выбор",
     "finalize": "Завершить",
     "rescan": "Пересканировать",
-    "uploadAction": "Выгрузить",
+    "uploadAction": "Загрузить",
     "uploading": "Загрузка...",
     "searchPlaceholder": "Поиск файлов...",
     "setDestinationAction": "Задать место назначения",
@@ -9332,7 +9340,7 @@
     "readyToUpload": "{count} готов к загрузке",
     "noIconsStaged": "Иконки пока нет",
     "uploading": "Загрузка...",
-    "upload": "Выгрузить",
+    "upload": "Загрузить",
     "uploadCount": "Загрузить {count}",
     "onlySvgSupported": "Поддерживаются только SVG файлы",
     "maxStaged": "Вы можете справляться с {max} иконками одновременно",
@@ -10836,7 +10844,7 @@
       "clearAll": "Очистить все",
       "done": "Готово",
       "retry": "Повторить",
-      "upload": "Выгрузить",
+      "upload": "Загрузить",
       "uploadWithCount": "Загрузить ({count})",
       "viewInLibrary": "Просмотр в библиотеке",
       "fileCount": "{count, plural, =0 {нет файлов} one {# файл} few {# файлов} many {# файлов} other {# файлов}}",
@@ -10847,7 +10855,7 @@
         "uploading": "Загрузка...",
         "complete": "Загрузка завершена",
         "uploadTo": "Загрузить на {library}",
-        "uploadBooks": "Выгрузить книги"
+        "uploadBooks": "Загрузить книги"
       },
       "dropzone": {
         "title": "Перетащите файлы сюда или нажмите для просмотра",
