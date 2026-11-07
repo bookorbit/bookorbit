@@ -143,15 +143,16 @@ export class HttpMetadataProvider implements MetadataProvider {
     const body = await this.call('lookup', () => this.client.lookup(this.provider.target, providerId, signal));
     return body ? this.toCandidate(body as SpecBookMetadata) : null;
   }
-
+  
   private searchQuery(params: MetadataSearchParams): URLSearchParams {
     const supported = new Set(this.provider.info.searchParams);
     const query = new URLSearchParams();
     if (params.title) query.set('query', params.title);
     if (params.author) query.set('author', params.author);
     if (params.isbn && supported.has('isbn')) query.set('isbn', params.isbn);
-    if (params.seriesName && supported.has('series')) query.set('series', params.seriesName);
-    if (params.seriesIndex && supported.has('seriesIndex')) query.set('seriesIndex', String(params.seriesIndex));
+    // The book's own series, from its folder, unless the user typed a different title in the search box.
+    if (params.seriesName && !params.titleIsExplicitQuery && supported.has('series')) query.set('series', params.seriesName);
+    if (params.seriesIndex && !params.titleIsExplicitQuery && supported.has('seriesIndex')) query.set('seriesIndex', String(params.seriesIndex));
     query.set('mediaType', params.isAudiobook ? 'audiobook' : 'book');
     if (params.resultsPerProvider && supported.has('limit')) query.set('limit', String(Math.min(params.resultsPerProvider, MAX_MATCHES)));
     return query;
