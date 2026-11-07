@@ -150,6 +150,8 @@ export class HttpMetadataProvider implements MetadataProvider {
     if (params.title) query.set('query', params.title);
     if (params.author) query.set('author', params.author);
     if (params.isbn && supported.has('isbn')) query.set('isbn', params.isbn);
+    if (params.seriesName && supported.has('series')) query.set('series', params.seriesName);
+    if (params.seriesIndex && supported.has('seriesIndex')) query.set('seriesIndex', String(params.seriesIndex));
     query.set('mediaType', params.isAudiobook ? 'audiobook' : 'book');
     if (params.resultsPerProvider && supported.has('limit')) query.set('limit', String(Math.min(params.resultsPerProvider, MAX_MATCHES)));
     return query;
