@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, nextTick, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -49,7 +49,7 @@ import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { sortFieldLabel } from '@/features/book/lib/filter-labels'
 import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
-import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
@@ -60,7 +60,14 @@ import { useSavedViews, type SavedView } from '@/features/book/composables/useSa
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
-import type { BookCard, GroupRule, SortSpec } from '@bookorbit/types'
+import {
+  normalizeCoverAspectRatio,
+  type BookCard,
+  type ConcreteBookMediaKind,
+  type CoverAspectRatio,
+  type GroupRule,
+  type SortSpec,
+} from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const { t } = useI18n()
@@ -71,8 +78,6 @@ const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { tableDensity, showJumpRails } = useDisplaySettings()
 
 const smartScopeId = shallowRef(Number(route.params.id))
-const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
-const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId, coverAspectRatio)
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('smartScope', smartScopeId)
 
 const { getEffectivePreference, setPreference, prefs } = useSeriesCollapsePreference()
@@ -140,6 +145,11 @@ const smartScopeNotFound = ref(false)
 const smartScopeLoadError = computed(() => smartScopesError.value ?? booksError.value)
 
 const smartScope = computed(() => smartScopes.value.find((l) => l.id === smartScopeId.value))
+const coverAspectRatio = computed<CoverAspectRatio>(() => normalizeCoverAspectRatio(smartScope.value?.coverAspectRatio))
+// A square scope reads as an audiobook shelf, so a book that also has an ebook still shows its audiobook.
+const gridMediaKind = computed<ConcreteBookMediaKind | null>(() => (coverAspectRatio.value === '1/1' ? 'audiobook' : null))
+provide(COVER_ASPECT_RATIO_KEY, coverAspectRatio)
+const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId, coverAspectRatio)
 const pageTitle = computed(() => {
   if (smartScope.value?.name) return t('views.smartScope.pageTitle', { name: smartScope.value.name })
   return Number.isFinite(smartScopeId.value) ? t('views.smartScope.pageTitleWithId', { id: smartScopeId.value }) : t('views.smartScope.title')
@@ -800,6 +810,7 @@ defineOptions({ name: 'SmartScopeView' })
             :is-selected="isSelected"
             :rail-gutter="railGutterReserved"
             :rail-gutter-kind="bucketKind"
+            :media-kind="gridMediaKind"
             @range="handleRange"
             @first-visible-index="handleFirstVisibleIndex"
             :allow-move-to-library="true"

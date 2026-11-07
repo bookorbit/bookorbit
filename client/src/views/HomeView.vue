@@ -1091,7 +1091,13 @@ defineOptions({ name: 'HomeView' })
       @sent="exitSelectionMode"
     />
 
-    <SaveAsSmartScopeDialog :open="saveAsSmartScopeOpen" :filter="filter" :sort="sort" @close="saveAsSmartScopeOpen = false" />
+    <SaveAsSmartScopeDialog
+      :open="saveAsSmartScopeOpen"
+      :filter="filter"
+      :sort="sort"
+      :cover-aspect-ratio="currentCoverAspectRatio"
+      @close="saveAsSmartScopeOpen = false"
+    />
 
     <BookUploadModal v-if="uploadOpen && libraryId !== null" :library-id="libraryId" @close="closeUpload" @uploaded="closeUpload" />
 

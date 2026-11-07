@@ -1,3 +1,5 @@
+import type { CoverAspectRatio } from "./library";
+
 export type Collection = {
   id: number;
   userId: number;
@@ -6,6 +8,8 @@ export type Collection = {
   description: string | null;
   isPublic: boolean;
   isOwner: boolean;
+  /** The grid's tile shape, set by the owner. Square also draws each book that has an audiobook as that audiobook. */
+  coverAspectRatio: CoverAspectRatio;
   syncToKobo: boolean;
   displayOrder: number;
   bookCount: number;
@@ -19,6 +23,7 @@ export type CreateCollectionPayload = {
   icon: string;
   description?: string;
   isPublic?: boolean;
+  coverAspectRatio?: CoverAspectRatio;
   syncToKobo?: boolean;
 };
 

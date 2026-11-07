@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import { ICON_VALUE_MAX_LENGTH, type SmartScopeFilter } from '@bookorbit/types';
-import { IsArray, IsBoolean, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateIf, ValidateNested } from 'class-validator';
+import { COVER_ASPECT_RATIOS, ICON_VALUE_MAX_LENGTH, type CoverAspectRatio, type SmartScopeFilter } from '@bookorbit/types';
+import { IsArray, IsBoolean, IsIn, IsNotEmpty, IsObject, IsOptional, IsString, MaxLength, ValidateIf, ValidateNested } from 'class-validator';
 import { SortSpecDto } from './create-smart-scope.dto';
 
 function trimString(value: unknown): unknown {
@@ -37,4 +37,8 @@ export class UpdateSmartScopeDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   syncToKobo?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsIn(COVER_ASPECT_RATIOS)
+  coverAspectRatio?: CoverAspectRatio;
 }

@@ -15,6 +15,7 @@ function makeCollection(overrides: Partial<Collection> = {}): Collection {
     icon: 'FolderOpen',
     description: null,
     isPublic: false,
+    coverAspectRatio: '2/3',
     isOwner: true,
     syncToKobo: false,
     displayOrder: 0,
@@ -176,5 +177,25 @@ describe('useCollections', () => {
       '/api/v1/collections',
       expect.objectContaining({ body: JSON.stringify({ name: 'Shared', icon: 'Users', isPublic: true }) }),
     )
+  })
+
+  it('sends the grid shape on update only when one is given (issue #1926)', async () => {
+    const { useCollections } = await import('../useCollections')
+    apiMock.mockResolvedValueOnce(makeResponse(makeCollection({ coverAspectRatio: '1/1' }))).mockResolvedValueOnce(makeResponse(makeCollection()))
+    const { updateCollection } = useCollections()
+
+    await updateCollection(1, 'Listening', 'Headphones', false, true, '1/1')
+    await updateCollection(1, 'Listening', 'Headphones')
+
+    const [, square] = apiMock.mock.calls[0] as [string, RequestInit]
+    const [, omitted] = apiMock.mock.calls[1] as [string, RequestInit]
+    expect(JSON.parse(String(square.body))).toEqual({
+      name: 'Listening',
+      icon: 'Headphones',
+      syncToKobo: false,
+      isPublic: true,
+      coverAspectRatio: '1/1',
+    })
+    expect(JSON.parse(String(omitted.body))).toEqual({ name: 'Listening', icon: 'Headphones' })
   })
 })

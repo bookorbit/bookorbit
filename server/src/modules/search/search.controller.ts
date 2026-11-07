@@ -2,7 +2,6 @@ import { Controller, Get, Query } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
-import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { GlobalSearchDto } from './dto/global-search.dto';
 import { SearchService } from './search.service';
 
@@ -11,7 +10,6 @@ export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
   @Get()
-  @RequireAppAttest()
   search(@Query() dto: GlobalSearchDto, @CurrentUser() user: RequestUser) {
     return this.searchService.search(user, dto);
   }

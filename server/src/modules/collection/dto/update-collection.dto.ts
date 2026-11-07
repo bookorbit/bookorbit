@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
-import { ICON_VALUE_MAX_LENGTH } from '@bookorbit/types';
+import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
+import { COVER_ASPECT_RATIOS, ICON_VALUE_MAX_LENGTH, type CoverAspectRatio } from '@bookorbit/types';
 
 function trimString(value: unknown): unknown {
   return typeof value === 'string' ? value.trim() : value;
@@ -28,6 +28,10 @@ export class UpdateCollectionDto {
   @ValidateIf((_, value) => value !== undefined)
   @IsBoolean()
   isPublic?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
+  @IsIn(COVER_ASPECT_RATIOS)
+  coverAspectRatio?: CoverAspectRatio;
 
   @IsOptional()
   @IsBoolean()

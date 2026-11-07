@@ -38,6 +38,7 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     filter: null,
     defaultSort: [],
     isPublic: false,
+    coverAspectRatio: '2/3',
     syncToKobo: false,
     displayOrder: 0,
     createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -391,6 +392,53 @@ describe('SmartScopeService', () => {
 
     expect(smartScopeRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ userId: 44, syncToKobo: true }));
     expect(result).toEqual(expect.objectContaining({ syncToKobo: true, koboSyncEnabled: true }));
+  });
+
+  describe('grid shape (issue #1926)', () => {
+    it('create persists a square grid shape and returns it', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const created = makeSmartScope({ id: 9, userId: 44, coverAspectRatio: '1/1' });
+      smartScopeRepo.insert.mockResolvedValue([created]);
+
+      const result = await service.create({ name: 'Audiobooks', icon: 'Headphones', defaultSort: [], coverAspectRatio: '1/1' }, makeUser({ id: 44 }));
+
+      expect(smartScopeRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ coverAspectRatio: '1/1' }));
+      expect(result).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+    });
+
+    it('create leaves the shape to the column default when the payload omits it', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.insert.mockResolvedValue([makeSmartScope()]);
+
+      await service.create({ name: 'Unread', icon: 'Aperture', defaultSort: [] }, makeUser());
+
+      const [values] = smartScopeRepo.insert.mock.calls[0] as [Record<string, unknown>];
+      expect(values.coverAspectRatio).toBeUndefined();
+    });
+
+    it('update writes the grid shape and leaves it alone when the payload omits it', async () => {
+      const { service, smartScopeRepo } = makeService();
+      const existing = makeSmartScope({ id: 3, userId: 12 });
+      smartScopeRepo.findById.mockResolvedValue([existing]);
+      smartScopeRepo.update.mockResolvedValue([{ ...existing, coverAspectRatio: '1/1' }]);
+
+      const result = await service.update(3, { coverAspectRatio: '1/1' }, makeUser({ id: 12 }));
+      await service.update(3, { name: 'Renamed' }, makeUser({ id: 12 }));
+
+      expect(smartScopeRepo.update).toHaveBeenNthCalledWith(1, 3, 12, expect.objectContaining({ coverAspectRatio: '1/1' }));
+      const [, , omitted] = smartScopeRepo.update.mock.calls[1] as [number, number, Record<string, unknown>];
+      expect(omitted.coverAspectRatio).toBeUndefined();
+      expect(result).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+    });
+
+    it('reports an unrecognised stored shape as portrait', async () => {
+      const { service, smartScopeRepo } = makeService();
+      smartScopeRepo.findById.mockResolvedValue([makeSmartScope({ coverAspectRatio: '4/5' })]);
+
+      const result = await service.findOne(5, makeUser());
+
+      expect(result).toEqual(expect.objectContaining({ coverAspectRatio: '2/3' }));
+    });
   });
 
   it('create returns the matching book count using the requesting user visibility and timezone', async () => {

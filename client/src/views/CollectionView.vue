@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -45,7 +45,7 @@ import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { useEffectiveViewMode } from '@/composables/useEffectiveViewMode'
 import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { usePageTitle } from '@/composables/usePageTitle'
-import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { useViewSort } from '@/features/book/composables/useViewSort'
 import { COLLECTION_DEFAULT_SORT } from '@/features/book/lib/sort-defaults'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
@@ -58,7 +58,7 @@ import { useInfiniteScrollSentinel } from '@/composables/useInfiniteScrollSentin
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
-import type { BookCard } from '@bookorbit/types'
+import { normalizeCoverAspectRatio, type BookCard, type ConcreteBookMediaKind, type CoverAspectRatio } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 
 const { t } = useI18n()
@@ -70,8 +70,6 @@ const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const collectionId = shallowRef(Number(route.params.id))
 const { tableDensity, showJumpRails } = useDisplaySettings()
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('collection', collectionId)
-const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
-const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId, coverAspectRatio)
 const {
   collections,
   loaded: collectionsLoaded,
@@ -82,6 +80,11 @@ const {
 } = useCollections()
 const collectionNotFound = ref(false)
 const collection = computed(() => collections.value.find((c) => c.id === collectionId.value))
+const coverAspectRatio = computed<CoverAspectRatio>(() => normalizeCoverAspectRatio(collection.value?.coverAspectRatio))
+// A square collection reads as an audiobook shelf, so a book that also has an ebook still shows its audiobook.
+const gridMediaKind = computed<ConcreteBookMediaKind | null>(() => (coverAspectRatio.value === '1/1' ? 'audiobook' : null))
+provide(COVER_ASPECT_RATIO_KEY, coverAspectRatio)
+const { coverSize, gridGap } = useViewDisplaySettings('collection', collectionId, coverAspectRatio)
 const isCollectionOwner = computed(() => canMutateCollection(collection.value))
 const pageTitle = computed(() => {
   if (collection.value?.name) return t('views.collection.pageTitle', { name: collection.value.name })
@@ -757,6 +760,7 @@ defineOptions({ name: 'CollectionView' })
           :is-selected="isSelected"
           :rail-gutter="railGutterReserved"
           :rail-gutter-kind="bucketKind"
+          :media-kind="gridMediaKind"
           @range="handleRange"
           @first-visible-index="handleFirstVisibleIndex"
           :allow-move-to-library="true"

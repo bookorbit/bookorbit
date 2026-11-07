@@ -1,6 +1,5 @@
 import { Module } from '@nestjs/common';
 
-import { AppAttestModule } from '../app-attest/app-attest.module';
 import { AuthorsModule } from '../authors/authors.module';
 import { BookModule } from '../book/book.module';
 import { SeriesModule } from '../series/series.module';
@@ -8,7 +7,7 @@ import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 
 @Module({
-  imports: [AppAttestModule, BookModule, AuthorsModule, SeriesModule],
+  imports: [BookModule, AuthorsModule, SeriesModule],
   controllers: [SearchController],
   providers: [SearchService],
 })

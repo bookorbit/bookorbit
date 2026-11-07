@@ -946,6 +946,20 @@
       "when": 1794001635101,
       "tag": "0134_add_story_edits",
       "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1794006681655,
+      "tag": "0135_add_smart_scope_cover_aspect_ratio",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1794034289159,
+      "tag": "0136_add_collection_cover_aspect_ratio",
+      "breakpoints": true
     }
   ]
 }

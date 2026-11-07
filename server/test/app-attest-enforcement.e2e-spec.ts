@@ -34,7 +34,6 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['GET', '/user-statistics/activity-details/completion-speed'],
   ['GET', '/user-statistics/activity-details/genre-time'],
   ['GET', '/user-statistics/activity-details/pace'],
-  ['GET', '/search'],
   ['GET', '/smart-scopes/1/books'],
   ['GET', '/books/1/journal'],
   ['POST', '/books/1/journal'],
@@ -67,6 +66,7 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
 
 const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['GET', '/dashboard/widgets/library-overview'],
+  ['GET', '/search?q=dune'],
   ['GET', '/notebook/trash'],
   ['GET', '/reading-history/summary'],
 ];

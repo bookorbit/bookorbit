@@ -17,6 +17,7 @@ const collectionFields = {
   icon: collections.icon,
   description: collections.description,
   isPublic: collections.isPublic,
+  coverAspectRatio: collections.coverAspectRatio,
   syncToKobo: collections.syncToKobo,
   displayOrder: collections.displayOrder,
   createdAt: collections.createdAt,

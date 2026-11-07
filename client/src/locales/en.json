@@ -8661,6 +8661,13 @@
         "success": "Moved {count} books to {library}",
         "partial": "Moved {moved} books, {failed} failed"
       }
+    },
+    "gridShape": {
+      "title": "Grid shape",
+      "tallTitle": "Tall cells",
+      "tallHint": "Each book shows the cover of its primary format",
+      "squareTitle": "Square cells",
+      "squareHint": "Books with an audiobook show its cover and play it when opened"
     }
   },
   "bookMetadataFetch": {
