@@ -36,6 +36,15 @@ const baseBook = {
 // A link whose identifiers are unchanged since it was made, so the cached path runs untouched.
 const BASE_BASIS = buildHardcoverMatchBasis(baseBook);
 
+// What Hardcover returns for a search hit that really is baseBook.
+const baseBookIdentity = {
+  title: 'Test Book',
+  subtitle: null,
+  cached_contributors: [{ author: { name: 'Test Author' }, contribution: null }],
+};
+
+const titleOnlyBook = { ...baseBook, isbn13: null, isbn10: null };
+
 describe('HardcoverBookMatchService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -308,7 +317,7 @@ describe('HardcoverBookMatchService', () => {
     mockClient.query
       .mockResolvedValueOnce({ books: [] })
       .mockResolvedValueOnce({ search: { ids: [123] } })
-      .mockResolvedValueOnce({ books: [{ id: 123 }] });
+      .mockResolvedValueOnce({ books: [{ id: 123, ...baseBookIdentity }] });
     const result = await makeService().matchBook(1, 'tok', baseBook);
     expect(result?.matchMethod).toBe('title');
     expect(result?.hardcoverBookId).toBe(123);
@@ -323,6 +332,11 @@ describe('HardcoverBookMatchService', () => {
     expect(searchQuery).toContain('error');
     expect(searchQuery).not.toContain('fields:');
     expect(searchQuery).not.toContain('weights:');
+    const hydrateQuery = mockClient.query.mock.calls[2]?.[2] as string;
+    expect(hydrateQuery).toContain('query FindBooksByIds');
+    expect(hydrateQuery).toMatch(/\btitle\b/);
+    expect(hydrateQuery).toMatch(/\bsubtitle\b/);
+    expect(hydrateQuery).toMatch(/\bcached_contributors\b/);
   });
 
   it('logs payload-level errors returned by Hardcover search', async () => {
@@ -354,8 +368,8 @@ describe('HardcoverBookMatchService', () => {
       .mockResolvedValueOnce({ search: { ids: [123, 456] } })
       .mockResolvedValueOnce({
         books: [
-          { id: 456, editions: [{ id: 40 }] },
-          { id: 123, editions: [{ id: 30 }] },
+          { id: 456, ...baseBookIdentity, editions: [{ id: 40 }] },
+          { id: 123, ...baseBookIdentity, editions: [{ id: 30 }] },
         ],
       });
 
@@ -367,6 +381,109 @@ describe('HardcoverBookMatchService', () => {
       editionPages: null,
       editionAudioSeconds: null,
       matchMethod: 'title',
+    });
+  });
+
+  describe('title search verification (issue 2106)', () => {
+    const unrelated = {
+      id: 5001,
+      title: 'Completely Different Cookbook',
+      subtitle: null,
+      cached_contributors: [{ author: { name: 'Someone Else' }, contribution: null }],
+      editions: [{ id: 7001, pages: null }],
+    };
+
+    function answerSearch(hits: unknown[]) {
+      const ids = hits.map((hit) => (hit as { id: number }).id);
+      mockRepo.findBookState.mockResolvedValue(undefined);
+      mockClient.query.mockResolvedValueOnce({ search: { ids } }).mockResolvedValueOnce({ books: hits });
+    }
+
+    it('links nothing when the top search hit has another title and author', async () => {
+      answerSearch([unrelated]);
+
+      await expect(makeService().matchBook(1, 'tok', titleOnlyBook)).resolves.toBeNull();
+
+      expect(mockRepo.upsertBookState).toHaveBeenCalledWith({
+        userId: 1,
+        bookId: 42,
+        hardcoverBookId: null,
+        matchBasis: null,
+        matchError: 'no_match',
+      });
+    });
+
+    it('skips a non-matching top hit and links the verified hit ranked below it', async () => {
+      answerSearch([unrelated, { id: 5002, ...baseBookIdentity, editions: [{ id: 7002, pages: 320 }] }]);
+
+      const result = await makeService().matchBook(1, 'tok', titleOnlyBook);
+
+      expect(result).toEqual({
+        hardcoverBookId: 5002,
+        hardcoverEditionId: 7002,
+        editionPages: 320,
+        editionAudioSeconds: null,
+        matchMethod: 'title',
+      });
+    });
+
+    it('does not link a hit whose title matches but whose authors do not', async () => {
+      answerSearch([{ id: 5001, ...baseBookIdentity, cached_contributors: [{ author: { name: 'Someone Else' }, contribution: null }] }]);
+
+      await expect(makeService().matchBook(1, 'tok', titleOnlyBook)).resolves.toBeNull();
+    });
+
+    it('does not link a hit whose author matches but whose title does not', async () => {
+      answerSearch([{ id: 5001, ...baseBookIdentity, title: 'Another Book By The Same Author' }]);
+
+      await expect(makeService().matchBook(1, 'tok', titleOnlyBook)).resolves.toBeNull();
+    });
+
+    it('does not link a hit that carries no title or contributors to verify', async () => {
+      answerSearch([{ id: 5001, editions: [{ id: 7001, pages: 100 }] }]);
+
+      await expect(makeService().matchBook(1, 'tok', titleOnlyBook)).resolves.toBeNull();
+    });
+
+    it('keeps two volumes of one series apart', async () => {
+      const volumeOne = { id: 5001, title: 'Samurai Jack: Volume 1', subtitle: null, cached_contributors: [{ author: { name: 'Jim Zub' } }] };
+      const volumeTwo = { id: 5002, title: 'Samurai Jack: Volume 2', subtitle: null, cached_contributors: [{ author: { name: 'Jim Zub' } }] };
+      const localVolumeTwo = { ...titleOnlyBook, title: 'Samurai Jack: Volume 2', authorName: 'Jim Zub' };
+
+      answerSearch([volumeOne, volumeTwo]);
+
+      await expect(makeService().matchBook(1, 'tok', localVolumeTwo)).resolves.toMatchObject({ hardcoverBookId: 5002, matchMethod: 'title' });
+    });
+
+    it('accepts the book when any contributor matches, whatever the role', async () => {
+      const comic = {
+        id: 5001,
+        title: 'Samurai Jack: Volume 1',
+        subtitle: null,
+        cached_contributors: [
+          { author: { name: 'Jim Zub' }, contribution: null },
+          { author: { name: 'Andy Suriano' }, contribution: 'Illustrator' },
+        ],
+      };
+      answerSearch([comic]);
+
+      const artistOnly = { ...titleOnlyBook, title: 'Samurai Jack: Volume 1', authorName: 'Andy Suriano' };
+      await expect(makeService().matchBook(1, 'tok', artistOnly)).resolves.toMatchObject({ hardcoverBookId: 5001 });
+    });
+
+    it('logs why a search that returned candidates produced no link', async () => {
+      answerSearch([unrelated]);
+      const service = makeService();
+      const logger = Reflect.get(service, 'logger') as { log: (message: string) => void };
+      const logSpy = vi.spyOn(logger, 'log').mockImplementation(() => undefined);
+
+      await service.matchBook(1, 'tok', titleOnlyBook);
+
+      expect(logSpy).toHaveBeenCalledWith(
+        expect.stringMatching(
+          /^\[hardcover\.book_match\] \[end\] userId=1 bookId=42 method=title_author candidates=1 matched=0 durationMs=\d+ - no search result matched the title and author$/,
+        ),
+      );
     });
   });
 
@@ -436,6 +553,7 @@ describe('HardcoverBookMatchService', () => {
       books: [
         {
           id: 123,
+          ...baseBookIdentity,
           editions: [
             { id: 800, pages: null, isbn_13: null, isbn_10: null, audio_seconds: 50000 },
             { id: 801, pages: 405, isbn_13: null, isbn_10: null, audio_seconds: null },
