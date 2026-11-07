@@ -1954,6 +1954,10 @@
         }
       },
       "providers": {
+        "tabs": {
+          "builtIn": "Incluido",
+          "attention": "Requiere atención"
+        },
         "availableSources": "Fuentes disponibles",
         "saveChanges": "Guardar cambios",
         "discard": "Descartar",
@@ -2024,6 +2028,16 @@
           "comicvine": "ComicVine requiere una clave API antes de poder habilitarse",
           "aladin": "Aladin requiere una clave TTB antes de poder habilitarse"
         }
+      },
+      "providerDirectory": {
+        "title": "Disponible para instalar",
+        "hint": "Cada uno funciona como un contenedor pequeño al lado de BookOrbit. Copie su servicio de Compose en el archivo que ejecuta BookOrbit, inícielo con docker compose up -d, luego seleccione Añadir.",
+        "updated": "Actualizado {time}",
+        "bundled": "Lista incluida con esta versión",
+        "loadFailed": "La lista de proveedores predefinidos no se pudo cargar. Todavía puede añadir cualquier proveedor por su dirección.",
+        "copy": "Copiar Compose",
+        "copyLabel": "Copiar el servicio de Compose para {name}",
+        "copied": "{name} copiado. Pégalo debajo de servicios: en tu archivo de Compose, y luego ejecuta docker compose up -d."
       },
       "fieldRules": {
         "clearAllProviders": "Borrar todos los proveedores",

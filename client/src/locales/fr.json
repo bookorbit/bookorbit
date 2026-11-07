@@ -112,10 +112,10 @@
           "hint": "L'aspect général de l'application. Mode, accent, coins et arrière-plan gardent leurs paramètres.",
           "bookorbit": {
             "label": "Orbite des livres",
-            "description": "Surfaces teintées, panneaux de verre et entêtes de sersif."
+            "description": "Surfaces teintées, panneaux de verre et titres à empattements."
           },
           "nostalgia": {
-            "label": "Nostalgia",
+            "label": "Nostalgie",
             "description": "Sols neutres, type système, panneaux plats et une lueur supérieure."
           }
         },
@@ -142,7 +142,7 @@
             "pine": "Pin",
             "olive": "Olive",
             "stone": "Pierre",
-            "sepia": "Sepia",
+            "sepia": "Sépia",
             "crimson": "Cramoisi",
             "plum": "Prune"
           }
@@ -199,7 +199,7 @@
           "aloe": "Aloès",
           "lemon": "Citron",
           "foam": "Mousse",
-          "aqua": "Aqua",
+          "aqua": "Aigue-marine",
           "celadon": "Céladon",
           "sage": "Sauge",
           "pistachio": "Pistache",
@@ -1954,6 +1954,11 @@
         }
       },
       "providers": {
+        "tabs": {
+          "builtIn": "Intégré",
+          "external": "Externe",
+          "attention": "Intervention requise"
+        },
         "availableSources": "Sources disponibles",
         "saveChanges": "Enregistrer les modifications",
         "discard": "Ignorer",
@@ -2024,6 +2029,17 @@
           "comicvine": "ComicVine nécessite une clé API avant de pouvoir être activé",
           "aladin": "Aladin nécessite une clé TTB avant de pouvoir être activé"
         }
+      },
+      "providerDirectory": {
+        "title": "Disponibles pour l'installation",
+        "hint": "Chacun s'exécute comme un petit conteneur aux côtés de BookOrbit. Copiez son service Compose dans le fichier qui exécute BookOrbit, démarrez-le avec la commande docker compose up -d, puis choisissez Ajouter.",
+        "updated": "Mis à jour {time}",
+        "bundled": "Liste incluse dans cette version",
+        "loadFailed": "Impossible de charger la liste des fournisseurs prêts à l'emploi. Vous pouvez tout de même ajouter un fournisseur par son adresse.",
+        "copy": "Copier le fichier Compose",
+        "copyLabel": "Copier le service Compose pour {name}",
+        "copied": "​{name} copié. Collez-le sous services: dans votre fichier Compose, puis exécutez docker compose up -d.",
+        "add": "Ajouter"
       },
       "fieldRules": {
         "clearAllProviders": "Effacer tous les fournisseurs",
