@@ -7,6 +7,7 @@ import {
   shareSignificantToken,
   significantTokens,
   startsWithWord,
+  symmetricTitleSimilarity,
   tokenizeTitleText,
 } from './title-match';
 
@@ -95,6 +96,10 @@ describe('title-match', () => {
       expect(scoreTitleMatch('Foundatun', 'Foundation')).toBeGreaterThan(0);
     });
 
+    it('does not let a volume digit in the query dilute the words a candidate shares', () => {
+      expect(scoreTitleMatch('The Faraway Paladin Volume 1', 'The Faraway Paladin: The Boy in the City of the Dead')).toBe(4);
+    });
+
     it('returns zero when either side is empty after normalization', () => {
       expect(scoreTitleMatch('', 'Dune')).toBe(0);
       expect(scoreTitleMatch('Dune', '???')).toBe(0);
@@ -152,8 +157,13 @@ describe('title-match', () => {
       expect(normalizeTitleText('  The   Hobbit: Or, There & Back Again!  ')).toBe('the hobbit or there back again');
     });
 
-    it('drops single-character tokens', () => {
-      expect(tokenizeTitleText('a tale of 2 cities')).toEqual(['tale', 'of', 'cities']);
+    it('drops single-character words but keeps numeric title tokens', () => {
+      expect(tokenizeTitleText('a tale of 2 cities')).toEqual(['tale', 'of', '2', 'cities']);
+    });
+
+    it('does not treat different single-digit volumes as identical titles', () => {
+      expect(symmetricTitleSimilarity('Example Title', 'Example Title 3')).toBeLessThan(1);
+      expect(symmetricTitleSimilarity('Example Title Vol. 3', 'Example Title Vol. 4')).toBeLessThan(1);
     });
   });
 });

@@ -5,6 +5,8 @@ function request(overrides: Partial<ScoringRequest> = {}): ScoringRequest {
   return {
     title: 'Dune',
     authors: ['Frank Herbert'],
+    seriesName: null,
+    seriesIndex: null,
     isbn13: null,
     isbn10: null,
     isbns: [],
@@ -215,6 +217,27 @@ describe('scoreRelease', () => {
     const scored = scoreRelease(
       release({ title: 'George Orwell - 1984 (Retail EPUB)', seeders: null }),
       request({ title: '1984', authors: ['George Orwell'] }),
+    );
+
+    expect(pointsFor(scored, 'authorMatch')).toBe(61);
+  });
+
+  it('removes the match points from a different volume of the requested series', () => {
+    const asked = request({ title: 'Example Title', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: 1 });
+    const wrongVolume = scoreRelease(release({ title: 'Example Title 3 - Author Name [M4B]', format: 'm4b' }), asked);
+    const requestedVolume = scoreRelease(release({ title: 'Example Title 1 - Author Name [M4B]', format: 'm4b' }), asked);
+    const unnumbered = scoreRelease(release({ title: 'Example Title - Author Name [M4B]', format: 'm4b' }), asked);
+
+    expect(pointsFor(wrongVolume, 'titleMatch')).toBe(0);
+    expect(wrongVolume.score).toBeLessThan(50);
+    expect(pointsFor(requestedVolume, 'authorMatch')).toBe(61);
+    expect(pointsFor(unnumbered, 'authorMatch')).toBe(61);
+  });
+
+  it('does not mistake a publication year after the series name for a volume', () => {
+    const scored = scoreRelease(
+      release({ title: 'Example Title 2020 - Author Name [EPUB]' }),
+      request({ title: 'Example Title', authors: ['Author Name'], seriesName: 'Example Title', seriesIndex: 1 }),
     );
 
     expect(pointsFor(scored, 'authorMatch')).toBe(61);

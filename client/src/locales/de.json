@@ -1954,6 +1954,9 @@
         }
       },
       "providers": {
+        "tabs": {
+          "attention": "Benötigt Aufmerksamkeit"
+        },
         "availableSources": "Verfügbare Quellen",
         "saveChanges": "Änderungen speichern",
         "discard": "Verwerfen",
@@ -2024,6 +2027,14 @@
           "comicvine": "ComicVine erfordert einen API-Schlüssel, bevor es aktiviert werden kann",
           "aladin": "Aladin erfordert einen TTB-Schlüssel, bevor es aktiviert werden kann"
         }
+      },
+      "providerDirectory": {
+        "title": "Bereit für Installation",
+        "updated": "Update {time}",
+        "loadFailed": "Die Liste der vorgefertigten Anbieter konnte nicht geladen werden. Sie können aber einen Anbieter mit seiner Adresse einfügen.",
+        "copy": "Compose kopieren",
+        "copyLabel": "Kopiere den Compose-Dienst für {name}",
+        "copied": "{name} kopiert. Fügen Sie es unter services: in Ihre Compose-Datei ein, dann führen Sie docker compose up -d aus."
       },
       "fieldRules": {
         "clearAllProviders": "Alle Anbieter entfernen",

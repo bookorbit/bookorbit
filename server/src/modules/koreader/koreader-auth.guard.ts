@@ -9,6 +9,8 @@ import { PermissionService } from '../../common/services/permission.service';
 import { UserService } from '../user/user.service';
 import { KoreaderRepository } from './koreader.repository';
 
+const MD5_HEX = /^[0-9a-f]{32}$/i;
+
 @Injectable()
 export class KoreaderAuthGuard implements CanActivate {
   constructor(
@@ -58,18 +60,15 @@ export class KoreaderAuthGuard implements CanActivate {
   }
 
   private async verifyPassword(incoming: string, bcryptHash: string, md5Hash: string | null): Promise<boolean> {
-    const bcryptMatch = await compare(incoming, bcryptHash);
-    if (bcryptMatch) return true;
+    // The KOReader plugin sends md5(password), which can never match the bcrypt hash of the plaintext.
+    // bcrypt costs hundreds of milliseconds of CPU, so it only runs when the cheap md5 check does not match.
+    if (md5Hash && this.matchesMd5(incoming, md5Hash)) return true;
 
-    if (md5Hash && incoming.length === 32 && /^[0-9a-f]{32}$/i.test(incoming)) {
-      return incoming.toLowerCase() === md5Hash.toLowerCase();
-    }
+    return compare(incoming, bcryptHash);
+  }
 
-    if (md5Hash) {
-      const incomingMd5 = createHash('md5').update(incoming).digest('hex');
-      return incomingMd5 === md5Hash.toLowerCase();
-    }
-
-    return false;
+  private matchesMd5(incoming: string, md5Hash: string): boolean {
+    const incomingMd5 = MD5_HEX.test(incoming) ? incoming : createHash('md5').update(incoming).digest('hex');
+    return incomingMd5.toLowerCase() === md5Hash.toLowerCase();
   }
 }

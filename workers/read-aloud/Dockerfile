@@ -4,7 +4,7 @@ ARG NODE_IMAGE=node:26.12.1-trixie-slim
 
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app
-RUN npm install -g pnpm@11.22.0
+RUN npm install -g pnpm@11.28.9
 
 # The image runs on CPU only: without this, onnxruntime-node downloads its CUDA provider on
 # linux/x64, which cannot load here (no CUDA or cuDNN libraries) and only adds size.
@@ -66,3 +66,11 @@ ENV APP_VERSION=${APP_VERSION}
 USER node
 EXPOSE 8787
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
+
+LABEL org.opencontainers.image.title="BookOrbit Read-Aloud Worker" \
+      org.opencontainers.image.description="Read-aloud EPUB generation worker for BookOrbit" \
+      org.opencontainers.image.url="https://bookorbit.app" \
+      org.opencontainers.image.documentation="https://github.com/bookorbit/bookorbit/blob/main/docs/READ_ALOUD.md" \
+      org.opencontainers.image.source="https://github.com/bookorbit/bookorbit" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.version="${APP_VERSION:-dev}"

@@ -66,4 +66,16 @@ describe('ChaptersHeroBar', () => {
 
     expect(cover.attributes('style')).toContain('aspect-ratio: 1')
   })
+
+  it('says a read-along list is view only and offers no protection to switch', async () => {
+    await setI18nLocale('en')
+    const state = { ...STATE, source: null, readAlong: true } as unknown as BookChaptersState
+    wrapper = mount(ChaptersHeroBar, { props: { book: book({}), state, editing: false, canEdit: false, chapterCount: 1 } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('From the read-along narration in the EPUB, view only')
+    expect(wrapper.text()).not.toContain('Not protected')
+    expect(wrapper.text()).not.toContain('Protected')
+    expect(wrapper.find('button').exists()).toBe(false)
+  })
 })

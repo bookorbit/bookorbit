@@ -1,7 +1,7 @@
 ARG NODE_IMAGE=node:26.12.1-alpine3.23@sha256:bc2b334006f15c7167bbeb2f08f28c2df883f7594a0470e04454ebe7560cfe68
 
 FROM ${NODE_IMAGE} AS base
-RUN npm install -g pnpm@11.22.0
+RUN npm install -g pnpm@11.28.9
 
 # Stage 1: Build client
 FROM base AS client-builder
@@ -93,3 +93,11 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
 
 ENTRYPOINT ["/sbin/tini", "-s", "--"]
 CMD ["sh", "/app/entrypoint.sh"]
+
+LABEL org.opencontainers.image.title="BookOrbit" \
+      org.opencontainers.image.description="Self-hosted library management and reading platform for ebooks, PDFs, audiobooks, and comics" \
+      org.opencontainers.image.url="https://bookorbit.app" \
+      org.opencontainers.image.documentation="https://github.com/bookorbit/bookorbit#quick-start-docker" \
+      org.opencontainers.image.source="https://github.com/bookorbit/bookorbit" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
+      org.opencontainers.image.version="${APP_VERSION}"
