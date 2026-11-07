@@ -389,6 +389,40 @@
             "label": "Lock status",
             "hint": "Metadata lock icon at top-right - orange when locked, green when unlocked"
           }
+        },
+        "formatBadgeStyle": {
+          "title": "Format badge style",
+          "hint": "How the badge shows a book that has several formats. A book with one format always shows its plain pill.",
+          "options": {
+            "primary": {
+              "label": "Primary format",
+              "hint": "One pill with the format the card opens."
+            },
+            "bubble": {
+              "label": "Count bubble",
+              "hint": "The primary pill with a small count of the other formats on its corner."
+            },
+            "underline": {
+              "label": "Underline",
+              "hint": "The primary pill with a bar under it, one colored segment per other format."
+            },
+            "pips": {
+              "label": "Pips",
+              "hint": "The primary pill with a colored pip above it for each other format."
+            },
+            "seal": {
+              "label": "Seal",
+              "hint": "A ring with a segment per format and the count inside."
+            },
+            "dots": {
+              "label": "Dots",
+              "hint": "A colored dot per format. Hover the cover for the full list."
+            },
+            "kinds": {
+              "label": "Read and listen",
+              "hint": "The primary format, then icons for what the book can do."
+            }
+          }
         }
       },
       "layout": {

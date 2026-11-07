@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { applyDisplayPreferences, getDisplayPreferencesSnapshot, sanitizeDisplayPreferences, useDisplaySettings } from '../useDisplaySettings'
 
 const settings = useDisplaySettings()
@@ -30,6 +30,7 @@ function resetDisplaySettings() {
   settings.gridCardSecondaryLabel.value = 'hidden'
   settings.cardInfoMode.value = 'hover-overlay'
   settings.thumbnailClickAction.value = 'reader'
+  settings.formatBadgeStyle.value = 'underline'
 }
 
 afterEach(() => {
@@ -248,5 +249,31 @@ describe('useDisplaySettings preferences helpers', () => {
   it('applies thumbnailClickAction from preferences', () => {
     applyDisplayPreferences({ thumbnailClickAction: 'details' })
     expect(settings.thumbnailClickAction.value).toBe('details')
+  })
+
+  it('sanitizes valid formatBadgeStyle values and drops the rest', () => {
+    expect(sanitizeDisplayPreferences({ formatBadgeStyle: 'primary' })).toEqual({ formatBadgeStyle: 'primary' })
+    expect(sanitizeDisplayPreferences({ formatBadgeStyle: 'pips' })).toEqual({ formatBadgeStyle: 'pips' })
+    expect(sanitizeDisplayPreferences({ formatBadgeStyle: 'spine' })).toEqual({})
+    expect(sanitizeDisplayPreferences({ formatBadgeStyle: 3 })).toEqual({})
+  })
+
+  it('applies formatBadgeStyle from preferences and includes it in the snapshot', () => {
+    applyDisplayPreferences({ formatBadgeStyle: 'bubble' })
+    expect(settings.formatBadgeStyle.value).toBe('bubble')
+    expect(getDisplayPreferencesSnapshot().formatBadgeStyle).toBe('bubble')
+  })
+
+  it('defaults formatBadgeStyle to underline, also when a stored value is not a style any more', async () => {
+    vi.resetModules()
+    localStorage.clear()
+    const fresh = await import('../useDisplaySettings')
+    expect(fresh.useDisplaySettings().formatBadgeStyle.value).toBe('underline')
+
+    vi.resetModules()
+    localStorage.setItem('formatBadgeStyle', JSON.stringify('spine'))
+    const stale = await import('../useDisplaySettings')
+    expect(stale.useDisplaySettings().formatBadgeStyle.value).toBe('underline')
+    localStorage.clear()
   })
 })

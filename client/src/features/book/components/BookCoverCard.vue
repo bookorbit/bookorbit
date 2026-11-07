@@ -2,6 +2,7 @@
 import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
 import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import BookCardFormatBadges from './BookCardFormatBadges.vue'
+import BookCardFormatList from './BookCardFormatList.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
@@ -147,7 +148,8 @@ async function handleRefreshMetadata() {
 const { hasPermission } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
-const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
+const { cardOverlays, formatBadgeStyle, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } =
+  useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
   () => props.coverAspectRatio ?? mediaView.value?.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
@@ -157,6 +159,8 @@ const showSendDialog = ref(false)
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
 const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && hasFormatBadges.value)
+/** Every badge style but the plain pill hides which formats a book has, so the hover overlay lists them. */
+const showFormatList = computed(() => showFormatOverlay.value && formatBadgeStyle.value !== 'primary')
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
@@ -522,13 +526,13 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
           </div>
 
-          <!-- Bottom-right overlay: format badges, the card's own then its linked books' -->
+          <!-- Bottom-right overlay: the format badge, in the style the user chose; it places itself -->
           <div
             v-if="showFormatOverlay && !selectionMode"
-            class="absolute bottom-1.5 right-1.5 z-10 flex max-w-[70%] items-center gap-0.5 pointer-events-none transition-opacity duration-150"
+            class="absolute inset-0 z-10 pointer-events-none transition-opacity duration-150"
             :class="overlayFadeClass"
           >
-            <BookCardFormatBadges :own-keys="ownFormatKeys" :linked="book.linked" />
+            <BookCardFormatBadges :own-keys="ownFormatKeys" :linked="book.linked" :badge-style="formatBadgeStyle" />
           </div>
 
           <!-- Reading progress bar - bottom edge -->
@@ -628,6 +632,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
 
             <!-- Bottom: title/author (hover-overlay mode only) + kebab (when not in below-cover label row) -->
             <div class="shrink-0 flex flex-col pr-10">
+              <BookCardFormatList v-if="showFormatList" class="mb-1" :own-keys="ownFormatKeys" :linked="book.linked" />
               <div class="flex items-start justify-between gap-2">
                 <p v-if="showHoverTitle" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
                   {{ book.title ?? '-' }}
