@@ -68,8 +68,8 @@ export async function extractAudioMetadata(absolutePath: string, options: { cove
     );
 
     const data: FfprobeOutput = JSON.parse(stdout);
-    const tags = normalizeTags(data.format?.tags ?? {});
     const streams = data.streams ?? [];
+    const tags = resolveTags(data.format?.tags, streams);
     const chapters = data.chapters ?? [];
 
     const rawAlbumArtist = tagValue(tags, 'albumartist') ?? tagValue(tags, 'album_artist');
@@ -233,6 +233,20 @@ async function extractCoverBytes(absolutePath: string, streams: FfprobeStream[])
 
 function normalizeTags(tags: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(tags).map(([k, v]) => [k.toLowerCase(), v]));
+}
+
+// Ogg files (Opus, Vorbis) carry their comments on the audio stream and leave the format's own tags
+// empty, so a file that reads as untagged here may simply keep its tags one level down. Only audio
+// streams count: an attached cover picture carries its own title and comment, which are not the book's.
+function resolveTags(formatTags: Record<string, string> | undefined, streams: FfprobeStream[]): Record<string, string> {
+  const tags = normalizeTags(formatTags ?? {});
+  for (const stream of streams) {
+    if (stream.codec_type !== 'audio') continue;
+    for (const [key, value] of Object.entries(normalizeTags(stream.tags ?? {}))) {
+      if (tagValue(tags, key) === null) tags[key] = value;
+    }
+  }
+  return tags;
 }
 
 function tagValue(tags: Record<string, string>, key: string): string | null {
