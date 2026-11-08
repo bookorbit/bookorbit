@@ -13,6 +13,7 @@ import {
 
 const statfsMock = vi.hoisted(() => ({ available: Number.MAX_SAFE_INTEGER }));
 const copyMock = vi.hoisted(() => ({ failAfterWriting: false }));
+const openedHandles = vi.hoisted(() => [] as import('node:fs/promises').FileHandle[]);
 
 vi.mock('node:stream/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:stream/promises')>();
@@ -32,6 +33,11 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>();
   return {
     ...actual,
+    open: vi.fn(async (...args: Parameters<typeof actual.open>) => {
+      const handle = await actual.open(...args);
+      openedHandles.push(handle);
+      return handle;
+    }),
     statfs: vi.fn(() => Promise.resolve({ bavail: BigInt(statfsMock.available), bsize: 1n })),
   };
 });
@@ -48,6 +54,7 @@ describe('GeneratedBookFileService', () => {
     await writeFile(source, 'generated read-along bytes');
     statfsMock.available = Number.MAX_SAFE_INTEGER;
     copyMock.failAfterWriting = false;
+    openedHandles.length = 0;
   });
 
   afterEach(async () => {
@@ -308,6 +315,19 @@ describe('GeneratedBookFileService', () => {
         service.addFile({ bookId: 12, sourcePath: source, partialKey: 'abc', maxBytes: 1e12, user: USER, filename: 'novel.readaloud.epub' }),
       ).rejects.toThrow('no space left on device');
       expect(await readdir(folder)).toEqual([]);
+    });
+
+    it('closes the source it opened when the copy fails, instead of leaving it to garbage collection', async () => {
+      const { service, folder } = makeService(null);
+      await (await import('node:fs/promises')).mkdir(folder, { recursive: true });
+      copyMock.failAfterWriting = true;
+
+      await expect(
+        service.addFile({ bookId: 12, sourcePath: source, partialKey: 'abc', maxBytes: 1e12, user: USER, filename: 'novel.readaloud.epub' }),
+      ).rejects.toThrow('no space left on device');
+
+      expect(openedHandles).toHaveLength(1);
+      await expect(openedHandles[0]!.stat()).rejects.toMatchObject({ code: 'EBADF' });
     });
 
     it("clears this book's leftovers before the free-space check, and leaves other books' alone", async () => {
