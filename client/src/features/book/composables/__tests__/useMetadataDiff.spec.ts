@@ -208,6 +208,37 @@ describe('useMetadataDiff', () => {
     expect(diff.buildPatch().formPatch.genres).toEqual(['Genre 2', 'Genre 3'])
   })
 
+  it('shows provider tags as their own row and merges them into the current tags by default', () => {
+    const diff = setup(
+      { provider: 'mangabaka', providerId: 'mb1', title: 'Tagged', genres: ['Genre 2'], tags: [' Isekai ', 'Magic', 'magic', ''] },
+      { current: { ...mockCurrent, tags: ['Favourite', 'isekai'] } },
+    )
+
+    expect(field(diff, 'tags')).toMatchObject({ bookValue: 'Favourite, isekai', mergeable: true })
+    diff.toggleField('tags')
+
+    expect(diff.decisionOf(field(diff, 'tags')!)).toBe('merge')
+    expect(diff.buildPatch().formPatch.tags).toEqual(['Favourite', 'isekai', 'Magic'])
+    expect(diff.buildPatch().formPatch.genres).toBeUndefined()
+  })
+
+  it('replaces tags on their own, without changing how genres are written', () => {
+    const diff = setup(
+      { provider: 'mangabaka', providerId: 'mb1', title: 'Tagged', genres: ['Genre 2'], tags: ['Isekai', 'Magic'] },
+      { current: { ...mockCurrent, tags: ['Favourite'] } },
+    )
+
+    diff.setField('tags', 'replace')
+
+    expect(diff.decisionOf(field(diff, 'tags')!)).toBe('replace')
+    expect(diff.genreWriteMode.value).toBe('merge')
+    expect(diff.buildPatch().formPatch.tags).toEqual(['Isekai', 'Magic'])
+  })
+
+  it('offers no tags row when neither the book nor the result has tags', () => {
+    expect(field(setup(goodreads), 'tags')).toBeUndefined()
+  })
+
   it('shows and applies the Libro.fm ISBN as a provider ID', () => {
     const diff = setup(
       { provider: 'librofm', providerId: '9781234567890', title: 'Libro.fm Title' },

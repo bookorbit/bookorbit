@@ -83,6 +83,7 @@ const DIRECT_PATCH_FIELDS = [
   'description',
   'authors',
   'genres',
+  'tags',
   'publisher',
   'language',
   'pageCount',

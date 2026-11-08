@@ -7017,6 +7017,7 @@
             "isbn13": "ISBN-13",
             "isbn10": "ISBN-10",
             "genres": "Genres",
+            "tags": "Tags",
             "narrators": "Narrators",
             "durationSeconds": "Duration (seconds)",
             "abridged": "Abridged",

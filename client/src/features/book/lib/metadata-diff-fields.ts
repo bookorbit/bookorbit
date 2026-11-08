@@ -55,6 +55,7 @@ export type DiffFieldKey =
   | 'isbn13'
   | 'isbn10'
   | 'genres'
+  | 'tags'
   | 'narrators'
   | 'durationSeconds'
   | 'abridged'
@@ -83,6 +84,7 @@ export const FIELD_DEFS: { key: DiffFieldKey; labelKey: string }[] = (
     'isbn13',
     'isbn10',
     'genres',
+    'tags',
     'narrators',
     'durationSeconds',
     'abridged',
@@ -166,6 +168,7 @@ export function existingProviderId(ids: ProviderIds | undefined, provider: Metad
 export const LIST_FIELD_KEYS = new Set<DiffFieldKey>([
   'authors',
   'genres',
+  'tags',
   'narrators',
   'comicPencillers',
   'comicInkers',
@@ -222,6 +225,7 @@ export function getCandidateValueFrom(candidate: MetadataCandidate, key: DiffFie
   if (key === 'coverUrl') return toDisplayCoverUrl(candidate.coverUrl)
   if (key === 'authors') return (candidate.authors ?? []).join(', ')
   if (key === 'genres') return (candidate.genres ?? []).join(', ')
+  if (key === 'tags') return (candidate.tags ?? []).join(', ')
   if (key === 'narrators') return (candidate.narrators ?? []).join(', ')
   if (key === 'communityRating') return formatCommunityRatingValue(candidate.communityRating, candidate.communityRatingCount)
   if (key === 'publishedDate') return candidate.publishedDate ?? (candidate.publishedYear != null ? String(candidate.publishedYear) : '')
@@ -237,6 +241,7 @@ export function getCandidateList(candidate: MetadataCandidate, key: DiffFieldKey
   }
   if (key === 'authors') return candidate.authors ?? []
   if (key === 'genres') return candidate.genres ?? []
+  if (key === 'tags') return candidate.tags ?? []
   if (key === 'narrators') return candidate.narrators ?? []
   return []
 }
@@ -245,6 +250,7 @@ export function getCandidateList(candidate: MetadataCandidate, key: DiffFieldKey
 export function getSourceList(current: MetadataSource, key: DiffFieldKey): string[] {
   if (key === 'authors') return current.authors
   if (key === 'genres') return current.genres
+  if (key === 'tags') return current.tags ?? []
   if (key === 'narrators') return current.narrators ?? []
   return []
 }

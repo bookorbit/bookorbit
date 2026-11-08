@@ -160,7 +160,7 @@ const diff = useMetadataDiff({
   coverShapeOf: shapeOf,
   coverSizeOf: sizeOf,
 })
-const { fields, cover, genreWriteMode, fillEmptyCount, takeAllCount, stagedByCandidate } = diff
+const { fields, cover, genreWriteMode, tagWriteMode, fillEmptyCount, takeAllCount, stagedByCandidate } = diff
 
 const secondLocked = computed(() => !!props.secondCover && (props.lockedFields ?? []).includes(coverLockField(props.secondCover.medium)))
 const second = useSecondCoverRow(
@@ -461,6 +461,7 @@ defineExpose({ focusQuery: () => rail.value?.focusQuery() })
           :fields="fields"
           :filter="filter"
           :genre-mode="genreWriteMode"
+          :tag-mode="tagWriteMode"
           :providers="knownProviders"
           :covers="covers"
           :position="position"

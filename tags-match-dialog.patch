@@ -1,0 +1,311 @@
+diff --git a/client/src/features/book/components/detail/tabs/EditMetadataTab.vue b/client/src/features/book/components/detail/tabs/EditMetadataTab.vue
+--- a/client/src/features/book/components/detail/tabs/EditMetadataTab.vue
++++ b/client/src/features/book/components/detail/tabs/EditMetadataTab.vue
+@@ -84,6 +84,7 @@
+   'description',
+   'authors',
+   'genres',
++  'tags',
+   'publisher',
+   'language',
+   'pageCount',
+diff --git a/client/src/features/book/components/detail/tabs/MetadataSearchDrawer.vue b/client/src/features/book/components/detail/tabs/MetadataSearchDrawer.vue
+--- a/client/src/features/book/components/detail/tabs/MetadataSearchDrawer.vue
++++ b/client/src/features/book/components/detail/tabs/MetadataSearchDrawer.vue
+@@ -69,6 +69,7 @@
+   isbn13: props.book.isbn13,
+   authors: props.book.authors.map((a) => a.name),
+   genres: props.book.genres,
++  tags: props.book.tags,
+   narrators: props.book.audioMetadata?.narrators.map((n) => n.name) ?? [],
+   durationSeconds: props.book.audioMetadata?.durationSeconds ?? null,
+   abridged: props.book.audioMetadata?.abridged ?? null,
+diff --git a/client/src/features/book/components/metadata-match/MetadataMatchCompare.vue b/client/src/features/book/components/metadata-match/MetadataMatchCompare.vue
+--- a/client/src/features/book/components/metadata-match/MetadataMatchCompare.vue
++++ b/client/src/features/book/components/metadata-match/MetadataMatchCompare.vue
+@@ -54,6 +54,7 @@
+   seriesName: 'series',
+   seriesIndex: 'series',
+   genres: 'genres',
++  tags: 'genres',
+   isbn13: 'identifiers',
+   isbn10: 'identifiers',
+   hardcoverEditionId: 'identifiers',
+@@ -72,6 +73,7 @@
+   fields: DiffField[]
+   filter: RowFilter
+   genreMode: GenreWriteMode
++  tagMode: GenreWriteMode
+   providers: MetadataProviderInfo[]
+   covers: CoverCardModel[]
+   position: number
+@@ -129,7 +131,8 @@
+ 
+ function decisionOf(field: DiffField): FieldDecision {
+   if (!field.pickedFromActive) return 'keep'
+-  return field.key === 'genres' ? props.genreMode : 'use'
++  if (field.key === 'genres') return props.genreMode
++  return field.key === 'tags' ? props.tagMode : 'use'
+ }
+ 
+ function sectionSummary(fields: DiffField[]): string {
+diff --git a/client/src/features/book/components/metadata-match/MetadataMatchWorkspace.vue b/client/src/features/book/components/metadata-match/MetadataMatchWorkspace.vue
+--- a/client/src/features/book/components/metadata-match/MetadataMatchWorkspace.vue
++++ b/client/src/features/book/components/metadata-match/MetadataMatchWorkspace.vue
+@@ -160,7 +160,7 @@
+   coverShapeOf: shapeOf,
+   coverSizeOf: sizeOf,
+ })
+-const { fields, cover, genreWriteMode, fillEmptyCount, takeAllCount, stagedByCandidate } = diff
++const { fields, cover, genreWriteMode, tagWriteMode, fillEmptyCount, takeAllCount, stagedByCandidate } = diff
+ 
+ const secondLocked = computed(() => !!props.secondCover && (props.lockedFields ?? []).includes(coverLockField(props.secondCover.medium)))
+ const second = useSecondCoverRow(
+@@ -461,6 +461,7 @@
+           :fields="fields"
+           :filter="filter"
+           :genre-mode="genreWriteMode"
++          :tag-mode="tagWriteMode"
+           :providers="knownProviders"
+           :covers="covers"
+           :position="position"
+diff --git a/client/src/features/book/composables/__tests__/useMetadataDiff.spec.ts b/client/src/features/book/composables/__tests__/useMetadataDiff.spec.ts
+--- a/client/src/features/book/composables/__tests__/useMetadataDiff.spec.ts
++++ b/client/src/features/book/composables/__tests__/useMetadataDiff.spec.ts
+@@ -208,6 +208,37 @@
+     expect(diff.buildPatch().formPatch.genres).toEqual(['Genre 2', 'Genre 3'])
+   })
+ 
++  it('shows provider tags as their own row and merges them into the current tags by default', () => {
++    const diff = setup(
++      { provider: 'mangabaka', providerId: 'mb1', title: 'Tagged', genres: ['Genre 2'], tags: [' Isekai ', 'Magic', 'magic', ''] },
++      { current: { ...mockCurrent, tags: ['Favourite', 'isekai'] } },
++    )
++
++    expect(field(diff, 'tags')).toMatchObject({ bookValue: 'Favourite, isekai', mergeable: true })
++    diff.toggleField('tags')
++
++    expect(diff.decisionOf(field(diff, 'tags')!)).toBe('merge')
++    expect(diff.buildPatch().formPatch.tags).toEqual(['Favourite', 'isekai', 'Magic'])
++    expect(diff.buildPatch().formPatch.genres).toBeUndefined()
++  })
++
++  it('replaces tags on their own, without changing how genres are written', () => {
++    const diff = setup(
++      { provider: 'mangabaka', providerId: 'mb1', title: 'Tagged', genres: ['Genre 2'], tags: ['Isekai', 'Magic'] },
++      { current: { ...mockCurrent, tags: ['Favourite'] } },
++    )
++
++    diff.setField('tags', 'replace')
++
++    expect(diff.decisionOf(field(diff, 'tags')!)).toBe('replace')
++    expect(diff.genreWriteMode.value).toBe('merge')
++    expect(diff.buildPatch().formPatch.tags).toEqual(['Isekai', 'Magic'])
++  })
++
++  it('offers no tags row when neither the book nor the result has tags', () => {
++    expect(field(setup(goodreads), 'tags')).toBeUndefined()
++  })
++
+   it('shows and applies the Libro.fm ISBN as a provider ID', () => {
+     const diff = setup(
+       { provider: 'librofm', providerId: '9781234567890', title: 'Libro.fm Title' },
+diff --git a/client/src/features/book/composables/useMetadataDiff.ts b/client/src/features/book/composables/useMetadataDiff.ts
+--- a/client/src/features/book/composables/useMetadataDiff.ts
++++ b/client/src/features/book/composables/useMetadataDiff.ts
+@@ -92,7 +92,7 @@
+   pickedCandidate: MetadataCandidate | null
+   pickedProvider: MetadataProviderKey | null
+   isLocked: boolean
+-  /** Genres can merge into the book's list as well as replace it. */
++  /** Genres and tags can merge into the book's list as well as replace it. */
+   mergeable: boolean
+   otherValues: OtherValue[]
+ }
+@@ -153,6 +153,7 @@
+   isbn13?: string | null
+   authors?: string[]
+   genres?: string[]
++  tags?: string[]
+   narrators?: string[]
+   durationSeconds?: number | null
+   abridged?: boolean
+@@ -239,6 +240,10 @@
+   // A book keeps one community rating per provider, so each provider's rating is its own pick.
+   const ratingPicks = shallowReactive(new Map<MetadataProviderKey, MetadataCandidate>())
+   const genreWriteMode = ref<GenreWriteMode>('merge')
++  const tagWriteMode = ref<GenreWriteMode>('merge')
++  /** The write mode a mergeable list field uses; the other fields have none. */
++  const writeModeOf = (key: DiffFieldKey): GenreWriteMode | null =>
++    key === 'genres' ? genreWriteMode.value : key === 'tags' ? tagWriteMode.value : null
+ 
+   const lockedFieldSet = computed(() => new Set(toValue(input.lockedFields) ?? []))
+   const coverMedium = computed<CoverMedium>(() => toValue(input.coverMedium) ?? 'ebook')
+@@ -321,7 +326,7 @@
+       pickedCandidate,
+       pickedProvider: pickedCandidate?.provider ?? null,
+       isLocked: isLocked(key),
+-      mergeable: key === 'genres' && current.genres.length > 0,
++      mergeable: (key === 'genres' && current.genres.length > 0) || (key === 'tags' && (current.tags ?? []).length > 0),
+       otherValues: key === 'communityRating' ? [] : otherValuesFor(key, active, current, pickedCandidate),
+     }
+   }
+@@ -423,19 +428,22 @@
+     }
+     if (!candidate) return
+     picks.set(key, toRaw(candidate))
+-    if (key === 'genres' && (decision === 'merge' || decision === 'replace')) genreWriteMode.value = decision
++    if ((key === 'genres' || key === 'tags') && (decision === 'merge' || decision === 'replace')) {
++      if (key === 'genres') genreWriteMode.value = decision
++      else tagWriteMode.value = decision
++    }
+   }
+ 
+   /** The decision a field's control shows for the active result. */
+   function decisionOf(field: DiffField): FieldDecision {
+     if (!field.pickedFromActive) return 'keep'
+-    return field.key === 'genres' ? genreWriteMode.value : 'use'
++    return writeModeOf(field.key) ?? 'use'
+   }
+ 
+   function toggleField(key: DiffFieldKey) {
+     const field = fields.value.find((f) => f.key === key)
+     if (!field) return
+-    setField(key, field.pickedFromActive ? 'keep' : field.key === 'genres' ? genreWriteMode.value : 'use')
++    setField(key, field.pickedFromActive ? 'keep' : (writeModeOf(field.key) ?? 'use'))
+   }
+ 
+   function pickCover(candidate: MetadataCandidate | null) {
+@@ -461,7 +469,7 @@
+   function takeAll() {
+     for (const field of fields.value) {
+       if (field.isLocked || !isActionable(field.kind)) continue
+-      setField(field.key, field.key === 'genres' ? genreWriteMode.value : 'use')
++      setField(field.key, writeModeOf(field.key) ?? 'use')
+     }
+     const state = cover.value
+     if (state.active && !state.locked && !state.active.broken && (state.active.fit !== 'mismatch' || !state.currentUrl))
+@@ -524,7 +532,8 @@
+         })
+         continue
+       }
+-      const merged = key === 'genres' && genreWriteMode.value === 'merge'
++      const merged = writeModeOf(key) === 'merge'
++      const mergedList = key === 'tags' ? mergeGenreLists(current.tags ?? [], candidate.tags ?? []) : mergeGenreLists(current.genres, candidate.genres ?? [])
+       const describe = (value: string) => (key === 'description' ? descriptionPlainText(value) : value)
+       out.push({
+         key,
+@@ -532,7 +541,7 @@
+         labelKey: FIELD_LABELS.get(key) ?? key,
+         candidate,
+         before: describe(getSourceValue(current, key, candidate.provider)),
+-        after: merged ? mergeGenreLists(current.genres, candidate.genres ?? []).join(', ') : describe(getCandidateValueFrom(candidate, key)),
++        after: merged ? mergedList.join(', ') : describe(getCandidateValueFrom(candidate, key)),
+         merged,
+         isCover: false,
+       })
+@@ -597,6 +606,10 @@
+           genreWriteMode.value === 'merge' ? mergeGenreLists(current.genres, candidate.genres ?? []) : mergeGenreLists([], candidate.genres ?? [])
+         continue
+       }
++      if (key === 'tags') {
++        formPatch.tags = mergeGenreLists(tagWriteMode.value === 'merge' ? (current.tags ?? []) : [], candidate.tags ?? [])
++        continue
++      }
+       if (key === 'narrators') {
+         formPatch.narrators = candidate.narrators ?? []
+         continue
+@@ -693,6 +706,10 @@
+     genreWriteMode.value = mode
+   }
+ 
++  function setTagWriteMode(mode: GenreWriteMode) {
++    tagWriteMode.value = mode
++  }
++
+   return {
+     fields,
+     cover,
+@@ -701,6 +718,8 @@
+     hasCopied,
+     genreWriteMode,
+     setGenreWriteMode,
++    tagWriteMode,
++    setTagWriteMode,
+     setField,
+     decisionOf,
+     toggleField,
+diff --git a/client/src/features/book/lib/metadata-diff-fields.ts b/client/src/features/book/lib/metadata-diff-fields.ts
+--- a/client/src/features/book/lib/metadata-diff-fields.ts
++++ b/client/src/features/book/lib/metadata-diff-fields.ts
+@@ -55,6 +55,7 @@
+   | 'isbn13'
+   | 'isbn10'
+   | 'genres'
++  | 'tags'
+   | 'narrators'
+   | 'durationSeconds'
+   | 'abridged'
+@@ -83,6 +84,7 @@
+     'isbn13',
+     'isbn10',
+     'genres',
++    'tags',
+     'narrators',
+     'durationSeconds',
+     'abridged',
+@@ -166,6 +168,7 @@
+ export const LIST_FIELD_KEYS = new Set<DiffFieldKey>([
+   'authors',
+   'genres',
++  'tags',
+   'narrators',
+   'comicPencillers',
+   'comicInkers',
+@@ -222,6 +225,7 @@
+   if (key === 'coverUrl') return toDisplayCoverUrl(candidate.coverUrl)
+   if (key === 'authors') return (candidate.authors ?? []).join(', ')
+   if (key === 'genres') return (candidate.genres ?? []).join(', ')
++  if (key === 'tags') return (candidate.tags ?? []).join(', ')
+   if (key === 'narrators') return (candidate.narrators ?? []).join(', ')
+   if (key === 'communityRating') return formatCommunityRatingValue(candidate.communityRating, candidate.communityRatingCount)
+   if (key === 'publishedDate') return candidate.publishedDate ?? (candidate.publishedYear != null ? String(candidate.publishedYear) : '')
+@@ -237,6 +241,7 @@
+   }
+   if (key === 'authors') return candidate.authors ?? []
+   if (key === 'genres') return candidate.genres ?? []
++  if (key === 'tags') return candidate.tags ?? []
+   if (key === 'narrators') return candidate.narrators ?? []
+   return []
+ }
+@@ -245,6 +250,7 @@
+ export function getSourceList(current: MetadataSource, key: DiffFieldKey): string[] {
+   if (key === 'authors') return current.authors
+   if (key === 'genres') return current.genres
++  if (key === 'tags') return current.tags ?? []
+   if (key === 'narrators') return current.narrators ?? []
+   return []
+ }
+diff --git a/client/src/locales/en.json b/client/src/locales/en.json
+--- a/client/src/locales/en.json
++++ b/client/src/locales/en.json
+@@ -6948,6 +6948,7 @@
+             "isbn13": "ISBN-13",
+             "isbn10": "ISBN-10",
+             "genres": "Genres",
++            "tags": "Tags",
+             "narrators": "Narrators",
+             "durationSeconds": "Duration (seconds)",
+             "abridged": "Abridged",
+diff --git a/packages/types/src/metadata-fetch.ts b/packages/types/src/metadata-fetch.ts
+--- a/packages/types/src/metadata-fetch.ts
++++ b/packages/types/src/metadata-fetch.ts
+@@ -349,6 +349,8 @@
+   isbn13: string | null;
+   authors: string[];
+   genres: string[];
++  /** Absent from callers that do not know the book's tags; read as none. */
++  tags?: string[];
+   narrators: string[];
+   durationSeconds: number | null;
+   abridged: boolean | null;

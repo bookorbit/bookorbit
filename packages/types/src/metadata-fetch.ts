@@ -349,6 +349,8 @@ export interface MetadataSource {
   isbn13: string | null;
   authors: string[];
   genres: string[];
+  /** Absent from callers that do not know the book's tags; read as none. */
+  tags?: string[];
   narrators: string[];
   durationSeconds: number | null;
   abridged: boolean | null;

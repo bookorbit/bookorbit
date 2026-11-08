@@ -54,6 +54,7 @@ const SECTION_OF: Partial<Record<DiffFieldKey, SectionId>> = {
   seriesName: 'series',
   seriesIndex: 'series',
   genres: 'genres',
+  tags: 'genres',
   isbn13: 'identifiers',
   isbn10: 'identifiers',
   hardcoverEditionId: 'identifiers',
@@ -72,6 +73,7 @@ const props = defineProps<{
   fields: DiffField[]
   filter: RowFilter
   genreMode: GenreWriteMode
+  tagMode: GenreWriteMode
   providers: MetadataProviderInfo[]
   covers: CoverCardModel[]
   position: number
@@ -129,7 +131,8 @@ const rowIndex = computed(() => new Map(visibleFields.value.map((field, index) =
 
 function decisionOf(field: DiffField): FieldDecision {
   if (!field.pickedFromActive) return 'keep'
-  return field.key === 'genres' ? props.genreMode : 'use'
+  if (field.key === 'genres') return props.genreMode
+  return field.key === 'tags' ? props.tagMode : 'use'
 }
 
 function sectionSummary(fields: DiffField[]): string {

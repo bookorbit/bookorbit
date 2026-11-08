@@ -92,7 +92,7 @@ export interface DiffField {
   pickedCandidate: MetadataCandidate | null
   pickedProvider: MetadataProviderKey | null
   isLocked: boolean
-  /** Genres can merge into the book's list as well as replace it. */
+  /** Genres and tags can merge into the book's list as well as replace it. */
   mergeable: boolean
   otherValues: OtherValue[]
 }
@@ -153,6 +153,7 @@ export interface MetadataPatch {
   isbn13?: string | null
   authors?: string[]
   genres?: string[]
+  tags?: string[]
   narrators?: string[]
   durationSeconds?: number | null
   abridged?: boolean
@@ -239,6 +240,10 @@ export function useMetadataDiff(input: MetadataDiffInput) {
   // A book keeps one community rating per provider, so each provider's rating is its own pick.
   const ratingPicks = shallowReactive(new Map<MetadataProviderKey, MetadataCandidate>())
   const genreWriteMode = ref<GenreWriteMode>('merge')
+  const tagWriteMode = ref<GenreWriteMode>('merge')
+  /** The write mode a mergeable list field uses; the other fields have none. */
+  const writeModeOf = (key: DiffFieldKey): GenreWriteMode | null =>
+    key === 'genres' ? genreWriteMode.value : key === 'tags' ? tagWriteMode.value : null
 
   const lockedFieldSet = computed(() => new Set(toValue(input.lockedFields) ?? []))
   const coverMedium = computed<CoverMedium>(() => toValue(input.coverMedium) ?? 'ebook')
@@ -321,7 +326,7 @@ export function useMetadataDiff(input: MetadataDiffInput) {
       pickedCandidate,
       pickedProvider: pickedCandidate?.provider ?? null,
       isLocked: isLocked(key),
-      mergeable: key === 'genres' && current.genres.length > 0,
+      mergeable: (key === 'genres' && current.genres.length > 0) || (key === 'tags' && (current.tags ?? []).length > 0),
       otherValues: key === 'communityRating' ? [] : otherValuesFor(key, active, current, pickedCandidate),
     }
   }
@@ -423,19 +428,22 @@ export function useMetadataDiff(input: MetadataDiffInput) {
     }
     if (!candidate) return
     picks.set(key, toRaw(candidate))
-    if (key === 'genres' && (decision === 'merge' || decision === 'replace')) genreWriteMode.value = decision
+    if ((key === 'genres' || key === 'tags') && (decision === 'merge' || decision === 'replace')) {
+      if (key === 'genres') genreWriteMode.value = decision
+      else tagWriteMode.value = decision
+    }
   }
 
   /** The decision a field's control shows for the active result. */
   function decisionOf(field: DiffField): FieldDecision {
     if (!field.pickedFromActive) return 'keep'
-    return field.key === 'genres' ? genreWriteMode.value : 'use'
+    return writeModeOf(field.key) ?? 'use'
   }
 
   function toggleField(key: DiffFieldKey) {
     const field = fields.value.find((f) => f.key === key)
     if (!field) return
-    setField(key, field.pickedFromActive ? 'keep' : field.key === 'genres' ? genreWriteMode.value : 'use')
+    setField(key, field.pickedFromActive ? 'keep' : (writeModeOf(field.key) ?? 'use'))
   }
 
   function pickCover(candidate: MetadataCandidate | null) {
@@ -461,7 +469,7 @@ export function useMetadataDiff(input: MetadataDiffInput) {
   function takeAll() {
     for (const field of fields.value) {
       if (field.isLocked || !isActionable(field.kind)) continue
-      setField(field.key, field.key === 'genres' ? genreWriteMode.value : 'use')
+      setField(field.key, writeModeOf(field.key) ?? 'use')
     }
     const state = cover.value
     if (state.active && !state.locked && !state.active.broken && (state.active.fit !== 'mismatch' || !state.currentUrl))
@@ -524,7 +532,9 @@ export function useMetadataDiff(input: MetadataDiffInput) {
         })
         continue
       }
-      const merged = key === 'genres' && genreWriteMode.value === 'merge'
+      const merged = writeModeOf(key) === 'merge'
+      const mergedList =
+        key === 'tags' ? mergeGenreLists(current.tags ?? [], candidate.tags ?? []) : mergeGenreLists(current.genres, candidate.genres ?? [])
       const describe = (value: string) => (key === 'description' ? descriptionPlainText(value) : value)
       out.push({
         key,
@@ -532,7 +542,7 @@ export function useMetadataDiff(input: MetadataDiffInput) {
         labelKey: FIELD_LABELS.get(key) ?? key,
         candidate,
         before: describe(getSourceValue(current, key, candidate.provider)),
-        after: merged ? mergeGenreLists(current.genres, candidate.genres ?? []).join(', ') : describe(getCandidateValueFrom(candidate, key)),
+        after: merged ? mergedList.join(', ') : describe(getCandidateValueFrom(candidate, key)),
         merged,
         isCover: false,
       })
@@ -595,6 +605,10 @@ export function useMetadataDiff(input: MetadataDiffInput) {
       if (key === 'genres') {
         formPatch.genres =
           genreWriteMode.value === 'merge' ? mergeGenreLists(current.genres, candidate.genres ?? []) : mergeGenreLists([], candidate.genres ?? [])
+        continue
+      }
+      if (key === 'tags') {
+        formPatch.tags = mergeGenreLists(tagWriteMode.value === 'merge' ? (current.tags ?? []) : [], candidate.tags ?? [])
         continue
       }
       if (key === 'narrators') {
@@ -693,6 +707,10 @@ export function useMetadataDiff(input: MetadataDiffInput) {
     genreWriteMode.value = mode
   }
 
+  function setTagWriteMode(mode: GenreWriteMode) {
+    tagWriteMode.value = mode
+  }
+
   return {
     fields,
     cover,
@@ -701,6 +719,8 @@ export function useMetadataDiff(input: MetadataDiffInput) {
     hasCopied,
     genreWriteMode,
     setGenreWriteMode,
+    tagWriteMode,
+    setTagWriteMode,
     setField,
     decisionOf,
     toggleField,
