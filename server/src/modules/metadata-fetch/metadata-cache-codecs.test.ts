@@ -25,6 +25,14 @@ describe('book cache codecs', () => {
     expect(bookLookupCodec.parse(null)).toBeNull();
   });
 
+  it('keeps tags in a cached answer, apart from genres', () => {
+    const tagged: MetadataCandidate = { ...candidate, genres: ['Action'], tags: ['Isekai', 'Magic'] };
+    const stored = JSON.parse(JSON.stringify(bookSearchCodec.sanitize([tagged]))) as unknown;
+
+    expect(bookSearchCodec.parse(stored)).toEqual([tagged]);
+    expect(bookSearchCodec.parse([{ ...candidate, tags: 'Isekai' }])).toBeUndefined();
+  });
+
   it('reports an unreadable payload as undefined rather than as an empty answer', () => {
     expect(bookSearchCodec.parse({})).toBeUndefined();
     expect(bookSearchCodec.parse([{ provider: 'google' }])).toBeUndefined();

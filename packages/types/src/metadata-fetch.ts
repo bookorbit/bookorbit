@@ -224,6 +224,8 @@ export interface MetadataCandidate {
   seriesTotalBooks?: number;
   seriesMemberships?: MetadataSeriesMembership[];
   genres?: string[];
+  /** Free-form labels kept apart from genres, so a source that tags a book does not have to call them genres. */
+  tags?: string[];
   coverUrl?: string;
   coverShape?: MetadataCoverShape;
   /** Pixel size of the cover when the provider states it, so a shape can be checked without a download. */

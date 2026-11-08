@@ -110,6 +110,21 @@ describe('HttpMetadataProvider', () => {
     expect(second).toMatchObject({ providerId: 'x', coverUrl: undefined, communityRating: undefined });
   });
 
+  it('reads tags as their own list, apart from genres', async () => {
+    const { client, adapter: a } = adapter();
+    client.search.mockResolvedValue({
+      matches: [
+        { providerId: 'a', title: 'Tagged', genres: ['Action'], tags: [' Isekai ', 'Magic', 'Isekai', 42, ''] },
+        { providerId: 'b', title: 'Untagged', genres: ['Drama'] },
+      ],
+    });
+
+    const [tagged, untagged] = await a.search({ title: 'Tagged' });
+
+    expect(tagged).toMatchObject({ genres: ['Action'], tags: ['Isekai', 'Magic'] });
+    expect(untagged?.tags).toBeUndefined();
+  });
+
   it("files the base spec's single isbn under the length it has", async () => {
     const { client, adapter: a } = adapter();
     client.search.mockResolvedValue({

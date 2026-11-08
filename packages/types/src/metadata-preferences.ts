@@ -16,6 +16,7 @@ export type MetadataField =
   | "seriesName"
   | "seriesIndex"
   | "genres"
+  | "tags"
   | "narrators"
   | "duration"
   | "abridged";
@@ -36,6 +37,7 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
   "seriesName",
   "seriesIndex",
   "genres",
+  "tags",
   "narrators",
   "duration",
   "abridged",

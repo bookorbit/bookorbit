@@ -49,7 +49,7 @@ const skipped = computed(() => skippedProviders(props.preference.providers, prop
 const providerLabel = (key: MetadataProviderKey) => props.statuses.find((entry) => entry.key === key)?.label ?? key
 
 const mergeOptions = computed(() =>
-  (props.field === 'genres' ? GENRE_MERGE_ORDER : STANDARD_MERGE_ORDER).map((value) => ({
+  (props.field === 'genres' || props.field === 'tags' ? GENRE_MERGE_ORDER : STANDARD_MERGE_ORDER).map((value) => ({
     value,
     label: t(`settings.metadata.mergeStrategy.${value}.label`),
     description: t(`settings.metadata.mergeStrategy.${value}.description`),

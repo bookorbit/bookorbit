@@ -22,6 +22,7 @@ export interface BookEligibilityData {
   hasAudioCover: boolean;
   hasAuthors: boolean;
   hasGenres: boolean;
+  hasTags: boolean;
   hasNarrators: boolean;
   durationSeconds: number | null;
   abridged: boolean | null;
@@ -58,6 +59,8 @@ export class BookMetadataFetchEligibilityService {
         return !book.hasAuthors;
       case 'genres':
         return !book.hasGenres;
+      case 'tags':
+        return !book.hasTags;
       // Only a book with audio can be missing these; an ebook has nothing for them to describe, and
       // counting them sent every ebook back into the queue on every pass.
       case 'narrators':

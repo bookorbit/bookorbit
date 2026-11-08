@@ -52,6 +52,7 @@ function makeService(withGateway = true) {
   const metadataService = {
     replaceAuthors: vi.fn().mockResolvedValue(undefined),
     replaceGenres: vi.fn().mockResolvedValue(undefined),
+    replaceTags: vi.fn().mockResolvedValue(undefined),
     replaceNarrators: vi.fn().mockResolvedValue(undefined),
     upsertComicMetadata: vi.fn().mockResolvedValue(undefined),
     downloadAndSaveCover: vi.fn().mockResolvedValue(true),
@@ -261,6 +262,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       book: { books: { libraryId: 2, status: 'present' }, book_metadata: { title: 'Gone' } },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -280,6 +282,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       book: { books: { libraryId: 2, status: 'present' }, book_metadata: { title: 'Both media' } },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -318,6 +321,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
         chapters: [{ title: 'Ch 1', startMs: 0 }],
         authors: ['Author A'],
         genres: ['Genre A'],
+        tags: ['Tag A'],
         narrators: ['Narrator A'],
         coverUrl: 'https://cover',
         comicMetadata: { issueNumber: '12' } as any,
@@ -332,7 +336,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       skippedFields: [],
     });
 
-    await (service as any).persistResolved(88, {}, {}, [{ name: 'Old A' }], [{ name: 'Old G' }], [{ name: 'Old N' }]);
+    await (service as any).persistResolved(88, {}, {}, [{ name: 'Old A' }], [{ name: 'Old G' }], [], [{ name: 'Old N' }]);
 
     expect(bookReadService.updateMetadataFields).toHaveBeenCalledWith(
       88,
@@ -361,6 +365,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
     ]);
     expect(metadataService.replaceAuthors).toHaveBeenCalledWith(88, [{ name: 'Author A', sortName: null }]);
     expect(metadataService.replaceGenres).toHaveBeenCalledWith(88, ['Genre A']);
+    expect(metadataService.replaceTags).toHaveBeenCalledWith(88, ['Tag A']);
     expect(metadataService.replaceNarrators).toHaveBeenCalledWith(88, [{ name: 'Narrator A', sortName: null }]);
     expect(metadataService.upsertComicMetadata).toHaveBeenCalledWith(88, { issueNumber: '12' });
     expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith([{ url: 'https://cover' }], 88, 'ebook');
@@ -391,6 +396,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -498,6 +504,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       book: { books: { libraryId: 2, status: 'present', primaryFileId: null }, book_metadata: { title: 'Fresh' } },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
       fileRows: [],
@@ -535,6 +542,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -556,6 +564,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -584,6 +593,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [{ name: 'Katsuhiro Otomo' }],
       genreRows: [{ name: 'Manga' }],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -617,6 +627,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [{ name: 'Author' }],
       genreRows: [{ name: 'Genre' }],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -751,6 +762,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -811,6 +823,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       },
       authorRows: [],
       genreRows: [],
+      tagRows: [],
       narratorRows: [],
       communityRatingRows: [],
     });
@@ -844,7 +857,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       skippedFields: ['title', 'cover'],
     });
 
-    await (service as any).persistResolved(93, {}, {}, [], [], []);
+    await (service as any).persistResolved(93, {}, {}, [], [], [], []);
 
     const fields = bookReadService.updateMetadataFields.mock.calls[0]?.[1] as Record<string, unknown>;
     expect(fields).toEqual({
@@ -870,7 +883,7 @@ describe('BookMetadataFetchOrchestratorService', () => {
       skippedFields: [],
     });
 
-    await (service as any).persistResolved(94, {}, {}, [{ name: 'Old A' }], [{ name: 'Old G' }], [{ name: 'Old N' }]);
+    await (service as any).persistResolved(94, {}, {}, [{ name: 'Old A' }], [{ name: 'Old G' }], [], [{ name: 'Old N' }]);
 
     expect(metadataService.replaceAuthors).toHaveBeenCalledWith(94, []);
     expect(metadataService.replaceGenres).toHaveBeenCalledWith(94, []);

@@ -164,6 +164,7 @@ export class BookMetadataLockService {
       }
     }
     this.copyResolvedField(filteredResolved, resolved, 'genres', 'genres', lockedSet, skippedFields);
+    this.copyResolvedField(filteredResolved, resolved, 'tags', 'tags', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'narrators', 'narrators', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'duration', 'durationSeconds', lockedSet, skippedFields);
     this.copyResolvedField(filteredResolved, resolved, 'abridged', 'abridged', lockedSet, skippedFields);

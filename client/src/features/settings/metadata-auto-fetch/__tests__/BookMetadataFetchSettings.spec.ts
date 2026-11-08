@@ -58,6 +58,7 @@ const breakdown: BookMetadataFetchBreakdown = {
     seriesName: 351,
     seriesIndex: 359,
     genres: 113,
+    tags: 0,
     narrators: 3,
     duration: 3,
     abridged: 0,

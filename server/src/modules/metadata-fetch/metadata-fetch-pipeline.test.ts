@@ -1370,6 +1370,59 @@ describe('MetadataFetchPipeline', () => {
     expect(sources.genres).toBe(MetadataProviderKey.GOOGLE);
   });
 
+  it('keeps provider tags apart from genres and adds them to the stored tags', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.genres = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE],
+        mergeStrategy: 'mergeExisting',
+      };
+      fields.tags = {
+        enabled: true,
+        providers: [MetadataProviderKey.GOOGLE, MetadataProviderKey.OPEN_LIBRARY],
+        mergeStrategy: 'mergeExisting',
+      };
+    });
+    prefs.options = {
+      genres: { mode: 'merge', blocklist: [], maxCount: null },
+      saveProviderIds: false,
+      providerIdMode: 'preferExisting',
+    };
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.searchCandidates.mockReturnValue(
+      of(
+        candidate(MetadataProviderKey.GOOGLE, 'g1', { genres: ['Action'], tags: ['Isekai', 'Magic'] }),
+        candidate(MetadataProviderKey.OPEN_LIBRARY, 'ol1', { tags: ['magic', 'School Life'] }),
+      ),
+    );
+
+    const { resolved, sources } = await pipeline.runWithSources({ title: 'Query' }, { genres: [], tags: ['Favourite'] });
+
+    expect(resolved.genres).toEqual(['Action']);
+    expect(resolved.tags).toEqual(['Favourite', 'Isekai', 'Magic', 'School Life']);
+    expect(sources.tags).toBe(MetadataProviderKey.GOOGLE);
+  });
+
+  it('leaves tags alone when the tags rule is empty or nothing new was fetched', async () => {
+    const prefs = createPreferences((fields) => {
+      fields.tags = { enabled: true, providers: [MetadataProviderKey.GOOGLE], mergeStrategy: 'mergeExisting' };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.GOOGLE }, { key: MetadataProviderKey.OPEN_LIBRARY }] as never);
+    fetchService.searchCandidates.mockReturnValue(of(candidate(MetadataProviderKey.GOOGLE, 'g1', { tags: ['Isekai'] })));
+
+    const { resolved } = await pipeline.runWithSources({ title: 'Query' }, { tags: ['isekai'] });
+
+    expect(resolved.tags).toBeUndefined();
+  });
+
   it('preserves stored blocklisted genres and limits only new merged additions', async () => {
     const prefs = createPreferences((fields) => {
       fields.genres = {

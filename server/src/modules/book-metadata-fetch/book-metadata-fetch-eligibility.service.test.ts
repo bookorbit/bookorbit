@@ -22,6 +22,7 @@ const baseBook = (): BookEligibilityData => ({
   hasAudioCover: false,
   hasAuthors: true,
   hasGenres: true,
+  hasTags: true,
   hasNarrators: true,
   durationSeconds: 10_000,
   abridged: false,
@@ -160,6 +161,7 @@ describe('BookMetadataFetchEligibilityService', () => {
     const cases: Array<{ field: string; book: BookEligibilityData; eligible: boolean }> = [
       { field: 'authors', book: { ...baseBook(), hasAuthors: false }, eligible: true },
       { field: 'genres', book: { ...baseBook(), hasGenres: false }, eligible: true },
+      { field: 'tags', book: { ...baseBook(), hasTags: false }, eligible: true },
       { field: 'subtitle', book: { ...baseBook(), subtitle: '' }, eligible: true },
       { field: 'publisher', book: { ...baseBook(), publisher: '' }, eligible: true },
       { field: 'publishedYear', book: { ...baseBook(), publishedYear: null }, eligible: true },

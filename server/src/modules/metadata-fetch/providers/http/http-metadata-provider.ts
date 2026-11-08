@@ -22,7 +22,7 @@ import type { MetadataSearchParams } from '../metadata-search-params';
 import { providerCacheContext } from '../provider-cache';
 
 /** Bump when the spec-to-candidate mapping below changes, so cached answers mapped the old way expire. */
-const MAPPING_VERSION = 5;
+const MAPPING_VERSION = 6;
 const MAX_MATCHES = 50;
 const MAX_TITLE = 1_000;
 const MAX_DESCRIPTION = 50_000;
@@ -51,6 +51,7 @@ interface SpecBookMetadata {
   isbn13?: unknown;
   isbn10?: unknown;
   genres?: unknown;
+  tags?: unknown;
   series?: unknown;
   languageCode?: unknown;
   duration?: unknown;
@@ -143,7 +144,7 @@ export class HttpMetadataProvider implements MetadataProvider {
     const body = await this.call('lookup', () => this.client.lookup(this.provider.target, providerId, signal));
     return body ? this.toCandidate(body as SpecBookMetadata) : null;
   }
-  
+
   private searchQuery(params: MetadataSearchParams): URLSearchParams {
     const supported = new Set(this.provider.info.searchParams);
     const query = new URLSearchParams();
@@ -229,6 +230,7 @@ export class HttpMetadataProvider implements MetadataProvider {
       isbn13: text(raw.isbn13, 20) ?? isbn.isbn13,
       isbn10: text(raw.isbn10, 20) ?? isbn.isbn10,
       genres: strings(raw.genres),
+      tags: strings(raw.tags),
       coverUrl: httpUrl(raw.cover) ?? undefined,
       coverWidth: integerIn(raw.coverWidth, 1, 20_000),
       coverHeight: integerIn(raw.coverHeight, 1, 20_000),

@@ -85,6 +85,8 @@ const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> =
     mergeStrategy: 'mergeExisting',
     providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.GOOGLE, MetadataProviderKey.ITUNES, MetadataProviderKey.KOBO],
   },
+  // No built-in provider fills tags, so the rule starts empty; an external provider that does can be added to it.
+  tags: { mergeStrategy: 'mergeExisting', providers: [] },
   communityRating: { providers: [...COMMUNITY_RATING_PROVIDER_KEYS] },
   // Google and Open Library carry no series.
   seriesName: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.AMAZON, MetadataProviderKey.KOBO] },
@@ -195,7 +197,7 @@ export class MetadataPreferenceResolver {
       Array.isArray(candidate.providers) && candidate.providers.every((p) => typeof p === 'string')
         ? [...candidate.providers]
         : [...fallback.providers];
-    const mergeStrategySet = field === 'genres' ? GENRE_MERGE_STRATEGY_SET : MERGE_STRATEGY_SET;
+    const mergeStrategySet = field === 'genres' || field === 'tags' ? GENRE_MERGE_STRATEGY_SET : MERGE_STRATEGY_SET;
     const mergeStrategy = mergeStrategySet.has(candidate.mergeStrategy as MetadataMergeStrategy)
       ? (candidate.mergeStrategy as MetadataMergeStrategy)
       : fallback.mergeStrategy;

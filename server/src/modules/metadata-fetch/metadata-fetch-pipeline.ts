@@ -771,6 +771,19 @@ export class MetadataFetchPipeline {
         continue;
       }
 
+      if (field === 'tags') {
+        // Tags have no blocklist or cap, and a book's tags always come from every listed provider that has some.
+        const { tags, sourceProvider } = this.mergeTags(fieldPreference.providers as MetadataProviderKey[], byProvider);
+        if (!tags.length) continue;
+
+        const resolvedTags = this.resolveTagWrite(tags, existing[field], mergeStrategy);
+        if (resolvedTags) {
+          result.tags = resolvedTags;
+          if (sourceProvider) sources.tags = sourceProvider;
+        }
+        continue;
+      }
+
       if (field === 'communityRating') {
         const existingValue = existing[field];
         if (mergeStrategy === 'fillMissing' && !this.isMissing(existingValue)) continue;
@@ -1023,6 +1036,35 @@ export class MetadataFetchPipeline {
     }
 
     return { genres: applyGenreFetchOptions(merged, blockedGenreTokens, maxCount), sourceProvider };
+  }
+
+  private mergeTags(providerKeys: MetadataProviderKey[], byProvider: Map<string, MetadataCandidate>) {
+    const seen = new Set<string>();
+    const merged: string[] = [];
+    let sourceProvider: MetadataProviderKey | undefined;
+
+    for (const providerKey of providerKeys) {
+      for (const raw of byProvider.get(providerKey)?.tags ?? []) {
+        const tag = raw.trim();
+        const token = tag.toLocaleLowerCase();
+        if (!tag || seen.has(token)) continue;
+        seen.add(token);
+        merged.push(tag);
+        sourceProvider ??= providerKey;
+      }
+    }
+
+    return { tags: merged, sourceProvider };
+  }
+
+  private resolveTagWrite(fetchedTags: string[], existingValue: unknown, mergeStrategy: MetadataMergeStrategy): string[] | undefined {
+    if (mergeStrategy === 'fillMissing') return this.isMissing(existingValue) ? fetchedTags : undefined;
+    if (mergeStrategy !== 'mergeExisting') return fetchedTags;
+
+    const existingTags = Array.isArray(existingValue) ? existingValue.filter((value): value is string => typeof value === 'string') : [];
+    const known = new Set(existingTags.map((tag) => tag.trim().toLocaleLowerCase()));
+    const merged = [...existingTags, ...fetchedTags.filter((tag) => !known.has(tag.toLocaleLowerCase()))];
+    return this.arraysEqual(merged, existingTags) ? undefined : merged;
   }
 
   private resolveGenreWrite(

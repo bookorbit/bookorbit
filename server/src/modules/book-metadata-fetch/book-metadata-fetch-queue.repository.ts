@@ -24,6 +24,7 @@ import {
   bookMetadata,
   bookMetadataFetchQueue,
   bookNarrators,
+  bookTags,
   books,
   libraries,
 } from '../../db/schema';
@@ -520,6 +521,8 @@ export class BookMetadataFetchQueueRepository {
         return sql`NOT EXISTS (SELECT 1 FROM ${bookAuthors} WHERE ${bookAuthors.bookId} = ${bookMetadata.bookId})`;
       case 'genres':
         return sql`NOT EXISTS (SELECT 1 FROM ${bookGenres} WHERE ${bookGenres.bookId} = ${bookMetadata.bookId})`;
+      case 'tags':
+        return sql`NOT EXISTS (SELECT 1 FROM ${bookTags} WHERE ${bookTags.bookId} = ${bookMetadata.bookId})`;
       // Mirrors `BookMetadataFetchEligibilityService.isFieldMissing`: only a book with audio can lack these.
       case 'narrators':
         return sql`(${coverMediaSql(bookMetadata.bookId).hasAudio} AND NOT EXISTS (SELECT 1 FROM ${bookNarrators} WHERE ${bookNarrators.bookId} = ${bookMetadata.bookId}))`;

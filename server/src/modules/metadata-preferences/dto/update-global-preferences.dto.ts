@@ -77,7 +77,7 @@ export class IsFieldPreferencesMapConstraint implements ValidatorConstraintInter
       if (!knownFields.has(field)) return false;
       const instance = plainToInstance(FieldPreferenceDto, v);
       if (validateSync(instance).length > 0) return false;
-      if (field !== 'genres' && instance.mergeStrategy === 'mergeExisting') return false;
+      if (field !== 'genres' && field !== 'tags' && instance.mergeStrategy === 'mergeExisting') return false;
     }
     return true;
   }

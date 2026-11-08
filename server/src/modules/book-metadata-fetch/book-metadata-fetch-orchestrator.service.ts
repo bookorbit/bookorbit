@@ -233,7 +233,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         return NO_OUTBOUND;
       }
 
-      const { book, authorRows, genreRows, narratorRows, communityRatingRows, fileRows } = found;
+      const { book, authorRows, genreRows, tagRows, narratorRows, communityRatingRows, fileRows } = found;
       const meta = book.book_metadata;
       const libraryId = book.books.libraryId;
 
@@ -307,6 +307,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
+        tags: tagRows.map((t) => t.name),
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
         narrators: narratorRows.map((n) => n.name),
@@ -327,7 +328,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         cacheDirective: { policy: ignoreCache ? 'refresh' : 'default', allowFallback: true },
       });
 
-      const coverDownloads = await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, narratorRows);
+      const coverDownloads = await this.persistResolved(bookId, resolved, providerIds, authorRows, genreRows, tagRows, narratorRows);
 
       await this.scoreService.calculateAndSave(bookId);
 
@@ -361,6 +362,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     providerIds: Partial<Record<MetadataProviderKey, string>>,
     existingAuthorRows: { name: string }[],
     existingGenreRows: { name: string }[],
+    existingTagRows: { name: string }[],
     existingNarratorRows: { name: string }[],
   ): Promise<number> {
     const {
@@ -475,6 +477,13 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       }
     }
 
+    const resolvedTags = this.asStringArray(filteredResolved.tags);
+    if (resolvedTags !== undefined) {
+      if (resolvedTags.length > 0 || existingTagRows.length > 0) {
+        await this.metadataService.replaceTags(bookId, resolvedTags);
+      }
+    }
+
     const resolvedNarrators = this.asStringArray(filteredResolved.narrators);
     if (resolvedNarrators !== undefined) {
       const names = resolvedNarrators;
@@ -518,7 +527,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   }
 
   private toEligibilityData(found: BookReadResult, coverState: CoverFetchState) {
-    const { book, authorRows, genreRows, narratorRows, communityRatingRows } = found;
+    const { book, authorRows, genreRows, tagRows, narratorRows, communityRatingRows } = found;
     const meta = book.book_metadata;
     return {
       metadataScore: meta?.metadataScore ?? null,
@@ -540,6 +549,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       hasAudioCover: coverState.filled.audio,
       hasAuthors: authorRows.length > 0,
       hasGenres: genreRows.length > 0,
+      hasTags: tagRows.length > 0,
       hasNarrators: narratorRows.length > 0,
       durationSeconds: meta?.durationSeconds ?? null,
       abridged: meta?.abridged ?? null,

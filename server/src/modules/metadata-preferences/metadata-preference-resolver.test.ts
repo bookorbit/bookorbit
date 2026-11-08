@@ -25,6 +25,11 @@ describe('MetadataPreferenceResolver', () => {
     }
   });
 
+  it('starts the tags rule empty and merging, since no built-in provider fills tags', () => {
+    const { fields } = resolver.getDefaultPreferences();
+    expect(fields.tags).toEqual({ enabled: true, providers: [], mergeStrategy: 'mergeExisting' });
+  });
+
   it('builds defaults for every field with expected baseline strategies', () => {
     const defaults = resolver.getDefaultPreferences();
 

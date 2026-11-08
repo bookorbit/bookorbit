@@ -7,7 +7,7 @@ export const FIELD_GROUPS: { id: string; fields: MetadataField[] }[] = [
   { id: 'contributors', fields: ['authors'] },
   { id: 'publication', fields: ['publisher', 'isbn', 'publishedYear', 'language', 'pageCount', 'communityRating'] },
   { id: 'series', fields: ['seriesName', 'seriesIndex'] },
-  { id: 'classification', fields: ['genres'] },
+  { id: 'classification', fields: ['genres', 'tags'] },
   { id: 'audiobook', fields: ['narrators', 'duration', 'abridged'] },
 ]
 

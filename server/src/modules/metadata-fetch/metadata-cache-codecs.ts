@@ -28,6 +28,7 @@ const CANDIDATE_FIELDS: Record<keyof MetadataCandidate, CacheFieldKind> = {
   seriesTotalBooks: 'number',
   seriesMemberships: 'object[]',
   genres: 'string[]',
+  tags: 'string[]',
   coverUrl: 'string',
   coverShape: 'string',
   coverWidth: 'number',

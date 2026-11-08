@@ -33,6 +33,7 @@ const SPEC_BOOK_FIELDS: MetadataField[] = [
   'seriesName',
   'seriesIndex',
   'genres',
+  'tags',
 ]
 const SPEC_AUDIOBOOK_FIELDS: MetadataField[] = ['audioCover', 'narrators', 'duration']
 
