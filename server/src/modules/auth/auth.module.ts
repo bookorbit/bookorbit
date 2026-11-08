@@ -1,18 +1,20 @@
 import { AuthSessionRepository } from './auth-session.repository';
 import { AuthSessionService } from './auth-session.service';
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import type { StringValue } from 'ms';
 
 import { CommonModule } from '../../common/common.module';
+import { ApiKeyModule } from '../api-key/api-key.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
+import { AuthenticatorService } from './authenticator.service';
 import { JwtStrategy } from './jwt.strategy';
 import { MagicLinkRepository } from './magic-link.repository';
 import { MagicLinkService } from './magic-link.service';
@@ -28,6 +30,11 @@ import { OidcStateService } from './oidc/oidc-state.service';
 import { OidcTokenClientService } from './oidc/oidc-token-client.service';
 import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
 
+/**
+ * Global so any gateway can authenticate a socket. Importing it instead would close an import cycle
+ * through EmailModule and NotificationModule.
+ */
+@Global()
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
@@ -43,10 +50,12 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
     AppSettingsModule,
     AuditModule,
     EmailModule,
+    ApiKeyModule,
   ],
   controllers: [AuthController],
   providers: [
     AuthService,
+    AuthenticatorService,
     AuthSessionRepository,
     AuthSessionService,
     JwtStrategy,
@@ -64,6 +73,6 @@ import { OidcTokenValidatorService } from './oidc/oidc-token-validator.service';
     OidcCleanupService,
     OidcCleanupJob,
   ],
-  exports: [AuthService],
+  exports: [AuthService, AuthenticatorService],
 })
 export class AuthModule {}

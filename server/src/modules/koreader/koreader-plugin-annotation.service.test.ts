@@ -31,20 +31,23 @@ function makeAnnotation(overrides: Record<string, unknown> = {}) {
   } as AnnotationsUploadDto['books'][number]['annotations'][number];
 }
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderPluginAnnotationService', () => {
-  let koreaderRepo: { getAccessibleLibraryIds: ReturnType<typeof vi.fn>; resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
+  let koreaderRepo: { resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
   let annotationSync: {
     ingestDeviceAnnotations: ReturnType<typeof vi.fn>;
   };
   let service: KoreaderPluginAnnotationService;
 
   beforeEach(() => {
+    accessibleLibraryIds = vi.fn().mockResolvedValue([1]);
     vi.restoreAllMocks();
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     koreaderRepo = {
-      getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
     };
     annotationSync = {
@@ -55,7 +58,11 @@ describe('KoreaderPluginAnnotationService', () => {
         ),
     };
 
-    service = new KoreaderPluginAnnotationService(koreaderRepo as unknown as KoreaderRepository, annotationSync as unknown as AnnotationSyncService);
+    service = new KoreaderPluginAnnotationService(
+      koreaderRepo as unknown as KoreaderRepository,
+      annotationSync as unknown as AnnotationSyncService,
+      libraryScopeStub() as never,
+    );
   });
 
   it('routes matched books through the sync ingest with mapped fields', async () => {

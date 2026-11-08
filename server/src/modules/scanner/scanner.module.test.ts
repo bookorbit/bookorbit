@@ -36,8 +36,8 @@ describe('ScannerModule', () => {
     expect(imports[5]).toBe(CommonModule);
     expect(imports[6]).toEqual(expect.objectContaining({ forwardRef: expect.any(Function) }));
     expect(imports[7]).toEqual(expect.objectContaining({ forwardRef: expect.any(Function) }));
-    expect(imports[8]).toEqual(expect.objectContaining({ module: expect.any(Function) }));
-    expect(imports[9]).toBe(BookConsolidationModule);
+    expect(imports[8]).toBe(BookConsolidationModule);
+    expect(imports).toHaveLength(9);
 
     expect(Reflect.getMetadata('controllers', ScannerModule)).toEqual([ScannerController]);
     expect(Reflect.getMetadata('providers', ScannerModule)).toEqual([

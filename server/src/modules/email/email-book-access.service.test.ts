@@ -26,7 +26,7 @@ describe('EmailBookAccessService', () => {
 
   let service: EmailBookAccessService;
   let bookReadService: { findLibraryIdsByBookIds: ReturnType<typeof vi.fn> };
-  let libraryService: { verifyUserAccess: ReturnType<typeof vi.fn> };
+  let libraryService: { verifyAccess: ReturnType<typeof vi.fn> };
 
   beforeEach(() => {
     bookReadService = {
@@ -34,7 +34,7 @@ describe('EmailBookAccessService', () => {
       checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
     };
     libraryService = {
-      verifyUserAccess: vi.fn().mockResolvedValue(undefined),
+      verifyAccess: vi.fn().mockResolvedValue(undefined),
     };
     service = new EmailBookAccessService(bookReadService as unknown as BookReadService, libraryService as unknown as LibraryService);
   });
@@ -48,9 +48,9 @@ describe('EmailBookAccessService', () => {
     await service.assertUserCanAccessBooks([1, 2, 1], user);
 
     expect(bookReadService.findLibraryIdsByBookIds).toHaveBeenCalledWith([1, 2]);
-    expect(libraryService.verifyUserAccess).toHaveBeenCalledTimes(2);
-    expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 10, user.isSuperuser);
-    expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 11, user.isSuperuser);
+    expect(libraryService.verifyAccess).toHaveBeenCalledTimes(2);
+    expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: user.isSuperuser }), 10);
+    expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: user.isSuperuser }), 11);
   });
 
   it('throws NotFoundException when any requested book is missing', async () => {
@@ -61,7 +61,7 @@ describe('EmailBookAccessService', () => {
 
   it('propagates ForbiddenException from library access checks', async () => {
     bookReadService.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 10 }]);
-    libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
+    libraryService.verifyAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
 
     await expect(service.assertUserCanAccessBook(1, user)).rejects.toThrow(ForbiddenException);
   });

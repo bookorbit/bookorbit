@@ -58,20 +58,23 @@ function makeExchangeDto(books: AnnotationExchangeDto['books']): AnnotationExcha
   return { deviceId: DEVICE_ID, deviceModel: 'Kobo', pluginVersion: '0.4.0', books } as AnnotationExchangeDto;
 }
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderAnnotationExchangeService', () => {
-  let koreaderRepo: { getAccessibleLibraryIds: ReturnType<typeof vi.fn>; resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
+  let koreaderRepo: { resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
   // Loose mock typing: format-dependent mockImplementations return promises.
   let annotationSync: Record<string, any>;
   let positionConverter: { version: number; cfiToXpointer: ReturnType<typeof vi.fn>; xpointerToCfi: ReturnType<typeof vi.fn> };
   let service: KoreaderAnnotationExchangeService;
 
   beforeEach(() => {
+    accessibleLibraryIds = vi.fn().mockResolvedValue([1]);
     vi.restoreAllMocks();
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     koreaderRepo = {
-      getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
     };
     annotationSync = {
@@ -104,6 +107,7 @@ describe('KoreaderAnnotationExchangeService', () => {
       koreaderRepo as unknown as KoreaderRepository,
       annotationSync as unknown as AnnotationSyncService,
       positionConverter as unknown as PositionConverterService,
+      libraryScopeStub() as never,
     );
   });
 

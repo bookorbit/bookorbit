@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -21,6 +22,7 @@ export class KoreaderPluginAnnotationService {
   constructor(
     private readonly koreaderRepo: KoreaderRepository,
     private readonly annotationSync: AnnotationSyncService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   /** Legacy one-way upload used by plugin 0.3.x; the 0.4+ exchange endpoint supersedes it. */
@@ -36,7 +38,7 @@ export class KoreaderPluginAnnotationService {
         throw new BadRequestException(`Too many annotations in one request (max ${MAX_ANNOTATIONS_PER_REQUEST})`);
       }
 
-      const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 

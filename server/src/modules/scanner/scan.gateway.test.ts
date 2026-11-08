@@ -1,24 +1,26 @@
 import type { BookMergedEvent, BookMissingEvent, BookTransferredEvent, CoverRefreshedEvent, ScanProgressEvent } from '@bookorbit/types';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 
 import { ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, AchievementEventsService } from '../achievement/achievement-events.service';
 import { ScanGateway } from './scan.gateway';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateSessionUser: vi.fn() };
   const scanJobStore = { get: vi.fn(), isRunning: vi.fn() };
-  const scannerRepository = { hasLibraryAccess: vi.fn().mockResolvedValue(false) };
+  const scopeRepo = { findGrantedLevel: vi.fn().mockResolvedValue(null) };
   const achievementEvents = new AchievementEventsService();
   const appConfiguration = { appUrl: 'http://localhost:6263' };
   const gateway = new ScanGateway(
-    jwtService as any,
-    authService as any,
+    new AuthenticatorService(jwtService as never, authService as never) as any,
     scanJobStore as any,
-    scannerRepository as any,
+    {} as any,
     achievementEvents,
+    new LibraryScopeService(scopeRepo as any),
     appConfiguration as any,
   );
-  return { gateway, jwtService, authService, scanJobStore, scannerRepository, achievementEvents };
+  return { gateway, jwtService, authService, scanJobStore, scopeRepo, achievementEvents };
 }
 
 const reader = { id: 42, username: 'reader', isSuperuser: false };
@@ -215,14 +217,14 @@ describe('subscription lifecycle', () => {
 
 describe('subscribe:library', () => {
   it('joins the room and sends the in-flight scan snapshot to a user with access to the library', async () => {
-    const { gateway, scanJobStore, scannerRepository } = makeGateway();
-    scannerRepository.hasLibraryAccess.mockResolvedValue(true);
+    const { gateway, scanJobStore, scopeRepo } = makeGateway();
+    scopeRepo.findGrantedLevel.mockResolvedValue('viewer');
     scanJobStore.get.mockReturnValue(runningScan);
     const client = subscriber(reader);
 
     await gateway.handleSubscribeLibrary(client, 88);
 
-    expect(scannerRepository.hasLibraryAccess).toHaveBeenCalledWith(42, 88);
+    expect(scopeRepo.findGrantedLevel).toHaveBeenCalledWith(42, 88);
     expect(client.join).toHaveBeenCalledWith('library:88');
     expect(client.emit).toHaveBeenCalledWith('scan:progress', {
       jobId: 9,
@@ -237,8 +239,8 @@ describe('subscribe:library', () => {
   });
 
   it('subscribes without emitting progress when no scan entry exists', async () => {
-    const { gateway, scanJobStore, scannerRepository } = makeGateway();
-    scannerRepository.hasLibraryAccess.mockResolvedValue(true);
+    const { gateway, scanJobStore, scopeRepo } = makeGateway();
+    scopeRepo.findGrantedLevel.mockResolvedValue('viewer');
     scanJobStore.get.mockReturnValue(undefined);
     const client = subscriber(reader);
 
@@ -249,56 +251,56 @@ describe('subscribe:library', () => {
   });
 
   it('lets a superuser into any library without an access row', async () => {
-    const { gateway, scannerRepository } = makeGateway();
+    const { gateway, scopeRepo } = makeGateway();
     const client = subscriber(admin);
 
     await gateway.handleSubscribeLibrary(client, 5);
 
-    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
     expect(client.join).toHaveBeenCalledWith('library:5');
   });
 
   it('keeps a user out of a library they cannot read, so its book cards and scan counts never reach them', async () => {
-    const { gateway, scanJobStore, scannerRepository } = makeGateway();
-    scannerRepository.hasLibraryAccess.mockResolvedValue(false);
+    const { gateway, scanJobStore, scopeRepo } = makeGateway();
+    scopeRepo.findGrantedLevel.mockResolvedValue(null);
     scanJobStore.get.mockReturnValue(runningScan);
     const client = subscriber(reader);
 
     await gateway.handleSubscribeLibrary(client, 3);
 
-    expect(scannerRepository.hasLibraryAccess).toHaveBeenCalledWith(42, 3);
+    expect(scopeRepo.findGrantedLevel).toHaveBeenCalledWith(42, 3);
     expect(client.join).not.toHaveBeenCalled();
     expect(client.emit).not.toHaveBeenCalled();
   });
 
   it('ignores a socket that never authenticated', async () => {
-    const { gateway, scanJobStore, scannerRepository } = makeGateway();
+    const { gateway, scanJobStore, scopeRepo } = makeGateway();
     scanJobStore.get.mockReturnValue(runningScan);
     const client = subscriber();
 
     await gateway.handleSubscribeLibrary(client, 3);
 
-    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
     expect(client.join).not.toHaveBeenCalled();
     expect(client.emit).not.toHaveBeenCalled();
   });
 
   it.each([0, -1, 1.5, Number.NaN, '7', null, undefined, { id: 7 }])('ignores the malformed library id %s without querying', async (libraryId) => {
-    const { gateway, scannerRepository } = makeGateway();
+    const { gateway, scopeRepo } = makeGateway();
     const client = subscriber(admin);
 
     await gateway.handleSubscribeLibrary(client, libraryId as never);
 
-    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
     expect(client.join).not.toHaveBeenCalled();
   });
 
   it('holds a subscription that arrives mid-handshake until the token check finishes, then honours it', async () => {
-    const { gateway, jwtService, authService, scannerRepository } = makeGateway();
+    const { gateway, jwtService, authService, scopeRepo } = makeGateway();
     jwtService.verify.mockReturnValue({ sub: 42, ver: 3, sid: 11 });
     let finishSessionCheck!: (user: object) => void;
     authService.validateSessionUser.mockReturnValue(new Promise((done) => (finishSessionCheck = done)));
-    scannerRepository.hasLibraryAccess.mockResolvedValue(true);
+    scopeRepo.findGrantedLevel.mockResolvedValue('viewer');
     const client = { ...subscriber(), handshake: { auth: { token: 'valid' } }, disconnect: vi.fn() } as any;
 
     const connected = gateway.handleConnection(client);
@@ -315,7 +317,7 @@ describe('subscribe:library', () => {
   });
 
   it('drops a subscription that arrives mid-handshake when the handshake is refused', async () => {
-    const { gateway, jwtService, authService, scannerRepository } = makeGateway();
+    const { gateway, jwtService, authService, scopeRepo } = makeGateway();
     jwtService.verify.mockReturnValue({ sub: 42, ver: 3, sid: 11 });
     let finishSessionCheck!: (user: object | null) => void;
     authService.validateSessionUser.mockReturnValue(new Promise((done) => (finishSessionCheck = done)));
@@ -327,7 +329,7 @@ describe('subscribe:library', () => {
     await Promise.all([connected, subscribed]);
 
     expect(client.disconnect).toHaveBeenCalledTimes(1);
-    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
     expect(client.join).not.toHaveBeenCalled();
   });
 });

@@ -57,7 +57,7 @@ export class RecommendationService {
     try {
       const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
       if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-      await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, libraryId);
 
       const target = (await this.recRepo.getTargetBookData(bookId)) ?? this.createFallbackTarget();
       const embedding = target.embedding ?? (await this.embedder.embedBook(bookId));
@@ -131,7 +131,7 @@ export class RecommendationService {
     try {
       const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
       if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-      await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, libraryId);
 
       const series = await this.recRepo.getSeriesIdentity(bookId);
       if (!series) {
@@ -178,7 +178,7 @@ export class RecommendationService {
     try {
       const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
       if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-      await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, libraryId);
 
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
       const rows = await this.recRepo.findAuthorBooks(bookId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);

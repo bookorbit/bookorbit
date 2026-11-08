@@ -6,7 +6,7 @@ import type { CoverMedia } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookFiles, bookMetadata, books, userLibraryAccess } from '../../db/schema';
+import { bookFiles, bookMetadata, books } from '../../db/schema';
 import { coverMediaSql } from '../book-cover-store/book-cover-store.repository';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -76,15 +76,5 @@ export class MetadataFetchRepository {
       .where(and(eq(bookFiles.bookId, bookId), inArray(bookFiles.role, ['content', 'primary'])));
     const { hasEbook, hasAudio, ...stored } = row;
     return { ...stored, mediaFiles, coverMedia: { hasEbook: hasEbook === true, hasAudio: hasAudio === true } };
-  }
-
-  async hasLibraryAccess(userId: number, libraryId: number): Promise<boolean> {
-    const row = await this.db.query.userLibraryAccess.findFirst({
-      where: and(eq(userLibraryAccess.userId, userId), eq(userLibraryAccess.libraryId, libraryId)),
-      columns: {
-        userId: true,
-      },
-    });
-    return row != null;
   }
 }

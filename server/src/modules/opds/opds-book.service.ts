@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { SQL, type SQLWrapper, type Subquery, and, count, eq, exists, gt, inArray, not, notExists, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -18,7 +19,6 @@ import {
   libraries,
   readingProgress,
   userBookStatus,
-  userLibraryAccess,
 } from '../../db/schema';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
 import { isAudioFormat, type ContentFilterRules, type GroupRule } from '@bookorbit/types';
@@ -299,30 +299,16 @@ export class OpdsBookService {
     @Inject(DB) private readonly db: Db,
     private readonly queryBuilder: BookQueryBuilder,
     private readonly collectionRepository: OpdsCollectionRepository,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async getAccessibleLibraryIds(userId: number, isSuperuser = false): Promise<number[]> {
-    if (isSuperuser) {
-      const rows = await this.db.select({ id: libraries.id }).from(libraries);
-      return rows.map((r) => r.id);
-    }
-    const rows = await this.db.select({ libraryId: userLibraryAccess.libraryId }).from(userLibraryAccess).where(eq(userLibraryAccess.userId, userId));
-    return rows.map((r) => r.libraryId);
+    return this.libraryScope.visibleIds({ id: userId, isSuperuser });
   }
 
   async getAccessibleLibraries(userId: number, isSuperuser = false) {
-    if (isSuperuser) {
-      return this.db
-        .select({
-          id: libraries.id,
-          name: libraries.name,
-          bookCount: sql<number>`count(${books.id})::int`,
-        })
-        .from(libraries)
-        .leftJoin(books, and(eq(books.libraryId, libraries.id), eq(books.status, 'present')))
-        .groupBy(libraries.id)
-        .orderBy(libraries.name);
-    }
+    const visible = await this.libraryScope.visibleIdsOrAll({ id: userId, isSuperuser });
+    if (visible !== null && visible.length === 0) return [];
     return this.db
       .select({
         id: libraries.id,
@@ -330,8 +316,8 @@ export class OpdsBookService {
         bookCount: sql<number>`count(${books.id})::int`,
       })
       .from(libraries)
-      .innerJoin(userLibraryAccess, and(eq(userLibraryAccess.libraryId, libraries.id), eq(userLibraryAccess.userId, userId)))
       .leftJoin(books, and(eq(books.libraryId, libraries.id), eq(books.status, 'present')))
+      .where(visible === null ? undefined : inArray(libraries.id, visible))
       .groupBy(libraries.id)
       .orderBy(libraries.name);
   }
@@ -1149,6 +1135,7 @@ export class OpdsBookService {
   async getUserCollections(userId: number, isSuperuser = false, contentFilters?: ContentFilterRules, options: CatalogVisibilityOptions = {}) {
     return this.collectionRepository.findVisibleForUser(
       userId,
+      await this.libraryScope.visibleIdsOrAll({ id: userId, isSuperuser }),
       isSuperuser,
       contentFilters,
       options.excludeAudioOnly ? [excludeAudioOnlyBooks()] : [],

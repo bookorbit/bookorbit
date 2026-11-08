@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 
+import { InteractiveOnly } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppAttestService } from './app-attest.service';
@@ -9,6 +10,7 @@ import { RegisterAppAttestKeyDto } from './dto/register-app-attest-key.dto';
 const ONE_MINUTE_MS = 60_000;
 
 @Controller('app-attest')
+@InteractiveOnly()
 export class AppAttestController {
   constructor(private readonly appAttest: AppAttestService) {}
 

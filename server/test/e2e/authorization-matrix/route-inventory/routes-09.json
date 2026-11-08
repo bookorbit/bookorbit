@@ -9,7 +9,8 @@
     "libraryAccess": ["'viewer'"],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/library/library.controller.ts",
@@ -21,7 +22,8 @@
     "libraryAccess": ["'viewer'"],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/library/library.controller.ts",
@@ -33,7 +35,8 @@
     "libraryAccess": ["'editor'"],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/library/library.controller.ts",
@@ -45,7 +48,8 @@
     "libraryAccess": ["'editor'"],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/library/library.controller.ts",
@@ -57,7 +61,8 @@
     "libraryAccess": ["'editor'"],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/user-preferences/user-preferences.controller.ts",
@@ -69,7 +74,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-preferences/user-preferences.controller.ts",
@@ -81,7 +87,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/user-preferences/user-preferences.controller.ts",
@@ -93,7 +100,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-preferences/user-preferences.controller.ts",
@@ -105,6 +113,7 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   }
 ]

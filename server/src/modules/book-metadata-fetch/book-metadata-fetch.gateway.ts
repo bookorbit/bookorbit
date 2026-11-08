@@ -1,16 +1,15 @@
-import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
-import { Permission, type AuthenticationMethod, type BookMetadataFetchStatusEvent } from '@bookorbit/types';
+import { Permission, type BookMetadataFetchStatusEvent } from '@bookorbit/types';
 import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';
-import { AuthService } from '../auth/auth.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 import { wsCorsOrigin } from '../../common/utils/ws-cors.utils';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 export const BOOK_METADATA_FETCH_STATUS_EVENT = 'book-metadata-fetch:status';
 
@@ -20,8 +19,7 @@ export class BookMetadataFetchGateway implements OnGatewayConnection, OnGatewayD
   private readonly logger = new Logger(BookMetadataFetchGateway.name);
 
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly authService: AuthService,
+    private readonly authenticator: AuthenticatorService,
     private readonly queueRepo: BookMetadataFetchQueueRepository,
     private readonly configService: BookMetadataFetchConfigService,
     private readonly session: BookMetadataFetchSessionService,
@@ -29,14 +27,7 @@ export class BookMetadataFetchGateway implements OnGatewayConnection, OnGatewayD
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new UnauthorizedException('No token provided');
-
-      const payload = this.jwtService.verify<{ sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }>(token, {
-        algorithms: ['HS256'],
-      });
-      const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
-      if (!user) throw new UnauthorizedException('User not found or token revoked');
+      const user = await this.authenticator.authenticateSocket(client);
 
       this.assertCanViewStatus(user);
       (client.data as { user?: RequestUser }).user = user;

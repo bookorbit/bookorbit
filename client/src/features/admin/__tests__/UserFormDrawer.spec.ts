@@ -42,6 +42,8 @@ function jsonResponse(body: unknown) {
 
 function stubApi(overrides: { grants?: UserLibraryGrant[]; filters?: unknown } = {}) {
   apiMock.mockImplementation(async (input: string) => {
+    if (input === '/api/v1/api-keys/settings') return jsonResponse({ enabled: true, maxLifetimeDays: null })
+    if (input.endsWith('/api-keys')) return jsonResponse([])
     if (input.endsWith('/library-access')) return jsonResponse(overrides.grants ?? [{ libraryId: 1, accessLevel: 'viewer' }])
     if (input.endsWith('/content-filters')) {
       return jsonResponse(overrides.filters ?? { includeTags: [], excludeTags: [], includeGenres: [], excludeGenres: [] })
@@ -355,5 +357,38 @@ describe('UserFormDrawer saving', () => {
     await remove?.trigger('click')
 
     expect(wrapper.emitted('delete')).toHaveLength(1)
+  })
+})
+
+describe('UserFormDrawer API keys', () => {
+  it('offers the section only to someone allowed to manage keys, and never on a shared account', async () => {
+    expect((await mountDrawer()).find('nav').text()).not.toContain('API keys')
+    expect((await mountDrawer({ canManageApiKeys: true })).find('nav').text()).toContain('API keys')
+    expect((await mountDrawer({ canManageApiKeys: true, user: { ...USER, provisioningMethod: 'shared' } })).find('nav').text()).not.toContain(
+      'API keys',
+    )
+  })
+
+  it("keeps an administrator's keys away from a manager who is not one", async () => {
+    const admin = { ...USER, isSuperuser: true }
+    expect((await mountDrawer({ canManageApiKeys: true, user: admin })).find('nav').text()).not.toContain('API keys')
+    expect((await mountDrawer({ canManageApiKeys: true, canManageSuperuser: true, user: admin })).find('nav').text()).toContain('API keys')
+  })
+
+  it("lists the person's keys and says why none can be issued without the permission", async () => {
+    const wrapper = await mountDrawer({ canManageApiKeys: true })
+    await openSection(wrapper, 'API keys')
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/users/7/api-keys', undefined)
+    expect(wrapper.find('[data-testid="api-keys-owner-not-permitted"]').exists()).toBe(true)
+    expect(wrapper.findAll('button').some((button) => button.text().includes('Issue key'))).toBe(false)
+  })
+
+  it('lets a key be issued once the person holds the permission', async () => {
+    const wrapper = await mountDrawer({ canManageApiKeys: true, user: { ...USER, permissions: [...USER.permissions, Permission.ApiKeys] } })
+    await openSection(wrapper, 'API keys')
+
+    expect(wrapper.find('[data-testid="api-keys-owner-not-permitted"]').exists()).toBe(false)
+    expect(wrapper.findAll('button').some((button) => button.text().includes('Issue key'))).toBe(true)
   })
 })

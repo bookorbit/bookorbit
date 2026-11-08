@@ -217,7 +217,7 @@ describe('EpubService', () => {
     findPrimaryFilesByBookIds: vi.fn(),
   };
   const libraryService = {
-    verifyUserAccess: vi.fn(),
+    verifyAccess: vi.fn(),
   };
   let service: EpubService;
 
@@ -229,7 +229,7 @@ describe('EpubService', () => {
     service = module.get(EpubService);
     bookReadService.findLibraryIdByBookId.mockResolvedValue(3);
     bookReadService.findPrimaryFilesByBookIds.mockResolvedValue([{ format: 'epub', absolutePath: '/books/book.epub', sizeBytes: null }]);
-    libraryService.verifyUserAccess.mockResolvedValue(undefined);
+    libraryService.verifyAccess.mockResolvedValue(undefined);
     mockStat.mockResolvedValue({ mtimeMs: 100 } as Awaited<ReturnType<typeof stat>>);
     mockOpenRange.mockImplementation(async (_path, entry, start, end) => Readable.from([(await entry.buffer()).subarray(start, end + 1)]));
   });
@@ -329,7 +329,7 @@ describe('EpubService', () => {
         ],
       }),
     );
-    expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(10, 3, false);
+    expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: 10, isSuperuser: false }), 3);
   });
 
   it('falls back to NCX TOC when nav parsing fails', async () => {

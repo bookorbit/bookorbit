@@ -11,8 +11,8 @@ const user = {
 } as unknown as RequestUser;
 
 function setup() {
+  const libraryScope = { visibleIdsOrAll: vi.fn(() => Promise.resolve([1, 2])) };
   const repo = {
-    getAccessibleLibraryIds: vi.fn(() => Promise.resolve([1, 2])),
     list: vi.fn(() => Promise.resolve([])),
     count: vi.fn(() => Promise.resolve(0)),
     months: vi.fn(() => Promise.resolve([])),
@@ -42,7 +42,7 @@ function setup() {
   };
   const bookService = { bulkSetRating: vi.fn(() => Promise.resolve(undefined)) };
   const events = { on: vi.fn(), removeListener: vi.fn() };
-  const service = new ReadingHistoryService(repo as never, bookService as never, events as never);
+  const service = new ReadingHistoryService(repo as never, bookService as never, events as never, libraryScope as never);
   return { service, repo, bookService };
 }
 

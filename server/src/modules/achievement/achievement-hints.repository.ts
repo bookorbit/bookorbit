@@ -17,7 +17,6 @@ import {
   readingSessions,
   userBookRatings,
   userBookStatus,
-  userLibraryAccess,
   userReadingDailyStats,
 } from '../../db/schema';
 
@@ -27,6 +26,8 @@ type Db = NodePgDatabase<typeof schema>;
 export interface HintScope {
   userId: number;
   isSuperuser: boolean;
+  /** Libraries the requester may see, or null for every library. */
+  libraryIds: number[] | null;
   contentFilters?: ContentFilterRules;
 }
 
@@ -347,15 +348,8 @@ export class AchievementHintsRepository {
   /** Present books in libraries the user can open, minus anything their content filters hide. */
   private visibleTo(scope: HintScope): SQL {
     const clauses: SQL[] = [eq(books.status, 'present')];
-    if (!scope.isSuperuser) {
-      clauses.push(
-        inArray(
-          books.libraryId,
-          this.db.select({ libraryId: userLibraryAccess.libraryId }).from(userLibraryAccess).where(eq(userLibraryAccess.userId, scope.userId)),
-        ),
-      );
-      if (scope.contentFilters) clauses.push(...buildContentFilterClauses(scope.contentFilters, this.db));
-    }
+    if (scope.libraryIds !== null) clauses.push(scope.libraryIds.length === 0 ? sql`false` : inArray(books.libraryId, scope.libraryIds));
+    if (!scope.isSuperuser && scope.contentFilters) clauses.push(...buildContentFilterClauses(scope.contentFilters, this.db));
     return and(...clauses)!;
   }
 }

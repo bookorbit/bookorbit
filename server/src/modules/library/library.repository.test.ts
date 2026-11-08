@@ -257,12 +257,6 @@ describe('LibraryRepository', () => {
     expect(db.select).not.toHaveBeenCalled();
   });
 
-  it('hasUserAccess returns false when no access row exists', async () => {
-    (db.query.userLibraryAccess.findFirst as vi.Mock).mockResolvedValue(undefined);
-
-    await expect(repo.hasUserAccess(1, 2)).resolves.toBe(false);
-  });
-
   it('getStats throws when totalSizeBytes exceeds safe integer range', async () => {
     const countChain = {
       from: vi.fn().mockReturnValue({

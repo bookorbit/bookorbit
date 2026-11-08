@@ -60,7 +60,7 @@ function makeService() {
   };
 
   const libraryService = {
-    verifyUserAccess: vi.fn(),
+    verifyAccess: vi.fn(),
     findAccessibleLibraryIds: vi.fn().mockResolvedValue([100]),
   };
 
@@ -466,7 +466,7 @@ describe('CollectionService', () => {
 
       await service.addBooks(10, { bookIds: [7, 8] }, makeUser({ id: 42, isSuperuser: true }));
 
-      expect(libraryService.verifyUserAccess).not.toHaveBeenCalled();
+      expect(libraryService.verifyAccess).not.toHaveBeenCalled();
       expect(collectionRepo.addBooks).toHaveBeenCalledWith(10, [7, 8]);
     });
 

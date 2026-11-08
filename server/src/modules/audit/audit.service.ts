@@ -3,6 +3,7 @@ import { getAuditCategory, type AuditLogSummary, type AuditSignInPage } from '@b
 
 import { APP_SETTING_KEYS, DEFAULT_AUDIT_RETENTION_DAYS } from '../../common/constants/app-settings.constants';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { currentApiKeyActor } from './api-key-audit-context';
 import { AUDIT_EVENT, AuditEventPayload, AuditEventsService } from './audit-events.service';
 import { AuditRepository, AuditLogFilters, AuditLogQuery, AuditSignInQuery, hasTargetLabels } from './audit.repository';
 
@@ -138,12 +139,16 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
   }
 
   record(payload: AuditEventPayload): Promise<void> {
+    // Read while still inside the emitting request's async context.
+    const apiKey = currentApiKeyActor();
     const needsLabel = payload.resourceLabel === undefined && hasTargetLabels(payload.resource) && Number.isInteger(payload.resourceId);
-    if (!needsLabel) return this.insert(payload, payload.resourceLabel ?? null);
-    return this.targetLabels.resolveForWrite(payload.resource, payload.resourceId).then((label) => this.insert(payload, label));
+    if (!needsLabel) return this.insert(payload, payload.resourceLabel ?? null, apiKey);
+    return this.targetLabels.resolveForWrite(payload.resource, payload.resourceId).then((label) => this.insert(payload, label, apiKey));
   }
 
-  private insert(payload: AuditEventPayload, resourceLabel: string | null): Promise<void> {
+  private insert(payload: AuditEventPayload, resourceLabel: string | null, apiKey = currentApiKeyActor()): Promise<void> {
+    const apiKeyId = payload.apiKeyId ?? apiKey?.keyId ?? null;
+    const meta = apiKey && payload.apiKeyId === undefined ? { ...(payload.meta ?? {}), viaApiKey: apiKey.keyName } : (payload.meta ?? null);
     return this.auditRepository.insert({
       userId: payload.userId,
       actorUsername: payload.actorUsername,
@@ -153,7 +158,8 @@ export class AuditService implements OnModuleInit, OnModuleDestroy {
       resourceLabel,
       description: payload.description,
       ip: payload.ip ?? null,
-      meta: payload.meta ?? null,
+      meta,
+      apiKeyId,
     });
   }
 

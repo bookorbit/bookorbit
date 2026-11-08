@@ -3,7 +3,7 @@ import { ExecutionContext, ForbiddenException, UnauthorizedException } from '@ne
 import { ALLOW_DEFAULT_PASSWORD_KEY } from '../decorators/allow-default-password.decorator';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 import type { RequestUser } from '../types/request-user';
-import { JwtAuthGuard } from './jwt-auth.guard';
+import { JwtAuthGuard, presentedApiKey } from './jwt-auth.guard';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
@@ -27,15 +27,21 @@ function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
   };
 }
 
-function makeContext(type: 'http' | 'ws' = 'http') {
+const KEY = 'bok_' + 'a'.repeat(49);
+
+function makeContext(type: 'http' | 'ws' = 'http', request: Record<string, unknown> = { headers: {} }) {
   return {
     getType: () => type,
     getHandler: vi.fn(),
     getClass: vi.fn(),
     switchToHttp: () => ({
-      getRequest: () => ({ method: 'POST', url: '/api/v1/somewhere' }),
+      getRequest: () => ({ method: 'POST', url: '/api/v1/somewhere', ip: '10.0.0.9', ...request }),
     }),
   } as unknown as ExecutionContext;
+}
+
+function makeGuard(reflector: unknown = { getAllAndOverride: vi.fn() }, authenticator: unknown = { authenticateApiKey: vi.fn() }) {
+  return new JwtAuthGuard(reflector as never, authenticator as never);
 }
 
 describe('JwtAuthGuard', () => {
@@ -46,47 +52,68 @@ describe('JwtAuthGuard', () => {
     vi.restoreAllMocks();
   });
 
-  it('lets gateway messages through without asking passport, which would read headers a socket does not have', () => {
+  it('lets gateway messages through without asking passport, which would read headers a socket does not have', async () => {
     const passport = passportCanActivate().mockReturnValue(false);
-    const reflector = { getAllAndOverride: vi.fn() };
-    const guard = new JwtAuthGuard(reflector as never);
+    const guard = makeGuard();
 
-    expect(guard.canActivate(makeContext('ws'))).toBe(true);
+    await expect(guard.canActivate(makeContext('ws'))).resolves.toBe(true);
     expect(passport).not.toHaveBeenCalled();
   });
 
-  it('still authenticates every non-public HTTP request through passport', () => {
-    const passport = passportCanActivate().mockReturnValue(false);
-    const reflector = { getAllAndOverride: vi.fn().mockReturnValue(undefined) };
-    const guard = new JwtAuthGuard(reflector as never);
-    const context = makeContext('http');
+  it('still authenticates every non-public HTTP request through passport', async () => {
+    const passport = passportCanActivate().mockResolvedValue(false);
+    const guard = makeGuard({ getAllAndOverride: vi.fn().mockReturnValue(undefined) });
+    const context = makeContext('http', { headers: { authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig' } });
 
-    expect(guard.canActivate(context)).toBe(false);
+    await expect(guard.canActivate(context)).resolves.toBe(false);
     expect(passport).toHaveBeenCalledWith(context);
   });
 
-  it('returns true in canActivate for @Public routes', () => {
+  it('returns true in canActivate for @Public routes without reading any credential', async () => {
     const reflector = {
       getAllAndOverride: vi.fn((key: string) => {
         if (key === IS_PUBLIC_KEY) return true;
         return undefined;
       }),
     };
-    const guard = new JwtAuthGuard(reflector as never);
+    const authenticator = { authenticateApiKey: vi.fn() };
+    const guard = makeGuard(reflector, authenticator);
 
-    expect(guard.canActivate(makeContext())).toBe(true);
+    await expect(guard.canActivate(makeContext('http', { headers: { 'x-api-key': KEY } }))).resolves.toBe(true);
+    expect(authenticator.authenticateApiKey).not.toHaveBeenCalled();
+  });
+
+  it('authenticates an API key itself and skips passport and the default-password gate', async () => {
+    const passport = passportCanActivate();
+    const keyUser = makeUser({ isDefaultPassword: false, authenticationMethod: 'api_key' });
+    const authenticator = { authenticateApiKey: vi.fn().mockResolvedValue(keyUser) };
+    const guard = makeGuard({ getAllAndOverride: vi.fn() }, authenticator);
+    const request: Record<string, unknown> = { headers: { authorization: `Bearer ${KEY}` } };
+
+    await expect(guard.canActivate(makeContext('http', request))).resolves.toBe(true);
+    expect(authenticator.authenticateApiKey).toHaveBeenCalledWith(KEY, '10.0.0.9');
+    expect(passport).not.toHaveBeenCalled();
+  });
+
+  it('refuses two credentials that disagree instead of choosing one', async () => {
+    const authenticator = { authenticateApiKey: vi.fn() };
+    const guard = makeGuard({ getAllAndOverride: vi.fn() }, authenticator);
+    const request = { headers: { 'x-api-key': KEY, authorization: 'Bearer eyJhbGciOiJIUzI1NiJ9.e30.sig' } };
+
+    await expect(guard.canActivate(makeContext('http', request))).rejects.toBeInstanceOf(UnauthorizedException);
+    expect(authenticator.authenticateApiKey).not.toHaveBeenCalled();
   });
 
   it('throws UnauthorizedException when passport strategy returns an error', () => {
     const reflector = { getAllAndOverride: vi.fn() };
-    const guard = new JwtAuthGuard(reflector as never);
+    const guard = makeGuard(reflector);
 
     expect(() => guard.handleRequest(new Error('boom'), makeUser(), undefined, makeContext())).toThrow(UnauthorizedException);
   });
 
   it('throws UnauthorizedException when no authenticated user is present', () => {
     const reflector = { getAllAndOverride: vi.fn() };
-    const guard = new JwtAuthGuard(reflector as never);
+    const guard = makeGuard(reflector);
 
     expect(() => guard.handleRequest(undefined, undefined as never, undefined, makeContext())).toThrow(UnauthorizedException);
   });
@@ -98,7 +125,7 @@ describe('JwtAuthGuard', () => {
         return false;
       }),
     };
-    const guard = new JwtAuthGuard(reflector as never);
+    const guard = makeGuard(reflector);
 
     expect(() => guard.handleRequest(undefined, makeUser({ isDefaultPassword: true }), undefined, makeContext())).toThrow(ForbiddenException);
   });
@@ -110,7 +137,7 @@ describe('JwtAuthGuard', () => {
         return false;
       }),
     };
-    const guard = new JwtAuthGuard(reflector as never);
+    const guard = makeGuard(reflector);
     const user = makeUser({ isDefaultPassword: true });
 
     const result = guard.handleRequest(undefined, user, undefined, makeContext());
@@ -119,10 +146,27 @@ describe('JwtAuthGuard', () => {
 
   it('does not force a password change for an OIDC-authenticated session', () => {
     const reflector = { getAllAndOverride: vi.fn() };
-    const guard = new JwtAuthGuard(reflector as never);
+    const guard = makeGuard(reflector);
 
     expect(() =>
       guard.handleRequest(undefined, makeUser({ isDefaultPassword: true, authenticationMethod: 'oidc' }), undefined, makeContext()),
     ).not.toThrow();
+  });
+});
+
+describe('presentedApiKey', () => {
+  it('reads a key from either header and leaves session tokens to passport', () => {
+    expect(presentedApiKey({ 'x-api-key': KEY })).toEqual({ kind: 'key', token: KEY });
+    expect(presentedApiKey({ authorization: `Bearer ${KEY}` })).toEqual({ kind: 'key', token: KEY });
+    expect(presentedApiKey({ authorization: `bearer ${KEY}` })).toEqual({ kind: 'key', token: KEY });
+    expect(presentedApiKey({ authorization: 'Bearer eyJ.a.b' })).toEqual({ kind: 'none' });
+    expect(presentedApiKey({})).toEqual({ kind: 'none' });
+  });
+
+  it('accepts the same key in both headers and refuses anything that disagrees', () => {
+    expect(presentedApiKey({ 'x-api-key': KEY, authorization: `Bearer ${KEY}` })).toEqual({ kind: 'key', token: KEY });
+    expect(presentedApiKey({ 'x-api-key': KEY, authorization: 'Bearer eyJ.a.b' })).toEqual({ kind: 'conflict' });
+    expect(presentedApiKey({ 'x-api-key': KEY, authorization: 'Basic dTpw' })).toEqual({ kind: 'conflict' });
+    expect(presentedApiKey({ 'x-api-key': [KEY, KEY] as never })).toEqual({ kind: 'conflict' });
   });
 });

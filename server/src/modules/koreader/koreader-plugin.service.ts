@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 
@@ -117,6 +118,7 @@ export class KoreaderPluginService {
     private readonly userBookNoteService: UserBookNoteService,
     private readonly achievementEvents: AchievementEventsService,
     private readonly bookService: BookService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async matchCheck(user: RequestUser, dto: MatchCheckDto): Promise<MatchCheckResult> {
@@ -125,7 +127,7 @@ export class KoreaderPluginService {
       `[${MATCH_EVENT}] [start] userId=${user.id} deviceId=${dto.deviceId.slice(0, 8)} hashes=${dto.hashes.length} - match check started`,
     );
 
-    const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const hashes = [...new Set(dto.hashes.map((hash) => hash.toLowerCase()))];
     const resolved = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
     const linked = await this.linkRequestedFileHashes(user, hashes, resolved, this.buildCandidateMap(dto), accessibleLibraryIds);
@@ -159,7 +161,7 @@ export class KoreaderPluginService {
     );
 
     try {
-      const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 
@@ -232,7 +234,7 @@ export class KoreaderPluginService {
     );
 
     try {
-      const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
       const hashes = [...new Set(dto.items.map((item) => item.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 
@@ -297,7 +299,7 @@ export class KoreaderPluginService {
     });
     await this.koreaderRepo.restoreDevice(user.id, dto.deviceId);
 
-    const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const libraryVersion = await this.computeLibraryVersion(user.id, accessibleLibraryIds);
 
     this.logger.log(
@@ -310,7 +312,7 @@ export class KoreaderPluginService {
   // Snapshot token for anything that must notice a library change: bulk
   // manifest cursors bind to it, and match freshness invalidates on it.
   async getLibraryVersion(userId: number): Promise<string> {
-    const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(userId);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAllForUserId(userId);
     return this.computeLibraryVersion(userId, accessibleLibraryIds);
   }
 

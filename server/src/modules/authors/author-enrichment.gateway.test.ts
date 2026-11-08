@@ -2,6 +2,7 @@ import { AuthorEnrichmentGateway } from './author-enrichment.gateway';
 import { AUTHOR_ENRICHMENT_STATUS_EVENT } from './author-enrichment.gateway';
 import { Permission } from '@bookorbit/types';
 import { WS_UNAUTHORIZED_EVENT } from '../../common/utils/ws-auth.utils';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
@@ -12,8 +13,7 @@ function makeGateway() {
   const appConfiguration = { appUrl: 'http://localhost:6263' };
 
   const gateway = new AuthorEnrichmentGateway(
-    jwtService as any,
-    authService as any,
+    new AuthenticatorService(jwtService as never, authService as never) as any,
     queueRepo as any,
     enrichmentConfig as any,
     session as any,

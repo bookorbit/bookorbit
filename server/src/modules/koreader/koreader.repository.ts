@@ -683,20 +683,6 @@ export class KoreaderRepository {
     return result.rows[0] ?? null;
   }
 
-  async getAccessibleLibraryIds(userId: number): Promise<number[] | null> {
-    const user = await this.db.query.users.findFirst({
-      where: eq(schema.users.id, userId),
-      columns: { isSuperuser: true },
-    });
-    if (user?.isSuperuser) return null;
-
-    const rows = await this.db
-      .select({ libraryId: schema.userLibraryAccess.libraryId })
-      .from(schema.userLibraryAccess)
-      .where(eq(schema.userLibraryAccess.userId, userId));
-    return rows.map((r) => r.libraryId);
-  }
-
   async upsertDeviceProgress(data: {
     bookFileId: number;
     userId: number;

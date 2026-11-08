@@ -20,6 +20,7 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 import { AllowDefaultPassword } from '../../common/decorators/allow-default-password.decorator';
+import { AllowApiKey, InteractiveOnly } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
@@ -45,6 +46,7 @@ const ONE_MINUTE_MS = 60_000;
 const ONE_HOUR_MS = 3_600_000;
 
 @Controller('auth')
+@InteractiveOnly()
 export class AuthController {
   constructor(
     private readonly authService: AuthService,
@@ -103,6 +105,7 @@ export class AuthController {
 
   @Get('me')
   @AllowDefaultPassword()
+  @AllowApiKey()
   me(@CurrentUser() user: RequestUser) {
     return this.authService.buildUserResponse(user);
   }

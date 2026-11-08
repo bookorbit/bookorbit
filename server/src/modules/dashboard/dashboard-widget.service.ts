@@ -22,7 +22,7 @@ import type {
 } from '@bookorbit/types';
 
 import { serverText } from '../../common/i18n/server-text';
-import type { RequestUser } from '../../common/types/request-user';
+import { principalCacheKey, type RequestUser } from '../../common/types/request-user';
 import { StatsCache } from '../../common/cache/stats-cache';
 import { mapWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -98,7 +98,7 @@ export class DashboardWidgetService implements OnModuleInit, OnModuleDestroy {
   }
 
   private cacheOwnerKey(user: RequestUser, libraryIds: readonly number[]): string {
-    return `${user.id}:${dashboardLibraryScopeCacheKey(libraryIds)}`;
+    return principalCacheKey(user, `${user.id}:${dashboardLibraryScopeCacheKey(libraryIds)}`);
   }
 
   private async getLibraryIds(user: RequestUser): Promise<number[]> {

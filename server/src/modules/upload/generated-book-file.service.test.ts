@@ -97,7 +97,7 @@ describe('GeneratedBookFileService', () => {
     const fileLocks = { withLock: vi.fn((_path: string, fn: () => Promise<unknown>) => fn()) };
     const service = new GeneratedBookFileService(
       repository as never,
-      { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } as never,
+      { verifyAccess: vi.fn().mockResolvedValue(undefined) } as never,
       validator as never,
       { assertWithinRoot: vi.fn().mockResolvedValue(undefined) } as never,
       uploads as never,

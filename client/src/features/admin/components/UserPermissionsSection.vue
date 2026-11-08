@@ -2,7 +2,7 @@
 import { computed, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, TriangleAlert } from '@lucide/vue'
-import { Permission, PERMISSION_LABELS } from '@bookorbit/types'
+import type { Permission } from '@bookorbit/types'
 import { formatNumber } from '@/i18n/formatters'
 import {
   PERMISSION_GROUPS,
@@ -11,6 +11,7 @@ import {
   type PermissionPreset,
   type PermissionSelection,
 } from '../lib/permission-presets'
+import { permissionLabel } from '../lib/permission-labels'
 
 const props = defineProps<{
   selected: ReadonlySet<string>
@@ -46,11 +47,6 @@ const presetOptions = computed<PresetOption[]>(() => [
   { id: 'admin', label: t('adminFeature.userForm.presets.admin'), preset: 'admin' },
 ])
 
-function permissionLabel(permission: Permission): string {
-  if (permission === Permission.ViewUserActivity) return t('adminFeature.accountActivity.permissionLabel')
-  return PERMISSION_LABELS[permission] ?? permission
-}
-
 interface PermissionRow {
   name: Permission
   label: string
@@ -85,7 +81,7 @@ const groups = computed<RenderedGroup[]>(() => {
         const note = props.notes?.[permission]
         return {
           name: permission,
-          label: permissionLabel(permission),
+          label: permissionLabel(permission, t),
           manage: group.manage.includes(permission),
           checked: props.selected.has(permission),
           note: note && { ...note, id: `${noteIdPrefix}-${permission}` },

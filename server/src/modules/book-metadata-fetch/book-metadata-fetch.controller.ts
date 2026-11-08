@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query } from '@nestjs/common';
 import { type BookMetadataFetchConfig, type BookMetadataFetchConfigOverride, Permission } from '@bookorbit/types';
 
+import { KeyReadSafe } from '../../common/decorators/api-key-policy.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { BookMetadataFetchConfigService } from './book-metadata-fetch-config.service';
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';
@@ -109,6 +110,7 @@ export class BookMetadataFetchController {
   }
 
   @Post('preview-count')
+  @KeyReadSafe()
   @RequirePermission(Permission.ManageMetadataConfig)
   async previewCount(@Body() dto: PreviewCountDto) {
     const config: BookMetadataFetchConfig = {
@@ -121,12 +123,14 @@ export class BookMetadataFetchController {
   }
 
   @Post('preview-breakdown')
+  @KeyReadSafe()
   @RequirePermission(Permission.ManageMetadataConfig)
   previewBreakdown(@Body() dto: PreviewScopeDto) {
     return this.preview.breakdown(dto);
   }
 
   @Post('preview-books')
+  @KeyReadSafe()
   @RequirePermission(Permission.ManageMetadataConfig)
   previewBooks(@Body() dto: PreviewBooksDto) {
     return this.preview.previewBooks({ conditions: dto.conditions, libraryIds: dto.libraryIds }, dto.limit);

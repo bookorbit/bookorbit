@@ -1,9 +1,10 @@
 import { BookDockGateway } from './book-dock.gateway';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateSessionUser: vi.fn() };
-  const gateway = new BookDockGateway(jwtService as any, authService as any);
+  const gateway = new BookDockGateway(new AuthenticatorService(jwtService as never, authService as never) as any);
   return { gateway, jwtService, authService };
 }
 

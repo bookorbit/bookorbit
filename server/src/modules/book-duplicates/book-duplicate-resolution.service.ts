@@ -256,7 +256,7 @@ export class BookDuplicateResolutionService implements OnApplicationBootstrap {
       if (!editable.has(libraryId)) {
         editable.set(
           libraryId,
-          this.libraries.verifyUserAccessLevel(user.id, libraryId, user.isSuperuser, 'editor').then(
+          this.libraries.verifyAccessLevel(user, libraryId, 'editor').then(
             () => true,
             () => false,
           ),

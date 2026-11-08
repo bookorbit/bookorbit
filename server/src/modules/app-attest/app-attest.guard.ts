@@ -1,7 +1,7 @@
-import { CanActivate, ExecutionContext, Injectable, type RawBodyRequest, UseGuards } from '@nestjs/common';
+import { CanActivate, ExecutionContext, ForbiddenException, Injectable, type RawBodyRequest, UseGuards } from '@nestjs/common';
 import type { FastifyRequest } from 'fastify';
 
-import type { RequestUser } from '../../common/types/request-user';
+import { apiKeyCredentialOf, type RequestUser } from '../../common/types/request-user';
 import { hasInjectedEmptyBody } from '../../common/utils/bootstrap.utils';
 import { AppAttestService } from './app-attest.service';
 
@@ -16,6 +16,10 @@ export class AppAttestGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<RawBodyRequest<FastifyRequest> & { user: RequestUser }>();
+    // An API key is never an attested app (C5).
+    if (apiKeyCredentialOf(request.user)) {
+      throw new ForbiddenException({ message: 'API keys cannot use this route', errorCode: 'API_KEY_ROUTE_FORBIDDEN' });
+    }
     this.appAttest.verifyRequest(request.user, {
       method: request.method,
       url: request.url,

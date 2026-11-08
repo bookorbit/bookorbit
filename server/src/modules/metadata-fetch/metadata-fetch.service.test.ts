@@ -4,6 +4,7 @@ import type { Mocked } from 'vitest';
 import { filter, firstValueFrom, map, pipe, toArray } from 'rxjs';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { createTestExecutor, type TestExecutorHarness } from '../metadata-cache/test-helpers';
 import { recordProviderRequest } from '../../common/provider-cache/provider-call-context';
 import type { CacheDirective, ProviderCacheSpec } from '../../common/provider-cache/provider-cache-spec';
@@ -69,6 +70,7 @@ describe('MetadataFetchService', () => {
   let registry: Mocked<ProviderRegistry>;
   let throttleTracker: Mocked<ProviderThrottleTracker>;
   let metadataFetchRepository: Mocked<MetadataFetchRepository>;
+  let scopeRepo: { findGrantedLevel: ReturnType<typeof vi.fn> };
   let service: MetadataFetchService;
   let cacheHarness: TestExecutorHarness;
 
@@ -91,11 +93,17 @@ describe('MetadataFetchService', () => {
 
     metadataFetchRepository = {
       findStoredProviderIdsRow: vi.fn(),
-      hasLibraryAccess: vi.fn(),
     } as unknown as Mocked<MetadataFetchRepository>;
+    scopeRepo = { findGrantedLevel: vi.fn().mockResolvedValue(null) };
 
     cacheHarness = createTestExecutor();
-    service = new MetadataFetchService(registry, throttleTracker, metadataFetchRepository, cacheHarness.executor);
+    service = new MetadataFetchService(
+      registry,
+      throttleTracker,
+      metadataFetchRepository,
+      cacheHarness.executor,
+      new LibraryScopeService(scopeRepo as never),
+    );
   });
 
   afterEach(() => {
@@ -774,7 +782,7 @@ describe('MetadataFetchService', () => {
       lubimyczytacId: 'lc-1',
       aladinId: null,
     });
-    metadataFetchRepository.hasLibraryAccess.mockResolvedValue(true);
+    scopeRepo.findGrantedLevel.mockResolvedValue('viewer');
 
     const result = await service.getStoredProviderIds(42, makeUser({ id: 5 }));
 
@@ -793,7 +801,7 @@ describe('MetadataFetchService', () => {
       [MetadataProviderKey.LUBIMYCZYTAC]: 'lc-1',
       [MetadataProviderKey.ALADIN]: undefined,
     });
-    expect(metadataFetchRepository.hasLibraryAccess).toHaveBeenCalledWith(5, 7);
+    expect(scopeRepo.findGrantedLevel).toHaveBeenCalledWith(5, 7);
   });
 
   it('bypasses library access checks for superusers', async () => {
@@ -829,7 +837,7 @@ describe('MetadataFetchService', () => {
       [MetadataProviderKey.LUBIMYCZYTAC]: undefined,
       [MetadataProviderKey.ALADIN]: undefined,
     });
-    expect(metadataFetchRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
   });
 
   it('throws NotFoundException when the target book does not exist', async () => {
@@ -855,7 +863,7 @@ describe('MetadataFetchService', () => {
       lubimyczytacId: null,
       aladinId: null,
     });
-    metadataFetchRepository.hasLibraryAccess.mockResolvedValue(false);
+    scopeRepo.findGrantedLevel.mockResolvedValue(null);
 
     await expect(service.getStoredProviderIds(5, makeUser({ id: 12 }))).rejects.toBeInstanceOf(ForbiddenException);
   });

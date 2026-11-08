@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { Test } from '@nestjs/testing';
 import { BookService } from '../book/book.service';
 import { BadRequestException, ConflictException, Logger, NotFoundException } from '@nestjs/common';
@@ -9,10 +10,12 @@ import { KoreaderRepository } from './koreader.repository';
 const HASH_A = 'a'.repeat(32);
 const HASH_B = 'b'.repeat(32);
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderHashLinkService', () => {
   let service: KoreaderHashLinkService;
   let mockRepo: {
-    getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
     resolveBookFileByHash: ReturnType<typeof vi.fn>;
     resolveBookFilesByHashes: ReturnType<typeof vi.fn>;
     listUnmatchedBooks: ReturnType<typeof vi.fn>;
@@ -52,11 +55,11 @@ describe('KoreaderHashLinkService', () => {
   }
 
   beforeEach(async () => {
+    accessibleLibraryIds = vi.fn().mockResolvedValue([1, 2]);
     vi.restoreAllMocks();
     vi.clearAllMocks();
 
     mockRepo = {
-      getAccessibleLibraryIds: vi.fn().mockResolvedValue([1, 2]),
       resolveBookFileByHash: vi.fn(),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map()),
       listUnmatchedBooks: vi.fn().mockResolvedValue([]),
@@ -82,7 +85,12 @@ describe('KoreaderHashLinkService', () => {
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     const module = await Test.createTestingModule({
-      providers: [KoreaderHashLinkService, { provide: KoreaderRepository, useValue: mockRepo }, { provide: BookService, useValue: mockBookService }],
+      providers: [
+        KoreaderHashLinkService,
+        { provide: LibraryScopeService, useValue: libraryScopeStub() },
+        { provide: KoreaderRepository, useValue: mockRepo },
+        { provide: BookService, useValue: mockBookService },
+      ],
     }).compile();
     service = module.get(KoreaderHashLinkService);
   });
@@ -93,7 +101,7 @@ describe('KoreaderHashLinkService', () => {
 
       await expect(service.listUnmatchedBooks(user)).resolves.toEqual([]);
 
-      expect(mockRepo.getAccessibleLibraryIds).not.toHaveBeenCalled();
+      expect(accessibleLibraryIds).not.toHaveBeenCalled();
       expect(mockRepo.resolveBookFilesByHashes).not.toHaveBeenCalled();
     });
 
@@ -249,7 +257,7 @@ describe('KoreaderHashLinkService', () => {
 
       await expect(service.listUnmatchedBookSuggestions(user)).resolves.toEqual([]);
       expect(mockRepo.findBooksByTitleKeys).not.toHaveBeenCalled();
-      expect(mockRepo.getAccessibleLibraryIds).not.toHaveBeenCalled();
+      expect(accessibleLibraryIds).not.toHaveBeenCalled();
     });
 
     it('never offers a book whose primary file is audio or not content, because the link targets that file', async () => {

@@ -2,11 +2,12 @@ import { Permission } from '@bookorbit/types';
 import { WS_UNAUTHORIZED_EVENT } from '../../common/utils/ws-auth.utils';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { AuthenticatorService } from '../auth/authenticator.service';
 import { NotificationGateway } from './notification.gateway';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 function makeGateway() {
-  return new NotificationGateway({} as never, {} as never, {} as never, { appUrl: 'http://localhost:6263' } as never);
+  return new NotificationGateway({} as never, {} as never, { appUrl: 'http://localhost:6263' } as never);
 }
 
 function makeUser(overrides: Partial<RequestUser> = {}): RequestUser {
@@ -82,10 +83,11 @@ describe('NotificationGateway handshake rejection', () => {
           throw expiredTokenError();
         }),
     };
-    const userService = { findByIdWithPermissions: vi.fn().mockResolvedValue(overrides.user ?? null) };
+    const authService = { validateSessionUser: vi.fn().mockResolvedValue(overrides.user ?? null) };
     const notificationRepo = { countUnread: vi.fn().mockResolvedValue(0) };
     const config = { appUrl: 'http://localhost:6263' };
-    const gateway = new NotificationGateway(jwtService as never, userService as never, notificationRepo as never, config as never);
+    const authenticator = new AuthenticatorService(jwtService as never, authService as never);
+    const gateway = new NotificationGateway(authenticator, notificationRepo as never, config as never);
     const client = { id: 'sock-1', handshake: { auth: { token: 'jwt' } }, data: {}, join: vi.fn(), emit: vi.fn(), disconnect: vi.fn() };
     return { gateway, client };
   }
@@ -101,7 +103,7 @@ describe('NotificationGateway handshake rejection', () => {
 
   it('closes without an invitation when the user simply lacks notification access', async () => {
     const { gateway, client } = makeConnectingGateway({
-      verify: vi.fn(() => ({ sub: 7, ver: 1 })),
+      verify: vi.fn(() => ({ sub: 7, ver: 1, sid: 3 })),
       user: makeUser({ permissions: [] }),
     });
 
@@ -110,5 +112,14 @@ describe('NotificationGateway handshake rejection', () => {
     // A new token would be refused the same way, so the client must not retry.
     expect(client.emit).not.toHaveBeenCalled();
     expect(client.disconnect).toHaveBeenCalledTimes(1);
+  });
+
+  it('refuses a token whose session was revoked, like every other socket', async () => {
+    const { gateway, client } = makeConnectingGateway({ verify: vi.fn(() => ({ sub: 7, ver: 1, sid: 3 })), user: null });
+
+    await gateway.handleConnection(client as never);
+
+    expect(client.emit).toHaveBeenCalledWith(WS_UNAUTHORIZED_EVENT, { reason: 'invalid_token' });
+    expect(client.join).not.toHaveBeenCalled();
   });
 });

@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
@@ -47,7 +48,7 @@ import type {
 import { StatsCache } from '../../common/cache/stats-cache';
 import { isUniqueViolation } from '../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import type { RequestUser } from '../../common/types/request-user';
+import { principalCacheKey, type RequestUser } from '../../common/types/request-user';
 import type { BookRequestRow, NewBookRequestRow } from '../../db/schema';
 import { LibraryService } from '../library/library.service';
 import { BookRequestAttributionService } from './book-request-attribution.service';
@@ -222,6 +223,7 @@ export class BookRequestService {
     private readonly attribution: BookRequestAttributionService,
     private readonly indexers: IndexerConfigService,
     private readonly companions: RequestCompanionService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   canManageAll(user: RequestUser): boolean {
@@ -243,7 +245,7 @@ export class BookRequestService {
    * instance with hundreds of libraries.
    */
   private async reachableLibraryIds(user: RequestUser): Promise<number[] | null> {
-    return user.isSuperuser ? null : this.libraryService.findAccessibleLibraryIds(user);
+    return this.libraryScope.visibleIdsOrAll(user);
   }
 
   /**
@@ -786,7 +788,7 @@ export class BookRequestService {
   private async resolveRequestedLibrary(targetLibraryId: number | null, user: RequestUser): Promise<number | null> {
     if (targetLibraryId === null) return null;
     try {
-      await this.libraryService.verifyUserAccess(user.id, targetLibraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, targetLibraryId);
     } catch (error) {
       // The rule belongs to the library service; only the sentence is ours, and the form has to be
       // able to translate this the way it translates every other reason a submission is refused.
@@ -1124,7 +1126,7 @@ export class BookRequestService {
     // The approver may reroute, but only somewhere they can reach themselves.
     let targetLibraryId = joined.request.targetLibraryId;
     if (dto.targetLibraryId !== undefined && dto.targetLibraryId !== null) {
-      await this.libraryService.verifyUserAccess(user.id, dto.targetLibraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, dto.targetLibraryId);
       targetLibraryId = dto.targetLibraryId;
     }
 
@@ -1380,12 +1382,14 @@ export class BookRequestService {
   }
 
   async checkAvailability(queries: BookRequestAvailabilityQuery[], user: RequestUser): Promise<BookRequestAvailability[]> {
-    const libraryIds = user.isSuperuser ? null : await this.libraryService.findAccessibleLibraryIds(user);
+    const libraryIds = await this.libraryScope.visibleIdsOrAll(user);
     return this.dedupe.checkAvailability(queries, user.id, libraryIds);
   }
 
   getSummary(user: RequestUser): Promise<BookRequestSummary> {
-    return this.summaryCache.get('book-request-summary', `${user.id}:${this.gateway.changeVersion}`, () => this.loadSummary(user));
+    return this.summaryCache.get('book-request-summary', principalCacheKey(user, `${user.id}:${this.gateway.changeVersion}`), () =>
+      this.loadSummary(user),
+    );
   }
 
   private async loadSummary(user: RequestUser): Promise<BookRequestSummary> {

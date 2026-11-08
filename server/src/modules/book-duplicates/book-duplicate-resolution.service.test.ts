@@ -94,7 +94,7 @@ function setup(groups: Record<number, GroupFixture>, liveIds: number[] = Object.
   };
   const gateway = { emitDuplicateResolution: vi.fn() };
   const auditEvents = { emit: vi.fn() };
-  const libraries = { verifyUserAccessLevel: vi.fn().mockResolvedValue(undefined) };
+  const libraries = { verifyAccessLevel: vi.fn().mockResolvedValue(undefined) };
   const service = new BookDuplicateResolutionService(
     repo as never,
     duplicates as never,
@@ -440,7 +440,7 @@ describe('BookDuplicateResolutionService', () => {
       ]),
     );
     repo.findMemberIds.mockResolvedValue(new Map([[6, [20, 21]]]));
-    libraries.verifyUserAccessLevel.mockImplementation((_userId: number, libraryId: number) =>
+    libraries.verifyAccessLevel.mockImplementation((_userId: number, libraryId: number) =>
       libraryId === 2 ? Promise.reject(new ForbiddenException('Insufficient library access level')) : Promise.resolve(),
     );
 
@@ -449,7 +449,7 @@ describe('BookDuplicateResolutionService', () => {
 
     expect(outcomes.map((outcome) => outcome.groupId)).toEqual([6]);
     expect(merges.mergeWithinLease).toHaveBeenCalledTimes(1);
-    expect(libraries.verifyUserAccessLevel).toHaveBeenCalledTimes(2);
+    expect(libraries.verifyAccessLevel).toHaveBeenCalledTimes(2);
   });
 
   it('resolves fifty groups of mixed actions with one stale and one failing group', async () => {

@@ -117,7 +117,7 @@ describe('KoreaderController', () => {
     expect(koreaderService.getDevices).toHaveBeenCalledWith(7);
 
     await expect(controller.getBookProgress(user, 10)).resolves.toBeNull();
-    expect(koreaderService.getBookProgress).toHaveBeenCalledWith(7, 10);
+    expect(koreaderService.getBookProgress).toHaveBeenCalledWith(user, 10);
   });
 
   it('scopes KOReader default pattern reads and writes to the authenticated user', async () => {

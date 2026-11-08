@@ -57,20 +57,23 @@ function makeBook(overrides: Partial<BookmarkExchangeDto['books'][number]> = {})
   return { hash: HASH_A, keys: [], keysComplete: false, changes: [], ...overrides } as BookmarkExchangeDto['books'][number];
 }
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderBookmarkExchangeService', () => {
-  let koreaderRepo: { getAccessibleLibraryIds: ReturnType<typeof vi.fn>; resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
+  let koreaderRepo: { resolveBookFilesByHashes: ReturnType<typeof vi.fn> };
   let bookmarkRepo: Record<string, ReturnType<typeof vi.fn>>;
   let bookmarkSync: Record<string, ReturnType<typeof vi.fn>>;
   let positionConverter: Record<string, ReturnType<typeof vi.fn>>;
   let service: KoreaderBookmarkExchangeService;
 
   beforeEach(() => {
+    accessibleLibraryIds = vi.fn().mockResolvedValue([1]);
     vi.restoreAllMocks();
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     koreaderRepo = {
-      getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
     };
     bookmarkRepo = {
@@ -92,7 +95,13 @@ describe('KoreaderBookmarkExchangeService', () => {
       cfiPointToXpointer: vi.fn().mockResolvedValue({ status: 'exact', pos0: POS }),
     };
 
-    service = new KoreaderBookmarkExchangeService(koreaderRepo as never, bookmarkRepo as never, bookmarkSync as never, positionConverter as never);
+    service = new KoreaderBookmarkExchangeService(
+      koreaderRepo as never,
+      bookmarkRepo as never,
+      bookmarkSync as never,
+      positionConverter as never,
+      libraryScopeStub() as never,
+    );
   });
 
   describe('exchange', () => {

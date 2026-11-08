@@ -782,34 +782,6 @@ describe('KoreaderRepository', () => {
     });
   });
 
-  describe('getAccessibleLibraryIds', () => {
-    it('returns null for superusers', async () => {
-      db.query.users.findFirst.mockResolvedValue({ isSuperuser: true });
-
-      const result = await repo.getAccessibleLibraryIds(1);
-
-      expect(result).toBeNull();
-    });
-
-    it('returns an array of library IDs for regular users', async () => {
-      db.query.users.findFirst.mockResolvedValue({ isSuperuser: false });
-      db.select.mockReturnValue(makeQueryChain([{ libraryId: 3 }, { libraryId: 7 }]));
-
-      const result = await repo.getAccessibleLibraryIds(1);
-
-      expect(result).toEqual([3, 7]);
-    });
-
-    it('returns an empty array for regular users with no library access', async () => {
-      db.query.users.findFirst.mockResolvedValue({ isSuperuser: false });
-      db.select.mockReturnValue(makeQueryChain([]));
-
-      const result = await repo.getAccessibleLibraryIds(1);
-
-      expect(result).toEqual([]);
-    });
-  });
-
   describe('koreader user records', () => {
     it('finds a koreader user by app user id', async () => {
       const row = { userId: 42, username: 'reader' };

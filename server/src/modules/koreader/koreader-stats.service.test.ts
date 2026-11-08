@@ -37,9 +37,11 @@ function makeSession(startEpoch: number): DerivedKoreaderSession {
   };
 }
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderStatsService', () => {
   let koreaderRepo: {
-    getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
     resolveBookFilesByHashes: ReturnType<typeof vi.fn>;
     restoreDevice: ReturnType<typeof vi.fn>;
   };
@@ -49,12 +51,12 @@ describe('KoreaderStatsService', () => {
   let service: KoreaderStatsService;
 
   beforeEach(() => {
+    accessibleLibraryIds = vi.fn().mockResolvedValue([1]);
     vi.restoreAllMocks();
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     koreaderRepo = {
-      getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
       restoreDevice: vi.fn().mockResolvedValue(undefined),
     };
@@ -71,6 +73,7 @@ describe('KoreaderStatsService', () => {
       pluginRepo as unknown as KoreaderPluginRepository,
       achievementEvents as unknown as AchievementEventsService,
       bookService as unknown as BookService,
+      libraryScopeStub() as never,
     );
   });
 

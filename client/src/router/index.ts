@@ -54,6 +54,7 @@ const ACCOUNT_ROUTES: Record<AccountTab, string> = {
   privacy: 'settings-account-privacy',
   notifications: 'settings-notifications',
   restrictions: 'settings-account-restrictions',
+  'api-keys': 'settings-account-api-keys',
 }
 
 const APPEARANCE_ROUTES: Record<AppearanceTab, string> = {
@@ -93,6 +94,7 @@ const ADMIN_ROUTES: Record<AdminTab, string> = {
   oidc: 'settings-admin-oidc',
   'server-fonts': 'settings-admin-server-fonts',
   tts: 'settings-admin-tts',
+  'api-keys': 'settings-admin-api-keys',
 }
 
 const SYSTEM_ROUTES: Record<SystemTab, string> = {
@@ -191,6 +193,17 @@ export const routes: RouteRecordRaw[] = [
             name: 'settings-account-restrictions',
             component: () => import('@/features/settings/ContentRestrictionsSettings.vue'),
             meta: { title: () => t('titles.account.restrictions') },
+          },
+          {
+            path: 'account/api-keys',
+            name: 'settings-account-api-keys',
+            component: () => import('@/features/api-keys/ApiKeysSettings.vue'),
+            meta: {
+              maxWidth: 'max-w-5xl',
+              requiredPermission: Permission.ApiKeys,
+              permissionFallback: 'settings-account-profile',
+              title: () => t('titles.account.apiKeys'),
+            },
           },
           {
             path: 'appearance',
@@ -457,6 +470,17 @@ export const routes: RouteRecordRaw[] = [
             component: () => import('@/features/settings/OidcSettings.vue'),
             props: { embedded: true },
             meta: { maxWidth: 'max-w-3xl', title: () => t('titles.admin.oidc') },
+          },
+          {
+            path: 'admin/api-keys',
+            name: 'settings-admin-api-keys',
+            component: () => import('@/features/api-keys/ApiKeysAdminSettings.vue'),
+            meta: {
+              maxWidth: 'max-w-3xl',
+              requiredPermission: Permission.ManageAppSettings,
+              permissionFallback: 'settings-account-profile',
+              title: () => t('titles.admin.api-keys'),
+            },
           },
           {
             path: 'admin/server-fonts',

@@ -22,7 +22,7 @@ function makeService() {
     findContentFormatsByBookIds: vi.fn().mockResolvedValue(new Map()),
   };
   const bookService = { verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
-  const libraryService = { verifyUserAccessLevel: vi.fn().mockResolvedValue(undefined) };
+  const libraryService = { verifyAccessLevel: vi.fn().mockResolvedValue(undefined) };
   const service = new BookDockJoinService(repo as never, bookService as never, libraryService as never);
   return { service, repo, bookService, libraryService };
 }
@@ -166,10 +166,10 @@ describe('BookDockJoinService.canJoinIn', () => {
     await expect(service.canJoinIn({ id: 5, organizationMode: 'book_per_folder' }, USER, cache)).resolves.toBe(true);
     await expect(service.canJoinIn({ id: 5, organizationMode: 'book_per_folder' }, USER, cache)).resolves.toBe(true);
     await expect(service.canJoinIn({ id: 6, organizationMode: 'book_per_file' }, USER, cache)).resolves.toBe(false);
-    expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledTimes(1);
-    expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(7, 5, false, 'editor');
+    expect(libraryService.verifyAccessLevel).toHaveBeenCalledTimes(1);
+    expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(expect.objectContaining({ id: 7, isSuperuser: false }), 5, 'editor');
 
-    libraryService.verifyUserAccessLevel.mockRejectedValueOnce(new ForbiddenException('Insufficient library access level'));
+    libraryService.verifyAccessLevel.mockRejectedValueOnce(new ForbiddenException('Insufficient library access level'));
     await expect(service.canJoinIn({ id: 8, organizationMode: 'book_per_folder' }, USER, cache)).resolves.toBe(false);
   });
 });

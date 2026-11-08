@@ -1,3 +1,4 @@
+import { LibraryScopeService, type LibraryScopeSubject } from '../../common/library-scope/library-scope.service';
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { hash as bcryptHash } from 'bcryptjs';
 import { createHash } from 'crypto';
@@ -96,6 +97,7 @@ export class KoreaderService {
     private readonly positionConverter: PositionConverterService,
     private readonly bookService: BookService,
     private readonly packageService: KoreaderPackageService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async createCredentials(userId: number, username: string, password: string, readAloudDelivery?: ReadAloudDeliveryPreference) {
@@ -211,7 +213,7 @@ export class KoreaderService {
 
     this.logger.debug(`[${SYNC_EVENT}] [start] userId=${userId} document=${data.document.slice(0, 16)} device=${device} - save progress started`);
 
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAllForUserId(userId);
     const bookFile = await this.repo.resolveBookFileByHash(data.document, accessibleLibraryIds, userId);
 
     if (!bookFile) {
@@ -554,7 +556,7 @@ export class KoreaderService {
   }
 
   async getProgress(userId: number, documentHash: string) {
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAllForUserId(userId);
     const bookFile = await this.repo.resolveBookFileByHash(documentHash, accessibleLibraryIds, userId);
 
     if (!bookFile) return null;
@@ -846,8 +848,9 @@ export class KoreaderService {
     return `koreader-file-naming:${userId}`;
   }
 
-  async getBookProgress(userId: number, bookId: number): Promise<KoreaderBookSyncInfo | null> {
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
+  async getBookProgress(user: LibraryScopeSubject, bookId: number): Promise<KoreaderBookSyncInfo | null> {
+    const userId = user.id;
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const bookFile = await this.repo.findProgressBookFileByBookId(bookId, userId, accessibleLibraryIds);
     if (!bookFile) return null;
     const bookFileId = bookFile.id;
@@ -912,9 +915,10 @@ export class KoreaderService {
    * the device and said no, and without this the only ways out are reading the book in
    * BookOrbit or resetting again, neither of which is reachable from seeing the hold.
    */
-  async releaseResetHold(userId: number, bookId: number, deviceId: string): Promise<void> {
+  async releaseResetHold(user: LibraryScopeSubject, bookId: number, deviceId: string): Promise<void> {
+    const userId = user.id;
     const startedAt = Date.now();
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(userId);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const bookFile = await this.repo.findProgressBookFileByBookId(bookId, userId, accessibleLibraryIds);
     if (!bookFile) throw new NotFoundException(`No synced file found for book ${bookId}`);
 

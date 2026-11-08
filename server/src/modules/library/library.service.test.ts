@@ -20,6 +20,7 @@ import { readdir, rm, stat } from 'fs/promises';
 import { ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { LibraryService } from './library.service';
 
 const mockReaddir = readdir as MockedFunction<typeof readdir>;
@@ -36,13 +37,16 @@ function dirent(name: string, kind: 'file' | 'dir') {
 }
 
 describe('LibraryService', () => {
+  const scopeRepo = {
+    findAllIds: vi.fn(),
+    findExistingIds: vi.fn(),
+    findGrantedLevels: vi.fn(),
+    findGrantedLevel: vi.fn(),
+    findIsSuperuser: vi.fn(),
+  };
   const libraryRepo = {
-    hasUserAccess: vi.fn(),
-    findUserAccessLevel: vi.fn(),
     findAll: vi.fn(),
     findAllForUser: vi.fn(),
-    findAllIds: vi.fn(),
-    findAccessibleIdsForUser: vi.fn(),
     findAllFolders: vi.fn(),
     findFoldersByLibraryIds: vi.fn(),
     findById: vi.fn(),
@@ -106,6 +110,7 @@ describe('LibraryService', () => {
       regexMetadata as any,
       readingEvents,
       libraryGate,
+      new LibraryScopeService(scopeRepo as any),
     );
 
     libraryRepo.findById.mockResolvedValue([{ id: 1 }]);
@@ -147,8 +152,11 @@ describe('LibraryService', () => {
   });
 
   it('findAccessibleLibraryIds reads all IDs for superusers and scoped IDs for normal users', async () => {
-    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }, { id: 2 }]);
-    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 3 }, { id: 4 }]);
+    scopeRepo.findAllIds.mockResolvedValue([1, 2]);
+    scopeRepo.findGrantedLevels.mockResolvedValue([
+      { id: 3, accessLevel: 'viewer' },
+      { id: 4, accessLevel: 'editor' },
+    ]);
 
     await expect(service.findAccessibleLibraryIds({ id: 99, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual(
       [1, 2],
@@ -159,18 +167,18 @@ describe('LibraryService', () => {
   });
 
   it('findEditableLibraryIds reads all IDs for superusers and editor-or-owner IDs for normal users', async () => {
-    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }, { id: 2 }]);
-    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 4 }]);
+    scopeRepo.findAllIds.mockResolvedValue([1, 2]);
+    scopeRepo.findGrantedLevels.mockResolvedValue([{ id: 4, accessLevel: 'editor' }]);
 
     await expect(service.findEditableLibraryIds({ id: 99, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual([
       1, 2,
     ]);
-    expect(libraryRepo.findAccessibleIdsForUser).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevels).not.toHaveBeenCalled();
 
     await expect(service.findEditableLibraryIds({ id: 42, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES } as any)).resolves.toEqual([
       4,
     ]);
-    expect(libraryRepo.findAccessibleIdsForUser).toHaveBeenCalledWith(42, ['editor', 'owner']);
+    expect(scopeRepo.findGrantedLevels).toHaveBeenCalledWith(42, ['editor', 'owner']);
   });
 
   it('findOne returns library details and normalizes organization mode', async () => {
@@ -224,7 +232,7 @@ describe('LibraryService', () => {
       { rules: [{ ...first, pattern: '(?<title>.*)' }, second] },
     ])('validates and persists an actual change without a library grant: %j', async (changed) => {
       await service.update(2, { regexMetadata: changed });
-      expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
+      expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
       expect(regexMetadata.validate).toHaveBeenCalledWith(changed);
       expect(libraryRepo.update).toHaveBeenCalledWith(2, { regexMetadata: changed });
     });
@@ -249,21 +257,38 @@ describe('LibraryService', () => {
     });
   });
 
-  it('verifyUserAccess bypasses lookup for superusers', async () => {
-    await service.verifyUserAccess(1, 2, true);
-    expect(libraryRepo.hasUserAccess).not.toHaveBeenCalled();
+  it('verifyAccess bypasses lookup for superusers', async () => {
+    await service.verifyAccess({ id: 1, isSuperuser: true }, 2);
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
   });
 
-  it('verifyUserAccess throws when user has no library access', async () => {
-    libraryRepo.hasUserAccess.mockResolvedValue(false);
-    await expect(service.verifyUserAccess(1, 2, false)).rejects.toThrow('No access to this library');
+  it('verifyAccess throws when user has no library access', async () => {
+    scopeRepo.findGrantedLevel.mockResolvedValue(null);
+    await expect(service.verifyAccess({ id: 1, isSuperuser: false }, 2)).rejects.toThrow('No access to this library');
   });
 
-  it('verifyUserAccessLevel enforces the required library role', async () => {
-    libraryRepo.findUserAccessLevel.mockResolvedValue('viewer');
+  it('verifyAccessLevel enforces the required library role', async () => {
+    scopeRepo.findGrantedLevel.mockResolvedValue('viewer');
 
-    await expect(service.verifyUserAccessLevel(1, 2, false, 'editor')).rejects.toThrow('Insufficient library access level');
-    await expect(service.verifyUserAccessLevel(1, 2, true, 'owner')).resolves.toBeUndefined();
+    await expect(service.verifyAccessLevel({ id: 1, isSuperuser: false }, 2, 'editor')).rejects.toThrow('Insufficient library access level');
+    await expect(service.verifyAccessLevel({ id: 1, isSuperuser: true }, 2, 'owner')).resolves.toBeUndefined();
+  });
+
+  it('findAll narrows a library-limited API key to its libraries and caps a read key at viewer', async () => {
+    scopeRepo.findGrantedLevels.mockResolvedValue([
+      { id: 10, accessLevel: 'editor' },
+      { id: 11, accessLevel: 'viewer' },
+    ]);
+    libraryRepo.findAllForUser.mockResolvedValue([
+      { id: 10, name: 'A', accessLevel: 'editor' },
+      { id: 11, name: 'B', accessLevel: 'viewer' },
+    ]);
+    libraryRepo.findFoldersByLibraryIds.mockResolvedValue([]);
+    const credential = { kind: 'api_key', keyId: 1, keyName: 'k', audience: 'api', access: 'read', libraryIds: [10], ownerIsSuperuser: false };
+
+    const result = await service.findAll({ id: 7, isSuperuser: false, contentFilters: EMPTY_CONTENT_FILTER_RULES, credential } as any);
+
+    expect(result.map(({ id, accessLevel }: any) => ({ id, accessLevel }))).toEqual([{ id: 10, accessLevel: 'viewer' }]);
   });
 
   it.each([undefined, ['regex', 'embedded']])('preserves regex configuration with precedence %j on create', async (metadataPrecedence) => {
@@ -826,7 +851,10 @@ describe('LibraryService', () => {
   });
 
   it('getOverview scopes to the caller and merges stats with the last scan', async () => {
-    libraryRepo.findAccessibleIdsForUser.mockResolvedValue([{ id: 1 }, { id: 2 }]);
+    scopeRepo.findGrantedLevels.mockResolvedValue([
+      { id: 1, accessLevel: 'viewer' },
+      { id: 2, accessLevel: 'viewer' },
+    ]);
     libraryRepo.getStatsForLibraries.mockResolvedValue(
       new Map([
         [1, { totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 } }],
@@ -847,8 +875,8 @@ describe('LibraryService', () => {
 
     const result = await service.getOverview({ id: 7, isSuperuser: false } as any);
 
-    expect(libraryRepo.findAccessibleIdsForUser).toHaveBeenCalledWith(7);
-    expect(libraryRepo.findAllIds).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevels).toHaveBeenCalledWith(7, undefined);
+    expect(scopeRepo.findAllIds).not.toHaveBeenCalled();
     expect(libraryRepo.getStatsForLibraries).toHaveBeenCalledWith([1, 2]);
     expect(result).toEqual([
       { libraryId: 1, totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 }, lastScan },
@@ -857,7 +885,7 @@ describe('LibraryService', () => {
   });
 
   it('getOverview returns nothing and issues no queries when the caller has no libraries', async () => {
-    libraryRepo.findAllIds.mockResolvedValue([]);
+    scopeRepo.findAllIds.mockResolvedValue([]);
 
     const result = await service.getOverview({ id: 1, isSuperuser: true } as any);
 
@@ -867,7 +895,7 @@ describe('LibraryService', () => {
   });
 
   it('getOverview maps repository overflow errors to InternalServerErrorException', async () => {
-    libraryRepo.findAllIds.mockResolvedValue([{ id: 1 }]);
+    scopeRepo.findAllIds.mockResolvedValue([1]);
     libraryRepo.getStatsForLibraries.mockRejectedValue(new RangeError('overflow'));
 
     await expect(service.getOverview({ id: 1, isSuperuser: true } as any)).rejects.toBeInstanceOf(InternalServerErrorException);

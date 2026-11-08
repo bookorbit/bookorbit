@@ -1,8 +1,9 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { ReadingHistoryMarks, ReadingHistoryPage, ReadingHistoryRatingResponse, ReadingHistorySummary } from '@bookorbit/types';
 
 import { StatsCache } from '../../common/cache/stats-cache';
-import type { RequestUser } from '../../common/types/request-user';
+import { principalCacheKey, type RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { BookService } from '../book/book.service';
@@ -29,6 +30,7 @@ export class ReadingHistoryService implements OnModuleInit, OnModuleDestroy {
     private readonly repo: ReadingHistoryRepository,
     private readonly bookService: BookService,
     private readonly readingAttemptEvents: ReadingAttemptEventsService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   private readonly onReadingAttemptChanged = ({ userId }: ReadingAttemptChangedPayload): void => {
@@ -47,7 +49,7 @@ export class ReadingHistoryService implements OnModuleInit, OnModuleDestroy {
   private async scope(user: RequestUser): Promise<ReadingHistoryScope> {
     return {
       userId: user.id,
-      libraryIds: await this.repo.getAccessibleLibraryIds(user.id, user.isSuperuser),
+      libraryIds: await this.libraryScope.visibleIdsOrAll(user),
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
       timeZone: resolveTimeZone(user.settings?.timezone),
     };
@@ -87,7 +89,7 @@ export class ReadingHistoryService implements OnModuleInit, OnModuleDestroy {
     const period = this.period(query);
     const libraryKey = scope.libraryIds === null ? 'all' : [...scope.libraryIds].sort((a, b) => a - b).join(',');
     const key = `${scope.timeZone}:${libraryKey}:${query.year ?? 'all'}:${query.quarter ?? '-'}`;
-    return this.summaryCache.get(`${user.id}:`, key, () => this.loadSummary(user, scope, period, query));
+    return this.summaryCache.get(`${user.id}:`, principalCacheKey(user, key), () => this.loadSummary(user, scope, period, query));
   }
 
   private async loadSummary(

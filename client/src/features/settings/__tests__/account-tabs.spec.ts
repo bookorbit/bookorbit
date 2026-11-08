@@ -4,11 +4,11 @@ import { ACCOUNT_TABS, normalizeAccountTab } from '../lib/account-tabs'
 describe('account-tabs', () => {
   describe('ACCOUNT_TABS', () => {
     it('contains the account settings tabs in display order', () => {
-      expect(ACCOUNT_TABS).toEqual(['profile', 'privacy', 'notifications', 'restrictions'])
+      expect(ACCOUNT_TABS).toEqual(['profile', 'privacy', 'notifications', 'restrictions', 'api-keys'])
     })
 
-    it('has length 4', () => {
-      expect(ACCOUNT_TABS.length).toBe(4)
+    it('has length 5', () => {
+      expect(ACCOUNT_TABS.length).toBe(5)
     })
   })
 

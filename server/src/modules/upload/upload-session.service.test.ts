@@ -99,7 +99,7 @@ describe('UploadSessionService', () => {
     };
     library = {
       findAccessibleLibraryIds: vi.fn(() => [1]),
-      verifyUserAccess: vi.fn(() => undefined),
+      verifyAccess: vi.fn(() => undefined),
     };
     service = new UploadSessionService(
       { appDataPath: root } as any,

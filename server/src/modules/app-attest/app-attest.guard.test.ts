@@ -11,6 +11,10 @@ import { ATTESTATION_FIXTURE } from './test-fixtures/attestation-fixture';
 
 const fixture = ATTESTATION_FIXTURE;
 
+function contextFor(user: unknown): ExecutionContext {
+  return { switchToHttp: () => ({ getRequest: () => ({ user, method: 'GET', url: '/probe', headers: {} }) }) } as unknown as ExecutionContext;
+}
+
 @Injectable()
 class StubAuthGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
@@ -131,5 +135,13 @@ describe('AppAttestGuard', () => {
     const response = await app.inject({ method: 'GET', url: '/api/v1/probe' });
     expect(response.statusCode).toBe(403);
     expect(errorCodeOf(response)).toBe('APP_ATTEST_REQUIRED');
+  });
+
+  it('refuses an API key before verifying, because a key is never an attested app', () => {
+    const verifyRequest = vi.fn();
+    const keyUser = { id: 7, credential: { kind: 'api_key', keyId: 3 } };
+    const guard = new AppAttestGuard({ verifyRequest } as never);
+    expect(() => guard.canActivate(contextFor(keyUser))).toThrow('API keys cannot use this route');
+    expect(verifyRequest).not.toHaveBeenCalled();
   });
 });

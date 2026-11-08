@@ -1,7 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import type { StringValue } from 'ms';
 
 import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
@@ -24,21 +21,7 @@ import { ReadAloudWorkerService } from './read-aloud-worker.service';
 import { ReadAloudWorkspace } from './read-aloud-workspace.service';
 
 @Module({
-  imports: [
-    AuthModule,
-    BookModule,
-    LibraryModule,
-    NotificationModule,
-    UploadModule,
-    UserModule,
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('auth.jwtSecret'),
-        signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn') },
-      }),
-    }),
-  ],
+  imports: [AuthModule, BookModule, LibraryModule, NotificationModule, UploadModule, UserModule],
   controllers: [ReadAloudController],
   providers: [
     ReadAloudActivityService,

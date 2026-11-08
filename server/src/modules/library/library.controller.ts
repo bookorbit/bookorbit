@@ -4,6 +4,7 @@ import type { FastifyReply } from 'fastify';
 
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import type { BookQuery, BulkRenameProgressEvent, JumpBucketsQuery, LibraryBookFacets, LibraryFileSyncProgressEvent } from '@bookorbit/types';
+import { KeyReadSafe } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequireLibraryAccess } from '../../common/decorators/require-library-access.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -49,6 +50,7 @@ export class LibraryController {
   }
 
   @Post('regex-metadata/validate')
+  @KeyReadSafe()
   @HttpCode(HttpStatus.OK)
   @RequirePermission(Permission.ManageLibraries)
   validateRegexMetadata(@Body() dto: RegexMetadataValidationDto) {
@@ -56,6 +58,7 @@ export class LibraryController {
   }
 
   @Post('regex-metadata/preview')
+  @KeyReadSafe()
   @HttpCode(HttpStatus.OK)
   @RequirePermission(Permission.ManageLibraries)
   previewRegexMetadata(@Body() dto: RegexMetadataPreviewDto) {
@@ -69,12 +72,14 @@ export class LibraryController {
   }
 
   @Post(':id/books')
+  @KeyReadSafe()
   @RequireLibraryAccess('viewer')
   queryBooks(@Param('id', ParseIntPipe) libraryId: number, @Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.bookService.queryForLibrary(user, libraryId, query);
   }
 
   @Post(':id/books/facets')
+  @KeyReadSafe()
   @RequireLibraryAccess('viewer')
   getBookFacets(
     @Param('id', ParseIntPipe) libraryId: number,
@@ -85,6 +90,7 @@ export class LibraryController {
   }
 
   @Post(':id/books/jump-buckets')
+  @KeyReadSafe()
   @RequireLibraryAccess('viewer')
   queryJumpBuckets(
     @Param('id', ParseIntPipe) libraryId: number,

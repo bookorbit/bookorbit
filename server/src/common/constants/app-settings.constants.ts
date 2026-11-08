@@ -30,7 +30,14 @@ export const APP_SETTING_KEYS = {
   UPDATE_CHECK_ENABLED: 'update_check_enabled',
   MAX_UPLOAD_SIZE_MB: 'max_upload_size_mb',
   HARDCOVER_ENABLED: 'hardcover_enabled',
+  API_KEYS_ENABLED: 'api_keys_enabled',
+  API_KEYS_MAX_LIFETIME_DAYS: 'api_keys_max_lifetime_days',
 } as const;
+
+/** Written only through the API key settings endpoint, which validates them together. */
+export const API_KEY_MANAGED_SETTING_KEYS: readonly string[] = [APP_SETTING_KEYS.API_KEYS_ENABLED, APP_SETTING_KEYS.API_KEYS_MAX_LIFETIME_DAYS];
+
+export const MAX_API_KEY_LIFETIME_CAP_DAYS = 3650;
 
 export const BOOK_DOCK_MANAGED_SETTING_KEYS: readonly string[] = [
   APP_SETTING_KEYS.BOOK_DOCK_PAUSED,

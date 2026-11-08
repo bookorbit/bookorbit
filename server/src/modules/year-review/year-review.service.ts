@@ -1,3 +1,5 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
+import { principalCacheKey } from '../../common/types/request-user';
 import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { YearReviewBook, YearReviewResponse } from '@bookorbit/types';
 import { YEAR_REVIEW_MIN_YEAR } from '@bookorbit/types';
@@ -48,6 +50,7 @@ export class YearReviewService implements OnModuleInit, OnModuleDestroy {
     private readonly repo: YearReviewRepository,
     private readonly readingHistory: ReadingHistoryService,
     private readonly readingAttemptEvents: ReadingAttemptEventsService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   private readonly onReadingAttemptChanged = ({ userId }: ReadingAttemptChangedPayload): void => {
@@ -80,7 +83,7 @@ export class YearReviewService implements OnModuleInit, OnModuleDestroy {
     const throughDay = partial ? today : `${year}-12-31`;
     const scope: YearReviewScope = {
       userId: user.id,
-      libraryIds: await this.repo.getAccessibleLibraryIds(user.id, user.isSuperuser),
+      libraryIds: await this.libraryScope.visibleIdsOrAll(user),
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     };
     const libraryKey = scope.libraryIds === null ? 'all' : [...scope.libraryIds].sort((a, b) => a - b).join(',');
@@ -88,7 +91,7 @@ export class YearReviewService implements OnModuleInit, OnModuleDestroy {
     const cache = partial ? this.runningCache : this.closedCache;
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
-    return cache.get(`${user.id}:`, key, () => this.load(user, scope, year, timeZone, throughDay, partial));
+    return cache.get(`${user.id}:`, principalCacheKey(user, key), () => this.load(user, scope, year, timeZone, throughDay, partial));
   }
 
   private async load(

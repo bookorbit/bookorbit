@@ -1,5 +1,6 @@
 import { UnauthorizedException } from '@nestjs/common';
 
+import { AuthenticatorService } from './authenticator.service';
 import { JwtStrategy } from './jwt.strategy';
 
 function makeStrategy() {
@@ -10,7 +11,7 @@ function makeStrategy() {
     get: vi.fn().mockReturnValue('test-jwt-secret'),
   };
 
-  const strategy = new JwtStrategy(config as never, authService as never);
+  const strategy = new JwtStrategy(config as never, new AuthenticatorService({} as never, authService as never));
 
   return { strategy, authService, config };
 }

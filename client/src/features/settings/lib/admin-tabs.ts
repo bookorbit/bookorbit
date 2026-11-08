@@ -1,4 +1,4 @@
-export const ADMIN_TABS = ['users', 'account-activity', 'oidc', 'magic-links', 'server-fonts', 'tts'] as const
+export const ADMIN_TABS = ['users', 'account-activity', 'oidc', 'magic-links', 'server-fonts', 'tts', 'api-keys'] as const
 
 export type AdminTab = (typeof ADMIN_TABS)[number]
 
@@ -31,6 +31,10 @@ export const ADMIN_TAB_INFO: Record<AdminTab, AdminTabInfo> = {
   tts: {
     permission: 'manage_app_settings',
     titleKey: 'titles.admin.tts',
+  },
+  'api-keys': {
+    permission: 'manage_app_settings',
+    titleKey: 'titles.admin.api-keys',
   },
 }
 

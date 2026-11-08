@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../../common/library-scope/library-scope.service';
 import { ForbiddenException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -14,20 +15,11 @@ export class KoboBookAccessService {
   constructor(
     @Inject(DB) private readonly db: Db,
     private readonly contentFilterRepository: ContentFilterRepository,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async getAccessibleLibraryIds(userId: number): Promise<number[] | null> {
-    const user = await this.db.query.users.findFirst({
-      where: eq(schema.users.id, userId),
-      columns: { isSuperuser: true },
-    });
-    if (user?.isSuperuser) return null;
-
-    const rows = await this.db
-      .select({ libraryId: schema.userLibraryAccess.libraryId })
-      .from(schema.userLibraryAccess)
-      .where(eq(schema.userLibraryAccess.userId, userId));
-    return rows.map((row) => row.libraryId);
+    return this.libraryScope.visibleIdsOrAllForUserId(userId);
   }
 
   async assertBookAccessible(userId: number, bookId: number): Promise<void> {

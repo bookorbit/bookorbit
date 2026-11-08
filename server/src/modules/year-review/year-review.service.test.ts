@@ -54,8 +54,8 @@ function row(id: number, bookId: number, start: string, minutes: number, session
 }
 
 function setup(sessions: YearReviewSessionRow[] = []) {
+  const libraryScope = { visibleIdsOrAll: vi.fn(() => Promise.resolve([1])) };
   const repo = {
-    getAccessibleLibraryIds: vi.fn(() => Promise.resolve([1])),
     getSessionPage: vi.fn((_scope: unknown, _window: unknown, afterId: number) => Promise.resolve(sessions.filter((item) => item.id > afterId))),
     getFinishedBooks: vi.fn(() =>
       Promise.resolve([
@@ -107,6 +107,7 @@ function setup(sessions: YearReviewSessionRow[] = []) {
     repo as unknown as YearReviewRepository,
     history as unknown as ReadingHistoryService,
     events as unknown as ReadingAttemptEventsService,
+    libraryScope as never,
   );
   return { repo, history, events, service };
 }

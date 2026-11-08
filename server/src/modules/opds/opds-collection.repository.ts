@@ -1,11 +1,11 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { type SQL, and, count, eq, exists, or, sql } from 'drizzle-orm';
+import { type SQL, and, count, eq, inArray, or, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules } from '@bookorbit/types';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { books, collectionBooks, collections, userLibraryAccess } from '../../db/schema';
+import { books, collectionBooks, collections } from '../../db/schema';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -19,15 +19,16 @@ export class OpdsCollectionRepository {
   }
 
   // bookClauses narrow which member books a collection's count includes, never which collections list.
-  findVisibleForUser(userId: number, isSuperuser: boolean, contentFilters?: ContentFilterRules, bookClauses: SQL[] = []) {
-    const libraryAccess = isSuperuser
-      ? undefined
-      : exists(
-          this.db
-            .select({ one: sql`1` })
-            .from(userLibraryAccess)
-            .where(and(eq(userLibraryAccess.userId, userId), eq(userLibraryAccess.libraryId, books.libraryId))),
-        );
+  // A null accessibleLibraryIds means every library is visible.
+  findVisibleForUser(
+    userId: number,
+    accessibleLibraryIds: number[] | null,
+    isSuperuser: boolean,
+    contentFilters?: ContentFilterRules,
+    bookClauses: SQL[] = [],
+  ) {
+    const libraryAccess =
+      accessibleLibraryIds === null ? undefined : accessibleLibraryIds.length === 0 ? sql`false` : inArray(books.libraryId, accessibleLibraryIds);
     const filterClauses = !isSuperuser && contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
 
     return this.db

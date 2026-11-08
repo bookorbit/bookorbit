@@ -248,7 +248,7 @@ export class GeneratedBookFileService {
   private async loadBook(bookId: number, user: RequestUser) {
     const book = await this.repository.findBookPlacement(bookId);
     if (!book) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(user.id, book.libraryId, user.isSuperuser);
+    await this.libraryService.verifyAccess(user, book.libraryId);
     if (book.organizationMode === 'book_per_file') {
       throw new GeneratedFileError('not_allowed', 'Single-file libraries cannot hold more than one file per book');
     }

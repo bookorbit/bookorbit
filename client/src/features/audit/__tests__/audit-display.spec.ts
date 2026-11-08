@@ -149,4 +149,9 @@ describe('audit display helpers', () => {
     expect(getAuditFacts(cleaned).map((fact) => fact.key)).toEqual(['cleaned', 'skipped', 'remaining'])
     expect(getAuditFacts(makeEntry())).toEqual([])
   })
+
+  it('names the API key an action was taken with', () => {
+    const viaKey = makeEntry({ meta: { viaApiKey: 'Backup script' } })
+    expect(getAuditFacts(viaKey)).toEqual([{ key: 'viaApiKey', value: 'Backup script' }])
+  })
 })

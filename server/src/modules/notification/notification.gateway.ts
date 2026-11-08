@@ -1,6 +1,5 @@
-import { ForbiddenException, Inject, Logger, UnauthorizedException } from '@nestjs/common';
+import { ForbiddenException, Inject, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Permission } from '@bookorbit/types';
 import type { NotificationItem } from '@bookorbit/types';
@@ -8,7 +7,7 @@ import { Server, Socket } from 'socket.io';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { UserService } from '../user/user.service';
+import { AuthenticatorService } from '../auth/authenticator.service';
 import { NotificationRepository } from './notification.repository';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 import { appConfig } from '../../config/config';
@@ -20,8 +19,7 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
   private readonly clientOrigin: string;
 
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly userService: UserService,
+    private readonly authenticator: AuthenticatorService,
     private readonly notificationRepo: NotificationRepository,
     @Inject(appConfig.KEY) app: ConfigType<typeof appConfig>,
   ) {
@@ -40,13 +38,7 @@ export class NotificationGateway implements OnGatewayInit, OnGatewayConnection, 
   async handleConnection(client: Socket): Promise<void> {
     const event = 'notification.socket';
     try {
-      const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new UnauthorizedException('No token provided');
-
-      const payload = this.jwtService.verify<{ sub: number; ver: number }>(token, { algorithms: ['HS256'] });
-      const user = await this.userService.findByIdWithPermissions(payload.sub);
-      if (!user || !user.active) throw new UnauthorizedException('User not found or inactive');
-      if (user.tokenVersion !== payload.ver) throw new UnauthorizedException('Token revoked');
+      const user = await this.authenticator.authenticateSocket(client);
 
       this.assertHasAccess(user);
 

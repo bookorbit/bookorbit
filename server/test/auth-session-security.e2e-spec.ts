@@ -11,6 +11,8 @@ import { AppModule } from '../src/app.module';
 import { DB } from '../src/db';
 import * as schema from '../src/db/schema';
 import { MetadataService } from '../src/modules/metadata/metadata.service';
+import { NotificationGateway } from '../src/modules/notification/notification.gateway';
+import { WS_UNAUTHORIZED_EVENT } from '../src/common/utils/ws-auth.utils';
 import { makeMetadataNoopMock } from './e2e/app-harness';
 import type { Db } from './e2e/app-harness';
 
@@ -879,6 +881,39 @@ describe('Auth session security (e2e)', () => {
         },
       });
       expect(revokedSessionRefresh.statusCode).toBe(401);
+    }, 15_000);
+
+    it('refuses the notification socket for a revoked session while its access token is still unexpired', async () => {
+      const owner = await createLocalUser(context.db, { password: 'SocketPass123' });
+      await context.db.insert(schema.userPermissions).values({ userId: owner.userId, permissionName: Permission.NotificationAccess });
+      const revoked = await login(context.app, owner.username, owner.password);
+      const kept = await login(context.app, owner.username, owner.password);
+      const revokedRow = await findRefreshTokenByRawToken(context.db, revoked.refreshToken);
+      const gateway = context.app.get(NotificationGateway);
+      const connect = async (token: string) => {
+        const client = { id: `socket-${randomUUID()}`, handshake: { auth: { token } }, data: {}, join: vi.fn(), emit: vi.fn(), disconnect: vi.fn() };
+        await gateway.handleConnection(client as never);
+        return client;
+      };
+
+      const before = await connect(revoked.accessToken);
+      expect(before.disconnect).not.toHaveBeenCalled();
+      expect(before.join).toHaveBeenCalledWith(`user:${owner.userId}`);
+
+      const revokeResponse = await context.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/auth/sessions/${revokedRow!.sessionId}`,
+        headers: { authorization: `Bearer ${kept.accessToken}` },
+      });
+      expect(revokeResponse.statusCode).toBe(204);
+
+      const after = await connect(revoked.accessToken);
+      expect(after.emit).toHaveBeenCalledWith(WS_UNAUTHORIZED_EVENT, { reason: 'invalid_token' });
+      expect(after.disconnect).toHaveBeenCalledTimes(1);
+      expect(after.join).not.toHaveBeenCalled();
+
+      const other = await connect(kept.accessToken);
+      expect(other.disconnect).not.toHaveBeenCalled();
     }, 15_000);
   });
 });

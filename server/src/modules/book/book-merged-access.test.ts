@@ -10,7 +10,7 @@ describe('verifyBookAccess for a merged-away id', () => {
   const build = (options: { libraries: Record<number, number>; forbiddenLibraries?: number[]; passesFilters?: boolean }) => {
     const bookRepo = { findLibraryIdByBookId: vi.fn((id: number) => Promise.resolve(options.libraries[id] ?? null)) };
     const libraryService = {
-      verifyUserAccess: vi.fn((_userId: number, libraryId: number) =>
+      verifyAccess: vi.fn((_userId: number, libraryId: number) =>
         options.forbiddenLibraries?.includes(libraryId) ? Promise.reject(new ForbiddenException('No access to this library')) : Promise.resolve(),
       ),
     };

@@ -3,6 +3,7 @@ import { BadRequestException, ConflictException, ForbiddenException, ServiceUnav
 import { LibraryAddedAtService } from './library-added-at.service';
 import { LibraryRepository } from './library.repository';
 import { PathPolicyService } from '../path/path-policy.service';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { realpath, stat } from 'fs/promises';
 
@@ -17,8 +18,8 @@ const file = (id: number, bookId = id) => ({ id, bookId, absolutePath: `/library
 describe('LibraryAddedAtService', () => {
   let module: TestingModule;
   let service: LibraryAddedAtService;
+  const libraryScope = { assertVisible: vi.fn() };
   const repo = {
-    hasUserAccess: vi.fn(),
     findById: vi.fn(),
     getAddedAtRecomputeBounds: vi.fn(),
     findAddedAtBookBatch: vi.fn(),
@@ -30,7 +31,7 @@ describe('LibraryAddedAtService', () => {
 
   beforeEach(async () => {
     vi.resetAllMocks();
-    repo.hasUserAccess.mockResolvedValue(true);
+    libraryScope.assertVisible.mockResolvedValue(undefined);
     repo.findById.mockResolvedValue([{ id: 1, addedAtSource: 'file_modified' }]);
     repo.getAddedAtRecomputeBounds.mockResolvedValue({ total: 1, maxId: 1 });
     repo.findAddedAtBookBatch.mockResolvedValue([book(1)]);
@@ -41,7 +42,12 @@ describe('LibraryAddedAtService', () => {
     vi.mocked(realpath).mockImplementation((path) => Promise.resolve(String(path)));
     vi.mocked(stat).mockResolvedValue({ birthtime: oldTime, mtime: newTime, isFile: () => true } as Awaited<ReturnType<typeof stat>>);
     module = await Test.createTestingModule({
-      providers: [LibraryAddedAtService, { provide: LibraryRepository, useValue: repo }, { provide: PathPolicyService, useValue: pathPolicy }],
+      providers: [
+        LibraryAddedAtService,
+        { provide: LibraryRepository, useValue: repo },
+        { provide: PathPolicyService, useValue: pathPolicy },
+        { provide: LibraryScopeService, useValue: libraryScope },
+      ],
     }).compile();
     service = module.get(LibraryAddedAtService);
   });
@@ -138,12 +144,12 @@ describe('LibraryAddedAtService', () => {
   });
 
   it('checks library access and keeps another user job private', async () => {
-    repo.hasUserAccess.mockResolvedValueOnce(false);
+    libraryScope.assertVisible.mockRejectedValueOnce(new ForbiddenException('No access to this library'));
     await expect(service.start(1, user)).rejects.toBeInstanceOf(ForbiddenException);
     await service.start(1, user);
     expect(await service.get(1, { ...user, id: 8 })).toBeNull();
     await complete();
-    repo.hasUserAccess.mockResolvedValueOnce(false);
+    libraryScope.assertVisible.mockRejectedValueOnce(new ForbiddenException('No access to this library'));
     await expect(service.get(1, user)).rejects.toBeInstanceOf(ForbiddenException);
   });
 

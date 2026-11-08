@@ -3,7 +3,7 @@ import { PERMISSION_REQUIRES, type AccessLevel, type AuthUser, type Permission, 
 import { api } from '@/lib/api'
 import { grantingPermissions, isRestrictionPermission, presetPermissions, type PermissionPreset } from '../lib/permission-presets'
 
-export type UserFormSection = 'profile' | 'libraries' | 'permissions' | 'restrictions'
+export type UserFormSection = 'profile' | 'libraries' | 'permissions' | 'restrictions' | 'apiKeys'
 
 /**
  * The list row the drawer is opened from. `createdAt` and `lockedUntil` ride along on the list
@@ -77,6 +77,8 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
   )
 
   /** Selected libraries where the account's role lets Edit metadata take effect. */
+  /** The libraries the account can see as saved, before any unsaved ticks in this form. */
+  const savedLibraryIds = computed(() => [...savedAccessLevels.value.keys()])
   const editorLibraryIds = computed(
     () =>
       new Set(
@@ -360,6 +362,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     selectedPermissionNames,
     selectedLibraryIds,
     editorLibraryIds,
+    savedLibraryIds,
     includeTagItems,
     excludeTagItems,
     includeGenreItems,

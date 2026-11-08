@@ -6,6 +6,7 @@ import { appConfig } from './config/config';
 
 const SWAGGER_METADATA_MODULE_PATH = './metadata.js';
 const PUBLIC_OPERATION_EXTENSION = 'x-public';
+const API_KEY_OPERATION_EXTENSION = 'x-api-key';
 const HTTP_METHODS = ['get', 'put', 'post', 'delete', 'options', 'head', 'patch', 'trace', 'search'] as const;
 
 type AppConfiguration = ConfigType<typeof appConfig>;
@@ -13,6 +14,7 @@ type SwaggerPluginMetadataFactory = () => Promise<Record<string, any>>;
 type SwaggerOperation = {
   security?: Array<Record<string, string[]>>;
   [PUBLIC_OPERATION_EXTENSION]?: boolean;
+  [API_KEY_OPERATION_EXTENSION]?: 'interactive' | 'allowed';
 };
 type SwaggerPathItem = OpenAPIObject['paths'][string] & Record<string, SwaggerOperation | unknown>;
 
@@ -23,7 +25,11 @@ export async function setupSwaggerDocs(app: NestFastifyApplication, config: AppC
     .setTitle('BookOrbit API')
     .setDescription('BookOrbit server API')
     .setVersion(config.version)
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', description: 'A session access token, or an API key (`bok_...`) where the route accepts one.' },
+      'bearer',
+    )
+    .addApiKey({ type: 'apiKey', in: 'header', name: 'X-Api-Key', description: 'An API key (`bok_...`).' }, 'api-key')
     .build();
 
   const documentFactory = () => normalizeSwaggerDocument(SwaggerModule.createDocument(app, openApiConfig));
@@ -55,8 +61,14 @@ function applyOperationSecurity(pathItem: SwaggerPathItem): void {
       continue;
     }
 
-    operation.security = operation[PUBLIC_OPERATION_EXTENSION] === true ? [] : [{ bearer: [] }];
+    operation.security = operationSecurity(operation);
   }
+}
+
+function operationSecurity(operation: SwaggerOperation): Array<Record<string, string[]>> {
+  if (operation[PUBLIC_OPERATION_EXTENSION] === true) return [];
+  if (operation[API_KEY_OPERATION_EXTENSION] === 'interactive') return [{ bearer: [] }];
+  return [{ bearer: [] }, { 'api-key': [] }];
 }
 
 function isSwaggerOperation(value: unknown): value is SwaggerOperation {

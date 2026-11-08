@@ -38,6 +38,7 @@ export default defineConfigWithVueTs(
       'src/features/book/components/merge/*.vue',
       'src/features/book/components/link/*.vue',
       'src/components/browse-header/*.vue',
+      'src/features/api-keys/**/*.vue',
     ],
     rules: { 'vue/v-on-handler-style': ['error', ['method', 'inline']] },
   },

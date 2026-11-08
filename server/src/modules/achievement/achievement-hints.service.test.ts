@@ -57,6 +57,8 @@ function hintFor(hints: AchievementHint[], key: string): AchievementHint | undef
   return hints.find((hint) => hint.key === key);
 }
 
+const libraryScope = { visibleIdsOrAll: vi.fn((user: RequestUser) => Promise.resolve(user.isSuperuser ? null : [1])) };
+
 describe('AchievementHintsService', () => {
   let achievements: ReturnType<typeof makeAchievementRepo>;
   let hints: ReturnType<typeof makeHintsRepo>;
@@ -67,7 +69,7 @@ describe('AchievementHintsService', () => {
     vi.setSystemTime(NOW);
     achievements = makeAchievementRepo();
     hints = makeHintsRepo();
-    service = new AchievementHintsService(achievements as never, hints as never);
+    service = new AchievementHintsService(achievements as never, hints as never, libraryScope as never);
   });
 
   afterEach(() => {
@@ -86,7 +88,7 @@ describe('AchievementHintsService', () => {
 
   it('speaks to the next unearned tier of a set and skips achievements already earned', async () => {
     achievements = makeAchievementRepo(['hours_read_1', 'hours_read_2', 'slow_burn']);
-    service = new AchievementHintsService(achievements as never, hints as never);
+    service = new AchievementHintsService(achievements as never, hints as never, libraryScope as never);
     achievements.sumReadingHours.mockResolvedValue(474);
     hints.sumReadingSecondsSince.mockResolvedValue(44.3 * 3600);
     hints.findStalledBook.mockResolvedValue({ bookId: 1, title: 'x', percent: 50, startedAt: new Date(), fileId: 2, format: 'epub', total: 1 });
@@ -162,7 +164,7 @@ describe('AchievementHintsService', () => {
 
   it('marks a long-book tier unavailable when no unfinished book is long enough', async () => {
     achievements = makeAchievementRepo(['long_book_1', 'page_turner', 'long_book_3']);
-    service = new AchievementHintsService(achievements as never, hints as never);
+    service = new AchievementHintsService(achievements as never, hints as never, libraryScope as never);
     hints.findUnfinishedByPageCount.mockImplementation((_scope, bounds: { atLeast?: number }) =>
       Promise.resolve(bounds.atLeast ? { count: 0, inProgress: 0, bookIds: [] } : { count: 8, inProgress: 2, bookIds: [663, 37, 674] }),
     );
@@ -316,10 +318,10 @@ describe('AchievementHintsService', () => {
     const contentFilters = { ...EMPTY_CONTENT_FILTER_RULES, excludeGenreIds: [4] };
 
     await service.getHints(makeUser({ contentFilters }));
-    expect(hints.findNearlyFinished).toHaveBeenLastCalledWith({ userId: 7, isSuperuser: false, contentFilters }, 90);
+    expect(hints.findNearlyFinished).toHaveBeenLastCalledWith({ userId: 7, isSuperuser: false, libraryIds: [1], contentFilters }, 90);
 
     await service.getHints(makeUser({ isSuperuser: true, contentFilters }));
-    expect(hints.findNearlyFinished).toHaveBeenLastCalledWith({ userId: 7, isSuperuser: true, contentFilters: undefined }, 90);
+    expect(hints.findNearlyFinished).toHaveBeenLastCalledWith({ userId: 7, isSuperuser: true, libraryIds: null, contentFilters: undefined }, 90);
   });
 });
 
