@@ -38,6 +38,18 @@ describe('BookDock DTO validation', () => {
     expect((await errorsFor(FinalizeBookDockDto, { defaultLibraryId: 1, defaultFolderId: 2, fileIds: [1, 2] })).length).toBe(0);
   });
 
+  it('FinalizeBookDockDto accepts an optional existing book to join per override and nothing else in it', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+    const check = (overrides: unknown[]) => pipe.transform({ fileIds: [1], overrides }, { type: 'body', metatype: FinalizeBookDockDto });
+
+    await expect(check([{ fileId: 1 }])).resolves.toBeDefined();
+    await expect(check([{ fileId: 1, joinBook: { bookId: 42 } }])).resolves.toMatchObject({ overrides: [{ fileId: 1, joinBook: { bookId: 42 } }] });
+    await expect(check([{ fileId: 1, joinBook: { bookId: 0 } }])).rejects.toThrow();
+    await expect(check([{ fileId: 1, joinBook: { bookId: '42x' } }])).rejects.toThrow();
+    await expect(check([{ fileId: 1, joinBook: 42 }])).rejects.toThrow();
+    await expect(check([{ fileId: 1, joinBook: { bookId: 42, folderPath: '/elsewhere' } }])).rejects.toThrow();
+  });
+
   it('UpdateBookDockFileDto allows null destination values but rejects non-integers', async () => {
     expect((await errorsFor(UpdateBookDockFileDto, { targetLibraryId: null, targetFolderId: null })).length).toBe(0);
     expect((await errorsFor(UpdateBookDockFileDto, { targetLibraryId: 'x' })).length).toBeGreaterThan(0);

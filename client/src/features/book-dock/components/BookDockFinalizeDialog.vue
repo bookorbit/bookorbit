@@ -2,13 +2,21 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText, Trash2 } from '@lucide/vue'
-import type { BookDockDiscardDuplicatesResult, BookDockFinalizePreviewResult } from '@bookorbit/types'
+import { X, Check, AlertCircle, Copy, Loader2, ExternalLink, ChevronDown, FileText, Trash2, Layers } from '@lucide/vue'
+import type {
+  BookDockDiscardDuplicatesResult,
+  BookDockFinalizeFileResult,
+  BookDockFinalizeOverride,
+  BookDockFinalizePreviewItem,
+  BookDockFinalizePreviewResult,
+} from '@bookorbit/types'
 
 import { api } from '@/lib/api'
 import { useBookDestination } from '@/features/library/composables/useBookDestination'
 import BookDestinationFields from '@/features/library/components/BookDestinationFields.vue'
 import { useBookDockFinalize } from '../composables/useBookDockFinalize'
+import { joinErrorMessageKey, useBookDockJoinChoices, type BookDockJoinChoice } from '../composables/useBookDockJoinChoices'
+import BookDockFinalizePreviewRow from './BookDockFinalizePreviewRow.vue'
 
 const { t } = useI18n()
 
@@ -35,6 +43,7 @@ type FinalizePayload = {
   search?: string
   defaultLibraryId?: number
   defaultFolderId?: number
+  overrides?: BookDockFinalizeOverride[]
 }
 
 const emit = defineEmits<{
@@ -46,6 +55,7 @@ const router = useRouter()
 const destination = useBookDestination({ defaultToFirstLibrary: true })
 const { libraryId: defaultLibraryId, folderId: defaultFolderId, hasDestination, fetchLibraries, refreshLibraries } = destination
 const { result, loading, error, finalize, reset } = useBookDockFinalize()
+const joinChoices = useBookDockJoinChoices()
 
 const expandedErrors = ref<Set<number>>(new Set())
 const reimportingIds = reactive(new Set<number>())
@@ -62,6 +72,14 @@ const resultDuplicateCount = computed(() => resultDuplicateIds.value.length)
 const previewDuplicateItems = computed(() => finalizePreview.value?.items.filter((item) => item.status === 'duplicate') ?? [])
 const previewDuplicateCount = computed(() => finalizePreview.value?.duplicates ?? 0)
 const effectiveSelectionCount = computed(() => finalizePreview.value?.total ?? Math.max(0, props.selectionCount - discardedIds.value.size))
+/** Every listed file that will be filed, plus any whose requested join was refused, so the refusal shows beside it. */
+const previewRows = computed(
+  () => finalizePreview.value?.items.filter((item) => !!item.newName || joinChoices.choiceFor(item.fileId) !== undefined) ?? [],
+)
+const unlistedCount = computed(() =>
+  finalizePreview.value?.truncated ? Math.max(0, finalizePreview.value.total - finalizePreview.value.items.length) : 0,
+)
+const joiningCount = computed(() => finalizePreview.value?.joining ?? 0)
 
 function isFileExistsError(msg: string | undefined): boolean {
   return !!msg?.includes('file with this name already exists')
@@ -84,6 +102,12 @@ function setRenameInput(fileId: number, value: string) {
 function markDiscarded(ids: number[]) {
   if (!ids.length) return
   discardedIds.value = new Set([...discardedIds.value, ...ids])
+  joinChoices.forget(ids)
+}
+
+function withJoinOverrides<T extends FinalizePayload>(payload: T, fileIds?: number[]): T {
+  const overrides = joinChoices.overrides(fileIds)
+  return overrides.length > 0 ? { ...payload, overrides } : payload
 }
 
 function effectiveSelectionPayload(): {
@@ -107,7 +131,7 @@ function effectiveSelectionPayload(): {
 }
 
 function finalizePayload(): FinalizePayload {
-  return {
+  return withJoinOverrides({
     ...effectiveSelectionPayload(),
     ...(requiresDefaultDestination.value && hasDestination.value && defaultLibraryId.value !== null && defaultFolderId.value !== null
       ? {
@@ -115,7 +139,28 @@ function finalizePayload(): FinalizePayload {
           defaultFolderId: defaultFolderId.value,
         }
       : {}),
-  }
+  })
+}
+
+function resultMessage(item: BookDockFinalizeFileResult): string | undefined {
+  if (!item.errorCode) return item.message
+  return t(joinErrorMessageKey(item.errorCode), { title: joinChoices.choiceFor(item.fileId)?.title || t('book.untitled') })
+}
+
+function handleJoinChoose(item: BookDockFinalizePreviewItem, book: BookDockJoinChoice) {
+  joinChoices.choose(item.fileId, book)
+}
+
+function handleJoinClear(item: BookDockFinalizePreviewItem) {
+  joinChoices.clear(item.fileId)
+}
+
+function handleJoinOpenPicker(item: BookDockFinalizePreviewItem) {
+  joinChoices.openPicker(item.fileId)
+}
+
+function handleJoinClosePicker() {
+  joinChoices.closePicker()
 }
 
 async function handleRenameAndRetry(fileId: number) {
@@ -123,9 +168,10 @@ async function handleRenameAndRetry(fileId: number) {
   if (!name || !result.value || reimportingIds.has(fileId)) return
   reimportingIds.add(fileId)
   try {
+    const choice = joinChoices.choiceFor(fileId)
     const payload: Record<string, unknown> = {
       fileIds: [fileId],
-      overrides: [{ fileId, targetFileName: name }],
+      overrides: [{ fileId, targetFileName: name, ...(choice ? { joinBook: { bookId: choice.bookId } } : {}) }],
     }
     if (defaultLibraryId.value !== null) payload.defaultLibraryId = defaultLibraryId.value
     if (defaultFolderId.value !== null) payload.defaultFolderId = defaultFolderId.value
@@ -153,7 +199,6 @@ async function handleRenameAndRetry(fileId: number) {
   }
 }
 
-const namePreview = ref<{ fileId: number; fileName: string; newName: string }[]>([])
 const previewLoading = ref(false)
 let previewReqSeq = 0
 
@@ -170,16 +215,10 @@ onMounted(async () => {
   void fetchFinalizePreview()
 })
 
-function syncNamePreviewFromFinalizePreview(preview: BookDockFinalizePreviewResult | null) {
-  namePreview.value =
-    preview?.items.filter((item) => !!item.newName).map((item) => ({ fileId: item.fileId, fileName: item.fileName, newName: item.newName! })) ?? []
-}
-
 async function fetchFinalizePreview() {
   if (!selectionSummary.value || (requiresDefaultDestination.value && !hasDestination.value)) {
     ++previewReqSeq
     finalizePreview.value = null
-    namePreview.value = []
     previewLoading.value = false
     finalizePreviewLoading.value = false
     return
@@ -198,7 +237,6 @@ async function fetchFinalizePreview() {
       if (reqId === previewReqSeq) {
         finalizePreview.value = null
         finalizePreviewError.value = `Preview failed (${res.status})`
-        namePreview.value = []
         previewLoading.value = false
         finalizePreviewLoading.value = false
       }
@@ -208,14 +246,12 @@ async function fetchFinalizePreview() {
     const preview: BookDockFinalizePreviewResult = await res.json()
     if (reqId !== previewReqSeq) return
     finalizePreview.value = preview
-    syncNamePreviewFromFinalizePreview(preview)
     previewLoading.value = false
     finalizePreviewLoading.value = false
   } catch {
     if (reqId !== previewReqSeq) return
     finalizePreview.value = null
     finalizePreviewError.value = 'Finalize preview failed'
-    namePreview.value = []
     previewLoading.value = false
     finalizePreviewLoading.value = false
   }
@@ -238,7 +274,7 @@ async function fetchSelectionSummary() {
   selectionSummary.value = { total: props.selectionCount, withDestination: 0, withoutDestination: props.selectionCount }
 }
 
-watch([defaultLibraryId, defaultFolderId, requiresDefaultDestination, hasDestination], () => {
+watch([defaultLibraryId, defaultFolderId, requiresDefaultDestination, hasDestination, joinChoices.choices], () => {
   void fetchFinalizePreview()
 })
 
@@ -287,15 +323,20 @@ async function handleDiscardResultDuplicates() {
   if (!result.value || duplicateDiscardLoading.value || resultDuplicateIds.value.length === 0) return
   duplicateDiscardLoading.value = true
   try {
-    const discardResult = await discardDuplicateSelection({
-      fileIds: resultDuplicateIds.value,
-      ...(defaultLibraryId.value !== null && defaultFolderId.value !== null
-        ? {
-            defaultLibraryId: defaultLibraryId.value,
-            defaultFolderId: defaultFolderId.value,
-          }
-        : {}),
-    })
+    const discardResult = await discardDuplicateSelection(
+      withJoinOverrides(
+        {
+          fileIds: resultDuplicateIds.value,
+          ...(defaultLibraryId.value !== null && defaultFolderId.value !== null
+            ? {
+                defaultLibraryId: defaultLibraryId.value,
+                defaultFolderId: defaultFolderId.value,
+              }
+            : {}),
+        },
+        resultDuplicateIds.value,
+      ),
+    )
     if (!discardResult || discardResult.discarded === 0) return
 
     const removedIds = new Set(discardResult.discardedFileIds)
@@ -350,6 +391,10 @@ async function handleDiscardResultDuplicates() {
               <span class="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-1 text-emerald-700 dark:text-emerald-300">
                 <Check class="size-3" />
                 {{ t('bookDock.finalizeDialog.readyCount', { count: finalizePreview.ready }) }}
+              </span>
+              <span v-if="joiningCount > 0" class="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-primary">
+                <Layers class="size-3" aria-hidden="true" />
+                {{ t('bookDock.finalizeDialog.joiningCount', { count: joiningCount }) }}
               </span>
               <span
                 v-if="finalizePreview.duplicates > 0"
@@ -414,18 +459,26 @@ async function handleDiscardResultDuplicates() {
             :folder-label="t('bookDock.finalizeDialog.defaultDestinationFolder')"
           />
 
-          <div v-if="namePreview.length || previewLoading" class="space-y-1.5">
+          <div v-if="previewRows.length || previewLoading" class="space-y-1.5">
             <div class="flex items-center gap-1.5">
               <FileText class="size-3.5 text-muted-foreground" />
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.finalizeDialog.renamePreview') }}</span>
               <span v-if="previewLoading" class="text-xs text-muted-foreground italic">{{ t('common.loading') }}</span>
             </div>
-            <div class="rounded-lg border border-border bg-muted/20 divide-y divide-border max-h-48 overflow-y-auto">
-              <div v-for="p in namePreview.slice(0, 8)" :key="p.fileId" class="px-3 py-1.5 text-xs">
-                <span class="text-foreground font-medium font-mono break-all">{{ p.newName }}</span>
-              </div>
-              <div v-if="namePreview.length > 8" class="px-3 py-1.5 text-xs text-muted-foreground italic">
-                {{ t('bookDock.finalizeDialog.moreFiles', { count: namePreview.length - 8 }) }}
+            <div class="rounded-lg border border-border bg-muted/20 divide-y divide-border max-h-72 overflow-y-auto">
+              <BookDockFinalizePreviewRow
+                v-for="item in previewRows"
+                :key="item.fileId"
+                :item="item"
+                :choice="joinChoices.choiceFor(item.fileId)"
+                :picker-open="joinChoices.pickerFileId.value === item.fileId"
+                @choose="handleJoinChoose(item, $event)"
+                @clear="handleJoinClear(item)"
+                @open-picker="handleJoinOpenPicker(item)"
+                @close-picker="handleJoinClosePicker"
+              />
+              <div v-if="unlistedCount > 0" class="px-3 py-1.5 text-xs text-muted-foreground italic">
+                {{ t('bookDock.finalizeDialog.moreFiles', { count: unlistedCount }) }}
               </div>
             </div>
           </div>
@@ -532,7 +585,7 @@ async function handleDiscardResultDuplicates() {
                 </div>
               </div>
               <div v-if="!r.success && r.message && expandedErrors.has(r.fileId)" class="px-3 pb-2">
-                <p class="text-xs text-red-500 bg-red-500/10 rounded-md p-2 break-all">{{ r.message }}</p>
+                <p class="text-xs text-red-500 bg-red-500/10 rounded-md p-2 break-all">{{ resultMessage(r) }}</p>
               </div>
             </div>
           </div>

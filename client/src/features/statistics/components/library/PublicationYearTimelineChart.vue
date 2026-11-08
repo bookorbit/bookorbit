@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { TrendingUp } from '@lucide/vue'
 
 import { usePublicationYearTimeline } from '../../composables/usePublicationYearTimeline'
@@ -214,7 +214,7 @@ watchEffect(() => {
     :empty="!data.items.length"
   >
     <div class="flex h-full flex-col">
-      <VChart :option autoresize style="flex: 1; min-height: 0" />
+      <AppChart :option autoresize style="flex: 1; min-height: 0" />
       <div v-if="statCards" class="mt-2 grid grid-cols-6 gap-2 md:gap-8 px-1">
         <div v-for="card in statCards" :key="card.label" class="bg-muted/40 border-border/60 rounded-md border px-2 py-1 text-center">
           <p class="text-muted-foreground text-[10px] leading-none">{{ card.label }}</p>

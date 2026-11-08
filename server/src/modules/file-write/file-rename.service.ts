@@ -1,4 +1,4 @@
-import { Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
 import { basename, dirname, extname, isAbsolute, join, normalize, relative, sep } from 'path';
@@ -10,6 +10,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { resolveSingleFileBookPath } from '../../common/utils/book-path.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { BookConsolidationService } from '../book-consolidation/book-consolidation.service';
 import type { BookCoverSlotRow } from '../book-cover-store/book-cover-store.repository';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
@@ -43,6 +44,7 @@ export class FileRenameService implements OnModuleDestroy {
     private readonly config: ConfigService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
     private readonly coverStore: BookCoverStore,
+    private readonly consolidation: BookConsolidationService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
   ) {
     this.debounceMs = resolvePositiveInteger(this.config.get('fileWrite.debounceMs'), DEFAULT_RENAME_DEBOUNCE_MS);
@@ -249,15 +251,23 @@ export class FileRenameService implements OnModuleDestroy {
     this.selfWriteRegistry.begin(suppressPaths);
     try {
       if (mergeTargetBookId !== null) {
-        await this.mergeBookIntoExistingFolder(
-          bookId,
-          data,
-          currentFolderPath,
-          newFolderPath,
-          fileTargets,
-          mergeTargetBookId,
-          sanitizeForCrossPlatform,
+        const targetBookId = mergeTargetBookId;
+        // The lock is not re-entrant and this rename already holds its own book's, so waiting for
+        // the target's could deadlock against a merge that took the two in the other order.
+        const merging = this.lockService.tryWithLock(bookOperationLockKey(targetBookId), () =>
+          this.mergeBookIntoExistingFolder(
+            bookId,
+            userId,
+            data,
+            currentFolderPath,
+            newFolderPath,
+            fileTargets,
+            targetBookId,
+            sanitizeForCrossPlatform,
+          ),
         );
+        if (!merging) throw new ConflictException('The book that owns the target folder is busy. Try the rename again shortly.');
+        await merging;
       } else if (bookHasOwnFolder && newFolderPath !== currentFolderPath) {
         if (moveIntoExistingFolder) {
           await this.renameBookIntoExistingFolder(bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
@@ -492,6 +502,7 @@ export class FileRenameService implements OnModuleDestroy {
 
   private async mergeBookIntoExistingFolder(
     bookId: number,
+    userId: number,
     data: BookRenameData,
     oldFolderPath: string,
     newFolderPath: string,
@@ -501,7 +512,7 @@ export class FileRenameService implements OnModuleDestroy {
   ): Promise<void> {
     const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const updates = allFiles.map((file) => ({
-      id: file.id,
+      fileId: file.id,
       absolutePath: fileTargets.get(file.id)!,
       relPath: relative(data.libraryFolderPath, fileTargets.get(file.id)!),
     }));
@@ -527,12 +538,17 @@ export class FileRenameService implements OnModuleDestroy {
         }
       }
 
-      await this.renameRepo.applyExistingFolderMerge({
-        sourceBookId: bookId,
-        targetBookId,
-        updates,
-        fallbackPrimaryFileId: data.file.id,
-      });
+      // The source's readers, shelves, Kobo state and history move onto the target, the way a book
+      // merge moves them; deleting the source outright here used to lose all of it.
+      await this.renameRepo.transaction((tx) =>
+        this.consolidation.consolidate(tx, {
+          targetBookId,
+          sourceBookId: bookId,
+          destination: null,
+          sourceFileUpdates: updates,
+          mergedByUserId: userId,
+        }),
+      );
     } catch (error) {
       for (const { from, to } of [...movedFiles].reverse()) {
         try {

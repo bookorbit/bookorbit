@@ -17,6 +17,7 @@ import * as schema from '../../../src/db/schema';
 import { MetadataService } from '../../../src/modules/metadata/metadata.service';
 import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
 import { makeMetadataNoopMock, seedLibrary, waitForScanCompletion } from '../app-harness';
+import { allowAppAttest } from '../allow-app-attest';
 import { createReaderStateIsolationFixtureRoot, type ReaderStateIsolationFixtureRoot } from './reader-state-isolation-fixture-builder';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -76,9 +77,11 @@ export async function createReaderStateIsolationE2EContext(
 
   process.env.APP_DATA_PATH = fixture.booksPath;
 
-  const builder = Test.createTestingModule({
-    imports: [AppModule],
-  });
+  const builder = allowAppAttest(
+    Test.createTestingModule({
+      imports: [AppModule],
+    }),
+  );
   if (!options.realMetadata) builder.overrideProvider(MetadataService).useValue(makeMetadataNoopMock());
   const moduleFixture = await builder.compile();
 

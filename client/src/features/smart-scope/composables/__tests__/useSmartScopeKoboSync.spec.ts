@@ -27,6 +27,7 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     filter: null,
     defaultSort: [],
     isPublic: true,
+    coverAspectRatio: '2/3',
     syncToKobo: false,
     koboSyncEnabled: false,
     isOwner: false,

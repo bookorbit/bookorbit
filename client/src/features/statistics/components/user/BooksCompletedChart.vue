@@ -2,7 +2,7 @@
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { BookCheck } from '@lucide/vue'
 
 import { useUserBooksCompleted } from '../../composables/useUserBooksCompleted'
@@ -15,7 +15,7 @@ const MIN_COMPLETIONS = 2
 
 const { t } = useI18n()
 const router = useRouter()
-const chartRef = ref<InstanceType<typeof VChart> | null>(null)
+const chartRef = ref<InstanceType<typeof AppChart> | null>(null)
 
 const { data, loading, error } = useUserBooksCompleted()
 
@@ -27,7 +27,7 @@ const option = shallowRef({})
 
 /** A month on the chart opens History on the reads behind it. */
 function handleChartClick(event: { offsetX: number; offsetY: number }) {
-  const route = historyRouteForChartClick(chartRef.value, event, data.value)
+  const route = historyRouteForChartClick(chartRef.value?.instance, event, data.value)
   if (route) void router.push(route)
 }
 
@@ -92,6 +92,6 @@ watchEffect(() => {
       :title="t('statistics.empty.notEnoughData')"
       :description="t('statistics.charts.booksCompleted.notEnoughData', { count: MIN_COMPLETIONS })"
     />
-    <VChart v-else ref="chartRef" :option autoresize class="cursor-pointer" style="height: 100%" @zr:click="handleChartClick" />
+    <AppChart v-else ref="chartRef" :option autoresize class="cursor-pointer" style="height: 100%" @zr:click="handleChartClick" />
   </ChartCard>
 </template>

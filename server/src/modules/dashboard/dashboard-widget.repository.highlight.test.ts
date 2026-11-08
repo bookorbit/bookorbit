@@ -51,6 +51,7 @@ function expectActiveAnnotationPool(where: unknown, userId: number, libraryIds: 
 
   expect(rendered.sql).toContain('"annotations"."user_id" = $1');
   expect(rendered.sql).toContain('"annotations"."deleted_at" is null');
+  expect(rendered.sql).toContain(`"annotations"."text" <> ''`);
   expect(rendered.sql).toContain('"books"."library_id" in ($2, $3)');
   expect(rendered.params).toEqual([userId, ...libraryIds]);
 }
@@ -100,6 +101,7 @@ describe('DashboardWidgetRepository highlight queries', () => {
     const rendered = dialect.sqlToQuery(query.where.mock.calls[0]?.[0] as SQL);
     expect(rendered.sql).toContain('"annotations"."user_id" = $1');
     expect(rendered.sql).toContain('"annotations"."deleted_at" is null');
+    expect(rendered.sql).toContain(`"annotations"."text" <> ''`);
     expect(rendered.sql).toContain('"books"."library_id" in ($2, $3)');
     expect(rendered.sql).toContain('"annotations"."book_id" not in ($4)');
     expect(rendered.params).toEqual([42, 7, 8, 5]);

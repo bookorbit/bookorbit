@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, onUnmounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -45,6 +45,8 @@ import { useSeriesCollapsePreference } from '@/features/book/composables/useSeri
 import { useEffectiveSeriesCollapse } from '@/features/book/composables/useEffectiveSeriesCollapse'
 
 import { useBookEvents } from '@/features/book/composables/useBookEvents'
+import { useBookMergeSync } from '@/features/book/composables/useBookMergeSync'
+import { useBookLinkSync } from '@/features/book/composables/useBookLinkSync'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLiveScanBooks } from '@/features/scanner/composables/useLiveScanBooks'
 import { useLibraryScan } from '@/features/scanner/composables/useLibraryScan'
@@ -69,9 +71,12 @@ import { useBookViewContext } from '@/features/book/composables/useBookViewConte
 import { useBookTableShell } from '@/features/book/composables/useBookTableShell'
 import { useInfiniteScrollSentinel } from '@/composables/useInfiniteScrollSentinel'
 import { useSavedViews, type SavedView } from '@/features/book/composables/useSavedViews'
-import type { GroupRule, Rule, SortSpec } from '@bookorbit/types'
+import type { BookLinksChangedEvent, BookMergedEvent, GroupRule, Rule, SortSpec } from '@bookorbit/types'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import { type QuerySelectionState } from '@/features/book/composables/useBookBulkActions'
+
+const MergeBooksSheet = defineAsyncComponent(() => import('@/features/book/components/merge/MergeBooksSheet.vue'))
+const LinkBooksSheet = defineAsyncComponent(() => import('@/features/book/components/link/LinkBooksSheet.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
@@ -117,6 +122,7 @@ const {
   booksProxy: books,
   slots,
   total,
+  bookTotal,
   loading,
   initialized: booksInitialized,
   error,
@@ -152,6 +158,7 @@ const {
   railEnabled: showJumpRails,
   railViewport: mainRef,
   collapseEnabled: effectiveCollapseEnabled,
+  collapseLinked: true,
   q: debouncedQuery,
 })
 const { onLibraryUploadCompleted } = useLibraryUploadEvents()
@@ -266,7 +273,8 @@ function activateQuerySelection() {
     filter: filter.value,
     q: debouncedQuery.value || undefined,
     sort: sort.value,
-    total: total.value,
+    // Every matching book is acted on, linked ones included, so the count is books, not cards (G7).
+    total: bookTotal.value,
   }
   showQuerySelectionBanner.value = false
 }
@@ -340,7 +348,7 @@ function handleResetSort() {
 
 const { tokens: filterTokens, selectedFormats, ruleCount: filterRuleCount, removeToken: removeFilterToken, toggleFormat } = useFilterTokens(filter)
 
-const { facets } = useLibraryFacets(libraryId, filter, debouncedQuery)
+const { facets, refresh: refreshFacets } = useLibraryFacets(libraryId, filter, debouncedQuery)
 const formatFacets = computed(() => facets.value?.formats ?? [])
 const showFormatFacets = computed(() => formatFacets.value.length > 1 || selectedFormats.value.length > 0)
 const selectedFormatsLabel = computed(() => (selectedFormats.value.length > 0 ? selectedFormats.value.map(formatFilterValueLabel).join(', ') : null))
@@ -494,6 +502,21 @@ const {
   selectedIds,
   selectedCount,
   canEditSelectionMetadata,
+  mergeSelection,
+  mergeOpen,
+  mergeBookIds,
+  openMergeForSelection,
+  setMergeOpen,
+  linkSelection,
+  linkOpen,
+  linkBookIds,
+  linkBooks,
+  linkSeedBooks,
+  openLinkForSelection,
+  setLinkOpen,
+  switchMergeToLink,
+  selectionHasLinked,
+  pendingDeleteLinked,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -585,6 +608,45 @@ onBookTransferred((event) => {
     scheduleTransferRefresh(event.toLibraryId)
   }
 })
+
+function refreshAfterMerge() {
+  resetBooks()
+  refreshBuckets()
+  void refreshFacets()
+}
+
+/** A merge across libraries reaches every library it touched: the one the kept book lands in reloads too. */
+function mergeAffectsLibrary(event: BookMergedEvent): boolean {
+  const id = libraryId.value
+  return id !== null && (event.libraryId === id || (event.sourceLibraryIds ?? []).includes(id))
+}
+
+const { applyMerged } = useBookMergeSync({ books, deselect: deselectAll, refresh: refreshAfterMerge, affectsScope: mergeAffectsLibrary })
+
+function handleBooksMerged(event: BookMergedEvent) {
+  applyMerged(event)
+  exitSelectionMode()
+}
+
+function refreshAfterLinkChange() {
+  resetBooks()
+  refreshBuckets()
+}
+
+function linkChangeAffectsLibrary(event: BookLinksChangedEvent): boolean {
+  return event.libraryId === libraryId.value
+}
+
+const { scheduleRefresh: scheduleLinkRefresh } = useBookLinkSync({
+  books,
+  refresh: refreshAfterLinkChange,
+  affectsScope: linkChangeAffectsLibrary,
+})
+
+function handleBooksLinked() {
+  exitSelectionMode()
+  scheduleLinkRefresh()
+}
 
 const bookGridRef = ref<{ scrollToIndex: (index: number) => void } | null>(null)
 
@@ -972,7 +1034,7 @@ defineOptions({ name: 'HomeView' })
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
             <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">{{
-              t('views.bookView.allBooksLoaded', { count: formatNumber(total) })
+              t('views.bookView.allBooksLoaded', { count: formatNumber(bookTotal) })
             }}</span>
           </div>
 
@@ -1011,10 +1073,10 @@ defineOptions({ name: 'HomeView' })
         class="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-lg border border-primary/30 bg-background px-4 py-2.5 text-sm shadow-lg"
       >
         <span class="text-muted-foreground">
-          {{ t('views.library.querySelection.loadedSelected', { selected: formatNumber(selectedCount), total: formatNumber(total) }) }}
+          {{ t('views.library.querySelection.loadedSelected', { selected: formatNumber(selectedCount), total: formatNumber(bookTotal) }) }}
         </span>
         <button class="font-medium text-primary underline-offset-2 hover:underline" @click="activateQuerySelection">
-          {{ t('views.library.querySelection.selectAllMatching', { total: formatNumber(total) }) }}
+          {{ t('views.library.querySelection.selectAllMatching', { total: formatNumber(bookTotal) }) }}
         </button>
         <button class="text-muted-foreground hover:text-foreground" @click="dismissQuerySelectionBanner">
           <X :size="14" />
@@ -1032,7 +1094,12 @@ defineOptions({ name: 'HomeView' })
       @download="handleDownloadFiles"
       @export-metadata="openMetadataExport(querySelection ? 'all-matching' : 'selected')"
       @add-to-collection="addToCollectionOpen = true"
+      :merge="mergeSelection"
+      :link="linkSelection"
+      :linked-selected="selectionHasLinked"
       @move-to-library="openMoveForSelection"
+      @merge="openMergeForSelection"
+      @link="openLinkForSelection"
       @edit="handleEditSelected"
       @edit-individually="handleEditIndividually"
       @refresh-metadata="handleBulkRefreshMetadata"
@@ -1050,7 +1117,7 @@ defineOptions({ name: 'HomeView' })
       view-type="library"
       :selected-book-ids="[...selectedIds]"
       :selected-count="selectedCount"
-      :total-count="total"
+      :total-count="bookTotal"
       :all-matching-query="metadataExportQuery"
       :sort="sort"
       :visible-columns="visibleExportColumns"
@@ -1091,10 +1158,41 @@ defineOptions({ name: 'HomeView' })
       @sent="exitSelectionMode"
     />
 
-    <SaveAsSmartScopeDialog :open="saveAsSmartScopeOpen" :filter="filter" :sort="sort" @close="saveAsSmartScopeOpen = false" />
+    <SaveAsSmartScopeDialog
+      :open="saveAsSmartScopeOpen"
+      :filter="filter"
+      :sort="sort"
+      :cover-aspect-ratio="currentCoverAspectRatio"
+      @close="saveAsSmartScopeOpen = false"
+    />
 
     <BookUploadModal v-if="uploadOpen && libraryId !== null" :library-id="libraryId" @close="closeUpload" @uploaded="closeUpload" />
 
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+    <DeleteBookDialog
+      :open="deleteBookId !== null"
+      :deleting="deletingBook"
+      :linked="pendingDeleteLinked"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
+
+    <LinkBooksSheet
+      v-if="linkBookIds.length > 0"
+      :open="linkOpen"
+      :book-ids="linkBookIds"
+      :books="linkBooks"
+      :seed-books="linkSeedBooks"
+      @update:open="setLinkOpen"
+      @linked="handleBooksLinked"
+    />
+
+    <MergeBooksSheet
+      v-if="mergeBookIds.length > 0"
+      :open="mergeOpen"
+      :book-ids="mergeBookIds"
+      @update:open="setMergeOpen"
+      @link-instead="switchMergeToLink"
+      @merged="handleBooksMerged"
+    />
   </div>
 </template>

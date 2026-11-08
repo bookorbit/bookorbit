@@ -43,7 +43,7 @@ vi.mock('@/lib/api', () => ({
 }))
 
 vi.mock('vue-sonner', () => ({
-  toast: { success: toastSuccess, error: vi.fn<() => void>() },
+  toast: { success: toastSuccess, error: toastError },
 }))
 
 vi.mock('@/lib/clipboard', () => ({
@@ -67,6 +67,7 @@ const accessRef = ref<LibraryAccessEntry[]>([])
 const apiMock = vi.fn<(...args: unknown[]) => Promise<{ ok: boolean; json: () => Promise<unknown> }>>()
 type ToastOptions = { action?: { label: string; onClick: () => void }; description?: string }
 const toastSuccess = vi.hoisted(() => vi.fn<(message: string, options?: ToastOptions) => void>())
+const toastError = vi.hoisted(() => vi.fn<(message: string) => void>())
 const copyMock = vi.hoisted(() => vi.fn<(text: string) => Promise<boolean>>())
 
 // --- Factory helpers ---
@@ -881,6 +882,38 @@ describe('LibrariesSettings ledger', () => {
       input.dispatchEvent(new Event('input'))
       await flushPromises()
       expect(confirmButton()?.disabled).toBe(false)
+
+      wrapper.unmount()
+      headerTarget.remove()
+    })
+
+    it('says the library is busy when a scan, move, rename or merge holds it, and keeps the dialog open', async () => {
+      const headerTarget = document.createElement('div')
+      headerTarget.id = 'settings-header-actions'
+      document.body.appendChild(headerTarget)
+      librariesRef.value = [makeLibrary({ id: 5, name: 'Novels' })]
+      const fallback = apiMock.getMockImplementation()!
+      apiMock.mockImplementation(async (path: unknown, init?: unknown) => {
+        if (String(path).endsWith('/libraries/5') && (init as RequestInit | undefined)?.method === 'DELETE') {
+          return { ok: false, status: 409, json: async () => ({ statusCode: 409, message: 'Busy', errorCode: 'LIBRARY_BUSY' }) }
+        }
+        return fallback(path, init)
+      })
+      const wrapper = await mountLoaded({ realTeleport: true })
+
+      wrapper.findComponent(LibraryRowActions).vm.$emit('remove', librariesRef.value[0]!)
+      await flushPromises()
+      const dialog = document.querySelector('[role="dialog"]')!
+      const input = dialog.querySelector('input') as HTMLInputElement
+      input.value = 'Novels'
+      input.dispatchEvent(new Event('input'))
+      await flushPromises()
+      ;[...dialog.querySelectorAll('button')].find((button) => button.textContent?.includes('Delete Library'))!.click()
+      await flushPromises()
+
+      expect(toastError).toHaveBeenCalledWith('The library is busy with a scan, move, rename or merge. Try again when it finishes.')
+      expect(toastSuccess).not.toHaveBeenCalled()
+      expect(document.querySelector('[role="dialog"]')?.textContent).toContain('Delete "Novels"?')
 
       wrapper.unmount()
       headerTarget.remove()

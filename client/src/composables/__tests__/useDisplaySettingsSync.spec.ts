@@ -31,6 +31,7 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     gridCardSecondaryLabel: 'hidden',
     thumbnailClickAction: 'reader',
     placeholderCoverStyle: 'bauhaus',
+    formatBadgeStyle: 'primary',
     ...overrides,
   }
 }

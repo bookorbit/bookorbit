@@ -192,6 +192,78 @@
     "useGuards": []
   },
   {
+    "file": "server/src/modules/book-merge/book-merge.controller.ts",
+    "className": "BookMergeController",
+    "methodName": "preview",
+    "httpMethod": "POST",
+    "path": "/books/merge/preview",
+    "permissions": ["Permission.LibraryMergeBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-merge/book-merge.controller.ts",
+    "className": "BookMergeController",
+    "methodName": "merge",
+    "httpMethod": "POST",
+    "path": "/books/merge",
+    "permissions": ["Permission.LibraryMergeBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-merge/book-merge.controller.ts",
+    "className": "BookMergeController",
+    "methodName": "getJob",
+    "httpMethod": "GET",
+    "path": "/books/merge/jobs/:jobId",
+    "permissions": ["Permission.LibraryMergeBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-link/book-link.controller.ts",
+    "className": "BookLinkController",
+    "methodName": "link",
+    "httpMethod": "POST",
+    "path": "/books/links",
+    "permissions": ["Permission.LibraryMergeBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-link/book-link.controller.ts",
+    "className": "BookLinkController",
+    "methodName": "setLead",
+    "httpMethod": "PATCH",
+    "path": "/books/links/:groupId",
+    "permissions": ["Permission.LibraryMergeBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/book-link/book-link.controller.ts",
+    "className": "BookLinkController",
+    "methodName": "unlink",
+    "httpMethod": "DELETE",
+    "path": "/books/:id/link",
+    "permissions": ["Permission.LibraryMergeBooks"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
     "file": "server/src/modules/book-request/book-request.controller.ts",
     "className": "BookRequestController",
     "methodName": "submit",

@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { and, type SQL } from 'drizzle-orm';
 
-import { type BookQuery, type BooksPage, type JumpBucketsQuery, type JumpBucketsResponse } from '@bookorbit/types';
+import { normalizeCoverAspectRatio, type BookQuery, type BooksPage, type JumpBucketsQuery, type JumpBucketsResponse } from '@bookorbit/types';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import type { RequestUser } from '../../common/types/request-user';
@@ -74,7 +74,7 @@ export class CollectionService {
   }
 
   private toResponse<T extends CollectionRow & { bookCount: number }>(collection: T, user: RequestUser) {
-    return { ...collection, isOwner: collection.userId === user.id };
+    return { ...collection, coverAspectRatio: normalizeCoverAspectRatio(collection.coverAspectRatio), isOwner: collection.userId === user.id };
   }
 
   private async buildViewerBookWhere(user: RequestUser): Promise<SQL | undefined> {
@@ -150,6 +150,7 @@ export class CollectionService {
         icon,
         description: dto.description ?? null,
         isPublic: dto.isPublic ?? false,
+        coverAspectRatio: dto.coverAspectRatio,
         syncToKobo: dto.syncToKobo ?? false,
       });
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_COLLECTION_CREATED, {
@@ -178,6 +179,7 @@ export class CollectionService {
         ...(dto.icon !== undefined && { icon }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
+        ...(dto.coverAspectRatio !== undefined && { coverAspectRatio: dto.coverAspectRatio }),
         ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
       });
     } catch (error) {
@@ -287,7 +289,7 @@ export class CollectionService {
     );
     try {
       const where = await this.buildBooksWhere(id, user, query);
-      const page = await this.bookService.executeBooksQuery(user.id, where, query, { defaultCollectionId: id });
+      const page = await this.bookService.executeBooksQuery(user.id, where, query, { defaultCollectionId: id, viewer: user });
 
       this.logger.log(
         `[${event}] [end] collectionId=${id} durationMs=${Date.now() - startedAt} total=${page.total} itemCount=${page.items.length} - query collection books completed`,

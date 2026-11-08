@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
-import { ref } from 'vue'
-import type { BookDetail } from '@bookorbit/types'
+import { nextTick, ref } from 'vue'
+import type { BookDetail, LinkedBookSummary } from '@bookorbit/types'
 
 const mocks = vi.hoisted(() => ({
   push: vi.fn<(to: unknown) => void>(),
@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   hasPermission: vi.fn<(permission: string) => boolean>(),
   api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(),
   onDeleted: null as ((id: number) => void) | null,
+  libraries: null as unknown as { value: { id: number; accessLevel: string }[] },
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -20,9 +21,11 @@ vi.mock('@/lib/api', () => ({ api: mocks.api, setOnAuthFailure: vi.fn<(callback:
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: mocks.hasPermission, isSuperuser: ref(false), isDemoRestrictedAccount: ref(false) }),
 }))
-vi.mock('@/features/library/composables/useLibraries', () => ({
-  useLibraries: () => ({ libraries: ref([{ id: 3, accessLevel: 'editor' }]) }),
-}))
+vi.mock('@/features/library/composables/useLibraries', async () => {
+  const { ref: vueRef } = await import('vue')
+  mocks.libraries = vueRef([{ id: 3, accessLevel: 'editor' }])
+  return { useLibraries: () => ({ libraries: mocks.libraries }) }
+})
 
 vi.mock('@/features/book/composables/useDeleteBook', () => ({
   useDeleteBook: (onDeleted: (id: number) => void) => {
@@ -113,9 +116,9 @@ function response(data: unknown): Response {
   return { ok: true, status: 200, json: async () => data } as unknown as Response
 }
 
-function mountTab() {
+function mountTab(overrides: Partial<BookDetail> = {}) {
   return shallowMount(DetailsTab, {
-    props: { book: makeBook() },
+    props: { book: makeBook(overrides) },
     global: {
       stubs: {
         Popover: { template: '<div><slot /><slot name="content" /></div>' },
@@ -143,6 +146,7 @@ beforeEach(() => {
     },
   )
   mocks.onDeleted = null
+  mocks.libraries.value = [{ id: 3, accessLevel: 'editor' }]
 })
 
 describe('deleting from the detail page', () => {
@@ -179,5 +183,143 @@ describe('moving from the detail page', () => {
     await sheet.vm.$emit('moved')
 
     expect(wrapper.emitted('moved')).toHaveLength(1)
+  })
+})
+
+function linkedBook(overrides: Partial<LinkedBookSummary> = {}): LinkedBookSummary {
+  return {
+    bookId: 40,
+    libraryId: 5,
+    libraryName: 'Audiobooks',
+    title: 'Cover Behavior Test',
+    formats: ['m4b'],
+    mediaKind: 'audiobook',
+    status: 'present',
+    isLead: true,
+    ...overrides,
+  }
+}
+
+describe('linking from the detail page', () => {
+  const linked = { linkGroupId: 4, linkedBooks: [linkedBook()] }
+
+  function menuItems(wrapper: ReturnType<typeof mountTab>) {
+    return {
+      link: wrapper.find('[data-testid="detail-link-book"]'),
+      unlink: wrapper.find('[data-testid="detail-unlink-book"]'),
+      makeMain: wrapper.find('[data-testid="detail-make-main-book"]'),
+    }
+  }
+
+  it('offers no link items without the merge permission', () => {
+    mocks.hasPermission.mockImplementation((permission) => permission !== 'library_merge_books')
+    const items = menuItems(mountTab(linked))
+    expect(items.link.exists()).toBe(false)
+    expect(items.unlink.exists()).toBe(false)
+    expect(items.makeMain.exists()).toBe(false)
+  })
+
+  it('offers no link items to a viewer of the library', () => {
+    mocks.libraries.value = [{ id: 3, accessLevel: 'viewer' }]
+    const items = menuItems(mountTab(linked))
+    expect(items.link.exists()).toBe(false)
+    expect(items.unlink.exists()).toBe(false)
+  })
+
+  it('offers only linking for a book that is not linked yet', () => {
+    const wrapper = mountTab()
+    const items = menuItems(wrapper)
+    expect(items.link.exists()).toBe(true)
+    expect(items.unlink.exists()).toBe(false)
+    expect(items.makeMain.exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'BookLinkedChips' }).exists()).toBe(false)
+  })
+
+  it('offers unlinking and making this the main book when another book leads', () => {
+    const wrapper = mountTab(linked)
+    const items = menuItems(wrapper)
+    expect(items.link.exists()).toBe(true)
+    expect(items.unlink.exists()).toBe(true)
+    expect(items.makeMain.exists()).toBe(true)
+    const chips = wrapper.findAllComponents({ name: 'BookLinkedChips' })
+    expect(chips.length).toBeGreaterThan(0)
+    expect(chips[0]!.props('books')).toEqual(linked.linkedBooks)
+  })
+
+  it('leaves out Make this the main book when no other visible book leads', () => {
+    const items = menuItems(mountTab({ linkGroupId: 4, linkedBooks: [linkedBook({ isLead: false })] }))
+    expect(items.unlink.exists()).toBe(true)
+    expect(items.makeMain.exists()).toBe(false)
+  })
+
+  it('uses the server flag for the main book when it sends one', () => {
+    const notLead = menuItems(mountTab({ linkGroupId: 4, linkIsLead: false, linkedBooks: [linkedBook({ isLead: false })] }))
+    expect(notLead.makeMain.exists()).toBe(true)
+    const lead = menuItems(mountTab({ linkGroupId: 4, linkIsLead: true, linkedBooks: [linkedBook({ isLead: false })] }))
+    expect(lead.makeMain.exists()).toBe(false)
+  })
+
+  it('unlinks the open book and reports the change', async () => {
+    const wrapper = mountTab(linked)
+    mocks.api.mockResolvedValue({ ok: true, status: 204, json: async () => null } as unknown as Response)
+
+    await menuItems(wrapper).unlink.trigger('click')
+    await vi.waitFor(() => expect(wrapper.emitted('links-changed')).toHaveLength(1))
+
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/12/link', expect.objectContaining({ method: 'DELETE' }))
+  })
+
+  it('makes the open book the main book of its group', async () => {
+    const wrapper = mountTab(linked)
+    mocks.api.mockResolvedValue(response({ groupId: 4, leadBookId: 12, books: [] }))
+
+    await menuItems(wrapper).makeMain.trigger('click')
+    await vi.waitFor(() => expect(wrapper.emitted('links-changed')).toHaveLength(1))
+
+    const [url, init] = mocks.api.mock.calls.at(-1)!
+    expect(url).toBe('/api/v1/books/links/4')
+    expect(init).toEqual(expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ leadBookId: 12 }) }))
+  })
+
+  it('opens the link sheet with the open book and its linked books kept out of the search', async () => {
+    const wrapper = mountTab(linked)
+    expect(wrapper.findComponent({ name: 'LinkBooksSheet' }).exists()).toBe(false)
+
+    await menuItems(wrapper).link.trigger('click')
+    await nextTick()
+
+    // The sheet loads on demand, so its stub carries what it was given as attributes.
+    const sheet = wrapper.findComponent({ name: 'LinkBooksSheet' })
+    expect(sheet.exists()).toBe(true)
+    const attrs = sheet.vm.$attrs as Record<string, unknown>
+    expect(attrs['book-ids'] ?? attrs.bookIds).toEqual([12])
+    expect(attrs['exclude-ids'] ?? attrs.excludeIds).toEqual([40])
+    expect(attrs.picker).not.toBe(false)
+    expect(attrs.open).toBe(true)
+  })
+
+  it('hands a blocked merge to Link with the same books listed, not searched for again', async () => {
+    const wrapper = mountTab()
+    await wrapper.get('[data-testid="detail-merge-book"]').trigger('click')
+    await nextTick()
+
+    const seeds = [
+      { id: 40, title: 'Dune', libraryId: 4, formats: ['m4b'] },
+      { id: 12, title: 'Dune', libraryId: 3, formats: ['epub'] },
+    ]
+    wrapper.findComponent({ name: 'MergeBooksSheet' }).vm.$emit('link-instead', [40, 12], seeds)
+    await nextTick()
+
+    const attrs = wrapper.findComponent({ name: 'LinkBooksSheet' }).vm.$attrs as Record<string, unknown>
+    expect(attrs['book-ids'] ?? attrs.bookIds).toEqual([40, 12])
+    expect(attrs['seed-books'] ?? attrs.seedBooks).toEqual(seeds)
+    expect(attrs.picker).toBe(false)
+    expect(attrs.open).toBe(true)
+    await vi.dynamicImportSettled()
+  })
+
+  it('tells the delete dialog that linked books stay', () => {
+    expect(mountTab(linked).findComponent({ name: 'DeleteBookDialog' }).props('linked')).toBe(true)
+    expect(mountTab().findComponent({ name: 'DeleteBookDialog' }).props('linked')).toBe(false)
   })
 })

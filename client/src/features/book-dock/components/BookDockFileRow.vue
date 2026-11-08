@@ -55,7 +55,8 @@ const isApplied = computed(() => state.value === 'edited')
 const isFetchedPending = computed(() => state.value === 'fetched')
 
 const confidence = computed(() => props.file.confidence)
-const hasScore = computed(() => confidence.value !== null && confidence.value !== undefined && confidence.value > 0)
+// The server scores only fetched results, so 0% is a fetched result that disagrees, not a missing one.
+const hasScore = computed(() => confidence.value !== null && confidence.value !== undefined)
 const weakMatch = computed(() => hasScore.value && (confidence.value as number) < 85)
 const noMatchYet = computed(() => props.file.status === 'ready' && !hasScore.value)
 const canRefetch = computed(() => props.file.status === 'ready' || props.file.status === 'error')

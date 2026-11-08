@@ -615,6 +615,150 @@ describe('extractAudioMetadata — misc fields', () => {
   });
 });
 
+// ── STREAM-LEVEL TAGS (OGG OPUS / VORBIS) ────────────────────────────────────
+
+describe('extractAudioMetadata - stream-level tags', () => {
+  beforeEach(() => resetMocks());
+
+  it('reads every mapped field from the audio stream when the format carries no tags', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { duration: '1800', tags: {} },
+        streams: [
+          {
+            codec_type: 'audio',
+            codec_name: 'opus',
+            tags: {
+              title: 'Track One',
+              album: 'Blinkist Summary',
+              artist: 'Jane Author',
+              albumartist: 'Jane Author',
+              composer: 'Sam Narrator',
+              date: '2021-05-04',
+              genre: 'Business; Self-help',
+              comment: 'A short summary',
+              publisher: 'Blinkist',
+              series: 'Summaries',
+              'series-part': '3',
+              language: 'eng',
+            },
+          },
+        ],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/summary.opus');
+
+    expect(result?.title).toBe('Blinkist Summary');
+    expect(result?.authors).toEqual([{ name: 'Jane Author', sortName: null }]);
+    expect(result?.narrators).toEqual(['Sam Narrator']);
+    expect(result?.publishedYear).toBe(2021);
+    expect(result?.genres).toEqual(['Business', 'Self-help']);
+    expect(result?.description).toBe('A short summary');
+    expect(result?.publisher).toBe('Blinkist');
+    expect(result?.seriesName).toBe('Summaries');
+    expect(result?.seriesIndex).toBe('3');
+    expect(result?.language).toBe('eng');
+    expect(result?.durationSeconds).toBe(1800);
+  });
+
+  it('normalizes the upper-case keys Vorbis comments use', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        streams: [{ codec_type: 'audio', codec_name: 'vorbis', tags: { ALBUM: 'Upper Album', ARTIST: 'Upper Artist', ALBUMARTIST: 'Upper Author' } }],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/upper.ogg');
+
+    expect(result?.title).toBe('Upper Album');
+    expect(result?.authors).toEqual([{ name: 'Upper Author', sortName: null }]);
+    expect(result?.narrators).toEqual(['Upper Artist']);
+  });
+
+  it('prefers a format tag over the same tag on the stream', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { tags: { album: 'Format Album' } },
+        streams: [{ codec_type: 'audio', codec_name: 'aac', tags: { album: 'Stream Album' } }],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/book.m4b');
+
+    expect(result?.title).toBe('Format Album');
+  });
+
+  it('fills a tag the format lacks from the stream while keeping the format tags it has', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { tags: { album: 'Format Album' } },
+        streams: [{ codec_type: 'audio', codec_name: 'opus', tags: { album: 'Stream Album', artist: 'Stream Artist' } }],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/mixed.opus');
+
+    expect(result?.title).toBe('Format Album');
+    expect(result?.authors).toEqual([{ name: 'Stream Artist', sortName: null }]);
+  });
+
+  it('takes the stream value when the format tag is blank', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        format: { tags: { album: '   ' } },
+        streams: [{ codec_type: 'audio', codec_name: 'opus', tags: { album: 'Stream Album' } }],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/blank.opus');
+
+    expect(result?.title).toBe('Stream Album');
+  });
+
+  it('prefers the earlier audio stream when several carry the same tag', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        streams: [
+          { codec_type: 'audio', codec_name: 'vorbis', tags: { album: 'First Stream' } },
+          { codec_type: 'audio', codec_name: 'vorbis', tags: { album: 'Second Stream', publisher: 'Second Publisher' } },
+        ],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/chained.ogg');
+
+    expect(result?.title).toBe('First Stream');
+    expect(result?.publisher).toBe('Second Publisher');
+  });
+
+  it('ignores the tags of an attached cover picture', async () => {
+    makeExecFileSuccess(
+      makeProbeOutput({
+        streams: [
+          { codec_type: 'audio', codec_name: 'opus', tags: { album: 'Real Album' } },
+          { codec_type: 'video', codec_name: 'mjpeg', tags: { title: 'Cover', comment: 'Cover (front)' } },
+        ],
+      }),
+    );
+
+    const result = await extractAudioMetadata('/path/with-cover.opus');
+
+    expect(result?.title).toBe('Real Album');
+    expect(result?.description).toBeNull();
+  });
+
+  it('still reads as untagged when neither the format nor the audio stream has tags', async () => {
+    makeExecFileSuccess(makeProbeOutput({ streams: [{ codec_type: 'audio', codec_name: 'opus' }] }));
+
+    const result = await extractAudioMetadata('/path/untagged.opus');
+
+    expect(result).not.toBeNull();
+    expect(result?.title).toBeNull();
+    expect(result?.authors).toEqual([]);
+  });
+});
+
 // ── FAILURE TOLERANCE ────────────────────────────────────────────────────────
 
 describe('extractAudioMetadata — failure tolerance', () => {

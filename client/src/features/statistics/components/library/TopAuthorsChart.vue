@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { Users } from '@lucide/vue'
 
 import { useChartTokens } from '@/composables/useChartTokens'
@@ -126,6 +126,6 @@ watchEffect(() => {
 
 <template>
   <ChartCard :title="t('statistics.charts.topAuthors.title')" :icon="Users" :color-index="6" :loading :error :empty="!data.items.length">
-    <VChart :option autoresize style="height: 100%" />
+    <AppChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

@@ -407,7 +407,7 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId, { followMerges: true });
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     const state = await this.readingStateService.getRawState(user.id, id, device.deviceId);
     reply.send(state ? [state] : []);
@@ -423,7 +423,7 @@ export class KoboSyncController {
     @Req() req: FastifyRequest,
     @Res() reply: FastifyReply,
   ) {
-    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId);
+    const id = await this.bookIdentityService.resolveBookIdByEntitlementId(user.id, bookId, { followMerges: true });
     if (id === null) return this.proxyService.forward(req, reply, device.deviceToken);
     const startedAt = Date.now();
     try {

@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequestLocale } from '../../common/decorators/request-locale.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { AchievementService } from './achievement.service';
 import { AchievementBackfillService, type BackfillResult } from './achievement-backfill.service';
 import { AchievementHintsService } from './achievement-hints.service';
@@ -30,12 +31,14 @@ export class AchievementController {
   }
 
   @Post('celebrations/claim')
+  @RequireAppAttest()
   @Header('Vary', 'Accept-Language')
   async claimCelebration(@CurrentUser() user: RequestUser, @RequestLocale() locale: Locale): Promise<AchievementCelebrationClaim | null> {
     return this.service.claimCelebration(user, locale);
   }
 
   @Post('celebrations/:claimId/acknowledge')
+  @RequireAppAttest()
   @HttpCode(HttpStatus.NO_CONTENT)
   async acknowledgeCelebration(@CurrentUser() user: RequestUser, @Param('claimId', new ParseUUIDPipe()) claimId: string): Promise<void> {
     await this.service.acknowledgeCelebration(user, claimId);

@@ -14,6 +14,7 @@ import { DB } from '../../db';
 import { realignAudioTrackOrder } from '../../db/audio-track-order';
 import * as schema from '../../db/schema';
 import { books, bookFiles, libraries, libraryFolders } from '../../db/schema';
+import { FileLockService, bookOperationLockKey } from '../../common/services/file-lock.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { LibraryService } from '../library/library.service';
@@ -53,6 +54,7 @@ export class UploadService {
     private readonly processor: UploadProcessorService,
     private readonly moduleRef: ModuleRef,
     private readonly pathPolicy: PathPolicyService,
+    private readonly fileLocks: FileLockService,
   ) {}
 
   private resolveFileRenameService(): FileRenameService | null {
@@ -138,22 +140,28 @@ export class UploadService {
       await this.pathPolicy.assertWithinRoot(absolutePath, folder.path);
       destinationPath = absolutePath;
 
-      if (await this.destinationExists(absolutePath)) {
-        throw uploadError.destinationConflict(`A file named "${basename(absolutePath)}" already exists at the target location`);
-      }
+      // The file may land in a book that is already there, so it lands under that book's lock, the
+      // one write-back, rename and merge take. Spelled as on disk, which is how the book row has it.
+      const lockFolder = (await resolveExistingPathSpelling(bookFolderPath, folder.path)) ?? bookFolderPath;
+      const { bookId, created, persistedAbsolutePath } = await this.processor.withFolderBookLock(libraryId, lockFolder, async () => {
+        if (await this.destinationExists(absolutePath)) {
+          throw uploadError.destinationConflict(`A file named "${basename(absolutePath)}" already exists at the target location`);
+        }
 
-      shouldCleanupDestination = true;
-      await this.storage.moveToPath(tempPath, absolutePath);
+        shouldCleanupDestination = true;
+        await this.storage.moveToPath(tempPath, absolutePath);
 
-      const persistedAbsolutePath = (await resolveExistingPathSpelling(absolutePath, folder.path)) ?? absolutePath;
-      const persistedBookFolderPath = bookFolderPath === absolutePath ? persistedAbsolutePath : dirname(persistedAbsolutePath);
-      const persistedRelPath = relative(folder.path, persistedAbsolutePath);
-      destinationPath = persistedAbsolutePath;
+        const persistedPath = (await resolveExistingPathSpelling(absolutePath, folder.path)) ?? absolutePath;
+        const persistedBookFolderPath = bookFolderPath === absolutePath ? persistedPath : dirname(persistedPath);
+        const persistedRelPath = relative(folder.path, persistedPath);
+        destinationPath = persistedPath;
 
-      const createArgs = [libraryId, folder.id, persistedBookFolderPath, persistedAbsolutePath, persistedRelPath, format, sizeBytes] as const;
-      const { bookId, created } = uploadSessionId
-        ? await this.processor.createBookRecord(...createArgs, { uploadSessionId })
-        : await this.processor.createBookRecord(...createArgs);
+        const createArgs = [libraryId, folder.id, persistedBookFolderPath, persistedPath, persistedRelPath, format, sizeBytes] as const;
+        const record = uploadSessionId
+          ? await this.processor.createBookRecord(...createArgs, { uploadSessionId })
+          : await this.processor.createBookRecord(...createArgs);
+        return { ...record, persistedAbsolutePath: persistedPath };
+      });
 
       this.logger.log(
         `[${event}] [end] libraryId=${libraryId} userId=${user.id} folderId=${folder.id} bookId=${bookId} format=${format} sizeBytes=${sizeBytes} durationMs=${Date.now() - startedAt} - upload completed`,
@@ -234,38 +242,50 @@ export class UploadService {
       await this.validator.validateContent(tempPath, format);
       const fileHash = await computeFileHash(tempPath);
 
-      const [existingWithHash] = await this.db
-        .select({ id: bookFiles.id })
-        .from(bookFiles)
-        .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.fileHash, fileHash)))
-        .limit(1);
+      // The upload streamed without the lock; the write into the folder takes it, and re-reads the
+      // folder, because a merge or rename may have moved the book while the bytes arrived.
+      const result = await this.fileLocks.withLock(bookOperationLockKey(bookId), async () => {
+        const [current] = await this.db
+          .select({ folderPath: books.folderPath, libraryFolderId: books.libraryFolderId, libraryFolderPath: libraryFolders.path })
+          .from(books)
+          .innerJoin(libraryFolders, eq(books.libraryFolderId, libraryFolders.id))
+          .where(eq(books.id, bookId))
+          .limit(1);
+        if (!current) throw new NotFoundException(`Book ${bookId} not found`);
 
-      if (existingWithHash) {
-        throw uploadError.duplicate('This file is already attached to this book');
-      }
+        const [existingWithHash] = await this.db
+          .select({ id: bookFiles.id })
+          .from(bookFiles)
+          .where(and(eq(bookFiles.bookId, bookId), eq(bookFiles.fileHash, fileHash)))
+          .limit(1);
 
-      destination = join(bookRow.folderPath, filename);
-      await this.pathPolicy.assertWithinRoot(destination, bookRow.folderPath);
+        if (existingWithHash) {
+          throw uploadError.duplicate('This file is already attached to this book');
+        }
 
-      if (await this.destinationExists(destination)) {
-        throw uploadError.destinationConflict(`A file named "${filename}" already exists in this book's folder`);
-      }
+        destination = join(current.folderPath, filename);
+        await this.pathPolicy.assertWithinRoot(destination, current.folderPath);
 
-      shouldCleanupDestination = true;
-      await this.storage.moveToPath(tempPath, destination);
-      // File is on disk. Do not delete it on any subsequent failure; the scanner
-      // will reconcile any orphan. This also prevents the catch block from deleting
-      // a file that a concurrent upload may have written to the same path.
-      shouldCleanupDestination = false;
+        if (await this.destinationExists(destination)) {
+          throw uploadError.destinationConflict(`A file named "${filename}" already exists in this book's folder`);
+        }
 
-      const result = await this.registerBookFile({
-        bookId,
-        libraryFolderId: bookRow.libraryFolderId,
-        libraryFolderPath: bookRow.libraryFolderPath,
-        destination,
-        sizeBytes,
-        fileHash,
-        format,
+        shouldCleanupDestination = true;
+        await this.storage.moveToPath(tempPath, destination);
+        // File is on disk. Do not delete it on any subsequent failure; the scanner
+        // will reconcile any orphan. This also prevents the catch block from deleting
+        // a file that a concurrent upload may have written to the same path.
+        shouldCleanupDestination = false;
+
+        return this.registerBookFile({
+          bookId,
+          libraryFolderId: current.libraryFolderId,
+          libraryFolderPath: current.libraryFolderPath,
+          destination,
+          sizeBytes,
+          fileHash,
+          format,
+        });
       });
 
       this.logger.log(

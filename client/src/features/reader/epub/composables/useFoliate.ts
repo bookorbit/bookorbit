@@ -6,6 +6,7 @@ import { useFoliateSelection } from './useFoliateSelection'
 import { useFoliateInput } from './useFoliateInput'
 import { ensureMediaOverlayActiveClass } from '../../media-overlay/lib/media-overlay-highlight'
 import { scalePublisherFontSizes } from '../lib/publisher-font-sizes'
+import { markBookAlignment } from '../lib/book-alignment'
 import type { EpubBookInfo, EpubReaderSettings } from '@bookorbit/types'
 
 export interface RelocateDetail {
@@ -211,6 +212,7 @@ export function useFoliate(
         }, 0)
         annotations.reAddAll(view)
         if (detail?.doc) {
+          if (!isFixedLayout.value) markBookAlignment(detail.doc as Document)
           input.attachIframeClicks(detail.doc)
           onChapterLoad?.(detail.doc as Document, view as HTMLElement)
         }

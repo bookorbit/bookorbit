@@ -120,9 +120,12 @@ describe('sidebar nav registry', () => {
     expect(resolved.isActive).toBe(true)
   })
 
-  it.each(['manage_libraries', 'library_delete_books', 'library_edit_metadata'])('shows Tools for the any-of permission %s', (permission) => {
-    expect(allowedIds(makeContext({ permissions: [permission] }))).toContain('tools')
-  })
+  it.each(['manage_libraries', 'library_delete_books', 'library_merge_books', 'library_edit_metadata'])(
+    'shows Tools for the any-of permission %s',
+    (permission) => {
+      expect(allowedIds(makeContext({ permissions: [permission] }))).toContain('tools')
+    },
+  )
 
   it('resolves Tools to the entity manager when the user can manage libraries', () => {
     const context = makeContext({ permissions: ['manage_libraries'] })
@@ -134,6 +137,14 @@ describe('sidebar nav registry', () => {
 
   it('resolves Tools to duplicate books when the user can only delete books', () => {
     const context = makeContext({ permissions: ['library_delete_books'] })
+
+    const resolved = resolveNavEntry(entry('tools'), context, makeRoute('dashboard'), 'Tools')
+
+    expect(resolved.to).toEqual({ name: 'tools-duplicate-books' })
+  })
+
+  it('resolves Tools to duplicate books when the user can only merge books', () => {
+    const context = makeContext({ permissions: ['library_merge_books', 'library_edit_metadata'] })
 
     const resolved = resolveNavEntry(entry('tools'), context, makeRoute('dashboard'), 'Tools')
 

@@ -35,6 +35,8 @@ export default defineConfigWithVueTs(
       'src/components/FormSheet.vue',
       'src/features/collection/components/CollectionMembershipList.vue',
       'src/features/book/components/metadata-match/*.vue',
+      'src/features/book/components/merge/*.vue',
+      'src/features/book/components/link/*.vue',
       'src/components/browse-header/*.vue',
     ],
     rules: { 'vue/v-on-handler-style': ['error', ['method', 'inline']] },
@@ -62,6 +64,32 @@ export default defineConfigWithVueTs(
           selector:
             "CallExpression[callee.property.name='execCommand'][arguments.0.value='copy'], CallExpression[callee.property.value='execCommand'][arguments.0.value='copy']",
           message: "Use copyToClipboard from '@/lib/clipboard' instead of adding another copy fallback.",
+        },
+        {
+          selector: "ImportDeclaration[source.value='@lucide/vue'] > ImportNamespaceSpecifier",
+          message: 'A namespace import puts every Lucide icon on every page. Import icons by name, and render stored icon names with AppIcon.',
+        },
+      ],
+    },
+  },
+
+  // Only AppChart registers the chart types and applies the theme, and keeping echarts behind it is
+  // what keeps the library out of the first page load.
+  {
+    files: ['src/**/*.{vue,ts,mts,tsx}'],
+    ignores: ['src/components/charts/AppChart.vue', 'src/lib/echarts-setup.ts', 'src/**/__tests__/*', 'src/**/*.spec.ts', 'src/**/*.test.ts'],
+    rules: {
+      '@typescript-eslint/no-restricted-imports': [
+        'error',
+        {
+          paths: [{ name: 'vue-echarts', allowTypeImports: true, message: 'Render charts with AppChart from @/components/charts/AppChart.vue.' }],
+          patterns: [
+            {
+              group: ['echarts', 'echarts/*'],
+              allowTypeImports: true,
+              message: 'Render charts with AppChart from @/components/charts/AppChart.vue.',
+            },
+          ],
         },
       ],
     },

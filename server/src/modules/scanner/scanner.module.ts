@@ -3,10 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import type { StringValue } from 'ms';
 
+import { CommonModule } from '../../common/common.module';
 import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AuthModule } from '../auth/auth.module';
 import { BookMetadataFetchModule } from '../book-metadata-fetch/book-metadata-fetch.module';
+import { BookConsolidationModule } from '../book-consolidation/book-consolidation.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -26,6 +28,7 @@ import { ScannerService } from './scanner.service';
     AuthModule,
     AchievementModule,
     SelfWriteRegistryModule,
+    CommonModule,
     forwardRef(() => NotificationModule),
     forwardRef(() => BookMetadataFetchModule),
     JwtModule.registerAsync({
@@ -35,6 +38,7 @@ import { ScannerService } from './scanner.service';
         signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn') },
       }),
     }),
+    BookConsolidationModule,
   ],
   controllers: [ScannerController],
   providers: [

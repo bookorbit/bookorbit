@@ -1,7 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, ChevronRight, Database, Folder, FolderLock, FolderOpen, HardDrive, Lock, TriangleAlert } from '@lucide/vue'
+import {
+  ChevronDown,
+  ChevronRight,
+  Database,
+  Folder,
+  FolderLock,
+  FolderOpen,
+  HardDrive,
+  Library as LibraryIcon,
+  Lock,
+  TriangleAlert,
+} from '@lucide/vue'
 import AppIcon from '@/components/AppIcon.vue'
 import { formatList, formatNumber } from '@/i18n/formatters'
 import { isInside, leafName, type PickerLibrary } from '../../composables/folder-picker/folder-picker-rules'
@@ -147,7 +158,7 @@ function onDoubleClick() {
         :class="library.self ? 'border-primary/40 text-primary' : 'border-border text-muted-foreground'"
         :title="t('library.folderBrowser.tree.readsThis', { name: library.name })"
       >
-        <AppIcon :icon="library.icon" fallback="Library" :size="11" />
+        <AppIcon :icon="library.icon" :fallback="LibraryIcon" :size="11" />
         <template v-if="!picker.phone.value">{{ library.self ? t('library.folderBrowser.tree.thisLibrary') : library.name }}</template>
       </span>
       <span
@@ -155,7 +166,7 @@ function onDoubleClick() {
         class="flex shrink-0 items-center gap-0.5 text-muted-foreground"
         :title="t('library.folderBrowser.tree.librariesInside', { names: formatList(below.map((library) => library.name)), count: below.length })"
       >
-        <AppIcon v-for="library in below.slice(0, 4)" :key="library.id ?? 'self'" :icon="library.icon" fallback="Library" :size="12" />
+        <AppIcon v-for="library in below.slice(0, 4)" :key="library.id ?? 'self'" :icon="library.icon" :fallback="LibraryIcon" :size="12" />
       </span>
       <span v-if="mixedCount" class="shrink-0 text-[11px] font-medium text-primary">{{
         t('library.folderBrowser.tree.inside', { count: mixedCount })

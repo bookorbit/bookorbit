@@ -2,12 +2,12 @@
 import { computed, ref } from 'vue'
 import { Undo2 } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import type { BookDuplicateDismissal } from '@bookorbit/types'
+import type { BookDuplicateDismissal, BookDuplicateKind } from '@bookorbit/types'
 
 import { formatDate } from '@/i18n/formatters'
 
 const props = defineProps<{ dismissals: BookDuplicateDismissal[] }>()
-const emit = defineEmits<{ restore: [bookIdA: number, bookIdB: number] }>()
+const emit = defineEmits<{ restore: [bookIdA: number, bookIdB: number, kind: BookDuplicateKind] }>()
 
 const { t } = useI18n()
 const expanded = ref(false)
@@ -19,7 +19,7 @@ function handleToggle(): void {
 }
 
 function handleRestore(dismissal: BookDuplicateDismissal): void {
-  emit('restore', dismissal.bookIdA, dismissal.bookIdB)
+  emit('restore', dismissal.bookIdA, dismissal.bookIdB, dismissal.kind)
 }
 </script>
 
@@ -37,7 +37,7 @@ function handleRestore(dismissal: BookDuplicateDismissal): void {
     <ul v-if="expanded" class="mt-2 grid max-h-52 gap-1 overflow-y-auto">
       <li
         v-for="dismissal in dismissals"
-        :key="`${dismissal.bookIdA}-${dismissal.bookIdB}`"
+        :key="`${dismissal.kind}-${dismissal.bookIdA}-${dismissal.bookIdB}`"
         class="flex items-center gap-2 rounded-lg bg-secondary px-2.5 py-1.5 text-[12px]"
       >
         <span class="min-w-0 flex-1 truncate text-foreground">
@@ -48,6 +48,9 @@ function handleRestore(dismissal: BookDuplicateDismissal): void {
             })
           }}
         </span>
+        <span v-if="dismissal.kind === 'other_format'" class="shrink-0 text-muted-foreground">{{
+          t('tools.bookDuplicates.kinds.other_format')
+        }}</span>
         <span class="shrink-0 text-muted-foreground">{{ formatDate(new Date(dismissal.createdAt)) }}</span>
         <button
           type="button"

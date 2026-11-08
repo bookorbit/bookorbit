@@ -20,6 +20,7 @@ import { useBookDownload } from './useBookDownload'
 import { useBookRefreshFeedback } from './useBookRefreshFeedback'
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
 import { withIgnoreCache, type IgnoreCacheOptions } from '@/features/metadata-cache/lib/metadata-cache'
+import type { BulkReadingStatePatch } from './useBookStatus'
 
 export type ExportScope = 'primary' | 'all' | 'audio'
 
@@ -63,12 +64,15 @@ export type QuerySelectionState = BookSelectionQuery & {
   total: number
 }
 
-function buildLocalReadStatus(status: ReadStatus, existing: UserBookStatus | null, nowIso: string): UserBookStatus {
+function buildLocalReadStatus(patch: BulkReadingStatePatch, existing: UserBookStatus | null, nowIso: string): UserBookStatus {
+  const clearsLifecycle = patch.status === 'unread' || patch.status === 'want_to_read'
+  const hasStartedAt = Object.prototype.hasOwnProperty.call(patch, 'startedAt')
+  const hasFinishedAt = Object.prototype.hasOwnProperty.call(patch, 'finishedAt')
   return {
-    status,
+    status: patch.status,
     source: 'manual',
-    startedAt: existing?.startedAt ?? null,
-    finishedAt: existing?.finishedAt ?? null,
+    startedAt: clearsLifecycle ? null : hasStartedAt ? (patch.startedAt ?? null) : (existing?.startedAt ?? null),
+    finishedAt: clearsLifecycle ? null : hasFinishedAt ? (patch.finishedAt ?? null) : (existing?.finishedAt ?? null),
     updatedAt: nowIso,
   }
 }
@@ -267,25 +271,26 @@ export function useBookBulkActions(
     await exportBooks(ids, scope === 'all', scope === 'audio' ? 'audio' : undefined)
   }
 
-  async function handleBulkSetStatus(status: ReadStatus) {
+  async function handleBulkSetStatus(input: ReadStatus | BulkReadingStatePatch) {
     if (!hasSelection()) return
+    const patch: BulkReadingStatePatch = typeof input === 'string' ? { status: input } : input
     const ids = querySelection?.value ? [] : [...selectedIds.value]
     const res = await api('/api/v1/books/bulk-set-status', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...getSelectionPayload(), status }),
+      body: JSON.stringify({ ...getSelectionPayload(), ...patch }),
     })
     if (!res.ok) {
-      toast.error('Failed to update status')
+      toast.error(i18n.global.t('book.bulkReadingState.failed'))
       return
     }
     const nowIso = new Date().toISOString()
     updateSelectedBooks(ids, (book) => ({
       ...book,
-      readStatus: buildLocalReadStatus(status, book.readStatus, nowIso),
+      readStatus: buildLocalReadStatus(patch, book.readStatus, nowIso),
     }))
     const count = querySelection?.value ? querySelection.value.total : ids.length
-    toast.success(`Updated status for ${count} book${count === 1 ? '' : 's'}`)
+    toast.success(i18n.global.t('book.bulkReadingState.updated', { count }))
   }
 
   async function handleBulkSetRating(rating: number | null) {

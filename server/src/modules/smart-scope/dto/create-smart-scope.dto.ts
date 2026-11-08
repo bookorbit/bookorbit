@@ -1,6 +1,6 @@
 import { Transform, Type } from 'class-transformer';
-import type { SmartScopeFilter, SortField, SortSpec } from '@bookorbit/types';
-import { ICON_VALUE_MAX_LENGTH, isSortField } from '@bookorbit/types';
+import type { CoverAspectRatio, SmartScopeFilter, SortField, SortSpec } from '@bookorbit/types';
+import { COVER_ASPECT_RATIOS, ICON_VALUE_MAX_LENGTH, isSortField } from '@bookorbit/types';
 import {
   IsArray,
   IsBoolean,
@@ -76,4 +76,8 @@ export class CreateSmartScopeDto {
   @IsOptional()
   @IsBoolean()
   syncToKobo?: boolean;
+
+  @IsOptional()
+  @IsIn(COVER_ASPECT_RATIOS)
+  coverAspectRatio?: CoverAspectRatio;
 }

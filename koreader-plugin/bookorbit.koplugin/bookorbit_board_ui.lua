@@ -16,7 +16,8 @@ data (titles, authors, quotes) may be shortened; pass data = true for those.
 
 local BD = require("ui/bidi")
 local CenterContainer = require("ui/widget/container/centercontainer")
-local Screen = require("device").screen
+local Device = require("device")
+local Screen = Device.screen
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
 local HorizontalGroup = require("ui/widget/horizontalgroup")
@@ -55,17 +56,31 @@ local function isRGB(c)
 end
 BoardUI.isRGB = isRGB
 
-local function paintBorder(bb, x, y, w, h, bw, c, r)
+-- Android's C blitter defers night-mode inversion until the window copy, but
+-- RGB rounded corners use Lua pixel writes that honor the inverse flag at
+-- paint time. A non-owning view keeps both paths in the same color space.
+local function rgbCanvas(bb)
+    if not Device.isAndroid or not Device:isAndroid() or not bb.getInverse or bb:getInverse() ~= 1
+            or not bb.viewport or not bb.getWidth or not bb.getHeight then
+        return bb
+    end
+    local view = bb:viewport(0, 0, bb:getWidth(), bb:getHeight())
+    view:setInverse(0)
+    return view
+end
+BoardUI.rgbCanvas = rgbCanvas
+
+local function paintBorder(bb, x, y, w, h, bw, c, r, anti_alias)
     if isRGB(c) and bb.paintBorderRGB32 then
-        bb:paintBorderRGB32(x, y, w, h, bw, c, r)
+        rgbCanvas(bb):paintBorderRGB32(x, y, w, h, bw, c, r, anti_alias)
     else
-        bb:paintBorder(x, y, w, h, bw, c, r)
+        bb:paintBorder(x, y, w, h, bw, c, r, anti_alias)
     end
 end
 
 local function paintRoundedRect(bb, x, y, w, h, c, r)
     if isRGB(c) and bb.paintRoundedRectRGB32 then
-        bb:paintRoundedRectRGB32(x, y, w, h, c, r)
+        rgbCanvas(bb):paintRoundedRectRGB32(x, y, w, h, c, r)
     else
         bb:paintRoundedRect(x, y, w, h, c, r)
     end
@@ -511,18 +526,42 @@ function ColourRing:paintTo(bb, x, y)
     paintBorder(bb, x, y, self.dimen.w, self.dimen.h, self.bw, self.color, self.radius)
 end
 
+local ColourFill = Widget:extend{ color = nil, radius = 0 }
+
+function ColourFill:getSize()
+    return self.dimen
+end
+
+function ColourFill:paintTo(bb, x, y)
+    self.dimen.x, self.dimen.y = x, y
+    paintRoundedRect(bb, x, y, self.dimen.w, self.dimen.h, self.color, self.radius)
+end
+
 -- A fixed box with an optional fill, radius and inner border.
 function BoardUI.box(o, child)
     local border = o.border or 0
     local inner_w, inner_h = o.w - 2 * border, o.h - 2 * border
-    if border > 0 and isRGB(o.border_col) then
+    local rgb_bg = isRGB(o.bg)
+    local rgb_border = border > 0 and isRGB(o.border_col)
+    if rgb_bg or rgb_border then
         local plain = {}
         for k, v in pairs(o) do plain[k] = v end
-        plain.border_col = INK.white
-        return BoardUI.overlay(o.w, o.h, {
-            { widget = BoardUI.box(plain, child) },
-            { widget = ColourRing:new{ dimen = Geom:new{ w = o.w, h = o.h }, bw = border, color = o.border_col, radius = o.radius or 0 } },
-        })
+        if rgb_bg then plain.bg = nil end
+        if rgb_border then plain.border_col = INK.white end
+        local layers = {}
+        if rgb_bg then
+            local radius = o.radius and border > 0 and o.radius + border or o.radius or 0
+            table.insert(layers, { widget = ColourFill:new{
+                dimen = Geom:new{ w = o.w, h = o.h }, color = o.bg, radius = radius,
+            } })
+        end
+        table.insert(layers, { widget = BoardUI.box(plain, child) })
+        if rgb_border then
+            table.insert(layers, { widget = ColourRing:new{
+                dimen = Geom:new{ w = o.w, h = o.h }, bw = border, color = o.border_col, radius = o.radius or 0,
+            } })
+        end
+        return BoardUI.overlay(o.w, o.h, layers)
     end
     return FrameContainer:new{
         margin = 0,
@@ -545,39 +584,36 @@ function BoardUI.bar(w, h, pct, o)
     local fill_w = math.floor(w * pct / 100 + 0.5)
     if pct > 0 then fill_w = math.max(fill_w, math.max(1, px(1.5))) end
     local r = o.r or 0
-    local track = FrameContainer:new{
-        margin = 0, padding = 0, bordersize = 0, radius = r,
-        background = o.track or INK.gc,
+    local track = BoardUI.box({ w = w, h = h, radius = r, bg = o.track or INK.gc },
         LeftContainer:new{
             dimen = Geom:new{ w = w, h = h },
-            fill_w > 0 and FrameContainer:new{
-                margin = 0, padding = 0, bordersize = 0, radius = r,
-                background = o.fill or INK.black,
-                HorizontalGroup:new{ HorizontalSpan:new{ width = fill_w }, VerticalSpan:new{ width = h } },
-            } or HorizontalSpan:new{ width = 0 },
-        },
-    }
+            fill_w > 0 and BoardUI.rect(fill_w, h, o.fill or INK.black, r) or HorizontalSpan:new{ width = 0 },
+        })
     return track
 end
 
 -- A dot: filled, or an outlined ring.
 function BoardUI.dot(size, on, o)
     o = o or {}
-    return FrameContainer:new{
-        margin = 0, padding = 0,
-        bordersize = on and 0 or math.max(1, px(1.25)),
-        color = o.off or INK.ga,
+    local border = on and 0 or math.max(1, px(1.25))
+    return BoardUI.box({
+        w = size, h = size, border = border, border_col = o.off or INK.ga,
         radius = math.floor(size / 2),
-        background = on and (o.col or INK.black) or nil,
+        bg = on and (o.col or INK.black) or nil,
+    },
         HorizontalGroup:new{
-            HorizontalSpan:new{ width = size - (on and 0 or 2 * math.max(1, px(1.25))) },
-            VerticalSpan:new{ width = size - (on and 0 or 2 * math.max(1, px(1.25))) },
-        },
-    }
+            HorizontalSpan:new{ width = size - 2 * border },
+            VerticalSpan:new{ width = size - 2 * border },
+        })
 end
 
 -- A rectangle of solid colour.
 function BoardUI.rect(w, h, col, r)
+    if isRGB(col) then
+        return ColourFill:new{
+            dimen = Geom:new{ w = math.max(0, w), h = math.max(0, h) }, color = col, radius = r or 0,
+        }
+    end
     return FrameContainer:new{
         margin = 0, padding = 0, bordersize = 0, radius = r,
         background = col,
@@ -598,14 +634,12 @@ end
 -- A circle of diameter d with an icon centred in it.
 function BoardUI.circle(d, o, child)
     local border = o.border or 0
-    return FrameContainer:new{
-        margin = 0, padding = 0,
-        bordersize = border,
-        color = o.border_col or INK.black,
+    return BoardUI.box({
+        w = d, h = d, border = border, border_col = o.border_col or INK.black,
         radius = math.floor(d / 2),
-        background = o.bg,
-        CenterContainer:new{ dimen = Geom:new{ w = d - 2 * border, h = d - 2 * border }, child },
-    }
+        bg = o.bg,
+    },
+        CenterContainer:new{ dimen = Geom:new{ w = d - 2 * border, h = d - 2 * border }, child })
 end
 
 -- --------------------------------------------------------------- hit areas
@@ -879,18 +913,22 @@ end
 function CellGrid:paintTo(bb, x, y)
     self.dimen.x, self.dimen.y = x, y
     local s, r = self.size, self.radius
+    local rgb_bb
     for _i, cell in ipairs(self.cells) do
         if cell.ring then
             local ring, gap = math.max(2, px(2)), math.max(1, px(1))
             bb:paintRoundedRect(x + cell.x - ring, y + cell.y - ring, s + 2 * ring, s + 2 * ring, INK.black, r + ring)
             bb:paintRoundedRect(x + cell.x - gap, y + cell.y - gap, s + 2 * gap, s + 2 * gap, INK.white, r + gap)
         end
-        if cell.border and isRGB(cell.col) and bb.paintBorderRGB32 then
-            bb:paintBorderRGB32(x + cell.x, y + cell.y, s, s, cell.border, cell.col, r, true)
-        elseif cell.border then
-            bb:paintBorder(x + cell.x, y + cell.y, s, s, cell.border, cell.col, r, true)
+        local target = bb
+        if isRGB(cell.col) then
+            rgb_bb = rgb_bb or rgbCanvas(bb)
+            target = rgb_bb
+        end
+        if cell.border then
+            paintBorder(target, x + cell.x, y + cell.y, s, s, cell.border, cell.col, r, true)
         else
-            paintRoundedRect(bb, x + cell.x, y + cell.y, s, s, cell.col, r)
+            paintRoundedRect(target, x + cell.x, y + cell.y, s, s, cell.col, r)
         end
     end
 end
@@ -943,7 +981,6 @@ end
 
 function BoardUI.snapshot(key, full_w, full_h, w, h, build)
     if not snapshot_cache[key] then
-        local Screen = require("device").screen
         local Blitbuffer_ = require("ffi/blitbuffer")
         -- KOReader's MuPDF scaler keeps the 16-bit stride when it widens RGB565 and throws, so the
         -- reMarkable's RGB565 screen draws its thumbnails in RGB32 instead.

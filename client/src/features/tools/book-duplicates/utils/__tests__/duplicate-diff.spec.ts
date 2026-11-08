@@ -22,6 +22,7 @@ function candidate(overrides: Partial<BookDuplicateCandidate> & { id: number }):
     addedAt: '2026-08-22T03:15:32.000Z',
     updatedAt: null,
     hasCover: true,
+    bookPerFile: false,
     ...overrides,
   }
 }
@@ -74,10 +75,26 @@ describe('diffPathSegments', () => {
 describe('strongestReason', () => {
   it('leads with the reason that needs the least judgement', () => {
     expect(
-      strongestReason({ id: 1, reasons: ['fuzzy_metadata', 'file_hash'], maxTitleSimilarity: 1, reclaimableBytes: 0, books: [], pairs: [] }),
+      strongestReason({
+        id: 1,
+        kind: 'duplicate',
+        reasons: ['fuzzy_metadata', 'file_hash'],
+        maxTitleSimilarity: 1,
+        reclaimableBytes: 0,
+        books: [],
+        pairs: [],
+      }),
     ).toBe('file_hash')
     expect(
-      strongestReason({ id: 2, reasons: ['fuzzy_metadata', 'exact_metadata'], maxTitleSimilarity: 1, reclaimableBytes: 0, books: [], pairs: [] }),
+      strongestReason({
+        id: 2,
+        kind: 'duplicate',
+        reasons: ['fuzzy_metadata', 'exact_metadata'],
+        maxTitleSimilarity: 1,
+        reclaimableBytes: 0,
+        books: [],
+        pairs: [],
+      }),
     ).toBe('exact_metadata')
   })
 })

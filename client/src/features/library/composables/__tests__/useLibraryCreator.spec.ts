@@ -318,6 +318,83 @@ describe('useLibraryCreator', () => {
     expect(creator.loading.value).toBe(false)
   })
 
+  describe('overlapping folders', () => {
+    function prescan(paths: PrescanResult['paths']) {
+      apiMock.mockResolvedValueOnce(jsonResponse({ paths, totalFiles: 0 } satisfies PrescanResult))
+    }
+
+    it('will not save a new folder another library reads', async () => {
+      const { useLibraryCreator } = await import('../useLibraryCreator')
+      const creator = useLibraryCreator()
+      creator.form.name = 'Comics'
+      creator.form.icon = 'BookOpen'
+      creator.form.folders = ['/books/comics']
+      prescan([{ path: '/books/comics', accessible: true, fileCount: 3, overlapLibrary: 'Books' }])
+      await creator.checkFolders()
+
+      await expect(creator.save()).resolves.toBeNull()
+
+      expect(creator.validationErrors.value.folders).toBe('/books/comics overlaps a folder of Books. A folder can belong to only one library.')
+      expect(apiMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('will not save two new folders of one library where one holds the other', async () => {
+      const { useLibraryCreator } = await import('../useLibraryCreator')
+      const creator = useLibraryCreator()
+      creator.form.folders = ['/srv/comics', '/srv/comics/manga']
+
+      expect(creator.validationErrors.value.folders).toBe(
+        '/srv/comics overlaps /srv/comics/manga. A library cannot read the same folder twice, so keep only one of them.',
+      )
+    })
+
+    it('still saves a library whose folders overlapped before, as long as no new folder does', async () => {
+      const { useLibraryCreator } = await import('../useLibraryCreator')
+      const creator = useLibraryCreator()
+      creator.initEdit(
+        makeLibrary({
+          id: 12,
+          folders: [
+            { id: 1, path: '/media/audio', createdAt: '2026-01-01T00:00:00.000Z' },
+            { id: 2, path: '/media/audio/podcasts', createdAt: '2026-01-01T00:00:00.000Z' },
+          ],
+        }),
+      )
+      prescan([
+        { path: '/media/audio', accessible: true, fileCount: 3, overlapLibrary: 'Books' },
+        { path: '/media/audio/podcasts', accessible: true, fileCount: 1 },
+      ])
+      await creator.checkFolders()
+
+      expect(creator.validationErrors.value.folders).toBeUndefined()
+
+      creator.form.folders = [...creator.form.folders, '/media/audio/books']
+      expect(creator.validationErrors.value.folders).toBe(
+        '/media/audio/books overlaps /media/audio. A library cannot read the same folder twice, so keep only one of them.',
+      )
+    })
+
+    it('explains a refusal the server makes from its own check', async () => {
+      const { useLibraryCreator } = await import('../useLibraryCreator')
+      const creator = useLibraryCreator()
+      creator.initEdit(makeLibrary({ id: 12 }))
+      apiMock.mockResolvedValue(
+        jsonResponse(
+          {
+            message: 'Library folders cannot sit inside one another or be shared between libraries.',
+            errorCode: 'LIBRARY_FOLDER_OVERLAP',
+            errorMeta: { path: '/books', overlapPath: '/books/comics', overlapLibrary: 'Comics' },
+          },
+          409,
+        ),
+      )
+
+      await expect(creator.save()).resolves.toBeNull()
+
+      expect(creator.error.value).toBe('/books overlaps a folder of Comics. A folder can belong to only one library.')
+    })
+  })
+
   it('shows the read-along entry above EPUB and saves it only once it is moved', async () => {
     const { useLibraryCreator } = await import('../useLibraryCreator')
     const creator = useLibraryCreator()

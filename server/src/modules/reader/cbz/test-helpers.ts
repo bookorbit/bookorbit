@@ -45,6 +45,11 @@ export class FakeSevenZip implements SevenZipModule {
   constructor(public archive: Record<string, FakeArchiveEntry> = {}) {}
 
   readonly FS: SevenZipFS = {
+    filesystems: { NODEFS: {} },
+    mount: () => {
+      throw new Error('FakeSevenZip does not mount host filesystems');
+    },
+    unmount: () => undefined,
     open: (path) => {
       this.nodes.set(path, { mode: FILE_MODE, data: new Uint8Array() });
       return this.handles.push(path) - 1;

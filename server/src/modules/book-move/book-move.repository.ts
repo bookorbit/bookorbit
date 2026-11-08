@@ -1,4 +1,4 @@
-import { deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
+import { bumpKoreaderHashRevisions, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -95,6 +95,8 @@ export interface ApplyBookMoveInput {
   fileUpdates: BookFileMoveUpdate[];
   /** When set, this book in the target library is replaced by the moved book. */
   mergeDuplicateBookId?: number | null;
+  /** Folds the replaced book into the moved one when readers have data on it; false leaves it to be deleted. */
+  absorbDuplicate?: (tx: Parameters<Parameters<Db['transaction']>[0]>[0], duplicateBookId: number) => Promise<boolean>;
 }
 
 @Injectable()
@@ -374,7 +376,8 @@ export class BookMoveRepository {
           .limit(1);
 
         if (duplicate && duplicate.libraryId === input.targetLibraryId) {
-          await deleteBooksWithHashInvalidation(tx, eq(books.id, duplicate.id));
+          const absorbed = input.absorbDuplicate ? await input.absorbDuplicate(tx, duplicate.id) : false;
+          if (!absorbed) await deleteBooksWithHashInvalidation(tx, eq(books.id, duplicate.id));
           mergedBookId = duplicate.id;
         }
       }
@@ -409,6 +412,7 @@ export class BookMoveRepository {
       }
 
       await reselectPrimaryFile(tx, input.bookId, input.targetLibraryId);
+      await bumpKoreaderHashRevisions(tx, [current.libraryId, input.targetLibraryId]);
 
       return { moved: true, mergedBookId };
     });

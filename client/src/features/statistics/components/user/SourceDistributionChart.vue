@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { MonitorSmartphone } from '@lucide/vue'
 import { READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
@@ -82,6 +82,6 @@ watchEffect(() => {
     :empty-title="t('statistics.charts.sourceDistribution.emptyTitle')"
     :empty-description="t('statistics.charts.sourceDistribution.emptyDescriptionWithNativeClients')"
   >
-    <VChart :option autoresize style="height: 100%" />
+    <AppChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

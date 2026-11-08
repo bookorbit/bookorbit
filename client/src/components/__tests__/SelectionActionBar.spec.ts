@@ -2,6 +2,10 @@ import { mount } from '@vue/test-utils'
 import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { nextTick } from 'vue'
 import SelectionActionBar from '../SelectionActionBar.vue'
+import { BOOK_LINK_MAX_MEMBERS, BOOK_MERGE_MAX_BOOKS } from '@bookorbit/types'
+import { i18n } from '@/i18n'
+import type { MergeSelectionState } from '@/features/book/lib/book-merge'
+import type { LinkSelectionState } from '@/features/book/lib/book-link'
 
 const permissionState = {
   allowed: new Set<string>(),
@@ -39,6 +43,12 @@ const globalStubs = {
     TooltipTrigger: { template: '<div><slot /></div>' },
     TooltipContent: { template: '<div><slot /></div>' },
     TooltipProvider: { template: '<div><slot /></div>' },
+    BulkReadingStateDialog: {
+      props: ['open'],
+      emits: ['confirm'],
+      template:
+        '<button v-if="open" data-testid="bulk-reading-state-confirm-stub" @click="$emit(\'confirm\', { status: \'read\', finishedAt: null })">Confirm reading state</button>',
+    },
   },
 }
 
@@ -121,7 +131,7 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.find('[data-testid="action-add-to-collection"]').exists()).toBe(true)
   })
 
-  it('emits add/send/download/metadata-export/status/rating actions from default controls', async () => {
+  it('emits add/send/download/metadata-export/reading-state/rating actions from default controls', async () => {
     const wrapper = mountBar()
 
     await wrapper.find('[data-testid="action-add-to-collection"]').trigger('click')
@@ -142,11 +152,8 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.emitted('download')?.[0]).toEqual(['primary'])
 
     await wrapper.find('[data-testid="action-bulk-set-status"]').trigger('click')
-    await wrapper
-      .findAll('button')
-      .find((btn) => btn.text().includes('Reading'))
-      ?.trigger('click')
-    expect(wrapper.emitted('set-status')?.[0]).toEqual(['reading'])
+    await wrapper.find('[data-testid="bulk-reading-state-confirm-stub"]').trigger('click')
+    expect(wrapper.emitted('set-status')?.[0]).toEqual([{ status: 'read', finishedAt: null }])
 
     await wrapper.find('[data-testid="action-bulk-set-rating"]').trigger('click')
     await nextTick()
@@ -287,5 +294,140 @@ describe('SelectionActionBar demo restriction', () => {
 
     expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(true)
     expect(wrapper.find('select').exists()).toBe(false)
+  })
+})
+
+describe('SelectionActionBar merge action', () => {
+  const mergeStubs = {
+    stubs: {
+      ...globalStubs.stubs,
+      DropdownMenuItem: { emits: ['select'], template: '<button type="button" @click="$emit(\'select\', $event)"><slot /></button>' },
+    },
+  }
+
+  function mountWithMerge(merge: MergeSelectionState | null, count = 2) {
+    return mount(SelectionActionBar, {
+      props: { visible: true, count, inCollection: false, inFlight: null, merge },
+      global: mergeStubs,
+    })
+  }
+
+  beforeEach(() => {
+    permissionState.allowed = new Set(['library_edit_metadata', 'library_merge_books'])
+    permissionState.demoRestricted = false
+  })
+
+  it('leaves Merge out when the selection offers no merge state', () => {
+    expect(mountWithMerge(null).find('[data-testid="action-merge-books"]').exists()).toBe(false)
+  })
+
+  it('leaves Merge out for demo-restricted accounts', () => {
+    permissionState.demoRestricted = true
+    expect(mountWithMerge({ disabledReason: null }).find('[data-testid="action-merge-books"]').exists()).toBe(false)
+  })
+
+  it('emits merge when the selection can be merged', async () => {
+    const wrapper = mountWithMerge({ disabledReason: null })
+    const item = wrapper.get('[data-testid="action-merge-books"]')
+    expect(item.attributes('aria-disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="action-merge-books-reason"]').exists()).toBe(false)
+
+    await item.trigger('click')
+    expect(wrapper.emitted('merge')).toHaveLength(1)
+  })
+
+  it.each([
+    { reason: 'queryScoped', text: () => i18n.global.t('book.merge.disabled.queryScoped') },
+    { reason: 'tooFew', text: () => i18n.global.t('book.merge.disabled.tooFew') },
+    { reason: 'tooMany', text: () => i18n.global.t('book.merge.disabled.tooMany', { max: BOOK_MERGE_MAX_BOOKS }) },
+    { reason: 'notEditable', text: () => i18n.global.t('book.merge.disabled.notEditable') },
+  ] as const)('shows the $reason reason and does not emit', async ({ reason, text }) => {
+    const wrapper = mountWithMerge({ disabledReason: reason })
+    const item = wrapper.get('[data-testid="action-merge-books"]')
+    expect(item.attributes('aria-disabled')).toBe('true')
+    expect(wrapper.get('[data-testid="action-merge-books-reason"]').text()).toBe(text())
+
+    await item.trigger('click')
+    expect(wrapper.emitted('merge')).toBeUndefined()
+  })
+})
+
+describe('SelectionActionBar link action', () => {
+  const linkStubs = {
+    stubs: {
+      ...globalStubs.stubs,
+      DropdownMenuItem: { emits: ['select'], template: '<button type="button" @click="$emit(\'select\', $event)"><slot /></button>' },
+    },
+  }
+
+  function mountWithLink(link: LinkSelectionState | null, extra: Record<string, unknown> = {}) {
+    return mount(SelectionActionBar, {
+      props: { visible: true, count: 2, inCollection: false, inFlight: null, link, ...extra },
+      global: linkStubs,
+    })
+  }
+
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+    permissionState.allowed = new Set(['library_merge_books', 'library_delete_books'])
+    permissionState.demoRestricted = false
+  })
+
+  it('leaves Link out when the selection offers no link state', () => {
+    expect(mountWithLink(null).find('[data-testid="action-link-books"]').exists()).toBe(false)
+  })
+
+  it('leaves Link out for demo-restricted accounts', () => {
+    permissionState.demoRestricted = true
+    expect(mountWithLink({ disabledReason: null }).find('[data-testid="action-link-books"]').exists()).toBe(false)
+  })
+
+  it('emits link when the selection can be linked', async () => {
+    const wrapper = mountWithLink({ disabledReason: null })
+    const item = wrapper.get('[data-testid="action-link-books"]')
+    expect(item.attributes('aria-disabled')).toBeUndefined()
+    expect(item.text()).toContain('Link...')
+
+    await item.trigger('click')
+    expect(wrapper.emitted('link')).toHaveLength(1)
+  })
+
+  it.each([
+    { reason: 'queryScoped', text: 'Select the books one by one to link them' },
+    { reason: 'tooFew', text: 'Select at least two books to link' },
+    { reason: 'tooMany', text: `Link up to ${BOOK_LINK_MAX_MEMBERS} books at a time` },
+    { reason: 'notEditable', text: 'Only books in libraries you can edit can be linked' },
+  ] as const)('shows the $reason reason and does not emit', async ({ reason, text }) => {
+    const wrapper = mountWithLink({ disabledReason: reason })
+    const item = wrapper.get('[data-testid="action-link-books"]')
+    expect(item.attributes('aria-disabled')).toBe('true')
+    expect(wrapper.get('[data-testid="action-link-books-reason"]').text()).toBe(text)
+
+    await item.trigger('click')
+    expect(wrapper.emitted('link')).toBeUndefined()
+  })
+
+  it('offers Merge for books in different libraries alongside Link', () => {
+    const wrapper = mountWithLink({ disabledReason: null }, { merge: { disabledReason: null } })
+    expect(wrapper.get('[data-testid="action-merge-books"]').attributes('aria-disabled')).toBeUndefined()
+    expect(wrapper.find('[data-testid="action-merge-books-reason"]').exists()).toBe(false)
+  })
+
+  it('says why Merge is off when a selected book sits in a library the user cannot edit', () => {
+    const wrapper = mountWithLink(null, { merge: { disabledReason: 'notEditable' } })
+    expect(wrapper.get('[data-testid="action-merge-books-reason"]').text()).toBe('Only books in libraries you can edit can be merged')
+  })
+
+  it('says linked books are not affected when deleting a selection that holds them', async () => {
+    const wrapper = mountWithLink(null, { linkedSelected: true })
+    await wrapper.get('[data-testid="action-delete"]').trigger('click')
+    expect(wrapper.get('[data-testid="delete-linked-note"]').text()).toBe('Books linked with the selection are not affected.')
+  })
+
+  it('leaves the delete confirmation alone for a selection without linked books', async () => {
+    const wrapper = mountWithLink(null)
+    await wrapper.get('[data-testid="action-delete"]').trigger('click')
+    expect(wrapper.text()).toContain('Delete 2 books?')
+    expect(wrapper.find('[data-testid="delete-linked-note"]').exists()).toBe(false)
   })
 })

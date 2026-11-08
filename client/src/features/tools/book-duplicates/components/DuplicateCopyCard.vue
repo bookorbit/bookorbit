@@ -2,11 +2,11 @@
 import { computed } from 'vue'
 import { BookOpen, Check, Layers, Sparkles } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import type { BookDuplicateCandidate } from '@bookorbit/types'
+import type { BookDuplicateAction, BookDuplicateCandidate } from '@bookorbit/types'
 
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { formatBytes } from '@/lib/formatting'
-import { formatPercent } from '@/i18n/formatters'
+import { formatCopyProgress } from '../utils/copy-progress'
 import { copyBytes, copyFolderLabel } from '../utils/duplicate-keeper'
 
 const props = defineProps<{
@@ -15,6 +15,8 @@ const props = defineProps<{
   index: number
   keeper: boolean
   recommended: boolean
+  /** The group's action: what happens to the copies that are not kept. */
+  action?: BookDuplicateAction | null
 }>()
 
 const emit = defineEmits<{ keep: [bookId: number] }>()
@@ -23,6 +25,19 @@ const { t } = useI18n()
 
 const label = computed(() => copyFolderLabel(props.book) || props.book.title || t('book.untitled'))
 const bytes = computed(() => formatBytes(copyBytes(props.book)))
+const status = computed(() => {
+  if (props.keeper) return props.action === 'link' ? t('tools.bookDuplicates.copyStatus.main') : t('tools.bookDuplicates.keeping')
+  switch (props.action) {
+    case 'delete':
+      return t('tools.bookDuplicates.willDelete')
+    case 'merge':
+      return t('tools.bookDuplicates.copyStatus.merge')
+    case 'link':
+      return t('tools.bookDuplicates.copyStatus.link')
+    default:
+      return t('tools.bookDuplicates.copyStatus.other')
+  }
+})
 
 function handleKeep(): void {
   emit('keep', props.book.id)
@@ -54,7 +69,7 @@ function handleKeep(): void {
         >
           <Check v-if="keeper" class="size-2.5" aria-hidden="true" />
         </span>
-        {{ keeper ? t('tools.bookDuplicates.keeping') : t('tools.bookDuplicates.willDelete') }}
+        {{ status }}
       </span>
       <span class="rounded-xs border border-border px-1 font-mono text-[10px] leading-[15px] text-muted-foreground" aria-hidden="true">{{
         index + 1
@@ -79,7 +94,7 @@ function handleKeep(): void {
             class="inline-flex h-5 items-center gap-1 rounded-full bg-[color-mix(in_oklch,var(--pill-warning)_15%,transparent)] px-2 text-[10.5px] font-semibold text-[var(--pill-warning)]"
           >
             <BookOpen class="size-3" aria-hidden="true" />
-            {{ formatPercent(book.readingProgress) }}
+            {{ formatCopyProgress(book.readingProgress) }}
           </span>
           <span
             v-if="book.collections.length > 0"

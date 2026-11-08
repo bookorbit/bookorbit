@@ -1,0 +1,4 @@
+ALTER TABLE "book_duplicate_dismissals" DROP CONSTRAINT "book_duplicate_dismissals_user_id_book_id_a_book_id_b_pk";--> statement-breakpoint
+ALTER TABLE "book_duplicate_pairs" DROP CONSTRAINT "book_duplicate_pairs_scan_id_book_id_a_book_id_b_pk";--> statement-breakpoint
+ALTER TABLE "book_duplicate_dismissals" ADD CONSTRAINT "book_duplicate_dismissals_user_id_kind_book_id_a_book_id_b_pk" PRIMARY KEY("user_id","kind","book_id_a","book_id_b");--> statement-breakpoint
+ALTER TABLE "book_duplicate_pairs" ADD CONSTRAINT "book_duplicate_pairs_scan_id_kind_book_id_a_book_id_b_pk" PRIMARY KEY("scan_id","kind","book_id_a","book_id_b");

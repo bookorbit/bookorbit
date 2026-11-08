@@ -817,6 +817,12 @@ describe('Authorization matrix (e2e)', () => {
           path: '/book-request-fulfilment/download-clients',
           token: 'allPerms',
         },
+        [Permission.LibraryMergeBooks]: {
+          method: 'GET',
+          path: '/books/merge/jobs/:jobId',
+          params: { jobId: '2147483000' },
+          token: 'allPerms',
+        },
       };
 
       const failures: MatrixFailure[] = [];
@@ -1431,6 +1437,123 @@ describe('Authorization matrix (e2e)', () => {
         headers: authHeader(personas.otherUser.accessToken),
       });
       expect(publicRead.statusCode).toBe(200);
+    });
+
+    it('lets only the owner set a smartScope grid shape, and keeps it through a released iOS update (issue #1926)', async () => {
+      const portraitResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/smart-scopes',
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { name: `authz-portrait-smartScope-${randomUUID()}`, icon: 'Aperture', defaultSort: [] },
+      });
+      expect(portraitResponse.statusCode).toBe(201);
+      expect(portraitResponse.json()).toEqual(expect.objectContaining({ coverAspectRatio: '2/3' }));
+
+      const squareResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/smart-scopes',
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { name: `authz-square-smartScope-${randomUUID()}`, icon: 'Headphones', defaultSort: [], isPublic: true, coverAspectRatio: '1/1' },
+      });
+      expect(squareResponse.statusCode).toBe(201);
+      const squareScope = squareResponse.json() as { id: number; name: string; coverAspectRatio: string };
+      expect(squareScope.coverAspectRatio).toBe('1/1');
+
+      const sharedRead = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/smart-scopes/${squareScope.id}`,
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(sharedRead.statusCode).toBe(200);
+      expect(sharedRead.json()).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+
+      const foreignShapeChange = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/smart-scopes/${squareScope.id}`,
+        headers: authHeader(personas.otherUser.accessToken),
+        payload: { coverAspectRatio: '2/3' },
+      });
+      expectError(foreignShapeChange, 403, 'Cannot modify this smartScope');
+
+      // The released iOS app sends every field it knows on update, and the shape is not one of them.
+      const iosUpdate = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/smart-scopes/${squareScope.id}`,
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: {
+          name: squareScope.name,
+          icon: 'Headphones',
+          filter: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'listen' }] },
+          defaultSort: [],
+          isPublic: true,
+          syncToKobo: false,
+        },
+      });
+      expect(iosUpdate.statusCode).toBe(200);
+      expect(iosUpdate.json()).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+
+      const nullShape = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/smart-scopes/${squareScope.id}`,
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { coverAspectRatio: null },
+      });
+      expect(nullShape.statusCode).toBe(400);
+    });
+
+    it('lets only the owner set a collection grid shape, and keeps it through a released iOS update (issue #1926)', async () => {
+      const portraitResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { name: `authz-portrait-collection-${randomUUID()}`, icon: 'FolderOpen' },
+      });
+      expect(portraitResponse.statusCode).toBe(201);
+      expect(portraitResponse.json()).toEqual(expect.objectContaining({ coverAspectRatio: '2/3' }));
+
+      const squareResponse = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { name: `authz-square-collection-${randomUUID()}`, icon: 'Headphones', isPublic: true, coverAspectRatio: '1/1' },
+      });
+      expect(squareResponse.statusCode).toBe(201);
+      const squareCollection = squareResponse.json() as { id: number; name: string; coverAspectRatio: string };
+      expect(squareCollection.coverAspectRatio).toBe('1/1');
+
+      const sharedList = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/collections',
+        headers: authHeader(personas.otherUser.accessToken),
+      });
+      expect(sharedList.statusCode).toBe(200);
+      expect(sharedList.json()).toEqual(expect.arrayContaining([expect.objectContaining({ id: squareCollection.id, coverAspectRatio: '1/1' })]));
+
+      const foreignShapeChange = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/collections/${squareCollection.id}`,
+        headers: authHeader(personas.otherUser.accessToken),
+        payload: { coverAspectRatio: '2/3' },
+      });
+      expectError(foreignShapeChange, 403, 'Cannot modify this collection');
+
+      // The released iOS app sends every field it knows on update, and the shape is not one of them.
+      const iosUpdate = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/collections/${squareCollection.id}`,
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { name: squareCollection.name, icon: 'Headphones', description: 'For the commute', isPublic: true, syncToKobo: false },
+      });
+      expect(iosUpdate.statusCode).toBe(200);
+      expect(iosUpdate.json()).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+
+      const nullShape = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/collections/${squareCollection.id}`,
+        headers: authHeader(personas.ownerUser.accessToken),
+        payload: { coverAspectRatio: null },
+      });
+      expect(nullShape.statusCode).toBe(400);
     });
 
     it('enforces OPDS user ownership checks', async () => {

@@ -262,6 +262,167 @@ describe('BookDockFinalizeDialog', () => {
     const previewCall = apiMock.mock.calls.find(([url]) => url === '/api/v1/book-dock/finalize/preview')!
     expect(JSON.parse((previewCall[1] as RequestInit).body as string)).toEqual({ fileIds: [10, 11] })
   })
+  describe('adding a file to an existing book', () => {
+    const readyItem = { fileId: 11, fileName: 'ready.pdf', newName: 'Frank Herbert/Dune/ready.pdf', status: 'ready', libraryId: 2, canJoinBook: true }
+
+    function previewBodies() {
+      return apiMock.mock.calls
+        .filter(([url]) => url === '/api/v1/book-dock/finalize/preview')
+        .map(([, init]) => JSON.parse((init as RequestInit).body as string) as Record<string, unknown>)
+    }
+
+    function mockJoinPreview() {
+      apiMock.mockImplementation(async (url, init) => {
+        if (url === '/api/v1/book-dock/files/selection-summary') return jsonResponse(selectionSummary.value)
+        if (url !== '/api/v1/book-dock/finalize/preview') return jsonResponse({}, 404)
+        const body = JSON.parse((init as RequestInit).body as string) as { overrides?: unknown[] }
+        const joining = (body.overrides?.length ?? 0) > 0
+        return jsonResponse({
+          total: 1,
+          ready: 1,
+          joining: joining ? 1 : 0,
+          duplicates: 0,
+          destinationConflicts: 0,
+          missingDestination: 0,
+          blocked: 0,
+          truncated: false,
+          itemLimit: 200,
+          items: [
+            joining
+              ? { ...readyItem, newName: 'Frank Herbert/Dune/Dune.pdf', joinsBook: { bookId: 42, title: 'Dune', authors: ['Frank Herbert'] } }
+              : { ...readyItem, suggestedJoinBook: { bookId: 42, title: 'Dune', authors: ['Frank Herbert'], reason: 'isbn' } },
+          ],
+        })
+      })
+    }
+
+    it('takes a suggestion into the preview and the finalize request, and drops it again', async () => {
+      mockJoinPreview()
+      const wrapper = mountDialog()
+      await flushPromises()
+      expect(previewBodies().every((body) => !('overrides' in body))).toBe(true)
+
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().trim() === 'Add to this book')!
+        .trigger('click')
+      await flushPromises()
+
+      const override = [{ fileId: 11, joinBook: { bookId: 42 } }]
+      expect(previewBodies().at(-1)).toEqual({ fileIds: [10, 11], defaultLibraryId: 2, defaultFolderId: 3, overrides: override })
+      expect(wrapper.text()).toContain('Joins Dune')
+      expect(wrapper.text()).toContain('1 joins an existing book')
+
+      await startButton(wrapper).trigger('click')
+      expect(finalizeMock).toHaveBeenCalledExactlyOnceWith({ fileIds: [10, 11], defaultLibraryId: 2, defaultFolderId: 3, overrides: override })
+
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().trim() === 'File as a new book')!
+        .trigger('click')
+      await flushPromises()
+      expect(previewBodies().at(-1)).toEqual({ fileIds: [10, 11], defaultLibraryId: 2, defaultFolderId: 3 })
+      expect(wrapper.text()).toContain('Looks like another format of Dune')
+    })
+
+    it('keeps the chosen book when a clashing file is retried under a new name', async () => {
+      mockJoinPreview()
+      const wrapper = mountDialog()
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().trim() === 'Add to this book')!
+        .trigger('click')
+      await flushPromises()
+
+      finalizeResult.value = {
+        total: 1,
+        succeeded: 0,
+        failed: 1,
+        results: [
+          {
+            fileId: 11,
+            fileName: 'ready.pdf',
+            newName: 'Frank Herbert/Dune/Dune.pdf',
+            success: false,
+            message: 'A file with this name already exists at the target location',
+          },
+        ],
+      }
+      await flushPromises()
+      await wrapper.get('input[type="text"]').setValue('Dune (scan)')
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().trim() === 'Import')!
+        .trigger('click')
+      await flushPromises()
+
+      const retry = apiMock.mock.calls.find(([url]) => url === '/api/v1/book-dock/finalize')!
+      expect(JSON.parse((retry[1] as RequestInit).body as string)).toMatchObject({
+        fileIds: [11],
+        overrides: [{ fileId: 11, targetFileName: 'Dune (scan)', joinBook: { bookId: 42 } }],
+      })
+    })
+
+    it('lists every file the server returned and counts only the ones it left out', async () => {
+      apiMock.mockImplementation(async (url) => {
+        if (url === '/api/v1/book-dock/files/selection-summary') return jsonResponse(selectionSummary.value)
+        return jsonResponse({
+          total: 250,
+          ready: 200,
+          duplicates: 0,
+          destinationConflicts: 0,
+          missingDestination: 0,
+          blocked: 0,
+          truncated: true,
+          itemLimit: 200,
+          items: Array.from({ length: 200 }, (_, index) => ({
+            fileId: index + 1,
+            fileName: `f${index}.epub`,
+            newName: `f${index}.epub`,
+            status: 'ready',
+          })),
+        })
+      })
+      const wrapper = mountDialog()
+      await flushPromises()
+      expect(wrapper.findAll('[data-testid="book-dock-finalize-row"]')).toHaveLength(200)
+      expect(wrapper.text()).toContain('+50 more files')
+    })
+
+    it('explains a refused join in the results', async () => {
+      mockJoinPreview()
+      const wrapper = mountDialog()
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().trim() === 'Add to this book')!
+        .trigger('click')
+      await flushPromises()
+
+      finalizeResult.value = {
+        total: 1,
+        succeeded: 0,
+        failed: 1,
+        results: [
+          {
+            fileId: 11,
+            fileName: 'ready.pdf',
+            success: false,
+            errorCode: 'BOOK_DOCK_JOIN_FORBIDDEN',
+            message: 'You cannot edit the book this file was meant to join',
+          },
+        ],
+      }
+      await flushPromises()
+      await wrapper
+        .findAll('button')
+        .find((button) => button.text().includes('Details'))!
+        .trigger('click')
+      expect(wrapper.text()).toContain('You cannot edit Dune, so this file cannot be added to it.')
+    })
+  })
+
   it('ignores a late preview after the selected destination becomes unavailable', async () => {
     const completePreviews: Array<(response: Response) => void> = []
     apiMock.mockImplementation(async (url) => {

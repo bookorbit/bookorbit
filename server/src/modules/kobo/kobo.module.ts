@@ -4,6 +4,7 @@ import { CommonModule } from '../../common/common.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { AnnotationModule } from '../annotation/annotation.module';
 import { BookModule } from '../book/book.module';
+import { BookAliasModule } from '../book-alias/book-alias.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { PositionConverterModule } from '../position-converter/position-converter.module';
@@ -29,6 +30,7 @@ import { KoboDownloadService } from './services/kobo-download.service';
 import { KoboReadingProgressRepository } from './kobo-reading-progress.repository';
 import { KoboDeliveryRepository } from './kobo-delivery.repository';
 import { KoboAnnotationServeRepository } from './kobo-annotation-serve.repository';
+import { KoboTombstoneRepository } from './kobo-tombstone.repository';
 import { KoboBookmarkLinkRepository } from './kobo-bookmark-link.repository';
 import { KoboDeliveryService } from './services/kobo-delivery.service';
 import { KoboDownloadRepository } from './kobo-download.repository';
@@ -55,6 +57,7 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
     AchievementModule,
     AnnotationModule,
     BookModule,
+    BookAliasModule,
     BookmarkModule,
     BookCoverStoreModule,
     MetadataModule,
@@ -88,6 +91,7 @@ import { KoboAnalyticsService } from './services/kobo-analytics.service';
     KoboDeliveryRepository,
     KoboBookmarkLinkRepository,
     KoboAnnotationServeRepository,
+    KoboTombstoneRepository,
     KoboReadingProgressRepository,
     KoboDeliveryService,
     KoboDownloadHashBackfillService,

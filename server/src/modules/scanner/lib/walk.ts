@@ -122,9 +122,11 @@ async function collectByDir(
   knownDirMtimes?: Map<string, number>,
   unchangedDirs?: Set<string>,
   dirMtimes?: Map<string, number>,
+  skipDirectories?: ReadonlySet<string>,
 ): Promise<Set<string>> {
   const { skippedDirs } = await walkDirectoryTree(libraryRoot, {
     shouldExclude,
+    skipDirectories,
     logger,
     visit: async ({ path: dir, filePaths, subdirectoryPaths }) => {
       // Record this directory's mtime for incremental scan state
@@ -200,12 +202,13 @@ export async function findBookCandidates(
   excludePatterns: string[] = [],
   logger?: (msg: string) => void,
   knownDirMtimes?: Map<string, number>,
+  skipDirectories?: ReadonlySet<string>,
 ): Promise<WalkResult> {
   const byDir = new Map<string, FileStat[]>();
   const shouldExclude = buildNameExcludeMatcher(excludePatterns);
   const unchangedDirs = new Set<string>();
   const dirMtimes = new Map<string, number>();
-  const skippedDirs = await collectByDir(libraryFolderPath, byDir, shouldExclude, logger, knownDirMtimes, unchangedDirs, dirMtimes);
+  const skippedDirs = await collectByDir(libraryFolderPath, byDir, shouldExclude, logger, knownDirMtimes, unchangedDirs, dirMtimes, skipDirectories);
 
   // Flatten disc subdirectories (e.g. "CD 1", "Disc 2") into their parent.
   // Collect disc dirs first to avoid mutating the map while iterating.
@@ -309,12 +312,13 @@ export async function findLooseFileCandidates(
   excludePatterns: string[] = [],
   logger?: (msg: string) => void,
   knownDirMtimes?: Map<string, number>,
+  skipDirectories?: ReadonlySet<string>,
 ): Promise<WalkResult> {
   const byDir = new Map<string, FileStat[]>();
   const shouldExclude = buildNameExcludeMatcher(excludePatterns);
   const unchangedDirs = new Set<string>();
   const dirMtimes = new Map<string, number>();
-  const skippedDirs = await collectByDir(libraryFolderPath, byDir, shouldExclude, logger, knownDirMtimes, unchangedDirs, dirMtimes);
+  const skippedDirs = await collectByDir(libraryFolderPath, byDir, shouldExclude, logger, knownDirMtimes, unchangedDirs, dirMtimes, skipDirectories);
 
   const candidates: BookCandidate[] = [];
 

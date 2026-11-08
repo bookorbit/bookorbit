@@ -84,7 +84,7 @@ function openExamples() {
       </DropdownMenuLabel>
       <DropdownMenuItem v-for="entry in entries" :key="entry.id" class="flex-col items-stretch gap-1 py-2" @select="applyRecipe(entry.pattern)">
         <span class="flex items-center gap-2 text-[13px] font-semibold">
-          <AppIcon :icon="entry.icon" fallback="BookOpen" :size="14" aria-hidden="true" />
+          <AppIcon :icon="entry.icon" :fallback="BookOpen" :size="14" aria-hidden="true" />
           {{ entry.name }}
           <span v-if="entry.pattern === currentPattern" class="ms-auto inline-flex items-center gap-1 text-xs font-medium text-primary">
             <Check :size="13" class="text-primary" aria-hidden="true" />

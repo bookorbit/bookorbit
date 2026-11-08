@@ -75,6 +75,7 @@ const validDisplayPreferences: DisplayPreferences = {
   squareGridGap: 20,
   viewMode: 'grid',
   cardOverlays: ['progress-bar', 'format', 'rating'],
+  formatBadgeStyle: 'primary',
   showJumpRails: true,
   smartScopeFilterExpanded: true,
   authorCoverSize: 140,
@@ -471,6 +472,32 @@ describe('UserPreferencesService', () => {
     await expect(service.upsertDisplayPreferences(11, withoutAction as unknown as Record<string, unknown>)).resolves.toBeUndefined();
 
     expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ thumbnailClickAction: 'reader' }));
+  });
+
+  it('upsertDisplayPreferences defaults formatBadgeStyle to underline when omitted', async () => {
+    const { formatBadgeStyle, ...withoutStyle } = validDisplayPreferences;
+    void formatBadgeStyle;
+    await service.upsertDisplayPreferences(11, withoutStyle as unknown as Record<string, unknown>);
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ formatBadgeStyle: 'underline' }));
+  });
+
+  it('upsertDisplayPreferences keeps the primary format badge style when it is chosen', async () => {
+    await service.upsertDisplayPreferences(11, { ...validDisplayPreferences, formatBadgeStyle: 'primary' } as unknown as Record<string, unknown>);
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ formatBadgeStyle: 'primary' }));
+  });
+
+  it('upsertDisplayPreferences keeps a chosen formatBadgeStyle', async () => {
+    await service.upsertDisplayPreferences(11, { ...validDisplayPreferences, formatBadgeStyle: 'seal' } as unknown as Record<string, unknown>);
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ formatBadgeStyle: 'seal' }));
+  });
+
+  it('upsertDisplayPreferences rejects unknown formatBadgeStyle values', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, formatBadgeStyle: 'stack' } as unknown as Record<string, unknown>),
+    ).rejects.toThrow(BadRequestException);
   });
 
   it('upsertDisplayPreferences defaults placeholderCoverStyle to bauhaus when omitted', async () => {

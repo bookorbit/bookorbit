@@ -50,8 +50,8 @@ const issue = computed<{ text: string; icon: typeof X; actions: Action[] } | nul
     const folder = single ? leafName(single.folders.find((own) => own.startsWith(`${props.path}/`)) ?? single.folders[0]!) : ''
     return {
       text: single
-        ? t('library.folderBrowser.plan.attention.containsOne', { folder, library: single.name })
-        : t('library.folderBrowser.plan.attention.containsMany', { libraries: formatList(libraries.map((library) => library.name)) }),
+        ? t('library.folderBrowser.plan.attention.containsOneBlocked', { folder, library: single.name })
+        : t('library.folderBrowser.plan.attention.containsManyBlocked', { libraries: formatList(libraries.map((library) => library.name)) }),
       icon: TriangleAlert,
       actions: [
         {

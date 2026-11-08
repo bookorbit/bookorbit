@@ -82,6 +82,13 @@ export function useFoliateInput(
     return canNavigate ? canNavigate() : true
   }
 
+  // Foliate follows these links from its own click handler, so the same tap must not also turn
+  // the page or toggle the reader chrome. The selector matches the one Foliate follows.
+  function isOnFollowedLink(target: EventTarget | null): boolean {
+    const el = target as Element | null
+    return typeof el?.closest === 'function' && el.closest('a[href]') !== null
+  }
+
   function handleTouchStart(e: TouchEvent, doc: Document) {
     if (e.touches.length !== 1) return
     handleSelectionInteractionStart?.(doc)
@@ -150,7 +157,7 @@ export function useFoliateInput(
       const screenDeltaX = Math.abs(touch.screenX - touchStartScreenX)
       const screenDeltaY = Math.abs(touch.screenY - touchStartScreenY)
 
-      if (touchDuration < 500 && screenDeltaX < TAP_MOVEMENT_THRESHOLD && screenDeltaY < TAP_MOVEMENT_THRESHOLD) {
+      if (touchDuration < 500 && screenDeltaX < TAP_MOVEMENT_THRESHOLD && screenDeltaY < TAP_MOVEMENT_THRESHOLD && !isOnFollowedLink(e.target)) {
         const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null
         if (!iframe) return
         const iframeRect = iframe.getBoundingClientRect()
@@ -201,6 +208,7 @@ export function useFoliateInput(
       (e: MouseEvent) => {
         if (Date.now() - lastTouchTime < 500) return
         if (!longHoldTimeout) return
+        if (isOnFollowedLink(e.target)) return
         const iframe = doc.defaultView?.frameElement as HTMLIFrameElement | null
         if (!iframe) return
         const rect = iframe.getBoundingClientRect()

@@ -28,6 +28,7 @@ function makeService(db: any = {}) {
     scanBookFolderAsync: vi.fn(),
     scanBookDirectoryAsync: vi.fn(),
     isScanRunning: vi.fn().mockReturnValue(false),
+    ownsPath: vi.fn().mockResolvedValue(true),
     bufferWatcherNotification: vi.fn(),
     bufferBookMissingEvent: vi.fn(),
     bufferBooksUnavailableNotification: vi.fn(),
@@ -67,6 +68,21 @@ describe('onApplicationBootstrap()', () => {
 // ── process() routing ─────────────────────────────────────────────────────────
 
 describe('process()', () => {
+  it('leaves an event under a folder another library owns to that library', async () => {
+    const { service, processor, scannerService } = makeService();
+    (scannerService as any).ownsPath = vi.fn().mockResolvedValue(false);
+    processor.handleCreate = vi.fn();
+    processor.handleUnlink = vi.fn();
+
+    await (service as any).process('create', '/books/comics/Saga/saga.cbz', 1);
+    await (service as any).process('delete', '/books/comics/Saga/saga.cbz', 1);
+
+    expect((scannerService as any).ownsPath).toHaveBeenCalledWith(1, '/books/comics/Saga/saga.cbz');
+    expect(processor.handleCreate).not.toHaveBeenCalled();
+    expect(processor.handleUnlink).not.toHaveBeenCalled();
+    expect(scannerService.scanBookFolderAsync).not.toHaveBeenCalled();
+  });
+
   it('buffers book-missing when handleUnlink returns book-missing', async () => {
     const { service, processor, gateway, scannerService } = makeService();
     const missing = { type: 'book-missing', libraryId: 1, bookIds: [10, 11] };

@@ -389,6 +389,40 @@
             "label": "Lock status",
             "hint": "Metadata lock icon at top-right - orange when locked, green when unlocked"
           }
+        },
+        "formatBadgeStyle": {
+          "title": "Format badge style",
+          "hint": "How the badge shows a book that has several formats. A book with one format always shows its plain pill.",
+          "options": {
+            "primary": {
+              "label": "Primary format",
+              "hint": "One pill with the format the card opens."
+            },
+            "bubble": {
+              "label": "Count bubble",
+              "hint": "The primary pill with a small count of the other formats on its corner."
+            },
+            "underline": {
+              "label": "Underline",
+              "hint": "The primary pill with a bar under it, one colored segment per other format."
+            },
+            "pips": {
+              "label": "Pips",
+              "hint": "The primary pill with a colored pip above it for each other format."
+            },
+            "seal": {
+              "label": "Seal",
+              "hint": "A ring with a segment per format and the count inside."
+            },
+            "dots": {
+              "label": "Dots",
+              "hint": "A colored dot per format. Hover the cover for the full list."
+            },
+            "kinds": {
+              "label": "Read and listen",
+              "hint": "The primary format, then icons for what the book can do."
+            }
+          }
         }
       },
       "layout": {
@@ -3762,7 +3796,7 @@
         "clientsEmpty": {
           "title": "No download client yet",
           "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
-          "note": "qBittorrent, Transmission, Deluge, NZBGet and SABnzbd are supported."
+          "note": "qBittorrent, Transmission, Deluge, rTorrent, NZBGet and SABnzbd are supported."
         },
         "summary": "{type} - category {category}, priority {priority}",
         "disabled": "Disabled",
@@ -3778,6 +3812,7 @@
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
           "deluge": "Deluge",
+          "rtorrent": "rTorrent",
           "nzbget": "NZBGet",
           "sabnzbd": "SABnzbd"
         },
@@ -3790,6 +3825,7 @@
           "name": "Name",
           "type": "Client type",
           "baseUrl": "Base URL",
+          "baseUrlRtorrentBrief": "The XML-RPC endpoint itself: usually /RPC2, or plugins/httprpc/action.php when ruTorrent is in front. The username and password are the web server's, when it asks for them.",
           "username": "Username",
           "password": "Password",
           "apiKey": "API key",
@@ -3992,7 +4028,7 @@
             "ratioBrief": "A positive decimal. Blank inherits from the tracker or client.",
             "time": "Seed time (minutes)",
             "timeBrief": "A positive whole number. Blank inherits from the tracker or client.",
-            "clientSupport": "qBittorrent accepts ratio and total seed time. Deluge and Transmission accept ratio only. Client global rules and whichever limit is reached first can stop seeding, so these values do not guarantee that every tracker minimum is met.",
+            "clientSupport": "qBittorrent accepts ratio and total seed time. Deluge and Transmission accept ratio only. rTorrent accepts neither and follows its own ratio rules. Client global rules and whichever limit is reached first can stop seeding, so these values do not guarantee that every tracker minimum is met.",
             "futureGrabs": "Changes apply to future grabs. Existing or adopted torrents can retain client-specific limits. Turning tracker fallback off leaves client defaults active; it does not mean unlimited seeding.",
             "reset": "Reset seeding settings",
             "summary": {
@@ -4291,6 +4327,7 @@
           "qbittorrent": "Your own qBittorrent. Needs an address and an account.",
           "transmission": "Your own Transmission. It has no categories, so the category becomes a subfolder of its download directory.",
           "deluge": "Your own Deluge. Sign in with the Web UI password; the category needs the Label plugin switched on.",
+          "rtorrent": "Your own rTorrent, over XML-RPC. The category becomes its label; rTorrent's own settings decide where files go.",
           "nzbget": "Your own NZBGet. BookOrbit sends NZB files over its JSON-RPC API.",
           "sabnzbd": "Your own SABnzbd. BookOrbit sends NZB files using its API key."
         },
@@ -5070,6 +5107,7 @@
   },
   "annotations": {
     "unknownBook": "Unknown book",
+    "textUnavailable": "Text not available for this highlight",
     "styles": {
       "highlight": "Highlight",
       "underline": "Underline",
@@ -5478,6 +5516,10 @@
       "BookBulkSetMetadataLock": "Set metadata locks",
       "BookBulkEditMetadata": "Edit book metadata",
       "BookBulkMoveLibrary": "Move books to another library",
+      "BookMerge": "Merge books",
+      "BookLink": "Link books",
+      "BookUnlink": "Unlink book",
+      "BookDuplicatesResolve": "Resolve duplicate books",
       "BookReadingStateReset": "Reset reading state",
       "BookWriteAndRename": "Write metadata and rename file",
       "CollectionCreate": "Create collection",
@@ -6354,7 +6396,8 @@
     "deleteDialog": {
       "title": "Delete book?",
       "description": "This will permanently delete the book and all its metadata, files, reading progress, and bookmarks. This cannot be undone.",
-      "keepsHistory": "Finished reads stay in each reader's history, under the book's title and author."
+      "keepsHistory": "Finished reads stay in each reader's history, under the book's title and author.",
+      "linkedNotAffected": "Books linked with this one are not affected."
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Edit metadata - # book} one {Edit metadata - # book} other {Edit metadata - # books}}",
@@ -6372,6 +6415,32 @@
         "remove": "Remove",
         "replace": "Replace",
         "clear": "Clear"
+      }
+    },
+    "bulkReadingState": {
+      "title": "{count, plural, =0 {Update reading state} one {Update reading state for # book} other {Update reading state for # books}}",
+      "description": "Set a shared reading status and choose whether reading dates should be changed.",
+      "status": "Reading status",
+      "startedAt": "Date started",
+      "finishedAt": "Date finished",
+      "dateAction": "Date action",
+      "setDate": "Set date",
+      "clearDate": "Clear date",
+      "noFinishDate": "No finish date",
+      "clearStartedHint": "The start date will be removed from every selected book.",
+      "noFinishDateHint": "Completed reads stay undated and are not added to today's statistics.",
+      "close": "Close bulk reading state editor",
+      "cancel": "Cancel",
+      "apply": "Apply changes",
+      "updated": "{count, plural, one {Updated reading state for # book} other {Updated reading state for # books}}",
+      "failed": "Failed to update reading state",
+      "errors": {
+        "startRequired": "Choose a start date.",
+        "finishRequired": "Choose a finish date.",
+        "startFuture": "The start date cannot be in the future.",
+        "finishFuture": "The finish date cannot be in the future.",
+        "finishBeforeStart": "The finish date must be on or after the start date.",
+        "statusConflict": "Reading dates cannot be set for this reading status."
       }
     },
     "export": {
@@ -8631,6 +8700,459 @@
         "success": "Moved {count} books to {library}",
         "partial": "Moved {moved} books, {failed} failed"
       }
+    },
+    "gridShape": {
+      "title": "Grid shape",
+      "tallTitle": "Tall cells",
+      "tallHint": "Each book shows the cover of its primary format",
+      "squareTitle": "Square cells",
+      "squareHint": "Books with an audiobook show its cover and play it when opened"
+    },
+    "merge": {
+      "action": "Merge...",
+      "detailAction": "Merge with another book...",
+      "disabled": {
+        "queryScoped": "Select the books one by one to merge them",
+        "tooFew": "Select at least two books to merge",
+        "tooMany": "{max, plural, one {Merge up to # book at a time} other {Merge up to # books at a time}}",
+        "notEditable": "Only books in libraries you can edit can be merged"
+      },
+      "title": "Merge books",
+      "description": "Combine records of the same book into one. Their files move into one folder.",
+      "continue": "Review merge",
+      "confirm": "{count, plural, one {Merge # book} other {Merge # books}}",
+      "confirming": "Merging...",
+      "loading": "Loading the merge review...",
+      "redirected": "This book was merged into another book",
+      "steps": {
+        "pick": "Merge with which books?",
+        "keeper": "Keep which book?",
+        "review": "Review the merge",
+        "progress": "Merging books",
+        "result": "Merge result"
+      },
+      "picker": {
+        "searchPlaceholder": "Title or author",
+        "empty": "No books match.",
+        "failed": "The search did not work. Try again.",
+        "selected": "{count, plural, one {# book selected} other {# books selected}}",
+        "limit": "{max, plural, one {Choose up to # other book.} other {Choose up to # other books.}}",
+        "remove": "Remove {title}"
+      },
+      "keeper": {
+        "hint": "The kept book keeps its details and reading data. The other books merge into it and disappear.",
+        "label": "Book to keep",
+        "folderRoot": "In the library's top folder",
+        "filled": "{filled} of {total} details filled",
+        "files": "{count, plural, one {# file} other {# files}}",
+        "added": "Added {date}",
+        "missing": "Files missing",
+        "processing": "Processing",
+        "activity": {
+          "readers": "{count, plural, one {# reader} other {# readers}}",
+          "yourProgress": "Your progress",
+          "highlights": "{count, plural, one {# highlight} other {# highlights}}",
+          "shelves": "{count, plural, one {# shelf} other {# shelves}}"
+        },
+        "destination": {
+          "heading": "Where the files go",
+          "rootLevel": "The kept book is a single file in the library's top folder, so all files go into another book's folder.",
+          "newFolder": "Every book is a single file in the library's top folder, so a new folder is created for the merged book:",
+          "summary": "Files will be stored in the folder of {title}.",
+          "root": "Files will be stored in: {root}",
+          "change": "Choose another folder",
+          "label": "Folder for the merged files",
+          "option": "Folder of {title}"
+        }
+      },
+      "review": {
+        "keeping": "Keeping {title}",
+        "updating": "Updating the review...",
+        "sections": {
+          "details": "Details",
+          "files": "Files",
+          "readingData": "Reading data",
+          "visibility": "Visibility"
+        },
+        "detailsEmpty": "All details already match. Nothing to choose.",
+        "resultGenres": "Genres after merging",
+        "resultTags": "Tags after merging",
+        "audiobook": "Audiobook details",
+        "added": "Added",
+        "locked": "Locked",
+        "lockedHint": "Locked on the kept book. Its value stays unless you pick another one.",
+        "from": "from {title}",
+        "warnings": "Before you merge",
+        "fromKept": "from the kept book",
+        "detailsCount": "{count, plural, one {# to review} other {# to review}}"
+      },
+      "stale": {
+        "heading": "The books changed since the review",
+        "changed": "Check these again: {items}",
+        "nothingVisible": "Nothing visible changed. Check the review and merge again."
+      },
+      "blocked": {
+        "heading": "This merge cannot run",
+        "chooseKeeper": "Choose another book to keep",
+        "linkInstead": "Link these books instead"
+      },
+      "fields": {
+        "title": "Title",
+        "subtitle": "Subtitle",
+        "authors": "Authors",
+        "description": "Description",
+        "publisher": "Publisher",
+        "publishedYear": "Published",
+        "language": "Language",
+        "pageCount": "Page count",
+        "series": "Series",
+        "isbn": "ISBN",
+        "narrators": "Narrators",
+        "googleBooksId": "Google Books ID",
+        "goodreadsId": "Goodreads ID",
+        "amazonId": "Amazon ID",
+        "hardcoverId": "Hardcover ID",
+        "openLibraryId": "Open Library ID",
+        "itunesId": "iTunes ID",
+        "audibleId": "Audible ID",
+        "librofmId": "Libro.fm ID",
+        "koboId": "Kobo ID",
+        "comicvineId": "ComicVine ID",
+        "ranobedbId": "RanobeDB ID",
+        "lubimyczytacId": "LubimyCzytac ID",
+        "aladinId": "Aladin ID"
+      },
+      "files": {
+        "summary": "{count, plural, one {# file} other {# files}}",
+        "from": "From {path}",
+        "to": "To {path}",
+        "renamed": "Renamed",
+        "stays": "Stays in the old folder",
+        "hidden": "Hidden in the old folder",
+        "identical": "Identical copy",
+        "missing": "Missing on disk",
+        "inPlace": "Already in place",
+        "crossDevice": "{size} is copied to another drive, checked, then removed from the old one.",
+        "showMore": "{count, plural, one {Show # more file} other {Show # more files}}",
+        "removeIdentical": "Remove identical copies after merging",
+        "removeIdenticalHelp": "Removes only files confirmed byte for byte identical. Reading progress on a removed copy moves to the copy that stays."
+      },
+      "readingData": {
+        "ownHeading": "Your data that moves to the kept book",
+        "ownNone": "You have no reading data on the books being merged away.",
+        "othersHeading": "Other readers",
+        "othersGeneric": "Other readers' progress and highlights also move to the kept book.",
+        "othersNone": "No other reader has data on the books being merged away.",
+        "own": {
+          "readingProgress": "{count, plural, one {Your reading progress on # file} other {Your reading progress on # files}}",
+          "readingHistory": "{count, plural, one {# read in your reading history} other {# reads in your reading history}}",
+          "readingSessions": "{count, plural, one {# reading session} other {# reading sessions}}",
+          "annotations": "{count, plural, one {# highlight} other {# highlights}}",
+          "bookmarks": "{count, plural, one {# bookmark} other {# bookmarks}}",
+          "journal": "{count, plural, one {# journal entry} other {# journal entries}}",
+          "notes": "{count, plural, one {# note} other {# notes}}",
+          "ratings": "{count, plural, one {Your rating} other {# ratings}}",
+          "collections": "{count, plural, one {# shelf} other {# shelves}}",
+          "kobo": "{count, plural, one {# Kobo sync record} other {# Kobo sync records}}",
+          "hardcover": "{count, plural, one {# Hardcover sync record} other {# Hardcover sync records}}",
+          "storygraph": "{count, plural, one {# StoryGraph sync record} other {# StoryGraph sync records}}"
+        },
+        "others": {
+          "readingProgress": "{count, plural, one {Reading progress from # other reader} other {Reading progress from # other readers}}",
+          "readingHistory": "{count, plural, one {Reading history from # other reader} other {Reading history from # other readers}}",
+          "readingSessions": "{count, plural, one {Reading sessions from # other reader} other {Reading sessions from # other readers}}",
+          "annotations": "{count, plural, one {Highlights from # other reader} other {Highlights from # other readers}}",
+          "bookmarks": "{count, plural, one {Bookmarks from # other reader} other {Bookmarks from # other readers}}",
+          "journal": "{count, plural, one {Journal entries from # other reader} other {Journal entries from # other readers}}",
+          "notes": "{count, plural, one {Notes from # other reader} other {Notes from # other readers}}",
+          "ratings": "{count, plural, one {Ratings from # other reader} other {Ratings from # other readers}}",
+          "collections": "{count, plural, one {Shelves of # other reader} other {Shelves of # other readers}}",
+          "kobo": "{count, plural, one {Kobo sync state of # other reader} other {Kobo sync state of # other readers}}",
+          "hardcover": "{count, plural, one {Hardcover sync state of # other reader} other {Hardcover sync state of # other readers}}",
+          "storygraph": "{count, plural, one {StoryGraph sync state of # other reader} other {StoryGraph sync state of # other readers}}"
+        }
+      },
+      "visibility": {
+        "intro": "These tags and genres are left out of the kept book because they would change who can see it.",
+        "widens": "Would show the kept book to readers who cannot see it now",
+        "narrows": "Would hide the kept book from readers who can see it now",
+        "includeAnyway": "Include anyway",
+        "managersOnly": "Only someone who manages users can add these back.",
+        "tagName": "Tag: {name}",
+        "genreName": "Genre: {name}"
+      },
+      "busyReasons": {
+        "metadata_fetch": "Busy fetching metadata",
+        "chapter_lookup": "Busy looking up chapters",
+        "chapter_job": "Busy building chapters",
+        "read_aloud": "Busy creating a read-aloud book",
+        "upload": "Busy receiving an upload",
+        "file_operation": "Busy moving or renaming files"
+      },
+      "blockers": {
+        "NOT_FOUND": "One of these books no longer exists, or you cannot see it.",
+        "BOOK_MERGED": "One of these books was already merged into another book.",
+        "SAME_BOOK": "The same book is listed more than once.",
+        "TOO_MANY_BOOKS": "{max, plural, one {Merge up to # book at a time.} other {Merge up to # books at a time.}}",
+        "DIFFERENT_LIBRARIES": "These books are in different libraries. Only books in the same library can be merged.",
+        "FILE_PER_BOOK_LIBRARY": "This library keeps one file per book, so its books cannot share a folder.",
+        "TARGET_NOT_PRESENT": "The book to keep is missing on disk or still being processed.",
+        "SOURCE_PROCESSING": "A book is still being processed. Try again when it finishes.",
+        "BOTH_HAVE_AUDIO": "More than one of these books has an audiobook. Two sets of audio in one folder would play as one long recording.",
+        "NO_DESTINATION_FOLDER": "None of these books has a folder of its own to hold the merged files.",
+        "LEGACY_VIRTUAL_FOLDER": "A book uses an old folder layout. Rescan the library first.",
+        "FOLDER_NOT_WRITABLE": "BookOrbit cannot write to one of the folders involved.",
+        "LIBRARY_BUSY": "A scan, move, rename or another merge is running in this library. Try again when it finishes.",
+        "BOOK_BUSY": "A book is busy with another job, such as read-aloud, chapters or a metadata fetch. Try again when it finishes.",
+        "PATH_CONFLICT": "A file would land on a path another book already uses.",
+        "NESTED_BOOK_CONFLICT": "A moved file would collide with a subfolder and split part of the book off as a separate book.",
+        "PERMISSION_DENIED": "You do not have permission to merge books in this library.",
+        "INSUFFICIENT_SPACE": "The drive that receives the files does not have enough free space. The copy needs {size}.",
+        "FORMAT_NOT_ALLOWED": "{library} does not allow {format} files, so it would not see the moved file on its next scan.",
+        "PATH_EXCLUDED": "{library} skips this path when it scans, so the moved file would be marked missing.",
+        "LEFTOVER_CONTENT": "A book file would stay behind in {library}, where the next scan would add it back as a separate book.",
+        "READERS_LOSE_ACCESS": "Other readers would lose access to this book and its reading data. Only someone who manages users can merge it this way.",
+        "unknown": "Something stops this merge. Reload the page and try again."
+      },
+      "warnings": {
+        "CROSS_DEVICE_COPY": {
+          "message": "Some files move to another drive, so they are copied, checked, then removed from the old one.",
+          "detailed": "{size} moves to another drive, so it is copied, checked, then removed from the old one."
+        },
+        "IDENTICAL_COPIES": {
+          "message": "Some files are byte for byte copies of files the kept book already has.",
+          "detailed": "{count, plural, one {# file is a byte for byte copy of a file the kept book already has.} other {# files are byte for byte copies of files the kept book already has.}}"
+        },
+        "RENAMED_ON_COLLISION": {
+          "message": "Some files are renamed because their name is already taken in the destination folder.",
+          "detailed": "{count, plural, one {# file is renamed because its name is already taken in the destination folder.} other {# files are renamed because their names are already taken in the destination folder.}}"
+        },
+        "KOBO_REDELIVERY": {
+          "message": "Kobo devices that synced a merged-away book get the kept book again on their next sync."
+        },
+        "ISBN_DROPPED": {
+          "message": "The other books' ISBNs are not kept. The kept book keeps the ISBNs of its own edition."
+        },
+        "OTHER_READERS_AFFECTED": {
+          "message": "Other readers have reading data on these books. It moves to the kept book too.",
+          "detailed": "{count, plural, one {# other reader has reading data on these books. It moves to the kept book too.} other {# other readers have reading data on these books. It moves to the kept book too.}}"
+        },
+        "LEFTOVER_FILES": {
+          "message": "Some files BookOrbit does not track stay in the old folders.",
+          "detailed": "{count, plural, one {# file BookOrbit does not track stays in an old folder.} other {# files BookOrbit does not track stay in the old folders.}}"
+        },
+        "DESTINATION_MOVES_TARGET": {
+          "message": "The kept book's own files move too, because everything is stored in another book's folder."
+        },
+        "SIDECARS_LEFT_BEHIND": {
+          "message": "Metadata files of the merged-away books stay behind or are hidden, so they cannot overwrite the kept book's details.",
+          "detailed": "{count, plural, one {# metadata file stays behind or is hidden, so it cannot overwrite the kept book's details.} other {# metadata files stay behind or are hidden, so they cannot overwrite the kept book's details.}}"
+        },
+        "VISIBILITY_WIDENS": {
+          "message": "Some tags or genres are left out because they would show the kept book to readers who cannot see it now.",
+          "detailed": "{count, plural, one {Some tags or genres are left out because they would show the kept book to # reader who cannot see it now.} other {Some tags or genres are left out because they would show the kept book to # readers who cannot see it now.}}"
+        },
+        "VISIBILITY_NARROWS": {
+          "message": "Some readers who can see a merged-away book cannot see the kept book. Their reading data still moves to it.",
+          "detailed": "{count, plural, one {# reader who can see a merged-away book cannot see the kept book. Their reading data still moves to it.} other {# readers who can see a merged-away book cannot see the kept book. Their reading data still moves to it.}}"
+        },
+        "REMOTE_BOOKS_DIFFER": {
+          "message": "Hardcover or StoryGraph links these books to different books. The kept book's links stay."
+        },
+        "LIBRARY_ACCESS_NARROWS": {
+          "message": "Some readers cannot open {library}, so they lose access to this book and its reading data until they get access to it.",
+          "detailed": "{count, plural, one {# reader cannot open {library}, so they lose access to this book and its reading data until they get access to it.} other {# readers cannot open {library}, so they lose access to this book and its reading data until they get access to it.}}"
+        },
+        "KOBO_REMOVAL": {
+          "message": "This book leaves the Kobo devices of readers who cannot open {library} on their next sync.",
+          "detailed": "{count, plural, one {This book leaves the Kobo of # reader on their next sync.} other {This book leaves the Kobo of # readers on their next sync.}}"
+        },
+        "CUSTOM_FIELDS_HIDDEN": {
+          "message": "{library} does not use some of this book's custom fields. Their values are kept but hidden.",
+          "detailed": "{count, plural, one {{library} does not use # custom field of this book. Its value is kept but hidden.} other {{library} does not use # custom fields of this book. Their values are kept but hidden.}}"
+        },
+        "HARDLINKED_FILES": {
+          "message": "Some files have other hard links, such as a download client's copy. They are copied to another drive, and the other links keep using their own space.",
+          "detailed": "{count, plural, one {# file has other hard links, such as a download client's copy. It is copied to another drive, and the other links keep using their own space.} other {# files have other hard links, such as a download client's copy. They are copied to another drive, and the other links keep using their own space.}}"
+        },
+        "TARGET_CHANGES_LIBRARY": {
+          "message": "The kept book moves to {library}."
+        },
+        "COMPANION_REQUEST_STAYS": {
+          "message": "A requested other format of this book will arrive in {library} as a book of its own instead of joining the merged book.",
+          "detailed": "{count, plural, one {# requested other format of this book will arrive in {library} as a book of its own instead of joining the merged book.} other {# requested other formats of this book will arrive in {library} as books of their own instead of joining the merged book.}}"
+        },
+        "unknown": "The server flagged something else to check before merging."
+      },
+      "progress": {
+        "count": "Book {processed} of {total}",
+        "current": "Now merging {title}",
+        "closeHint": "You can close this. The merge carries on, and a message appears when it finishes.",
+        "announce": "Merging book {processed} of {total}",
+        "announceDone": "The merge finished",
+        "unreachable": "Progress cannot be read right now. The merge carries on in the background.",
+        "status": {
+          "planned": "Getting ready",
+          "moving": "Moving files",
+          "committing": "Saving changes",
+          "committed": "Finishing up",
+          "done": "Done",
+          "failed": "Failed",
+          "rolled_back": "Undone"
+        }
+      },
+      "result": {
+        "partialHeading": "Some books were not merged",
+        "failedHeading": "The merge did not complete",
+        "openBook": "Open book",
+        "failedReason": "Nothing was changed for this book.",
+        "movedFiles": "{count, plural, one {# file moved} other {# files moved}}",
+        "leftoverFiles": "{count, plural, one {# file stayed in an old folder} other {# files stayed in the old folders}}",
+        "retiredFiles": "{count, plural, one {# identical copy removed} other {# identical copies removed}}",
+        "reasons": {
+          "FILE_CHANGED": "A file changed on disk while the merge ran.",
+          "PATH_CONFLICT": "Another file appeared where one of these files was going.",
+          "INTERRUPTED": "The server restarted during the merge.",
+          "MERGE_FAILED": "The merge stopped on an unexpected error."
+        },
+        "outcome": {
+          "pending": "Not merged",
+          "merged": "Merged",
+          "rolled_back": "Undone, nothing changed",
+          "failed": "Failed"
+        }
+      },
+      "toast": {
+        "success": "{count, plural, one {Merged # book into {title}} other {Merged # books into {title}}}",
+        "partial": "{total, plural, one {{merged} of # book merged. Open the merge to see why the rest were not.} other {{merged} of # books merged. Open the merge to see why the rest were not.}}",
+        "failed": "The merge did not complete. Nothing was changed.",
+        "showResult": "Show details"
+      },
+      "errors": {
+        "previewFailed": "The merge review could not be prepared.",
+        "startFailed": "The merge could not start.",
+        "jobFailed": "The merge progress could not be read."
+      },
+      "bookLabel": "{title} · {detail}",
+      "crossLibrary": {
+        "unknownLibrary": "another library",
+        "picker": {
+          "hint": "Find the other records of this book in any library you can edit. The book open now is kept unless you choose otherwise.",
+          "searchLabel": "Search your libraries",
+          "prompt": "Type to search the libraries you can edit.",
+          "library": "In {library}"
+        },
+        "destination": {
+          "legend": "Where the merged book lives",
+          "hint": "Every file moves into this folder. The other libraries stop showing the book.",
+          "formatsHere": "{formats} here now",
+          "leaves": "{count, plural, one {{libraries} stops showing this book} other {{libraries} stop showing this book}}",
+          "accessCount": "{count, plural, one {# reader of {from} cannot open {library}} other {# readers of {from} cannot open {library}}}",
+          "accessSome": "Some readers cannot open {library}",
+          "only": "The merged book lives in {library}"
+        },
+        "review": {
+          "header": "{count, plural, one {Merge # book into {title} in {library}} other {Merge # books into {title} in {library}}}"
+        },
+        "files": {
+          "direction": "{count, plural, one {From {from} to {to} (# file, {size})} other {From {from} to {to} (# files, {size})}}",
+          "within": "{count, plural, one {Within {library} (# file, {size})} other {Within {library} (# files, {size})}}",
+          "copiedToDrive": "Copied to another drive, {size}"
+        },
+        "leftBehind": {
+          "heading": "Left in {library}",
+          "untracked": "These files stay in their old folder. BookOrbit stops tracking them."
+        },
+        "access": {
+          "acknowledge": "{count, plural, one {I understand # reader loses access to this book and its reading data until they get access to {library}} other {I understand # readers lose access to this book and its reading data until they get access to {library}}}",
+          "acknowledgeSome": "I understand some readers lose access to this book and its reading data until they get access to {library}"
+        },
+        "devices": {
+          "heading": "Devices"
+        },
+        "settings": {
+          "heading": "Library settings that change for this book",
+          "primaryFormat": "{library} puts {format} first, so the main file becomes the {format}",
+          "primaryFormatChanges": "{library} ranks formats differently, so the main file may change",
+          "fileWrite": "{library} writes metadata into files",
+          "namingPattern": "File names stay as they are. Bulk Rename can apply the naming pattern of {library}."
+        },
+        "blockers": {
+          "insufficientSpace": "The drive that receives the files does not have enough free space.",
+          "libraryBusy": "A scan, move, rename or another merge is running in {library}. Try again when it finishes."
+        },
+        "blocked": {
+          "chooseDestination": "Choose another place for the merged book"
+        },
+        "progress": {
+          "bytes": "Copying {done} of {total}"
+        },
+        "toast": {
+          "success": "Merged into {title} in {library}"
+        }
+      }
+    },
+    "link": {
+      "action": "Link...",
+      "detailAction": "Link with another book...",
+      "unlink": "Unlink",
+      "makeMain": "Make this the main book",
+      "disabled": {
+        "queryScoped": "Select the books one by one to link them",
+        "tooFew": "Select at least two books to link",
+        "tooMany": "{max, plural, one {Link up to # book at a time} other {Link up to # books at a time}}",
+        "notEditable": "Only books in libraries you can edit can be linked"
+      },
+      "title": "Link books",
+      "description": "Show separate books as one title, even across libraries. Each keeps its own record, files and reading progress.",
+      "selectedHeading": "{count, plural, one {# book to link} other {# books to link}}",
+      "notLoaded": "{count, plural, one {And # more selected book} other {And # more selected books}}",
+      "mainHint": "Where linked books are listed together, the first one is shown unless one of them is already linked with others.",
+      "confirm": "{count, plural, one {Link # book} other {Link # books}}",
+      "confirmEmpty": "Link books",
+      "linking": "Linking...",
+      "selectionNotAffected": "Books linked with the selection are not affected.",
+      "picker": {
+        "hint": "Find the same title in any library you can edit, such as its audiobook or another edition.",
+        "searchLabel": "Search all libraries",
+        "searchPlaceholder": "Title or author",
+        "prompt": "Type to search your libraries.",
+        "empty": "No books match.",
+        "failed": "The search did not work. Try again.",
+        "selected": "{count, plural, one {# book selected} other {# books selected}}",
+        "limit": "{max, plural, one {Choose up to # other book.} other {Choose up to # other books.}}",
+        "remove": "Remove {title}",
+        "library": "In {library}",
+        "alreadyLinked": "Already linked with other books"
+      },
+      "chips": {
+        "heading": "Also available as",
+        "label": "{medium} in {library} library",
+        "labelMissing": "{medium} in {library} library, files missing",
+        "missing": "Missing"
+      },
+      "medium": {
+        "ebook": "Ebook",
+        "audiobook": "Audiobook",
+        "comic": "Comic",
+        "unknown": "Book"
+      },
+      "badges": {
+        "summary": "Formats: {formats}",
+        "summaryLinked": "Formats: {formats}. Linked books: {linked}",
+        "linkedFormat": "{format} in {library}",
+        "more": "+{count}"
+      },
+      "toast": {
+        "linked": "{count, plural, one {Linked # book} other {Linked # books}}",
+        "unlinked": "This book is no longer linked",
+        "madeMain": "This is now the main book"
+      },
+      "errors": {
+        "linkFailed": "The books could not be linked.",
+        "unlinkFailed": "The book could not be unlinked.",
+        "leadFailed": "The main book could not be changed."
+      }
     }
   },
   "bookMetadataFetch": {
@@ -8847,7 +9369,43 @@
       "details": "Details",
       "alreadyExistsSaveAs": "Already exists - save as:",
       "renamePlaceholder": "e.g. {name} (2)",
-      "import": "Import"
+      "import": "Import",
+      "joiningCount": "{count, plural, one {# joins an existing book} other {# join existing books}}",
+      "join": {
+        "joins": "Joins {title}",
+        "suggested": "Looks like another format of {title}",
+        "reason": {
+          "isbn": "Same ISBN",
+          "workId": "Same work on Hardcover or Open Library",
+          "titleAuthor": "Same title and author"
+        },
+        "accept": "Add to this book",
+        "acceptLabel": "Add {file} to {title}",
+        "choose": "Add to an existing book",
+        "chooseAnother": "Choose another book",
+        "chooseLabel": "Choose an existing book for {file}",
+        "fileAsNew": "File as a new book",
+        "fileAsNewLabel": "File {file} as a new book",
+        "picker": {
+          "hint": "Pick the book {file} is another format of. The file goes into that book's folder, and the book keeps its details.",
+          "searchLabel": "Search this library",
+          "searchPlaceholder": "Title or author",
+          "prompt": "Type to search this library.",
+          "empty": "No books match.",
+          "failed": "The search did not work. Try again.",
+          "pick": "Add to {title}"
+        },
+        "error": {
+          "generic": "This file cannot be added to {title}.",
+          "BOOK_DOCK_JOIN_BOOK_NOT_FOUND": "{title} was not found. It may have been removed, or you cannot see it.",
+          "BOOK_DOCK_JOIN_BOOK_MISSING": "The files of {title} are missing from disk, so there is no folder to add this file to.",
+          "BOOK_DOCK_JOIN_FORBIDDEN": "You cannot edit {title}, so this file cannot be added to it.",
+          "BOOK_DOCK_JOIN_OTHER_LIBRARY": "{title} is in a different library from the one this file is filed into.",
+          "BOOK_DOCK_JOIN_FILE_PER_BOOK": "This library keeps one book per file, so this file cannot be added to {title}.",
+          "BOOK_DOCK_JOIN_ROOT_LEVEL": "{title} sits in the library's top folder without a folder of its own, so this file cannot be added to it.",
+          "BOOK_DOCK_JOIN_AUDIO_CONFLICT": "{title} already has an audiobook, and a book holds only one."
+        }
+      }
     },
     "layout": {
       "pause": "Pause",
@@ -10943,7 +11501,16 @@
       "CHAPTERS_ANALYSIS_TOO_LARGE": "That is too much audio to analyze at once.",
       "CHAPTERS_ANALYSIS_UNAVAILABLE": "Finding pauses needs ffmpeg on the server.",
       "CHAPTERS_WRITE_UNAVAILABLE": "Chapters can't be written into these files.",
-      "CHAPTERS_NOTHING_TO_WRITE": "There are no saved chapters to write."
+      "CHAPTERS_NOTHING_TO_WRITE": "There are no saved chapters to write.",
+      "BOOK_MERGED": "This book was merged into another book.",
+      "MERGE_PREVIEW_STALE": "The books changed since this review. The review is up to date again; check it and merge again.",
+      "MERGE_BLOCKED": "Something now stops this merge. The review shows why.",
+      "MERGE_IN_PROGRESS": "These books are already being merged.",
+      "ACCESS_LOSS_NOT_ACKNOWLEDGED": "Confirm that other readers lose access to this book before merging.",
+      "LIBRARY_BUSY": "The library is busy with a scan, move, rename or merge. Try again when it finishes.",
+      "LINK_GROUP_NOT_EDITABLE": "These books are linked with a book you cannot edit.",
+      "LINK_GROUP_FULL": "{max, plural, one {A link holds at most # book. Unlink some first.} other {A link holds at most # books. Unlink some first.}}",
+      "RESOLUTION_IN_PROGRESS": "A duplicate resolution is already running. Wait for it to finish."
     }
   },
   "hardcover": {
@@ -11255,6 +11822,7 @@
         "checkAll": "Check folders again",
         "checkAgain": "Check {folder} again",
         "checkHint": "Each folder is checked as soon as you add it. A folder another library already reads is flagged, because both libraries would import the same files.",
+        "checkHintOneLibrary": "Each folder is checked as soon as you add it. A folder can belong to only one library, so one that overlaps a folder of another library cannot be added.",
         "emptyHint": "Paste a server path below, or browse for one.",
         "pastePlaceholder": "Paste a server path, e.g. /books/Sci-Fi",
         "browse": "Browse...",
@@ -11264,6 +11832,8 @@
           "notAccessible": "Not accessible",
           "overlap": "Also in {library}",
           "overlapTitle": "The library \"{library}\" already reads this folder.",
+          "sharedWith": "Overlaps {library}",
+          "sharedWithTitle": "This folder overlaps a folder of {library}, and a folder can belong to only one library.",
           "files": "{count, plural, one {# file} other {# files}}"
         },
         "errors": {
@@ -11747,6 +12317,8 @@
         "nameRequired": "Enter a library name.",
         "iconRequired": "Choose an icon.",
         "folderRequired": "Add at least one folder.",
+        "folderOverlap": "{folder} overlaps a folder of {library}. A folder can belong to only one library.",
+        "folderNested": "{folder} overlaps {other}. A library cannot read the same folder twice, so keep only one of them.",
         "cronInvalid": "Enter a valid 5-field cron expression.",
         "readingStartRange": "Reading start must be between 0.05% and 5%.",
         "fileSizeRange": "File-size limits must be whole numbers from 1 to 10,000 MB.",
@@ -11882,6 +12454,10 @@
           "containsMany": "Contains folders that {libraries} read. Those books would be in two libraries.",
           "overlapExact": "{library} already reads this folder. Both libraries would import the same {count, plural, one {# book} other {# books}}.",
           "overlapInside": "This folder is inside {library}'s folder, so its books would be in both libraries.",
+          "containsOneBlocked": "Contains {folder}, which {library} reads. A folder can belong to only one library, so leave it out to add this one.",
+          "containsManyBlocked": "Contains folders that {libraries} read. A folder can belong to only one library, so leave them out to add this one.",
+          "overlapExactBlocked": "{library} already reads this folder, and a folder can belong to only one library.",
+          "overlapInsideBlocked": "This folder is inside a folder of {library}, and a folder can belong to only one library.",
           "merge": "{count, plural, one {# folder here holds} other {# folders here hold}} several books: as Folder as Book each becomes 1 book.",
           "split": "{count, plural, one {# audiobook here is} other {# audiobooks here are}} in parts: as File as Book each part becomes its own book.",
           "locked": "Organization is fixed once a library exists.",
@@ -11944,6 +12520,7 @@
         "addShort": "Add",
         "addShortCount": "Add {count}",
         "nothingPicked": "Nothing picked yet",
+        "resolveOverlap": "{count, plural, one {# picked folder overlaps another library. Leave it out or remove it to continue.} other {# picked folders overlap other libraries. Leave them out or remove them to continue.}}",
         "seePlan": "See the plan"
       },
       "divider": {
@@ -13739,7 +14316,10 @@
         "file_hash": "Identical file set",
         "isbn": "Same ISBN",
         "exact_metadata": "Exact title and authors",
-        "fuzzy_metadata": "Similar title and author"
+        "fuzzy_metadata": "Similar title and author",
+        "same_work": "Same work",
+        "title_author": "Same title and author",
+        "series_position": "Same series position"
       },
       "notDuplicates": "Not duplicates",
       "unknownAuthor": "Unknown author",
@@ -13766,7 +14346,8 @@
       },
       "initial": {
         "title": "Find duplicate books",
-        "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion."
+        "description": "Choose a library scope and similarity level, then run a scan. No books are changed until you explicitly confirm a deletion.",
+        "descriptionActions": "Choose a library scope and similarity level, then run a scan. No books are changed until you review and confirm what happens to each group."
       },
       "empty": {
         "title": "No duplicate groups found",
@@ -13784,7 +14365,8 @@
         "results": "Could not load duplicate groups.",
         "delete": "Could not delete the selected duplicate books.",
         "dismiss": "Could not dismiss that group.",
-        "restore": "Could not restore that pair."
+        "restore": "Could not restore that pair.",
+        "resolve": "Could not start resolving the selected groups."
       },
       "pagination": {
         "label": "Duplicate groups pages",
@@ -13796,6 +14378,12 @@
       "recommended": "Recommended",
       "keeping": "Keeping",
       "willDelete": "Delete",
+      "copyStatus": {
+        "main": "Main book",
+        "merge": "Merge in",
+        "link": "Link",
+        "other": "Other copy"
+      },
       "keepCopy": "Keep {name}",
       "selectGroup": "Select {title}",
       "selectAll": "Select every group on this page",
@@ -13811,12 +14399,16 @@
         "isbn": "Same ISBN",
         "exact_metadata": "Exact match",
         "fuzzy_metadata": "Similar",
-        "withSimilarity": "{label} {percent}"
+        "withSimilarity": "{label} {percent}",
+        "same_work": "Same work",
+        "title_author": "Title and author",
+        "series_position": "Series position"
       },
       "summary": {
         "groups": "{count, plural, one {group} other {groups}}",
         "extraCopies": "{count, plural, one {extra copy} other {extra copies}}",
-        "reclaimable": "reclaimable"
+        "reclaimable": "reclaimable",
+        "pairs": "{count, plural, one {pair} other {pairs}}"
       },
       "columns": {
         "match": "Match",
@@ -13824,6 +14416,7 @@
         "copies": "Copies",
         "libraries": "Libraries",
         "frees": "Frees",
+        "reclaimable": "Reclaimable",
         "keeping": "Keeping"
       },
       "keepRule": {
@@ -13858,7 +14451,12 @@
         "summary": "{groups} groups selected, {copies} copies to delete, frees {size}",
         "clear": "Clear",
         "review": "{count, plural, one {Review # copy} other {Review # copies}}",
-        "hint": "Tick the groups you trust, or open one to compare the copies."
+        "hint": "Tick the groups you trust, or open one to compare the copies.",
+        "groups": "{count, plural, one {# group selected} other {# groups selected}}",
+        "frees": "frees {size}",
+        "selectAllGroups": "{count, plural, one {Select the # group on every page} other {Select all # groups on every page}}",
+        "reviewGroups": "{count, plural, one {Review # group} other {Review # groups}}",
+        "capped": "One run resolves at most {max} groups. Run it again afterwards for the rest."
       },
       "keys": {
         "move": "move",
@@ -13870,13 +14468,101 @@
         "title": "{count, plural, one {Delete # copy} other {Delete # copies}}",
         "description": "Across {groups} groups, freeing {size}. Nothing is deleted until you confirm.",
         "riskWarning": "{count, plural, one {# group deletes a copy carrying your reading data.} other {# groups delete a copy carrying your reading data.}}",
-        "footer": "Frees {size}"
+        "footer": "Frees {size}",
+        "mergeTitle": "Merge into keeper",
+        "mergeDescription": "Everything moves onto the kept book: files, details, and every reader's reading data.",
+        "resolveTitle": "{count, plural, one {Resolve # group} other {Resolve # groups}}",
+        "resolveDescription": "Each group is checked again just before it is changed. Books that changed since the scan are skipped and reported.",
+        "bookAction": "Action for {name}",
+        "otherPages": "{count, plural, one {Plus # more group on other pages. It is resolved with the keep rule and its default action, or left as it is when it has none.} other {Plus # more groups on other pages. Each is resolved with the keep rule and its default action, or left as it is when it has none.}}",
+        "removeIdentical": "Remove identical copies",
+        "removeIdenticalHint": "A merged file whose full contents match a file the kept book already has is removed instead of kept as an extra file.",
+        "confirm": "{count, plural, one {Resolve # group} other {Resolve # groups}}"
       },
       "dismissed": {
         "show": "{count, plural, one {Show # dismissed pair} other {Show # dismissed pairs}}",
         "hide": "Hide dismissed pairs",
         "restore": "Restore this pair",
         "restored": "Pair restored. It can match again on the next scan."
+      },
+      "kinds": {
+        "label": "Match type",
+        "duplicate": "Duplicates",
+        "other_format": "Same book, other format"
+      },
+      "actions": {
+        "label": "Action",
+        "none": "Choose an action",
+        "delete": "Delete extras",
+        "merge": "Merge into keeper",
+        "link": "Link",
+        "skip": "Leave as is"
+      },
+      "reviewMerge": "Review merge",
+      "reviewLink": "Review link",
+      "mergeUnavailable": {
+        "TOO_MANY_BOOKS": "Merge is not available: the group has more books than one merge can take.",
+        "DIFFERENT_LIBRARIES": "Merge is not available: the books are in different libraries.",
+        "FILE_PER_BOOK_LIBRARY": "Merge is not available: the library keeps one book per file.",
+        "TARGET_NOT_PRESENT": "Merge is not available: the kept book's files are missing.",
+        "BOTH_HAVE_AUDIO": "Merge is not available: more than one book has an audiobook.",
+        "linkOffered": "Link keeps them as separate books shown together."
+      },
+      "crossLibrary": {
+        "into": "Into {library}",
+        "rowNote": "This merge moves files between libraries. The merged book is expected to live in {library}.",
+        "bulkHeading": "{count, plural, one {# merge moves files between libraries} other {# merges move files between libraries}}",
+        "bulkHint": "Files move into the library named, and the other libraries stop showing those books."
+      },
+      "resolution": {
+        "success": "{count, plural, =0 {No groups resolved} one {One group resolved} other {# groups resolved}}",
+        "partial": "{done} of {total} groups resolved. Open the review to see what was skipped or failed.",
+        "failed": "Resolving the duplicate groups stopped before it finished.",
+        "progress": "{processed} of {total} groups done",
+        "finished": "Finished: {processed} of {total} groups",
+        "progressLabel": "Resolution progress"
+      },
+      "outcomes": {
+        "pending": "Waiting",
+        "done": "Done",
+        "partial": "Partly done",
+        "skipped": "Skipped",
+        "failed": "Failed",
+        "withReason": "{status}: {reason}"
+      },
+      "bookOutcomes": {
+        "merged": "Merged",
+        "deleted": "Deleted",
+        "linked": "Linked",
+        "skipped": "Skipped",
+        "failed": "Failed"
+      },
+      "outcomeReasons": {
+        "STALE": "changed since the scan",
+        "KEEPER_MISSING": "the kept book is gone or its files are missing",
+        "NO_ACTION": "no action chosen",
+        "NOT_SELECTED": "left as is",
+        "ALREADY_RESOLVED": "already resolved",
+        "DELETE_FAILED": "the files could not be deleted",
+        "LINK_FAILED": "the books could not be linked",
+        "MERGE_FAILED": "the merge failed",
+        "MERGE_BLOCKED": "something stops this merge",
+        "MERGE_IN_PROGRESS": "these books are already being merged",
+        "FORBIDDEN": "you cannot change one of these books",
+        "LINK_GROUP_FULL": "the link is full",
+        "LINK_GROUP_NOT_EDITABLE": "linked with a book you cannot edit",
+        "LIBRARY_BUSY": "the library is busy",
+        "BOTH_HAVE_AUDIO": "more than one book has an audiobook",
+        "DIFFERENT_LIBRARIES": "the books are in different libraries",
+        "FILE_PER_BOOK_LIBRARY": "the library keeps one book per file",
+        "TARGET_NOT_PRESENT": "the kept book's files are missing",
+        "INSUFFICIENT_SPACE": "not enough free space on the receiving drive",
+        "FORMAT_NOT_ALLOWED": "the receiving library does not allow one of the formats",
+        "PATH_EXCLUDED": "a file would land on a path the receiving library skips",
+        "LEFTOVER_CONTENT": "a book file would stay behind in another library",
+        "READERS_LOSE_ACCESS": "other readers would lose access to the book",
+        "ACCESS_LOSS_NOT_ACKNOWLEDGED": "other readers would lose access to the book",
+        "other": "error {code}"
       }
     },
     "entityManager": {

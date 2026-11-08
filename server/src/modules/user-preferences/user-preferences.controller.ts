@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, Put } from '@nestjs/common';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { UpsertUserPreferenceDto } from './dto/upsert-user-preference.dto';
 import { UserPreferencesService } from './user-preferences.service';
 
@@ -94,12 +95,14 @@ export class UserPreferencesController {
   }
 
   @Get('annotation-colors')
+  @RequireAppAttest()
   async getAnnotationColorNamePreferences(@CurrentUser() user: RequestUser) {
     const settings = await this.userPreferencesService.getAnnotationColorNamePreferences(user.id);
     return { settings };
   }
 
   @Put('annotation-colors')
+  @RequireAppAttest()
   @HttpCode(204)
   async upsertAnnotationColorNamePreferences(@Body() dto: UpsertUserPreferenceDto, @CurrentUser() user: RequestUser) {
     await this.userPreferencesService.upsertAnnotationColorNamePreferences(user.id, dto.settings);

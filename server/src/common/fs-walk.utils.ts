@@ -28,6 +28,8 @@ export interface WalkDirectoryTreeOptions {
   /** Called for every readable directory, parents before children. */
   visit: (directory: WalkedDirectory) => Promise<void> | void;
   shouldExclude?: (name: string) => boolean;
+  /** Absolute directory paths the walk neither visits nor descends into, the root included. */
+  skipDirectories?: ReadonlySet<string>;
   logger?: (message: string) => void;
   /** Entries the walk refused to hand to `visit`, for callers that have to account for them. */
   onSkippedEntry?: (entry: { path: string; reason: WalkSkippedEntryReason }) => void;
@@ -61,6 +63,7 @@ export function buildNameExcludeMatcher(patterns: string[]): (name: string) => b
 
 export async function walkDirectoryTree(root: string, options: WalkDirectoryTreeOptions): Promise<WalkDirectoryTreeResult> {
   const skippedDirs = new Set<string>();
+  if (options.skipDirectories?.has(root)) return { skippedDirs };
   await collectDirectory(root, options, skippedDirs);
   return { skippedDirs };
 }
@@ -97,6 +100,7 @@ async function collectDirectory(dir: string, options: WalkDirectoryTreeOptions, 
       continue;
     }
     if (entry.isDirectory()) {
+      if (options.skipDirectories?.has(full)) continue;
       subdirectoryPaths.push(full);
     } else if (entry.isFile()) {
       if (full.length > maxPathLength) {

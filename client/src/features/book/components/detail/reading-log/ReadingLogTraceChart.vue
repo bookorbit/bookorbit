@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import type { BookReadingSession, BookReadingSessionStats, ReadingSessionSourceBucket } from '@bookorbit/types'
 import { toReadingSessionSourceBucket, READING_SESSION_SOURCE_BUCKET_LABELS } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
@@ -198,7 +198,7 @@ watchEffect(() => {
 
 <template>
   <div v-if="hasData" class="relative min-h-0 flex-1 transition-opacity" :class="{ 'opacity-50': loading }">
-    <VChart :option autoresize class="absolute inset-0" />
+    <AppChart :option autoresize class="absolute inset-0" />
   </div>
   <div v-else-if="loading" class="flex flex-1 items-end gap-1 px-2 pb-5 pt-2" aria-hidden="true">
     <div v-for="bar in 18" :key="bar" class="flex-1 rounded-t bg-muted animate-shimmer" :style="{ height: `${18 + ((bar * 37) % 60)}%` }" />

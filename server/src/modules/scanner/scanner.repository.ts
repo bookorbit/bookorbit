@@ -1,5 +1,10 @@
 import { realignAudioTrackOrder } from '../../db/audio-track-order';
-import { recordBookFileHashHistory, deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
+import {
+  bumpKoreaderHashRevisions,
+  recordBookFileHashHistory,
+  deleteBookFilesWithHashInvalidation,
+  deleteBooksWithHashInvalidation,
+} from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -24,6 +29,7 @@ import {
   users,
 } from '../../db/schema';
 import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
+import type { LibraryRoot } from './lib/library-roots';
 
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -31,6 +37,8 @@ type MoveBookToLibraryResult = Pick<typeof books.$inferSelect, 'id' | 'libraryId
   previousLibraryId: number;
   libraryChanged: boolean;
 };
+
+const CLAIM_LOOKUP_BATCH_SIZE = 1000;
 
 @Injectable()
 export class ScannerRepository {
@@ -102,6 +110,40 @@ export class ScannerRepository {
 
   async findLibraryFolders(libraryId: number) {
     return this.db.select().from(libraryFolders).where(eq(libraryFolders.libraryId, libraryId));
+  }
+
+  /** Every library's folders, which decide who owns a path when folders overlap. */
+  async findAllLibraryRoots(): Promise<LibraryRoot[]> {
+    return this.db.select({ id: libraryFolders.id, libraryId: libraryFolders.libraryId, path: libraryFolders.path }).from(libraryFolders);
+  }
+
+  /**
+   * Books filed under one of `fromFolderIds` at one of these folder paths, which now belong to a
+   * folder of `libraryId`. One that library already has a book at is left where it is: moving it
+   * would collide with that book.
+   */
+  async findBooksToClaim(
+    fromFolderIds: readonly number[],
+    libraryId: number,
+    folderPaths: readonly string[],
+  ): Promise<Array<{ id: number; libraryId: number; folderPath: string }>> {
+    if (fromFolderIds.length === 0 || folderPaths.length === 0) return [];
+    const found: Array<{ id: number; libraryId: number; folderPath: string }> = [];
+    for (let index = 0; index < folderPaths.length; index += CLAIM_LOOKUP_BATCH_SIZE) {
+      const batch = folderPaths.slice(index, index + CLAIM_LOOKUP_BATCH_SIZE);
+      const rows = await this.db
+        .select({ id: books.id, libraryId: books.libraryId, folderPath: books.folderPath })
+        .from(books)
+        .where(
+          and(
+            inArray(books.libraryFolderId, [...fromFolderIds]),
+            inArray(books.folderPath, batch),
+            sql`not exists (select 1 from ${books} mine where mine.library_id = ${libraryId} and mine.folder_path = ${books.folderPath} and mine.id <> ${books.id})`,
+          ),
+        );
+      found.push(...rows);
+    }
+    return found;
   }
 
   async findLibrarySettings(libraryId: number) {
@@ -325,9 +367,15 @@ export class ScannerRepository {
 
   async updateBookFile(id: number, data: Partial<typeof bookFiles.$inferInsert>) {
     return this.db.transaction(async (tx) => {
-      if (data.fileHash) {
-        const [previous] = await tx.select({ fileHash: bookFiles.fileHash }).from(bookFiles).where(eq(bookFiles.id, id)).for('update');
-        if (previous?.fileHash && previous.fileHash !== data.fileHash) {
+      let previousBookId: number | null = null;
+      if (data.fileHash || data.bookId !== undefined) {
+        const [previous] = await tx
+          .select({ fileHash: bookFiles.fileHash, bookId: bookFiles.bookId })
+          .from(bookFiles)
+          .where(eq(bookFiles.id, id))
+          .for('update');
+        previousBookId = previous?.bookId ?? null;
+        if (data.fileHash && previous?.fileHash && previous.fileHash !== data.fileHash) {
           await recordBookFileHashHistory(tx, id, previous.fileHash, 'rescan');
           // Positions from the replaced bytes cannot be interpreted in the new DOM.
           await tx
@@ -357,8 +405,65 @@ export class ScannerRepository {
         .set({ ...data, updatedAt: new Date() })
         .where(eq(bookFiles.id, id))
         .returning();
+      if (file && data.bookId !== undefined && previousBookId !== null && previousBookId !== data.bookId) {
+        await this.moveAudiobookProgressForReassignedFile(tx, id, previousBookId, data.bookId);
+      }
       return file;
     });
+  }
+
+  private async moveAudiobookProgressForReassignedFile(
+    tx: DbTransaction,
+    fileId: number,
+    previousBookId: number,
+    destinationBookId: number,
+  ): Promise<void> {
+    const sourceRows = await tx
+      .select()
+      .from(audiobookProgress)
+      .where(and(eq(audiobookProgress.bookId, previousBookId), eq(audiobookProgress.currentFileId, fileId)))
+      .for('update');
+
+    for (const source of sourceRows) {
+      const [destination] = await tx
+        .select()
+        .from(audiobookProgress)
+        .where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, destinationBookId)))
+        .for('update')
+        .limit(1);
+
+      if (!destination) {
+        await tx
+          .update(audiobookProgress)
+          .set({
+            bookId: destinationBookId,
+            revision: sql`${audiobookProgress.revision} + 1`,
+            operationId: null,
+            manifestRevision: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, previousBookId)));
+        continue;
+      }
+
+      if (source.capturedAt > destination.capturedAt) {
+        await tx
+          .update(audiobookProgress)
+          .set({
+            currentFileId: source.currentFileId,
+            positionSeconds: source.positionSeconds,
+            percentage: source.percentage,
+            capturedAt: source.capturedAt,
+            revision: sql`${audiobookProgress.revision} + 1`,
+            operationId: null,
+            manifestRevision: null,
+            updatedAt: new Date(),
+          })
+          .where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, destinationBookId)));
+      }
+
+      await tx.delete(audiobookProgress).where(and(eq(audiobookProgress.userId, source.userId), eq(audiobookProgress.bookId, previousBookId)));
+    }
   }
 
   async findBookFileByAbsolutePath(absolutePath: string, libraryId?: number) {
@@ -456,6 +561,7 @@ export class ScannerRepository {
           status: books.status,
           primaryFileId: books.primaryFileId,
         });
+      if (book && libraryChanged) await bumpKoreaderHashRevisions(tx, [current.libraryId, libraryId]);
       return book ? { ...book, previousLibraryId: current.libraryId, libraryChanged } : null;
     });
   }
@@ -610,6 +716,8 @@ export class ScannerRepository {
     sourceFileId: number;
     duplicateBookId: number;
     duplicateFileId: number;
+    /** Folds the duplicate into the moved book when readers have data on it; false leaves it to be deleted. */
+    absorbDuplicate?: (tx: DbTransaction) => Promise<boolean>;
   }): Promise<{ bookId: number; libraryId: number; duplicateBookId: number } | null> {
     return this.db.transaction(async (tx) => {
       const [source] = await tx
@@ -637,7 +745,8 @@ export class ScannerRepository {
         .limit(1);
       if (!duplicate || duplicate.bookId === input.sourceBookId) return null;
 
-      await deleteBooksWithHashInvalidation(tx, eq(books.id, input.duplicateBookId));
+      const absorbed = input.absorbDuplicate ? await input.absorbDuplicate(tx) : false;
+      if (!absorbed) await deleteBooksWithHashInvalidation(tx, eq(books.id, input.duplicateBookId));
       await tx
         .update(books)
         .set({

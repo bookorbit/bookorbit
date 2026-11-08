@@ -2,12 +2,13 @@ vi.mock('fs/promises', () => ({ stat: vi.fn() }));
 vi.mock('../scanner/lib/hash', () => ({ computeFileHash: vi.fn() }));
 vi.mock('../../db/audio-track-order', () => ({ realignAudioTrackOrder: vi.fn() }));
 
-import { InternalServerErrorException } from '@nestjs/common';
+import { ConflictException, InternalServerErrorException } from '@nestjs/common';
 import { PgDialect } from 'drizzle-orm/pg-core';
 import type { SQL } from 'drizzle-orm';
 import { stat } from 'fs/promises';
 import { computeFileHash } from '../scanner/lib/hash';
 import { realignAudioTrackOrder } from '../../db/audio-track-order';
+import { FileLockService } from '../../common/services/file-lock.service';
 import { books, bookFiles, bookMetadata, uploadSessions } from '../../db/schema';
 import { UploadProcessorService } from './upload-processor.service';
 
@@ -81,6 +82,7 @@ describe('UploadProcessorService', () => {
   const audioFilesWhere = vi.fn();
 
   let service: UploadProcessorService;
+  let fileLocks: FileLockService;
 
   beforeEach(() => {
     vi.resetAllMocks();
@@ -112,7 +114,61 @@ describe('UploadProcessorService', () => {
     mockStat.mockResolvedValue({ ino: 111n, mtime: new Date('2024-01-01') } as Awaited<ReturnType<typeof stat>>);
     mockComputeFileHash.mockResolvedValue('hash-abc');
 
-    service = new UploadProcessorService(db as any, metadataService as any, coverStore as any, orchestrator as any);
+    fileLocks = new FileLockService();
+    service = new UploadProcessorService(db as any, metadataService as any, coverStore as any, fileLocks, orchestrator as any);
+  });
+
+  describe('withFolderBookLock', () => {
+    /** Answers each lookup of the book at the folder in turn. */
+    function folderOwners(...owners: Array<number | null>) {
+      const limit = vi.fn();
+      for (const owner of owners) limit.mockResolvedValueOnce(owner === null ? [] : [{ id: owner }]);
+      db.select.mockReturnValue({ from: () => ({ where: () => ({ limit }) }) });
+    }
+
+    it('runs straight away without a lock when no book owns the folder', async () => {
+      folderOwners(null);
+      const work = vi.fn(() => Promise.resolve(fileLocks.isLocked('book:7')));
+
+      await expect(service.withFolderBookLock(1, '/library/Dune', work)).resolves.toBe(false);
+      expect(work).toHaveBeenCalledTimes(1);
+    });
+
+    it("waits for the owning book's lock and holds it while the work runs", async () => {
+      folderOwners(7, 7);
+      let releaseRename!: () => void;
+      const rename = fileLocks.withLock('book:7', () => new Promise<void>((resolve) => (releaseRename = resolve)));
+      const work = vi.fn(() => Promise.resolve(fileLocks.isLocked('book:7')));
+
+      const placed = service.withFolderBookLock(1, '/library/Dune', work);
+      await new Promise((resolve) => setImmediate(resolve));
+      expect(work).not.toHaveBeenCalled();
+
+      releaseRename();
+      await rename;
+      await expect(placed).resolves.toBe(true);
+      expect(fileLocks.isLocked('book:7')).toBe(false);
+    });
+
+    it('still files into a folder its book left while this waited', async () => {
+      folderOwners(7, null);
+      const work = vi.fn().mockResolvedValue('filed');
+
+      await expect(service.withFolderBookLock(1, '/library/Dune', work)).resolves.toBe('filed');
+    });
+
+    it.each([
+      ['another book took the folder while this waited', [7, 8], undefined],
+      ['the book to join is no longer there', [8], 7],
+      ['the book to join left while this waited', [7, null], 7],
+    ])('places nothing when %s', async (_label, owners, expectedBookId) => {
+      folderOwners(...(owners as Array<number | null>));
+      const work = vi.fn();
+
+      await expect(service.withFolderBookLock(1, '/library/Dune', work, expectedBookId)).rejects.toBeInstanceOf(ConflictException);
+      expect(work).not.toHaveBeenCalled();
+      expect(fileLocks.isLocked('book:7')).toBe(false);
+    });
   });
 
   it('creates book, metadata, and content file rows with fingerprint/stat data in a transaction', async () => {
@@ -411,7 +467,7 @@ describe('UploadProcessorService', () => {
 
     beforeEach(() => {
       metadataService.extractAndSave.mockResolvedValue(undefined);
-      serviceNoOrch = new UploadProcessorService(db as any, metadataService as any, coverStore as any, undefined);
+      serviceNoOrch = new UploadProcessorService(db as any, metadataService as any, coverStore as any, fileLocks, undefined);
     });
 
     it('createBookRecord completes without scheduling when orchestrator is undefined', async () => {
@@ -758,6 +814,7 @@ describe('UploadProcessorService', () => {
         db as any,
         metadataService as any,
         coverStore as any,
+        fileLocks,
         orchestrator as any,
         coverReconciler as any,
       );
@@ -772,7 +829,14 @@ describe('UploadProcessorService', () => {
 
   it('reconciles cover slots once metadata extraction has written the file’s own cover', async () => {
     const coverReconciler = { enqueue: vi.fn().mockResolvedValue(undefined) };
-    const withCovers = new UploadProcessorService(db as any, metadataService as any, coverStore as any, orchestrator as any, coverReconciler as any);
+    const withCovers = new UploadProcessorService(
+      db as any,
+      metadataService as any,
+      coverStore as any,
+      fileLocks,
+      orchestrator as any,
+      coverReconciler as any,
+    );
     metadataService.extractAndSave.mockResolvedValue(undefined);
     metadataService.extractAndAggregateAudioDuration.mockResolvedValue(undefined);
 
@@ -791,6 +855,7 @@ describe('UploadProcessorService', () => {
       db as any,
       metadataService as any,
       coverStore as any,
+      fileLocks,
       orchestrator as any,
       undefined,
       scanner as any,

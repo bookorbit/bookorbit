@@ -4,6 +4,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import type { MultipartRequest } from '../../common/types/multipart-request';
 import type { RequestUser } from '../../common/types/request-user';
 import { UPLOAD_CHUNK_SIZE_BYTES } from '../../common/constants/upload.constants';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { CreateUploadSessionDto } from './dto/create-upload-session.dto';
 import { UploadSessionService } from './upload-session.service';
 
@@ -12,17 +13,20 @@ export class UploadSessionController {
   constructor(private readonly sessions: UploadSessionService) {}
 
   @Get('capabilities')
+  @RequireAppAttest()
   capabilities(@CurrentUser() user: RequestUser) {
     return this.sessions.capabilities(user);
   }
 
   @Post()
+  @RequireAppAttest()
   @HttpCode(HttpStatus.CREATED)
   create(@Body() dto: CreateUploadSessionDto, @CurrentUser() user: RequestUser) {
     return this.sessions.create(dto, user);
   }
 
   @Get(':id')
+  @RequireAppAttest()
   get(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: RequestUser) {
     return this.sessions.get(id, user);
   }
@@ -42,12 +46,14 @@ export class UploadSessionController {
   }
 
   @Post(':id/complete')
+  @RequireAppAttest()
   @HttpCode(HttpStatus.ACCEPTED)
   complete(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: RequestUser) {
     return this.sessions.complete(id, user);
   }
 
   @Delete(':id')
+  @RequireAppAttest()
   cancel(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: RequestUser) {
     return this.sessions.cancel(id, user);
   }

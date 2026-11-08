@@ -173,6 +173,10 @@ const VirtualBookGridStub = defineComponent({
       type: Array as PropType<BookCard[]>,
       required: true,
     },
+    mediaKind: {
+      type: String,
+      default: null,
+    },
   },
   emits: ['action', 'update:book'],
   setup(props) {
@@ -180,7 +184,7 @@ const VirtualBookGridStub = defineComponent({
     return { bookIds }
   },
   template: `
-    <div data-testid="virtual-book-grid" :data-book-ids="bookIds">
+    <div data-testid="virtual-book-grid" :data-book-ids="bookIds" :data-media-kind="mediaKind || ''">
       <button v-for="book in books" :key="'add-' + book.id" :data-testid="'grid-add-action-' + book.id" @click="$emit('action', book, 'add-to-collection')">
         add
       </button>
@@ -417,8 +421,12 @@ describe('SeriesDetailView', () => {
     const wrapper = mountView()
     await nextTick()
 
-    expect(wrapper.get('[data-testid="series-media-group-books"] [data-testid="virtual-book-grid"]').attributes('data-book-ids')).toBe('7')
-    expect(wrapper.get('[data-testid="series-media-group-audiobooks"] [data-testid="virtual-book-grid"]').attributes('data-book-ids')).toBe('7')
+    const booksGrid = wrapper.get('[data-testid="series-media-group-books"] [data-testid="virtual-book-grid"]')
+    const audiobooksGrid = wrapper.get('[data-testid="series-media-group-audiobooks"] [data-testid="virtual-book-grid"]')
+    expect(booksGrid.attributes('data-book-ids')).toBe('7')
+    expect(booksGrid.attributes('data-media-kind')).toBe('ebook')
+    expect(audiobooksGrid.attributes('data-book-ids')).toBe('7')
+    expect(audiobooksGrid.attributes('data-media-kind')).toBe('audiobook')
     expect(wrapper.find('[data-testid="series-media-group-comics"]').exists()).toBe(false)
   })
 

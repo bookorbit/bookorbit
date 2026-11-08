@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { Gauge } from '@lucide/vue'
 
 import { useChartTokens } from '@/composables/useChartTokens'
@@ -94,7 +94,7 @@ watchEffect(() => {
 <template>
   <ChartCard :title="t('statistics.charts.metadataFreshness.title')" :icon="Gauge" :color-index="2" :loading :error :empty="totalBooks === 0">
     <div class="flex h-full flex-col">
-      <VChart :option="option" autoresize style="height: 76%" />
+      <AppChart :option="option" autoresize style="height: 76%" />
       <div class="mt-0 grid grid-cols-3 gap-2 px-1">
         <div v-for="card in statCards" :key="card.label" class="bg-muted/40 border-border/60 rounded-md border px-2 py-1 text-center">
           <p class="text-muted-foreground text-[10px] leading-none">{{ card.label }}</p>

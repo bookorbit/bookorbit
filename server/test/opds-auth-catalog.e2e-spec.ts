@@ -801,7 +801,7 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
         relPath: relative(library.folderPath, absolutePath),
         ino: fileStat.ino,
         sizeBytes: fileStat.size,
-        mtime: fileStat.mtime,
+        mtime: new Date(Math.floor(fileStat.mtimeMs)),
         format,
         role: 'content',
         sortOrder,

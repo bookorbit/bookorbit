@@ -1,5 +1,6 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { BookCopy } from '@lucide/vue'
 import type { BookMovePreviewResult, BookSelectionPayload, Library } from '@bookorbit/types'
 import MoveToLibrarySheet from '../MoveToLibrarySheet.vue'
 
@@ -95,8 +96,9 @@ const globalStubs = {
       template: '<input data-testid="search-input" :class="$props.class" :value="modelValue" :placeholder="placeholder" />',
     },
     AppIcon: {
+      name: 'AppIcon',
       props: ['icon', 'fallback', 'size'],
-      template: '<span data-testid="app-icon" :data-icon="icon" :data-fallback="fallback" />',
+      template: '<span data-testid="app-icon" :data-icon="icon" />',
     },
   },
 }
@@ -134,7 +136,7 @@ describe('destination list', () => {
 
     const icons = wrapper.findAll('[data-testid="app-icon"]')
     expect(icons.map((icon) => icon.attributes('data-icon'))).toEqual(['BookMarked', 'FileText'])
-    expect(icons[0].attributes('data-fallback')).toBe('BookCopy')
+    expect(wrapper.findAllComponents({ name: 'AppIcon' })[0].props('fallback')).toBe(BookCopy)
   })
 
   it('uses a single search control with no nested bordered wrapper', async () => {

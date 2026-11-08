@@ -356,6 +356,16 @@ describe('bulkSetManual', () => {
       expect.objectContaining({ status, source: 'manual', startedAt: null, finishedAt: null }),
     );
   });
+
+  it('applies explicit reading dates to every selected book', async () => {
+    const startedAt = new Date('2026-04-01T00:00:00.000Z');
+    mockRepo.findByBookIds.mockResolvedValue([makeRow({ bookId: 10, status: 'reading', startedAt: null, finishedAt: null })]);
+
+    await service.bulkSetManual(1, [10, 11], 'read', { startedAt, finishedAt: null });
+
+    expect(mockRepo.upsertState).toHaveBeenCalledWith(1, 10, expect.objectContaining({ status: 'read', startedAt, finishedAt: null }));
+    expect(mockRepo.upsertState).toHaveBeenCalledWith(1, 11, expect.objectContaining({ status: 'read', startedAt, finishedAt: null }));
+  });
 });
 
 describe('autoUpdate with default thresholds', () => {
@@ -662,6 +672,18 @@ describe('kobo status projection', () => {
     expect(mockKoboProjection.project).not.toHaveBeenCalled();
   });
 
+  it('projects a given status for another module only when two-way sync is on, and reports failure', async () => {
+    mockKoboProjection.isEnabled.mockResolvedValueOnce(false);
+    await service.projectKoboStatus(1, [10], 'read');
+    expect(mockKoboProjection.project).not.toHaveBeenCalled();
+
+    await service.projectKoboStatus(1, [10], 'read');
+    expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'read');
+
+    mockKoboProjection.project.mockRejectedValueOnce(new Error('deadlock'));
+    await expect(service.projectKoboStatus(1, [10], 'read')).rejects.toThrow('deadlock');
+  });
+
   describe('with reading attempts enabled', () => {
     const mockAttempts = {
       applyManualStatus: vi.fn(),
@@ -769,6 +791,22 @@ describe('kobo status projection', () => {
       expect(mockKoboProjection.project).toHaveBeenCalledTimes(2);
       expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [10], 'rereading');
       expect(mockKoboProjection.project).toHaveBeenCalledWith(1, [11], 'reading');
+    });
+
+    it('passes explicit bulk dates and a resolved timezone to each reading attempt', async () => {
+      mockRepo.findOne.mockResolvedValue(makeRow({ bookId: 10, status: 'reading' }));
+      mockAttempts.applyManualStatus.mockResolvedValue({
+        status: 'read',
+        source: 'manual',
+        startedAt: null,
+        finishedAt: null,
+        updatedAt: '2026-05-01T00:00:00.000Z',
+      });
+
+      await attemptService.bulkSetManual(1, [10], 'read', { finishedAt: null }, { endedOn: null }, 'America/Denver');
+
+      expect(mockAttempts.applyManualStatus).toHaveBeenCalledWith(1, 10, 'read', undefined, null, expect.any(String), { statusWasExplicit: true });
+      expect(mockRepo.findUserTimeZone).not.toHaveBeenCalled();
     });
   });
 });

@@ -34,9 +34,26 @@ export function useMissingFormatRequest(book: Ref<BookDetail | null>, enabled: R
     return null
   })
 
-  const state = computed<MissingFormatState>(() => (checking.value && !availability.value ? 'checking' : pairHalfState(availability.value)))
+  /**
+   * A linked edition already holding the missing format. The availability check matches by title and
+   * author, so it misses an edition whose title differs, say by a subtitle; the link does not.
+   */
+  const linkedHolderId = computed<number | null>(() => {
+    const mediaKind = missing.value
+    if (!mediaKind) return null
+    const formats = BOOK_REQUEST_FORMATS_BY_MEDIA_KIND[mediaKind]
+    const holder = book.value?.linkedBooks?.find(
+      (linked) => linked.status === 'present' && linked.formats.some((format) => formats.includes(format.toLowerCase())),
+    )
+    return holder?.bookId ?? null
+  })
+
+  const state = computed<MissingFormatState>(() => {
+    if (linkedHolderId.value !== null) return 'owned'
+    return checking.value && !availability.value ? 'checking' : pairHalfState(availability.value)
+  })
   const requestId = computed(() => availability.value?.existingRequestId ?? null)
-  const ownedBookId = computed(() => availability.value?.ownedBookId ?? null)
+  const ownedBookId = computed(() => linkedHolderId.value ?? availability.value?.ownedBookId ?? null)
 
   function workFor(current: BookDetail, mediaKind: BookRequestMediaKind) {
     return {
@@ -51,7 +68,7 @@ export function useMissingFormatRequest(book: Ref<BookDetail | null>, enabled: R
     const current = book.value
     const mediaKind = missing.value
     availability.value = null
-    if (!current || !mediaKind || !enabled.value) return
+    if (!current || !mediaKind || !enabled.value || linkedHolderId.value !== null) return
 
     const asked = ++generation
     const work = workFor(current, mediaKind)
@@ -122,7 +139,7 @@ export function useMissingFormatRequest(book: Ref<BookDetail | null>, enabled: R
     }
   }
 
-  watch([() => book.value?.id, missing, enabled], () => void check(), { immediate: true })
+  watch([() => book.value?.id, missing, enabled, linkedHolderId], () => void check(), { immediate: true })
 
   return { missing, state, requestId, ownedBookId, availability, submitting, check, request }
 }

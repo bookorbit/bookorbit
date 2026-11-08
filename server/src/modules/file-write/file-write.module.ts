@@ -4,6 +4,7 @@ import { CommonModule } from '../../common/common.module';
 import { AudiobookChaptersModule } from '../audiobook-chapters/audiobook-chapters.module';
 import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
+import { BookConsolidationModule } from '../book-consolidation/book-consolidation.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { NotificationModule } from '../notification/notification.module';
@@ -30,6 +31,7 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
     forwardRef(() => NotificationModule),
     AppSettingsModule,
     BookCoverStoreModule,
+    BookConsolidationModule,
     MetadataModule,
     SelfWriteRegistryModule,
   ],

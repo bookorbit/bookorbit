@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { apiJson, apiSend, errorMessage } from '@/lib/api-json'
+import { apiError, apiJson, apiSend, errorMessage } from '@/lib/api-json'
 import { api, NetworkError, setAccessToken, setOnAuthFailure } from '@/lib/api'
 
 /**
@@ -70,5 +70,23 @@ describe('unreachable server', () => {
     const reason = await api('/api/v1/anything').catch((error: unknown) => error)
 
     expect(reason).toBe(thrown)
+  })
+})
+
+describe('coded errors', () => {
+  function body(json: unknown): Response {
+    return { json: async () => json } as unknown as Response
+  }
+
+  it('fills the message from the plain values the server sends with the code', async () => {
+    const error = await apiError(body({ errorCode: 'LINK_GROUP_FULL', errorMeta: { max: 10 } }), 'common.error')
+
+    expect(error.message).toContain('10')
+  })
+
+  it('ignores structured values in the error details', async () => {
+    const error = await apiError(body({ errorCode: 'LINK_GROUP_NOT_EDITABLE', errorMeta: { blockers: [{ code: 'X' }] } }), 'common.error')
+
+    expect(error.message).toBe('These books are linked with a book you cannot edit.')
   })
 })

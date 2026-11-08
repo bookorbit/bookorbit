@@ -159,7 +159,14 @@ export class UserBookStatusService {
     };
   }
 
-  async bulkSetManual(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
+  async bulkSetManual(
+    userId: number,
+    bookIds: number[],
+    status: ReadStatus,
+    datePatch: Pick<ManualStatusPatch, 'startedAt' | 'finishedAt'> = {},
+    dateKeys: { startedOn?: string | null; endedOn?: string | null } = {},
+    resolvedTimeZone?: string,
+  ): Promise<void> {
     if (bookIds.length === 0) return;
     // Grouped by resulting status because reading-attempt projection can settle on a
     // different status than requested (a completed book set to "reading" becomes "rereading").
@@ -173,10 +180,12 @@ export class UserBookStatusService {
     if (this.attempts) {
       await this.attempts.coalesceChanges(async () => {
         const batchSize = 50;
-        const timeZone = await this.repo.findUserTimeZone(userId);
+        const timeZone = resolvedTimeZone ?? (await this.repo.findUserTimeZone(userId));
         for (let offset = 0; offset < bookIds.length; offset += batchSize) {
           const batch = bookIds.slice(offset, offset + batchSize);
-          const settled = await Promise.allSettled(batch.map((bookId) => this.applyManualStatus(userId, bookId, { status }, undefined, timeZone)));
+          const settled = await Promise.allSettled(
+            batch.map((bookId) => this.applyManualStatus(userId, bookId, { status, ...datePatch }, dateKeys, timeZone)),
+          );
           const failure = settled.find((result) => result.status === 'rejected');
           if (failure?.status === 'rejected') throw failure.reason;
           const results = settled.filter((result) => result.status === 'fulfilled').map((result) => result.value);
@@ -192,6 +201,8 @@ export class UserBookStatusService {
     const now = new Date();
     const existing = await this.repo.findByBookIds(userId, bookIds);
     const existingMap = new Map(existing.map((row) => [row.bookId, row]));
+    const hasStartedAt = Object.prototype.hasOwnProperty.call(datePatch, 'startedAt');
+    const hasFinishedAt = Object.prototype.hasOwnProperty.call(datePatch, 'finishedAt');
     await Promise.all(
       bookIds.map((bookId) => {
         const current = existingMap.get(bookId) ?? null;
@@ -199,8 +210,8 @@ export class UserBookStatusService {
         return this.repo.upsertState(userId, bookId, {
           status,
           source: 'manual',
-          startedAt: clearsLifecycle ? null : (current?.startedAt ?? null),
-          finishedAt: clearsLifecycle ? null : (current?.finishedAt ?? null),
+          startedAt: clearsLifecycle ? null : hasStartedAt ? (datePatch.startedAt ?? null) : (current?.startedAt ?? null),
+          finishedAt: clearsLifecycle ? null : hasFinishedAt ? (datePatch.finishedAt ?? null) : (current?.finishedAt ?? null),
           updatedAt: now,
         });
       }),
@@ -226,6 +237,12 @@ export class UserBookStatusService {
     }
   }
 
+  /** Writes a status onto the user's Kobo reading state when two-way sync is on. Throws on failure. */
+  async projectKoboStatus(userId: number, bookIds: number[], status: ReadStatus): Promise<void> {
+    if (bookIds.length === 0 || !(await this.koboProjection.isEnabled(userId))) return;
+    await this.koboProjection.project(userId, bookIds, status);
+  }
+
   /**
    * Mirrors the new read status onto the Kobo reading state so devices pick it up on
    * the next sync. Best-effort: a Kobo projection failure must not fail the status change.
@@ -234,8 +251,7 @@ export class UserBookStatusService {
     if (bookIds.length === 0) return;
     const startedAt = Date.now();
     try {
-      if (!(await this.koboProjection.isEnabled(userId))) return;
-      await this.koboProjection.project(userId, bookIds, status);
+      await this.projectKoboStatus(userId, bookIds, status);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
       this.logger.warn(

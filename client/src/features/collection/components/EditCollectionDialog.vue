@@ -7,7 +7,8 @@ import { toast } from 'vue-sonner'
 import { useCollections } from '../composables/useCollections'
 import IconPicker from '@/components/IconPicker.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
-import type { Collection } from '@bookorbit/types'
+import GridShapePicker from '@/features/book/components/GridShapePicker.vue'
+import { normalizeCoverAspectRatio, type Collection, type CoverAspectRatio } from '@bookorbit/types'
 
 const props = defineProps<{ open: boolean; collection: Collection }>()
 const emit = defineEmits<{ close: []; deleted: [id: number, name: string] }>()
@@ -20,6 +21,7 @@ const name = ref('')
 const icon = ref('')
 const syncToKobo = ref(false)
 const isPublic = ref(false)
+const coverAspectRatio = ref<CoverAspectRatio>('2/3')
 const saving = ref(false)
 const deleting = ref(false)
 const confirmingDelete = ref(false)
@@ -35,6 +37,7 @@ watch(
       icon.value = props.collection.icon ?? ''
       syncToKobo.value = props.collection.syncToKobo
       isPublic.value = props.collection.isPublic
+      coverAspectRatio.value = normalizeCoverAspectRatio(props.collection.coverAspectRatio)
       error.value = null
       confirmingDelete.value = false
     }
@@ -53,7 +56,7 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value, isPublic.value)
+    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value, isPublic.value, coverAspectRatio.value)
     emit('close')
   } catch {
     error.value = t('collection.editDialog.updateFailed')
@@ -105,7 +108,9 @@ async function confirmDelete() {
   <Teleport to="body">
     <div v-if="open" class="fixed inset-0 z-50 flex items-center justify-center">
       <div class="absolute inset-0 bg-scrim" @click="emit('close')" />
-      <div class="relative z-10 w-full max-w-md mx-4 bg-card border border-border rounded-lg shadow-2xl p-6">
+      <div
+        class="relative z-10 w-full max-w-md max-h-[calc(100dvh-2rem)] overflow-y-auto mx-4 bg-card border border-border rounded-lg shadow-2xl p-6"
+      >
         <div class="flex items-center justify-between mb-5">
           <h2 class="text-base font-semibold text-foreground">{{ t('collection.editDialog.title') }}</h2>
           <button @click="emit('close')" class="text-muted-foreground hover:text-foreground transition-colors">
@@ -127,6 +132,11 @@ async function confirmDelete() {
           <div class="flex flex-col gap-1.5">
             <label class="text-sm font-medium text-foreground">{{ t('collection.dialog.icon') }}</label>
             <IconPicker v-model="icon" :placeholder="t('collection.dialog.iconPlaceholder')" />
+          </div>
+
+          <div class="flex flex-col gap-1.5">
+            <p id="collection-grid-shape-title" class="text-sm font-medium text-foreground">{{ t('book.gridShape.title') }}</p>
+            <GridShapePicker v-model="coverAspectRatio" name="collection-grid-shape" aria-labelledby="collection-grid-shape-title" />
           </div>
 
           <div class="flex items-center justify-between py-1">

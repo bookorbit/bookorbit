@@ -1,7 +1,14 @@
 export const CARD_OVERLAY_KEYS = ["progress-bar", "format", "rating", "read-status", "lock-status", "series-position"] as const;
 export type CardOverlayKey = (typeof CARD_OVERLAY_KEYS)[number];
 
-export const GRID_CARD_LABEL_FIELDS = ["hidden", "book-title", "series-title", "series-title-position", "author"] as const;
+/**
+ * How the file format overlay draws a book that has several formats. `primary` is one pill for the
+ * format the card opens; the others fold every format into one badge.
+ */
+export const FORMAT_BADGE_STYLES = ["primary", "bubble", "underline", "pips", "seal", "dots", "kinds"] as const;
+export type FormatBadgeStyle = (typeof FORMAT_BADGE_STYLES)[number];
+
+export const GRID_CARD_LABEL_FIELDS =["hidden", "book-title", "series-title", "series-title-position", "author"] as const;
 export type GridCardLabelField = (typeof GRID_CARD_LABEL_FIELDS)[number];
 
 export const COVER_SIZE_SCOPES = ["per-view", "synced"] as const;
@@ -60,6 +67,7 @@ export interface DisplayPreferences {
   squareGridGap: number;
   viewMode: BookViewMode;
   cardOverlays: CardOverlayKey[];
+  formatBadgeStyle: FormatBadgeStyle;
   showJumpRails: boolean;
   smartScopeFilterExpanded: boolean;
   authorCoverSize: number;

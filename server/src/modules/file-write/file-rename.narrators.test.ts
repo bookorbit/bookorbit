@@ -53,7 +53,7 @@ describe('FileRenameService narrator-specific editions', () => {
       checkPathTakenByOtherBook: vi.fn().mockResolvedValue(false),
       applyFolderRename: vi.fn().mockResolvedValue(undefined),
       findFolderOwners: vi.fn().mockResolvedValue(new Map()),
-      applyExistingFolderMerge: vi.fn().mockResolvedValue(undefined),
+      transaction: vi.fn().mockImplementation((work: (tx: unknown) => Promise<unknown>) => work({})),
     };
     const lockService = {
       withLock: vi.fn().mockImplementation(async (_key: string, operation: () => Promise<unknown>) => operation()),
@@ -73,6 +73,7 @@ describe('FileRenameService narrator-specific editions', () => {
       config,
       new SelfWriteRegistry(),
       { slotsForAdoption: vi.fn().mockResolvedValue([]), adoptSlots: vi.fn(), removeCoverDirectory: vi.fn() } as never,
+      { consolidate: vi.fn().mockResolvedValue({}) } as never,
     );
 
     const simonResult = await service.performRename(1, 7);

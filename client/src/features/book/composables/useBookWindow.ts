@@ -37,6 +37,8 @@ function canonicalizeQueryValue(value: unknown): unknown {
 export function useBookWindow(options: { endpoint: Ref<string | null>; query: Ref<BookWindowQuery> }) {
   const slots = shallowRef<BookSlot[]>([])
   const total = shallowRef(0)
+  /** Books behind the cards. Differs from `total` only when a collapse flag folded books together. */
+  const bookTotal = shallowRef(0)
   const loading = shallowRef(false)
   const initialized = shallowRef(false)
   const error = shallowRef<string | null>(null)
@@ -119,6 +121,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
       }
       slots.value = next
       total.value = data.total
+      bookTotal.value = data.bookTotal ?? data.total
       error.value = null
       failedAt.delete(block)
     } catch (e) {
@@ -129,6 +132,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
         swapPending = false
         slots.value = []
         total.value = 0
+        bookTotal.value = 0
       }
       failedAt.set(block, Date.now())
       error.value = e instanceof Error ? e.message : 'Failed to load books'
@@ -180,6 +184,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
     swapPending = false
     slots.value = []
     total.value = 0
+    bookTotal.value = 0
   }
 
   /**
@@ -268,6 +273,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
     invalidateInFlight()
     slots.value = next
     total.value = Math.max(0, total.value - removed)
+    bookTotal.value = Math.max(0, bookTotal.value - removed)
   }
 
   function prependBooks(cards: BookCard[]) {
@@ -278,6 +284,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
     invalidateInFlight()
     slots.value = [...fresh, ...slots.value]
     total.value = total.value + fresh.length
+    bookTotal.value = bookTotal.value + fresh.length
   }
 
   // Writable view over the loaded cards so existing consumers that assign
@@ -321,6 +328,7 @@ export function useBookWindow(options: { endpoint: Ref<string | null>; query: Re
   return {
     slots,
     total,
+    bookTotal,
     loading,
     initialized,
     error,

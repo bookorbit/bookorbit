@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { TrendingUp } from '@lucide/vue'
 
 import { useFormatShareOverTime } from '../../composables/useFormatShareOverTime'
@@ -94,6 +94,6 @@ watchEffect(() => {
     :error
     :empty="!data.items.length"
   >
-    <VChart :option autoresize style="height: 100%" />
+    <AppChart :option autoresize style="height: 100%" />
   </ChartCard>
 </template>

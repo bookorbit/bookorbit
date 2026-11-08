@@ -2,12 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import type { BookDuplicateGroupSort, BookDuplicateMatchReason, BookDuplicateSortOrder } from '@bookorbit/types';
+import type { BookDuplicateGroupSort, BookDuplicateKind, BookDuplicateMatchReason, BookDuplicateSortOrder } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { crossFormatTitleSql, mediaFamilySql } from './book-duplicate-normalize';
 import {
   bookDuplicateDismissals,
   bookDuplicateGroupMembers,
@@ -20,12 +21,24 @@ import {
   books,
 } from '../../db/schema';
 
-type Db = NodePgDatabase<typeof schema>;
+export type Db = NodePgDatabase<typeof schema>;
 type ScanRow = typeof bookDuplicateScans.$inferSelect;
 
 const BOOK_DUPLICATE_SCAN_LOCK_NAMESPACE = 1_112_493_899;
 
-type PreviewRow = {
+export type OtherFormatBookRow = {
+  id: number;
+  title: string | null;
+  hardcover_id: string | null;
+  open_library_id: string | null;
+  series_id: number | null;
+  series_index: string | null;
+  formats: string[];
+  authors: string[];
+  narrators: string[];
+};
+
+export type PreviewRow = {
   group_id: number;
   id: number;
   title: string | null;
@@ -51,17 +64,23 @@ type PreviewRow = {
   added_at: Date;
   updated_at: Date | null;
   has_cover: boolean;
+  book_per_file: boolean;
 };
+
+/** The books a user's scan covers: their accessible libraries, minus anything their content filters hide. */
+export function duplicateScopeWhere(db: Db, libraryIds: number[], user: RequestUser): SQL {
+  if (libraryIds.length === 0) return sql`false`;
+  const clauses: SQL[] = [inArray(books.libraryId, libraryIds), ne(books.status, 'processing')];
+  if (!user.isSuperuser) clauses.push(...buildContentFilterClauses(user.contentFilters, db));
+  return and(...clauses)!;
+}
 
 @Injectable()
 export class BookDuplicatesRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
   private scopeWhere(libraryIds: number[], user: RequestUser): SQL {
-    if (libraryIds.length === 0) return sql`false`;
-    const clauses: SQL[] = [inArray(books.libraryId, libraryIds), ne(books.status, 'processing')];
-    if (!user.isSuperuser) clauses.push(...buildContentFilterClauses(user.contentFilters, this.db));
-    return and(...clauses)!;
+    return duplicateScopeWhere(this.db, libraryIds, user);
   }
 
   async findActiveForUser(userId: number): Promise<ScanRow | null> {
@@ -221,12 +240,7 @@ export class BookDuplicatesRepository {
           CASE
             WHEN EXISTS (SELECT 1 FROM book_files existing_file WHERE existing_file.book_id = ${books.id} AND existing_file.role = 'content')
             THEN ARRAY(
-              SELECT DISTINCT CASE
-                WHEN lower(coalesce(f.format, '')) IN ('m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac') THEN 'audiobook'
-                WHEN lower(coalesce(f.format, '')) IN ('cbz', 'cbr', 'cb7', 'cbx') THEN 'comic'
-                WHEN lower(coalesce(f.format, '')) IN ('epub', 'pdf', 'djvu', 'mobi', 'azw', 'azw3', 'fb2', 'kepub') THEN 'ebook'
-                ELSE 'unknown'
-              END AS family
+              SELECT DISTINCT ${mediaFamilySql(sql`f.format`)} AS family
               FROM book_files f
               WHERE f.book_id = ${books.id} AND f.role = 'content'
               ORDER BY family
@@ -260,6 +274,7 @@ export class BookDuplicatesRepository {
           min(book_id) OVER (PARTITION BY kind, value) AS anchor_id
         FROM ${bookDuplicateScanKeys}
         WHERE scan_id = ${scanId}
+          AND kind IN ('file_hash', 'isbn', 'exact_metadata')
       ), candidate_pairs AS (
         SELECT
           anchor_id AS book_id_a,
@@ -276,7 +291,7 @@ export class BookDuplicatesRepository {
       SELECT CAST(${scanId} AS integer), book_id_a, book_id_b, array_agg(DISTINCT reason ORDER BY reason)
       FROM candidate_pairs
       GROUP BY book_id_a, book_id_b
-      ON CONFLICT (scan_id, book_id_a, book_id_b) DO UPDATE
+      ON CONFLICT (scan_id, kind, book_id_a, book_id_b) DO UPDATE
       SET reasons = ARRAY(
         SELECT DISTINCT reason
         FROM unnest(book_duplicate_pairs.reasons || EXCLUDED.reasons) AS reason
@@ -305,12 +320,7 @@ export class BookDuplicatesRepository {
           CASE
             WHEN EXISTS (SELECT 1 FROM book_files existing_file WHERE existing_file.book_id = ${books.id} AND existing_file.role = 'content')
             THEN ARRAY(
-              SELECT DISTINCT CASE
-                WHEN lower(coalesce(f.format, '')) IN ('m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac') THEN 'audiobook'
-                WHEN lower(coalesce(f.format, '')) IN ('cbz', 'cbr', 'cb7', 'cbx') THEN 'comic'
-                WHEN lower(coalesce(f.format, '')) IN ('epub', 'pdf', 'djvu', 'mobi', 'azw', 'azw3', 'fb2', 'kepub') THEN 'ebook'
-                ELSE 'unknown'
-              END AS family
+              SELECT DISTINCT ${mediaFamilySql(sql`f.format`)} AS family
               FROM book_files f
               WHERE f.book_id = ${books.id} AND f.role = 'content'
               ORDER BY family
@@ -349,7 +359,7 @@ export class BookDuplicatesRepository {
       INSERT INTO ${bookDuplicatePairs} (scan_id, book_id_a, book_id_b, reasons, title_similarity)
       SELECT CAST(${scanId} AS integer), book_id_a, book_id_b, ARRAY['fuzzy_metadata']::text[], title_similarity
       FROM fuzzy_pairs
-      ON CONFLICT (scan_id, book_id_a, book_id_b) DO UPDATE
+      ON CONFLICT (scan_id, kind, book_id_a, book_id_b) DO UPDATE
       SET
         reasons = ARRAY(
           SELECT DISTINCT reason
@@ -367,9 +377,9 @@ export class BookDuplicatesRepository {
         INSERT INTO tmp_book_duplicate_components (book_id, root_id)
         SELECT book_id, book_id
         FROM (
-          SELECT book_id_a AS book_id FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId}
+          SELECT book_id_a AS book_id FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId} AND kind = 'duplicate'
           UNION
-          SELECT book_id_b AS book_id FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId}
+          SELECT book_id_b AS book_id FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId} AND kind = 'duplicate'
         ) endpoints
       `);
 
@@ -380,6 +390,7 @@ export class BookDuplicatesRepository {
             FROM tmp_book_duplicate_components component
             JOIN ${bookDuplicatePairs} pair
               ON pair.scan_id = ${scanId}
+              AND pair.kind = 'duplicate'
               AND (pair.book_id_a = component.book_id OR pair.book_id_b = component.book_id)
             JOIN tmp_book_duplicate_components neighbor
               ON neighbor.book_id = CASE WHEN pair.book_id_a = component.book_id THEN pair.book_id_b ELSE pair.book_id_a END
@@ -407,7 +418,7 @@ export class BookDuplicatesRepository {
           FROM ${bookDuplicatePairs} pair
           JOIN tmp_book_duplicate_components component ON component.book_id = pair.book_id_a
           CROSS JOIN LATERAL unnest(pair.reasons) AS reason
-          WHERE pair.scan_id = ${scanId}
+          WHERE pair.scan_id = ${scanId} AND pair.kind = 'duplicate'
           GROUP BY component.root_id
         ), member_bytes AS (
           SELECT
@@ -451,6 +462,7 @@ export class BookDuplicatesRepository {
         FROM tmp_book_duplicate_components component
         JOIN ${bookDuplicateGroups} duplicate_group
           ON duplicate_group.scan_id = ${scanId}
+          AND duplicate_group.kind = 'duplicate'
           AND duplicate_group.root_book_id = component.root_id
       `);
 
@@ -460,14 +472,164 @@ export class BookDuplicatesRepository {
         FROM tmp_book_duplicate_components component
         JOIN ${bookDuplicateGroups} duplicate_group
           ON duplicate_group.scan_id = ${scanId}
+          AND duplicate_group.kind = 'duplicate'
           AND duplicate_group.root_book_id = component.root_id
         WHERE pair.scan_id = ${scanId}
+          AND pair.kind = 'duplicate'
           AND component.book_id = pair.book_id_a
       `);
 
-      const [row] = await tx.select({ count: count() }).from(bookDuplicateGroups).where(eq(bookDuplicateGroups.scanId, scanId));
+      const [row] = await tx
+        .select({ count: count() })
+        .from(bookDuplicateGroups)
+        .where(and(eq(bookDuplicateGroups.scanId, scanId), eq(bookDuplicateGroups.kind, 'duplicate')));
       return row?.count ?? 0;
     });
+  }
+
+  /** One batch of the facts the other-format pass keys on: the book's media, title, people, work ids and series. */
+  async findOtherFormatBatch(libraryIds: number[], user: RequestUser, afterBookId: number, limit: number): Promise<OtherFormatBookRow[]> {
+    const scope = this.scopeWhere(libraryIds, user);
+    const result = await this.db.execute<OtherFormatBookRow>(sql`
+      SELECT
+        ${books.id} AS id,
+        ${bookMetadata.title} AS title,
+        ${bookMetadata.hardcoverId} AS hardcover_id,
+        ${bookMetadata.openLibraryId} AS open_library_id,
+        ${bookMetadata.seriesId} AS series_id,
+        ${bookMetadata.seriesIndex} AS series_index,
+        ARRAY(
+          SELECT DISTINCT lower(f.format)
+          FROM book_files f
+          WHERE f.book_id = ${books.id} AND f.role = 'content' AND f.format IS NOT NULL
+        ) AS formats,
+        ARRAY(
+          SELECT a.name FROM book_authors ba JOIN authors a ON a.id = ba.author_id WHERE ba.book_id = ${books.id}
+        ) AS authors,
+        ARRAY(
+          SELECT n.name FROM book_narrators bn JOIN narrators n ON n.id = bn.narrator_id WHERE bn.book_id = ${books.id}
+        ) AS narrators
+      FROM ${books}
+      JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
+      WHERE ${scope}
+        AND ${books.id} > ${afterBookId}
+      ORDER BY ${books.id}
+      LIMIT ${limit}
+    `);
+    return result.rows;
+  }
+
+  async insertScanKeys(values: { scanId: number; bookId: number; kind: string; value: string }[]): Promise<void> {
+    if (values.length === 0) return;
+    await this.db.insert(bookDuplicateScanKeys).values(values).onConflictDoNothing();
+  }
+
+  /**
+   * Pairs an ebook with an audiobook that share a work id, a title and a person, or a series
+   * position and a similar title. Each key carries its side (`e|` or `a|`), so only a cross-media
+   * pair can form. Books already linked together are left out: they are resolved.
+   */
+  async createOtherFormatPairs(scanId: number, similarityPercent: number): Promise<number> {
+    const threshold = similarityPercent / 100;
+    const titleA = crossFormatTitleSql(sql`metadata_a.title`);
+    const titleB = crossFormatTitleSql(sql`metadata_b.title`);
+    const result = await this.db.execute(sql`
+      WITH ebook_keys AS (
+        SELECT book_id, kind, substr(value, 3) AS key
+        FROM ${bookDuplicateScanKeys}
+        WHERE scan_id = ${scanId} AND kind IN ('of_work', 'of_title', 'of_series') AND value LIKE 'e|%'
+      ), audio_keys AS (
+        SELECT book_id, kind, substr(value, 3) AS key
+        FROM ${bookDuplicateScanKeys}
+        WHERE scan_id = ${scanId} AND kind IN ('of_work', 'of_title', 'of_series') AND value LIKE 'a|%'
+      ), matched AS (
+        SELECT DISTINCT
+          least(ebook_keys.book_id, audio_keys.book_id) AS book_id_a,
+          greatest(ebook_keys.book_id, audio_keys.book_id) AS book_id_b,
+          ebook_keys.kind
+        FROM ebook_keys
+        JOIN audio_keys ON audio_keys.kind = ebook_keys.kind AND audio_keys.key = ebook_keys.key
+        WHERE audio_keys.book_id <> ebook_keys.book_id
+      ), scored AS (
+        SELECT
+          matched.book_id_a,
+          matched.book_id_b,
+          CASE matched.kind WHEN 'of_work' THEN 'same_work' WHEN 'of_title' THEN 'title_author' ELSE 'series_position' END AS reason,
+          CASE WHEN matched.kind = 'of_series' THEN similarity(${titleA}, ${titleB}) ELSE NULL END AS title_similarity
+        FROM matched
+        JOIN ${bookMetadata} metadata_a ON metadata_a.book_id = matched.book_id_a
+        JOIN ${bookMetadata} metadata_b ON metadata_b.book_id = matched.book_id_b
+      )
+      INSERT INTO ${bookDuplicatePairs} (scan_id, kind, book_id_a, book_id_b, reasons, title_similarity)
+      SELECT
+        CAST(${scanId} AS integer),
+        'other_format',
+        scored.book_id_a,
+        scored.book_id_b,
+        array_agg(DISTINCT scored.reason ORDER BY scored.reason),
+        max(scored.title_similarity)
+      FROM scored
+      WHERE (scored.reason <> 'series_position' OR scored.title_similarity >= ${threshold})
+        AND NOT EXISTS (
+          SELECT 1
+          FROM book_links link_a
+          JOIN book_links link_b ON link_b.group_id = link_a.group_id
+          WHERE link_a.book_id = scored.book_id_a AND link_b.book_id = scored.book_id_b
+        )
+      GROUP BY scored.book_id_a, scored.book_id_b
+      ON CONFLICT (scan_id, kind, book_id_a, book_id_b) DO NOTHING
+    `);
+    return result.rowCount ?? 0;
+  }
+
+  /** Every other-format pair becomes a group of its own: pairs never chain, so one book can sit in several. */
+  async finalizeOtherFormatGroups(scanId: number): Promise<number> {
+    const result = await this.db.execute(sql`
+      WITH numbered AS (
+        SELECT
+          nextval(pg_get_serial_sequence('book_duplicate_groups', 'id'))::integer AS group_id,
+          pair.book_id_a,
+          pair.book_id_b,
+          pair.reasons,
+          pair.title_similarity
+        FROM ${bookDuplicatePairs} pair
+        WHERE pair.scan_id = ${scanId} AND pair.kind = 'other_format'
+      ), inserted_groups AS (
+        INSERT INTO ${bookDuplicateGroups}
+          (id, scan_id, root_book_id, kind, reasons, max_title_similarity, member_count, confidence, member_bytes_total, member_bytes_max)
+        SELECT
+          numbered.group_id,
+          CAST(${scanId} AS integer),
+          numbered.book_id_a,
+          'other_format',
+          numbered.reasons,
+          numbered.title_similarity,
+          2,
+          CASE
+            WHEN 'same_work' = ANY(numbered.reasons) THEN 3
+            WHEN 'title_author' = ANY(numbered.reasons) THEN 2
+            ELSE 1
+          END,
+          0,
+          0
+        FROM numbered
+        RETURNING id
+      ), inserted_members AS (
+        INSERT INTO ${bookDuplicateGroupMembers} (group_id, scan_id, book_id)
+        SELECT group_id, CAST(${scanId} AS integer), book_id_a FROM numbered
+        UNION ALL
+        SELECT group_id, CAST(${scanId} AS integer), book_id_b FROM numbered
+        RETURNING group_id
+      )
+      UPDATE ${bookDuplicatePairs} pair
+      SET group_id = numbered.group_id
+      FROM numbered
+      WHERE pair.scan_id = ${scanId}
+        AND pair.kind = 'other_format'
+        AND pair.book_id_a = numbered.book_id_a
+        AND pair.book_id_b = numbered.book_id_b
+    `);
+    return result.rowCount ?? 0;
   }
 
   async deleteScanKeys(scanId: number): Promise<void> {
@@ -491,6 +653,7 @@ export class BookDuplicatesRepository {
     reason: BookDuplicateMatchReason | undefined,
     sortBy: BookDuplicateGroupSort,
     order: BookDuplicateSortOrder,
+    kind: BookDuplicateKind = 'duplicate',
   ) {
     const accessibleGroupIds = this.db
       .select({ groupId: bookDuplicateGroupMembers.groupId })
@@ -500,11 +663,17 @@ export class BookDuplicatesRepository {
       .groupBy(bookDuplicateGroupMembers.groupId)
       .having(sql`count(*) >= 2`);
     const reasonFilter = reason ? sql`${reason} = ANY(${bookDuplicateGroups.reasons})` : sql`true`;
-    const where = and(eq(bookDuplicateGroups.scanId, scanId), inArray(bookDuplicateGroups.id, accessibleGroupIds), reasonFilter)!;
+    const where = and(
+      eq(bookDuplicateGroups.scanId, scanId),
+      eq(bookDuplicateGroups.kind, kind),
+      inArray(bookDuplicateGroups.id, accessibleGroupIds),
+      reasonFilter,
+    )!;
     const [countRow] = await this.db.select({ count: count() }).from(bookDuplicateGroups).where(where);
     const groups = await this.db
       .select({
         id: bookDuplicateGroups.id,
+        kind: bookDuplicateGroups.kind,
         reasons: bookDuplicateGroups.reasons,
         maxTitleSimilarity: bookDuplicateGroups.maxTitleSimilarity,
         memberCount: bookDuplicateGroups.memberCount,
@@ -546,6 +715,7 @@ export class BookDuplicatesRepository {
       USING ${bookDuplicateDismissals} dismissal
       WHERE pair.scan_id = ${scanId}
         AND dismissal.user_id = ${userId}
+        AND dismissal.kind = pair.kind
         AND dismissal.book_id_a = pair.book_id_a
         AND dismissal.book_id_b = pair.book_id_b
     `);
@@ -559,8 +729,17 @@ export class BookDuplicatesRepository {
         reclaimable: sql<string>`COALESCE(sum(${bookDuplicateGroups.memberBytesTotal} - ${bookDuplicateGroups.memberBytesMax}), 0)`,
       })
       .from(bookDuplicateGroups)
-      .where(eq(bookDuplicateGroups.scanId, scanId));
+      .where(and(eq(bookDuplicateGroups.scanId, scanId), eq(bookDuplicateGroups.kind, 'duplicate')));
     return { totalExtraCopies: Number(row?.extraCopies ?? 0), totalReclaimableBytes: Number(row?.reclaimable ?? 0) };
+  }
+
+  async findGroupKind(scanId: number, groupId: number): Promise<BookDuplicateKind | null> {
+    const [row] = await this.db
+      .select({ kind: bookDuplicateGroups.kind })
+      .from(bookDuplicateGroups)
+      .where(and(eq(bookDuplicateGroups.scanId, scanId), eq(bookDuplicateGroups.id, groupId)))
+      .limit(1);
+    return (row?.kind as BookDuplicateKind | undefined) ?? null;
   }
 
   async findGroupMemberIds(scanId: number, groupId: number): Promise<number[]> {
@@ -571,19 +750,24 @@ export class BookDuplicatesRepository {
     return rows.map((row) => row.bookId);
   }
 
-  async insertDismissals(userId: number, pairs: { bookIdA: number; bookIdB: number }[]): Promise<void> {
+  async insertDismissals(userId: number, kind: BookDuplicateKind, pairs: { bookIdA: number; bookIdB: number }[]): Promise<void> {
     if (pairs.length === 0) return;
     await this.db
       .insert(bookDuplicateDismissals)
-      .values(pairs.map((pair) => ({ userId, bookIdA: pair.bookIdA, bookIdB: pair.bookIdB })))
+      .values(pairs.map((pair) => ({ userId, kind, bookIdA: pair.bookIdA, bookIdB: pair.bookIdB })))
       .onConflictDoNothing();
   }
 
-  async deleteDismissal(userId: number, bookIdA: number, bookIdB: number): Promise<number> {
+  async deleteDismissal(userId: number, kind: BookDuplicateKind, bookIdA: number, bookIdB: number): Promise<number> {
     const result = await this.db
       .delete(bookDuplicateDismissals)
       .where(
-        and(eq(bookDuplicateDismissals.userId, userId), eq(bookDuplicateDismissals.bookIdA, bookIdA), eq(bookDuplicateDismissals.bookIdB, bookIdB)),
+        and(
+          eq(bookDuplicateDismissals.userId, userId),
+          eq(bookDuplicateDismissals.kind, kind),
+          eq(bookDuplicateDismissals.bookIdA, bookIdA),
+          eq(bookDuplicateDismissals.bookIdB, bookIdB),
+        ),
       );
     return result.rowCount ?? 0;
   }
@@ -591,11 +775,12 @@ export class BookDuplicatesRepository {
   async listDismissals(
     userId: number,
     limit: number,
-  ): Promise<{ bookIdA: number; bookIdB: number; titleA: string | null; titleB: string | null; createdAt: Date }[]> {
+  ): Promise<{ kind: string; bookIdA: number; bookIdB: number; titleA: string | null; titleB: string | null; createdAt: Date }[]> {
     const metadataA = alias(bookMetadata, 'metadata_a');
     const metadataB = alias(bookMetadata, 'metadata_b');
     return this.db
       .select({
+        kind: bookDuplicateDismissals.kind,
         bookIdA: bookDuplicateDismissals.bookIdA,
         bookIdB: bookDuplicateDismissals.bookIdB,
         titleA: metadataA.title,
@@ -681,7 +866,8 @@ export class BookDuplicatesRepository {
         ), '[]'::jsonb) AS collections,
         ${books.addedAt} AS added_at,
         ${books.updatedAt} AS updated_at,
-        (${bookMetadata.coverSource} IS NOT NULL) AS has_cover
+        (${bookMetadata.coverSource} IS NOT NULL) AS has_cover,
+        (library.organization_mode = 'book_per_file') AS book_per_file
       FROM ${bookDuplicateGroupMembers} member
       JOIN ${books} ON ${books.id} = member.book_id
       JOIN libraries library ON library.id = ${books.libraryId}

@@ -1,0 +1,1 @@
+ALTER TABLE "smart_scopes" ADD COLUMN "cover_aspect_ratio" varchar(10) DEFAULT '2/3' NOT NULL;

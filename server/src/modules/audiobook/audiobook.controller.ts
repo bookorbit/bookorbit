@@ -20,6 +20,7 @@ import { basename } from 'node:path';
 import type { FastifyReply } from 'fastify';
 
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import type { RequestUser } from '../../common/types/request-user';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { AudiobookService } from './audiobook.service';
@@ -40,11 +41,13 @@ const AUDIO_MIME_TYPES: Record<string, string> = {
 export class AudiobookController {
   constructor(private readonly service: AudiobookService) {}
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/manifest')
   getManifest(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
     return this.service.getManifest(bookId, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/assets/:assetId/content')
   async serveAsset(
     @Param('bookId', ParseIntPipe) bookId: number,
@@ -81,11 +84,13 @@ export class AudiobookController {
     reply.send(createReadStream(asset.absolutePath));
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/playback-state')
   getPlaybackState(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
     return this.service.getPlaybackState(bookId, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Put(':bookId/playback-state')
   putPlaybackState(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: PutAudiobookPlaybackStateDto, @CurrentUser() user: RequestUser) {
     return this.service.putPlaybackState(bookId, dto, user);
@@ -97,16 +102,19 @@ export class AudiobookController {
     return this.service.deletePlaybackState(bookId, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/bookmarks')
   listBookmarks(@Param('bookId', ParseIntPipe) bookId: number, @CurrentUser() user: RequestUser) {
     return this.service.listBookmarks(bookId, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Post(':bookId/bookmarks')
   createBookmark(@Param('bookId', ParseIntPipe) bookId: number, @Body() dto: CreateAudiobookBookmarkDto, @CurrentUser() user: RequestUser) {
     return this.service.createBookmark(bookId, dto, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Patch(':bookId/bookmarks/:bookmarkId')
   updateBookmark(
     @Param('bookId', ParseIntPipe) bookId: number,
@@ -117,6 +125,7 @@ export class AudiobookController {
     return this.service.updateBookmark(bookId, bookmarkId, dto, user);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Delete(':bookId/bookmarks/:bookmarkId')
   @HttpCode(HttpStatus.NO_CONTENT)
   deleteBookmark(

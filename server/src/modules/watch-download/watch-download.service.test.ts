@@ -123,6 +123,17 @@ describe('WatchDownloadService', () => {
     await expect(service.authorize(undefined, undefined, 21)).rejects.toBeInstanceOf(UnauthorizedException);
   });
 
+  it('lets a ticket minted before its book was merged fetch the cover of the book it was merged into', async () => {
+    const { jwt, auth, book, epub, user } = makeService();
+    const bookAlias = { resolveOne: vi.fn((id: number) => Promise.resolve(id === 10 ? 40 : null)) };
+    const service = new WatchDownloadService(jwt as never, auth as never, book as never, new PermissionService(), epub as never, bookAlias as never);
+
+    await expect(service.authorize('Bearer ticket', 10)).resolves.toEqual(user);
+    expect(bookAlias.resolveOne).not.toHaveBeenCalled();
+    await expect(service.authorize('Bearer ticket', 40)).resolves.toEqual(user);
+    await expect(service.authorize('Bearer ticket', 41)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
   it('issues a media-overlay ticket addressing resources by ticket index', async () => {
     const { service, jwt, user } = makeEpubService();
     const response = await service.issueMediaOverlay(10, 31, ['OEBPS/audio/ch1.mp3', 'OEBPS/audio/ch2.mp3'], user);

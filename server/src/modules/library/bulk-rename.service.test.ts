@@ -1,4 +1,5 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
 import { BulkRenameService } from './bulk-rename.service';
 import type { BulkRenameBookData } from '../file-write/bulk-rename.repository';
 import type { FileRenameResult } from '@bookorbit/types';
@@ -81,6 +82,7 @@ function renameEvents(events: any[]): any[] {
 
 describe('BulkRenameService', () => {
   let service: BulkRenameService;
+  let libraryGate: LibraryOperationGate;
 
   const bulkRenameRepo = {
     findAllBooksForLibrary: vi.fn(),
@@ -124,6 +126,7 @@ describe('BulkRenameService', () => {
     fileRenameRepo.findFolderOwners.mockResolvedValue(new Map());
     fileWatcherService.pauseWatcher.mockReturnValue(true);
 
+    libraryGate = new LibraryOperationGate();
     service = new BulkRenameService(
       bulkRenameRepo as any,
       fileRenameRepo as any,
@@ -131,6 +134,7 @@ describe('BulkRenameService', () => {
       appSettings as any,
       notificationService as any,
       fileWatcherService as any,
+      libraryGate,
     );
   });
 
@@ -1163,6 +1167,17 @@ describe('BulkRenameService', () => {
       // A preparation failure used to strand the lock, wedging the library as "already running".
       expect(service.isRunning(1)).toBe(false);
       expect(fileWatcherService.pauseWatcher).not.toHaveBeenCalled();
+    });
+
+    it('refuses with a conflict while a scan, move or merge holds the library', async () => {
+      bulkRenameRepo.findLibrarySettings.mockResolvedValue(noWatchSettings);
+      const release = libraryGate.tryAcquire(1, 'book_merge')!;
+
+      await expect(service.execute(1, 42, { onProgress: () => {}, isCancelled: () => false })).rejects.toThrow(ConflictException);
+      expect(bulkRenameRepo.findAllBooksForLibrary).not.toHaveBeenCalled();
+      expect(libraryGate.current(1)).toBe('book_merge');
+
+      release();
     });
 
     it('releases the lock when pausing the watcher fails', async () => {

@@ -9,6 +9,7 @@ import {
 } from '@bookorbit/types'
 import type { AddedAtSource, CoverAspectRatio, Library, LibraryStats, OrganizationMode, PrescanResult } from '@bookorbit/types'
 import { i18n } from '@/i18n'
+import { isAtOrInside } from './folder-picker/folder-picker-rules'
 
 export { DEFAULT_FORMAT_PRIORITY }
 
@@ -80,6 +81,8 @@ export function useLibraryCreator() {
   const storedAddedAtSource = ref<AddedAtSource | null>(null)
   /** The path rules the server has, which is what applying them to existing books uses. */
   const storedRegexMetadata = ref<Library['regexMetadata']>(null)
+  /** The folders the edited library already reads. The server only refuses overlaps among folders a save adds. */
+  const originalFolders = ref<string[]>([])
   const latestCheck = new Map<string, number>()
   let checkSequence = 0
 
@@ -88,6 +91,10 @@ export function useLibraryCreator() {
     if (!form.name.trim()) errors.details = t('library.creator.errors.nameRequired')
     else if (!form.icon?.trim()) errors.details = t('library.creator.errors.iconRequired')
     if (form.folders.length === 0) errors.folders = t('library.creator.errors.folderRequired')
+    else {
+      const overlap = folderOverlapError()
+      if (overlap) errors.folders = overlap
+    }
     if (form.autoScanCronExpression && !isFiveFieldCronExpression(form.autoScanCronExpression)) {
       errors.schedule = t('library.creator.errors.cronInvalid')
     }
@@ -114,7 +121,24 @@ export function useLibraryCreator() {
     return errors
   })
 
+  function folderOverlapError(): string | null {
+    const original = new Set(originalFolders.value)
+    // Compared as the save sends them: trimmed, each once.
+    const folders = [...new Set(form.folders.map((path) => path.trim()))]
+    for (const folder of folders) {
+      if (original.has(folder)) continue
+      const check = folderChecks.value[folder]
+      if (check?.state === 'checked' && check.overlapLibrary) {
+        return i18n.global.t('library.creator.errors.folderOverlap', { folder, library: check.overlapLibrary })
+      }
+      const other = folders.find((path) => path !== folder && (isAtOrInside(path, folder) || isAtOrInside(folder, path)))
+      if (other) return i18n.global.t('library.creator.errors.folderNested', { folder, other })
+    }
+    return null
+  }
+
   function initCreate() {
+    originalFolders.value = []
     storedAddedAtSource.value = null
     storedRegexMetadata.value = null
     Object.assign(form, blankForm())
@@ -127,6 +151,7 @@ export function useLibraryCreator() {
 
   function initEdit(library: Library) {
     applyLibrary(library)
+    originalFolders.value = [...form.folders]
     mode.value = 'edit'
     editingLibraryId.value = library.id
     folderChecks.value = {}
@@ -303,7 +328,14 @@ export function useLibraryCreator() {
 
 async function responseError(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => null)
+  if (body?.errorCode === 'LIBRARY_FOLDER_OVERLAP') return folderOverlapMessage(body.errorMeta ?? {})
   const message = body?.message
   if (Array.isArray(message)) return message.find((entry): entry is string => typeof entry === 'string') ?? fallback
   return typeof message === 'string' && message.trim() ? message : fallback
+}
+
+function folderOverlapMessage(meta: { path?: unknown; overlapPath?: unknown; overlapLibrary?: unknown }): string {
+  const folder = typeof meta.path === 'string' ? meta.path : ''
+  if (typeof meta.overlapLibrary === 'string') return i18n.global.t('library.creator.errors.folderOverlap', { folder, library: meta.overlapLibrary })
+  return i18n.global.t('library.creator.errors.folderNested', { folder, other: typeof meta.overlapPath === 'string' ? meta.overlapPath : '' })
 }

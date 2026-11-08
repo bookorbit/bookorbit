@@ -2,10 +2,11 @@
 import { computed, inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useElementSize, useWindowSize, watchDebounced } from '@vueuse/core'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import type { BookCard, CoverAspectRatio, JumpBucketKind } from '@bookorbit/types'
+import type { BookCard, ConcreteBookMediaKind, CoverAspectRatio, JumpBucketKind } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 import BookCoverSkeleton from './BookCoverSkeleton.vue'
 import CollapsedSeriesCard from './CollapsedSeriesCard.vue'
+import { cardMediaView } from '../lib/card-media'
 import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO } from '../lib/cover-aspect-ratio'
 import { isBookPlaceholder, type BookSlot } from '../composables/useBookWindow'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
@@ -25,6 +26,8 @@ const props = withDefaults(
     railGutter?: boolean
     railGutterKind?: JumpBucketKind | null
     allowMoveToLibrary?: boolean
+    /** Draws every card as this medium when the book has it, such as in a series' Audiobooks group. */
+    mediaKind?: ConcreteBookMediaKind | null
   }>(),
   {
     selectionMode: false,
@@ -34,6 +37,7 @@ const props = withDefaults(
     squareCoverScale: 1,
     railGutter: false,
     railGutterKind: null,
+    mediaKind: null,
   },
 )
 
@@ -153,13 +157,13 @@ function asBook(slot: BookSlot): BookCard {
 }
 
 function staticItemStyle(book: BookCard): { width: string; maxWidth: string } {
-  const scale = book.coverAspectRatio === '1/1' ? squareCoverScale.value : 1
+  const scale = staticCoverAspectRatio(book) === '1/1' ? squareCoverScale.value : 1
   const width = Math.max(1, Math.round(coverPx.value * scale))
   return { width: `${width}px`, maxWidth: '100%' }
 }
 
 function staticCoverAspectRatio(book: BookCard): CoverAspectRatio {
-  return book.coverAspectRatio ?? coverAspectRatio.value
+  return cardMediaView(book, props.mediaKind)?.coverAspectRatio ?? book.coverAspectRatio ?? coverAspectRatio.value
 }
 
 function handleScrollerUpdate(startIndex: number, endIndex: number) {
@@ -286,6 +290,7 @@ defineExpose({ scrollToIndex })
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
           :allow-move-to-library="allowMoveToLibrary"
+          :media-kind="mediaKind"
           @action="emit('action', book, $event)"
           @select="emit('select', book.id, $event)"
           @update:book="emit('update:book', $event)"
@@ -303,6 +308,7 @@ defineExpose({ scrollToIndex })
           :selection-mode="selectionMode"
           :selected="isSelected?.(book.id) ?? false"
           :allow-move-to-library="allowMoveToLibrary"
+          :media-kind="mediaKind"
           @action="emit('action', book, $event)"
           @select="emit('select', book.id, $event)"
           @update:book="emit('update:book', $event)"
@@ -344,6 +350,7 @@ defineExpose({ scrollToIndex })
             :selection-mode="selectionMode"
             :selected="isSelected?.(item.id) ?? false"
             :allow-move-to-library="allowMoveToLibrary"
+            :media-kind="mediaKind"
             @action="emit('action', asBook(item), $event)"
             @select="emit('select', item.id, $event)"
             @update:book="emit('update:book', $event)"

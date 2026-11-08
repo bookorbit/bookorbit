@@ -215,6 +215,11 @@ const credentialLabel = computed(() => t(`settings.system.requests.fields.${uses
 const credentialBrief = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyBrief' : 'passwordBrief'}`))
 const credentialKeep = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyKeep' : 'passwordKeep'}`))
 const credentialWillClear = computed(() => t(`settings.system.requests.fields.${usesApiKey.value ? 'apiKeyWillClear' : 'passwordWillClear'}`))
+// rTorrent is the one client whose address is an endpoint rather than a web UI, and pasting the
+// ruTorrent page instead is the mistake its connection test exists to catch.
+const isRtorrent = computed(() => draft.value?.adapterType === 'rtorrent')
+const baseUrlPlaceholder = computed(() => (isRtorrent.value ? 'http://localhost:8000/RPC2' : 'http://localhost:8080'))
+const baseUrlBrief = computed(() => (isRtorrent.value ? t('settings.system.requests.fields.baseUrlRtorrentBrief') : undefined))
 
 // Watched rather than reset in the picker's handler: the create form changes the type through its
 // own select, and a username left behind there is saved, hidden by the form it was saved from, and
@@ -706,14 +711,20 @@ async function confirmOrphanRemoval() {
             </SettingsField>
           </div>
 
-          <SettingsField :label="t('settings.system.requests.fields.baseUrl')" input-id="download-client-url" required :error="fieldErrors.baseUrl">
+          <SettingsField
+            :label="t('settings.system.requests.fields.baseUrl')"
+            input-id="download-client-url"
+            required
+            :brief="baseUrlBrief"
+            :error="fieldErrors.baseUrl"
+          >
             <template #default="{ describedBy, invalid }">
               <input
                 id="download-client-url"
                 v-model="draft.baseUrl"
                 type="url"
                 class="settings-control font-mono text-[13px]"
-                placeholder="http://localhost:8080"
+                :placeholder="baseUrlPlaceholder"
                 :aria-describedby="describedBy"
                 :aria-invalid="invalid || undefined"
                 @input="handleBaseUrlInput"

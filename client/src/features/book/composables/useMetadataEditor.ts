@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, readonly, ref } from 'vue'
 import { api } from '@/lib/api'
 import { readApiErrorDetail } from '@/lib/api-error'
 import {
@@ -373,5 +373,5 @@ export function useMetadataEditor() {
     }
   }
 
-  return { form, saving, error, isDirty, load, syncFromBook, reset, save }
+  return { form, saving, error, isDirty, includeAudioMetadata: readonly(includeAudioMetadata), load, syncFromBook, reset, save }
 }

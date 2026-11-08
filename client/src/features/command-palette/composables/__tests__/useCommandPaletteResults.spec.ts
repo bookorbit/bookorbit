@@ -87,6 +87,7 @@ vi.mock('@/features/book/composables/useGlobalSearch', async () => {
     useGlobalSearch: () => ({
       results: mocks.books,
       total: mocks.bookTotal,
+      bookTotal: mocks.bookTotal,
       loading: vueRef(false),
       loadingMore: vueRef(false),
       settled: vueRef(true),

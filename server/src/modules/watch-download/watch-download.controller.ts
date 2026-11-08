@@ -8,8 +8,10 @@ import type { FastifyReply } from 'fastify';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
+import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
+import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { BookService } from '../book/book.service';
 import { EpubService } from '../reader/epub/epub.service';
 import { CreateWatchDownloadDto } from './dto/create-watch-download.dto';
@@ -33,13 +35,17 @@ export class WatchDownloadController {
     private readonly epubService: EpubService,
   ) {}
 
+  @ResolvesMergedBook({ body: ['bookId'] })
   @Post()
+  @RequireAppAttest()
   @RequirePermission(Permission.LibraryDownload)
   create(@Body() dto: CreateWatchDownloadDto, @CurrentUser() user: RequestUser) {
     return this.watchDownloads.issue(dto.bookId, dto.fileIds, user);
   }
 
+  @ResolvesMergedBook({ body: ['bookId'] })
   @Post('media-overlay')
+  @RequireAppAttest()
   @RequirePermission(Permission.LibraryDownload)
   createMediaOverlay(@Body() dto: CreateWatchMediaOverlayDownloadDto, @CurrentUser() user: RequestUser) {
     return this.watchDownloads.issueMediaOverlay(dto.bookId, dto.fileId, dto.hrefs, user);
@@ -86,6 +92,7 @@ export class WatchDownloadController {
     this.sendRange(file.path, file.size, AUDIO_MIME_TYPES[file.format.toLowerCase()] ?? 'application/octet-stream', rangeHeader, reply);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get('books/:bookId/cover')
   @Public()
   async downloadCover(

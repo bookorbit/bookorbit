@@ -398,6 +398,11 @@ export type BookQuery = {
   sort: SortSpec[];
   pagination: { page: number; size: number };
   collapseSeries?: boolean;
+  /**
+   * Fold linked books into one card per group (the lead, else a stable representative). Released
+   * clients never send it, so their lists keep every book.
+   */
+  collapseLinked?: boolean;
   q?: string;
   /**
    * Shuffle seed for the `random` sort field. Every page of one listing must send the same

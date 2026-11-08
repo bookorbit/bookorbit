@@ -470,7 +470,7 @@ describe('Auth session security (e2e)', () => {
       expect(response.statusCode).toBe(401);
     });
 
-    it('rejects refresh with expired token and clears the refresh cookie', async () => {
+    it('rejects refresh with expired token and clears the session cookies', async () => {
       const credentials = await createLocalUser(context.db);
       const loginResult = await login(context.app, credentials.username, credentials.password);
       const tokenRow = await findRefreshTokenByRawToken(context.db, loginResult.refreshToken);
@@ -492,7 +492,7 @@ describe('Auth session security (e2e)', () => {
       expect(response.statusCode).toBe(401);
       const responseCookies = getSetCookieLines(response.headers);
       expect(cookieValue(responseCookies, 'refresh_token')).toBe('');
-      expect(cookieValue(responseCookies, 'access_token')).toBeNull();
+      expect(cookieValue(responseCookies, 'access_token')).toBe('');
     });
 
     it('rejects refresh for disabled users and clears both auth cookies', async () => {
@@ -594,7 +594,7 @@ describe('Auth session security (e2e)', () => {
       expect(replayAccessToken).toEqual(expect.any(String));
 
       const reuseCookies = getSetCookieLines(reuseResponse.headers);
-      expect(cookieValue(reuseCookies, 'refresh_token')).toBeNull();
+      expect(cookieValue(reuseCookies, 'refresh_token')).toEqual(expect.any(String));
       expect(cookieValue(reuseCookies, 'access_token')).toEqual(expect.any(String));
 
       expect(await activeSessionCount(context.db, credentials.userId)).toBe(1);
@@ -819,11 +819,11 @@ describe('Auth session security (e2e)', () => {
 
       expect(sessionsResponse.statusCode).toBe(200);
       const sessions = sessionsResponse.json() as Array<{ id: number }>;
-      expect(sessions.map((session) => session.id)).toEqual(expect.arrayContaining([sessionARow!.id, sessionBRow!.id]));
+      expect(sessions.map((session) => session.id)).toEqual(expect.arrayContaining([sessionARow!.sessionId, sessionBRow!.sessionId]));
 
       const revokeResponse = await context.app.inject({
         method: 'DELETE',
-        url: `/api/v1/auth/sessions/${sessionARow!.id}`,
+        url: `/api/v1/auth/sessions/${sessionARow!.sessionId}`,
         headers: {
           authorization: `Bearer ${sessionB.accessToken}`,
         },
@@ -839,14 +839,14 @@ describe('Auth session security (e2e)', () => {
       });
       expect(sessionsAfterRevoke.statusCode).toBe(200);
       const activeSessionIds = (sessionsAfterRevoke.json() as Array<{ id: number }>).map((session) => session.id);
-      expect(activeSessionIds).toContain(sessionBRow!.id);
-      expect(activeSessionIds).not.toContain(sessionARow!.id);
+      expect(activeSessionIds).toContain(sessionBRow!.sessionId);
+      expect(activeSessionIds).not.toContain(sessionARow!.sessionId);
 
       const otherUser = await createLocalUser(context.db, { password: 'OtherPass123' });
       const otherSession = await login(context.app, otherUser.username, otherUser.password);
       const forbiddenResponse = await context.app.inject({
         method: 'DELETE',
-        url: `/api/v1/auth/sessions/${sessionBRow!.id}`,
+        url: `/api/v1/auth/sessions/${sessionBRow!.sessionId}`,
         headers: {
           authorization: `Bearer ${otherSession.accessToken}`,
         },

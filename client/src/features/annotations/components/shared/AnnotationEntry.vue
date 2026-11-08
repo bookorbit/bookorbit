@@ -79,8 +79,10 @@ const needsReview = computed(() => props.annotation.positionStatus != null && pr
 const styleIcon = computed(() => STYLE_ICONS[props.annotation.style as keyof typeof STYLE_ICONS] ?? Highlighter)
 const bookLink = computed(() => ({ name: 'book-detail', params: { bookId: props.annotation.bookId }, query: { tab: 'highlights' } }))
 
+const quoteSizeClass = computed(() => (props.compact ? 'text-sm leading-relaxed' : 'text-base leading-[1.6]'))
+
 const quoteClass = computed(() => {
-  const base = props.compact ? 'text-sm leading-relaxed' : 'text-base leading-[1.6]'
+  const base = quoteSizeClass.value
   if (props.annotation.style === 'underline') return `${base} underline decoration-[1.5px] underline-offset-[3px]`
   if (props.annotation.style === 'strikethrough') return `${base} line-through decoration-[1.5px]`
   return base
@@ -155,7 +157,8 @@ function handlePurge() {
 
     <!-- WHAT -->
     <div class="col-start-3 min-w-0" :class="stacked ? 'row-start-2' : 'row-start-1'">
-      <p class="whitespace-pre-line text-foreground" :class="quoteClass">{{ annotation.text }}</p>
+      <p v-if="annotation.text" class="whitespace-pre-line text-foreground" :class="quoteClass">{{ annotation.text }}</p>
+      <p v-else class="italic text-muted-foreground" :class="quoteSizeClass">{{ t('annotations.textUnavailable') }}</p>
       <div v-if="annotation.note" class="mt-2 border-l-2 border-primary pl-2.5">
         <span class="mb-0.5 block text-[8.5px] font-bold uppercase tracking-[0.13em] text-primary">{{ t('annotations.hub.noteLabel') }}</span>
         <p class="text-[11.5px] leading-relaxed text-foreground">{{ annotation.note }}</p>

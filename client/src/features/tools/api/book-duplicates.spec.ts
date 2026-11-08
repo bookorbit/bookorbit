@@ -2,10 +2,12 @@ import { api } from '@/lib/api'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createBookDuplicateScan,
-  deleteDuplicateBooks,
   getActiveBookDuplicateScan,
   getBookDuplicateGroups,
+  getBookDuplicateResolution,
   getBookDuplicateScan,
+  restoreBookDuplicateDismissal,
+  startBookDuplicateResolution,
 } from './book-duplicates'
 
 vi.mock('@/lib/api', () => ({ api: vi.fn<(...args: unknown[]) => unknown>() }))
@@ -34,22 +36,50 @@ describe('book duplicate API', () => {
     expect(api).toHaveBeenNthCalledWith(3, '/api/v1/book-duplicates/scans/active')
   })
 
-  it('encodes bounded result filters and deletes selected books through the existing bulk route', async () => {
+  it('encodes bounded result filters and sends the kind only for the other-format list', async () => {
     vi.mocked(api)
       .mockResolvedValueOnce(new Response(JSON.stringify({ groups: [] }), { status: 200 }))
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ groups: [] }), { status: 200 }))
 
-    await getBookDuplicateGroups(7, { page: 2, pageSize: 10, reason: 'isbn' })
-    await deleteDuplicateBooks([3, 4])
+    await getBookDuplicateGroups(7, { page: 2, pageSize: 10, reason: 'isbn', kind: 'duplicate' })
+    await getBookDuplicateGroups(7, { page: 1, pageSize: 10, kind: 'other_format' })
 
     expect(api).toHaveBeenNthCalledWith(1, '/api/v1/book-duplicates/scans/7/groups?page=2&pageSize=10&reason=isbn')
-    expect(api).toHaveBeenNthCalledWith(2, '/api/v1/books', expect.objectContaining({ method: 'DELETE', body: JSON.stringify({ bookIds: [3, 4] }) }))
+    expect(api).toHaveBeenNthCalledWith(2, '/api/v1/book-duplicates/scans/7/groups?page=1&pageSize=10&kind=other_format')
+  })
+
+  it('restores a dismissal without a kind unless it is an other-format pair', async () => {
+    vi.mocked(api).mockResolvedValue(new Response(null, { status: 204 }))
+
+    await restoreBookDuplicateDismissal(3, 4)
+    await restoreBookDuplicateDismissal(3, 4, 'other_format')
+
+    expect(api).toHaveBeenNthCalledWith(1, '/api/v1/book-duplicates/dismissals/3/4', { method: 'DELETE' })
+    expect(api).toHaveBeenNthCalledWith(2, '/api/v1/book-duplicates/dismissals/3/4?kind=other_format', { method: 'DELETE' })
+  })
+
+  it('starts a resolution and reads it back by job id', async () => {
+    vi.mocked(api)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ jobId: 5, total: 1 }), { status: 201 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: 5, status: 'running' }), { status: 200 }))
+    const request = { scanId: 7, groups: [{ groupId: 1, keeperId: 3, action: 'merge' as const }] }
+
+    await expect(startBookDuplicateResolution(request)).resolves.toEqual({ jobId: 5, total: 1 })
+    await getBookDuplicateResolution(5)
+
+    expect(api).toHaveBeenNthCalledWith(
+      1,
+      '/api/v1/book-duplicates/resolutions',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify(request) }),
+    )
+    expect(api).toHaveBeenNthCalledWith(2, '/api/v1/book-duplicates/resolutions/5')
   })
 
   it('rejects unsuccessful API responses', async () => {
     vi.mocked(api).mockResolvedValue(new Response(null, { status: 500 }))
 
     await expect(getBookDuplicateScan(7)).rejects.toThrow('duplicate_scan_status_failed')
-    await expect(deleteDuplicateBooks([3])).rejects.toThrow('duplicate_delete_failed')
+    await expect(restoreBookDuplicateDismissal(3, 4)).rejects.toThrow('duplicate_restore_failed')
+    await expect(startBookDuplicateResolution({ scanId: 7 })).rejects.toThrow('Could not start resolving the selected groups.')
   })
 })
