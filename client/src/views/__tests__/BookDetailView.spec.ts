@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, nextTick, reactive, ref, type PropType } from 'vue'
 import { mount } from '@vue/test-utils'
-import type { BookDetail, BookProgressChangedEvent } from '@bookorbit/types'
+import type { BookDetail, BookLinksChangedEvent, BookMergedEvent, BookProgressChangedEvent } from '@bookorbit/types'
 import BookDetailView from '../BookDetailView.vue'
 
 const mockState = vi.hoisted(() => ({
@@ -9,9 +9,14 @@ const mockState = vi.hoisted(() => ({
   detail: null as unknown as { value: BookDetail | null },
   loading: null as unknown as { value: boolean },
   notFound: null as unknown as { value: boolean },
+  mergedInto: null as unknown as { value: number | null },
   libraries: null as unknown as { value: { id: number; accessLevel: string }[] },
   fetch: vi.fn<(bookId: number) => void>(),
   progressChangedCallback: null as ((event: BookProgressChangedEvent) => void) | null,
+  mergedCallback: null as ((event: BookMergedEvent) => void) | null,
+  linksChangedCallback: null as ((event: BookLinksChangedEvent) => void) | null,
+  replace: vi.fn<(location: unknown) => Promise<void>>(),
+  toastInfo: vi.fn<(message: string) => void>(),
 }))
 
 vi.mock('vue-router', async (importOriginal) => {
@@ -19,6 +24,7 @@ vi.mock('vue-router', async (importOriginal) => {
   return {
     ...actual,
     useRoute: () => mockState.route,
+    useRouter: () => ({ replace: mockState.replace }),
   }
 })
 
@@ -27,6 +33,7 @@ vi.mock('@/features/book/composables/useBookDetail', () => ({
     detail: mockState.detail,
     loading: mockState.loading,
     notFound: mockState.notFound,
+    mergedInto: mockState.mergedInto,
     fetch: mockState.fetch,
   }),
 }))
@@ -41,7 +48,19 @@ vi.mock('@/features/book/composables/useBookEvents', () => ({
       mockState.progressChangedCallback = callback
       return () => undefined
     },
+    onBookMerged: (callback: (event: BookMergedEvent) => void) => {
+      mockState.mergedCallback = callback
+      return () => undefined
+    },
+    onBookLinksChanged: (callback: (event: BookLinksChangedEvent) => void) => {
+      mockState.linksChangedCallback = callback
+      return () => undefined
+    },
   }),
+}))
+
+vi.mock('vue-sonner', () => ({
+  toast: { info: mockState.toastInfo, success: vi.fn<() => void>(), warning: vi.fn<() => void>(), error: vi.fn<() => void>() },
 }))
 
 vi.mock('@/features/scanner/composables/useScanProgress', () => ({
@@ -130,17 +149,21 @@ const DetailsTabStub = defineComponent({
       required: true,
     },
   },
-  emits: ['saved'],
+  emits: ['saved', 'links-changed'],
   setup(props, { emit }) {
     function emitSaved() {
       emit('saved', { ...props.book, rating: 4 })
     }
-    return { emitSaved }
+    function emitLinksChanged() {
+      emit('links-changed')
+    }
+    return { emitSaved, emitLinksChanged }
   },
   template: `
     <div>
       <div data-test="details-rating">{{ book.rating }}</div>
       <button data-test="details-save" @click="emitSaved">save</button>
+      <button data-test="details-links-changed" @click="emitLinksChanged">links</button>
     </div>
   `,
 })
@@ -166,8 +189,14 @@ describe('BookDetailView', () => {
     mockState.detail = ref(makeBook())
     mockState.loading = ref(false)
     mockState.notFound = ref(false)
+    mockState.mergedInto = ref(null)
     mockState.fetch.mockReset()
     mockState.progressChangedCallback = null
+    mockState.mergedCallback = null
+    mockState.linksChangedCallback = null
+    mockState.replace.mockReset()
+    mockState.replace.mockResolvedValue(undefined)
+    mockState.toastInfo.mockReset()
   })
 
   it('hides the editor for a viewer even when the URL explicitly selects edit', async () => {
@@ -278,6 +307,79 @@ describe('BookDetailView', () => {
     expect(mockState.fetch).not.toHaveBeenCalled()
 
     mockState.progressChangedCallback?.({ bookId: 217, progress: 61.02, source: 'koreader' })
+    expect(mockState.fetch).toHaveBeenCalledExactlyOnceWith(217)
+  })
+  const defaultStubs = {
+    BookDetailLayout: { template: '<div><slot /></div>' },
+    DetailsTab: DetailsTabStub,
+    EditMetadataTab: EditMetadataTabStub,
+    FilesTab: { template: '<div />' },
+  }
+
+  it('replaces the URL with the kept book when the open id was merged away', async () => {
+    mockState.route.query = { tab: 'files' }
+    mount(BookDetailView, { global: { stubs: defaultStubs } })
+
+    mockState.mergedInto.value = 512
+    await nextTick()
+
+    expect(mockState.replace).toHaveBeenCalledExactlyOnceWith({ name: 'book-detail', params: { bookId: 512 }, query: { tab: 'files' } })
+    expect(mockState.toastInfo).toHaveBeenCalledOnce()
+  })
+
+  it('follows a merge event that retires the open book and refetches when it is the kept book', async () => {
+    mount(BookDetailView, { global: { stubs: defaultStubs } })
+    mockState.fetch.mockClear()
+    const event: BookMergedEvent = { libraryId: 1, targetBookId: 300, sourceBookIds: [217, 218] }
+
+    mockState.mergedCallback?.(event)
+    mockState.mergedCallback?.(event)
+    expect(mockState.replace).toHaveBeenCalledOnce()
+    expect(mockState.replace).toHaveBeenCalledWith(expect.objectContaining({ params: { bookId: 300 } }))
+
+    mockState.mergedCallback?.({ libraryId: 1, targetBookId: 217, sourceBookIds: [5] })
+    expect(mockState.fetch).toHaveBeenCalledExactlyOnceWith(217)
+
+    mockState.mergedCallback?.({ libraryId: 1, targetBookId: 9, sourceBookIds: [10] })
+    expect(mockState.fetch).toHaveBeenCalledOnce()
+    expect(mockState.replace).toHaveBeenCalledOnce()
+  })
+
+  it('refetches when a link change names the open book or a book linked with it', () => {
+    mockState.detail.value = makeBook({
+      linkGroupId: 4,
+      linkedBooks: [
+        {
+          bookId: 900,
+          libraryId: 2,
+          libraryName: 'Audiobooks',
+          title: 'Rating Test',
+          formats: ['m4b'],
+          mediaKind: 'audiobook',
+          status: 'present',
+          isLead: false,
+        },
+      ],
+    })
+    mount(BookDetailView, { global: { stubs: defaultStubs } })
+    mockState.fetch.mockClear()
+
+    mockState.linksChangedCallback?.({ libraryId: 3, bookIds: [40, 41] })
+    expect(mockState.fetch).not.toHaveBeenCalled()
+
+    mockState.linksChangedCallback?.({ libraryId: 2, bookIds: [900, 901] })
+    expect(mockState.fetch).toHaveBeenCalledExactlyOnceWith(217)
+
+    mockState.linksChangedCallback?.({ libraryId: 1, bookIds: [217, 55] })
+    expect(mockState.fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('refetches after the details tab links or unlinks the book', async () => {
+    const wrapper = mount(BookDetailView, { global: { stubs: defaultStubs } })
+    mockState.fetch.mockClear()
+
+    await wrapper.get('[data-test="details-links-changed"]').trigger('click')
+
     expect(mockState.fetch).toHaveBeenCalledExactlyOnceWith(217)
   })
 })

@@ -844,7 +844,7 @@ describe('KoboSyncController', () => {
       reply as never,
     );
 
-    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, entitlementId);
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, entitlementId, { followMerges: true });
     expect(readingStateService.upsertState).toHaveBeenCalledWith(8, 77, state, 1, 99, true, 77);
     expect(proxyService.forward).not.toHaveBeenCalled();
     expect(reply.send).toHaveBeenCalledWith(STATE_UPDATE_ACK);
@@ -890,7 +890,7 @@ describe('KoboSyncController', () => {
 
     await controller.getReadingState(ids, { id: 8 } as never, { deviceId: 77, deviceToken: 'dev77' } as never, req as never, reply as never);
 
-    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, ids);
+    expect(bookIdentityService.resolveBookIdByEntitlementId).toHaveBeenCalledWith(8, ids, { followMerges: true });
     expect(proxyService.forward).toHaveBeenCalledWith(req, reply, 'dev77');
     expect(readingStateService.getRawState).not.toHaveBeenCalled();
   });

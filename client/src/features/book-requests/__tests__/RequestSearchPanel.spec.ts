@@ -1,7 +1,13 @@
 import { mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MetadataProviderKey, Permission } from '@bookorbit/types'
-import type { BookRequestMediaKind, MetadataCandidate, MetadataProviderInfo, ResolvedRequestDestination } from '@bookorbit/types'
+import type {
+  BookRequestMediaKind,
+  BookRequestMetadataSource,
+  MetadataCandidate,
+  MetadataProviderInfo,
+  ResolvedRequestDestination,
+} from '@bookorbit/types'
 import type { Ref } from 'vue'
 import type { CandidateGroup } from '../composables/useCandidateGroups'
 
@@ -350,6 +356,39 @@ describe('RequestSearchPanel provider sources', () => {
         ],
       }),
     )
+  })
+
+  it('bounds metadata sources while retaining the selected record', async () => {
+    state.submit.mockResolvedValue(null)
+    const selected = state.groups.value[0]!.candidates[2]!
+    state.groups.value[0]!.candidates = [
+      ...Array.from({ length: 20 }, (_, index): MetadataCandidate => ({
+        provider: MetadataProviderKey.GOOGLE,
+        providerId: `google-${index + 1}`,
+        title: 'One Dark Window',
+      })),
+      selected,
+    ]
+    state.groups.value[0]!.recommendedIsbnChoice = {
+      isbn: '9781250301697',
+      candidate: selected,
+      providers: [MetadataProviderKey.COMICVINE],
+      languageRank: 1,
+      agreementCount: 1,
+      providerPriority: 1,
+      providerResultRank: 0,
+      yearDistance: 1,
+    }
+    const wrapper = await render()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Request')!
+      .trigger('click')
+
+    const payload = state.submit.mock.calls[0]![1] as { metadataSources: BookRequestMetadataSource[] }
+    expect(payload.metadataSources).toHaveLength(20)
+    expect(payload.metadataSources[0]).toMatchObject({ providerKey: MetadataProviderKey.COMICVINE, providerId: 'comicvine-1' })
   })
 
   it('sends the note and preferred formats selected in the request form', async () => {

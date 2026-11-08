@@ -10,5 +10,6 @@ import { ReadingHistoryService } from './reading-history.service';
   imports: [BookModule, ReadingAttemptEventsModule],
   controllers: [ReadingHistoryController],
   providers: [ReadingHistoryService, ReadingHistoryRepository],
+  exports: [ReadingHistoryService],
 })
 export class ReadingHistoryModule {}

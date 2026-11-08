@@ -17,6 +17,8 @@ import { mapAudibleProduct } from './audible.mapper';
 import { AudibleSearchResponse } from './audible.types';
 import { normalizeAudibleDomain } from './normalize-audible-domain';
 
+const AUDIBLE_RESPONSE_GROUPS = 'product_desc,product_extended_attrs,media,product_attrs,series,product_plan_details,category_ladders,rating';
+
 @Injectable()
 export class AudibleProvider implements IdentifiableProvider {
   readonly key = MetadataProviderKey.AUDIBLE;
@@ -28,7 +30,7 @@ export class AudibleProvider implements IdentifiableProvider {
   private readonly logger = new Logger(AudibleProvider.name);
 
   readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
-    version: 1,
+    version: 2,
     trustEmpty: true,
     context: async () => {
       const { enabled, domain } = (await this.providerConfig.getConfig()).audible;
@@ -51,7 +53,7 @@ export class AudibleProvider implements IdentifiableProvider {
     const url = new URL('/1.0/catalog/products', audibleApiOrigin(normalizedDomain));
     url.searchParams.set('num_results', '10');
     url.searchParams.set('keywords', query);
-    url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
+    url.searchParams.set('response_groups', AUDIBLE_RESPONSE_GROUPS);
     // Without it the catalog lists only the 500px image.
     url.searchParams.set('image_sizes', '500,1024');
     const requestUrl = url.toString();
@@ -93,7 +95,7 @@ export class AudibleProvider implements IdentifiableProvider {
     const normalizedDomain = normalizeAudibleDomain(domain);
 
     const url = new URL(`/1.0/catalog/products/${encodeURIComponent(providerId)}`, audibleApiOrigin(normalizedDomain));
-    url.searchParams.set('response_groups', 'product_desc,media,product_attrs,series,product_plan_details,category_ladders,rating');
+    url.searchParams.set('response_groups', AUDIBLE_RESPONSE_GROUPS);
     // Without it the catalog lists only the 500px image.
     url.searchParams.set('image_sizes', '500,1024');
     const requestUrl = url.toString();

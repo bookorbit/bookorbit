@@ -202,6 +202,39 @@ const structuralScenarios: StructuralScenario[] = [
     },
   },
   {
+    id: 'manual-partial-audiobook-tracks-move-to-new-folder',
+    trigger: 'manual',
+    libraries: [{ key: 'a', rootDir: 'lib-a', mode: 'book_per_folder' }],
+    entries: [
+      file('lib-a/Source One/keep-one.mp3'),
+      file('lib-a/Source One/move-one.mp3'),
+      file('lib-a/Source Two/keep-two.mp3'),
+      file('lib-a/Source Two/move-two.mp3'),
+    ],
+    operations: [
+      { type: 'move', from: 'lib-a/Source One/move-one.mp3', to: 'lib-a/Topic/from-one.mp3' },
+      { type: 'move', from: 'lib-a/Source Two/move-two.mp3', to: 'lib-a/Topic/from-two.mp3' },
+    ],
+    expected: {
+      a: {
+        statusByFolder: {
+          'Source One': 'present',
+          'Source Two': 'present',
+          Topic: 'present',
+        },
+        fileOwners: {
+          'Source One/keep-one.mp3': 'Source One',
+          'Source Two/keep-two.mp3': 'Source Two',
+          'Topic/from-one.mp3': 'Topic',
+          'Topic/from-two.mp3': 'Topic',
+        },
+        absentFilePaths: ['Source One/move-one.mp3', 'Source Two/move-two.mp3'],
+        presentCount: 3,
+        missingCount: 0,
+      },
+    },
+  },
+  {
     id: 'manual-cross-library-file-move',
     trigger: 'manual',
     libraries: [
@@ -1332,6 +1365,87 @@ const statefulScenarios: StatefulScenario[] = [
     },
   },
   {
+    id: 'stateful-partial-audiobook-move-carries-playback-state',
+    trigger: 'manual',
+    fixturePrefix: 'scanner-file-ops-stateful-partial-audio-',
+    fixtureEntries: [file('lib-a/Source/01-move.mp3'), file('lib-a/Source/02-keep.mp3')],
+    run: async (context, fixture) => {
+      const requestedRootA = join(fixture.rootPath, 'lib-a');
+      await mkdir(requestedRootA, { recursive: true });
+      const rootA = await realpath(requestedRootA);
+      const library = await seedLibrary(context.db, {
+        rootPath: rootA,
+        mode: 'book_per_folder',
+        watch: false,
+        name: `scanner-file-ops-stateful-partial-audio-${randomUUID()}`,
+      });
+
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const sourceBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Source'));
+      const [movedFile] = await context.db
+        .select()
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.absolutePath, join(rootA, 'Source', '01-move.mp3')))
+        .limit(1);
+      if (!movedFile) throw new Error('Expected moved track to be registered');
+
+      const [userId] = await createRegularUsers(context.db);
+      const capturedAt = new Date('2026-01-02T03:04:05.000Z');
+      await context.db.insert(schema.audiobookProgress).values({
+        userId,
+        bookId: sourceBook.id,
+        currentFileId: movedFile.id,
+        percentage: 42.5,
+        positionSeconds: 23.5,
+        capturedAt,
+      });
+      await context.db.insert(schema.readingSessions).values({
+        userId,
+        bookFileId: movedFile.id,
+        bookId: sourceBook.id,
+        sessionId: `partial-audio-${randomUUID()}`,
+        sessionType: 'listen',
+        startedAt: new Date('2026-01-02T02:00:00.000Z'),
+        endedAt: new Date('2026-01-02T02:05:00.000Z'),
+        durationSeconds: 300,
+        endProgress: 42.5,
+      });
+
+      await applyOperation(fixture.rootPath, {
+        type: 'move',
+        from: 'lib-a/Source/01-move.mp3',
+        to: 'lib-a/Topic/01-move.mp3',
+      });
+      await triggerAndWaitForLibraryScan(context, library.libraryId);
+
+      const sourceAfter = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Source'));
+      const destinationBook = await getBookByFolderPath(context.db, library.libraryId, join(rootA, 'Topic'));
+      expect(sourceAfter.id).toBe(sourceBook.id);
+      expect(destinationBook.id).not.toBe(sourceBook.id);
+
+      const [movedFileAfter] = await context.db.select().from(schema.bookFiles).where(eq(schema.bookFiles.id, movedFile.id)).limit(1);
+      expect(movedFileAfter).toMatchObject({
+        id: movedFile.id,
+        bookId: destinationBook.id,
+        absolutePath: join(rootA, 'Topic', '01-move.mp3'),
+      });
+
+      const progressRows = await context.db.select().from(schema.audiobookProgress).where(eq(schema.audiobookProgress.userId, userId));
+      expect(progressRows).toHaveLength(1);
+      expect(progressRows[0]).toMatchObject({
+        bookId: destinationBook.id,
+        currentFileId: movedFile.id,
+        positionSeconds: 23.5,
+        capturedAt,
+      });
+
+      const [historicalSession] = await context.db.select().from(schema.readingSessions).where(eq(schema.readingSessions.userId, userId)).limit(1);
+      expect(historicalSession).toMatchObject({ bookId: sourceBook.id, bookFileId: movedFile.id });
+      await assertNoIntegrityViolations(context.db);
+    },
+  },
+  {
     id: 'stateful-manual-cross-library-move-preserves-book-identity',
     trigger: 'manual',
     fixturePrefix: 'scanner-file-ops-stateful-cross-lib-manual-',
@@ -1589,5 +1703,200 @@ describe('Scanner file operations (e2e)', () => {
         SCENARIO_TIMEOUT_MS,
       );
     }
+  });
+
+  // Installs created before overlapping folders were refused can still have one library's folder
+  // inside another's. The innermost folder owns everything under it.
+  describe('nested library folders', () => {
+    async function withNestedLibraries(
+      run: (setup: { outerRoot: string; innerRoot: string; outerId: number; innerId: number; ctx: ScannerE2EContext }) => Promise<void>,
+      options: { seedInner?: boolean } = {},
+    ): Promise<void> {
+      if (!context) throw new Error('E2E context not initialized');
+      const ctx = context;
+      const fixture = await createFixtureTree([file('outer/Loose/loose.epub'), file('outer/inner/Dune/dune.epub')], 'scanner-file-ops-nested-');
+      try {
+        await resetScannerFileOpsState(ctx.db);
+        const outerRoot = await realpath(join(fixture.rootPath, 'outer'));
+        const innerRoot = join(outerRoot, 'inner');
+        const outer = await seedLibrary(ctx.db, { rootPath: outerRoot, mode: 'book_per_folder', name: `scanner-file-ops-outer-${randomUUID()}` });
+        const inner =
+          options.seedInner === false
+            ? null
+            : await seedLibrary(ctx.db, { rootPath: innerRoot, mode: 'book_per_folder', name: `scanner-file-ops-inner-${randomUUID()}` });
+        await run({
+          outerRoot,
+          innerRoot,
+          outerId: outer.libraryId,
+          innerId: inner?.libraryId ?? -1,
+          ctx,
+        });
+        await assertNoIntegrityViolations(ctx.db);
+      } finally {
+        await fixture.cleanup();
+      }
+    }
+
+    async function ownerLibraryOf(db: ScannerE2EContext['db'], absolutePath: string): Promise<number | null> {
+      const [row] = await db
+        .select({ libraryId: schema.books.libraryId })
+        .from(schema.bookFiles)
+        .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+        .where(eq(schema.bookFiles.absolutePath, absolutePath))
+        .limit(1);
+      return row?.libraryId ?? null;
+    }
+
+    it(
+      'keeps the books of a nested library in that library however often both are scanned',
+      async () => {
+        await withNestedLibraries(async ({ outerRoot, innerRoot, outerId, innerId, ctx }) => {
+          const dune = join(innerRoot, 'Dune', 'dune.epub');
+          const owners: Array<'outer' | 'inner' | null> = [];
+          for (const libraryId of [outerId, innerId, outerId, innerId, outerId]) {
+            await triggerAndWaitForLibraryScan(ctx, libraryId);
+            const owner = await ownerLibraryOf(ctx.db, dune);
+            owners.push(owner === outerId ? 'outer' : owner === innerId ? 'inner' : null);
+          }
+
+          expect(owners).toEqual([null, 'inner', 'inner', 'inner', 'inner']);
+          expect((await loadLibraryBookState(ctx.db, outerId)).map((book) => [book.folderPath, book.status])).toEqual([
+            [join(outerRoot, 'Loose'), 'present'],
+          ]);
+          expect((await loadLibraryBookState(ctx.db, innerId)).map((book) => [book.folderPath, book.status])).toEqual([
+            [join(innerRoot, 'Dune'), 'present'],
+          ]);
+        });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'hands a book the outer library already had to the library inside it, with its reader data',
+      async () => {
+        await withNestedLibraries(
+          async ({ outerRoot, innerRoot, outerId, ctx }) => {
+            await triggerAndWaitForLibraryScan(ctx, outerId);
+            const before = await getBookByFolderPath(ctx.db, outerId, join(innerRoot, 'Dune'));
+            const seeded = await seedStatefulData(ctx.db, before.id, before.primaryFileId!);
+
+            const inner = await seedLibrary(ctx.db, { rootPath: innerRoot, mode: 'book_per_folder', name: `scanner-file-ops-inner-${randomUUID()}` });
+            await triggerAndWaitForLibraryScan(ctx, inner.libraryId);
+            await triggerAndWaitForLibraryScan(ctx, outerId);
+
+            const after = await getBookById(ctx.db, before.id);
+            expect(after).toMatchObject({
+              libraryId: inner.libraryId,
+              libraryFolderId: inner.libraryFolderId,
+              status: 'present',
+              primaryFileId: before.primaryFileId,
+            });
+            expect((await loadLibraryBookState(ctx.db, inner.libraryId)).map((book) => book.folderPath)).toEqual([join(innerRoot, 'Dune')]);
+            expect((await loadLibraryBookState(ctx.db, outerId)).map((book) => book.folderPath)).toEqual([join(outerRoot, 'Loose')]);
+            await assertStatefulUnchanged(ctx.db, before.id, before.primaryFileId!, seeded.snapshot);
+          },
+          { seedInner: false },
+        );
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'settles a book both libraries already hold: the nested library keeps the files, the outer copy is left missing',
+      async () => {
+        await withNestedLibraries(
+          async ({ innerRoot, outerId, ctx }) => {
+            await triggerAndWaitForLibraryScan(ctx, outerId);
+            const outerCopy = await getBookByFolderPath(ctx.db, outerId, join(innerRoot, 'Dune'));
+            // What two scans left behind before nested folders were handled: a book in each library for one folder.
+            const { libraryId: innerId, libraryFolderId } = await seedLibrary(ctx.db, {
+              rootPath: innerRoot,
+              mode: 'book_per_folder',
+              name: `scanner-file-ops-inner-${randomUUID()}`,
+            });
+            const [innerCopy] = await ctx.db
+              .insert(schema.books)
+              .values({ libraryId: innerId, libraryFolderId, folderPath: join(innerRoot, 'Dune'), status: 'present' })
+              .returning({ id: schema.books.id });
+            await ctx.db.insert(schema.bookMetadata).values({ bookId: innerCopy.id });
+
+            await triggerAndWaitForLibraryScan(ctx, innerId);
+            await triggerAndWaitForLibraryScan(ctx, outerId);
+            await triggerAndWaitForLibraryScan(ctx, innerId);
+
+            expect(await ownerLibraryOf(ctx.db, join(innerRoot, 'Dune', 'dune.epub'))).toBe(innerId);
+            expect(await getBookById(ctx.db, innerCopy.id)).toMatchObject({ libraryId: innerId, status: 'present' });
+            expect(await getBookById(ctx.db, outerCopy.id)).toMatchObject({ libraryId: outerId, status: 'missing' });
+          },
+          { seedInner: false },
+        );
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'scans a library whose second folder sits inside its first without counting a book twice',
+      async () => {
+        await withNestedLibraries(
+          async ({ outerRoot, innerRoot, outerId, ctx }) => {
+            const [innerFolder] = await ctx.db
+              .insert(schema.libraryFolders)
+              .values({ libraryId: outerId, path: innerRoot })
+              .returning({ id: schema.libraryFolders.id });
+
+            await triggerAndWaitForLibraryScan(ctx, outerId);
+            await triggerAndWaitForLibraryScan(ctx, outerId);
+
+            const rows = await ctx.db
+              .select({ folderPath: schema.books.folderPath, libraryFolderId: schema.books.libraryFolderId, status: schema.books.status })
+              .from(schema.books)
+              .where(eq(schema.books.libraryId, outerId))
+              .orderBy(schema.books.folderPath);
+            expect(rows).toEqual([
+              { folderPath: join(innerRoot, 'Dune'), libraryFolderId: innerFolder.id, status: 'present' },
+              { folderPath: join(outerRoot, 'Loose'), libraryFolderId: expect.any(Number), status: 'present' },
+            ]);
+            expect(rows[1].libraryFolderId).not.toBe(innerFolder.id);
+          },
+          { seedInner: false },
+        );
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'leaves a file added inside the nested library to it when only the outer library is watched',
+      async () => {
+        await withNestedLibraries(async ({ outerRoot, innerRoot, outerId, innerId, ctx }) => {
+          await triggerAndWaitForLibraryScan(ctx, outerId);
+          await triggerAndWaitForLibraryScan(ctx, innerId);
+          await startLibraryWatcher(ctx, outerId, [outerRoot]);
+          try {
+            await mkdir(join(innerRoot, 'Fresh'), { recursive: true });
+            await mkdir(join(outerRoot, 'Other'), { recursive: true });
+            await writeFile(join(innerRoot, 'Fresh', 'fresh.epub'), 'fresh\n'.repeat(600));
+            await writeFile(join(outerRoot, 'Other', 'other.epub'), 'other\n'.repeat(600));
+
+            // The outer library picking up its own new book proves its watcher handled the burst.
+            await waitForCondition(async () => {
+              const book = await getBookByFolderPath(ctx.db, outerId, join(outerRoot, 'Other'));
+              expect(book.status).toBe('present');
+            }, 40_000);
+            await sleep(WATCHER_DEBOUNCE_MS * 4);
+
+            expect(await ownerLibraryOf(ctx.db, join(innerRoot, 'Fresh', 'fresh.epub'))).toBeNull();
+            await triggerAndWaitForLibraryScan(ctx, innerId);
+            expect(await ownerLibraryOf(ctx.db, join(innerRoot, 'Fresh', 'fresh.epub'))).toBe(innerId);
+            expect((await loadLibraryBookState(ctx.db, outerId)).map((book) => book.folderPath)).toEqual([
+              join(outerRoot, 'Loose'),
+              join(outerRoot, 'Other'),
+            ]);
+          } finally {
+            await stopLibraryWatcher(ctx, outerId);
+          }
+        });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
   });
 });

@@ -19,6 +19,7 @@ import { KoboDeviceService } from './services/kobo-device.service';
 import { KoboDeliveryService } from './services/kobo-delivery.service';
 import { KoboDeliveryRepository } from './kobo-delivery.repository';
 import { KoboAnnotationServeRepository } from './kobo-annotation-serve.repository';
+import { KoboTombstoneRepository } from './kobo-tombstone.repository';
 import { KoboBookmarkLinkRepository } from './kobo-bookmark-link.repository';
 import { BookmarkModule } from '../bookmark/bookmark.module';
 import { KoboDownloadRepository } from './kobo-download.repository';
@@ -78,6 +79,7 @@ describe('KoboModule', () => {
       KoboDeliveryRepository,
       KoboBookmarkLinkRepository,
       KoboAnnotationServeRepository,
+      KoboTombstoneRepository,
       KoboReadingProgressRepository,
       KoboDeliveryService,
       KoboDownloadHashBackfillService,

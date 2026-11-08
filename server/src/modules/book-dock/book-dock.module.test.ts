@@ -15,6 +15,7 @@ import { BookDockEventsService } from './book-dock-events.service';
 import { BookDockFinalizeService } from './book-dock-finalize.service';
 import { BookDockGateway } from './book-dock.gateway';
 import { BookDockIngestService } from './book-dock-ingest.service';
+import { BookDockJoinService } from './book-dock-join.service';
 import { BookDockMetadataService } from './book-dock-metadata.service';
 import { BookDockModule } from './book-dock.module';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
@@ -37,6 +38,7 @@ describe('BookDockModule', () => {
         BookDockMetadataService,
         BookDockProcessingStateService,
         BookDockFinalizeService,
+        BookDockJoinService,
         BookDockWatcherService,
         BookDockGateway,
       ]),

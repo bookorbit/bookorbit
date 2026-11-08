@@ -1,5 +1,5 @@
 import { computed, type ComputedRef } from 'vue'
-import { createChartTokens, type ChartTokens } from '@/lib/echarts'
+import { createChartTokens, type ChartTokens } from '@/lib/chart-theme'
 import { useThemeStore } from '@/stores/theme'
 
 /** Chart colours read from the live tokens, rebuilt whenever an appearance setting changes them. */

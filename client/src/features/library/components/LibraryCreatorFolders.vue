@@ -178,10 +178,10 @@ function handleOrganizationMode(value: OrganizationMode) {
           <span
             v-else-if="row.status.kind === 'overlap'"
             class="inline-flex max-w-44 shrink-0 items-center gap-1 rounded-full bg-warning/14 px-2 py-0.5 text-xs font-medium text-warning"
-            :title="t('library.creator.folders.status.overlapTitle', { library: row.status.library })"
+            :title="t('library.creator.folders.status.sharedWithTitle', { library: row.status.library })"
           >
             <TriangleAlert :size="11" class="shrink-0" aria-hidden="true" />
-            <span class="truncate">{{ t('library.creator.folders.status.overlap', { library: row.status.library }) }}</span>
+            <span class="truncate">{{ t('library.creator.folders.status.sharedWith', { library: row.status.library }) }}</span>
           </span>
           <span
             v-else-if="row.status.kind === 'ok'"
@@ -253,7 +253,7 @@ function handleOrganizationMode(value: OrganizationMode) {
 
     <p class="flex items-start gap-1.5 text-xs text-muted-foreground">
       <Info :size="13" class="mt-px shrink-0" aria-hidden="true" />
-      <span>{{ t('library.creator.folders.checkHint') }}</span>
+      <span>{{ t('library.creator.folders.checkHintOneLibrary') }}</span>
     </p>
   </div>
 

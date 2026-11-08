@@ -122,3 +122,111 @@ describe('metadata permissions for bulk selections', () => {
     expect(ctx.canEditSelectionMetadata.value).toBe(false)
   })
 })
+
+describe('merge availability for bulk selections', () => {
+  function mergeContext(ids: number[]) {
+    const ctx = context(ids)
+    ctx.books.value = [
+      { id: 1, libraryId: 7 },
+      { id: 2, libraryId: 7 },
+      { id: 3, libraryId: 8 },
+      { id: 4, libraryId: 9 },
+      ...Array.from({ length: 12 }, (_, index) => ({ id: 100 + index, libraryId: 7 })),
+    ] as BookCard[]
+    return ctx
+  }
+
+  beforeEach(() => {
+    permissions.value = [Permission.LibraryMergeBooks]
+  })
+
+  it('hides Merge without the merge permission', () => {
+    permissions.value = [Permission.LibraryEditMetadata]
+    expect(mergeContext([1, 2]).mergeSelection.value).toBeNull()
+  })
+
+  it('hides Merge when every selected book sits in a library the user only views', () => {
+    expect(mergeContext([3]).mergeSelection.value).toBeNull()
+  })
+
+  it('enables Merge for two to ten books from one editable library', () => {
+    expect(mergeContext([1, 2]).mergeSelection.value).toEqual({ disabledReason: null })
+  })
+
+  it('enables Merge for books in different libraries the user edits', () => {
+    expect(mergeContext([1, 4]).mergeSelection.value).toEqual({ disabledReason: null })
+  })
+
+  it.each([
+    { ids: [1], reason: 'tooFew' },
+    { ids: [1, 3], reason: 'notEditable' },
+    { ids: [1, 2, ...Array.from({ length: 9 }, (_, index) => 100 + index)], reason: 'tooMany' },
+  ])('disables Merge with $reason', ({ ids, reason }) => {
+    expect(mergeContext(ids).mergeSelection.value).toEqual({ disabledReason: reason })
+  })
+
+  it('disables Merge for a select-all query selection', () => {
+    const ctx = mergeContext([1, 2])
+    ctx.query.value = { libraryId: 7, total: 10000 } as QuerySelectionState
+    expect(ctx.mergeSelection.value).toEqual({ disabledReason: 'queryScoped' })
+    ctx.query.value = { libraryId: 8, total: 10000 } as QuerySelectionState
+    expect(ctx.mergeSelection.value).toBeNull()
+  })
+})
+
+describe('link availability for bulk selections', () => {
+  function linkContext(ids: number[]) {
+    const ctx = context(ids)
+    ctx.books.value = [
+      { id: 1, libraryId: 7 },
+      { id: 2, libraryId: 9 },
+      { id: 3, libraryId: 8 },
+      ...Array.from({ length: 12 }, (_, index) => ({ id: 100 + index, libraryId: 7 })),
+    ] as BookCard[]
+    return ctx
+  }
+
+  beforeEach(() => {
+    permissions.value = [Permission.LibraryMergeBooks]
+  })
+
+  it('hides Link without the merge permission it shares', () => {
+    permissions.value = [Permission.LibraryEditMetadata]
+    expect(linkContext([1, 2]).linkSelection.value).toBeNull()
+  })
+
+  it('hides Link when every selected book sits in a library the user only views', () => {
+    expect(linkContext([3]).linkSelection.value).toBeNull()
+  })
+
+  it('enables Link and Merge across editable libraries', () => {
+    const ctx = linkContext([1, 2])
+    expect(ctx.linkSelection.value).toEqual({ disabledReason: null })
+    expect(ctx.mergeSelection.value).toEqual({ disabledReason: null })
+  })
+
+  it.each([
+    { ids: [1], reason: 'tooFew' },
+    { ids: [1, 3], reason: 'notEditable' },
+    { ids: [1, 2, ...Array.from({ length: 9 }, (_, index) => 100 + index)], reason: 'tooMany' },
+  ])('disables Link with $reason', ({ ids, reason }) => {
+    expect(linkContext(ids).linkSelection.value).toEqual({ disabledReason: reason })
+  })
+
+  it('fails closed for a selected book whose library is unknown', () => {
+    expect(linkContext([1, 999]).linkSelection.value).toEqual({ disabledReason: 'notEditable' })
+  })
+
+  it('disables Link for a select-all query selection', () => {
+    const ctx = linkContext([1, 2])
+    ctx.query.value = { libraryId: 7, total: 10000 } as QuerySelectionState
+    expect(ctx.linkSelection.value).toEqual({ disabledReason: 'queryScoped' })
+    ctx.query.value = { libraryId: 8, total: 10000 } as QuerySelectionState
+    expect(ctx.linkSelection.value).toBeNull()
+  })
+
+  it('lets a superuser link any selection', () => {
+    isSuperuser.value = true
+    expect(linkContext([1, 3]).linkSelection.value).toEqual({ disabledReason: null })
+  })
+})

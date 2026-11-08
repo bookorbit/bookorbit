@@ -74,6 +74,19 @@ describe('SmartScope DTO validation', () => {
     expect(await hasErrors(dto)).toBe(false);
   });
 
+  it('accepts only the supported grid shapes, and rejects a null shape on update', async () => {
+    const create = (coverAspectRatio: unknown) => plainToInstance(CreateSmartScopeDto, { name: 'Audiobooks', icon: 'Headphones', coverAspectRatio });
+    expect(await hasErrors(create('1/1'))).toBe(false);
+    expect(await hasErrors(create('2/3'))).toBe(false);
+    expect(await hasErrors(create(undefined))).toBe(false);
+    expect(await hasErrors(create('16/9'))).toBe(true);
+
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { coverAspectRatio: '1/1' }))).toBe(false);
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { coverAspectRatio: '1:1' }))).toBe(true);
+    // A null would otherwise reach the NOT NULL column as a 500 instead of a 400.
+    expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { coverAspectRatio: null }))).toBe(true);
+  });
+
   it('UpdateSmartScopeDto accepts null filter to clear filters and rejects non-object filters', async () => {
     expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { filter: null }))).toBe(false);
     expect(await hasErrors(plainToInstance(UpdateSmartScopeDto, { filter: 'bad' }))).toBe(true);

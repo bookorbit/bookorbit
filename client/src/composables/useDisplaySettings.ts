@@ -10,6 +10,7 @@ import {
   CARD_INFO_MODES,
   CARD_OVERLAY_KEYS,
   COVER_SIZE_SCOPES,
+  FORMAT_BADGE_STYLES,
   GRID_CARD_LABEL_FIELDS,
   PLACEHOLDER_COVER_STYLES,
   SERIES_CARD_COVER_MODES,
@@ -25,6 +26,7 @@ import {
   type CardOverlayKey,
   type CoverSizeScope,
   type DisplayPreferences,
+  type FormatBadgeStyle,
   type GridCardLabelField,
   type PlaceholderCoverStyle,
   type SeriesCardCoverMode,
@@ -44,6 +46,7 @@ export type {
   CardOverlayKey,
   CoverSizeScope,
   DisplayPreferences,
+  FormatBadgeStyle,
   GridCardLabelField,
   PlaceholderCoverStyle,
   SeriesCardCoverMode,
@@ -61,6 +64,13 @@ const DEFAULT_SERIES_CARD_COVER_MODE: SeriesCardCoverMode = 'stack'
 const DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION: BookThumbnailClickAction = 'reader'
 const DEFAULT_PLACEHOLDER_COVER_STYLE: PlaceholderCoverStyle = 'bauhaus'
 const DEFAULT_CARD_OVERLAYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'series-position']
+const DEFAULT_FORMAT_BADGE_STYLE: FormatBadgeStyle = 'underline'
+
+function normalizeFormatBadgeStyle(value: unknown): FormatBadgeStyle {
+  return typeof value === 'string' && FORMAT_BADGE_STYLES.includes(value as FormatBadgeStyle)
+    ? (value as FormatBadgeStyle)
+    : DEFAULT_FORMAT_BADGE_STYLE
+}
 
 function normalizeBookSpineOverlay(value: unknown): BookSpineOverlay {
   return typeof value === 'string' && BOOK_SPINE_OVERLAYS.includes(value as BookSpineOverlay)
@@ -160,6 +170,7 @@ function normalizeViewMode(v: unknown): BookViewMode {
 
 const viewMode = ref<BookViewMode>(normalizeViewMode(storage.get('viewMode', 'grid')))
 const cardOverlays = ref<CardOverlayKey[]>(normalizeCardOverlays(storage.get('cardOverlays', DEFAULT_CARD_OVERLAYS)))
+const formatBadgeStyle = ref<FormatBadgeStyle>(normalizeFormatBadgeStyle(storage.get('formatBadgeStyle', DEFAULT_FORMAT_BADGE_STYLE)))
 const showJumpRails = ref(storage.get<boolean>('showJumpRails', true) !== false)
 const smartScopeFilterExpanded = ref(storage.get<boolean>('smartScopeFilterExpanded', true) === true)
 const authorCoverSize = ref(normalizePositiveInteger(storage.get('authorCoverSize', 120), 120, 100, 400))
@@ -195,6 +206,7 @@ watch(portraitGridGap, (v) => storage.set('portraitGridGap', v))
 watch(squareGridGap, (v) => storage.set('squareGridGap', v))
 watch(viewMode, (v) => storage.set('viewMode', v))
 watch(cardOverlays, (v) => storage.set('cardOverlays', normalizeCardOverlays(v)), { deep: true })
+watch(formatBadgeStyle, (v) => storage.set('formatBadgeStyle', normalizeFormatBadgeStyle(v)))
 watch(showJumpRails, (v) => storage.set('showJumpRails', v))
 watch(smartScopeFilterExpanded, (v) => storage.set('smartScopeFilterExpanded', v))
 watch(authorCoverSize, (v) => storage.set('authorCoverSize', v))
@@ -225,6 +237,7 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     squareGridGap: normalizePositiveInteger(squareGridGap.value, DEFAULT_GRID_GAP, 1, 80),
     viewMode: normalizeViewMode(viewMode.value),
     cardOverlays: normalizeCardOverlays(cardOverlays.value),
+    formatBadgeStyle: normalizeFormatBadgeStyle(formatBadgeStyle.value),
     showJumpRails: showJumpRails.value !== false,
     smartScopeFilterExpanded: smartScopeFilterExpanded.value === true,
     authorCoverSize: normalizePositiveInteger(authorCoverSize.value, 120, 100, 400),
@@ -262,6 +275,7 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (typeof obj.squareGridGap === 'number') out.squareGridGap = normalizePositiveInteger(obj.squareGridGap, DEFAULT_GRID_GAP, 1, 80)
   if (BOOK_VIEW_MODES.includes(obj.viewMode as BookViewMode)) out.viewMode = obj.viewMode as BookViewMode
   if (Array.isArray(obj.cardOverlays)) out.cardOverlays = normalizeCardOverlays(obj.cardOverlays)
+  if (FORMAT_BADGE_STYLES.includes(obj.formatBadgeStyle as FormatBadgeStyle)) out.formatBadgeStyle = obj.formatBadgeStyle as FormatBadgeStyle
   if (typeof obj.showJumpRails === 'boolean') out.showJumpRails = obj.showJumpRails
   if (typeof obj.smartScopeFilterExpanded === 'boolean') out.smartScopeFilterExpanded = obj.smartScopeFilterExpanded
   if (typeof obj.authorCoverSize === 'number') out.authorCoverSize = normalizePositiveInteger(obj.authorCoverSize, 120, 100, 400)
@@ -312,6 +326,7 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.squareGridGap !== undefined) squareGridGap.value = prefs.squareGridGap
   if (prefs.viewMode !== undefined) viewMode.value = prefs.viewMode
   if (prefs.cardOverlays !== undefined) cardOverlays.value = prefs.cardOverlays
+  if (prefs.formatBadgeStyle !== undefined) formatBadgeStyle.value = prefs.formatBadgeStyle
   if (prefs.showJumpRails !== undefined) showJumpRails.value = prefs.showJumpRails
   if (prefs.smartScopeFilterExpanded !== undefined) smartScopeFilterExpanded.value = prefs.smartScopeFilterExpanded
   if (prefs.authorCoverSize !== undefined) authorCoverSize.value = prefs.authorCoverSize
@@ -343,6 +358,7 @@ export function useDisplaySettings() {
     squareGridGap,
     viewMode,
     cardOverlays,
+    formatBadgeStyle,
     showJumpRails,
     smartScopeFilterExpanded,
     authorCoverSize,

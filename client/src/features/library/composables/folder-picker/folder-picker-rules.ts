@@ -16,7 +16,7 @@ export interface FolderStatus {
   kind: FolderStatusKind
   /** Ticking is refused. */
   block?: boolean
-  /** Ticking is allowed but would put books in two libraries. */
+  /** Ticking is allowed, but the folder cannot be added until the overlap is left out or removed. */
   warn?: boolean
   /** For a ticked folder that overlaps: which overlap it is. */
   over?: 'overlap' | 'contains'

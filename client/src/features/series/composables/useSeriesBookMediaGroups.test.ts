@@ -118,10 +118,10 @@ describe('series book media groups', () => {
       makeBook(undefined, { id: 5 }),
     ]
 
-    expect(groupSeriesBooksByMedia(books).map((group) => [group.label, group.books.map((book) => book.id)])).toEqual([
-      ['Books', [3, 4, 5]],
-      ['Audiobooks', [1, 3, 4]],
-      ['Comics', [2, 4]],
+    expect(groupSeriesBooksByMedia(books).map((group) => [group.label, group.mediaKind, group.books.map((book) => book.id)])).toEqual([
+      ['Books', 'ebook', [3, 4, 5]],
+      ['Audiobooks', 'audiobook', [1, 3, 4]],
+      ['Comics', 'comic', [2, 4]],
     ])
   })
 })

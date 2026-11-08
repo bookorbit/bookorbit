@@ -2,13 +2,15 @@
 import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
-import * as LucideIcons from '@lucide/vue'
-import { ChevronDown, Search, X } from '@lucide/vue'
+import { ChevronDown, Search, Shapes, X } from '@lucide/vue'
+import { LUCIDE_PICKER_NAMES } from 'virtual:lucide-icon-names'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import type { CustomIcon } from '@bookorbit/types'
 import { customIconSlugFromValue, customIconValue } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import AppIcon from '@/components/AppIcon.vue'
+import LucideSymbolIcon from '@/components/LucideSymbolIcon.vue'
+import { lucideCatalogHref, resolveLucideIconFile } from '@/lib/lucide-icons'
 import { useCustomIcons } from '@/features/custom-icons/composables/useCustomIcons'
 
 const props = defineProps<{
@@ -26,13 +28,17 @@ const { t } = useI18n()
 
 // ── Icon list ─────────────────────────────────────────────────────────────
 
-const ALL_ICONS: string[] = Object.keys(LucideIcons)
-  .filter((k) => /^[A-Z]/.test(k) && !k.endsWith('Icon') && !k.startsWith('Lucide'))
-  .sort()
-
-function getIconComponent(name: string) {
-  return (LucideIcons as Record<string, unknown>)[name]
+interface PickerIcon {
+  name: string
+  file: string
+  href: string
 }
+
+// The grid draws from one catalog file of every icon, fetched the first time the picker opens.
+const ALL_ICONS: PickerIcon[] = LUCIDE_PICKER_NAMES.flatMap((name) => {
+  const file = resolveLucideIconFile(name)
+  return file ? [{ name, file, href: lucideCatalogHref(file) }] : []
+})
 
 const {
   icons: customIcons,
@@ -72,7 +78,7 @@ let serverSearchTimer: ReturnType<typeof setTimeout> | null = null
 
 const filteredIcons = computed(() => {
   const q = query.value.trim().toLowerCase()
-  return q ? ALL_ICONS.filter((n) => n.toLowerCase().includes(q)) : ALL_ICONS
+  return q ? ALL_ICONS.filter((icon) => icon.name.toLowerCase().includes(q)) : ALL_ICONS
 })
 
 const filteredCustomIcons = computed(() => {
@@ -106,7 +112,7 @@ watch([query, activeSource], ([newQuery, newSource]) => {
 
 interface IconRow {
   id: number
-  icons: string[]
+  icons: PickerIcon[]
 }
 
 interface CustomIconRow {
@@ -285,7 +291,7 @@ onUnmounted(() => {
           {{ placeholder ?? 'Choose an icon...' }}
         </span>
         <span v-else class="text-foreground flex items-center gap-1.5">
-          <component :is="LucideIcons.Shapes" :size="14" class="text-muted-foreground" />
+          <Shapes :size="14" class="text-muted-foreground" />
           {{ placeholder ?? 'Select icon' }}
         </span>
         <ChevronDown
@@ -382,19 +388,21 @@ onUnmounted(() => {
         >
           <template #default="{ item }">
             <div class="flex gap-0.5">
-              <Tooltip v-for="name in item.icons" :key="name">
+              <Tooltip v-for="icon in item.icons" :key="icon.name">
                 <TooltipTrigger as-child>
                   <button
                     type="button"
                     :style="{ width: `calc(100% / ${COLS})`, aspectRatio: '1' }"
                     class="flex items-center justify-center rounded-md transition-colors"
-                    :class="modelValue === name ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'"
-                    @click="select(name)"
+                    :class="
+                      modelValue === icon.name ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                    "
+                    @click="select(icon.name)"
                   >
-                    <component :is="getIconComponent(name)" :size="16" />
+                    <LucideSymbolIcon :file="icon.file" :href="icon.href" :size="16" />
                   </button>
                 </TooltipTrigger>
-                <TooltipContent class="z-300">{{ name }}</TooltipContent>
+                <TooltipContent class="z-300">{{ icon.name }}</TooltipContent>
               </Tooltip>
             </div>
           </template>

@@ -1,3 +1,4 @@
+import type { CoverAspectRatio } from "./library";
 import type { GroupRule, SortSpec } from "./query";
 
 export type SmartScopeFilter = GroupRule | null;
@@ -10,6 +11,8 @@ export interface SmartScope {
   filter: SmartScopeFilter;
   defaultSort: SortSpec[];
   isPublic: boolean;
+  /** The grid's tile shape, set by the owner. Square also draws each book that has an audiobook as that audiobook. */
+  coverAspectRatio: CoverAspectRatio;
   /** The owner's own preference. Only the owner's devices follow it. */
   syncToKobo: boolean;
   /** Whether this scope reaches the requesting user's Kobo: the owner's flag for the owner, an explicit opt-in for everyone else. */
@@ -29,4 +32,5 @@ export interface CreateSmartScopePayload {
   defaultSort: SortSpec[];
   isPublic?: boolean;
   syncToKobo?: boolean;
+  coverAspectRatio?: CoverAspectRatio;
 }

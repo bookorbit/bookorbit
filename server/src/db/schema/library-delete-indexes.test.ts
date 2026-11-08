@@ -17,6 +17,7 @@ import {
   userReadingDailyStats,
 } from './reader';
 import { storygraphBookState } from './storygraph';
+import { storyEdits } from './story-edits';
 
 const cascadeIndexCases = [
   ['book dock target library', bookDockFiles, ['target_library_id']],
@@ -38,6 +39,7 @@ const cascadeIndexCases = [
   ['annotation position book file', annotationPositions, ['book_file_id']],
   ['reader preferences book file', readerPreferences, ['book_file_id']],
   ['StoryGraph state book', storygraphBookState, ['book_id']],
+  ['story edit book', storyEdits, ['book_id']],
 ] as const;
 
 describe('library deletion cascade indexes', () => {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Aperture } from '@lucide/vue'
 import EntityIndexView from '@/components/entity-index/EntityIndexView.vue'
 import CreateSmartScopeDialog from '@/features/smart-scope/components/CreateSmartScopeDialog.vue'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
@@ -30,8 +31,8 @@ onMounted(() => {
     <CreateSmartScopeDialog :open="createOpen" @close="closeCreate" />
     <EntityIndexView
       :title="t('titles.smartScopes')"
-      title-icon="Aperture"
-      fallback-icon="Aperture"
+      :title-icon="Aperture"
+      :fallback-icon="Aperture"
       :items="smartScopes"
       route-name="smartScope"
       :loading="loading"

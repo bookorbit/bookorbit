@@ -32,6 +32,12 @@ describe('ProwlarrClient', () => {
               { name: 'torrentBaseSettings.seedRatio', value: '2.5' },
               { name: 'torrentBaseSettings.seedTime', value: 7200 },
             ],
+            capabilities: {
+              categories: [
+                { id: 7000, subCategories: [{ id: 7010 }] },
+                { id: 3000, subCategories: [{ id: 3030 }] },
+              ],
+            },
           },
           { id: 8, name: 'Usenet source', protocol: 'usenet', enable: false, priority: 20 },
           { id: 9, name: 'Unsupported source', protocol: 'http', enable: true },
@@ -51,6 +57,7 @@ describe('ProwlarrClient', () => {
         priority: 10,
         seedRatioGoal: 2.5,
         seedTimeMinutes: 7200,
+        categories: { ebook: [7000], audiobook: [3030] },
       },
       {
         id: 8,
@@ -61,6 +68,7 @@ describe('ProwlarrClient', () => {
         priority: 20,
         seedRatioGoal: null,
         seedTimeMinutes: null,
+        categories: { ebook: [7020], audiobook: [3030] },
       },
     ]);
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({ 'X-Api-Key': 'secret-key' }));
@@ -87,6 +95,44 @@ describe('ProwlarrClient', () => {
     await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([
       expect.objectContaining({ id: 4, seedRatioGoal: 1.5, seedTimeMinutes: null }),
     ]);
+  });
+
+  it('uses exact Prowlarr book categories when the source advertises them', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 4,
+            name: 'Book source',
+            protocol: 'torrent',
+            enable: true,
+            capabilities: { categories: [{ id: 7000, subCategories: [{ id: 7020 }] }, { id: 3030 }] },
+          },
+        ]),
+      ),
+    );
+
+    await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([
+      expect.objectContaining({ categories: { ebook: [7020], audiobook: [3030] } }),
+    ]);
+  });
+
+  it('searches without a category when Prowlarr advertises no compatible book category', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 4,
+            name: 'Uncategorised source',
+            protocol: 'torrent',
+            enable: true,
+            capabilities: { categories: [{ id: 5000 }] },
+          },
+        ]),
+      ),
+    );
+
+    await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([expect.objectContaining({ categories: { ebook: [], audiobook: [] } })]);
   });
 
   it('rejects invalid discovery payloads and oversized responses', async () => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, provide, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
@@ -49,7 +49,7 @@ import { useViewDisplaySettings } from '@/composables/useViewDisplaySettings'
 import { useViewSearch } from '@/features/book/composables/useViewSearch'
 import { sortFieldLabel } from '@/features/book/lib/filter-labels'
 import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
-import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
+import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
@@ -60,8 +60,21 @@ import { useSavedViews, type SavedView } from '@/features/book/composables/useSa
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBulkEditMetadata } from '@/features/book/composables/useBulkEditMetadata'
 import type { BulkEditFields } from '@/features/book/composables/useBulkEditMetadata'
-import type { BookCard, GroupRule, SortSpec } from '@bookorbit/types'
+import {
+  normalizeCoverAspectRatio,
+  type BookCard,
+  type BookMergedEvent,
+  type ConcreteBookMediaKind,
+  type CoverAspectRatio,
+  type GroupRule,
+  type SortSpec,
+} from '@bookorbit/types'
+import { useBookMergeSync } from '@/features/book/composables/useBookMergeSync'
+import { useBookLinkSync } from '@/features/book/composables/useBookLinkSync'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+
+const MergeBooksSheet = defineAsyncComponent(() => import('@/features/book/components/merge/MergeBooksSheet.vue'))
+const LinkBooksSheet = defineAsyncComponent(() => import('@/features/book/components/link/LinkBooksSheet.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
@@ -71,8 +84,6 @@ const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 const { tableDensity, showJumpRails } = useDisplaySettings()
 
 const smartScopeId = shallowRef(Number(route.params.id))
-const coverAspectRatio = computed(() => DEFAULT_COVER_ASPECT_RATIO)
-const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId, coverAspectRatio)
 const { allSavedViews, saveView, renameView, deleteView, duplicateView, toggleFavorite, importViews } = useSavedViews('smartScope', smartScopeId)
 
 const { getEffectivePreference, setPreference, prefs } = useSeriesCollapsePreference()
@@ -95,6 +106,7 @@ const {
   booksProxy: books,
   slots,
   total,
+  bookTotal,
   loading,
   initialized: booksInitialized,
   error: booksError,
@@ -129,6 +141,7 @@ const {
   railEnabled: showJumpRails,
   railViewport: mainRef,
   collapseEnabled: effectiveCollapseEnabled,
+  collapseLinked: true,
   q: debouncedQuery,
   enabled: scopeQueryReady,
 })
@@ -140,6 +153,11 @@ const smartScopeNotFound = ref(false)
 const smartScopeLoadError = computed(() => smartScopesError.value ?? booksError.value)
 
 const smartScope = computed(() => smartScopes.value.find((l) => l.id === smartScopeId.value))
+const coverAspectRatio = computed<CoverAspectRatio>(() => normalizeCoverAspectRatio(smartScope.value?.coverAspectRatio))
+// A square scope reads as an audiobook shelf, so a book that also has an ebook still shows its audiobook.
+const gridMediaKind = computed<ConcreteBookMediaKind | null>(() => (coverAspectRatio.value === '1/1' ? 'audiobook' : null))
+provide(COVER_ASPECT_RATIO_KEY, coverAspectRatio)
+const { coverSize, gridGap } = useViewDisplaySettings('smartScope', smartScopeId, coverAspectRatio)
 const pageTitle = computed(() => {
   if (smartScope.value?.name) return t('views.smartScope.pageTitle', { name: smartScope.value.name })
   return Number.isFinite(smartScopeId.value) ? t('views.smartScope.pageTitleWithId', { id: smartScopeId.value }) : t('views.smartScope.title')
@@ -244,6 +262,21 @@ const {
   selectedIds,
   selectedCount,
   canEditSelectionMetadata,
+  mergeSelection,
+  mergeOpen,
+  mergeBookIds,
+  openMergeForSelection,
+  setMergeOpen,
+  linkSelection,
+  linkOpen,
+  linkBookIds,
+  linkBooks,
+  linkSeedBooks,
+  openLinkForSelection,
+  setLinkOpen,
+  switchMergeToLink,
+  selectionHasLinked,
+  pendingDeleteLinked,
   enterSelectionMode,
   exitSelectionMode,
   selectAll,
@@ -294,6 +327,40 @@ const {
 // selection needs clearing here.
 function handleBooksMoved() {
   exitSelectionMode()
+}
+
+function refreshAfterMerge() {
+  resetBooks()
+  refreshBuckets()
+}
+
+const { applyMerged } = useBookMergeSync({ books, deselect: deselectAll, refresh: refreshAfterMerge })
+
+function handleBooksMerged(event: BookMergedEvent) {
+  applyMerged(event)
+  exitSelectionMode()
+}
+
+function refreshAfterLinkChange() {
+  resetBooks()
+  refreshBuckets()
+}
+
+// Books from any library can sit here, and with linked books collapsed a link anywhere can fold or
+// split a card, so every link change reloads the listing.
+function linkChangeAffectsView(): boolean {
+  return true
+}
+
+const { scheduleRefresh: scheduleLinkRefresh } = useBookLinkSync({
+  books,
+  refresh: refreshAfterLinkChange,
+  affectsScope: linkChangeAffectsView,
+})
+
+function handleBooksLinked() {
+  exitSelectionMode()
+  scheduleLinkRefresh()
 }
 
 const metadataExportOpen = ref(false)
@@ -372,7 +439,7 @@ const headerFacts = computed<HeaderFact[]>(() => {
   const scopeTotal = smartScope.value?.bookCount ?? null
   if (typeof scopeTotal === 'number') {
     if (isNarrowed.value && !effectiveCollapseEnabled.value && booksInitialized.value) {
-      facts.push({ key: 'count', text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(total.value), total: scopeTotal }) })
+      facts.push({ key: 'count', text: t('components.browseHeader.facts.booksOf', { matching: formatNumber(bookTotal.value), total: scopeTotal }) })
     } else {
       facts.push({ key: 'count', text: t('components.browseHeader.facts.books', { count: scopeTotal }) })
     }
@@ -520,7 +587,12 @@ defineOptions({ name: 'SmartScopeView' })
       @set-field="handleBulkSetField"
       @lock-metadata="handleBulkSetMetadataLock"
       @delete="handleDeleteSelected"
+      :merge="mergeSelection"
+      :link="linkSelection"
+      :linked-selected="selectionHasLinked"
       @move-to-library="openMoveForSelection"
+      @merge="openMergeForSelection"
+      @link="openLinkForSelection"
       @exit="exitSelectionMode"
     />
 
@@ -529,7 +601,7 @@ defineOptions({ name: 'SmartScopeView' })
       view-type="smartScope"
       :selected-book-ids="[...selectedIds]"
       :selected-count="selectedCount"
-      :total-count="total"
+      :total-count="bookTotal"
       :sort="tableSort"
       :visible-columns="visibleExportColumns"
       default-scope="selected"
@@ -566,7 +638,32 @@ defineOptions({ name: 'SmartScopeView' })
       @sent="exitSelectionMode"
     />
 
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelBookDelete" />
+    <DeleteBookDialog
+      :open="deleteBookId !== null"
+      :deleting="deletingBook"
+      :linked="pendingDeleteLinked"
+      @confirm="confirmDelete"
+      @cancel="cancelBookDelete"
+    />
+
+    <LinkBooksSheet
+      v-if="linkBookIds.length > 0"
+      :open="linkOpen"
+      :book-ids="linkBookIds"
+      :books="linkBooks"
+      :seed-books="linkSeedBooks"
+      @update:open="setLinkOpen"
+      @linked="handleBooksLinked"
+    />
+
+    <MergeBooksSheet
+      v-if="mergeBookIds.length > 0"
+      :open="mergeOpen"
+      :book-ids="mergeBookIds"
+      @update:open="setMergeOpen"
+      @link-instead="switchMergeToLink"
+      @merged="handleBooksMerged"
+    />
 
     <ConfirmDialog
       :open="confirmDeleteOpen"
@@ -800,6 +897,7 @@ defineOptions({ name: 'SmartScopeView' })
             :is-selected="isSelected"
             :rail-gutter="railGutterReserved"
             :rail-gutter-kind="bucketKind"
+            :media-kind="gridMediaKind"
             @range="handleRange"
             @first-visible-index="handleFirstVisibleIndex"
             :allow-move-to-library="true"
@@ -849,7 +947,7 @@ defineOptions({ name: 'SmartScopeView' })
           <div v-if="effectiveViewMode === 'list'" ref="sentinel" class="h-8 mt-4 flex items-center justify-center">
             <span v-if="loading" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMorePrefix && contiguousPrefix.length > 0" class="text-xs text-muted-foreground">
-              {{ t('views.bookView.allBooksLoaded', { count: formatNumber(total) }) }}
+              {{ t('views.bookView.allBooksLoaded', { count: formatNumber(bookTotal) }) }}
             </span>
           </div>
 

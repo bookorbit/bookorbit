@@ -2,15 +2,22 @@ import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, or, sql, sum, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
+import type { ContentFilterRules } from '@bookorbit/types';
+
 import { DB } from '../../db';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
+import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import * as schema from '../../db/schema';
 import {
+  authors,
+  bookAuthors,
   bookDockFiles,
   bookDockUnitFiles,
   bookFiles,
+  bookMetadata,
   books,
   libraries,
+  libraryFolders,
   type BookDockFileRow,
   type BookDockUnitFileRow,
   type NewBookDockFileRow,
@@ -80,6 +87,47 @@ export interface SelectionBatchOptions {
   userId: number;
   canManageAll: boolean;
 }
+
+/** An existing book a docked file was asked to join, and where it lives. */
+export interface BookDockJoinTargetRow {
+  bookId: number;
+  libraryId: number;
+  libraryFolderId: number;
+  folderPath: string;
+  /** The book is its own file: `folderPath` is the path of one of its files, not a folder. */
+  storedAsFile: boolean;
+  status: string;
+  title: string | null;
+}
+
+/** A book a docked file might be another format of. `titleKey` is `lower(title)`, as the index has it. */
+export interface BookDockJoinCandidateRow {
+  bookId: number;
+  libraryId: number;
+  folderPath: string;
+  /** The library folder the book is kept under. */
+  libraryFolderPath: string;
+  /** The book is its own file: `folderPath` is the path of one of its files, not a folder. */
+  storedAsFile: boolean;
+  title: string | null;
+  titleKey: string | null;
+  isbn10: string | null;
+  isbn13: string | null;
+  hardcoverId: string | null;
+  openLibraryId: string | null;
+}
+
+/**
+ * Whether the book is its own file, as a loose book at a library folder's root is: the scanner keys
+ * it by the file's path, so `folderPath` names that file rather than a folder. One lookup on the
+ * unique `book_files.absolute_path` index.
+ */
+function storedAsFile(): SQL<boolean> {
+  return sql<boolean>`exists (select 1 from ${bookFiles} bf where bf.book_id = ${books.id} and bf.absolute_path = ${books.folderPath})`;
+}
+
+/** However many files a batch carries, one probe never reads more than this many books. */
+export const JOIN_CANDIDATE_LIMIT = 500;
 
 @Injectable()
 export class BookDockRepository {
@@ -268,6 +316,123 @@ export class BookDockRepository {
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .where(inArray(bookFiles.absolutePath, paths));
+  }
+
+  async findJoinTarget(bookId: number): Promise<BookDockJoinTargetRow | undefined> {
+    const [row] = await this.db
+      .select({
+        bookId: books.id,
+        libraryId: books.libraryId,
+        libraryFolderId: books.libraryFolderId,
+        folderPath: books.folderPath,
+        storedAsFile: storedAsFile(),
+        status: books.status,
+        title: bookMetadata.title,
+      })
+      .from(books)
+      .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
+      .where(eq(books.id, bookId))
+      .limit(1);
+    return row;
+  }
+
+  /** Present books in these libraries carrying any of these ISBNs. Served by the ISBN indexes. */
+  async findJoinCandidatesByIsbn(
+    libraryIds: number[],
+    isbn13s: string[],
+    isbn10s: string[],
+    contentFilters?: ContentFilterRules,
+  ): Promise<BookDockJoinCandidateRow[]> {
+    const branches = [
+      isbn13s.length ? inArray(bookMetadata.isbn13, isbn13s) : undefined,
+      isbn10s.length ? inArray(bookMetadata.isbn10, isbn10s) : undefined,
+    ];
+    if (!branches.some(Boolean)) return [];
+    return this.findJoinCandidates(libraryIds, or(...branches)!, contentFilters);
+  }
+
+  /**
+   * Present books in these libraries carrying any of these work-level provider ids. Served by the
+   * partial `bm_hardcover_id_idx` and `bm_open_library_id_idx`, so each branch keeps their predicate.
+   */
+  async findJoinCandidatesByWorkId(
+    libraryIds: number[],
+    hardcoverIds: string[],
+    openLibraryIds: string[],
+    contentFilters?: ContentFilterRules,
+  ): Promise<BookDockJoinCandidateRow[]> {
+    const branches = [
+      hardcoverIds.length ? and(isNotNull(bookMetadata.hardcoverId), inArray(bookMetadata.hardcoverId, hardcoverIds)) : undefined,
+      openLibraryIds.length ? and(isNotNull(bookMetadata.openLibraryId), inArray(bookMetadata.openLibraryId, openLibraryIds)) : undefined,
+    ];
+    if (!branches.some(Boolean)) return [];
+    return this.findJoinCandidates(libraryIds, or(...branches)!, contentFilters);
+  }
+
+  /** Present books in these libraries whose `lower(title)` is one of these keys. Served by `bm_title_lower_idx`. */
+  async findJoinCandidatesByTitle(
+    libraryIds: number[],
+    titleKeys: string[],
+    contentFilters?: ContentFilterRules,
+  ): Promise<BookDockJoinCandidateRow[]> {
+    if (titleKeys.length === 0) return [];
+    return this.findJoinCandidates(libraryIds, inArray(sql`lower(${bookMetadata.title})`, titleKeys), contentFilters);
+  }
+
+  /** Author names per book, in display order. */
+  async findAuthorNamesByBookIds(bookIds: number[]): Promise<Map<number, string[]>> {
+    const result = new Map<number, string[]>();
+    if (bookIds.length === 0) return result;
+    const rows = await this.db
+      .select({ bookId: bookAuthors.bookId, name: authors.name })
+      .from(bookAuthors)
+      .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
+      .where(inArray(bookAuthors.bookId, bookIds))
+      .orderBy(asc(bookAuthors.bookId), asc(bookAuthors.displayOrder));
+    for (const row of rows) result.set(row.bookId, [...(result.get(row.bookId) ?? []), row.name]);
+    return result;
+  }
+
+  /** The distinct content formats each book holds, lowercased. */
+  async findContentFormatsByBookIds(bookIds: number[]): Promise<Map<number, string[]>> {
+    const result = new Map<number, string[]>();
+    if (bookIds.length === 0) return result;
+    const rows = await this.db
+      .selectDistinct({ bookId: bookFiles.bookId, format: bookFiles.format })
+      .from(bookFiles)
+      .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content'), isNotNull(bookFiles.format)));
+    for (const row of rows) {
+      const format = row.format!.toLowerCase();
+      const formats = result.get(row.bookId) ?? [];
+      if (!formats.includes(format)) formats.push(format);
+      result.set(row.bookId, formats);
+    }
+    return result;
+  }
+
+  private async findJoinCandidates(libraryIds: number[], match: SQL, contentFilters?: ContentFilterRules): Promise<BookDockJoinCandidateRow[]> {
+    if (libraryIds.length === 0) return [];
+    const visible = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
+    return this.db
+      .select({
+        bookId: books.id,
+        libraryId: books.libraryId,
+        folderPath: books.folderPath,
+        libraryFolderPath: libraryFolders.path,
+        storedAsFile: storedAsFile(),
+        title: bookMetadata.title,
+        titleKey: sql<string | null>`lower(${bookMetadata.title})`,
+        isbn10: bookMetadata.isbn10,
+        isbn13: bookMetadata.isbn13,
+        hardcoverId: bookMetadata.hardcoverId,
+        openLibraryId: bookMetadata.openLibraryId,
+      })
+      .from(bookMetadata)
+      .innerJoin(books, eq(books.id, bookMetadata.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, books.libraryFolderId))
+      .where(and(match, inArray(books.libraryId, libraryIds), eq(books.status, 'present'), ...visible))
+      .orderBy(asc(books.id))
+      .limit(JOIN_CANDIDATE_LIMIT);
   }
 
   async findSelectionBatch(options: SelectionBatchOptions): Promise<BookDockFileRow[]> {

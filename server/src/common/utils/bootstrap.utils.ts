@@ -116,6 +116,18 @@ export function shouldInjectEmptyJsonBody(method: string, headers: IncomingHttpH
   return contentLength === undefined || contentLength === '0';
 }
 
+// The injected '{}' rewrites content-length and becomes the parsed body, so only this marker still
+// says the client sent nothing. App Attest needs that to hash the bytes the client really signed.
+const requestsWithInjectedEmptyBody = new WeakSet<object>();
+
+export function markEmptyBodyInjected(request: object): void {
+  requestsWithInjectedEmptyBody.add(request);
+}
+
+export function hasInjectedEmptyBody(request: object): boolean {
+  return requestsWithInjectedEmptyBody.has(request);
+}
+
 export function buildEmptyJsonBodyStream(headers: IncomingHttpHeaders): Readable {
   headers['content-length'] = String(Buffer.byteLength(EMPTY_JSON_BODY));
   return Readable.from([Buffer.from(EMPTY_JSON_BODY)]);

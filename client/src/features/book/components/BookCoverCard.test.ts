@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
-import type { BookCard } from '@bookorbit/types'
+import type { BookCard, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
 
 // -- module mocks (must precede imports) -------------------------------------
@@ -69,6 +69,7 @@ const mockThumbnailClickAction = ref('reader')
 vi.mock('@/composables/useDisplaySettings', () => ({
   useDisplaySettings: () => ({
     cardOverlays: mockCardOverlays,
+    formatBadgeStyle: ref('primary'),
     bookSpineOverlay: ref('off'),
     bookShadowStrength: ref('default'),
     bookCoverDisplayMode: mockBookCoverDisplayMode,
@@ -105,6 +106,7 @@ vi.mock('@/features/book/lib/book-cover', () => ({
 
 vi.mock('@/features/book/lib/format-colors', () => ({
   getFormatColor: () => '#4a90e2',
+  formatChipStyle: () => ({}),
 }))
 
 vi.mock('@/features/book/components/BookCoverPlaceholder.vue', () => ({
@@ -187,7 +189,15 @@ function makeReadStatus(status: NonNullable<BookCard['readStatus']>['status']): 
 }
 
 function mountCard(
-  props: Partial<{ book: BookCard; selectionMode: boolean; selected: boolean; showLabel: boolean; onSelect: (e: MouseEvent) => void }> = {},
+  props: Partial<{
+    book: BookCard
+    selectionMode: boolean
+    selected: boolean
+    showLabel: boolean
+    mediaKind: ConcreteBookMediaKind
+    coverAspectRatio: CoverAspectRatio
+    onSelect: (e: MouseEvent) => void
+  }> = {},
 ) {
   return mount(BookCoverCard, {
     props: { book: makeBook(), selectionMode: false, selected: false, ...props },
@@ -475,7 +485,7 @@ describe('BookCoverCard', () => {
     it('uses coverUrl composable for the image src', () => {
       const book = makeBook({ id: 42, hasCover: true })
       mountCard({ book })
-      expect(mockCoverUrl).toHaveBeenCalledWith(42, 'thumbnail', book.coverVersion)
+      expect(mockCoverUrl).toHaveBeenCalledWith(42, 'thumbnail', book.coverVersion, undefined)
     })
 
     it('constrains overlays to the natural fitted cover frame after image load', async () => {
@@ -672,6 +682,78 @@ describe('BookCoverCard', () => {
       expect(mockBumpVersion).toHaveBeenCalledWith(42)
       expect(mockToastError).not.toHaveBeenCalled()
       vi.unstubAllGlobals()
+    })
+  })
+
+  // ── grid media kind ───────────────────────────────────────────────────────
+
+  describe('grid media kind', () => {
+    function dualFormatBook(primary: 'epub' | 'm4b') {
+      const epub = makeFile({ id: 10, format: 'epub', role: primary === 'epub' ? 'primary' : 'content' })
+      const m4b = makeFile({ id: 11, format: 'm4b', role: primary === 'm4b' ? 'primary' : 'content' })
+      return makeBook({
+        id: 42,
+        hasCover: true,
+        coverAspectRatio: primary === 'epub' ? '2/3' : '1/1',
+        coverVersion: `${primary === 'epub' ? 'ebook' : 'audio'}:2026-01-01T00:00:00.000Z:2026-01-02T00:00:00.000Z`,
+        files: primary === 'epub' ? [epub, m4b] : [m4b, epub],
+      })
+    }
+
+    function coverFrameStyle(wrapper: ReturnType<typeof mountCard>) {
+      return (wrapper.get('[style*="aspect-ratio"]').attributes('style') ?? '').replace(/\s/g, '')
+    }
+
+    beforeEach(() => {
+      mockCardOverlays.value = ['format']
+    })
+
+    it('draws an ebook-primary book as its audiobook in an audiobook grid', async () => {
+      const book = dualFormatBook('epub')
+      const wrapper = mountCard({ book, mediaKind: 'audiobook' })
+
+      expect(mockCoverUrl).toHaveBeenLastCalledWith(42, 'thumbnail', book.coverVersion, 'audio')
+      expect(coverFrameStyle(wrapper)).toContain('aspect-ratio:1/1')
+      expect(wrapper.getComponent({ name: 'BookFormatChip' }).props('formatKey')).toBe('m4b')
+      expect(wrapper.getComponent({ name: 'BookCoverArtwork' }).props('isAudio')).toBe(true)
+
+      await wrapper.get('[data-testid="grid-card-primary-action"]').trigger('click')
+      expect(mockRouterPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 42, fileId: 11 } }))
+    })
+
+    it('draws an audiobook-primary book as its ebook in an ebook grid', async () => {
+      const book = dualFormatBook('m4b')
+      const wrapper = mountCard({ book, mediaKind: 'ebook' })
+
+      expect(mockCoverUrl).toHaveBeenLastCalledWith(42, 'thumbnail', book.coverVersion, 'ebook')
+      expect(coverFrameStyle(wrapper)).toContain('aspect-ratio:2/3')
+      expect(wrapper.getComponent({ name: 'BookFormatChip' }).props('formatKey')).toBe('epub')
+      expect(wrapper.getComponent({ name: 'BookCoverArtwork' }).props('isAudio')).toBe(false)
+
+      await wrapper.get('[data-testid="grid-card-primary-action"]').trigger('click')
+      expect(mockRouterPush).toHaveBeenCalledWith(expect.objectContaining({ name: 'reader', params: { bookId: 42, fileId: 10 } }))
+    })
+
+    it('keeps the default cover URL when the default face already shows that medium', () => {
+      const book = dualFormatBook('epub')
+      mountCard({ book, mediaKind: 'ebook' })
+
+      expect(mockCoverUrl).toHaveBeenLastCalledWith(42, 'thumbnail', book.coverVersion, undefined)
+    })
+
+    it('keeps its own face when the book has no file of the grid medium', () => {
+      const book = makeBook({ id: 42, hasCover: true, files: [makeFile({ id: 10, format: 'epub', role: 'primary' })] })
+      const wrapper = mountCard({ book, mediaKind: 'audiobook' })
+
+      expect(mockCoverUrl).toHaveBeenLastCalledWith(42, 'thumbnail', book.coverVersion, undefined)
+      expect(coverFrameStyle(wrapper)).toContain('aspect-ratio:2/3')
+      expect(wrapper.getComponent({ name: 'BookFormatChip' }).props('formatKey')).toBe('epub')
+    })
+
+    it('lets an explicit grid frame win over the medium frame', () => {
+      const wrapper = mountCard({ book: dualFormatBook('epub'), mediaKind: 'audiobook', coverAspectRatio: '2/3' })
+
+      expect(coverFrameStyle(wrapper)).toContain('aspect-ratio:2/3')
     })
   })
 

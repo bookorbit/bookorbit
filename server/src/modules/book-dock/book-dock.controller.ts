@@ -299,6 +299,7 @@ export class BookDockController {
       dto.search,
       dto.needsReview,
       dto.readyToFile,
+      user,
     );
   }
 
@@ -320,6 +321,7 @@ export class BookDockController {
       dto.search,
       dto.needsReview,
       dto.readyToFile,
+      user,
     );
   }
 
@@ -351,6 +353,7 @@ export class BookDockController {
       dto.search,
       dto.needsReview,
       dto.readyToFile,
+      user,
     );
   }
 

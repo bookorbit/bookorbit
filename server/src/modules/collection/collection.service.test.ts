@@ -32,6 +32,7 @@ function makeCollection(overrides?: Record<string, unknown>) {
     icon: 'FolderOpen',
     description: null,
     isPublic: false,
+    coverAspectRatio: '2/3',
     syncToKobo: false,
     displayOrder: 0,
     createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -282,6 +283,53 @@ describe('CollectionService', () => {
     });
   });
 
+  describe('grid shape (issue #1926)', () => {
+    it('create persists a square grid shape and returns it', async () => {
+      const { service, collectionRepo } = makeService();
+      const created = makeCollection({ id: 28, userId: 9, coverAspectRatio: '1/1' });
+      collectionRepo.insert.mockResolvedValue([created]);
+      collectionRepo.findByIdForViewer.mockResolvedValue([created]);
+
+      const result = await service.create({ name: 'Listening', icon: 'Headphones', coverAspectRatio: '1/1' }, makeUser({ id: 9 }));
+
+      expect(collectionRepo.insert).toHaveBeenCalledWith(expect.objectContaining({ coverAspectRatio: '1/1' }));
+      expect(result).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+    });
+
+    it('create leaves the shape to the column default when the payload omits it', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.insert.mockResolvedValue([makeCollection()]);
+
+      await service.create({ name: 'Favorites', icon: 'FolderOpen' }, makeUser());
+
+      const [values] = collectionRepo.insert.mock.calls[0] as [Record<string, unknown>];
+      expect(values.coverAspectRatio).toBeUndefined();
+    });
+
+    it('update writes the grid shape and leaves it alone when the payload omits it', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      collectionRepo.findByIdForViewer.mockResolvedValue([makeCollection({ coverAspectRatio: '1/1' })]);
+
+      const result = await service.update(10, { coverAspectRatio: '1/1' }, makeUser());
+      await service.update(10, { name: 'Renamed' }, makeUser());
+
+      expect(collectionRepo.update).toHaveBeenNthCalledWith(1, 10, 1, { coverAspectRatio: '1/1' });
+      expect(collectionRepo.update).toHaveBeenNthCalledWith(2, 10, 1, { name: 'Renamed' });
+      expect(result).toEqual(expect.objectContaining({ coverAspectRatio: '1/1' }));
+    });
+
+    it('reports an unrecognised stored shape as portrait', async () => {
+      const { service, collectionRepo } = makeService();
+      collectionRepo.findById.mockResolvedValue([makeCollection()]);
+      collectionRepo.findByIdForViewer.mockResolvedValue([makeCollection({ coverAspectRatio: '4/5' })]);
+
+      const result = await service.findOne(10, makeUser());
+
+      expect(result).toEqual(expect.objectContaining({ coverAspectRatio: '2/3' }));
+    });
+  });
+
   describe('create/remove', () => {
     it('creates collection for current user and returns hydrated row', async () => {
       const { service, collectionRepo } = makeService();
@@ -471,7 +519,7 @@ describe('CollectionService', () => {
           sort: [{ field: 'collectionOrder', dir: 'asc' }],
           pagination: { page: 0, size: 50 },
         },
-        { defaultCollectionId: 10 },
+        { defaultCollectionId: 10, viewer: expect.objectContaining({ id: 1 }) },
       );
     });
 
@@ -510,7 +558,7 @@ describe('CollectionService', () => {
           collapseSeries: true,
           q: 'science',
         }),
-        { defaultCollectionId: 10 },
+        { defaultCollectionId: 10, viewer: expect.objectContaining({ id: 1 }) },
       );
       expect(result).toEqual({ items: [{ id: 2 }, { id: 1 }], total: 2, page: 0, size: 50 });
     });

@@ -147,6 +147,12 @@ export class UpdateBookDockFileDto {
   targetFolderId?: number | null;
 }
 
+class FinalizeJoinBookDto {
+  @IsInt()
+  @Min(1)
+  bookId!: number;
+}
+
 class FinalizeOverrideDto {
   @IsInt()
   fileId: number;
@@ -164,6 +170,12 @@ class FinalizeOverrideDto {
   @IsNotEmpty()
   @MaxLength(255)
   targetFileName?: string;
+
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => FinalizeJoinBookDto)
+  joinBook?: FinalizeJoinBookDto;
 }
 
 @HasCompleteDefaultDestination()

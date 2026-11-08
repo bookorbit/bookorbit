@@ -12,7 +12,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { mkdtemp, rm, stat, rename } from 'fs/promises';
-import { inArray, type SQL } from 'drizzle-orm';
+import { and, inArray, type SQL } from 'drizzle-orm';
 
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { chapterProvenance, normalizeAudiobookChapters, resolveStoredAudiobookChapters } from '../../common/utils/audiobook-chapters.utils';
@@ -39,6 +39,7 @@ import { tmpdir } from 'os';
 
 import {
   BOOK_FILTER_FORMATS,
+  BOOK_MERGED_ERROR_CODE,
   BOOK_METADATA_LOCK_FIELDS,
   DEFAULT_DOWNLOAD_PATTERN,
   COVER_MEDIA,
@@ -57,6 +58,7 @@ import type {
   AccessLevel,
   AudiobookChapter,
   AudiobookChapterSource,
+  BookCard,
   BookCommunityRating,
   BookKoboState,
   BookMetadataRefreshPreviewFields,
@@ -83,7 +85,7 @@ import type {
   WriteResult,
   EpubMediaOverlayCapability,
 } from '@bookorbit/types';
-import type { ContentFilterRules } from '@bookorbit/types';
+import type { ContentFilterRules, LinkedBookSummary } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
@@ -120,6 +122,7 @@ import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sy
 import type { DeliveryArtifact } from './delivery-artifact.service';
 import { DeliverySelectionService } from './delivery-selection.service';
 import { AudiolessEpubService } from './audioless-epub.service';
+import { BookLinkMembersRepository, toLinkedBookSummary } from './book-link-members.repository';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
 import { CustomMetadataService } from '../custom-metadata/custom-metadata.service';
@@ -142,6 +145,7 @@ import { inspectEpubMediaOverlayFields, mediaOverlayCapabilityFromFields } from 
 import { computeFileHash } from '../scanner/lib/hash';
 import { compareCfi } from '../position-converter/cfi.utils';
 import { PositionConverterService } from '../position-converter/position-converter.service';
+import { BookAliasService } from '../book-alias/book-alias.service';
 
 type SeriesCollapseQueryOptions = {
   seriesSelectionFilter: GroupRule | undefined;
@@ -149,6 +153,8 @@ type SeriesCollapseQueryOptions = {
 
 type BookQueryExecutionOptions = Partial<SeriesCollapseQueryOptions> & {
   defaultCollectionId?: number;
+  /** Who the cards are for. When set, each card lists the linked books this user can see. */
+  viewer?: RequestUser;
 };
 
 const METADATA_UPDATE_FAILPOINTS = [
@@ -346,6 +352,8 @@ export class BookService {
     @Optional() private readonly audiobookChapters?: AudiobookChaptersService,
     @Optional() private readonly providerIdStore?: ProviderIdStore,
     @Optional() private readonly providerRegistry?: ProviderRegistry,
+    @Optional() private readonly bookAlias?: BookAliasService,
+    @Optional() private readonly linkMembers?: BookLinkMembersRepository,
   ) {
     this.appDataPath = this.config.get<string>('storage.appDataPath')!;
   }
@@ -606,26 +614,48 @@ export class BookService {
 
   async verifyBookAccess(bookId: number, user: RequestUser, required: AccessLevel = 'viewer'): Promise<void> {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
-    if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    // Not found, rather than forbidden. A 403 tells the caller the book exists, and book ids are
-    // sequential integers, so the id space can be walked to learn which books a server holds. The
-    // upload session routes already answer 404 for another account's session, and the content
-    // filter branch below already answers 404 here, so this is the one denial reason in this method
-    // that was disclosing existence. Measured as F-013.
+    if (libraryId === null) throw await this.missingBookError(bookId, user);
+    if (!(await this.canSeeBook(bookId, libraryId, user))) throw new NotFoundException(`Book ${bookId} not found`);
+    if (required !== 'viewer') await this.libraryService.verifyUserAccessLevel(user.id, libraryId, this.isSuperuser(user), required);
+  }
+
+  /**
+   * Not found, rather than forbidden. A 403 tells the caller the book exists, and book ids are
+   * sequential integers, so the id space can be walked to learn which books a server holds. The
+   * upload session routes already answer 404 for another account's session, and the content filter
+   * check already answers 404, so a forbidden library is the one denial reason that was disclosing
+   * existence. Measured as F-013.
+   */
+  private async canSeeBook(bookId: number, libraryId: number, user: RequestUser): Promise<boolean> {
     try {
       await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
     } catch (error) {
-      if (error instanceof ForbiddenException) {
-        throw new NotFoundException(`Book ${bookId} not found`);
-      }
+      if (error instanceof ForbiddenException) return false;
       throw error;
     }
-
     if (!this.isSuperuser(user) && user.contentFilters) {
-      const passes = await this.checkBookPassesContentFilters(bookId, user.contentFilters);
-      if (!passes) throw new NotFoundException(`Book ${bookId} not found`);
+      return this.checkBookPassesContentFilters(bookId, user.contentFilters);
     }
-    if (required !== 'viewer') await this.libraryService.verifyUserAccessLevel(user.id, libraryId, this.isSuperuser(user), required);
+    return true;
+  }
+
+  /**
+   * A merged-away id names the book it was merged into, so a client can follow it. Only to a caller
+   * who can see that book; anyone else gets the plain 404, which says nothing about either book.
+   */
+  private async missingBookError(bookId: number, user: RequestUser): Promise<NotFoundException> {
+    const targetBookId = (await this.bookAlias?.resolveOne(bookId)) ?? null;
+    if (targetBookId !== null) {
+      const targetLibraryId = await this.bookRepo.findLibraryIdByBookId(targetBookId);
+      if (targetLibraryId !== null && (await this.canSeeBook(targetBookId, targetLibraryId, user))) {
+        return new NotFoundException({
+          message: 'Book was merged into another book',
+          errorCode: BOOK_MERGED_ERROR_CODE,
+          errorMeta: { targetBookId },
+        });
+      }
+    }
+    return new NotFoundException(`Book ${bookId} not found`);
   }
 
   setHardcoverEditionIdIfEmpty(bookId: number, hardcoverEditionId: string): Promise<boolean> {
@@ -1176,7 +1206,7 @@ export class BookService {
       timeZone,
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
-    return this.executeBooksQuery(user.id, where, query);
+    return this.executeBooksQuery(user.id, where, query, { viewer: user });
   }
 
   /** Browse-header counts from the listing's own where clause; sort, paging and collapse are ignored. */
@@ -1224,7 +1254,36 @@ export class BookService {
       timeZone,
       contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
     });
-    return this.executeBooksQuery(user.id, where, query);
+    return this.executeBooksQuery(user.id, where, query, { viewer: user });
+  }
+
+  /** Every book this user may see: their libraries and, unless a superuser, their content filters. */
+  async accessibleBooksWhere(user: RequestUser): Promise<SQL | undefined> {
+    const libs = await this.libraryService.findAll(user);
+    return this.queryBuilder.buildWhere(undefined, {
+      accessibleLibraryIds: libs.map((l) => l.id),
+      userId: user.id,
+      timeZone: this.resolveUserTimeZone(user),
+      contentFilters: this.isSuperuser(user) ? undefined : user.contentFilters,
+    });
+  }
+
+  /** Cards for these books in the order given, without any this user may not see. */
+  async findCardsByIds(user: RequestUser, ids: number[]): Promise<BookCard[]> {
+    const unique = [...new Set(ids)];
+    if (unique.length === 0) return [];
+    const where = and(await this.accessibleBooksWhere(user), inArray(books.id, unique));
+    const page = await this.executeBooksQuery(
+      user.id,
+      where,
+      {
+        sort: [{ field: 'title', dir: 'asc' }],
+        pagination: { page: 0, size: unique.length },
+      },
+      { viewer: user },
+    );
+    const byId = new Map(page.items.map((card) => [card.id, card]));
+    return unique.flatMap((id) => byId.get(id) ?? []);
   }
 
   /**
@@ -1247,11 +1306,13 @@ export class BookService {
     // caller resolved the selection filter to nothing, which is not the same thing.
     const seriesSelectionFilter = options && 'seriesSelectionFilter' in options ? options.seriesSelectionFilter : query.filter;
     const shouldCollapse = query.collapseSeries === true && !BookQueryBuilder.hasSeriesSelectionFilter(seriesSelectionFilter);
+    const collapseLinked = await this.shouldCollapseLinks(query, where);
+    const reportsBookTotal = query.collapseSeries === true || query.collapseLinked === true;
 
     const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
 
     if (shouldCollapse) {
-      const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
+      const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total, bookTotal } =
         await this.bookRepo.findCardsCollapsed({
           where,
           sort: query.sort,
@@ -1261,6 +1322,7 @@ export class BookService {
           customFieldTypes,
           ...(options?.defaultCollectionId !== undefined ? { defaultCollectionId: options.defaultCollectionId } : {}),
           ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
+          ...(collapseLinked ? { collapseLinked: true } : {}),
         });
       // Collapsed rows render BookTableCollapsedSeriesCell which does not display custom metadata.
       const cards = assembleCollapsedBookCards(
@@ -1275,16 +1337,18 @@ export class BookService {
         seriesMembershipRows,
       );
       await this.coverStore.enrichCardFaces(cards);
-      const result = {
+      await this.attachCardLinks(cards, options?.viewer);
+      const result: BooksPage = {
         items: cards,
         total,
         page,
         size,
+        bookTotal: bookTotal ?? total,
       };
       const durationMs = Date.now() - start;
       if (durationMs >= 500) {
         this.logger.warn(
-          `[book.list_query] [end] userId=${userId} page=${page} size=${size} filterCount=${query.filter?.rules?.length ?? 0} sortFields=${query.sort?.length ?? 0} collapseSeries=true resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
+          `[book.list_query] [end] userId=${userId} page=${page} size=${size} filterCount=${query.filter?.rules?.length ?? 0} sortFields=${query.sort?.length ?? 0} collapseSeries=true collapseLinked=${collapseLinked} resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
         );
       }
       return result;
@@ -1295,14 +1359,17 @@ export class BookService {
       ...(query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {}),
       ...(query.q !== undefined ? { query: query.q } : {}),
     });
-    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } =
-      await this.bookRepo.findCards({
-        where,
-        orderBy,
-        limit: size,
-        offset: page * size,
-        userId,
-      });
+    const cardQuery = { where, orderBy, limit: size, offset: page * size, userId };
+    let bookTotal: number | undefined;
+    let cardPage: Awaited<ReturnType<BookRepository['findCards']>>;
+    if (collapseLinked) {
+      const folded = await this.bookRepo.findCardsLinkCollapsed(cardQuery);
+      cardPage = folded;
+      bookTotal = folded.bookTotal;
+    } else {
+      cardPage = await this.bookRepo.findCards(cardQuery);
+    }
+    const { rows, authorRows, fileRows, genreRows, tagRows, progressRows, statusRows, narratorRows, seriesMembershipRows, total } = cardPage;
     const bookIds = rows.map((r) => r.id);
     const customMetadataRows = await this.customMetadataService.getCardValues(bookIds);
     const cards = assembleBookCards(
@@ -1318,19 +1385,45 @@ export class BookService {
       customMetadataRows,
     );
     await this.coverStore.enrichCardFaces(cards);
-    const result = {
+    await this.attachCardLinks(cards, options?.viewer);
+    const result: BooksPage = {
       items: cards,
       total,
       page,
       size,
+      ...(reportsBookTotal ? { bookTotal: bookTotal ?? total } : {}),
     };
     const durationMs = Date.now() - start;
     if (durationMs >= 500) {
       this.logger.warn(
-        `[book.list_query] [end] userId=${userId} page=${page} size=${size} filterCount=${query.filter?.rules?.length ?? 0} sortFields=${query.sort?.length ?? 0} collapseSeries=false resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
+        `[book.list_query] [end] userId=${userId} page=${page} size=${size} filterCount=${query.filter?.rules?.length ?? 0} sortFields=${query.sort?.length ?? 0} collapseSeries=false collapseLinked=${collapseLinked} resultCount=${result.items.length} durationMs=${durationMs} - slow query`,
       );
     }
     return result;
+  }
+
+  /**
+   * Folding linked books is opt-in (`collapseLinked`, never sent by released clients) and costs one
+   * probe. Where no link group has two members in the listing, the plain query runs unchanged.
+   */
+  private async shouldCollapseLinks(query: BookQuery, where: SQL | undefined): Promise<boolean> {
+    return query.collapseLinked === true && (await this.bookRepo.hasCollapsibleLinks(where));
+  }
+
+  /**
+   * Fills `linked` for cards whose book shares a group with present books this user can see, in one
+   * query for the page. A series stack stands for several books, so it carries none.
+   */
+  private async attachCardLinks(cards: BookCard[], viewer: RequestUser | undefined): Promise<void> {
+    if (!viewer) return;
+    const bookIds = cards.filter((card) => (card.collapsedSeries?.bookCount ?? 1) <= 1).map((card) => card.id);
+    const linkedIds = await this.bookRepo.findLinkedBookIds(bookIds);
+    if (linkedIds.length === 0) return;
+    const links = await this.bookRepo.findCardLinks(linkedIds, await this.accessibleBooksWhere(viewer));
+    for (const card of cards) {
+      const info = links.get(card.id);
+      if (info) card.linked = info;
+    }
   }
 
   async executeBookIdsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<number[]> {
@@ -1377,7 +1470,10 @@ export class BookService {
     if (!strategy) throw new BadRequestException('jump buckets are not available for this sort');
 
     const start = Date.now();
+    let collapseLinked = false;
     try {
+      collapseLinked = await this.shouldCollapseLinks(query, where);
+      const randomSeedOption = query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {};
       let response: JumpBucketsResponse;
       if (strategy.kind === 'temporal') {
         const temporalOpts = {
@@ -1389,9 +1485,19 @@ export class BookService {
           timeZone,
           maxBuckets: query.maxBuckets,
         };
-        response = shouldCollapse
-          ? await this.bookRepo.findTemporalJumpBucketsCollapsed(temporalOpts)
-          : await this.bookRepo.findTemporalJumpBuckets(temporalOpts);
+        if (shouldCollapse) {
+          response = await this.bookRepo.findTemporalJumpBucketsCollapsed({ ...temporalOpts, ...(collapseLinked ? { collapseLinked: true } : {}) });
+        } else {
+          // A folded group sits where the listing's full order puts its first member, so the
+          // buckets rank members with that same order.
+          const linkCollapseOrderBy = collapseLinked
+            ? this.queryBuilder.buildOrderBy(query.sort, userId, await this.resolveCustomSortFieldTypes(query.sort), {
+                ...randomSeedOption,
+                ...(query.q !== undefined ? { query: query.q } : {}),
+              })
+            : undefined;
+          response = await this.bookRepo.findTemporalJumpBuckets({ ...temporalOpts, ...(linkCollapseOrderBy ? { linkCollapseOrderBy } : {}) });
+        }
       } else {
         const discreteOpts = {
           where,
@@ -1404,26 +1510,27 @@ export class BookService {
         // rows inside a bucket, so they can reference custom fields. The temporal path
         // never applies the full sort, which is why this only matters here.
         const customFieldTypes = await this.resolveCustomSortFieldTypes(query.sort);
-        const randomSeedOption = query.randomSeed !== undefined ? { randomSeed: query.randomSeed } : {};
+        const linkOption = collapseLinked ? { collapseLinked: true } : {};
         response = shouldCollapse
-          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort, customFieldTypes, ...randomSeedOption })
+          ? await this.bookRepo.findJumpBucketsCollapsed({ ...discreteOpts, sort: query.sort, customFieldTypes, ...randomSeedOption, ...linkOption })
           : await this.bookRepo.findJumpBuckets({
               ...discreteOpts,
               orderBy: this.queryBuilder.buildOrderBy(query.sort, userId, customFieldTypes, {
                 ...randomSeedOption,
                 ...(query.q !== undefined ? { query: query.q } : {}),
               }),
+              ...linkOption,
             });
       }
       this.logger.log(
-        `[${event}] [end] userId=${userId} kind=${kind} collapse=${shouldCollapse} maxBuckets=${query.maxBuckets} durationMs=${Date.now() - start} bucketCount=${response.buckets.length} total=${response.total} - jump buckets computed`,
+        `[${event}] [end] userId=${userId} kind=${kind} collapse=${shouldCollapse} collapseLinked=${collapseLinked} maxBuckets=${query.maxBuckets} durationMs=${Date.now() - start} bucketCount=${response.buckets.length} total=${response.total} - jump buckets computed`,
       );
       return response;
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
       this.logger.warn(
-        `[${event}] [fail] userId=${userId} kind=${kind} collapse=${shouldCollapse} durationMs=${Date.now() - start} errorClass=${errorClass} error="${errorMessage}" - jump buckets failed`,
+        `[${event}] [fail] userId=${userId} kind=${kind} collapse=${shouldCollapse} collapseLinked=${collapseLinked} durationMs=${Date.now() - start} errorClass=${errorClass} error="${errorMessage}" - jump buckets failed`,
       );
       throw err;
     }
@@ -2697,12 +2804,39 @@ export class BookService {
     };
   }
 
-  async bulkSetStatus(bookIds: number[], status: ReadStatus, user: RequestUser): Promise<void> {
+  async bulkSetStatus(bookIds: number[], dto: Pick<SetStatusDto, 'status' | 'startedAt' | 'finishedAt'>, user: RequestUser): Promise<void> {
+    if (dto.status === undefined) throw new BadRequestException('status is required');
+    const status = dto.status;
     const event = 'book.bulk.set_status';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${bookIds.length} status=${status} - bulk set status started`);
     await this.verifyLibraryAccessForBookIds(bookIds, user);
-    await this.userBookStatusService.bulkSetManual(user.id, bookIds, status);
+    const timeZone = this.resolveUserTimeZone(user);
+    const datePatch: { startedAt?: Date | null; finishedAt?: Date | null } = {};
+    const dateKeys: { startedOn?: string | null; endedOn?: string | null } = {};
+
+    if (dto.startedAt !== undefined) {
+      if (dto.startedAt === null) {
+        datePatch.startedAt = null;
+        dateKeys.startedOn = null;
+      } else {
+        const normalized = this.parseManualReadDateInput(dto.startedAt, 'startedAt', timeZone);
+        datePatch.startedAt = normalized.date;
+        dateKeys.startedOn = normalized.dateKey;
+      }
+    }
+    if (dto.finishedAt !== undefined) {
+      if (dto.finishedAt === null) {
+        datePatch.finishedAt = null;
+        dateKeys.endedOn = null;
+      } else {
+        const normalized = this.parseManualReadDateInput(dto.finishedAt, 'finishedAt', timeZone);
+        datePatch.finishedAt = normalized.date;
+        dateKeys.endedOn = normalized.dateKey;
+      }
+    }
+
+    await this.userBookStatusService.bulkSetManual(user.id, bookIds, status, datePatch, dateKeys, timeZone);
     this.logger.log(
       `[${event}] [end] userId=${user.id} count=${bookIds.length} status=${status} durationMs=${Date.now() - startedAt} - bulk set status completed`,
     );
@@ -3530,7 +3664,7 @@ export class BookService {
 
   async getDetail(id: number, user: RequestUser): Promise<BookDetailDto> {
     await this.verifyBookAccess(id, user);
-    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows, readAloudSyncMode, coverContext] = await Promise.all([
+    const [result, personalRating, personalNote, readStatus, comicMeta, collectionRows, readAloudSyncMode, coverContext, linked] = await Promise.all([
       this.bookRepo.findById(id),
       this.bookRepo.findRatingByBookAndUser(id, user.id),
       this.userBookNoteService.findOne(user.id, id),
@@ -3539,6 +3673,7 @@ export class BookService {
       this.bookRepo.findCollectionsByBookId(id, user.id),
       this.bookRepo.findReadAloudSyncMode(user.id, id),
       this.coverStore.contextFor(id),
+      this.findLinkedBooks(id, user),
     ]);
     if (!result || !coverContext) throw new NotFoundException(`Book ${id} not found`);
 
@@ -3654,7 +3789,25 @@ export class BookService {
         writableFields: [],
       },
       ...supplementalFields,
+      linkedBooks: linked.books,
+      linkGroupId: linked.groupId,
+      linkIsLead: linked.isLead,
     };
+  }
+
+  /** Other books shown as this one, only those this user may see. Empty when it is not linked. */
+  async findLinkedBooks(bookId: number, user: RequestUser): Promise<{ groupId: number | null; books: LinkedBookSummary[]; isLead: boolean }> {
+    if (!this.linkMembers) return { groupId: null, books: [], isLead: false };
+    const groupId = await this.linkMembers.findGroupId(bookId);
+    if (groupId === null) return { groupId: null, books: [], isLead: false };
+    return this.linkMembers.findLinkedBooks(bookId, groupId, await this.accessibleBooksWhere(user));
+  }
+
+  /** The members of a link group this user may see, lead first. Empty when fewer than two remain. */
+  async findLinkGroupMembers(groupId: number, user: RequestUser): Promise<LinkedBookSummary[]> {
+    if (!this.linkMembers) return [];
+    const members = await this.linkMembers.findMembers([groupId], await this.accessibleBooksWhere(user));
+    return members.map(toLinkedBookSummary);
   }
 
   private async resolveMediaOverlayCapabilities(

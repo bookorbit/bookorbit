@@ -14,8 +14,8 @@ import type {
   TemporalJumpBucketPrecision,
   TemporalJumpBucketUnit,
 } from '@bookorbit/types';
-import type { UnscopedBookRecommendation } from '@bookorbit/types';
-import { READ_ALONG_FORMAT_PRIORITY, isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
+import type { BookCardLinkInfo, UnscopedBookRecommendation } from '@bookorbit/types';
+import { READ_ALONG_FORMAT_PRIORITY, getBookMediaKind, isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
@@ -28,6 +28,7 @@ import { SeriesIdentityService } from '../../common/services/series-identity.ser
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { letterJumpBucketExpr } from './jump-bucket-expr';
+import { LINK_FOLDED_BY_PREFERENCE_SQL, LINK_FOLDED_BY_SORT_SQL, LINK_FOLDED_COUNT_SQL, linkMembersCte } from './link-collapse-sql';
 import { preserveOutgoingChapters } from '../../db/preserve-audiobook-revision';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -37,6 +38,7 @@ import {
   bookCommunityRatings,
   bookFiles,
   bookGenres,
+  bookLinks,
   bookMetadata,
   bookNarrators,
   bookSeries,
@@ -548,6 +550,25 @@ export class BookRepository {
     return where ? and(where, ne(books.status, 'processing'))! : ne(books.status, 'processing');
   }
 
+  /**
+   * For the series-collapsed queries: with links folded, `base_rows` keeps only each group's
+   * representative, and `addFolded` adds the dropped members back into the book total.
+   */
+  private seriesCollapseLinkParts(visibleWhere: SQL, collapseLinked: boolean): { prefixCte: SQL; where: SQL; addFolded: SQL } {
+    if (!collapseLinked) return { prefixCte: sql``, where: visibleWhere, addFolded: sql`` };
+    return {
+      prefixCte: linkMembersCte(visibleWhere),
+      where: sql`${visibleWhere} AND ${LINK_FOLDED_BY_PREFERENCE_SQL}`,
+      addFolded: sql` + ${LINK_FOLDED_COUNT_SQL}`,
+    };
+  }
+
+  /** For the flat queries: with `orderBy`, each link group keeps only the member that order puts first. */
+  private flatLinkParts(visibleWhere: SQL, orderBy: SQL[] | undefined): { prefixCte: SQL; where: SQL } {
+    if (!orderBy) return { prefixCte: sql``, where: visibleWhere };
+    return { prefixCte: linkMembersCte(visibleWhere, orderBy), where: sql`${visibleWhere} AND ${LINK_FOLDED_BY_SORT_SQL}` };
+  }
+
   async withTransaction<T>(callback: (tx: DbTransaction) => Promise<T>): Promise<T> {
     return this.db.transaction((tx) => callback(tx));
   }
@@ -600,6 +621,145 @@ export class BookRepository {
     const enrichment = await this.enrichBookIds(bookRefs, userId);
 
     return { rows, ...enrichment, total: Number(total) };
+  }
+
+  /**
+   * Whether two or more books of one link group match `where`. When none do, folding linked books
+   * changes nothing, so the listing runs its normal query. Bounded by the number of linked books.
+   */
+  async hasCollapsibleLinks(where: SQL | undefined): Promise<boolean> {
+    const result = await this.db.execute<{ found: boolean }>(sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM book_links bl
+        INNER JOIN books ON books.id = bl.book_id
+        LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+        WHERE ${this.visibleWhere(where)}
+        GROUP BY bl.group_id
+        HAVING count(*) > 1
+      ) AS found
+    `);
+    return result.rows[0]?.found === true;
+  }
+
+  /**
+   * `findCards` with linked books folded into one card per group. Filtering comes first, so only
+   * matching members compete. The card shows the group's representative (`linkMembersCte`) at the
+   * position of the member the sort puts first. Paging keeps the plain listing's plan: the window
+   * functions run over matching linked books only, and an anti-join drops the folded ones.
+   */
+  async findCardsLinkCollapsed(opts: {
+    where: SQL | undefined;
+    orderBy: SQL[];
+    limit: number;
+    offset: number;
+    userId: number;
+  }): Promise<Awaited<ReturnType<BookRepository['findCards']>> & { bookTotal: number }> {
+    const { where, orderBy, limit, offset, userId } = opts;
+    const visibleWhere = this.visibleWhere(where);
+    const link = this.flatLinkParts(visibleWhere, orderBy);
+    const page = await this.db.execute<{ card_id: number; total_count: string; folded_count: string }>(sql`
+      WITH ${link.prefixCte}
+      folded AS (SELECT ${LINK_FOLDED_COUNT_SQL} AS folded_count)
+      SELECT
+        coalesce(rep.id, books.id) AS card_id,
+        count(*) OVER () AS total_count,
+        folded.folded_count
+      FROM books
+      LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+      LEFT JOIN link_members member ON member.id = books.id AND member.matched_members > 1
+      LEFT JOIN link_members rep ON rep.group_id = member.group_id AND rep.pref_rn = 1
+      CROSS JOIN folded
+      WHERE ${link.where}
+      ORDER BY ${sql.join(orderBy, sql`, `)}
+      LIMIT ${limit} OFFSET ${offset}
+    `);
+
+    const first = page.rows[0];
+    if (!first) {
+      const counts = await this.db.execute<{ book_total: string; folded_count: string }>(sql`
+        WITH ${linkMembersCte(visibleWhere)}
+        counted AS (
+          SELECT count(*) AS book_total
+          FROM books
+          LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+          WHERE ${visibleWhere}
+        )
+        SELECT counted.book_total, ${LINK_FOLDED_COUNT_SQL} AS folded_count FROM counted
+      `);
+      const bookTotal = Number(counts.rows[0]?.book_total ?? 0);
+      const empty = await this.findCardsByBookIds([], userId);
+      return { ...empty, total: bookTotal - Number(counts.rows[0]?.folded_count ?? 0), bookTotal };
+    }
+
+    const total = Number(first.total_count);
+    const cardIds = page.rows.map((row) => Number(row.card_id));
+    const cards = await this.findCards({ where: inArray(books.id, cardIds), orderBy: [], limit: cardIds.length, offset: 0, userId });
+    const position = new Map(cardIds.map((id, index) => [id, index]));
+    const rows = cards.rows.slice().sort((a, b) => (position.get(a.id) ?? 0) - (position.get(b.id) ?? 0));
+    return { ...cards, rows, total, bookTotal: total + Number(first.folded_count) };
+  }
+
+  /** Which of these books belong to a link group. */
+  async findLinkedBookIds(bookIds: number[]): Promise<number[]> {
+    if (bookIds.length === 0) return [];
+    const rows = await this.db.select({ bookId: bookLinks.bookId }).from(bookLinks).where(inArray(bookLinks.bookId, bookIds));
+    return rows.map((row) => row.bookId);
+  }
+
+  /**
+   * What each card is linked with: the other present members of its group that pass `accessWhere`
+   * (the viewer's libraries and content filters), with the distinct formats of their content files,
+   * primary first. Cards with no such member are left out, so a hidden member leaves no trace.
+   */
+  async findCardLinks(bookIds: number[], accessWhere: SQL | undefined): Promise<Map<number, BookCardLinkInfo>> {
+    const links = new Map<number, BookCardLinkInfo>();
+    if (bookIds.length === 0) return links;
+    const result = await this.db.execute<{
+      card_book_id: number;
+      group_id: number;
+      book_id: number;
+      library_id: number;
+      formats: string[] | null;
+    }>(sql`
+      SELECT
+        mine.book_id AS card_book_id,
+        mine.group_id,
+        books.id AS book_id,
+        books.library_id,
+        (
+          SELECT array_agg(file_formats.format ORDER BY file_formats.rank_key)
+          FROM (
+            SELECT
+              lower(bf.format) AS format,
+              min(ARRAY[CASE WHEN bf.id = books.primary_file_id THEN 0 ELSE 1 END, coalesce(bf.sort_order, 2147483647), bf.id]) AS rank_key
+            FROM book_files bf
+            WHERE bf.book_id = books.id AND bf.role = 'content' AND bf.format IS NOT NULL
+            GROUP BY lower(bf.format)
+          ) file_formats
+        ) AS formats
+      FROM book_links mine
+      INNER JOIN book_links bl ON bl.group_id = mine.group_id AND bl.book_id <> mine.book_id
+      INNER JOIN books ON books.id = bl.book_id
+      LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+      WHERE mine.book_id IN (${sql.join(
+        bookIds.map((id) => sql`${id}`),
+        sql`, `,
+      )})
+        AND books.status = 'present'
+        AND ${accessWhere ?? sql`true`}
+      ORDER BY mine.book_id, books.id
+    `);
+
+    for (const row of result.rows) {
+      const cardBookId = Number(row.card_book_id);
+      const formats = row.formats ?? [];
+      const info = links.get(cardBookId) ?? { groupId: Number(row.group_id), books: [], memberCount: 1 };
+      info.books.push({ bookId: Number(row.book_id), libraryId: Number(row.library_id), formats, mediaKind: getBookMediaKind(formats[0]) });
+      info.memberCount = info.books.length + 1;
+      links.set(cardBookId, info);
+    }
+    return links;
   }
 
   async findCardIds(opts: { where: SQL | undefined; orderBy: SQL[]; limit: number; offset: number; userId: number }): Promise<number[]> {
@@ -825,6 +985,8 @@ export class BookRepository {
     customFieldTypes?: CustomMetadataFieldTypeMap;
     defaultCollectionId?: number;
     randomSeed?: number;
+    /** Fold linked books to their representative before series are grouped, so no series counts one twice. */
+    collapseLinked?: boolean;
   }): Promise<{
     rows: Array<{
       id: number;
@@ -898,7 +1060,8 @@ export class BookRepository {
     if (defaultCollectionId !== undefined && (!Number.isSafeInteger(defaultCollectionId) || defaultCollectionId <= 0)) {
       throw new BadRequestException('Invalid default collection id');
     }
-    const whereFragment = this.visibleWhere(where);
+    const visibleWhere = this.visibleWhere(where);
+    const link = this.seriesCollapseLinkParts(visibleWhere, opts.collapseLinked === true);
     const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     // The collectionOrder branch of the order by names sort_collection_position, so the column has
     // to exist even for the library and smart scope queries that can never sort on it.
@@ -913,7 +1076,8 @@ export class BookRepository {
           )`;
 
     const result = await this.db.execute<CollapsedRawRow>(sql`
-      WITH base_rows AS (
+      WITH ${link.prefixCte}
+      base_rows AS (
         SELECT
           books.id,
           books.library_id,
@@ -945,7 +1109,7 @@ export class BookRepository {
         FROM books
         INNER JOIN libraries ON libraries.id = books.library_id
         LEFT JOIN book_metadata ON book_metadata.book_id = books.id
-        WHERE ${whereFragment}
+        WHERE ${link.where}
       ),
       series_agg AS (
         SELECT
@@ -1118,7 +1282,7 @@ export class BookRepository {
       totals AS (
         SELECT
           COUNT(*) AS total_count,
-          COALESCE(SUM(COALESCE(book_count, 1)), 0) AS book_total
+          COALESCE(SUM(COALESCE(book_count, 1)), 0)${link.addFolded} AS book_total
         FROM representatives
       )
       SELECT r.*, totals.total_count, totals.book_total
@@ -1186,15 +1350,18 @@ export class BookRepository {
     userId: number;
     maxBuckets: number;
     orderBy: SQL[];
+    /** Count each link group once, at the member `orderBy` puts first, as the folded listing does. */
+    collapseLinked?: boolean;
   }): Promise<JumpBucketsResponse> {
     const source = flatDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
     const visibleWhere = this.visibleWhere(opts.where);
+    const link = this.flatLinkParts(visibleWhere, opts.collapseLinked ? opts.orderBy : undefined);
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
     const result = await this.db.execute<DiscreteJumpBucketRawRow>(
       discreteBucketsQuery({
-        prefixCte: source.prefixCte,
+        prefixCte: sql`${source.prefixCte} ${link.prefixCte}`,
         orderedRows: sql`
         SELECT
           ${bucketExpr} AS bucket,
@@ -1203,7 +1370,7 @@ export class BookRepository {
         FROM ${books}
         LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
         ${source.join}
-        WHERE ${visibleWhere}
+        WHERE ${link.where}
       `,
         maxBuckets: opts.maxBuckets,
       }),
@@ -1220,21 +1387,24 @@ export class BookRepository {
     userId: number;
     timeZone: string;
     maxBuckets: number;
+    /** The listing's order. Set to count each link group once, at the member it puts first. */
+    linkCollapseOrderBy?: SQL[];
   }): Promise<JumpBucketsResponse> {
     const source = temporalSourceParts(opts.field, opts.userId, opts.timeZone, false);
     if (!source) return { buckets: [], total: 0, kind: 'temporal', granularity: null };
 
     const visibleWhere = this.visibleWhere(opts.where);
+    const link = this.flatLinkParts(visibleWhere, opts.linkCollapseOrderBy);
     const temporalRows = sql`
       SELECT ${source.value} AS value
       FROM ${books}
       LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
       ${source.join}
-      WHERE ${visibleWhere}
+      WHERE ${link.where}
     `;
     const result = await this.db.execute<TemporalJumpBucketRawRow>(
       temporalBucketsQuery({
-        prefixCte: source.prefixCte,
+        prefixCte: sql`${source.prefixCte} ${link.prefixCte}`,
         temporalRows,
         precision: opts.precision,
         direction: opts.direction,
@@ -1258,10 +1428,11 @@ export class BookRepository {
     maxBuckets: number;
     customFieldTypes?: CustomMetadataFieldTypeMap;
     randomSeed?: number;
+    collapseLinked?: boolean;
   }): Promise<JumpBucketsResponse> {
     const source = collapsedDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
-    const whereFragment = this.visibleWhere(opts.where);
+    const link = this.seriesCollapseLinkParts(this.visibleWhere(opts.where), opts.collapseLinked === true);
     const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
@@ -1269,6 +1440,7 @@ export class BookRepository {
       discreteBucketsQuery({
         prefixCte: sql`
       ${source.prefixCte}
+      ${link.prefixCte}
       base_rows AS MATERIALIZED (
         SELECT
           books.id,
@@ -1291,7 +1463,7 @@ export class BookRepository {
         FROM books
         LEFT JOIN book_metadata ON book_metadata.book_id = books.id
         ${source.baseJoin}
-        WHERE ${whereFragment}
+        WHERE ${link.where}
       ),
       series_latest AS (
         SELECT
@@ -1349,11 +1521,12 @@ export class BookRepository {
     userId: number;
     timeZone: string;
     maxBuckets: number;
+    collapseLinked?: boolean;
   }): Promise<JumpBucketsResponse> {
     const source = temporalSourceParts(opts.field, opts.userId, opts.timeZone, true);
     if (!source) return { buckets: [], total: 0, kind: 'temporal', granularity: null };
 
-    const whereFragment = this.visibleWhere(opts.where);
+    const link = this.seriesCollapseLinkParts(this.visibleWhere(opts.where), opts.collapseLinked === true);
     const empty = sql.raw('');
     const usesSeriesLatest = opts.field === 'addedAt';
     const seriesLatestCte = usesSeriesLatest
@@ -1370,6 +1543,7 @@ export class BookRepository {
     const sortAddedAt = usesSeriesLatest ? sql`coalesce(sl.latest_added_at, base.added_at)` : sql`base.added_at`;
     const prefixCte = sql`
       ${source.prefixCte}
+      ${link.prefixCte}
       base_rows AS MATERIALIZED (
         SELECT
           ${books.id} AS id,
@@ -1384,7 +1558,7 @@ export class BookRepository {
         FROM ${books}
         LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
         ${source.join}
-        WHERE ${whereFragment}
+        WHERE ${link.where}
       ),
       ${seriesLatestCte}
       representatives AS (

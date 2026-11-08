@@ -229,6 +229,8 @@ export type BookCard = {
   tags: string[];
   customMetadata: CustomMetadataBookValue[];
   collapsedSeries?: import("./series-collapse").CollapsedSeriesInfo;
+  /** Present when the book is linked with others the viewer can see. Sent only by servers with `book-links`. */
+  linked?: import("./book-link").BookCardLinkInfo;
 };
 
 export type BookDetailFile = {
@@ -356,6 +358,12 @@ export type BookDetail = {
   lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
   fileWriteStatus?: BookFileWriteStatus;
+  /** Other books shown as this one, only those the viewer can see. Sent only by servers with `book-links`. */
+  linkedBooks?: import("./book-link").LinkedBookSummary[];
+  /** The link group this book belongs to, when it has one. */
+  linkGroupId?: number | null;
+  /** This book is its link group's main book. False when it is not linked. Absent from older servers. */
+  linkIsLead?: boolean;
 };
 
 export type BookCoverSlot = {
@@ -452,9 +460,12 @@ export type BookKoboState = {
 
 export type BooksPage = {
   items: BookCard[];
+  /** Cards: what paging counts. With a collapse flag, one card can stand for several books. */
   total: number;
   page: number;
   size: number;
+  /** Books behind the cards, set when a collapse flag folded any together. Equals `total` otherwise. */
+  bookTotal?: number;
 };
 
 export type BookFormatFacet = {

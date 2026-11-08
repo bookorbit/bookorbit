@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { ArrowRight, Target, Pencil } from '@lucide/vue'
 
 import { useChartTokens } from '@/composables/useChartTokens'
@@ -154,7 +154,7 @@ function handleCancelEdit() {
     <!-- Goal gauge -->
     <template v-else>
       <div class="relative flex flex-1 items-center justify-center">
-        <VChart :option="option" autoresize style="width: 124px; height: 124px" />
+        <AppChart :option="option" autoresize style="width: 124px; height: 124px" />
         <div class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
           <p class="text-xl leading-none font-semibold tabular-nums text-foreground">{{ data?.completedBooks ?? 0 }}</p>
           <p class="mt-1 text-[11px] leading-none text-muted-foreground">

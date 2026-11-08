@@ -11,7 +11,7 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { Skeleton } from '@/components/ui/skeleton'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
-import { jsonBody } from '@/lib/api-json'
+import { apiError, jsonBody } from '@/lib/api-json'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import type { LibraryCreatorSectionId } from '@/features/library/composables/useLibraryCreator'
@@ -429,7 +429,7 @@ async function confirmDelete() {
         else router.replace('/')
       }
     } else {
-      toast.error(t('settings.admin.libraries.deleteFailed'))
+      toast.error((await apiError(res, 'settings.admin.libraries.deleteFailed')).message)
     }
   } catch {
     toast.error(t('settings.admin.libraries.deleteFailed'))

@@ -18,6 +18,7 @@ import {
   type BookDockFile,
   type BookDockFinalizePreviewResult,
   type BookDockFinalizeResult,
+  type BookDockMetadata,
   type DashboardScrollerResponse,
 } from '@bookorbit/types';
 
@@ -654,6 +655,228 @@ describe('Book Dock ingest + finalize (e2e)', () => {
       expect(await audioDurations(bookId)).toEqual({ files: [AUDIO_SECONDS], book: AUDIO_SECONDS });
       expect(await listenHalfway(bookId)).toMatchObject({ percentage: 50, completed: false });
       expect(await continueListeningIds()).toContain(bookId);
+    });
+  });
+
+  /**
+   * Book Dock "Add to existing book": a docked file becomes another format of a book already on the
+   * shelf, in that book's own folder, and the book keeps the metadata it has (#1568, #1050).
+   */
+  describe('adding a docked file to an existing book', () => {
+    const original = {
+      title: 'Join Target',
+      authors: ['Join Author'],
+      isbn13: '9780441172719',
+      hardcoverId: 'join-target-hc',
+      description: 'Original description',
+    };
+
+    async function seedBook(destination: Awaited<ReturnType<typeof createLibraryWithFolder>>): Promise<number> {
+      const row = await createBookDockRow(context, {
+        fileName: `join-target-${randomUUID()}.fb2`,
+        selectedMetadata: original,
+        targetLibraryId: destination.libraryId,
+        targetFolderId: destination.libraryFolderId,
+      });
+      const response = await context.app.inject({
+        method: 'POST',
+        url: '/api/v1/book-dock/finalize',
+        headers: authHeader(context.adminToken),
+        payload: { fileIds: [row.id] },
+      });
+      expect(response.statusCode).toBe(201);
+      return (response.json() as BookDockFinalizeResult).results[0]!.bookId!;
+    }
+
+    async function dockPdf(
+      destination: Awaited<ReturnType<typeof createLibraryWithFolder>> | null,
+      name: string,
+      selectedMetadata: BookDockMetadata,
+      uploadedBy?: number,
+    ) {
+      const fixture = await createPdfFixture(context.fixture.booksPath, `pdf-fixtures/${randomUUID()}.pdf`, selectedMetadata.title ?? 'PDF');
+      return createBookDockRow(context, {
+        fileName: `${name}-${randomUUID()}.pdf`,
+        content: await readFile(fixture),
+        selectedMetadata,
+        targetLibraryId: destination?.libraryId ?? null,
+        targetFolderId: destination?.libraryFolderId ?? null,
+        uploadedBy: uploadedBy ?? null,
+      });
+    }
+
+    async function post<T>(path: 'finalize' | 'finalize/preview', token: string, payload: Record<string, unknown>) {
+      const response = await context.app.inject({ method: 'POST', url: `/api/v1/book-dock/${path}`, headers: authHeader(token), payload });
+      expect(response.statusCode).toBe(path === 'finalize' ? 201 : 200);
+      return response.json() as T;
+    }
+
+    async function bookState(bookId: number) {
+      const [book] = await context.db.select({ folderPath: schema.books.folderPath }).from(schema.books).where(eq(schema.books.id, bookId)).limit(1);
+      const files = await context.db
+        .select({ format: schema.bookFiles.format, absolutePath: schema.bookFiles.absolutePath })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.bookId, bookId));
+      const [metadata] = await context.db
+        .select({ title: schema.bookMetadata.title, description: schema.bookMetadata.description, isbn13: schema.bookMetadata.isbn13 })
+        .from(schema.bookMetadata)
+        .where(eq(schema.bookMetadata.bookId, bookId))
+        .limit(1);
+      return { folderPath: book!.folderPath, files, metadata };
+    }
+
+    it('suggests the book by ISBN, work id, or title and author, then files the format into its folder and keeps its metadata', async () => {
+      const destination = await createLibraryWithFolder(context, { allowedFormats: ['fb2', 'pdf'] });
+      const bookId = await seedBook(destination);
+      const before = await bookState(bookId);
+
+      const byIsbn = await dockPdf(destination, 'join-isbn', {
+        title: 'Join Target Deluxe',
+        authors: ['Another Name'],
+        isbn13: '978-0-441-17271-9',
+        description: 'Docked description',
+      });
+      const byTitle = await dockPdf(destination, 'join-title', { title: 'Join Target (Unabridged)', authors: ['Join Author'] });
+      const byWork = await dockPdf(destination, 'join-work', { title: 'Retitled Edition', authors: ['Translator'], hardcoverId: 'JOIN-TARGET-HC' });
+      const titleOnly = await dockPdf(destination, 'join-none', { title: 'Join Target', authors: ['Somebody Else'] });
+
+      const suggested = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, {
+        fileIds: [byIsbn.id, byTitle.id, byWork.id, titleOnly.id],
+      });
+      const item = (id: number) => suggested.items.find((entry) => entry.fileId === id);
+      const book = { bookId, title: 'Join Target', authors: ['Join Author'] };
+      expect(item(byIsbn.id)).toMatchObject({
+        status: 'ready',
+        libraryId: destination.libraryId,
+        canJoinBook: true,
+        suggestedJoinBook: { ...book, reason: 'isbn' },
+      });
+      expect(item(byTitle.id)).toMatchObject({ status: 'ready', canJoinBook: true, suggestedJoinBook: { ...book, reason: 'title_author' } });
+      expect(item(byWork.id)).toMatchObject({ status: 'ready', canJoinBook: true, suggestedJoinBook: { ...book, reason: 'work_id' } });
+      expect(item(titleOnly.id)).toMatchObject({ status: 'ready', canJoinBook: true });
+      expect(item(titleOnly.id)).not.toHaveProperty('suggestedJoinBook');
+      expect(suggested.joining).toBe(0);
+
+      const joinPayload = { fileIds: [byIsbn.id], overrides: [{ fileId: byIsbn.id, joinBook: { bookId } }] };
+      const joined = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, joinPayload);
+      expect(joined).toMatchObject({ ready: 1, joining: 1 });
+      expect(joined.items[0]).toMatchObject({ status: 'ready', joinsBook: book });
+      expect(join(destination.folderPath, joined.items[0]!.newName!).startsWith(`${before.folderPath}/`)).toBe(true);
+
+      const result = await post<BookDockFinalizeResult>('finalize', context.adminToken, joinPayload);
+      expect(result).toMatchObject({ succeeded: 1, failed: 0 });
+      expect(result.results[0]).toMatchObject({ success: true, bookId });
+
+      const after = await bookState(bookId);
+      expect(after.folderPath).toBe(before.folderPath);
+      expect(after.files.map((file) => file.format).sort()).toEqual(['fb2', 'pdf']);
+      expect(dirname(after.files.find((file) => file.format === 'pdf')!.absolutePath)).toBe(before.folderPath);
+      expect(after.metadata).toEqual({ title: 'Join Target', description: 'Original description', isbn13: '9780441172719' });
+      expect(after.files).toHaveLength(2);
+      expect(await getBookDockRow(context, byIsbn.id)).toBeUndefined();
+
+      // The format is there now, so a second copy of it is no longer suggested.
+      const again = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, { fileIds: [byTitle.id, byWork.id] });
+      expect(again.items.map((entry) => entry.suggestedJoinBook)).toEqual([undefined, undefined]);
+    });
+
+    it("takes the book's library for a file with no destination of its own", async () => {
+      const destination = await createLibraryWithFolder(context, { allowedFormats: ['fb2', 'pdf'] });
+      const bookId = await seedBook(destination);
+      const homeless = await dockPdf(null, 'join-homeless', { title: 'Anything' });
+
+      const result = await post<BookDockFinalizeResult>('finalize', context.adminToken, {
+        fileIds: [homeless.id],
+        overrides: [{ fileId: homeless.id, joinBook: { bookId } }],
+      });
+
+      expect(result.results[0]).toMatchObject({ success: true, bookId });
+      expect((await bookState(bookId)).files.map((file) => file.format).sort()).toEqual(['fb2', 'pdf']);
+    });
+
+    it('never suggests a book sitting loose at the library root, and holds an explicit join to one', async () => {
+      const destination = await createLibraryWithFolder(context, { allowedFormats: ['fb2', 'pdf'] });
+      await context.db
+        .update(schema.libraries)
+        .set({ fileNamingPattern: '<{title}|{originalFilename}> - <{authors:first}>' })
+        .where(eq(schema.libraries.id, destination.libraryId));
+      const bookId = await seedBook(destination);
+      const before = await bookState(bookId);
+      // A loose root book is keyed by its own file's path, not by a folder.
+      expect(dirname(before.folderPath)).toBe(destination.folderPath);
+      expect(before.files.map((file) => file.absolutePath)).toEqual([before.folderPath]);
+
+      const docked = await dockPdf(destination, 'join-root', { title: 'Join Target Deluxe', authors: ['Another Name'], isbn13: original.isbn13 });
+      const offer = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, { fileIds: [docked.id] });
+      expect(offer.items[0]).toMatchObject({ status: 'ready', canJoinBook: true });
+      expect(offer.items[0]).not.toHaveProperty('suggestedJoinBook');
+
+      const joinPayload = { fileIds: [docked.id], overrides: [{ fileId: docked.id, joinBook: { bookId } }] };
+      const refused = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, joinPayload);
+      expect(refused.items[0]).toMatchObject({ status: 'invalid_target', errorCode: 'BOOK_DOCK_JOIN_ROOT_LEVEL' });
+      const result = await post<BookDockFinalizeResult>('finalize', context.adminToken, joinPayload);
+      expect(result.results[0]).toMatchObject({ success: false, errorCode: 'BOOK_DOCK_JOIN_ROOT_LEVEL' });
+      expect(await getBookDockRow(context, docked.id)).toBeDefined();
+      expect((await bookState(bookId)).files.map((file) => file.format)).toEqual(['fb2']);
+    });
+
+    it('holds the file with a stable code when the library, the book or the person cannot take the join', async () => {
+      const folderLibrary = await createLibraryWithFolder(context, { allowedFormats: ['fb2', 'pdf'] });
+      const otherLibrary = await createLibraryWithFolder(context, { allowedFormats: ['fb2', 'pdf'] });
+      const fileLibrary = await createLibraryWithFolder(context, { mode: 'book_per_file', allowedFormats: ['fb2', 'pdf'] });
+      const bookId = await seedBook(folderLibrary);
+      const otherBookId = await seedBook(otherLibrary);
+      const looseBookId = await seedBook(fileLibrary);
+
+      const wrongLibrary = await dockPdf(otherLibrary, 'join-wrong-library', original);
+      const loose = await dockPdf(fileLibrary, 'join-loose', original);
+      const refused = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, {
+        fileIds: [wrongLibrary.id, loose.id],
+        overrides: [
+          { fileId: wrongLibrary.id, joinBook: { bookId } },
+          { fileId: loose.id, joinBook: { bookId: looseBookId } },
+        ],
+      });
+      expect(refused).toMatchObject({ ready: 0, blocked: 2 });
+      expect(refused.items.find((entry) => entry.fileId === wrongLibrary.id)).toMatchObject({
+        status: 'invalid_target',
+        errorCode: 'BOOK_DOCK_JOIN_OTHER_LIBRARY',
+      });
+      expect(refused.items.find((entry) => entry.fileId === loose.id)).toMatchObject({
+        status: 'invalid_target',
+        errorCode: 'BOOK_DOCK_JOIN_FILE_PER_BOOK',
+      });
+
+      // A file-per-book library is never offered a join, or a suggestion.
+      const looseOffer = await post<BookDockFinalizePreviewResult>('finalize/preview', context.adminToken, { fileIds: [loose.id] });
+      expect(looseOffer.items[0]).toMatchObject({ status: 'ready', canJoinBook: false });
+      expect(looseOffer.items[0]).not.toHaveProperty('suggestedJoinBook');
+
+      const uploader = await createUserAndLogin(context, { permissions: [Permission.BookDockAccess, Permission.LibraryUpload] });
+      await grantLibraryAccess(context, uploader.userId, folderLibrary.libraryId, 'viewer');
+      const viewerFile = await dockPdf(folderLibrary, 'join-viewer', original, uploader.userId);
+
+      const viewerOffer = await post<BookDockFinalizePreviewResult>('finalize/preview', uploader.accessToken, { fileIds: [viewerFile.id] });
+      expect(viewerOffer.items[0]).toMatchObject({ status: 'ready', canJoinBook: false });
+      expect(viewerOffer.items[0]).not.toHaveProperty('suggestedJoinBook');
+
+      const asViewer = (target: number) => ({ fileIds: [viewerFile.id], overrides: [{ fileId: viewerFile.id, joinBook: { bookId: target } }] });
+      const notEditor = await post<BookDockFinalizeResult>('finalize', uploader.accessToken, asViewer(bookId));
+      expect(notEditor.results[0]).toMatchObject({ success: false, errorCode: 'BOOK_DOCK_JOIN_FORBIDDEN' });
+      const unseen = await post<BookDockFinalizePreviewResult>('finalize/preview', uploader.accessToken, asViewer(otherBookId));
+      expect(unseen.items[0]).toMatchObject({ status: 'invalid_target', errorCode: 'BOOK_DOCK_JOIN_BOOK_NOT_FOUND' });
+      expect(await getBookDockRow(context, viewerFile.id)).toBeDefined();
+      expect((await bookState(bookId)).files.map((file) => file.format)).toEqual(['fb2']);
+
+      for (const joinBook of [{ bookId: 'x' }, { bookId: 0 }, { bookId, folderPath: '/tmp' }]) {
+        const response = await context.app.inject({
+          method: 'POST',
+          url: '/api/v1/book-dock/finalize/preview',
+          headers: authHeader(context.adminToken),
+          payload: { fileIds: [viewerFile.id], overrides: [{ fileId: viewerFile.id, joinBook }] },
+        });
+        expect(response.statusCode).toBe(400);
+      }
     });
   });
 

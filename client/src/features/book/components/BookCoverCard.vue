@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import type { BookCard, BookFileRef, CoverAspectRatio } from '@bookorbit/types'
-import { getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
-import BookFormatChip from './BookFormatChip.vue'
+import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
+import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import BookCardFormatBadges from './BookCardFormatBadges.vue'
+import BookCardFormatList from './BookCardFormatList.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
+import { cardMediaView } from '../lib/card-media'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -69,6 +71,8 @@ const props = defineProps<{
   coverAspectRatio?: CoverAspectRatio
   /** Opt-in: only views that host the destination sheet should offer this. */
   allowMoveToLibrary?: boolean
+  /** The medium the surrounding grid shows, such as a series' Audiobooks group. */
+  mediaKind?: ConcreteBookMediaKind | null
 }>()
 
 type BookActionType = 'quick-view' | 'add-to-collection' | 'move-to-library' | 'delete'
@@ -86,17 +90,34 @@ const formatEntries = computed(() => bookFormatEntries(props.book.files))
 /** One file per edition: an audiobook downloads as a whole and opens from its first track. */
 const downloadableFiles = computed(() => formatEntries.value.map((entry) => entry.files[0]!))
 const openableFiles = computed(() => downloadableFiles.value.filter((file) => READER_OPENABLE_FORMATS.has(file.format!.toLowerCase())))
-const primaryFile = computed(() => openableFiles.value.find((f) => f.role === 'primary') ?? openableFiles.value[0] ?? null)
+const mediaView = computed(() => cardMediaView(props.book, props.mediaKind))
+const primaryFile = computed(() => {
+  const kind = mediaView.value?.kind
+  const fileOfKind = kind ? openableFiles.value.find((f) => getBookMediaKind(f.format) === kind) : undefined
+  return fileOfKind ?? openableFiles.value.find((f) => f.role === 'primary') ?? openableFiles.value[0] ?? null
+})
 const primaryDownloadFile = computed(() => downloadableFiles.value[0] ?? null)
 const mediaProfile = computed(() => getBookMediaProfile(formatEntries.value.flatMap((entry) => entry.files)))
-const formatOverlayKey = computed(() => formatEntries.value[0]?.key ?? null)
-const isAudiobook = computed(() => mediaProfile.value.primaryMediaKind === 'audiobook')
-const isComic = computed(() => mediaProfile.value.primaryMediaKind === 'comic')
+const formatOverlayKey = computed(() => {
+  const kind = mediaView.value?.kind
+  const entry = kind ? formatEntries.value.find((e) => getBookMediaKind(e.files[0]?.format) === kind) : formatEntries.value[0]
+  return entry?.key ?? null
+})
+/** Every edition the card offers, the one its media view leads with first; linked formats follow. */
+const ownFormatKeys = computed(() => {
+  const keys = formatEntries.value.map((entry) => entry.key)
+  const lead = formatOverlayKey.value
+  return lead ? [lead, ...keys.filter((key) => key !== lead)] : keys
+})
+const hasFormatBadges = computed(() => ownFormatKeys.value.length > 0 || (props.book.linked?.books.length ?? 0) > 0)
+const displayMediaKind = computed(() => mediaView.value?.kind ?? mediaProfile.value.primaryMediaKind)
+const isAudiobook = computed(() => displayMediaKind.value === 'audiobook')
+const isComic = computed(() => displayMediaKind.value === 'comic')
 
 const isMultiTrackAudio = computed(() => formatEntries.value.some((entry) => entry.audio && entry.files.length > 1))
 
 const { coverUrl, bumpVersion } = useCoverVersions()
-const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion))
+const coverSrc = computed(() => coverUrl(props.book.id, 'thumbnail', props.book.coverVersion, mediaView.value?.coverMedium))
 
 const { refreshing, refreshWithFeedback } = useRefreshMetadata()
 const { isRefreshing } = useRefreshingBooks()
@@ -127,16 +148,19 @@ async function handleRefreshMetadata() {
 const { hasPermission } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
-const { cardOverlays, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } = useDisplaySettings()
+const { cardOverlays, formatBadgeStyle, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } =
+  useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
-  () => props.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
+  () => props.coverAspectRatio ?? mediaView.value?.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
 )
 const showSendDialog = ref(false)
 
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
-const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && formatOverlayKey.value != null)
+const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && hasFormatBadges.value)
+/** Every badge style but the plain pill hides which formats a book has, so the hover overlay lists them. */
+const showFormatList = computed(() => showFormatOverlay.value && formatBadgeStyle.value !== 'primary')
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
@@ -502,17 +526,13 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
             <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
           </div>
 
-          <!-- Bottom-right overlay: format badge -->
+          <!-- Bottom-right overlay: the format badge, in the style the user chose; it places itself -->
           <div
             v-if="showFormatOverlay && !selectionMode"
-            class="absolute bottom-1.5 right-1.5 z-10 flex items-center gap-0.5 pointer-events-none transition-opacity duration-150"
+            class="absolute inset-0 z-10 pointer-events-none transition-opacity duration-150"
             :class="overlayFadeClass"
           >
-            <BookFormatChip
-              :format-key="formatOverlayKey!"
-              variant="solid"
-              class="gap-0.5 rounded-xs px-1.5 py-0.5 text-[8px] font-semibold tracking-widest opacity-90"
-            />
+            <BookCardFormatBadges :own-keys="ownFormatKeys" :linked="book.linked" :badge-style="formatBadgeStyle" />
           </div>
 
           <!-- Reading progress bar - bottom edge -->
@@ -612,6 +632,7 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
 
             <!-- Bottom: title/author (hover-overlay mode only) + kebab (when not in below-cover label row) -->
             <div class="shrink-0 flex flex-col pr-10">
+              <BookCardFormatList v-if="showFormatList" class="mb-1" :own-keys="ownFormatKeys" :linked="book.linked" />
               <div class="flex items-start justify-between gap-2">
                 <p v-if="showHoverTitle" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
                   {{ book.title ?? '-' }}

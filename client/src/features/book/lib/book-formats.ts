@@ -82,6 +82,11 @@ export function rankedContentFiles<T extends FormatFile>(files: readonly T[], fo
   return bookFormatEntries(files, formatPriority).flatMap((entry) => entry.files)
 }
 
+/** The short code of each edition once, such as `EPUB` and `M4B`: what a picker row lists beside a title. */
+export function bookFormatCodes(files: readonly FormatFile[]): string[] {
+  return [...new Set(bookFormatEntries(files).map((entry) => formatKeyCode(entry.key)))]
+}
+
 /** The short code a chip shows. A read-along EPUB is `EPUB`; its headphones tell it apart. */
 export function formatKeyCode(key: string): string {
   return formatOfKey(key).toUpperCase()

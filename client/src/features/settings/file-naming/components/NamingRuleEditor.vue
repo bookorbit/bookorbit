@@ -159,7 +159,7 @@ async function handleCopyPattern() {
       </Button>
 
       <span class="hidden size-9 shrink-0 place-items-center rounded-lg bg-primary/12 text-primary @2xl/naming:grid">
-        <AppIcon :icon="icon" fallback="File" :size="17" aria-hidden="true" />
+        <AppIcon :icon="icon" :fallback="File" :size="17" aria-hidden="true" />
       </span>
 
       <div class="min-w-0 flex-1">

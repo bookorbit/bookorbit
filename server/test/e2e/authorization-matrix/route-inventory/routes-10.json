@@ -1186,5 +1186,77 @@
     "isPublic": false,
     "allowDefault": false,
     "useGuards": []
+  },
+  {
+    "file": "server/src/modules/page-locator/page-locator.controller.ts",
+    "className": "PageLocatorController",
+    "methodName": "locateText",
+    "httpMethod": "POST",
+    "path": "/mobile/books/files/:fileId/locate-text",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/year-review/year-review.controller.ts",
+    "className": "YearReviewController",
+    "methodName": "getYear",
+    "httpMethod": "GET",
+    "path": "/mobile/year-review/:year",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/visual-match/visual-match.controller.ts",
+    "className": "VisualMatchController",
+    "methodName": "match",
+    "httpMethod": "POST",
+    "path": "/mobile/visual-match",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/visual-match/shelf-match.controller.ts",
+    "className": "ShelfMatchController",
+    "methodName": "match",
+    "httpMethod": "POST",
+    "path": "/mobile/shelf-match",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/story-edits/story-edits.controller.ts",
+    "className": "StoryEditsController",
+    "methodName": "list",
+    "httpMethod": "GET",
+    "path": "/mobile/books/:bookId/story-edits",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/story-edits/story-edits.controller.ts",
+    "className": "StoryEditsController",
+    "methodName": "put",
+    "httpMethod": "PUT",
+    "path": "/mobile/books/:bookId/story-edits/:id",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
   }
 ]

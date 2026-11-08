@@ -5,12 +5,14 @@ import { useRouter } from 'vue-router'
 import { X } from '@lucide/vue'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import IconPicker from '@/components/IconPicker.vue'
-import type { GroupRule, SortSpec } from '@bookorbit/types'
+import type { CoverAspectRatio, GroupRule, SortSpec } from '@bookorbit/types'
 
 const props = defineProps<{
   open: boolean
   filter: GroupRule | undefined
   sort: SortSpec[]
+  /** The grid shape of the view the scope is saved from, so a scope cut from a square library stays square. */
+  coverAspectRatio?: CoverAspectRatio
 }>()
 
 const emit = defineEmits<{ close: [] }>()
@@ -43,6 +45,7 @@ async function submit() {
       icon: trimmedIcon.value,
       filter: props.filter,
       defaultSort: props.sort,
+      coverAspectRatio: props.coverAspectRatio,
     })
     name.value = ''
     icon.value = ''

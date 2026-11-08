@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Check } from '@lucide/vue'
+import { Check, Library as LibraryIcon } from '@lucide/vue'
 import type { CoverAspectRatio } from '@bookorbit/types'
 import AppIcon from '@/components/AppIcon.vue'
 import IconPicker from '@/components/IconPicker.vue'
@@ -101,7 +101,7 @@ function updateCoverAspectRatio(event: Event) {
           :class="icon ? 'bg-primary/12 text-primary' : 'border-[1.5px] border-dashed border-primary/45 text-primary'"
           aria-hidden="true"
         >
-          <AppIcon :icon="icon || 'Library'" fallback="Library" :size="24" />
+          <AppIcon :icon="icon" :fallback="LibraryIcon" :size="24" />
         </span>
         <div class="min-w-0 flex-1">
           <label for="library-name" class="mb-1.5 block text-xs font-medium text-muted-foreground">
@@ -149,7 +149,7 @@ function updateCoverAspectRatio(event: Event) {
             :title="iconLabel(choice)"
             @click="selectIcon(choice)"
           >
-            <AppIcon :icon="choice" fallback="Library" :size="17" />
+            <AppIcon :icon="choice" :fallback="LibraryIcon" :size="17" />
           </button>
         </div>
       </div>

@@ -38,7 +38,7 @@ describe('LibraryCreatorFolders', () => {
 
     const rows = wrapper.findAll('li')
     expect(rows[0]!.text()).toContain('1,250 files')
-    expect(rows[1]!.text()).toContain('Also in Comics')
+    expect(rows[1]!.text()).toContain('Overlaps Comics')
     expect(rows[2]!.text()).toContain('Not accessible')
     expect(rows[3]!.text()).toContain('Checking')
     expect(wrapper.text()).toContain('1,261 matching files')

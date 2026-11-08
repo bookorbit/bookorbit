@@ -1,11 +1,12 @@
 import { randomUUID } from 'crypto';
 import { access, mkdir, readFile, stat, utimes, writeFile } from 'fs/promises';
-import { basename, join } from 'path';
+import { basename, dirname, join } from 'path';
 
 import { and, eq, sql } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
 import type { AddedAtRecomputeJob, RegexMetadataConfig } from '@bookorbit/types';
 
+import { LibraryOperationGate } from '../src/common/services/library-operation-gate.service';
 import * as schema from '../src/db/schema';
 import { waitForCondition, waitForScanCompletion } from './e2e/app-harness';
 import {
@@ -701,6 +702,57 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
       expect(read.json().markAsFinishedPercentComplete).toBe(98.05);
     });
 
+    it('refuses folders that overlap another library folder, and keeps saving a library whose folders overlapped before', async () => {
+      const { body: books } = await createLibraryViaApi(ctx, manager.accessToken);
+      const booksFolder = books.folders[0]!.path;
+      const nested = join(booksFolder, 'comics');
+      const sibling = `${booksFolder}-extra`;
+      await mkdir(nested, { recursive: true });
+      await mkdir(sibling, { recursive: true });
+      const create = (folders: string[]) =>
+        ctx.app.inject({
+          method: 'POST',
+          url: '/api/v1/libraries',
+          headers: authHeader(manager.accessToken),
+          payload: { name: `Overlap ${randomUUID()}`, icon: 'library', folders },
+        });
+
+      for (const folders of [[nested], [booksFolder], [dirname(booksFolder)]]) {
+        const refused = await create(folders);
+        expect(refused.statusCode, refused.body).toBe(409);
+        expect(refused.json()).toMatchObject({
+          errorCode: 'LIBRARY_FOLDER_OVERLAP',
+          errorMeta: { path: folders[0], overlapPath: expect.any(String) },
+        });
+      }
+      const nestedInRequest = await create([sibling, join(sibling, 'inside')]);
+      expect(nestedInRequest.statusCode, nestedInRequest.body).toBe(409);
+
+      // A folder that only shares a name prefix is a different folder.
+      const accepted = await create([sibling]);
+      expect(accepted.statusCode, accepted.body).toBe(201);
+
+      await grantLibraryAccess(ctx, manager.userId, books.id, 'owner');
+      const addNested = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${books.id}`,
+        headers: authHeader(manager.accessToken),
+        payload: { folders: [booksFolder, nested] },
+      });
+      expect(addNested.statusCode, addNested.body).toBe(409);
+      expect(await ctx.db.select().from(schema.libraryFolders).where(eq(schema.libraryFolders.libraryId, books.id))).toHaveLength(1);
+
+      // A library saved before the rule, with a second folder inside its first.
+      await ctx.db.insert(schema.libraryFolders).values({ libraryId: books.id, path: nested });
+      const resave = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/libraries/${books.id}`,
+        headers: authHeader(manager.accessToken),
+        payload: { name: `Renamed ${randomUUID()}`, folders: [booksFolder, nested] },
+      });
+      expect(resave.statusCode, resave.body).toBe(200);
+    });
+
     it('creates a library with the requested settings, requires explicit access rows, and reflects grant/update/revoke changes', async () => {
       const { body: createdLibrary } = await createLibraryViaApi(ctx, manager.accessToken, {
         name: `library-contract-${randomUUID()}`,
@@ -1160,6 +1212,34 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
       await expect(access(join(ctx.fixture.booksPath, 'covers', String(uploadedBookId)))).rejects.toMatchObject({
         code: 'ENOENT',
       });
+    });
+
+    it('refuses to delete a library while a scan, move, rename or merge holds it, and deletes it once that finishes', async () => {
+      const busyLibrary = await createLibraryWithFolder(ctx, { name: `library-busy-${randomUUID()}` });
+      const releaseMove = ctx.app.get(LibraryOperationGate).tryAcquire(busyLibrary.libraryId, 'book_move');
+      expect(releaseMove).not.toBeNull();
+
+      const refused = await ctx.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/libraries/${busyLibrary.libraryId}`,
+        headers: authHeader(ctx.adminToken),
+      });
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json()).toMatchObject({ errorCode: 'LIBRARY_BUSY' });
+      const stillThere = await ctx.db
+        .select({ id: schema.libraries.id })
+        .from(schema.libraries)
+        .where(eq(schema.libraries.id, busyLibrary.libraryId));
+      expect(stillThere).toHaveLength(1);
+
+      releaseMove!();
+      const deleted = await ctx.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/libraries/${busyLibrary.libraryId}`,
+        headers: authHeader(ctx.adminToken),
+      });
+      expect(deleted.statusCode).toBe(204);
+      expect(ctx.app.get(LibraryOperationGate).isHeld(busyLibrary.libraryId)).toBe(false);
     });
   });
 });

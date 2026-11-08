@@ -1,3 +1,6 @@
+import { sql, type SQL } from 'drizzle-orm';
+import { AUDIO_FORMAT_LIST, COMIC_FORMAT_LIST, EBOOK_FORMAT_LIST, normalizeWorkToken } from '@bookorbit/types';
+
 export function normalizeIsbn(value: string | null): string | null {
   if (!value) return null;
   const normalized = value.replace(/[^0-9Xx]/g, '').toUpperCase();
@@ -41,11 +44,74 @@ export function canonicalizeIsbn(isbn10: string | null, isbn13: string | null): 
   return null;
 }
 
-export function mediaFamilyForFormat(format: string | null): 'ebook' | 'comic' | 'audiobook' | 'unknown' {
+export const MEDIA_FAMILIES = ['audiobook', 'comic', 'ebook'] as const;
+export type MediaFamily = (typeof MEDIA_FAMILIES)[number] | 'unknown';
+
+const FAMILY_FORMATS: ReadonlyArray<readonly [MediaFamily, readonly string[]]> = [
+  ['audiobook', AUDIO_FORMAT_LIST],
+  ['comic', COMIC_FORMAT_LIST],
+  ['ebook', EBOOK_FORMAT_LIST],
+];
+
+export function mediaFamilyForFormat(format: string | null): MediaFamily {
   const normalized = format?.toLowerCase();
   if (!normalized) return 'unknown';
-  if (['m4b', 'mp3', 'm4a', 'opus', 'ogg', 'flac'].includes(normalized)) return 'audiobook';
-  if (['cbz', 'cbr', 'cb7', 'cbx'].includes(normalized)) return 'comic';
-  if (['epub', 'pdf', 'djvu', 'mobi', 'azw', 'azw3', 'fb2', 'kepub'].includes(normalized)) return 'ebook';
-  return 'unknown';
+  return FAMILY_FORMATS.find(([, formats]) => formats.includes(normalized))?.[0] ?? 'unknown';
+}
+
+function sqlLiteral(value: string): SQL {
+  if (!/^[a-z0-9 ]+$/.test(value)) throw new Error(`Unsafe SQL literal: ${value}`);
+  return sql.raw(`'${value}'`);
+}
+
+/** The same mapping as a SQL `CASE` over a format column, so the scan's queries and the normalizer cannot drift. */
+export function mediaFamilySql(format: SQL): SQL {
+  const branches = FAMILY_FORMATS.map(
+    ([family, formats]) =>
+      sql`WHEN lower(coalesce(${format}, '')) IN (${sql.join(
+        formats.map((value) => sqlLiteral(value)),
+        sql`, `,
+      )}) THEN ${sqlLiteral(family)}`,
+  );
+  return sql`CASE ${sql.join(branches, sql` `)} ELSE 'unknown' END`;
+}
+
+/**
+ * Words an audiobook edition adds to a title. Removed as whole words, with any subtitle after a
+ * colon, before an ebook's title is compared with an audiobook's (H10).
+ */
+export const AUDIO_TITLE_MARKERS = ['unabridged', 'abridged', 'audiobook', 'audio book', 'a novel'] as const;
+
+const AUDIO_TITLE_MARKER_PATTERN = new RegExp(`\\b(?:${AUDIO_TITLE_MARKERS.join('|')})\\b`, 'giu');
+
+function titleHead(title: string): string {
+  const head = title.split(':')[0] ?? '';
+  return head.trim() ? head : title;
+}
+
+/** The token an ebook and an audiobook of one work share, whatever edition markers either title carries. */
+export function crossFormatTitleKey(title: string | null | undefined): string {
+  if (!title?.trim()) return '';
+  return normalizeWorkToken(titleHead(title).replace(AUDIO_TITLE_MARKER_PATTERN, ' '));
+}
+
+/** The person token used to match an author on one side with an author or narrator on the other. */
+export function crossFormatPersonKey(name: string | null | undefined): string {
+  return normalizeWorkToken(name ?? '');
+}
+
+/**
+ * The SQL counterpart of `crossFormatTitleKey`, spaced so trigram similarity still sees words. Used
+ * where a similarity, not an equality, decides (series position matches).
+ */
+export function crossFormatTitleSql(title: SQL): SQL {
+  const markers = sql.raw(`'\\m(?:${AUDIO_TITLE_MARKERS.join('|')})\\M'`);
+  return sql`lower(btrim(regexp_replace(regexp_replace(regexp_replace(public.bookorbit_unaccent(CASE WHEN btrim(split_part(coalesce(${title}, ''), ':', 1)) = '' THEN coalesce(${title}, '') ELSE split_part(coalesce(${title}, ''), ':', 1) END), ${markers}, ' ', 'gi'), '[^[:alnum:]]+', ' ', 'g'), '[[:space:]]+', ' ', 'g')))`;
+}
+
+/** A series position in one canonical spelling, so "1", "01" and "1.0" agree. */
+export function canonicalSeriesIndex(index: string | null | undefined): string | null {
+  if (index === null || index === undefined || !index.trim()) return null;
+  const value = Number(index.trim());
+  return Number.isFinite(value) ? String(value) : null;
 }

@@ -18,6 +18,8 @@ vi.mock('@/lib/api', () => ({
 
 const SHARING_SWITCH = 'button[aria-label="Visible to all users"]'
 const KOBO_SWITCH = 'button[aria-label="Sync to Kobo"]'
+const TALL_SHAPE = 'input[name="smart-scope-grid-shape"][value="2/3"]'
+const SQUARE_SHAPE = 'input[name="smart-scope-grid-shape"][value="1/1"]'
 
 function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
   return {
@@ -28,6 +30,7 @@ function makeSmartScope(overrides: Partial<SmartScope> = {}): SmartScope {
     filter: null,
     defaultSort: [],
     isPublic: false,
+    coverAspectRatio: '2/3',
     syncToKobo: false,
     koboSyncEnabled: false,
     isOwner: true,
@@ -105,6 +108,7 @@ describe('SmartScopeEditorPanel', () => {
       defaultSort: [],
       isPublic: true,
       syncToKobo: false,
+      coverAspectRatio: '2/3',
     })
     expect(wrapper.emitted('saved')).toEqual([[]])
     expect(wrapper.emitted('close')).toEqual([[]])
@@ -204,5 +208,38 @@ describe('SmartScopeEditorPanel', () => {
     expect(wrapper.emitted('saved')).toBeUndefined()
     expect(wrapper.emitted('close')).toBeUndefined()
     expect(wrapper.find(SHARING_SWITCH).attributes('aria-checked')).toBe('true')
+  })
+
+  describe('grid shape (issue #1926)', () => {
+    function isChecked(wrapper: Panel, selector: string): boolean {
+      return (wrapper.find(selector).element as HTMLInputElement).checked
+    }
+
+    it('seeds the selected shape from the scope when the panel opens', async () => {
+      const wrapper = await openPanel(makeSmartScope({ coverAspectRatio: '1/1' }))
+
+      expect(isChecked(wrapper, SQUARE_SHAPE)).toBe(true)
+      expect(isChecked(wrapper, TALL_SHAPE)).toBe(false)
+    })
+
+    it('saves a square grid when square cells are picked', async () => {
+      const wrapper = await openPanel(makeSmartScope())
+
+      await wrapper.find(SQUARE_SHAPE).setValue()
+      await save(wrapper)
+
+      expect(savedPayload()).toMatchObject({ coverAspectRatio: '1/1' })
+    })
+
+    it('reseeds the shape when the panel reopens for a different scope', async () => {
+      const wrapper = await openPanel(makeSmartScope({ id: 11, coverAspectRatio: '1/1' }))
+
+      await wrapper.setProps({ open: false })
+      await wrapper.setProps({ smartScope: makeSmartScope({ id: 12, coverAspectRatio: '2/3' }), open: true })
+
+      expect(isChecked(wrapper, TALL_SHAPE)).toBe(true)
+      await save(wrapper)
+      expect(mockState.updateSmartScope).toHaveBeenCalledWith(12, expect.objectContaining({ coverAspectRatio: '2/3' }))
+    })
   })
 })

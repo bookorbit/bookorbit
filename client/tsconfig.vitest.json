@@ -3,7 +3,7 @@
 
   // Override to include only test files and clear exclusions.
   // Application code imported in tests is automatically included via module resolution.
-  "include": ["src/**/__tests__/*", "src/**/*.test.ts", "src/**/*.spec.ts", "env.d.ts"],
+  "include": ["src/**/__tests__/*", "src/**/*.test.ts", "src/**/*.spec.ts", "env.d.ts", "src/lib/lucide-icons-virtual.d.ts"],
   "exclude": [],
 
   "compilerOptions": {

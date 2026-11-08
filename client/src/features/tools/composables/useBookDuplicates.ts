@@ -1,18 +1,32 @@
 import { computed, onActivated, onDeactivated, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import type {
-  BookDuplicateDismissal,
-  BookDuplicateGroup,
-  BookDuplicateGroupSort,
-  BookDuplicateMatchReason,
-  BookDuplicateScan,
-  BookDuplicateSortOrder,
+import {
+  BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS,
+  Permission,
+  allowedDuplicateActions,
+  defaultDuplicateAction,
+  duplicateLinkAvailable,
+  duplicateMergeAvailability,
+  type BookDuplicateAction,
+  type BookDuplicateBookAction,
+  type BookDuplicateDismissal,
+  type BookDuplicateGroup,
+  type BookDuplicateGroupSort,
+  type BookDuplicateKind,
+  type BookDuplicateMatchReason,
+  type BookDuplicateMergeAvailability,
+  type BookDuplicatePermissions,
+  type BookDuplicateResolutionJob,
+  type BookDuplicateResolutionRequest,
+  type BookDuplicateScan,
+  type BookDuplicateSortOrder,
 } from '@bookorbit/types'
 
+import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import {
   createBookDuplicateScan,
-  deleteDuplicateBooks,
   dismissBookDuplicateGroup,
   getActiveBookDuplicateScan,
   getBookDuplicateDismissals,
@@ -21,12 +35,22 @@ import {
   restoreBookDuplicateDismissal,
 } from '../api/book-duplicates'
 import { recommendKeeper, reclaimableBytes, type DuplicateKeepRule } from '../book-duplicates/utils/duplicate-keeper'
+import { useDuplicateResolution } from './useDuplicateResolution'
 
 const POLL_INTERVAL_MS = 1000
 
+export interface ResolveOptions {
+  /** Every group of the scan matching the current tab and filter, not only those on screen (H8). */
+  allGroups?: boolean
+  removeIdenticalCopies?: boolean
+}
+
 export function useBookDuplicates() {
   const { t } = useI18n()
+  const { hasPermission } = usePermissions()
+  const { hasLibraryPermission } = useLibraryPermissions()
   const scan = ref<BookDuplicateScan | null>(null)
+  const kind = ref<BookDuplicateKind>('duplicate')
   const groups = ref<BookDuplicateGroup[]>([])
   const total = ref(0)
   const page = ref(1)
@@ -36,12 +60,14 @@ export function useBookDuplicates() {
   const order = ref<BookDuplicateSortOrder>('desc')
   const keepRule = ref<DuplicateKeepRule>('metadata')
   const keeperOverrides = ref(new Map<number, number>())
+  const actionOverrides = ref(new Map<number, BookDuplicateAction | null>())
+  const bookActionOverrides = ref(new Map<number, Map<number, BookDuplicateBookAction>>())
   const selectedGroupIds = ref(new Set<number>())
+  const allGroupsSelected = ref(false)
   const expandedGroupIds = ref(new Set<number>())
   const dismissals = ref<BookDuplicateDismissal[]>([])
   const loading = ref(false)
   const loaded = ref(false)
-  const deleting = ref(false)
   const error = ref<string | null>(null)
   const hiddenGroupIds = ref(new Set<number>())
   let pollTimer: ReturnType<typeof setTimeout> | null = null
@@ -53,21 +79,68 @@ export function useBookDuplicates() {
   const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize.value)))
   const scanning = computed(() => scan.value?.status === 'queued' || scan.value?.status === 'running')
   const scanFinished = computed(() => scan.value?.status === 'completed')
+  const permissions = computed<BookDuplicatePermissions>(() => ({
+    canDelete: hasPermission(Permission.LibraryDeleteBooks),
+    canMerge: hasPermission(Permission.LibraryMergeBooks),
+  }))
+  const canUseTool = computed(() => permissions.value.canDelete || permissions.value.canMerge)
+
+  const resolution = useDuplicateResolution(handleResolutionFinished)
+  const resolving = computed(() => resolution.running.value)
 
   /** The keeper a group is currently resolved to: the user's pick, else the active rule's. */
   function keeperIdFor(group: BookDuplicateGroup): number {
     return keeperOverrides.value.get(group.id) ?? recommendKeeper(group, keepRule.value).keeperId
   }
 
+  function mergeAvailabilityFor(group: BookDuplicateGroup): BookDuplicateMergeAvailability {
+    return duplicateMergeAvailability(group.books, keeperIdFor(group))
+  }
+
+  /** Merge and link need editor access to every book's library; the server refuses the rest. */
+  function editsEveryLibrary(group: BookDuplicateGroup): boolean {
+    return [...new Set(group.books.map((book) => book.libraryId))].every((libraryId) =>
+      hasLibraryPermission(Permission.LibraryMergeBooks, libraryId, 'editor'),
+    )
+  }
+
+  /** What the user may choose for a group: the permission rule, less what the group itself cannot do (H3, H4, H11). */
+  function actionsFor(group: BookDuplicateGroup): BookDuplicateAction[] {
+    return allowedDuplicateActions(group.kind, permissions.value).filter((action) => {
+      if (action === 'merge') return editsEveryLibrary(group) && mergeAvailabilityFor(group).available
+      if (action === 'link') return editsEveryLibrary(group) && duplicateLinkAvailable(group.books)
+      return true
+    })
+  }
+
+  /** The user's pick for a group, else its default; never an action the group no longer allows. */
+  function actionFor(group: BookDuplicateGroup): BookDuplicateAction | null {
+    const allowed = actionsFor(group)
+    const chosen = actionOverrides.value.has(group.id)
+      ? (actionOverrides.value.get(group.id) ?? null)
+      : defaultDuplicateAction(group, keeperIdFor(group), permissions.value)
+    return chosen !== null && allowed.includes(chosen) ? chosen : null
+  }
+
+  /** A copy's own action when the user set one in the review (H5), else its group's. */
+  function bookActionFor(group: BookDuplicateGroup, bookId: number): BookDuplicateBookAction | null {
+    return bookActionOverrides.value.get(group.id)?.get(bookId) ?? actionFor(group)
+  }
+
   const selectedGroups = computed(() => visibleGroups.value.filter((group) => selectedGroupIds.value.has(group.id)))
+  /** Every page selected, but more groups match than one resolution takes (it stops at the cap). */
+  const allGroupsCapped = computed(() => allGroupsSelected.value && total.value > BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS)
+  const selectionGroupCount = computed(() =>
+    allGroupsSelected.value ? Math.min(total.value, BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS) : selectedGroupIds.value.size,
+  )
   const selectionCopyCount = computed(() => selectedGroups.value.reduce((count, group) => count + group.books.length - 1, 0))
-  const selectionBytes = computed(() => selectedGroups.value.reduce((bytes, group) => bytes + reclaimableBytes(group, keeperIdFor(group)), 0))
-  const selectionBookIds = computed(() =>
-    selectedGroups.value.flatMap((group) => group.books.filter((book) => book.id !== keeperIdFor(group)).map((book) => book.id)),
+  const selectionBytes = computed(() =>
+    selectedGroups.value.reduce((bytes, group) => bytes + (actionFor(group) === 'delete' ? reclaimableBytes(group, keeperIdFor(group)) : 0), 0),
   )
   const allVisibleSelected = computed(
     () => visibleGroups.value.length > 0 && visibleGroups.value.every((group) => selectedGroupIds.value.has(group.id)),
   )
+  const canSelectAllGroups = computed(() => allVisibleSelected.value && !allGroupsSelected.value && total.value > visibleGroups.value.length)
 
   onActivated(() => {
     active = true
@@ -96,7 +169,10 @@ export function useBookDuplicates() {
     reason.value = undefined
     hiddenGroupIds.value = new Set()
     keeperOverrides.value = new Map()
+    actionOverrides.value = new Map()
+    bookActionOverrides.value = new Map()
     selectedGroupIds.value = new Set()
+    allGroupsSelected.value = false
     expandedGroupIds.value = new Set()
     loaded.value = false
   }
@@ -173,6 +249,7 @@ export function useBookDuplicates() {
         reason: reason.value,
         sortBy: sortBy.value,
         order: order.value,
+        kind: kind.value,
       })
       if (requestId !== groupsRequestId || disposed) return
       const lastPage = Math.max(1, Math.ceil(response.total / pageSize.value))
@@ -184,6 +261,7 @@ export function useBookDuplicates() {
           reason: reason.value,
           sortBy: sortBy.value,
           order: order.value,
+          kind: kind.value,
         })
         if (requestId !== groupsRequestId || disposed) return
       }
@@ -201,6 +279,21 @@ export function useBookDuplicates() {
   async function setReason(value: BookDuplicateMatchReason | undefined): Promise<void> {
     reason.value = value
     page.value = 1
+    allGroupsSelected.value = false
+    await fetchGroups()
+  }
+
+  /** Switches between duplicates and the same book in another format; each is its own list. */
+  async function setKind(value: BookDuplicateKind): Promise<void> {
+    if (kind.value === value) return
+    kind.value = value
+    reason.value = undefined
+    page.value = 1
+    selectedGroupIds.value = new Set()
+    allGroupsSelected.value = false
+    expandedGroupIds.value = new Set()
+    groups.value = []
+    loaded.value = false
     await fetchGroups()
   }
 
@@ -225,6 +318,26 @@ export function useBookDuplicates() {
     const next = new Map(keeperOverrides.value)
     next.set(groupId, bookId)
     keeperOverrides.value = next
+    const books = new Map(bookActionOverrides.value)
+    books.delete(groupId)
+    bookActionOverrides.value = books
+  }
+
+  function setAction(groupId: number, action: BookDuplicateAction | null): void {
+    const next = new Map(actionOverrides.value)
+    next.set(groupId, action)
+    actionOverrides.value = next
+    const books = new Map(bookActionOverrides.value)
+    books.delete(groupId)
+    bookActionOverrides.value = books
+  }
+
+  function setBookAction(groupId: number, bookId: number, action: BookDuplicateBookAction): void {
+    const next = new Map(bookActionOverrides.value)
+    const forGroup = new Map(next.get(groupId) ?? [])
+    forGroup.set(bookId, action)
+    next.set(groupId, forGroup)
+    bookActionOverrides.value = next
   }
 
   function toggleExpanded(groupId: number): void {
@@ -235,6 +348,7 @@ export function useBookDuplicates() {
   }
 
   function toggleSelected(groupId: number): void {
+    allGroupsSelected.value = false
     const next = new Set(selectedGroupIds.value)
     if (next.has(groupId)) next.delete(groupId)
     else next.add(groupId)
@@ -242,11 +356,19 @@ export function useBookDuplicates() {
   }
 
   function toggleSelectAll(): void {
+    allGroupsSelected.value = false
     selectedGroupIds.value = allVisibleSelected.value ? new Set() : new Set(visibleGroups.value.map((group) => group.id))
+  }
+
+  /** Extends the selection to every group of the scan, on every page (H8). */
+  function selectAllGroups(): void {
+    selectedGroupIds.value = new Set(visibleGroups.value.map((group) => group.id))
+    allGroupsSelected.value = true
   }
 
   function clearSelection(): void {
     selectedGroupIds.value = new Set()
+    allGroupsSelected.value = false
   }
 
   function hideGroup(groupId: number): void {
@@ -279,35 +401,71 @@ export function useBookDuplicates() {
     }
   }
 
-  async function restoreDismissal(bookIdA: number, bookIdB: number): Promise<void> {
+  async function restoreDismissal(bookIdA: number, bookIdB: number, dismissalKind: BookDuplicateKind = 'duplicate'): Promise<void> {
     try {
-      await restoreBookDuplicateDismissal(bookIdA, bookIdB)
-      dismissals.value = dismissals.value.filter((entry) => !(entry.bookIdA === bookIdA && entry.bookIdB === bookIdB))
+      await restoreBookDuplicateDismissal(bookIdA, bookIdB, dismissalKind)
+      dismissals.value = dismissals.value.filter((entry) => !(entry.bookIdA === bookIdA && entry.bookIdB === bookIdB && entry.kind === dismissalKind))
       toast.success(t('tools.bookDuplicates.dismissed.restored'))
     } catch {
       toast.error(t('tools.bookDuplicates.errors.restore'))
     }
   }
 
-  async function discardBooks(bookIds: number[]): Promise<boolean> {
-    if (bookIds.length === 0) return false
-    deleting.value = true
-    try {
-      await deleteDuplicateBooks(bookIds)
-      clearSelection()
-      await fetchGroups()
-      toast.success(t('tools.bookDuplicates.deleteDialog.success', { count: bookIds.length }, bookIds.length))
-      return true
-    } catch {
-      toast.error(t('tools.bookDuplicates.errors.delete'))
-      return false
-    } finally {
-      deleting.value = false
+  /**
+   * The request for these groups: each group's keeper, action and per-copy choices, plus every
+   * other matching group of the scan when the selection spans all pages. Groups listed here are
+   * left out of the server's own pass, so a choice made on screen always wins.
+   */
+  function buildResolution(targets: BookDuplicateGroup[], options: ResolveOptions = {}): BookDuplicateResolutionRequest | null {
+    if (!scan.value) return null
+    const requested = targets.flatMap((group) => {
+      const action = actionFor(group)
+      if (!action) return []
+      const keeperId = keeperIdFor(group)
+      const perBook = group.books
+        .filter((book) => book.id !== keeperId)
+        .flatMap((book) => {
+          const chosen = bookActionOverrides.value.get(group.id)?.get(book.id)
+          return chosen && chosen !== action ? [{ bookId: book.id, action: chosen }] : []
+        })
+      return [{ groupId: group.id, keeperId, action, ...(perBook.length > 0 ? { perBook } : {}) }]
+    })
+    const request: BookDuplicateResolutionRequest = { scanId: scan.value.id }
+    if (requested.length > 0) request.groups = requested
+    if (options.allGroups) {
+      request.allGroups = {
+        kind: kind.value,
+        keepRule: keepRule.value,
+        ...(reason.value ? { reason: reason.value } : {}),
+        excludeGroupIds: [...hiddenGroupIds.value, ...targets.filter((group) => !actionFor(group)).map((group) => group.id)],
+      }
     }
+    if (options.removeIdenticalCopies && permissions.value.canDelete) request.removeIdenticalCopies = true
+    return request.groups || request.allGroups ? request : null
+  }
+
+  async function resolveGroups(targets: BookDuplicateGroup[], options: ResolveOptions = {}): Promise<boolean> {
+    const request = buildResolution(targets, options)
+    if (!request) return false
+    return resolution.start(request)
+  }
+
+  function handleResolutionFinished(job: BookDuplicateResolutionJob): void {
+    clearSelection()
+    actionOverrides.value = new Map()
+    bookActionOverrides.value = new Map()
+    void fetchGroups()
+    const count = (status: string) => job.outcomes.filter((outcome) => outcome.status === status).length
+    const done = count('done')
+    const unresolved = count('failed') + count('partial')
+    if (job.status === 'failed') toast.error(t('tools.bookDuplicates.resolution.failed'))
+    else if (unresolved > 0) toast.warning(t('tools.bookDuplicates.resolution.partial', { done, total: job.total }))
+    else toast.success(t('tools.bookDuplicates.resolution.success', { count: done }, done))
   }
 
   return {
     scan,
+    kind,
     visibleGroups,
     total,
     page,
@@ -317,12 +475,16 @@ export function useBookDuplicates() {
     order,
     keepRule,
     keeperOverrides,
+    actionOverrides,
     selectedGroupIds,
+    allGroupsSelected,
+    allGroupsCapped,
+    canSelectAllGroups,
+    selectionGroupCount,
     expandedGroupIds,
     selectedGroups,
     selectionCopyCount,
     selectionBytes,
-    selectionBookIds,
     allVisibleSelected,
     dismissals,
     totalPages,
@@ -330,25 +492,37 @@ export function useBookDuplicates() {
     scanFinished,
     loading,
     loaded,
-    deleting,
     error,
+    permissions,
+    canUseTool,
+    resolution,
+    resolving,
     keeperIdFor,
+    actionFor,
+    actionsFor,
+    bookActionFor,
+    mergeAvailabilityFor,
     startScan,
     resumeActiveScan,
     fetchGroups,
     fetchDismissals,
     setReason,
+    setKind,
     setSort,
     setPage,
     setKeepRule,
     setKeeper,
+    setAction,
+    setBookAction,
     toggleExpanded,
     toggleSelected,
     toggleSelectAll,
+    selectAllGroups,
     clearSelection,
     hideGroup,
     dismissGroup,
     restoreDismissal,
-    discardBooks,
+    buildResolution,
+    resolveGroups,
   }
 }

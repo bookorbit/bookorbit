@@ -19,7 +19,7 @@ const props = withDefaults(
 const { t } = useI18n()
 
 /**
- * Four reasons, four certainties: an identical file set is a fact, a similar title is a guess.
+ * Each reason carries its certainty: an identical file set is a fact, a similar title is a guess.
  * Colour carries the ladder and the label repeats it, so the ranking never rests on hue alone.
  */
 const REASON_COLORS: Record<BookDuplicateMatchReason, string> = {
@@ -27,6 +27,9 @@ const REASON_COLORS: Record<BookDuplicateMatchReason, string> = {
   isbn: 'var(--pill-info)',
   exact_metadata: 'var(--pill-source-indigo)',
   fuzzy_metadata: 'var(--pill-warning)',
+  same_work: 'var(--pill-success)',
+  title_author: 'var(--pill-info)',
+  series_position: 'var(--pill-warning)',
 }
 
 const color = computed(() => REASON_COLORS[props.reason])

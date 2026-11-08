@@ -289,7 +289,6 @@ describe('metadata-lock e2e', { timeout: 30_000 }, () => {
         narrators: ['Locked Narrator'],
         durationSeconds: 1111,
         abridged: false,
-        chapters: [{ title: 'Seed Chapter', startMs: 0, durationMs: 60_000 }],
       },
       comicMetadata: {
         issueNumber: 'LOCK-1',

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
-import { ChevronRight } from '@lucide/vue'
+import { ChevronRight, File as FileIcon, FolderOpen } from '@lucide/vue'
 import AppIcon from '@/components/AppIcon.vue'
 import type { NamingRuleId } from '../lib/naming-rules'
 
@@ -55,7 +55,7 @@ function isCurrent(id: NamingRuleId): boolean {
             class="grid size-6 shrink-0 place-items-center rounded-[5px]"
             :class="isCurrent(group.rule.id) ? 'bg-primary/20 text-primary' : 'bg-surface-3 text-muted-foreground'"
           >
-            <AppIcon :icon="group.rule.icon" fallback="File" :size="13" aria-hidden="true" />
+            <AppIcon :icon="group.rule.icon" :fallback="FileIcon" :size="13" aria-hidden="true" />
           </span>
           <span
             class="min-w-0 flex-1 truncate text-sm font-medium @2xl/naming:text-[13px]"
@@ -84,7 +84,7 @@ function isCurrent(id: NamingRuleId): boolean {
             >
               <AppIcon
                 :icon="item.icon"
-                fallback="FolderOpen"
+                :fallback="FolderOpen"
                 :size="14"
                 class="shrink-0"
                 :class="item.custom || isCurrent(item.id) ? 'text-primary' : 'text-muted-foreground'"

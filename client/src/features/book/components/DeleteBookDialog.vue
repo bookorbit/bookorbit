@@ -1,8 +1,16 @@
 <script setup lang="ts">
-import { History, Loader2, Trash2 } from '@lucide/vue'
+import { History, Link2, Loader2, Trash2 } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 
-defineProps<{ open: boolean; deleting: boolean }>()
+withDefaults(
+  defineProps<{
+    open: boolean
+    deleting: boolean
+    /** The book is linked with others; only this one is deleted (G6). */
+    linked?: boolean
+  }>(),
+  { linked: false },
+)
 const emit = defineEmits<{ confirm: []; cancel: [] }>()
 
 const { t } = useI18n()
@@ -25,6 +33,10 @@ const { t } = useI18n()
             <p class="mt-3 flex gap-2 rounded-md border border-primary/25 bg-primary/10 px-2.5 py-2 text-[12.5px] leading-[17px] text-foreground">
               <History class="mt-px shrink-0 text-primary" :size="14" aria-hidden="true" />
               {{ t('book.deleteDialog.keepsHistory') }}
+            </p>
+            <p v-if="linked" class="mt-2 flex gap-2 text-[12.5px] leading-[17px] text-muted-foreground" data-testid="delete-linked-note">
+              <Link2 class="mt-px shrink-0" :size="14" aria-hidden="true" />
+              {{ t('book.deleteDialog.linkedNotAffected') }}
             </p>
           </div>
         </div>

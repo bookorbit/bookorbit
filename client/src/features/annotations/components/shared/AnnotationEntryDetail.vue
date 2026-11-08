@@ -97,7 +97,7 @@ function handlePickStyle(style: string) {
         </Button>
         <Button variant="outline" size="sm" :disabled="!dirty" @click="handleResetNote">{{ t('common.cancel') }}</Button>
         <div class="ml-auto flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" class="gap-1.5" @click="handleCopy">
+          <Button v-if="annotation.text" variant="outline" size="sm" class="gap-1.5" @click="handleCopy">
             <Copy :size="11" />
             {{ t('annotations.listItem.copyText') }}
           </Button>

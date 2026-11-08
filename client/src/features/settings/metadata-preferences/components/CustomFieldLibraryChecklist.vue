@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { EyeOff, TriangleAlert } from '@lucide/vue'
+import { EyeOff, Library as LibraryIcon, TriangleAlert } from '@lucide/vue'
 import type { CustomMetadataFieldDefinition, Library } from '@bookorbit/types'
 import AppIcon from '@/components/AppIcon.vue'
 import { Button } from '@/components/ui/button'
@@ -72,7 +72,7 @@ function filledOf(library: Library): string {
         class="grid min-h-[38px] cursor-pointer grid-cols-[16px_16px_minmax(0,1fr)_auto] items-center gap-2.5 px-3 transition-colors hover:bg-foreground/3"
       >
         <input type="checkbox" class="size-4 rounded-xs border-input accent-primary" :checked="isOn(library.id)" @change="toggle(library.id)" />
-        <AppIcon :icon="library.icon" fallback="Library" :size="15" class="text-muted-foreground" aria-hidden="true" />
+        <AppIcon :icon="library.icon" :fallback="LibraryIcon" :size="15" class="text-muted-foreground" aria-hidden="true" />
         <span class="truncate text-sm text-foreground">{{ library.name }}</span>
         <span v-if="field && !isOn(library.id) && valuesIn(library.id) > 0" class="inline-flex items-center gap-1 text-xs text-[var(--pill-warning)]">
           <EyeOff :size="12" aria-hidden="true" />

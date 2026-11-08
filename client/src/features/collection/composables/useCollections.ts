@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { api } from '@/lib/api'
 import { createCoalescedFetch, createRequestGeneration } from '@/lib/async'
-import type { BookSelectionPayload, Collection, CreateCollectionPayload } from '@bookorbit/types'
+import type { BookSelectionPayload, Collection, CoverAspectRatio, CreateCollectionPayload } from '@bookorbit/types'
 
 const collections = ref<Collection[]>([])
 const loaded = ref(false)
@@ -76,7 +76,14 @@ export function useCollections() {
     return created
   }
 
-  async function updateCollection(id: number, name: string, icon: string, syncToKobo?: boolean, isPublic?: boolean): Promise<Collection> {
+  async function updateCollection(
+    id: number,
+    name: string,
+    icon: string,
+    syncToKobo?: boolean,
+    isPublic?: boolean,
+    coverAspectRatio?: CoverAspectRatio,
+  ): Promise<Collection> {
     const res = await api(`/api/v1/collections/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -85,6 +92,7 @@ export function useCollections() {
         icon,
         ...(syncToKobo !== undefined && { syncToKobo }),
         ...(isPublic !== undefined && { isPublic }),
+        ...(coverAspectRatio !== undefined && { coverAspectRatio }),
       }),
     })
     if (!res.ok) throw new Error('Failed to update collection')

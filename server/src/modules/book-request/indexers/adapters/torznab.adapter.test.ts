@@ -1,4 +1,4 @@
-import { DEFAULT_INDEXER_CATEGORIES } from '@bookorbit/types';
+import { DEFAULT_INDEXER_CATEGORIES, MAX_INDEXER_RELEASE_GUID_LENGTH } from '@bookorbit/types';
 
 /**
  * Grabbing a .torrent pins the connection to the address that passed policy, and that path goes
@@ -250,6 +250,44 @@ describe('TorznabAdapter', () => {
 
     expect(release.magnet).toBe('magnet:?xt=urn:btih:abc');
     expect(release.downloadUrl).toBeUndefined();
+  });
+
+  it('falls back to a magnet guid when the Prowlarr download link exceeds the field bound', async () => {
+    const infoHash = 'C9E15763F722F23E98A29DECDFAE341B98D53056';
+    const magnet = `magnet:?xt=urn:btih:${infoHash}&dn=Dune`;
+    const link = `https://prowlarr.example.com/download?payload=${'x'.repeat(MAX_INDEXER_RELEASE_GUID_LENGTH)}`;
+    const item = `<item><title>Dune</title><guid><![CDATA[${magnet}]]></guid><link><![CDATA[${link}]]></link><torznab:attr name="infohash" value="${infoHash}" /></item>`;
+    fetchMock.mockResolvedValue(new Response(feed(item)));
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    expect(release).toMatchObject({ magnet, infoHash: infoHash.toLowerCase() });
+    expect(release.downloadUrl).toBeUndefined();
+  });
+
+  it('builds a magnet from the infohash when no bounded download link or magnet guid is available', async () => {
+    const infoHash = 'C9E15763F722F23E98A29DECDFAE341B98D53056';
+    const link = `https://prowlarr.example.com/download?payload=${'x'.repeat(MAX_INDEXER_RELEASE_GUID_LENGTH)}`;
+    const item = `<item><title>Dune EPUB</title><guid>release-1</guid><link><![CDATA[${link}]]></link><torznab:attr name="infohash" value="${infoHash}" /></item>`;
+    fetchMock.mockResolvedValue(new Response(feed(item)));
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    expect(release.magnet).toBe(`magnet:?xt=urn:btih:${infoHash.toLowerCase()}&dn=Dune%20EPUB`);
+    expect(release.downloadUrl).toBeUndefined();
+  });
+
+  it('keeps a bounded download link instead of replacing it with a magnet guid fallback', async () => {
+    const infoHash = 'C9E15763F722F23E98A29DECDFAE341B98D53056';
+    const magnet = `magnet:?xt=urn:btih:${infoHash}&dn=Dune`;
+    const link = 'https://tracker.example.com/download/1.torrent?passkey=abc';
+    const item = `<item><title>Dune</title><guid><![CDATA[${magnet}]]></guid><link>${link}</link><torznab:attr name="infohash" value="${infoHash}" /></item>`;
+    fetchMock.mockResolvedValue(new Response(feed(item)));
+
+    const [release] = await new TorznabAdapter().search(query(), config(), AbortSignal.timeout(1000));
+
+    expect(release.downloadUrl).toBe(link);
+    expect(release.magnet).toBeUndefined();
   });
 
   /**

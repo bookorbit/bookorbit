@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { AppAttestModule } from '../app-attest/app-attest.module';
 import { BookModule } from '../book/book.module';
 import { TtsAdminController } from './tts-admin.controller';
 import { TtsAdminService } from './tts-admin.service';
@@ -11,7 +12,7 @@ import { TtsTextExtractorService } from './tts-text-extractor.service';
 import { TtsProviderFactory } from './providers/tts-provider.factory';
 
 @Module({
-  imports: [BookModule],
+  imports: [AppAttestModule, BookModule],
   controllers: [TtsController, TtsAdminController],
   providers: [TtsRepository, TtsService, TtsAdminService, TtsSynthesisService, TtsTextExtractorService, TtsProviderFactory],
 })

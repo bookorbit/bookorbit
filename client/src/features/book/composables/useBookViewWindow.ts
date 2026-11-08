@@ -40,6 +40,8 @@ export function useBookViewWindow(options: {
   railEnabled?: Ref<boolean>
   railViewport?: Ref<HTMLElement | null>
   collapseEnabled?: Ref<boolean>
+  /** Folds linked books into one card. Only the web views that show one title once ask for it. */
+  collapseLinked?: boolean
   q?: Ref<string>
   enabled?: Ref<boolean>
   defaultSort?: SortSpec[]
@@ -79,6 +81,7 @@ export function useBookViewWindow(options: {
     ...(randomSortActive.value ? { randomSeed: randomSeed.value } : {}),
     ...(filter.value ? { filter: filter.value } : {}),
     ...(options.collapseEnabled?.value ? { collapseSeries: true } : {}),
+    ...(options.collapseLinked ? { collapseLinked: true } : {}),
     ...(options.q?.value.trim() ? { q: options.q.value.trim() } : {}),
   }))
 

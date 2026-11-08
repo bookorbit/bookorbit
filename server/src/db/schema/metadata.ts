@@ -147,6 +147,12 @@ export const bookMetadata = pgTable(
     ),
     index('bm_isbn10_idx').on(t.isbn10),
     index('bm_isbn13_idx').on(t.isbn13),
+    index('bm_hardcover_id_idx')
+      .on(t.hardcoverId)
+      .where(sql`${t.hardcoverId} is not null`),
+    index('bm_open_library_id_idx')
+      .on(t.openLibraryId)
+      .where(sql`${t.openLibraryId} is not null`),
     index('bm_embedding_hnsw_cosine_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
     check('book_metadata_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 10)`),
     check(

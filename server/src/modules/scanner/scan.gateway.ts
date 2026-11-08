@@ -7,6 +7,10 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import type {
   AuthenticationMethod,
+  BookMergedEvent,
+  BookLinksChangedEvent,
+  BookDuplicateResolutionEvent,
+  BookMergeJobEvent,
   BookMissingEvent,
   BookMovedEvent,
   BookProgressChangedEvent,
@@ -168,6 +172,27 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       `[scanner.ws_emit] [book:transferred] fromLibraryId=${event.fromLibraryId} toLibraryId=${event.toLibraryId} bookCount=${event.bookIds.length}`,
     );
     this.server?.to([`library:${event.fromLibraryId}`, `library:${event.toLibraryId}`]).emit('book:transferred', event);
+  }
+
+  /** To the room of every library the merge touched: viewers of a library the books left must drop them too. */
+  emitBookMerged(event: BookMergedEvent): void {
+    const libraryIds = [...new Set([event.libraryId, ...(event.sourceLibraryIds ?? [])])];
+    this.logger.debug(
+      `[scanner.ws_emit] [book:merged] libraryId=${event.libraryId} libraryIds=${libraryIds.join(',')} targetBookId=${event.targetBookId} sourceCount=${event.sourceBookIds.length}`,
+    );
+    this.server?.to(libraryIds.map((id) => `library:${id}`)).emit('book:merged', event);
+  }
+
+  emitBookMergeJob(userId: number, phase: 'progress' | 'finished', event: BookMergeJobEvent): void {
+    this.server?.to(`user:${userId}`).emit(`book-merge:${phase}`, event);
+  }
+
+  emitDuplicateResolution(userId: number, phase: 'progress' | 'finished', event: BookDuplicateResolutionEvent): void {
+    this.server?.to(`user:${userId}`).emit(`book-duplicates:resolution-${phase}`, event);
+  }
+
+  emitBookLinksChanged(event: BookLinksChangedEvent): void {
+    this.server?.to(`library:${event.libraryId}`).emit('book:links-changed', event);
   }
 
   emitBookProgressChanged(payload: BookProgressChangedPayload): void {

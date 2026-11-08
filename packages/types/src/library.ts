@@ -2,7 +2,8 @@ import type { RegexMetadataConfig } from "./regex-metadata";
 import type { LibraryLastScan } from "./scanner";
 
 export type OrganizationMode = "book_per_file" | "book_per_folder";
-export type CoverAspectRatio = "2/3" | "1/1";
+export const COVER_ASPECT_RATIOS = ["2/3", "1/1"] as const;
+export type CoverAspectRatio = (typeof COVER_ASPECT_RATIOS)[number];
 export type AddedAtSource = "imported" | "file_modified" | "file_created";
 
 export function normalizeCoverAspectRatio(value: unknown): CoverAspectRatio {

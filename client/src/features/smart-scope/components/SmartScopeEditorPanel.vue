@@ -3,11 +3,12 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X, Zap } from '@lucide/vue'
 import { api } from '@/lib/api'
-import type { GroupRule, SmartScope, Rule, SortSpec } from '@bookorbit/types'
+import { normalizeCoverAspectRatio, type CoverAspectRatio, type GroupRule, type SmartScope, type Rule, type SortSpec } from '@bookorbit/types'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import IconPicker from '@/components/IconPicker.vue'
+import GridShapePicker from '@/features/book/components/GridShapePicker.vue'
 
 const { t } = useI18n()
 
@@ -54,6 +55,7 @@ const draftFilter = ref<GroupRule | undefined>(undefined)
 const draftSort = ref<SortSpec[]>([])
 const draftIsPublic = ref(false)
 const draftSyncToKobo = ref(false)
+const draftCoverAspectRatio = ref<CoverAspectRatio>('2/3')
 const saving = ref(false)
 const saveError = ref<string | null>(null)
 const trimmedDraftName = computed(() => draftName.value.trim())
@@ -73,6 +75,7 @@ watch(
       draftSort.value = props.smartScope.defaultSort ? [...props.smartScope.defaultSort] : []
       draftIsPublic.value = props.smartScope.isPublic
       draftSyncToKobo.value = props.smartScope.syncToKobo
+      draftCoverAspectRatio.value = normalizeCoverAspectRatio(props.smartScope.coverAspectRatio)
       schedulePreview()
     }
   },
@@ -146,6 +149,7 @@ async function save() {
       defaultSort: draftSort.value,
       isPublic: draftIsPublic.value,
       syncToKobo: draftSyncToKobo.value,
+      coverAspectRatio: draftCoverAspectRatio.value,
     })
     emit('saved')
     emit('close')
@@ -253,6 +257,19 @@ async function save() {
                 />
               </button>
             </div>
+          </div>
+
+          <!-- Grid shape card -->
+          <div class="rounded-lg border border-border bg-background p-5 flex flex-col gap-4">
+            <h3 id="smart-scope-grid-shape-title" class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+              {{ t('book.gridShape.title') }}
+            </h3>
+            <GridShapePicker
+              v-model="draftCoverAspectRatio"
+              name="smart-scope-grid-shape"
+              aria-labelledby="smart-scope-grid-shape-title"
+              class="sm:grid-cols-2"
+            />
           </div>
 
           <!-- Filters card -->

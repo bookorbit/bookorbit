@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, nextTick, ref } from 'vue'
+import type { Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Check, ChevronDown, Search } from '@lucide/vue'
+import { Aperture, BookCopy, Check, ChevronDown, FolderOpen, Search } from '@lucide/vue'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import AppIcon from '@/components/AppIcon.vue'
 import { formatNumber } from '@/i18n/formatters'
@@ -35,7 +36,7 @@ interface SwitchItem {
   id: number
   name: string
   icon: string | null
-  fallback: string
+  fallback: Component
   count: number | null
 }
 
@@ -51,7 +52,7 @@ const groups = computed(() => {
         id: library.id,
         name: library.name,
         icon: library.icon ?? null,
-        fallback: 'BookCopy',
+        fallback: BookCopy,
         count: entityCount(library),
       })),
     },
@@ -63,7 +64,7 @@ const groups = computed(() => {
         id: scope.id,
         name: scope.name,
         icon: scope.icon ?? null,
-        fallback: 'Aperture',
+        fallback: Aperture,
         count: entityCount(scope),
       })),
     },
@@ -75,7 +76,7 @@ const groups = computed(() => {
         id: collection.id,
         name: collection.name,
         icon: collection.icon ?? null,
-        fallback: 'FolderOpen',
+        fallback: FolderOpen,
         count: entityCount(collection),
       })),
     },

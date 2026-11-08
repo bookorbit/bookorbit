@@ -34,6 +34,7 @@ function makeService(db: any = {}) {
     scanBookFolderAsync: vi.fn(),
     scanBookDirectoryAsync: vi.fn(),
     isScanRunning: vi.fn().mockReturnValue(false),
+    ownsPath: vi.fn().mockResolvedValue(true),
     bufferBookMissingEvent: vi.fn(),
     bufferBooksUnavailableNotification: vi.fn(),
     bufferBooksRestoredNotification: vi.fn(),

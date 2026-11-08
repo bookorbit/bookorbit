@@ -3,9 +3,11 @@ import { computed, nextTick, ref, useSlots, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   BookOpen,
+  Combine,
   Download,
   FileSpreadsheet,
   FolderInput,
+  Link2,
   FolderMinus,
   FolderPlus,
   ImageDown,
@@ -38,8 +40,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
-import { STATUS_ICONS, STATUS_OPTIONS } from '@/features/book/composables/useBookStatus'
-import type { ReadStatus } from '@bookorbit/types'
+import BulkReadingStateDialog from '@/features/book/components/BulkReadingStateDialog.vue'
+import type { BulkReadingStatePatch } from '@/features/book/composables/useBookStatus'
 import {
   BULK_EDITABLE_ARRAY_FIELDS,
   BULK_EDITABLE_FIELD_OPTIONS,
@@ -47,6 +49,9 @@ import {
   type BulkEditableValue,
   type InFlightOp,
 } from '@/features/book/composables/useBookBulkActions'
+import type { MergeSelectionState } from '@/features/book/lib/book-merge'
+import type { LinkSelectionState } from '@/features/book/lib/book-link'
+import { BOOK_LINK_MAX_MEMBERS, BOOK_MERGE_MAX_BOOKS } from '@bookorbit/types'
 
 export type ExportScope = 'primary' | 'all' | 'audio'
 
@@ -73,8 +78,14 @@ const props = withDefaults(
     // Selection is query-scoped (all matching across pages), so individual ids aren't enumerable.
     queryScoped?: boolean
     metadataEditable?: boolean
+    /** Present when the user may merge books here; its reason says why this selection cannot be merged. */
+    merge?: MergeSelectionState | null
+    /** Present when the user may link books here; its reason says why this selection cannot be linked. */
+    link?: LinkSelectionState | null
+    /** The selection holds books linked with others, which a delete leaves alone (G6). */
+    linkedSelected?: boolean
   }>(),
-  { metadataEditable: true },
+  { metadataEditable: true, merge: null, link: null, linkedSelected: false },
 )
 
 const emit = defineEmits<{
@@ -87,11 +98,13 @@ const emit = defineEmits<{
   'export-metadata': []
   'refresh-metadata': [options: IgnoreCacheOptions]
   're-extract-cover': []
-  'set-status': [status: ReadStatus]
+  'set-status': [patch: BulkReadingStatePatch]
   'set-rating': [rating: number | null]
   'set-field': [field: BulkEditableField, value: BulkEditableValue]
   'lock-metadata': [locked: boolean]
   'move-to-library': []
+  merge: []
+  link: []
   delete: []
   exit: []
 }>()
@@ -109,6 +122,7 @@ const fieldMenuOpen = ref(false)
 const refreshConfirmOpen = ref(false)
 const refreshIgnoreCache = ref(false)
 const refreshConfirmButton = ref<HTMLButtonElement | null>(null)
+const readingStateOpen = ref(false)
 const bulkField = ref<BulkEditableField>('publisher')
 const fieldValue = ref('')
 const slots = useSlots()
@@ -118,7 +132,37 @@ const canDownload = computed(() => hasPermission('library_download') && canBulkA
 const canSetRating = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value)
 const canEditMetadata = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value && props.metadataEditable !== false)
 const canMoveToLibrary = computed(() => hasPermission('library_edit_metadata') && canBulkActions.value && props.metadataEditable !== false)
-const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMoveToLibrary.value)
+const canMerge = computed(() => props.merge !== null && canBulkActions.value)
+const canLink = computed(() => props.link !== null && canBulkActions.value)
+const mergeDisabledText = computed(() => {
+  switch (props.merge?.disabledReason) {
+    case 'queryScoped':
+      return t('book.merge.disabled.queryScoped')
+    case 'tooFew':
+      return t('book.merge.disabled.tooFew')
+    case 'tooMany':
+      return t('book.merge.disabled.tooMany', { max: BOOK_MERGE_MAX_BOOKS })
+    case 'notEditable':
+      return t('book.merge.disabled.notEditable')
+    default:
+      return null
+  }
+})
+const linkDisabledText = computed(() => {
+  switch (props.link?.disabledReason) {
+    case 'queryScoped':
+      return t('book.link.disabled.queryScoped')
+    case 'tooFew':
+      return t('book.link.disabled.tooFew')
+    case 'tooMany':
+      return t('book.link.disabled.tooMany', { max: BOOK_LINK_MAX_MEMBERS })
+    case 'notEditable':
+      return t('book.link.disabled.notEditable')
+    default:
+      return null
+  }
+})
+const canShowMoreMenu = computed(() => canDownload.value || canEditMetadata.value || canMoveToLibrary.value || canMerge.value || canLink.value)
 const canShare = computed(() => hasPermission('email_send') || canDownload.value)
 const numericFieldSelected = computed(() => bulkField.value === 'publishedYear')
 const arrayFieldSelected = computed(() => (BULK_EDITABLE_ARRAY_FIELDS as readonly string[]).includes(bulkField.value))
@@ -151,8 +195,17 @@ function onConfirmDelete() {
   deleteInput.value = ''
 }
 
-function onSetStatus(status: ReadStatus) {
-  emit('set-status', status)
+function openReadingStateEditor() {
+  readingStateOpen.value = true
+}
+
+function handleReadingStateOpenChange(open: boolean) {
+  readingStateOpen.value = open
+}
+
+function handleReadingStateConfirm(patch: BulkReadingStatePatch) {
+  emit('set-status', patch)
+  readingStateOpen.value = false
 }
 
 function onSetRating(rating: number | null) {
@@ -210,6 +263,23 @@ function onMoveToLibrary() {
   emit('move-to-library')
 }
 
+// The item stays focusable while unavailable so its reason can be read; selecting it does nothing.
+function onMergeSelect(event: Event) {
+  if (mergeDisabledText.value !== null) {
+    event.preventDefault()
+    return
+  }
+  emit('merge')
+}
+
+function onLinkSelect(event: Event) {
+  if (linkDisabledText.value !== null) {
+    event.preventDefault()
+    return
+  }
+  emit('link')
+}
+
 function resetFieldEditor() {
   fieldMenuOpen.value = false
   bulkField.value = 'publisher'
@@ -248,6 +318,7 @@ watch(
       exportMenuOpen.value = false
       ratingMenuOpen.value = false
       refreshConfirmOpen.value = false
+      readingStateOpen.value = false
       deleteInput.value = ''
       resetFieldEditor()
     }
@@ -292,24 +363,15 @@ watch(
             <Tooltip v-if="canBulkActions">
               <TooltipTrigger as-child>
                 <span class="inline-flex shrink-0">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger as-child>
-                      <button
-                        data-testid="action-bulk-set-status"
-                        :disabled="count === 0"
-                        :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
-                        :aria-label="t('components.selectionActionBar.setReadingStatus')"
-                      >
-                        <BookOpen :size="ICON_SIZE" />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent side="top" align="center" class="w-48">
-                      <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="onSetStatus(opt.value)">
-                        <component :is="STATUS_ICONS[opt.value]" :size="14" />
-                        <span>{{ opt.label }}</span>
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <button
+                    data-testid="action-bulk-set-status"
+                    :disabled="count === 0"
+                    :class="[BTN_ICON, count > 0 ? BTN_PRIMARY : BTN_DISABLED]"
+                    :aria-label="t('components.selectionActionBar.setReadingStatus')"
+                    @click="openReadingStateEditor"
+                  >
+                    <BookOpen :size="ICON_SIZE" />
+                  </button>
                 </span>
               </TooltipTrigger>
               <TooltipContent side="top">{{ t('components.selectionActionBar.setReadingStatus') }}</TooltipContent>
@@ -481,6 +543,40 @@ watch(
                           <span>{{ t('book.move.action') }}</span>
                         </DropdownMenuItem>
                       </template>
+                      <template v-if="canMerge">
+                        <DropdownMenuSeparator v-if="!canMoveToLibrary" />
+                        <DropdownMenuItem
+                          data-testid="action-merge-books"
+                          :aria-disabled="mergeDisabledText !== null ? 'true' : undefined"
+                          :class="mergeDisabledText !== null ? 'cursor-not-allowed items-start' : undefined"
+                          @select="onMergeSelect"
+                        >
+                          <Combine :size="14" :class="mergeDisabledText !== null ? 'mt-0.5' : undefined" />
+                          <span class="flex min-w-0 flex-col">
+                            <span :class="mergeDisabledText !== null ? 'text-muted-foreground' : undefined">{{ t('book.merge.action') }}</span>
+                            <span v-if="mergeDisabledText" class="text-xs text-muted-foreground" data-testid="action-merge-books-reason">{{
+                              mergeDisabledText
+                            }}</span>
+                          </span>
+                        </DropdownMenuItem>
+                      </template>
+                      <template v-if="canLink">
+                        <DropdownMenuSeparator v-if="!canMoveToLibrary && !canMerge" />
+                        <DropdownMenuItem
+                          data-testid="action-link-books"
+                          :aria-disabled="linkDisabledText !== null ? 'true' : undefined"
+                          :class="linkDisabledText !== null ? 'cursor-not-allowed items-start' : undefined"
+                          @select="onLinkSelect"
+                        >
+                          <Link2 :size="14" :class="linkDisabledText !== null ? 'mt-0.5' : undefined" />
+                          <span class="flex min-w-0 flex-col">
+                            <span :class="linkDisabledText !== null ? 'text-muted-foreground' : undefined">{{ t('book.link.action') }}</span>
+                            <span v-if="linkDisabledText" class="text-xs text-muted-foreground" data-testid="action-link-books-reason">{{
+                              linkDisabledText
+                            }}</span>
+                          </span>
+                        </DropdownMenuItem>
+                      </template>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </span>
@@ -606,8 +702,11 @@ watch(
 
           <!-- Delete confirmation -->
           <template v-else>
-            <span class="px-3 text-sm font-semibold text-destructive whitespace-nowrap">
-              {{ t('components.selectionActionBar.deleteConfirm', { count }) }}
+            <span class="flex flex-col px-3 whitespace-nowrap">
+              <span class="text-sm font-semibold text-destructive">{{ t('components.selectionActionBar.deleteConfirm', { count }) }}</span>
+              <span v-if="linkedSelected" class="text-xs text-muted-foreground" data-testid="delete-linked-note">{{
+                t('book.link.selectionNotAffected')
+              }}</span>
             </span>
             <template v-if="count > 50">
               <input
@@ -630,4 +729,10 @@ watch(
       </div>
     </div>
   </Transition>
+  <BulkReadingStateDialog
+    :open="readingStateOpen"
+    :book-count="count"
+    @update:open="handleReadingStateOpenChange"
+    @confirm="handleReadingStateConfirm"
+  />
 </template>

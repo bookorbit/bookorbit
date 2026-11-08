@@ -87,6 +87,17 @@ describe('KoboBookIdentityService', () => {
     await expect(service.resolveBookIdByCoverImageId(5, 'not-a-cover-id')).resolves.toBeNull();
   });
 
+  it('follows a merged-away legacy id to the kept book only when asked', async () => {
+    const aliases = { resolveOne: vi.fn().mockImplementation((id: number) => Promise.resolve(id === 420 ? 12 : null)) };
+    const service = new KoboBookIdentityService(makeDb() as never, aliases as never);
+
+    await expect(service.resolveBookIdByEntitlementId(5, '420')).resolves.toBe(420);
+    await expect(service.resolveBookIdByEntitlementId(5, '420', { followMerges: true })).resolves.toBe(12);
+    await expect(service.resolveBookIdByEntitlementId(5, '421', { followMerges: true })).resolves.toBe(421);
+    await expect(service.resolveBookIdByCoverImageId(5, '420-1778450221186', { followMerges: true })).resolves.toBe(12);
+    expect(aliases.resolveOne).toHaveBeenCalledTimes(3);
+  });
+
   it('marks legacy numeric removal complete only when book ids are provided', async () => {
     const db = makeDb();
     const service = new KoboBookIdentityService(db as never);

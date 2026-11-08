@@ -6,11 +6,13 @@ import vue from '@vitejs/plugin-vue'
 import vueDevTools from 'vite-plugin-vue-devtools'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { lucideIconsPlugin } from './build/vite-plugin-lucide-icons'
 
 const apiAgent = new Agent({ keepAlive: true })
 /** Lets a second dev client point at a throwaway API instance, so restart testing leaves the main stack alone. */
 const apiTarget = process.env.BOOKORBIT_API_TARGET ?? 'http://localhost:6262'
 const offlineShellUrl = '__bookorbit_offline_shell'
+const localeCatalogModule = /[\\/]src[\\/]locales[\\/]([A-Za-z-]+)\.json(?:\?.*)?$/
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -23,6 +25,7 @@ export default defineConfig({
     vue(),
     vueDevTools(),
     tailwindcss(),
+    lucideIconsPlugin(),
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
@@ -90,7 +93,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
-        globIgnores: ['**/assets/foliate/**'],
+        // Lucide icon files and non-English catalogs are fetched on demand and cached at runtime
+        // below; precaching them would download every icon and every language on install.
+        globIgnores: ['**/assets/foliate/**', '**/assets/lucide/**', '**/assets/locale-catalog-*.js'],
         // Keep the offline shell at a separate path. Workbox maps '/' and its query variants to
         // precached index.html before the NetworkFirst route can contact the auth proxy.
         manifestTransforms: [
@@ -179,6 +184,26 @@ export default defineConfig({
               },
             },
           },
+          {
+            // Content-hashed names, so a cached catalog is never stale.
+            urlPattern: /\/assets\/locale-catalog-[^/]+\.js$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'locale-catalogs',
+              expiration: { maxEntries: 4 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // The folder is named after the Lucide version, so a cached icon is never stale.
+            urlPattern: /\/assets\/lucide\/[^/]+\/[a-z0-9-]+\.svg$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'lucide-icons',
+              expiration: { maxEntries: 300 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
         ],
       },
       devOptions: {
@@ -187,6 +212,22 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rolldownOptions: {
+      output: {
+        // Without a group, every icon shared between two chunks becomes its own sub-kilobyte file,
+        // and the first page preloads well over a hundred of them.
+        codeSplitting: {
+          groups: [{ name: 'lucide-icons', test: /[\\/]@lucide[\\/]vue[\\/]/ }],
+        },
+        // A distinct prefix lets the service worker skip languages the user never opens.
+        chunkFileNames: (chunk) => {
+          const locale = chunk.facadeModuleId?.match(localeCatalogModule)?.[1]
+          return locale && locale !== 'en' ? 'assets/locale-catalog-[name]-[hash].js' : 'assets/[name]-[hash].js'
+        },
+      },
+    },
+  },
   resolve: {
     dedupe: ['vue'],
     alias: {

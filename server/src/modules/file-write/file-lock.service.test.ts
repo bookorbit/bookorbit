@@ -54,4 +54,20 @@ describe('FileLockService', () => {
       }),
     ).resolves.toBe('ok');
   });
+
+  it('reports whether a key is held and refuses tryWithLock without waiting while it is', async () => {
+    const lock = new FileLockService();
+    let release!: () => void;
+    const holder = lock.withLock('book:1', () => new Promise<void>((resolve) => (release = resolve)));
+
+    expect(lock.isLocked('book:1')).toBe(true);
+    expect(lock.tryWithLock('book:1', () => Promise.resolve('never'))).toBeNull();
+    expect(lock.isLocked('book:2')).toBe(false);
+    await expect(lock.tryWithLock('book:2', () => Promise.resolve('ran'))).resolves.toBe('ran');
+
+    release();
+    await holder;
+    expect(lock.isLocked('book:1')).toBe(false);
+    await expect(lock.tryWithLock('book:1', () => Promise.resolve('free'))).resolves.toBe('free');
+  });
 });

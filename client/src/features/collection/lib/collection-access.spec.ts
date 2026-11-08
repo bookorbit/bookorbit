@@ -10,6 +10,7 @@ function makeCollection(id: number, isOwner: boolean): Collection {
     icon: 'FolderOpen',
     description: null,
     isPublic: !isOwner,
+    coverAspectRatio: '2/3',
     isOwner,
     syncToKobo: false,
     displayOrder: id,

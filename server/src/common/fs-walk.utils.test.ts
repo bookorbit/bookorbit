@@ -75,6 +75,26 @@ describe('walkDirectoryTree', () => {
     expect(visited[0]!.filePaths.map((file) => basename(file))).toEqual(['kept.mp3']);
   });
 
+  it('leaves out the directories it is told to skip, with everything under them', async () => {
+    await mkdir(join(root, 'comics', 'Saga'), { recursive: true });
+    await mkdir(join(root, 'comics-extra'), { recursive: true });
+    await writeFile(join(root, 'comics', 'Saga', 'saga.cbz'), 'a');
+    await writeFile(join(root, 'comics-extra', 'extra.cbz'), 'b');
+
+    const { visited } = await collect({ skipDirectories: new Set([join(root, 'comics')]) });
+
+    expect(visited.map((directory) => basename(directory.path))).toEqual([basename(root), 'comics-extra']);
+    expect(visited[0]!.subdirectoryPaths.map((directory) => basename(directory))).toEqual(['comics-extra']);
+  });
+
+  it('walks nothing when the root itself is to be skipped', async () => {
+    await writeFile(join(root, 'book.epub'), 'a');
+
+    const { visited } = await collect({ skipDirectories: new Set([root]) });
+
+    expect(visited).toEqual([]);
+  });
+
   it('reports symlinked entries instead of following them', async () => {
     await writeFile(join(root, 'real.mp3'), 'a');
     await mkdir(join(root, 'target'), { recursive: true });

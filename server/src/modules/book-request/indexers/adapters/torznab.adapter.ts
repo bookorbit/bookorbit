@@ -34,6 +34,7 @@ const MAX_XML_RESPONSE_BYTES = 16 * 1024 * 1024;
  */
 const MAX_FEED_ITEMS = 500;
 const MAX_FEED_FIELD_CHARS = MAX_INDEXER_RELEASE_GUID_LENGTH;
+const HEX_INFO_HASH = /^[0-9a-f]{40}$/i;
 const REQUEST_TIMEOUT_MS = 25_000;
 /** The same ceiling the direct fetcher uses, and for the same reason: a chain, not a loop. */
 const MAX_REDIRECTS = 5;
@@ -268,14 +269,20 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
 
     const attrs = attrMap(item);
     const enclosure = toArray(item.enclosure)[0];
-    const sourceGuid = readGuid(item) ?? enclosure?.['@_url'] ?? title;
+    const feedGuid = readGuid(item);
+    const sourceGuid = feedGuid ?? enclosure?.['@_url'] ?? title;
     if (!withinFieldBound(sourceGuid)) continue;
     const guid = publicReleaseGuid(indexerId, sourceGuid);
-    // A proxy may publish the release as a magnet in `link`, in an enclosure, or in an attribute.
-    const link = withinFieldBound(item.link ?? enclosure?.['@_url']) ? (item.link ?? enclosure?.['@_url']) : undefined;
-    const magnet = attrs.get('magneturl') ?? (link?.startsWith('magnet:') ? link : undefined);
-    const downloadUrl = link && !link.startsWith('magnet:') ? link : undefined;
+    // A proxy may publish the release as a magnet in `link`, an enclosure, an attribute, or the guid.
+    const publishedLink = item.link ?? enclosure?.['@_url'];
+    const link = withinFieldBound(publishedLink) ? publishedLink : undefined;
     const infoHash = attrs.get('infohash');
+    const magnet =
+      attrs.get('magneturl') ??
+      (isMagnetLink(link) ? link : undefined) ??
+      (link === undefined && isMagnetLink(feedGuid) ? feedGuid : undefined) ??
+      (link === undefined ? magnetFromInfoHash(infoHash, title) : undefined);
+    const downloadUrl = link && !isMagnetLink(link) ? link : undefined;
     // A bare count includes cover art, so it is a scoring penalty rather than a hard filter.
     const fileCount = toNumber(attrs.get('files'));
     const publishedAt = parseDate(item.pubDate);
@@ -345,6 +352,17 @@ function attrMap(item: TorznabItem): Map<string, string> {
 /** A title, link or attribute longer than the bound is not one; the item is dropped rather than kept. */
 function withinFieldBound(value: string | undefined): boolean {
   return value === undefined || value.length <= MAX_FEED_FIELD_CHARS;
+}
+
+function isMagnetLink(value: string | undefined): value is string {
+  return value !== undefined && /^magnet:/i.test(value);
+}
+
+function magnetFromInfoHash(infoHash: string | undefined, title: string): string | undefined {
+  if (!infoHash || !HEX_INFO_HASH.test(infoHash)) return undefined;
+  const base = `magnet:?xt=urn:btih:${infoHash.toLowerCase()}`;
+  const named = `${base}&dn=${encodeURIComponent(title)}`;
+  return withinFieldBound(named) ? named : base;
 }
 
 /** `guid` is a bare string on some proxies and `{ '#text', '@_isPermaLink' }` on others. */

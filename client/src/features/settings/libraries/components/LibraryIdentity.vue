@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { FileText, Folder } from '@lucide/vue'
+import { FileText, Folder, FolderOpen } from '@lucide/vue'
 import type { Library } from '@bookorbit/types'
 import AppIcon from '@/components/AppIcon.vue'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -39,7 +39,7 @@ const pathLeaf = computed(() => (firstFolder.value ?? '').slice(pathHead.value.l
       :class="prominent ? 'size-10 rounded-xl' : 'size-8 rounded-lg'"
       :aria-label="t('settings.admin.libraries.openLibrary', { name: library.name })"
     >
-      <AppIcon :icon="library.icon || 'FolderOpen'" fallback="FolderOpen" :size="prominent ? 19 : 15" class="text-primary" />
+      <AppIcon :icon="library.icon" :fallback="FolderOpen" :size="prominent ? 19 : 15" class="text-primary" />
     </RouterLink>
     <div class="min-w-0">
       <RouterLink

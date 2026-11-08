@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { oklchToHex, toLegacyColor } from './css-color'
-import { buildChartTheme, createChartTokens } from './echarts'
+import { buildChartTheme, createChartTokens } from './chart-theme'
 
 function isHexColor(v: string): boolean {
   return /^#[0-9a-f]{6}$/i.test(v)

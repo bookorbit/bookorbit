@@ -1,17 +1,33 @@
 import { toast } from 'vue-sonner'
 import { getCurrentInstance, onUnmounted } from 'vue'
-import type { BookMissingEvent, BookMovedEvent, BookProgressChangedEvent, BookRestoredEvent, BookTransferredEvent } from '@bookorbit/types'
+import type {
+  BookLinksChangedEvent,
+  BookMergedEvent,
+  BookMergeJobEvent,
+  BookMissingEvent,
+  BookMovedEvent,
+  BookProgressChangedEvent,
+  BookRestoredEvent,
+  BookTransferredEvent,
+} from '@bookorbit/types'
 import { getSocket } from '@/features/scanner/composables/useScanProgress'
 
 type BookIdsCallback = (bookIds: number[]) => void
 type BookTransferredCallback = (event: BookTransferredEvent) => void
 type BookProgressChangedCallback = (event: BookProgressChangedEvent) => void
+type BookMergedCallback = (event: BookMergedEvent) => void
+type BookMergeJobCallback = (event: BookMergeJobEvent) => void
+type BookLinksChangedCallback = (event: BookLinksChangedEvent) => void
 
 const missingCallbacks = new Set<BookIdsCallback>()
 const restoredCallbacks = new Set<BookIdsCallback>()
 const movedCallbacks = new Set<BookIdsCallback>()
 const transferredCallbacks = new Set<BookTransferredCallback>()
 const progressChangedCallbacks = new Set<BookProgressChangedCallback>()
+const mergedCallbacks = new Set<BookMergedCallback>()
+const mergeProgressCallbacks = new Set<BookMergeJobCallback>()
+const mergeFinishedCallbacks = new Set<BookMergeJobCallback>()
+const linksChangedCallbacks = new Set<BookLinksChangedCallback>()
 
 let pendingMissingCount = 0
 let pendingRestoredCount = 0
@@ -80,6 +96,22 @@ function ensureInitialized() {
   socket.on('book:progress-changed', (event: BookProgressChangedEvent) => {
     for (const cb of progressChangedCallbacks) cb(event)
   })
+
+  socket.on('book:merged', (event: BookMergedEvent) => {
+    for (const cb of mergedCallbacks) cb(event)
+  })
+
+  socket.on('book-merge:progress', (event: BookMergeJobEvent) => {
+    for (const cb of mergeProgressCallbacks) cb(event)
+  })
+
+  socket.on('book-merge:finished', (event: BookMergeJobEvent) => {
+    for (const cb of mergeFinishedCallbacks) cb(event)
+  })
+
+  socket.on('book:links-changed', (event: BookLinksChangedEvent) => {
+    for (const cb of linksChangedCallbacks) cb(event)
+  })
 }
 
 function registerCallback<T extends (...args: never[]) => void>(callbacks: Set<T>, cb: T): () => void {
@@ -112,5 +144,33 @@ export function useBookEvents() {
     return registerCallback(progressChangedCallbacks, cb)
   }
 
-  return { onBookMissing, onBookRestored, onBookMoved, onBookTransferred, onBookProgressChanged }
+  function onBookMerged(cb: BookMergedCallback): () => void {
+    return registerCallback(mergedCallbacks, cb)
+  }
+
+  /** Progress of a merge this user started. Arrives on the user's own room, not the library's. */
+  function onBookMergeProgress(cb: BookMergeJobCallback): () => void {
+    return registerCallback(mergeProgressCallbacks, cb)
+  }
+
+  function onBookMergeFinished(cb: BookMergeJobCallback): () => void {
+    return registerCallback(mergeFinishedCallbacks, cb)
+  }
+
+  /** Books were linked or unlinked, or a group's main book changed. One event per affected library. */
+  function onBookLinksChanged(cb: BookLinksChangedCallback): () => void {
+    return registerCallback(linksChangedCallbacks, cb)
+  }
+
+  return {
+    onBookMissing,
+    onBookRestored,
+    onBookMoved,
+    onBookTransferred,
+    onBookProgressChanged,
+    onBookMerged,
+    onBookMergeProgress,
+    onBookMergeFinished,
+    onBookLinksChanged,
+  }
 }

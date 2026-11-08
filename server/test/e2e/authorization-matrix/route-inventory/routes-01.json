@@ -48,6 +48,42 @@
     "useGuards": []
   },
   {
+    "file": "server/src/modules/app-attest/app-attest.controller.ts",
+    "className": "AppAttestController",
+    "methodName": "createChallenge",
+    "httpMethod": "POST",
+    "path": "/app-attest/challenges",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-attest/app-attest.controller.ts",
+    "className": "AppAttestController",
+    "methodName": "listKeys",
+    "httpMethod": "GET",
+    "path": "/app-attest/keys",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
+    "file": "server/src/modules/app-attest/app-attest.controller.ts",
+    "className": "AppAttestController",
+    "methodName": "registerKey",
+    "httpMethod": "POST",
+    "path": "/app-attest/keys",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": []
+  },
+  {
     "file": "server/src/modules/app-settings/app-settings.controller.ts",
     "className": "AppSettingsController",
     "methodName": "listSettings",

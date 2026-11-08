@@ -12,15 +12,25 @@ import {
   type BookShadowStrength,
   type BookSpineOverlay,
   type CardOverlayKey,
+  type FormatBadgeStyle,
   type PlaceholderCoverStyle,
 } from '@/composables/useDisplaySettings'
+import BookCardFormatBadges from '@/features/book/components/BookCardFormatBadges.vue'
 import BookCoverPlaceholder from '@/features/book/components/BookCoverPlaceholder.vue'
 import { useCoverSearchPreferences } from '@/features/book/composables/useCoverSearchPreferences'
 
 const { t } = useI18n()
 
-const { cardOverlays, bookSpineOverlay, showSpineOnComics, bookShadowStrength, bookCoverDisplayMode, bookDetailCoverTint, placeholderCoverStyle } =
-  useDisplaySettings()
+const {
+  cardOverlays,
+  formatBadgeStyle,
+  bookSpineOverlay,
+  showSpineOnComics,
+  bookShadowStrength,
+  bookCoverDisplayMode,
+  bookDetailCoverTint,
+  placeholderCoverStyle,
+} = useDisplaySettings()
 const {
   defaultProvider: defaultCoverSearchProvider,
   isLoading: isCoverSearchPreferenceLoading,
@@ -152,6 +162,48 @@ const overlayOptions = computed<{ key: CardOverlayKey; label: string; hint: stri
   },
 ])
 
+// One book in three formats, so every style has something to fold; sample data like the placeholder books.
+const FORMAT_BADGE_PREVIEW_KEYS = ['epub', 'm4b', 'pdf']
+const formatBadgePreviewBook = PLACEHOLDER_SAMPLES[0]!
+
+const formatBadgeStyleOptions = computed<{ id: FormatBadgeStyle; label: string; hint: string }[]>(() => [
+  {
+    id: 'primary',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.primary.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.primary.hint'),
+  },
+  {
+    id: 'bubble',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.bubble.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.bubble.hint'),
+  },
+  {
+    id: 'underline',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.underline.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.underline.hint'),
+  },
+  {
+    id: 'pips',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.pips.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.pips.hint'),
+  },
+  {
+    id: 'seal',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.seal.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.seal.hint'),
+  },
+  {
+    id: 'dots',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.dots.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.dots.hint'),
+  },
+  {
+    id: 'kinds',
+    label: t('settings.appearance.bookCovers.formatBadgeStyle.options.kinds.label'),
+    hint: t('settings.appearance.bookCovers.formatBadgeStyle.options.kinds.hint'),
+  },
+])
+
 const bookSpineOptions = computed<{ id: BookSpineOverlay; label: string; hint: string }[]>(() => [
   {
     id: 'off',
@@ -223,6 +275,10 @@ function toggleOverlay(key: CardOverlayKey) {
   const idx = cardOverlays.value.indexOf(key)
   if (idx === -1) cardOverlays.value = [...cardOverlays.value, key]
   else cardOverlays.value = cardOverlays.value.filter((k) => k !== key)
+}
+
+function setFormatBadgeStyle(style: FormatBadgeStyle) {
+  formatBadgeStyle.value = style
 }
 
 function setBookSpineOverlay(mode: BookSpineOverlay) {
@@ -467,15 +523,57 @@ onMounted(async () => {
           {{ t('settings.appearance.bookCovers.overlays.hint') }}
         </p>
       </div>
-      <div v-for="opt in overlayOptions" :key="opt.key" class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
-        <div class="min-w-0">
-          <p class="settings-label">{{ opt.label }}</p>
-          <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
-            {{ opt.hint }}
-          </p>
+      <template v-for="opt in overlayOptions" :key="opt.key">
+        <div class="flex items-center justify-between gap-3 px-4 py-3 md:px-5 md:py-3.5 bg-card">
+          <div class="min-w-0">
+            <p class="settings-label">{{ opt.label }}</p>
+            <p class="settings-hint overflow-hidden text-ellipsis whitespace-nowrap md:whitespace-normal md:overflow-visible">
+              {{ opt.hint }}
+            </p>
+          </div>
+          <ToggleSwitch :model-value="cardOverlays.includes(opt.key)" @update:model-value="toggleOverlay(opt.key)" />
         </div>
-        <ToggleSwitch :model-value="cardOverlays.includes(opt.key)" @update:model-value="toggleOverlay(opt.key)" />
-      </div>
+        <div v-if="opt.key === 'format' && cardOverlays.includes('format')" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <div>
+            <p id="format-badge-style-label" class="settings-label">
+              {{ t('settings.appearance.bookCovers.formatBadgeStyle.title') }}
+            </p>
+            <p class="settings-hint">
+              {{ t('settings.appearance.bookCovers.formatBadgeStyle.hint') }}
+            </p>
+          </div>
+          <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4" role="group" aria-labelledby="format-badge-style-label">
+            <button
+              v-for="style in formatBadgeStyleOptions"
+              :key="style.id"
+              type="button"
+              class="flex flex-col rounded-md border p-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="formatBadgeStyle === style.id ? 'border-primary bg-primary/8' : 'border-border hover:border-muted-foreground/40'"
+              :aria-pressed="formatBadgeStyle === style.id"
+              :data-testid="`format-badge-style-${style.id}`"
+              @click="setFormatBadgeStyle(style.id)"
+            >
+              <span class="relative block aspect-[2/3] w-full overflow-hidden rounded-sm" aria-hidden="true">
+                <BookCoverPlaceholder
+                  :title="formatBadgePreviewBook.title"
+                  :subtitle="formatBadgePreviewBook.subtitle"
+                  :authors="formatBadgePreviewBook.authors"
+                  :series-name="formatBadgePreviewBook.seriesName"
+                  :series-index="formatBadgePreviewBook.seriesIndex"
+                  :genres="formatBadgePreviewBook.genres"
+                  :seed="formatBadgePreviewBook.seed"
+                  :variant="placeholderCoverStyle"
+                />
+                <BookCardFormatBadges :own-keys="FORMAT_BADGE_PREVIEW_KEYS" :badge-style="style.id" />
+              </span>
+              <span class="mt-2 block text-xs font-semibold" :class="formatBadgeStyle === style.id ? 'text-primary' : 'text-foreground'">{{
+                style.label
+              }}</span>
+              <span class="mt-0.5 block text-[11px] leading-snug text-muted-foreground">{{ style.hint }}</span>
+            </button>
+          </div>
+        </div>
+      </template>
     </div>
   </div>
 </template>

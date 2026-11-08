@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { AlertTriangle, ArrowRight, Check, FolderInput, Loader2, Search, Smartphone, Users } from '@lucide/vue'
+import { AlertTriangle, ArrowRight, BookCopy, Check, FolderInput, Loader2, Search, Smartphone, Users } from '@lucide/vue'
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -213,7 +213,7 @@ function collisionLabel(kind: string): string {
                 <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-muted">
                   <AppIcon
                     :icon="library.icon"
-                    fallback="BookCopy"
+                    :fallback="BookCopy"
                     :size="15"
                     :class="selectedLibraryId === library.id ? 'text-primary' : 'text-muted-foreground'"
                   />

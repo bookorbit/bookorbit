@@ -158,12 +158,12 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     to: (context) => ({
       name: context.hasPermission('manage_libraries')
         ? 'tools-entity-manager'
-        : context.hasPermission('library_delete_books')
+        : context.hasPermission('library_delete_books') || context.hasPermission('library_merge_books')
           ? 'tools-duplicate-books'
           : 'tools-chapter-health',
     }),
     isActive: (route) => routeNameStartsWith(route, 'tools-'),
-    permission: ['manage_libraries', 'library_delete_books', 'library_edit_metadata'],
+    permission: ['manage_libraries', 'library_delete_books', 'library_merge_books', 'library_edit_metadata'],
   },
   {
     id: 'authors',

@@ -44,6 +44,21 @@ describe('Collection DTO validation', () => {
     });
   });
 
+  describe('grid shape (issue #1926)', () => {
+    it('accepts only the supported grid shapes, and rejects a null shape on update', async () => {
+      const create = (coverAspectRatio: unknown) => errorsFor(CreateCollectionDto, { name: 'Listening', icon: 'Headphones', coverAspectRatio });
+      expect((await create('1/1')).length).toBe(0);
+      expect((await create('2/3')).length).toBe(0);
+      expect((await create(undefined)).length).toBe(0);
+      expect((await create('16/9')).length).toBeGreaterThan(0);
+
+      expect((await errorsFor(UpdateCollectionDto, { coverAspectRatio: '1/1' })).length).toBe(0);
+      expect((await errorsFor(UpdateCollectionDto, { coverAspectRatio: '1:1' })).length).toBeGreaterThan(0);
+      // A null would otherwise reach the NOT NULL column as a 500 instead of a 400.
+      expect((await errorsFor(UpdateCollectionDto, { coverAspectRatio: null })).length).toBeGreaterThan(0);
+    });
+  });
+
   describe('CollectionBooksDto', () => {
     it('requires non-empty positive integer book ids', async () => {
       expect((await errorsFor(CollectionBooksDto, { bookIds: [1, 2, 3] })).length).toBe(0);

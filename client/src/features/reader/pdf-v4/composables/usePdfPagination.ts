@@ -50,11 +50,14 @@ export function usePdfPagination({ mode, scrollState, scroll, touchPageTurningEn
     }
   }
 
-  function turnPage(direction: -1 | 1) {
+  // The scroll plugin moves its current page to the target when a turn starts, so a chained turn
+  // computes its target from the page already being scrolled to. Wheel and touch input keep the
+  // lock, because inertial scrolling emits many events for one gesture and would skip pages.
+  function turnPage(direction: -1 | 1, { chained = false }: { chained?: boolean } = {}) {
     const scope = getScrollScope()
     if (!scope) return
     try {
-      if (scope.getPageChangeState().isChanging) return
+      if (!chained && scope.getPageChangeState().isChanging) return
       const spreads = getSpreads(scope)
       if (spreads.length === 0) return
       const target = findAdjacentPage(spreads, pageRange.value.start, direction, scrollState.value.totalPages)
@@ -67,7 +70,7 @@ export function usePdfPagination({ mode, scrollState, scroll, touchPageTurningEn
 
   function previousPage() {
     onActivity()
-    if (mode.value === 'page') turnPage(-1)
+    if (mode.value === 'page') turnPage(-1, { chained: true })
     else {
       try {
         getScrollScope()?.scrollToPreviousPage(behavior.value)
@@ -79,7 +82,7 @@ export function usePdfPagination({ mode, scrollState, scroll, touchPageTurningEn
 
   function nextPage() {
     onActivity()
-    if (mode.value === 'page') turnPage(1)
+    if (mode.value === 'page') turnPage(1, { chained: true })
     else {
       try {
         getScrollScope()?.scrollToNextPage(behavior.value)

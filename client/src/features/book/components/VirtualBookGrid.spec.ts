@@ -24,11 +24,11 @@ vi.mock('vue-virtual-scroller', () => ({
 vi.mock('./BookCoverCard.vue', () => ({
   default: {
     name: 'BookCoverCard',
-    props: ['book', 'selectionMode', 'selected', 'showLabel', 'coverAspectRatio'],
+    props: ['book', 'selectionMode', 'selected', 'showLabel', 'coverAspectRatio', 'mediaKind'],
     emits: ['action', 'select', 'update:book'],
     template:
       '<div>' +
-      '<button data-testid="book-card" :data-cover-ratio="coverAspectRatio || \'\'" @click="$emit(\'action\', \'quick-view\')">' +
+      '<button data-testid="book-card" :data-cover-ratio="coverAspectRatio || \'\'" :data-media-kind="mediaKind || \'\'" @click="$emit(\'action\', \'quick-view\')">' +
       '{{ book.id }}<span v-if="showLabel" data-testid="book-card-label-slot" /></button>' +
       '<button data-testid="book-card-select" @click="$emit(\'select\', $event)">select</button>' +
       '<button data-testid="book-card-update" @click="$emit(\'update:book\', { ...book, title: \'Updated\' })">update</button>' +
@@ -254,6 +254,38 @@ describe('VirtualBookGrid', () => {
 
     expect(ebookWrapperStyle).toContain('width: 120px;')
     expect(audioWrapperStyle).toContain('width: 150px;')
+  })
+
+  it("frames and sizes each book as the grid's medium when it has that medium", () => {
+    const books = [
+      makeBook(1, {
+        coverAspectRatio: '2/3',
+        files: [
+          { id: 11, format: 'epub', role: 'primary', sizeBytes: null },
+          { id: 12, format: 'm4b', role: 'content', sizeBytes: null },
+        ],
+      }),
+      makeBook(2, { coverAspectRatio: '2/3', files: [{ id: 22, format: 'epub', role: 'primary', sizeBytes: null }] }),
+    ]
+
+    const wrapper = mount(VirtualBookGrid, {
+      props: { books, coverSize: 120, gridGap: 12, virtualized: false, squareCoverScale: 1.25, mediaKind: 'audiobook' },
+    })
+
+    const cards = wrapper.findAll('[data-testid="book-card"]')
+    expect(cards.map((card) => card.attributes('data-cover-ratio'))).toEqual(['1/1', '2/3'])
+    expect(cards.map((card) => card.attributes('data-media-kind'))).toEqual(['audiobook', 'audiobook'])
+    const itemWrappers = wrapper.findAll('.min-w-0.shrink-0')
+    expect(itemWrappers[0]!.attributes('style')).toContain('width: 150px;')
+    expect(itemWrappers[1]!.attributes('style')).toContain('width: 120px;')
+  })
+
+  it.each([true, false])('forwards the media kind to every card when virtualized=%s', (virtualized) => {
+    const wrapper = mount(VirtualBookGrid, {
+      props: { books: [makeBook(1), makeBook(2)], coverSize: 120, gridGap: 12, virtualized, mediaKind: 'comic' },
+    })
+
+    expect(wrapper.findAll('[data-testid="book-card"]').map((card) => card.attributes('data-media-kind'))).toEqual(['comic', 'comic'])
   })
 
   describe('windowed slots', () => {

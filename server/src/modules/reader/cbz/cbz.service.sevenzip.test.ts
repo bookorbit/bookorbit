@@ -12,12 +12,15 @@ import { CbzService, type ComicPageResult } from './cbz.service';
 describe('CbzService CB7 pages against the real 7z module', () => {
   const user = { id: 9, isSuperuser: false, permissions: [] } as any;
   let workspace: string;
+  let services: CbzService[];
 
   beforeEach(async () => {
     workspace = await mkdtemp(join(tmpdir(), 'bookorbit-cb7-real-'));
+    services = [];
   });
 
   afterEach(async () => {
+    await Promise.all(services.map((service) => service.onModuleDestroy()));
     await rm(workspace, { recursive: true, force: true });
   });
 
@@ -83,6 +86,7 @@ describe('CbzService CB7 pages against the real 7z module', () => {
     const path = join(workspace, 'unique.cb7');
     await writeFile(path, archive);
     const service = new CbzService({ verifyFileAccess: vi.fn().mockResolvedValue({ format: 'cb7', absolutePath: path }) } as any);
+    services.push(service);
 
     await expect(pageTexts(service, 31)).resolves.toEqual(await flatPageNames(archive));
   });
@@ -91,6 +95,7 @@ describe('CbzService CB7 pages against the real 7z module', () => {
     const path = join(workspace, 'nested.cb7');
     await writeFile(path, await buildSevenZip({ 'ch2/001.jpg': 'ch2-1', 'ch1/001.jpg': 'ch1-1', 'ch1/002.jpg': 'ch1-2' }));
     const service = new CbzService({ verifyFileAccess: vi.fn().mockResolvedValue({ format: 'cb7', absolutePath: path }) } as any);
+    services.push(service);
 
     await expect(pageTexts(service, 32)).resolves.toEqual(['ch1-1', 'ch2-1', 'ch1-2']);
 

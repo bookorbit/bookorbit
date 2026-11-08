@@ -49,6 +49,7 @@ function makeCollection(overrides: Partial<Collection> = {}): Collection {
     icon: 'FolderOpen',
     description: null,
     isPublic: false,
+    coverAspectRatio: '2/3',
     isOwner: true,
     syncToKobo: false,
     displayOrder: 0,

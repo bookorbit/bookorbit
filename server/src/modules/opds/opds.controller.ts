@@ -21,6 +21,7 @@ import type { FastifyReply } from 'fastify';
 
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { Public } from '../../common/decorators/public.decorator';
+import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
 import { OPDS_MIME_ACQ, OPDS_MIME_NAV, OPDS_MIME_SEARCH, fileMimeType } from './opds-xml.helpers';
@@ -224,6 +225,7 @@ export class OpdsController {
     reply.type(`${OPDS_MIME_SEARCH}; charset=utf-8`).send(xml);
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/cover')
   async cover(
     @Param('bookId', ParseIntPipe) bookId: number,
@@ -251,6 +253,7 @@ export class OpdsController {
     }
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/thumbnail')
   async thumbnail(
     @Param('bookId', ParseIntPipe) bookId: number,
@@ -293,6 +296,7 @@ export class OpdsController {
     reply.send(createReadStream(thumbnailPath));
   }
 
+  @ResolvesMergedBook({ params: ['bookId'] })
   @Get(':bookId/download')
   async download(
     @Param('bookId', ParseIntPipe) bookId: number,

@@ -1,4 +1,4 @@
-import { defineComponent, h, ref, type Ref } from 'vue'
+import { computed, defineComponent, h, ref, type Ref } from 'vue'
 import { describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { Rotation, type PdfPageObjectWithRotatedSize } from '@embedpdf/models'
@@ -10,6 +10,8 @@ interface PaginationHarness {
   wrapper: VueWrapper
   pagination: ReturnType<typeof usePdfPagination>
   touchPageTurningEnabled: Ref<boolean>
+  currentPage: Ref<number>
+  isChanging: Ref<boolean>
   onActivity: ReturnType<typeof vi.fn<() => void>>
   scrollToPage: ReturnType<typeof vi.fn<(options: { pageNumber: number; behavior: 'instant' | 'smooth' }) => void>>
 }
@@ -47,10 +49,17 @@ function mountPagination({
   const mode = ref<PdfReaderSettings['scrollMode']>(scrollMode)
   const touchPageTurningEnabled = ref(touchTurning)
   const onActivity = vi.fn<() => void>()
-  const scrollToPage = vi.fn<(options: { pageNumber: number; behavior: 'instant' | 'smooth' }) => void>()
+  const current = ref(currentPage)
+  const isChanging = ref(false)
+  // Mirrors the scroll plugin: a turn moves the current page to its target at once and stays in
+  // flight until the smooth scroll settles.
+  const scrollToPage = vi.fn<(options: { pageNumber: number; behavior: 'instant' | 'smooth' }) => void>((options) => {
+    current.value = options.pageNumber
+    isChanging.value = true
+  })
   const scroll = ref({
-    getSpreadPagesWithRotatedSize: () => [[page(0)], [page(1)], [page(2)]],
-    getPageChangeState: () => ({ isChanging: false }),
+    getSpreadPagesWithRotatedSize: () => Array.from({ length: totalPages }, (_, index) => [page(index)]),
+    getPageChangeState: () => ({ isChanging: isChanging.value }),
     getMetrics: () => ({ pageVisibilityMetrics: [] }),
     scrollToPage,
   } as unknown as Readonly<ScrollScope>)
@@ -61,7 +70,7 @@ function mountPagination({
       setup() {
         pagination = usePdfPagination({
           mode,
-          scrollState: ref({ currentPage, totalPages }),
+          scrollState: computed(() => ({ currentPage: current.value, totalPages })),
           scroll,
           touchPageTurningEnabled,
           onActivity,
@@ -71,7 +80,7 @@ function mountPagination({
     }),
   )
 
-  return { wrapper, pagination, touchPageTurningEnabled, onActivity, scrollToPage }
+  return { wrapper, pagination, touchPageTurningEnabled, currentPage: current, isChanging, onActivity, scrollToPage }
 }
 
 function swipe(pagination: ReturnType<typeof usePdfPagination>, from: [number, number], to: [number, number]) {
@@ -217,6 +226,69 @@ describe('usePdfPagination', () => {
     expect(canceledEnd.defaultPrevented).toBe(false)
     expect(multiTouchEnd.defaultPrevented).toBe(false)
     expect(harness.scrollToPage).not.toHaveBeenCalled()
+
+    harness.wrapper.unmount()
+  })
+  it('chains keyboard and button page turns while an earlier turn is still scrolling', () => {
+    const harness = mountPagination({ currentPage: 1, totalPages: 5 })
+
+    harness.pagination.nextPage()
+    harness.pagination.nextPage()
+    harness.pagination.nextPage()
+
+    expect(harness.scrollToPage.mock.calls.map(([options]) => options.pageNumber)).toEqual([2, 3, 4])
+    expect(harness.isChanging.value).toBe(true)
+
+    harness.pagination.previousPage()
+    expect(harness.scrollToPage).toHaveBeenLastCalledWith({ pageNumber: 3, behavior: 'smooth' })
+
+    harness.wrapper.unmount()
+  })
+
+  it('stops chained page turns at the first and last page', () => {
+    const harness = mountPagination({ currentPage: 2, totalPages: 3 })
+
+    harness.pagination.nextPage()
+    harness.pagination.nextPage()
+    harness.pagination.nextPage()
+    expect(harness.scrollToPage.mock.calls.map(([options]) => options.pageNumber)).toEqual([3])
+
+    harness.pagination.previousPage()
+    harness.pagination.previousPage()
+    harness.pagination.previousPage()
+    expect(harness.scrollToPage.mock.calls.map(([options]) => options.pageNumber)).toEqual([3, 2, 1])
+
+    harness.wrapper.unmount()
+  })
+
+  it('keeps wheel turns locked while a page turn is still scrolling', () => {
+    const harness = mountPagination({ currentPage: 1, totalPages: 5 })
+    const wheel = () => harness.pagination.handleWheel(new WheelEvent('wheel', { deltaY: 100, cancelable: true }))
+
+    wheel()
+    expect(harness.scrollToPage).toHaveBeenCalledExactlyOnceWith({ pageNumber: 2, behavior: 'smooth' })
+
+    harness.isChanging.value = false
+    harness.pagination.nextPage()
+    harness.isChanging.value = true
+    wheel()
+    wheel()
+    expect(harness.scrollToPage).toHaveBeenCalledTimes(2)
+
+    harness.wrapper.unmount()
+  })
+
+  it('keeps swipe turns locked while a page turn is still scrolling', () => {
+    const harness = mountPagination({ currentPage: 1, totalPages: 5 })
+
+    harness.pagination.nextPage()
+    swipe(harness.pagination, [180, 100], [100, 100])
+
+    expect(harness.scrollToPage).toHaveBeenCalledExactlyOnceWith({ pageNumber: 2, behavior: 'smooth' })
+
+    harness.isChanging.value = false
+    swipe(harness.pagination, [180, 100], [100, 100])
+    expect(harness.scrollToPage).toHaveBeenLastCalledWith({ pageNumber: 3, behavior: 'smooth' })
 
     harness.wrapper.unmount()
   })

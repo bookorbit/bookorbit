@@ -6,6 +6,7 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 
+import { BookConsolidationService } from '../book-consolidation/book-consolidation.service';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import { classifyFile, DEFAULT_FORMAT_PRIORITY } from './lib/classify';
@@ -31,6 +32,7 @@ export class FileEventProcessorService {
   constructor(
     private readonly scannerRepo: ScannerRepository,
     private readonly coverStore: BookCoverStore,
+    private readonly consolidation: BookConsolidationService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
   ) {}
 
@@ -380,6 +382,14 @@ export class FileEventProcessorService {
         sourceFileId: sourceFile.id,
         duplicateBookId: candidate.bookId,
         duplicateFileId: candidate.file.id,
+        // A duplicate someone already read or shelved keeps that data on the moved book.
+        absorbDuplicate: (tx) =>
+          this.consolidation.absorbDuplicate(tx, {
+            targetBookId: bookId,
+            duplicateBookId: candidate.bookId,
+            incomingFiles: [{ fileId: sourceFile.id, absolutePath: candidate.file.absolutePath }],
+            mergedByUserId: null,
+          }),
       });
       if (!moved) continue;
       await this.coverStore.removeCoverDirectory(moved.duplicateBookId).catch(() => undefined);

@@ -49,6 +49,36 @@ export const SERVER_FEATURES = [
    * kind, several files saved in one request, and `editedAt` so the newer of two saves wins.
    */
   "reading-progress",
+  /** `POST /mobile/books/files/:fileId/locate-text` finds where text recognised on a photographed page appears in an EPUB. */
+  "locate-text",
+  /** `GET /mobile/year-review/:year`: a reader's year, for the app's Year in Review story. */
+  "year-review",
+  /**
+   * `POST /mobile/visual-match` names the books in the reader's libraries that text recognised on a
+   * photographed cover or spine, or its barcode, points to.
+   */
+  "visual-match",
+  /**
+   * `POST /mobile/shelf-match` names, for each spine in a photographed shelf, the books in the
+   * reader's libraries that the text recognised on it points to.
+   */
+  "shelf-match",
+  /**
+   * `GET /mobile/books/:bookId/story-edits` pages a reader's corrections to a book's people, places
+   * and terms by revision cursor, and `PUT /mobile/books/:bookId/story-edits/:id` writes one.
+   */
+  "story-edits",
+  /**
+   * `POST /books/merge/preview`, `POST /books/merge` and `GET /books/merge/jobs/:jobId`; a merged-away
+   * book id answers 404 with `errorCode: "BOOK_MERGED"` and `errorMeta.targetBookId`, and queued writes
+   * to it land on the kept book.
+   */
+  "book-merge",
+  /**
+   * `POST /books/links`, `PATCH /books/links/:groupId`, `DELETE /books/:id/link`; book queries accept
+   * `collapseLinked`, cards carry `linked` and `BooksPage.bookTotal`, and book detail `linkedBooks`.
+   */
+  "book-links",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

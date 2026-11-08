@@ -150,6 +150,28 @@ describe('title-match', () => {
     it('matches an author name across a diacritic difference', () => {
       expect(shareSignificantToken(['Natsume Sōseki'], ['Natsume Soseki'])).toBe(true);
     });
+
+    it('keeps Devanagari vowel signs inside their words', () => {
+      expect(normalizeTitleText('हिन्दी साहित्य')).toBe('हिन्दी साहित्य');
+      expect(tokenizeTitleText(normalizeTitleText('हिन्दी साहित्य'))).toEqual(['हिन्दी', 'साहित्य']);
+      expect(normalizeTitleText('कुल')).not.toBe(normalizeTitleText('कल'));
+    });
+
+    it('matches identical Devanagari titles and authors, and separates different ones', () => {
+      expect(scoreTitleMatch('गोदान', 'गोदान')).toBe(10);
+      expect(scoreTitleMatch('गोदान', 'निर्मला')).toBe(0);
+      expect(shareSignificantToken(['प्रेमचंद'], ['प्रेमचंद'])).toBe(true);
+    });
+
+    it('keeps kana voicing marks, which tell two words apart', () => {
+      expect(normalizeTitleText('ガラス')).not.toBe(normalizeTitleText('カラス'));
+      expect(symmetricTitleSimilarity('ガラス', 'カラス')).toBeLessThan(1);
+    });
+
+    it('folds optional Arabic and Hebrew vowel pointing', () => {
+      expect(scoreTitleMatch('كِتَاب', 'كتاب')).toBe(10);
+      expect(scoreTitleMatch('סֵפֶר', 'ספר')).toBe(10);
+    });
   });
 
   describe('normalizeTitleText and tokenizeTitleText', () => {

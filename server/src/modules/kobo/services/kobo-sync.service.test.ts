@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import { sql } from 'drizzle-orm';
 import * as schema from '../../../db/schema';
 import { encodeSyncToken } from './kobo-sync-token';
-import { KoboSyncService } from './kobo-sync.service';
+import { KoboSyncService, SYNC_PAGE_SIZE } from './kobo-sync.service';
 
 // Recursively counts bound query params (drizzle-orm's `Param` chunks) in a built SQL tree,
 // so tests can assert a clause isn't binding one parameter per matched book id.
@@ -174,6 +174,12 @@ describe('KoboSyncService', () => {
   const metadataExtractionService = {
     detectFixedLayout: vi.fn(),
   };
+  const tombstoneRepository = {
+    hasPending: vi.fn(),
+    findPending: vi.fn(),
+    markServed: vi.fn(),
+    prune: vi.fn(),
+  };
 
   function makeIdentity(bookId: number, needsLegacyNumericRemoval = false) {
     return {
@@ -198,6 +204,7 @@ describe('KoboSyncService', () => {
       queryBuilder as never,
       smartScopeService as never,
       metadataExtractionService as never,
+      tombstoneRepository as never,
     );
   }
 
@@ -208,6 +215,10 @@ describe('KoboSyncService', () => {
     readingStateService.getRawState.mockResolvedValue(null);
     contentFilterRepository.findByUserId.mockResolvedValue([]);
     metadataExtractionService.detectFixedLayout.mockResolvedValue(null);
+    tombstoneRepository.hasPending.mockResolvedValue(false);
+    tombstoneRepository.findPending.mockResolvedValue([]);
+    tombstoneRepository.markServed.mockResolvedValue(undefined);
+    tombstoneRepository.prune.mockResolvedValue(undefined);
     bookIdentityService.ensureForBooks.mockImplementation((_userId: number, bookIds: number[], needsLegacyNumericRemoval: boolean) =>
       makeIdentityMap(bookIds, needsLegacyNumericRemoval),
     );
@@ -250,8 +261,8 @@ describe('KoboSyncService', () => {
     expect(createSpy).toHaveBeenNthCalledWith(2, 5, 202, eligible, new Set());
     expect((service as any).fetchEligibleSnapshotRows).toHaveBeenNthCalledWith(1, 5, false, expect.any(Map), true);
     expect((service as any).fetchEligibleSnapshotRows).toHaveBeenNthCalledWith(2, 5, true, expect.any(Map), true);
-    expect(pageSpy).toHaveBeenNthCalledWith(1, 5, 11, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
-    expect(pageSpy).toHaveBeenNthCalledWith(2, 5, 22, 'device-b-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    expect(pageSpy).toHaveBeenNthCalledWith(1, 5, 101, 11, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    expect(pageSpy).toHaveBeenNthCalledWith(2, 5, 202, 22, 'device-b-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
   });
 
   it('reconciles only the caller device snapshot when it already exists', async () => {
@@ -266,8 +277,8 @@ describe('KoboSyncService', () => {
     await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
 
     expect(reconcileSpy).toHaveBeenCalledWith(9, eligible);
-    expect(pageSpy).toHaveBeenCalledWith(5, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
-    await expect(pageSpy.mock.calls[0]![5]()).resolves.toEqual(new Set([1]));
+    expect(pageSpy).toHaveBeenCalledWith(5, 101, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    await expect(pageSpy.mock.calls[0]![6]()).resolves.toEqual(new Set([1]));
   });
 
   it('serves the next page without reconciling while the device still has pending rows', async () => {
@@ -282,7 +293,7 @@ describe('KoboSyncService', () => {
 
     expect(reconcileSpy).not.toHaveBeenCalled();
     expect(eligibleSpy).not.toHaveBeenCalled();
-    expect(pageSpy).toHaveBeenCalledWith(5, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+    expect(pageSpy).toHaveBeenCalledWith(5, 101, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
   });
 
   it('still resolves eligible ids for tag delivery when a pending page drains before it is served', async () => {
@@ -296,7 +307,7 @@ describe('KoboSyncService', () => {
 
     await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
 
-    await expect(pageSpy.mock.calls[0]![5]()).resolves.toEqual(new Set([7]));
+    await expect(pageSpy.mock.calls[0]![6]()).resolves.toEqual(new Set([7]));
     expect(eligibleSpy).toHaveBeenCalledWith(5, true, expect.any(Map));
   });
 
@@ -507,7 +518,7 @@ describe('KoboSyncService', () => {
     const service = makeService(db);
     vi.spyOn(service as any, 'buildTagItems').mockResolvedValue([{ ChangedTag: {} }]);
 
-    const result = await (service as any).getPageFromSnapshot(7, 1, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([1])));
+    const result = await (service as any).getPageFromSnapshot(7, 101, 1, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([1])));
 
     expect(result).toEqual({
       entitlements: [{ ChangedTag: {} }],
@@ -534,7 +545,9 @@ describe('KoboSyncService', () => {
     );
     readingStateService.getRawState.mockResolvedValue(null);
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([1, 2, 3])));
+    const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () =>
+      Promise.resolve(new Set([1, 2, 3])),
+    );
 
     expect(result.hasMore).toBe(false);
     expect(result.entitlements).toHaveLength(3);
@@ -553,7 +566,7 @@ describe('KoboSyncService', () => {
     vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map([[3, makeBook(3)]]));
     readingStateService.getRawState.mockResolvedValue({ EntitlementId: 'entitlement-3', CurrentBookmark: { ProgressPercent: 61 } });
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
+    const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
 
     expect(result.entitlements).toHaveLength(2);
     expect(result.entitlements[0]).toHaveProperty('ChangedProductMetadata');
@@ -573,7 +586,7 @@ describe('KoboSyncService', () => {
     bookIdentityService.findByBookIds.mockResolvedValue(new Map([[3, makeIdentity(3, false)]]));
     readingStateService.getRawState.mockResolvedValue({ EntitlementId: 'entitlement-3', CurrentBookmark: { ProgressPercent: 61 } });
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
+    const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([3])));
 
     expect(result.entitlements).toHaveLength(2);
     expect(result.entitlements[0]).toHaveProperty('ChangedEntitlement');
@@ -593,13 +606,166 @@ describe('KoboSyncService', () => {
     vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map());
     bookIdentityService.findByBookIds.mockResolvedValue(new Map([[3, makeIdentity(3, true)]]));
 
-    const result = await (service as any).getPageFromSnapshot(7, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
+    const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
     const removedIds = result.entitlements.map(
       (entry: Record<string, { BookEntitlement: { Id: string } }>) => entry.ChangedEntitlement.BookEntitlement.Id,
     );
 
     expect(removedIds).toEqual(['3', 'entitlement-3']);
     expect(bookIdentityService.markLegacyNumericRemovalComplete).toHaveBeenCalledWith(7, [3]);
+  });
+
+  it('removes a book that left the synced set while an update for it was pending, instead of leaving the row pending', async () => {
+    const db = makeDb({
+      select: [[{ bookId: 4, pendingDelete: false, isNew: false, needsLegacyNumericRemoval: false }]],
+    });
+    const service = makeService(db);
+    vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map());
+
+    const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
+
+    expect(result.entitlements).toEqual([
+      expect.objectContaining({
+        ChangedEntitlement: expect.objectContaining({ BookEntitlement: expect.objectContaining({ Id: 'entitlement-4', IsRemoved: true }) }),
+      }),
+    ]);
+    expect(db.delete).toHaveBeenCalledTimes(1);
+    expect(db.update).not.toHaveBeenCalled();
+    expect(readingStateService.getRawState).not.toHaveBeenCalled();
+  });
+
+  describe('deleted book removals', () => {
+    function removedIds(entitlements: unknown[]): string[] {
+      return entitlements.map(
+        (entry) => (entry as { ChangedEntitlement: { BookEntitlement: { Id: string } } }).ChangedEntitlement.BookEntitlement.Id,
+      );
+    }
+
+    it('serves a removal for each tombstone before the snapshot rows, with the numeric id first when recorded', async () => {
+      const db = makeDb({ select: [[{ bookId: 2, pendingDelete: false, isNew: true }]] });
+      const service = makeService(db);
+      vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map([[2, makeBook(2)]]));
+      tombstoneRepository.findPending.mockResolvedValue([
+        { entitlementId: 'gone-a', legacyBookId: null },
+        { entitlementId: 'gone-b', legacyBookId: 41 },
+      ]);
+
+      const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([2])));
+
+      expect(tombstoneRepository.findPending).toHaveBeenCalledWith(7, 101, SYNC_PAGE_SIZE + 1);
+      expect(removedIds(result.entitlements.slice(0, 3))).toEqual(['gone-a', '41', 'gone-b']);
+      expect(result.entitlements[0]).toEqual({
+        ChangedEntitlement: expect.objectContaining({ BookEntitlement: expect.objectContaining({ IsRemoved: true, Status: 'Deleted' }) }),
+      });
+      expect(result.entitlements[3]).toHaveProperty('NewEntitlement');
+      expect(result.hasMore).toBe(false);
+      expect(db.__chains[0]!.limit).toHaveBeenCalledWith(SYNC_PAGE_SIZE - 2 + 1);
+      expect(tombstoneRepository.markServed).toHaveBeenCalledWith(7, 101, ['gone-a', 'gone-b']);
+      expect(tombstoneRepository.prune).toHaveBeenCalledWith(7);
+    });
+
+    it('fills a page with removals and leaves the snapshot rows for the next page', async () => {
+      const db = makeDb({ select: [[{ bookId: 2, pendingDelete: false, isNew: true }]] });
+      const service = makeService(db);
+      const buildTagItems = vi.spyOn(service as any, 'buildTagItems');
+      const pending = Array.from({ length: SYNC_PAGE_SIZE + 1 }, (_, index) => ({ entitlementId: `gone-${index}`, legacyBookId: null }));
+      tombstoneRepository.findPending.mockResolvedValue(pending);
+
+      const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([2])));
+
+      expect(result.hasMore).toBe(true);
+      expect(removedIds(result.entitlements)).toEqual(pending.slice(0, SYNC_PAGE_SIZE).map((removal) => removal.entitlementId));
+      expect(db.__chains[0]!.limit).toHaveBeenCalledWith(1);
+      expect(tombstoneRepository.markServed).toHaveBeenCalledWith(
+        7,
+        101,
+        pending.slice(0, SYNC_PAGE_SIZE).map((removal) => removal.entitlementId),
+      );
+      expect(buildTagItems).not.toHaveBeenCalled();
+    });
+
+    it('reports more when a full page of removals still leaves snapshot rows', async () => {
+      const db = makeDb({ select: [[{ bookId: 2, pendingDelete: false, isNew: true }]] });
+      const service = makeService(db);
+      tombstoneRepository.findPending.mockResolvedValue(
+        Array.from({ length: SYNC_PAGE_SIZE }, (_, index) => ({ entitlementId: `gone-${index}`, legacyBookId: null })),
+      );
+
+      const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set([2])));
+
+      expect(result.hasMore).toBe(true);
+      expect(result.entitlements).toHaveLength(SYNC_PAGE_SIZE);
+    });
+
+    it('serves the last removals without the tags, which the closing page still sends', async () => {
+      const db = makeDb({ select: [[]] });
+      const service = makeService(db);
+      const buildTagItems = vi.spyOn(service as any, 'buildTagItems').mockResolvedValue([{ ChangedTag: {} }]);
+      tombstoneRepository.findPending.mockResolvedValue([{ entitlementId: 'gone-a', legacyBookId: null }]);
+
+      const result = await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
+
+      expect(removedIds(result.entitlements)).toEqual(['gone-a']);
+      expect(result.hasMore).toBe(false);
+      expect(buildTagItems).not.toHaveBeenCalled();
+      expect(db.delete).not.toHaveBeenCalled();
+    });
+
+    it('never marks anything served when no tombstone is pending', async () => {
+      const db = makeDb({ select: [[]] });
+      const service = makeService(db);
+      vi.spyOn(service as any, 'buildTagItems').mockResolvedValue([]);
+
+      await (service as any).getPageFromSnapshot(7, 101, 22, 'tok', 'https://base', new Map(), () => Promise.resolve(new Set()));
+
+      expect(tombstoneRepository.markServed).not.toHaveBeenCalled();
+      expect(db.__chains[0]!.limit).toHaveBeenCalledWith(SYNC_PAGE_SIZE + 1);
+    });
+
+    it('serves pending removals without reconciling, then sends the device back for the reconcile', async () => {
+      const db = makeDb({ select: [[]] });
+      const service = makeService(db);
+      vi.spyOn(service as any, 'findDeviceSnapshot').mockResolvedValue({ id: 9, userId: 5, deviceId: 101 });
+      const eligibleSpy = vi.spyOn(service as any, 'fetchEligibleSnapshotRows').mockResolvedValue([]);
+      const reconcileSpy = vi.spyOn(service as any, 'reconcileSnapshot').mockResolvedValue(undefined);
+      const pageSpy = vi
+        .spyOn(service as any, 'getPageFromSnapshot')
+        .mockResolvedValue({ entitlements: [{ ChangedEntitlement: {} }], hasMore: false, syncToken: 'PX.token' });
+      tombstoneRepository.hasPending.mockResolvedValue(true);
+
+      const result = await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
+
+      expect(tombstoneRepository.hasPending).toHaveBeenCalledWith(5, 101);
+      expect(reconcileSpy).not.toHaveBeenCalled();
+      expect(eligibleSpy).not.toHaveBeenCalled();
+      expect(pageSpy).toHaveBeenCalledWith(5, 101, 9, 'device-a-token', 'https://reader.example.com', expect.any(Map), expect.any(Function));
+      expect(result).toEqual({ entitlements: [{ ChangedEntitlement: {} }], hasMore: true, syncToken: 'PX.token' });
+    });
+
+    it('keeps the page verdict while snapshot rows are pending alongside removals', async () => {
+      const db = makeDb({ select: [[{ bookId: 4 }]] });
+      const service = makeService(db);
+      vi.spyOn(service as any, 'findDeviceSnapshot').mockResolvedValue({ id: 9, userId: 5, deviceId: 101 });
+      vi.spyOn(service as any, 'getPageFromSnapshot').mockResolvedValue({ entitlements: [], hasMore: false, syncToken: 'PX.token' });
+      tombstoneRepository.hasPending.mockResolvedValue(true);
+
+      const result = await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
+
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('prunes the user tombstones on the sync that opens with a reconcile', async () => {
+      const db = makeDb();
+      const service = makeService(db);
+      vi.spyOn(service as any, 'findDeviceSnapshot').mockResolvedValue({ id: 9, userId: 5, deviceId: 101 });
+      vi.spyOn(service as any, 'fetchEligibleSnapshotRows').mockResolvedValue([]);
+      vi.spyOn(service as any, 'reconcileSnapshot').mockResolvedValue(undefined);
+      vi.spyOn(service as any, 'getPageFromSnapshot').mockResolvedValue({ entitlements: [], hasMore: false, syncToken: 'PX.token' });
+
+      await service.getDelta(5, 101, 'device-a-token', 'https://reader.example.com');
+
+      expect(tombstoneRepository.prune).toHaveBeenCalledWith(5);
+    });
   });
 
   it('buildTagItems includes only currently-eligible books per collection', async () => {
@@ -971,24 +1137,26 @@ describe('KoboSyncService', () => {
       expect(sql).toContain('is_new = true');
     });
 
-    it('keeps an undelivered legacy numeric removal as a pending delete when eligibility changes', async () => {
+    it('owes a removal for every ineligible row the device did not remove itself, whatever its synced flag says', async () => {
       const { fn: txExecute, captured } = makeTxExecute();
       const db = makeReconcileDb(txExecute);
       const service = makeService(db);
 
       await (service as any).reconcileSnapshot(5, []);
 
-      const markPendingStmt = captured.find((stmt) => {
-        const sql = extractSqlStrings(stmt).join(' ');
-        return sql.includes('SET pending_delete = true') && sql.includes('sb.needs_legacy_numeric_removal = true');
-      });
-      const deleteStmt = captured.find((stmt) => {
-        const sql = extractSqlStrings(stmt).join(' ');
-        return sql.includes('DELETE FROM') && sql.includes('sb.needs_legacy_numeric_removal = false');
-      });
+      const statements = captured.map((stmt) => extractSqlStrings(stmt).join(' '));
+      const markPendingSql = statements.find((sql) => sql.includes('SET pending_delete = true'));
+      const deleteSql = statements.find((sql) => sql.includes('DELETE FROM'));
 
-      expect(markPendingStmt).toBeDefined();
-      expect(deleteStmt).toBeDefined();
+      // A delivered book loses `synced` whenever the device is owed an update for it (a status set on
+      // the web, a failed re-delivery), so the flag cannot decide whether the device holds the book.
+      expect(markPendingSql).toBeDefined();
+      expect(markPendingSql).toContain('sb.removed_by_device = false');
+      expect(markPendingSql).not.toContain('sb.synced');
+      expect(markPendingSql).not.toContain('needs_legacy_numeric_removal');
+      expect(deleteSql).toBeDefined();
+      expect(deleteSql).toContain('sb.removed_by_device = true');
+      expect(deleteSql).not.toContain('sb.synced');
     });
 
     it('marks delivery and cover changes as new entitlements and other metadata changes as metadata updates', async () => {

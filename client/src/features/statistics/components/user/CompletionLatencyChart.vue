@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import VChart from 'vue-echarts'
+import AppChart from '@/components/charts/AppChart.vue'
 import { Rabbit } from '@lucide/vue'
 
 import { useUserCompletionLatency } from '../../composables/useUserCompletionLatency'
@@ -84,7 +84,7 @@ function metric(value: number | null): string {
           <div class="text-foreground text-sm font-semibold">{{ metric(data.percentile90Days) }}</div>
         </div>
       </div>
-      <VChart :option autoresize style="height: 100%" />
+      <AppChart :option autoresize style="height: 100%" />
     </div>
   </ChartCard>
 </template>

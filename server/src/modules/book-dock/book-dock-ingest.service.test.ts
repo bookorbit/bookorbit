@@ -942,6 +942,74 @@ describe('BookDockIngestService', () => {
       );
     });
 
+    it.each([
+      [
+        'an exact Cyrillic title and author',
+        { title: 'Война и мир', authors: ['Лев Толстой'] },
+        { title: 'Война и мир', authors: ['Лев Толстой'] },
+        85,
+      ],
+      ['a numbered Cyrillic title against its unnumbered form', { title: '01 Пример названия' }, { title: 'Пример названия' }, 37],
+      ['unrelated Cyrillic titles', { title: 'Первая книга' }, { title: 'Другая история' }, 0],
+      ['different Cyrillic authors', { title: 'Example', authors: ['Лев Толстой'] }, { title: 'Example', authors: ['Михаил Булгаков'] }, 55],
+      ['an unrelated Japanese book', { title: 'ノルウェイの森', authors: ['村上春樹'] }, { title: '雪国', authors: ['川端康成'] }, 0],
+      [
+        'an exact Japanese title and author',
+        { title: 'ノルウェイの森', authors: ['村上春樹'] },
+        { title: 'ノルウェイの森', authors: ['村上春樹'] },
+        85,
+      ],
+      ['titles differing only in kana voicing', { title: 'ガラス' }, { title: 'カラス' }, 0],
+      ['an exact Devanagari title', { title: 'हिन्दी साहित्य' }, { title: 'हिन्दी साहित्य' }, 55],
+      ['different Devanagari titles', { title: 'गोदान' }, { title: 'निर्मला' }, 0],
+      ['an Arabic title with and without vowel pointing', { title: 'كِتَاب' }, { title: 'كتاب' }, 55],
+      [
+        'a Latin title with and without accents',
+        { title: 'Les Misérables', authors: ['Émile Zola'] },
+        { title: 'Les Miserables', authors: ['Emile Zola'] },
+        85,
+      ],
+      ['a decomposed accent against a precomposed one', { title: 'Cafe\u0301 Society' }, { title: 'Caf\u00e9 Society' }, 55],
+      ['punctuation-only titles', { title: '...' }, { title: '!!!' }, 0],
+      ['two titles made only of stop words', { title: 'The' }, { title: 'It' }, 0],
+      [
+        'a title made only of a stop word, matched exactly',
+        { title: 'It', authors: ['Stephen King'] },
+        { title: 'It', authors: ['King, Stephen'] },
+        85,
+      ],
+      ['a single-letter title, matched exactly', { title: 'V.' }, { title: 'V' }, 55],
+      ['a Latin title and author', { title: 'Example', authors: ['Jane Smith'] }, { title: 'Example', authors: ['Jane Smith'] }, 85],
+    ])('scores %s', async (_label, embedded, fetched, confidence) => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockResolvedValue({ id: 14, fileName: 'book.epub', status: 'ready', embeddedMetadata: embedded });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({ resolved: fetched, sources: {} });
+
+      await (service as any).autoFetchMetadataAsync(14);
+
+      expect(repo.update).toHaveBeenLastCalledWith(14, expect.objectContaining({ confidence }));
+    });
+
+    it('keeps an exact ISBN match ahead of disagreeing Cyrillic titles', async () => {
+      const { service, appSettings, repo, metadataFetchPipeline } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);
+      repo.findById.mockResolvedValue({
+        id: 16,
+        fileName: 'book.epub',
+        status: 'ready',
+        embeddedMetadata: { title: 'Первая книга', isbn13: '9780306406157' },
+      });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({
+        resolved: { title: 'Другая история', isbn13: '9780306406157' },
+        sources: {},
+      });
+
+      await (service as any).autoFetchMetadataAsync(16);
+
+      expect(repo.update).toHaveBeenLastCalledWith(16, expect.objectContaining({ confidence: 95 }));
+    });
+
     it('marks ready without fetchedMetadata when providers return only undefined fields', async () => {
       const { service, appSettings, repo, metadataFetchPipeline } = makeService();
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(true);

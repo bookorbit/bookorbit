@@ -1,10 +1,10 @@
 {
-  "totalRoutes": 648,
+  "totalRoutes": 674,
   "byPermission": {
-    "(none)": 256,
+    "(none)": 265,
     "Permission.ManageMetadataConfig": 47,
     "Permission.EmailSend": 34,
-    "Permission.LibraryEditMetadata": 54,
+    "Permission.LibraryEditMetadata": 59,
     "Permission.BookDockAccess": 17,
     "Permission.ManageAppSettings": 62,
     "Permission.ManageLibraries": 33,
@@ -17,7 +17,7 @@
     "Permission.OpdsAccess": 4,
     "Permission.ViewAuditLog": 4,
     "Permission.ViewUserActivity": 6,
-    "Permission.LibraryDeleteBooks": 14,
+    "Permission.LibraryDeleteBooks": 20,
     "Permission.LibraryDownload": 4,
     "Permission.LibraryUpload": 2,
     "Permission.ManageBookDock": 3,
@@ -28,7 +28,8 @@
     "Permission.BookRequestAccess": 27,
     "Permission.ManageBookRequests": 21,
     "Permission.BookRequestSelfFulfill": 12,
-    "Permission.LibraryGenerateReadAloud": 10
+    "Permission.LibraryGenerateReadAloud": 10,
+    "Permission.LibraryMergeBooks": 15
   },
   "byLibraryAccess": {
     "'viewer'": 6,

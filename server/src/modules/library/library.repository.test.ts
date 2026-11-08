@@ -7,7 +7,12 @@ vi.mock('drizzle-orm', () => ({
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { books, libraries, libraryFolders } from '../../db/schema';
+vi.mock('../../db/reading-attempt-retention', () => ({ retainFinishedReads: vi.fn() }));
+vi.mock('../../db/kobo-entitlement-tombstones', () => ({ writeKoboTombstones: vi.fn() }));
+
+import { writeKoboTombstones } from '../../db/kobo-entitlement-tombstones';
+import { retainFinishedReads } from '../../db/reading-attempt-retention';
+import { bookLinkGroups, bookLinks, books, libraries, libraryFolders } from '../../db/schema';
 import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
 import { LibraryRepository } from './library.repository';
 
@@ -15,8 +20,13 @@ describe('LibraryRepository', () => {
   const txUpdateWhere = vi.fn();
   const txUpdateSet = vi.fn();
   const txUpdate = vi.fn(() => ({ set: txUpdateSet }));
+  const txExecute = vi.fn();
+  const txDeleteWhere = vi.fn();
+  const txDelete = vi.fn(() => ({ where: txDeleteWhere }));
   const tx = {
     update: txUpdate,
+    execute: txExecute,
+    delete: txDelete,
   };
 
   const db = {
@@ -40,6 +50,26 @@ describe('LibraryRepository', () => {
     txUpdate.mockImplementation(() => ({ set: txUpdateSet }));
     txUpdateSet.mockReturnValue({ where: txUpdateWhere });
     txUpdateWhere.mockResolvedValue(undefined);
+    txExecute.mockResolvedValue(undefined);
+    txDelete.mockImplementation(() => ({ where: txDeleteWhere }));
+    txDeleteWhere.mockResolvedValue(undefined);
+  });
+
+  it('delete drops the link groups the library leaves with fewer than two members, in the same transaction', async () => {
+    await repo.delete(42);
+
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(retainFinishedReads).toHaveBeenCalledWith(tx, { op: 'eq', left: books.libraryId, right: 42 });
+    expect(writeKoboTombstones).toHaveBeenCalledWith(tx, { op: 'eq', left: books.libraryId, right: 42 });
+    expect(txExecute).toHaveBeenCalledTimes(1);
+    const statement = txExecute.mock.calls[0]![0] as { text: string; values: unknown[] };
+    expect(statement.text).toMatch(/^\s*delete from /);
+    expect(statement.text).toContain(') < 2');
+    expect(statement.values).toEqual([bookLinkGroups, bookLinks, books, 42, bookLinks, books, 42]);
+    expect(txDelete).toHaveBeenCalledWith(libraries);
+    expect(txDeleteWhere).toHaveBeenCalledWith({ op: 'eq', left: libraries.id, right: 42 });
+    // Counted while the books are still there: the library delete cascades them away.
+    expect(txExecute.mock.invocationCallOrder[0]).toBeLessThan(txDelete.mock.invocationCallOrder[0]!);
   });
 
   it('updateDisplayOrders updates each library order entry in one transaction', async () => {

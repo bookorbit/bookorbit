@@ -15,6 +15,7 @@ export const smartScopes = pgTable(
     filter: jsonb('filter').$type<GroupRule | null>(),
     defaultSort: jsonb('default_sort').$type<SortSpec[]>().notNull().default([]),
     isPublic: boolean('is_public').notNull().default(false),
+    coverAspectRatio: varchar('cover_aspect_ratio', { length: 10 }).notNull().default('2/3'),
     syncToKobo: boolean('sync_to_kobo').notNull().default(false),
     displayOrder: integer('display_order').notNull().default(0),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),

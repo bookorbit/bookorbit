@@ -9,6 +9,7 @@ import { api, NetworkError } from './api'
 interface ApiErrorBody {
   errorCode?: unknown
   message?: unknown
+  errorMeta?: unknown
 }
 
 export class ApiError extends Error {
@@ -31,13 +32,22 @@ export async function apiError(response: Response, fallbackKey: string): Promise
   const body = (await response.json().catch(() => null)) as ApiErrorBody | null
   const errorCode = typeof body?.errorCode === 'string' ? body.errorCode : null
   const serverMessage = typeof body?.message === 'string' && body.message.trim() ? body.message : null
-  return new ApiError(translateErrorCode(errorCode) ?? i18n.global.t(fallbackKey), response.status, errorCode, serverMessage)
+  return new ApiError(translateErrorCode(errorCode, body?.errorMeta) ?? i18n.global.t(fallbackKey), response.status, errorCode, serverMessage)
 }
 
-function translateErrorCode(errorCode: string | null): string | null {
+function translateErrorCode(errorCode: string | null, errorMeta: unknown): string | null {
   if (!errorCode) return null
   const key = `errors.codes.${errorCode}`
-  return i18n.global.te(key) ? i18n.global.t(key) : null
+  return i18n.global.te(key) ? i18n.global.t(key, messageParams(errorMeta)) : null
+}
+
+/** A coded error's plain number and string details, as named message parameters (for example `max`). */
+function messageParams(errorMeta: unknown): Record<string, string | number> {
+  if (!errorMeta || typeof errorMeta !== 'object') return {}
+  return Object.fromEntries(Object.entries(errorMeta).filter(([, value]) => typeof value === 'string' || typeof value === 'number')) as Record<
+    string,
+    string | number
+  >
 }
 
 /**

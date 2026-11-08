@@ -7,6 +7,7 @@ import { buildHardcoverMatchBasis, parseHardcoverBookId, parseHardcoverEditionId
 import type { BookSyncData } from './hardcover.repository';
 import { HardcoverClientService } from './hardcover-client.service';
 import { HardcoverRepository } from './hardcover.repository';
+import { matchesTitleAndAuthor, type HardcoverBookIdentity } from './hardcover-title-author-match';
 
 export interface HardcoverBookMatch {
   hardcoverBookId: number;
@@ -74,6 +75,9 @@ const FIND_BOOKS_BY_IDS_QUERY = `
 query FindBooksByIds($ids: [Int!]!) {
   books(where: { id: { _in: $ids } }, limit: 5) {
     id
+    title
+    subtitle
+    cached_contributors
     editions(limit: ${EDITION_SELECTION_LIMIT}) {${EDITION_FIELDS}
     }
   }
@@ -129,10 +133,12 @@ interface HardcoverEdition {
 }
 
 interface BooksQueryResult {
-  books: Array<{
-    id: number;
-    editions?: HardcoverEdition[];
-  }>;
+  books: Array<
+    {
+      id: number;
+      editions?: HardcoverEdition[];
+    } & HardcoverBookIdentity
+  >;
 }
 
 // Hardcover reading_format_id: 1 = physical, 2 = audiobook, 4 = ebook.
@@ -437,8 +443,16 @@ export class HardcoverBookMatchService {
 
       const data = await this.client.query<BooksQueryResult>(userId, token, FIND_BOOKS_BY_IDS_QUERY, { ids });
       const booksById = new Map((data.books ?? []).map((candidate) => [candidate.id, candidate]));
-      const hardcoverBook = ids.map((id) => booksById.get(id)).find((candidate): candidate is BooksQueryResult['books'][number] => candidate != null);
-      if (!hardcoverBook) return null;
+      // Search ranking only orders the candidates; the first one that is verifiably this book wins.
+      const hardcoverBook = ids
+        .map((id) => booksById.get(id))
+        .find((candidate): candidate is BooksQueryResult['books'][number] => candidate != null && matchesTitleAndAuthor(candidate, title, author));
+      if (!hardcoverBook) {
+        this.logger.log(
+          `[hardcover.book_match] [end] userId=${userId} bookId=${book.bookId} method=title_author candidates=${booksById.size} matched=0 durationMs=${Date.now() - startedAt} - no search result matched the title and author`,
+        );
+        return null;
+      }
       const fallback = this.pickBestEdition(hardcoverBook.editions ?? [], book);
       return await this.buildMatch(userId, token, hardcoverBook, book, 'title', fallback);
     } catch (err) {

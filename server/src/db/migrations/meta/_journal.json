@@ -932,6 +932,62 @@
       "when": 1793339549312,
       "tag": "0132_drop_podcasts",
       "breakpoints": true
+    },
+    {
+      "idx": 133,
+      "version": "7",
+      "when": 1793956021917,
+      "tag": "0133_add_rtorrent_download_client",
+      "breakpoints": true
+    },
+    {
+      "idx": 134,
+      "version": "7",
+      "when": 1794001635101,
+      "tag": "0134_add_story_edits",
+      "breakpoints": true
+    },
+    {
+      "idx": 135,
+      "version": "7",
+      "when": 1794006681655,
+      "tag": "0135_add_smart_scope_cover_aspect_ratio",
+      "breakpoints": true
+    },
+    {
+      "idx": 136,
+      "version": "7",
+      "when": 1794034289159,
+      "tag": "0136_add_collection_cover_aspect_ratio",
+      "breakpoints": true
+    },
+    {
+      "idx": 137,
+      "version": "7",
+      "when": 1794038167922,
+      "tag": "0137_add_book_merges_links_and_duplicate_kinds",
+      "breakpoints": true
+    },
+    {
+      "idx": 138,
+      "version": "7",
+      "when": 1794038170218,
+      "tag": "0138_key_duplicate_pairs_by_kind",
+      "breakpoints": true
+    },
+    {
+      "idx": 139,
+      "version": "7",
+      "when": 1794038172134,
+      "tag": "0139_seed_library_merge_books",
+      "breakpoints": true
+    },
+    {
+      "idx": 140,
+      "version": "7",
+      "when": 1794068460741,
+      "tag": "0140_add_merge_job_library_ids",
+      "breakpoints": true
     }
   ]
 }

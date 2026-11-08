@@ -26,6 +26,7 @@ import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
 import { SeriesIdentityModule } from './common/series-identity.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
+import { MergedBookAliasInterceptor } from './common/interceptors/merged-book-alias.interceptor';
 import { GLOBAL_GUARDS } from './common/guards/global-guards';
 import { DbModule } from './db/db.module';
 import { AnnotationModule } from './modules/annotation/annotation.module';
@@ -40,6 +41,7 @@ import { BookmarkModule } from './modules/bookmark/bookmark.module';
 import { BookJournalModule } from './modules/book-journal/book-journal.module';
 import { NotebookModule } from './modules/notebook/notebook.module';
 import { BookModule } from './modules/book/book.module';
+import { BookAliasModule } from './modules/book-alias/book-alias.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CoverModule } from './modules/cover/cover.module';
 import { KoboModule } from './modules/kobo/kobo.module';
@@ -93,6 +95,8 @@ import { AccountActivityModule } from './modules/account-activity/account-activi
 import { SharedReadingInsightsModule } from './modules/shared-reading-insights/shared-reading-insights.module';
 import { BookDuplicatesModule } from './modules/book-duplicates/book-duplicates.module';
 import { MaintenanceModule } from './modules/maintenance/maintenance.module';
+import { BookLinkModule } from './modules/book-link/book-link.module';
+import { BookMergeModule } from './modules/book-merge/book-merge.module';
 import { BookMoveModule } from './modules/book-move/book-move.module';
 import { AudiobookModule } from './modules/audiobook/audiobook.module';
 import { ChapterEditorModule } from './modules/chapter-editor/chapter-editor.module';
@@ -100,7 +104,12 @@ import { ChapterHealthModule } from './modules/chapter-health/chapter-health.mod
 import { TtsModule } from './modules/tts/tts.module';
 import { SearchModule } from './modules/search/search.module';
 import { WatchDownloadModule } from './modules/watch-download/watch-download.module';
+import { AppAttestModule } from './modules/app-attest/app-attest.module';
 import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
+import { PageLocatorModule } from './modules/page-locator/page-locator.module';
+import { YearReviewModule } from './modules/year-review/year-review.module';
+import { VisualMatchModule } from './modules/visual-match/visual-match.module';
+import { StoryEditsModule } from './modules/story-edits/story-edits.module';
 
 @Module({
   imports: [
@@ -147,6 +156,7 @@ import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
     BookMetadataFetchModule,
     LibraryModule,
     PathModule,
+    BookAliasModule,
     BookModule,
     AudiobookModule,
     ChapterEditorModule,
@@ -207,12 +217,24 @@ import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
     BookDuplicatesModule,
     MaintenanceModule,
     BookMoveModule,
+    BookMergeModule,
+    BookLinkModule,
     BrowseCountsModule,
     TtsModule,
     SearchModule,
     WatchDownloadModule,
+    AppAttestModule,
     ReadAloudModule,
+    PageLocatorModule,
+    YearReviewModule,
+    VisualMatchModule,
+    StoryEditsModule,
   ],
-  providers: [{ provide: APP_INTERCEPTOR, useClass: AuditInterceptor }, ...GLOBAL_GUARDS.map((useClass) => ({ provide: APP_GUARD, useClass }))],
+  providers: [
+    // Before the audit interceptor, so an audited route records the book the request now lands on.
+    { provide: APP_INTERCEPTOR, useClass: MergedBookAliasInterceptor },
+    { provide: APP_INTERCEPTOR, useClass: AuditInterceptor },
+    ...GLOBAL_GUARDS.map((useClass) => ({ provide: APP_GUARD, useClass })),
+  ],
 })
 export class AppModule {}

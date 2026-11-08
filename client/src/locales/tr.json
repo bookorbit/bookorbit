@@ -80,6 +80,8 @@
         "empty": "Hiçbir yönetici paylaşılan okuma profilinizi görüntülemedi.",
         "paginationLabel": "Profil erişim geçmişi sayfaları"
       },
+      "durationMinutes": "{count, plural, one {# dakika} other {# dakika}}",
+      "durationHours": "{count, plural, one {# saat} other {# saat}}",
       "unknownTitle": "İsimsiz kitap",
       "errors": {
         "load": "Paylaşım ayarları yüklenemedi.",
@@ -94,8 +96,10 @@
         "loadError": "Seçilen dil yüklenemedi",
         "saveError": "Dil terchileri kaydedilemedi"
       },
+      "pageTitle": "Ekran",
       "theme": {
         "accents": {
+          "marigold": "Kadife",
           "fuchsia": "Fuşya",
           "raspberry": "Ahududu",
           "pink": "Pembe",
@@ -161,6 +165,13 @@
       "storage": {
         "title": "Görünüş tercihlerini kaydetme yeri",
         "active": "Aktif"
+      },
+      "bookCovers": {
+        "displayMode": {
+          "blurredFit": {
+            "label": "Bulanık sığdır"
+          }
+        }
       }
     }
   }

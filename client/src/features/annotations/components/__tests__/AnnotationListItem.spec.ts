@@ -128,6 +128,12 @@ describe('AnnotationListItem', () => {
     expect(writeText).toHaveBeenCalledWith('a short highlight')
   })
 
+  it('shows a placeholder and no copy action for a highlight without text', () => {
+    const wrapper = mountItem({ annotation: makeAnnotation({ text: '', cfi: null }) })
+    expect(wrapper.text()).toContain('Text not available for this highlight')
+    expect(iconButton(wrapper, 'lucide-copy')).toBeUndefined()
+  })
+
   it('toggles expansion for long quotes', async () => {
     const wrapper = mountItem({ annotation: makeAnnotation({ text: 'x'.repeat(300) }) })
     const expand = wrapper.findAll('button').find((button) => button.text().includes('Expand'))

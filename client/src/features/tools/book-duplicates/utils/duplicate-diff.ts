@@ -28,7 +28,7 @@ function fieldSignature(book: BookDuplicateCandidate, field: DuplicateField): st
     case 'library':
       return book.libraryName
     case 'reading':
-      return book.readingProgress === null ? '' : String(Math.round(book.readingProgress * 100))
+      return book.readingProgress === null ? '' : String(Math.round(book.readingProgress))
     case 'collections':
       return book.collections
         .map((collection) => collection.name)
@@ -89,6 +89,9 @@ const REASON_RANK: Record<BookDuplicateMatchReason, number> = {
   isbn: 3,
   exact_metadata: 2,
   fuzzy_metadata: 1,
+  same_work: 3,
+  title_author: 2,
+  series_position: 1,
 }
 
 /** Reasons strongest first, so a group leads with the one that decides how much judgement it needs. */
@@ -97,5 +100,5 @@ export function rankedReasons(reasons: BookDuplicateMatchReason[]): BookDuplicat
 }
 
 export function strongestReason(group: BookDuplicateGroup): BookDuplicateMatchReason {
-  return rankedReasons(group.reasons)[0] ?? 'fuzzy_metadata'
+  return rankedReasons(group.reasons)[0] ?? (group.kind === 'other_format' ? 'series_position' : 'fuzzy_metadata')
 }

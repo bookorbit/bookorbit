@@ -1,11 +1,12 @@
 import { createHash, randomUUID } from 'crypto';
-import { readFile, readdir } from 'fs/promises';
+import { mkdir, readFile, readdir } from 'fs/promises';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { Client } from 'pg';
 
 import * as schema from '../src/db/schema';
+import { LibraryRepository } from '../src/modules/library/library.repository';
 import { SYNC_PAGE_SIZE } from '../src/modules/kobo/services/kobo-sync.service';
 import { waitForCondition } from './e2e/app-harness';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
@@ -854,6 +855,284 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
 
       const delivered = await drainEntries(writeDevice);
       expect(newEntitlementIds(delivered)).toContain(writeEntitlementId);
+    });
+  });
+
+  describe('removal of deleted books', () => {
+    let deviceX!: KoboDevice;
+    let deviceY!: KoboDevice;
+
+    function removalsOf(entries: unknown[], id: string): number {
+      return removedEntitlementIds(entries).filter((removedId) => removedId === id).length;
+    }
+
+    async function entitlementIdFor(bookId: number): Promise<string> {
+      const [identity] = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, bookId)));
+      if (!identity) throw new Error(`Book ${bookId} has no Kobo entitlement identity`);
+      return identity.entitlementId;
+    }
+
+    /** Scans one new book into the folder, adds it to the synced collection, and delivers it to both devices. */
+    async function deliverNewBook(libraryId: number, folderPath: string, label: string): Promise<{ bookId: number; entitlementId: string }> {
+      const path = await createEpubFixture(folderPath, `kobo-removal-${label}-${randomUUID()}.epub`, {
+        title: `Kobo Removal ${label}`,
+        uid: `urn:uuid:${randomUUID()}`,
+      });
+      await triggerAndWaitForLibraryScan(ctx, libraryId);
+      const { bookId } = await locateBookByAbsolutePath(ctx, path);
+      const addResponse = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/collections/${collectionId}/books`,
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: [bookId] },
+      });
+      expect([200, 201]).toContain(addResponse.statusCode);
+
+      const [xEntries, yEntries] = [await drainEntries(deviceX), await drainEntries(deviceY)];
+      const entitlementId = await entitlementIdFor(bookId);
+      expect(newEntitlementIds(xEntries)).toContain(entitlementId);
+      expect(newEntitlementIds(yEntries)).toContain(entitlementId);
+      return { bookId, entitlementId };
+    }
+
+    async function tombstoneState(entitlementId: string) {
+      const tombstones = await ctx.db
+        .select()
+        .from(schema.koboEntitlementTombstones)
+        .where(and(eq(schema.koboEntitlementTombstones.userId, userId), eq(schema.koboEntitlementTombstones.entitlementId, entitlementId)));
+      const owedBy = await ctx.db
+        .select({ deviceId: schema.koboDeviceEntitlementTombstones.deviceId })
+        .from(schema.koboDeviceEntitlementTombstones)
+        .where(eq(schema.koboDeviceEntitlementTombstones.entitlementId, entitlementId));
+      return { tombstones, owedBy: owedBy.map((row) => row.deviceId).sort((a, b) => a - b) };
+    }
+
+    /** Each device receives the removal on its next sync, and never again. */
+    async function expectRemovedOnceFromBothDevices(entitlementId: string): Promise<void> {
+      expect((await tombstoneState(entitlementId)).owedBy).toEqual([deviceX.id, deviceY.id].sort((a, b) => a - b));
+
+      expect(removalsOf(await drainEntries(deviceX), entitlementId)).toBe(1);
+      expect(removalsOf(await drainEntries(deviceX), entitlementId)).toBe(0);
+      expect((await tombstoneState(entitlementId)).owedBy).toEqual([deviceY.id]);
+
+      expect(removalsOf(await drainEntries(deviceY), entitlementId)).toBe(1);
+      expect(removalsOf(await drainEntries(deviceY), entitlementId)).toBe(0);
+      expect(await tombstoneState(entitlementId)).toEqual({ tombstones: [], owedBy: [] });
+    }
+
+    beforeAll(async () => {
+      deviceX = await createDevice('Kobo Removal X');
+      deviceY = await createDevice('Kobo Removal Y');
+      await drainEntries(deviceX);
+      await drainEntries(deviceY);
+    }, 180_000);
+
+    it('sends every device that holds a deleted book IsRemoved exactly once', async () => {
+      const removalLibrary = await createLibraryWithFolder(ctx, { name: `kobo-removal-book-${randomUUID()}` });
+      const deleted = await deliverNewBook(removalLibrary.libraryId, removalLibrary.folderPath, 'deleted');
+      const kept = await deliverNewBook(removalLibrary.libraryId, removalLibrary.folderPath, 'kept');
+
+      const deleteResponse = await ctx.app.inject({
+        method: 'DELETE',
+        url: '/api/v1/books',
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: [deleted.bookId] },
+      });
+      expect(deleteResponse.statusCode).toBe(204);
+
+      const [tombstone] = (await tombstoneState(deleted.entitlementId)).tombstones;
+      expect(tombstone).toMatchObject({ userId, entitlementId: deleted.entitlementId, legacyBookId: null });
+      await expectRemovedOnceFromBothDevices(deleted.entitlementId);
+      expect((await tombstoneState(kept.entitlementId)).tombstones).toEqual([]);
+
+      const devicesHoldingKept = await ctx.db
+        .select({ deviceId: schema.koboLibrarySnapshots.deviceId })
+        .from(schema.koboSnapshotBooks)
+        .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
+        .where(and(eq(schema.koboSnapshotBooks.bookId, kept.bookId), eq(schema.koboSnapshotBooks.pendingDelete, false)));
+      expect(devicesHoldingKept.map((row) => row.deviceId)).toEqual(expect.arrayContaining([deviceX.id, deviceY.id]));
+    });
+
+    it('removes the books of a folder taken out of its library from every device', async () => {
+      const removalLibrary = await createLibraryWithFolder(ctx, { name: `kobo-removal-folder-${randomUUID()}` });
+      const secondFolderPath = `${ctx.fixture.booksPath}/library-${randomUUID()}`;
+      await mkdir(secondFolderPath, { recursive: true });
+      const [secondFolder] = await ctx.db
+        .insert(schema.libraryFolders)
+        .values({ libraryId: removalLibrary.libraryId, path: secondFolderPath })
+        .returning({ id: schema.libraryFolders.id });
+      const inRemovedFolder = await deliverNewBook(removalLibrary.libraryId, secondFolderPath, 'folder');
+
+      await ctx.app.get(LibraryRepository).deleteFolder(secondFolder!.id);
+
+      expect(await ctx.db.select({ id: schema.books.id }).from(schema.books).where(eq(schema.books.id, inRemovedFolder.bookId))).toEqual([]);
+      await expectRemovedOnceFromBothDevices(inRemovedFolder.entitlementId);
+    });
+
+    it('removes the books of a deleted library from every device', async () => {
+      const removalLibrary = await createLibraryWithFolder(ctx, { name: `kobo-removal-library-${randomUUID()}` });
+      const inDeletedLibrary = await deliverNewBook(removalLibrary.libraryId, removalLibrary.folderPath, 'library');
+
+      const deleteResponse = await ctx.app.inject({
+        method: 'DELETE',
+        url: `/api/v1/libraries/${removalLibrary.libraryId}`,
+        headers: authHeader(ctx.adminToken),
+      });
+      expect(deleteResponse.statusCode).toBe(204);
+
+      await expectRemovedOnceFromBothDevices(inDeletedLibrary.entitlementId);
+    });
+
+    it('also removes the numeric id from a device that may still know the book by it', async () => {
+      const removalLibrary = await createLibraryWithFolder(ctx, { name: `kobo-removal-legacy-${randomUUID()}` });
+      const legacy = await deliverNewBook(removalLibrary.libraryId, removalLibrary.folderPath, 'legacy');
+      const [xSnapshot] = await ctx.db
+        .select({ id: schema.koboLibrarySnapshots.id })
+        .from(schema.koboLibrarySnapshots)
+        .where(eq(schema.koboLibrarySnapshots.deviceId, deviceX.id));
+      await ctx.db
+        .update(schema.koboBookEntitlements)
+        .set({ needsLegacyNumericRemoval: true })
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, legacy.bookId)));
+      await ctx.db
+        .update(schema.koboSnapshotBooks)
+        .set({ needsLegacyNumericRemoval: true })
+        .where(and(eq(schema.koboSnapshotBooks.snapshotId, xSnapshot!.id), eq(schema.koboSnapshotBooks.bookId, legacy.bookId)));
+
+      const deleteResponse = await ctx.app.inject({
+        method: 'DELETE',
+        url: '/api/v1/books',
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: [legacy.bookId] },
+      });
+      expect(deleteResponse.statusCode).toBe(204);
+      expect((await tombstoneState(legacy.entitlementId)).tombstones).toEqual([expect.objectContaining({ legacyBookId: legacy.bookId })]);
+
+      const xEntries = await drainEntries(deviceX);
+      const xRemoved = removedEntitlementIds(xEntries);
+      expect(removalsOf(xEntries, String(legacy.bookId))).toBe(1);
+      expect(removalsOf(xEntries, legacy.entitlementId)).toBe(1);
+      expect(xRemoved.indexOf(String(legacy.bookId))).toBeLessThan(xRemoved.indexOf(legacy.entitlementId));
+
+      const yEntries = await drainEntries(deviceY);
+      expect(removalsOf(yEntries, legacy.entitlementId)).toBe(1);
+      expect(removalsOf(yEntries, String(legacy.bookId))).toBe(0);
+
+      expect(removedEntitlementIds([...(await drainEntries(deviceX)), ...(await drainEntries(deviceY))])).toEqual([]);
+      expect(await tombstoneState(legacy.entitlementId)).toEqual({ tombstones: [], owedBy: [] });
+    });
+  });
+
+  describe('books that leave the synced set while the device is owed an update for them', () => {
+    let device!: KoboDevice;
+    let unshelveLibrary!: CreatedLibrary;
+
+    async function entitlementIdFor(bookId: number): Promise<string> {
+      const [identity] = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, bookId)));
+      if (!identity) throw new Error(`Book ${bookId} has no Kobo entitlement identity`);
+      return identity.entitlementId;
+    }
+
+    async function setCollectionMembership(bookId: number, member: boolean): Promise<void> {
+      const response = await ctx.app.inject({
+        method: member ? 'POST' : 'DELETE',
+        url: `/api/v1/collections/${collectionId}/books`,
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: [bookId] },
+      });
+      expect([200, 201, 204]).toContain(response.statusCode);
+    }
+
+    async function deliverNewBook(label: string): Promise<{ bookId: number; entitlementId: string }> {
+      const path = await createEpubFixture(unshelveLibrary.folderPath, `kobo-unshelve-${label}-${randomUUID()}.epub`, {
+        title: `Kobo Unshelve ${label}`,
+        uid: `urn:uuid:${randomUUID()}`,
+      });
+      await triggerAndWaitForLibraryScan(ctx, unshelveLibrary.libraryId);
+      const { bookId } = await locateBookByAbsolutePath(ctx, path);
+      await setCollectionMembership(bookId, true);
+
+      const entries = await drainEntries(device);
+      const entitlementId = await entitlementIdFor(bookId);
+      expect(newEntitlementIds(entries)).toContain(entitlementId);
+      return { bookId, entitlementId };
+    }
+
+    async function deviceRow(bookId: number) {
+      const [row] = await ctx.db
+        .select({ synced: schema.koboSnapshotBooks.synced, pendingDelete: schema.koboSnapshotBooks.pendingDelete })
+        .from(schema.koboSnapshotBooks)
+        .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
+        .where(and(eq(schema.koboLibrarySnapshots.deviceId, device.id), eq(schema.koboSnapshotBooks.bookId, bookId)));
+      return row ?? null;
+    }
+
+    beforeAll(async () => {
+      const settingsResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/kobo/settings',
+        headers: authHeader(ctx.adminToken),
+        payload: { twoWayProgressSync: true },
+      });
+      expect(settingsResponse.statusCode).toBe(200);
+      unshelveLibrary = await createLibraryWithFolder(ctx, { name: `kobo-unshelve-${randomUUID()}` });
+      device = await createDevice('Kobo Unshelve');
+      await drainEntries(device);
+    }, 180_000);
+
+    it('removes a book whose read status was set on the web and that then left the synced collection', async () => {
+      const unshelved = await deliverNewBook('status');
+
+      const statusResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${unshelved.bookId}/status`,
+        headers: authHeader(ctx.adminToken),
+        payload: { status: 'read' },
+      });
+      expect(statusResponse.statusCode).toBe(200);
+      expect(await deviceRow(unshelved.bookId)).toEqual({ synced: false, pendingDelete: false });
+
+      await setCollectionMembership(unshelved.bookId, false);
+
+      const entries = await drainEntries(device);
+      expect(removedEntitlementIds(entries).filter((id) => id === unshelved.entitlementId)).toHaveLength(1);
+      expect(await deviceRow(unshelved.bookId)).toBeNull();
+
+      // The device is not left stuck on the row: what changes next still reaches it.
+      const next = await deliverNewBook('after-status');
+      expect(await deviceRow(next.bookId)).toEqual({ synced: true, pendingDelete: false });
+      expect(removedEntitlementIds(await drainEntries(device))).toEqual([]);
+    });
+
+    it('removes a delivered book whose re-delivery was deferred after a failure when it leaves the synced collection', async () => {
+      const deferred = await deliverNewBook('deferred');
+
+      // What a failed re-delivery leaves behind: reconcile flagged the delivered book as changed, the
+      // page could not prepare it, and it waits for its retry while every other row is up to date.
+      await ctx.db.execute(sql`
+        UPDATE ${schema.koboSnapshotBooks} AS sb
+        SET synced = false,
+            is_new = true,
+            delivery_retry_at = now() + interval '5 minutes',
+            delivery_failure_code = 'DELIVERY_PREPARATION_FAILED'
+        FROM ${schema.koboLibrarySnapshots} AS snap
+        WHERE snap.id = sb.snapshot_id
+          AND snap.device_id = ${device.id}
+          AND sb.book_id = ${deferred.bookId}
+      `);
+
+      await setCollectionMembership(deferred.bookId, false);
+
+      const entries = await drainEntries(device);
+      expect(removedEntitlementIds(entries).filter((id) => id === deferred.entitlementId)).toHaveLength(1);
+      expect(await deviceRow(deferred.bookId)).toBeNull();
+      expect(removedEntitlementIds(await drainEntries(device))).toEqual([]);
     });
   });
 });
