@@ -236,6 +236,59 @@ describe('BookDuplicatesService', () => {
     }
   });
 
+  it.each([
+    { case: 'no cause', failure: new Error('database unavailable'), code: 'unknown', message: 'database unavailable' },
+    {
+      case: 'cause without SQLSTATE',
+      failure: new Error('query failed', { cause: new Error('connection reset') }),
+      code: 'unknown',
+      message: 'connection reset',
+    },
+    {
+      case: 'invalid SQLSTATE',
+      failure: new Error('query failed', { cause: Object.assign(new Error('invalid code'), { code: '5701!' }) }),
+      code: 'unknown',
+      message: 'invalid code',
+    },
+    {
+      case: 'non-string SQLSTATE',
+      failure: new Error('query failed', { cause: Object.assign(new Error('numeric code'), { code: 57014 }) }),
+      code: 'unknown',
+      message: 'numeric code',
+    },
+    {
+      case: 'non-Error cause with SQLSTATE',
+      failure: new Error('query failed', { cause: { code: '23505' } }),
+      code: '23505',
+      message: 'query failed',
+    },
+    {
+      case: 'non-Error cause without SQLSTATE',
+      failure: new Error('query failed', { cause: { detail: 'other' } }),
+      code: 'unknown',
+      message: 'query failed',
+    },
+    { case: 'primitive cause', failure: new Error('query failed', { cause: 'network error' }), code: 'unknown', message: 'query failed' },
+    { case: 'non-Error rejection', failure: 'plain failure', code: 'unknown', message: 'plain failure' },
+  ])('logs the safe fallback for $case', async ({ failure, code, message }) => {
+    const { service, repo } = setup();
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      repo.countScopedBooks.mockResolvedValue(10);
+      repo.createOtherFormatPairs.mockRejectedValue(failure);
+
+      await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
+
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining(`postgresCode=${code}`)));
+      const logged = String(warn.mock.calls.at(-1)?.[0]);
+      expect(logged).toContain(`error="${message}"`);
+      expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
+      expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   it('scans all accessible libraries when no library is selected', async () => {
     const { service, repo } = setup([2, 3]);
     repo.countScopedBooks.mockResolvedValue(2);
