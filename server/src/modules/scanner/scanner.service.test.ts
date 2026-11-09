@@ -162,6 +162,7 @@ const mockMetadata = {
   applyRegexMetadataRules: vi.fn().mockResolvedValue('unchanged'),
   refreshCoverForBook: vi.fn().mockResolvedValue(false),
   extractAudioFileDuration: vi.fn().mockResolvedValue(undefined),
+  measureAudioFile: vi.fn().mockResolvedValue(null),
   aggregateAudioDuration: vi.fn().mockResolvedValue(undefined),
   extractAudioChaptersAndNarrators: vi.fn().mockResolvedValue(undefined),
   extractMergedAudioChapters: vi.fn().mockResolvedValue(undefined),
@@ -226,6 +227,7 @@ beforeEach(() => {
   mockPathsReferToSameEntry.mockResolvedValue(false);
   mockReaddir.mockResolvedValue([]);
   mockStat.mockResolvedValue({ isFile: () => true, ino: 2001n, size: 1024, mtime: new Date('2024-01-01') } as any);
+  mockMetadata.measureAudioFile.mockResolvedValue(null);
   delete (mockMetadata as Record<string, unknown>).extractAndSaveIfAvailable;
 });
 
@@ -878,6 +880,52 @@ describe('genuinely new primary file', () => {
 
     expect(order).toEqual(['extract', 'promote', 'schedule']);
     expect(autoFetchOrchestrator.scheduleImportedBooksIfEligible).toHaveBeenCalledWith(1, [1]);
+  });
+
+  it('registers books one at a time in discovery order but reads several at once', async () => {
+    const folders = Array.from({ length: 6 }, (_, index) => `/library/Author/Book ${index + 1}`);
+    const candidates = folders.map((folderPath, index) =>
+      makeCandidate(folderPath, [
+        makeFileStat({ absolutePath: `${folderPath}/book.epub`, relPath: `Author/Book ${index + 1}/book.epub`, ino: BigInt(2001 + index) }),
+      ]),
+    );
+    mockFindCandidates.mockResolvedValue({ candidates, skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
+
+    const registered: number[] = [];
+    let registering = 0;
+    let reading = 0;
+    let peakReading = 0;
+    let nextFileId = 500;
+    const repo = makeRepo({
+      createBook: vi.fn().mockImplementation(async ({ folderPath }: { folderPath: string }) => {
+        registering++;
+        expect(registering).toBe(1);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        registering--;
+        const id = folders.indexOf(folderPath) + 1;
+        registered.push(id);
+        return { id, status: 'processing', libraryFolderId: 1, folderPath, libraryId: 1 };
+      }),
+      createBookFile: vi.fn().mockImplementation((data: Record<string, unknown>) => Promise.resolve(makeBookFile({ ...data, id: nextFileId++ }))),
+    });
+    // Earlier books read slower, so reads finish in the reverse of discovery order.
+    mockMetadata.extractAndSave.mockImplementation(async (bookId: number) => {
+      reading++;
+      peakReading = Math.max(peakReading, reading);
+      await new Promise((resolve) => setTimeout(resolve, (7 - bookId) * 5));
+      reading--;
+    });
+    const autoFetchOrchestrator = { scheduleImportedBooksIfEligible: vi.fn().mockResolvedValue(6) };
+    const done = awaitScan(repo);
+    const { service } = makeService(repo, autoFetchOrchestrator);
+
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(registered).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(peakReading).toBe(4);
+    expect(repo.promoteProcessingBookToPresent).toHaveBeenCalledTimes(6);
+    expect(autoFetchOrchestrator.scheduleImportedBooksIfEligible).toHaveBeenCalledWith(1, [1, 2, 3, 4, 5, 6]);
   });
 
   it('does not extract metadata for non-primary files', async () => {
@@ -1822,7 +1870,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-01.mp3', 'mp3');
   });
 
-  it('calls extractAudioFileDuration for ALL new audio files including the winner', async () => {
+  it('calls measureAudioFile for ALL new audio files including the winner', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/chapter-01.mp3', relPath: 'Book/chapter-01.mp3' });
     const file2 = makeFileStat({ absolutePath: '/library/Book/chapter-02.mp3', relPath: 'Book/chapter-02.mp3', ino: 1002n });
     const file3 = makeFileStat({ absolutePath: '/library/Book/chapter-03.mp3', relPath: 'Book/chapter-03.mp3', ino: 1003n });
@@ -1837,10 +1885,10 @@ describe('audio multi-file audiobook', () => {
 
     // All 3 files including the first (winner) must get per-file duration so
     // aggregateAudioDuration can sum them all correctly.
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(3);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-01.mp3');
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-02.mp3');
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-03.mp3');
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledTimes(3);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-01.mp3');
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-02.mp3');
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), '/library/Book/chapter-03.mp3');
   });
 
   it('calls aggregateAudioDuration after processing audio files', async () => {
@@ -1858,7 +1906,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
-  it('calls extractAudioFileDuration once and aggregates for a single-file m4b', async () => {
+  it('calls measureAudioFile once and aggregates for a single-file m4b', async () => {
     const file1 = makeFileStat({ absolutePath: '/library/Book/book.m4b', relPath: 'Book/book.m4b' });
     const candidate = makeCandidate('/library/Book', [file1]);
     mockFindCandidates.mockResolvedValue({ candidates: [candidate], skippedDirs: new Set(), unchangedDirs: new Set(), dirMtimes: new Map() });
@@ -1870,8 +1918,8 @@ describe('audio multi-file audiobook', () => {
     await done;
 
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/book.m4b', 'm4b');
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(1);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), '/library/Book/book.m4b');
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledTimes(1);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), '/library/Book/book.m4b');
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -1904,7 +1952,37 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(
       expect.any(Number),
       ['/library/Book/Book - 01.m4b', '/library/Book/Book - 02.m4b', '/library/Book/Book - 10.m4b'],
-      { filesChanged: true },
+      { filesChanged: true, probes: expect.any(Map) },
+    );
+  });
+
+  it('hands the chapter merge what each duration probe read, so no file is probed twice', async () => {
+    const file1 = makeFileStat({ absolutePath: '/library/Book/01.mp3', relPath: 'Book/01.mp3', format: 'mp3', role: 'content' });
+    const file2 = makeFileStat({ absolutePath: '/library/Book/02.mp3', relPath: 'Book/02.mp3', ino: 1002n, format: 'mp3', role: 'content' });
+    const unreadable = makeFileStat({ absolutePath: '/library/Book/03.mp3', relPath: 'Book/03.mp3', ino: 1003n, format: 'mp3', role: 'content' });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Book', [file1, file2, unreadable])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const probeFor = (absolutePath: string) => ({ durationSeconds: 60, durationMs: 60_000, chapters: [{ title: absolutePath, startMs: 0 }] });
+    mockMetadata.measureAudioFile.mockImplementation((_bookId: number, absolutePath: string) =>
+      Promise.resolve(absolutePath === unreadable.absolutePath ? null : probeFor(absolutePath)),
+    );
+
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    const [, , options] = mockMetadata.extractMergedAudioChapters.mock.calls[0]!;
+    expect(options.probes).toEqual(
+      new Map([
+        [file1.absolutePath, probeFor(file1.absolutePath)],
+        [file2.absolutePath, probeFor(file2.absolutePath)],
+      ]),
     );
   });
 
@@ -1932,6 +2010,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), '/library/Book/01.mp3', 'mp3');
     expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(expect.any(Number), ['/library/Book/01.mp3', '/library/Book/02.mp3'], {
       filesChanged: true,
+      probes: expect.any(Map),
     });
   });
 
@@ -1965,6 +2044,7 @@ describe('audio multi-file audiobook', () => {
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
     expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(expect.any(Number), ['/library/Book/01.m4b', '/library/Book/02.m4b'], {
       filesChanged: false,
+      probes: expect.any(Map),
     });
   });
 
@@ -2175,7 +2255,7 @@ describe('audio multi-file audiobook', () => {
       // 120 s was 20 s into CD 2/01, which now follows both CD 1 tracks.
       expect(remap(120)).toBe(420);
       expect(percentageAt(21, 20)).toBe(42);
-      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true });
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true, probes: expect.any(Map) });
     });
 
     it('leaves positions alone when the order did not change', async () => {
@@ -2198,7 +2278,7 @@ describe('audio multi-file audiobook', () => {
       await scan(repo);
 
       expect(repo.remapAudioPositions).not.toHaveBeenCalled();
-      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: false });
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: false, probes: expect.any(Map) });
     });
 
     it('leaves positions alone when a track is new, because they cannot be placed', async () => {
@@ -2227,14 +2307,14 @@ describe('audio multi-file audiobook', () => {
       await scan(repo);
 
       expect(repo.remapAudioPositions).not.toHaveBeenCalled();
-      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true });
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true, probes: expect.any(Map) });
     });
 
     it('still rebuilds chapters when remapping positions fails', async () => {
       const repo = reorderRepo({ remapAudioPositions: vi.fn().mockRejectedValue(new Error('deadlock detected')) });
       await scan(repo);
 
-      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true });
+      expect(mockMetadata.extractMergedAudioChapters).toHaveBeenCalledWith(1, pathOrder, { filesChanged: true, probes: expect.any(Map) });
     });
   });
 
@@ -2354,9 +2434,9 @@ describe('audio multi-file audiobook', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(2);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3b.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledTimes(2);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), mp3b.absolutePath);
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -2374,8 +2454,8 @@ describe('audio multi-file audiobook', () => {
 
     expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
     expect(mockMetadata.extractAndSave).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath, 'mp3');
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), mp3b.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), mp3a.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), mp3b.absolutePath);
   });
 });
 
@@ -2442,7 +2522,7 @@ describe('multi-format metadata source routing', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -2470,7 +2550,7 @@ describe('multi-format metadata source routing', () => {
     expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledTimes(1);
     expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
     // per-file duration + aggregate
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -2498,9 +2578,9 @@ describe('multi-format metadata source routing', () => {
     expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledTimes(1);
     expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b1.absolutePath, 'm4b');
     // per-file duration for both m4b files
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledTimes(2);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b1.absolutePath);
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b2.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledTimes(2);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), m4b1.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), m4b2.absolutePath);
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -2593,7 +2673,7 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
     // epub is not audio — no audio extraction either
     expect(mockMetadata.extractAudioChaptersAndNarrators).not.toHaveBeenCalled();
-    expect(mockMetadata.extractAudioFileDuration).not.toHaveBeenCalled();
+    expect(mockMetadata.measureAudioFile).not.toHaveBeenCalled();
     expect(mockMetadata.aggregateAudioDuration).not.toHaveBeenCalled();
   });
 
@@ -2624,7 +2704,7 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
     // m4b is new audio and winner is not audio — extract audio-specific fields
     expect(mockMetadata.extractAudioChaptersAndNarrators).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath, 'm4b');
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(expect.any(Number), m4b.absolutePath);
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(expect.any(Number));
   });
 
@@ -2675,8 +2755,8 @@ describe('incremental scan — no re-extraction on unchanged winner', () => {
     await service.startScan(1, 'manual');
     await done;
 
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledOnce();
-    expect(mockMetadata.extractAudioFileDuration).toHaveBeenCalledWith(1, m4b.absolutePath);
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledOnce();
+    expect(mockMetadata.measureAudioFile).toHaveBeenCalledWith(1, m4b.absolutePath);
     expect(mockMetadata.aggregateAudioDuration).toHaveBeenCalledWith(1);
   });
 

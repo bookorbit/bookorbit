@@ -92,6 +92,7 @@
     "jose": "^6.2.13",
     "langs": "^2.0.0",
     "ms": "^2.1.3",
+    "music-metadata": "^12.3.5",
     "mysql2": "^3.24.6",
     "nestjs-pino": "^5.3.1",
     "node-unrar-js": "^2.0.2",

@@ -1,0 +1,15 @@
+diff --git a/lib/mpeg/MpegParser.js b/lib/mpeg/MpegParser.js
+index fa2cce00de06f4fe014f5372ef0c6f2b672df633..6b5099449589aae0a966ee5cda8aebe181f6f9e9 100644
+--- a/lib/mpeg/MpegParser.js
++++ b/lib/mpeg/MpegParser.js
+@@ -91,7 +91,9 @@ export class MpegParser extends AbstractID3Parser {
+             if (this.tokenizer.fileInfo.size && format.codecProfile === 'CBR' && !this.calculateEofDuration) {
+                 const mpegSize = this.tokenizer.fileInfo.size - this.mpegOffset - (hasID3v1 ? 128 : 0);
+                 if (this.samplesPerFrame !== null) {
+-                    const numberOfSamples = Math.round(mpegSize / this.frameSize) * this.samplesPerFrame;
++                    const numberOfSamples = format.bitrate && format.sampleRate
++                        ? Math.round(((mpegSize * 8) / format.bitrate) * format.sampleRate)
++                        : Math.round(mpegSize / this.frameSize) * this.samplesPerFrame;
+                     this.metadata.setFormat('numberOfSamples', numberOfSamples);
+                     if (format.sampleRate && !format.duration) {
+                         const duration = numberOfSamples / format.sampleRate;

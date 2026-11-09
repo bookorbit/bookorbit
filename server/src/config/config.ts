@@ -83,6 +83,8 @@ export const readAloudConfig = registerAs('readAloud', () => {
 export const audioToolsConfig = registerAs('audioTools', () => ({
   ffmpegPath: process.env.FFMPEG_PATH?.trim() || 'ffmpeg',
   ffprobePath: process.env.FFPROBE_PATH?.trim() || 'ffprobe',
+  /** How scans read each audio file's length and chapters; `ffprobe` is the escape hatch from the in-process reader. */
+  scanReader: process.env.AUDIO_SCAN_READER?.trim().toLowerCase() === 'ffprobe' ? ('ffprobe' as const) : ('builtin' as const),
 }));
 
 export const emailConfig = registerAs('email', () => ({

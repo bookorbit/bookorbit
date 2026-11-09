@@ -69,6 +69,7 @@ patchedDependencies:
   "@embedpdf/engines@2.15.1": patches/@embedpdf__engines@2.15.1.patch
   "@embedpdf/plugin-scroll@2.15.1": patches/@embedpdf__plugin-scroll@2.15.1.patch
   "@embedpdf/plugin-zoom@2.15.1": patches/@embedpdf__plugin-zoom@2.15.1.patch
+  music-metadata@12.3.5: patches/music-metadata@12.3.5.patch
 minimumReleaseAgeExclude:
   - "@tsconfig/node24@24.0.5"
   - "@vue/language-core@3.3.10"

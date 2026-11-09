@@ -162,6 +162,11 @@ const envSchema = z.object({
     .string()
     .transform((val) => val.trim())
     .optional(),
+  AUDIO_SCAN_READER: z
+    .string()
+    .transform((val) => val.trim().toLowerCase())
+    .pipe(z.enum(['builtin', 'ffprobe']))
+    .optional(),
 });
 
 export function validateEnv(config: Record<string, unknown>) {

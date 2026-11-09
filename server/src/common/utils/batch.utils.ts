@@ -25,3 +25,42 @@ export async function mapWithConcurrency<T, R>(items: readonly T[], limit: numbe
   await Promise.all(workers);
   return results;
 }
+
+/**
+ * Two-stage pipeline: `ordered` runs for one item at a time in input order, and each item's
+ * `parallel` stage runs for up to `limit` items at once, overlapping the ordered stage of the items
+ * after it. An item whose ordered stage finished always gets its parallel stage. After any failure
+ * no further item starts; the call waits for the stages already running, then rejects with the
+ * first error.
+ */
+export async function pipelineWithConcurrency<T, S>(
+  items: readonly T[],
+  limit: number,
+  ordered: (item: T, index: number) => Promise<S>,
+  parallel: (staged: S, item: T, index: number) => Promise<void>,
+): Promise<void> {
+  const running = new Set<Promise<void>>();
+  const slots = Math.max(1, limit);
+  // Asserted rather than annotated: set from callbacks, so flow narrowing to null would be wrong.
+  let failure = null as { error: unknown } | null;
+  const fail = (error: unknown) => {
+    failure ??= { error };
+  };
+
+  try {
+    for (const [index, item] of items.entries()) {
+      while (running.size >= slots && !failure) await Promise.race(running);
+      if (failure) break;
+      const staged = await ordered(item, index);
+      const task: Promise<void> = parallel(staged, item, index)
+        .catch(fail)
+        .finally(() => running.delete(task));
+      running.add(task);
+    }
+  } catch (error) {
+    fail(error);
+  } finally {
+    await Promise.all(running);
+  }
+  if (failure) throw failure.error;
+}
