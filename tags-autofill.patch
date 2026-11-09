@@ -1,0 +1,318 @@
+diff --git a/client/src/features/book/components/detail/tabs/EditMetadataTab.vue b/client/src/features/book/components/detail/tabs/EditMetadataTab.vue
+--- a/client/src/features/book/components/detail/tabs/EditMetadataTab.vue
++++ b/client/src/features/book/components/detail/tabs/EditMetadataTab.vue
+@@ -765,6 +765,7 @@
+     description: preview.description,
+     authors: preview.authors,
+     genres: preview.genres,
++    tags: preview.tags,
+     publisher: preview.publisher,
+     publishedDate: preview.publishedDate,
+     publishedYear: preview.publishedYear,
+diff --git a/packages/types/src/book.ts b/packages/types/src/book.ts
+--- a/packages/types/src/book.ts
++++ b/packages/types/src/book.ts
+@@ -379,6 +379,7 @@
+   description?: string | null;
+   authors?: string[];
+   genres?: string[];
++  tags?: string[];
+   publisher?: string | null;
+   publishedDate?: string | null;
+   publishedYear?: number | null;
+diff --git a/server/src/modules/book/book.service.test.ts b/server/src/modules/book/book.service.test.ts
+--- a/server/src/modules/book/book.service.test.ts
++++ b/server/src/modules/book/book.service.test.ts
+@@ -1026,6 +1026,7 @@
+         },
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+         narratorRows: [],
+         communityRatingRows: [],
+         fileRows: [{ format: 'epub', role: 'primary', mediaOverlayAvailable: false }],
+@@ -1076,6 +1077,7 @@
+           seriesName: null,
+           seriesIndex: null,
+           genres: [],
++          tags: [],
+           cover: true,
+           audioCover: null,
+           duration: undefined,
+@@ -1089,6 +1091,32 @@
+       expect(metadataService.downloadAndSaveCover).not.toHaveBeenCalled();
+     });
+ 
++    it('refreshMetadata hands the book\'s tags to the pipeline and returns the merged tags in a preview', async () => {
++      const { service, bookRepo, pipeline, coverStore } = makeService();
++      bookRepo.findById.mockResolvedValue({
++        book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old', isbn13: null, isbn10: null } },
++        authorRows: [],
++        genreRows: [],
++        tagRows: [{ name: 'Favourite' }],
++        narratorRows: [],
++        communityRatingRows: [],
++        fileRows: [{ format: 'epub', role: 'primary', mediaOverlayAvailable: false }],
++      });
++      pipeline.runWithSources.mockResolvedValue({
++        cache: NO_CACHE_USE,
++        resolved: { tags: ['Favourite', 'Isekai'] },
++        sources: {},
++        providerIds: {},
++        diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 1 }),
++      });
++      coverStore.fetchState.mockResolvedValue({ media: { hasEbook: true, hasAudio: false }, filled: { ebook: true, audio: false }, locked: [] });
++
++      const result = (await service.refreshMetadata(1, true, makeUser())) as { metadata: Record<string, unknown> };
++
++      expect(pipeline.runWithSources.mock.calls[0]?.[1]).toMatchObject({ tags: ['Favourite'] });
++      expect(result.metadata).toEqual({ tags: ['Favourite', 'Isekai'] });
++    });
++
+     it('refreshMetadata updates mapped fields and downloads cover when provided', async () => {
+       const { service, bookRepo, pipeline, metadataService } = makeService();
+       const user = makeUser();
+@@ -1100,6 +1128,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1138,6 +1167,7 @@
+         },
+         authorRows: [],
+         genreRows: [],
++        tagRows: [],
+         narratorRows: [],
+         fileRows: [
+           { format: 'epub', role: 'primary', mediaOverlayAvailable: false },
+@@ -1180,6 +1210,7 @@
+         book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old', chapters } },
+         authorRows: [],
+         genreRows: [],
++        tagRows: [],
+         narratorRows: [],
+         communityRatingRows: [],
+         fileRows: [{ format: 'm4b', role: 'content', mediaOverlayAvailable: false }],
+@@ -1198,6 +1229,7 @@
+         book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old' } },
+         authorRows: [],
+         genreRows: [],
++        tagRows: [],
+         narratorRows: [],
+         fileRows: [],
+       });
+@@ -1214,6 +1246,7 @@
+         book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old' } },
+         authorRows: [],
+         genreRows: [],
++        tagRows: [],
+         narratorRows: [],
+         fileRows: [],
+       });
+@@ -1245,6 +1278,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1282,6 +1316,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+         communityRatingRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+@@ -1315,6 +1350,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1361,6 +1397,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Terry Goodkind', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1403,6 +1440,7 @@
+         narratorRows: [],
+         authorRows: [],
+         genreRows: [],
++        tagRows: [],
+       });
+       const fallback = { provider: MetadataProviderKey.GOODREADS, source: 'fallback' as const, stale: true, cachedAt: '2026-01-01T00:00:00.000Z' };
+       pipeline.runWithSources.mockResolvedValue({
+@@ -1432,6 +1470,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1476,6 +1515,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Patrick Rothfuss', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+         communityRatingRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+@@ -1513,6 +1553,7 @@
+         narratorRows: [{ id: 4, name: 'Simon Vance', sortName: null, displayOrder: 0 }],
+         authorRows: [],
+         genreRows: [],
++        tagRows: [],
+         communityRatingRows: [],
+         fileRows: [
+           { id: 1, format: 'epub', role: 'content' },
+@@ -1540,6 +1581,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Patrick Rothfuss', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+         communityRatingRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({ cache: NO_CACHE_USE, resolved: {}, sources: {}, providerIds: {} });
+@@ -1565,6 +1607,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+         communityRatingRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+@@ -1605,6 +1648,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Terry Goodkind', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1654,6 +1698,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1703,6 +1748,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -1752,6 +1798,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockResolvedValue({
+         cache: NO_CACHE_USE,
+@@ -3794,6 +3841,7 @@
+         authorRows: [],
+         fileRows: [],
+         genreRows: [],
++        tagRows: [],
+         progressRows: [],
+         statusRows: [],
+         total: 1,
+@@ -4027,6 +4075,7 @@
+         authorRows: [],
+         fileRows: [],
+         genreRows: [],
++        tagRows: [],
+         progressRows: [],
+         statusRows: [],
+         total: 0,
+@@ -4052,6 +4101,7 @@
+         authorRows: [],
+         fileRows: [],
+         genreRows: [],
++        tagRows: [],
+         progressRows: [],
+         statusRows: [],
+         total: 0,
+@@ -4084,6 +4134,7 @@
+         authorRows: [],
+         fileRows: [],
+         genreRows: [],
++        tagRows: [],
+         progressRows: [],
+         statusRows: [],
+         total: 0,
+@@ -4110,6 +4161,7 @@
+         authorRows: [],
+         fileRows: [],
+         genreRows: [],
++        tagRows: [],
+         progressRows: [],
+         statusRows: [],
+         total: 0,
+@@ -4155,6 +4207,7 @@
+         authorRows: [],
+         fileRows: [],
+         genreRows: [],
++        tagRows: [],
+         progressRows: [],
+         statusRows: [],
+         total: 0,
+@@ -4449,6 +4502,7 @@
+         narratorRows: [],
+         authorRows: [{ id: 1, name: 'Author', sortName: null }],
+         genreRows: [],
++        tagRows: [],
+       });
+       pipeline.runWithSources.mockRejectedValue(new Error('provider timeout'));
+ 
+diff --git a/server/src/modules/book/book.service.ts b/server/src/modules/book/book.service.ts
+--- a/server/src/modules/book/book.service.ts
++++ b/server/src/modules/book/book.service.ts
+@@ -478,6 +478,7 @@
+     if (r.description !== undefined) preview.description = r.description as string | null;
+     if (r.authors !== undefined) preview.authors = r.authors as string[];
+     if (r.genres !== undefined) preview.genres = r.genres as string[];
++    if (r.tags !== undefined) preview.tags = r.tags as string[];
+     if (r.publisher !== undefined) preview.publisher = r.publisher as string | null;
+     if (r.publishedDate !== undefined) preview.publishedDate = r.publishedDate as string | null;
+     if (r.publishedYear !== undefined) preview.publishedYear = r.publishedYear as number | null;
+@@ -3116,7 +3117,7 @@
+       const found = await this.bookRepo.findById(id);
+       if (!found) throw new NotFoundException(`Book ${id} not found`);
+ 
+-      const { book, authorRows, genreRows, communityRatingRows, fileRows, narratorRows } = found;
++      const { book, authorRows, genreRows, tagRows, communityRatingRows, fileRows, narratorRows } = found;
+       await this.libraryService.verifyUserAccessLevel(user.id, book.books.libraryId, this.isSuperuser(user), 'editor');
+       const meta = book.book_metadata;
+ 
+@@ -3151,6 +3152,7 @@
+         seriesName: meta?.seriesName,
+         seriesIndex: meta?.seriesIndex,
+         genres: genreRows.map((g) => g.name),
++        tags: tagRows.map((t) => t.name),
+         duration: meta?.durationSeconds ?? undefined,
+         abridged: meta?.abridged ?? undefined,
+         // Without these a fill-missing narrators rule saw none and wrote over the book's own narrators
+@@ -3196,6 +3198,7 @@
+       if (r.description !== undefined) dto.description = r.description as string | null;
+       if (r.authors !== undefined) dto.authors = r.authors as string[];
+       if (r.genres !== undefined) dto.genres = r.genres as string[];
++      if (r.tags !== undefined) dto.tags = r.tags as string[];
+       if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
+       if (r.publishedDate !== undefined) dto.publishedDate = r.publishedDate as string | null;
+       if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;

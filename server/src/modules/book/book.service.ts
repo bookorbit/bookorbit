@@ -486,6 +486,7 @@ export class BookService {
     if (r.description !== undefined) preview.description = r.description as string | null;
     if (r.authors !== undefined) preview.authors = r.authors as string[];
     if (r.genres !== undefined) preview.genres = r.genres as string[];
+    if (r.tags !== undefined) preview.tags = r.tags as string[];
     if (r.publisher !== undefined) preview.publisher = r.publisher as string | null;
     if (r.publishedDate !== undefined) preview.publishedDate = r.publishedDate as string | null;
     if (r.publishedYear !== undefined) preview.publishedYear = r.publishedYear as number | null;
@@ -3250,7 +3251,7 @@ export class BookService {
       const found = await this.bookRepo.findById(id);
       if (!found) throw new NotFoundException(`Book ${id} not found`);
 
-      const { book, authorRows, genreRows, communityRatingRows, fileRows, narratorRows } = found;
+      const { book, authorRows, genreRows, tagRows, communityRatingRows, fileRows, narratorRows } = found;
       await this.libraryService.verifyUserAccessLevel(user.id, book.books.libraryId, this.isSuperuser(user), 'editor');
       const meta = book.book_metadata;
 
@@ -3285,6 +3286,7 @@ export class BookService {
         seriesName: meta?.seriesName,
         seriesIndex: meta?.seriesIndex,
         genres: genreRows.map((g) => g.name),
+        tags: tagRows.map((t) => t.name),
         duration: meta?.durationSeconds ?? undefined,
         abridged: meta?.abridged ?? undefined,
         // Without these a fill-missing narrators rule saw none and wrote over the book's own narrators
@@ -3330,6 +3332,7 @@ export class BookService {
       if (r.description !== undefined) dto.description = r.description as string | null;
       if (r.authors !== undefined) dto.authors = r.authors as string[];
       if (r.genres !== undefined) dto.genres = r.genres as string[];
+      if (r.tags !== undefined) dto.tags = r.tags as string[];
       if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
       if (r.publishedDate !== undefined) dto.publishedDate = r.publishedDate as string | null;
       if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;

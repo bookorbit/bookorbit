@@ -1061,6 +1061,7 @@ describe('BookService', () => {
         },
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
         narratorRows: [],
         communityRatingRows: [],
         fileRows: [{ format: 'epub', role: 'primary', mediaOverlayAvailable: false }],
@@ -1111,6 +1112,7 @@ describe('BookService', () => {
           seriesName: null,
           seriesIndex: null,
           genres: [],
+          tags: [],
           cover: true,
           audioCover: null,
           duration: undefined,
@@ -1124,6 +1126,32 @@ describe('BookService', () => {
       expect(metadataService.downloadAndSaveCover).not.toHaveBeenCalled();
     });
 
+    it("refreshMetadata hands the book's tags to the pipeline and returns the merged tags in a preview", async () => {
+      const { service, bookRepo, pipeline, coverStore } = makeService();
+      bookRepo.findById.mockResolvedValue({
+        book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old', isbn13: null, isbn10: null } },
+        authorRows: [],
+        genreRows: [],
+        tagRows: [{ name: 'Favourite' }],
+        narratorRows: [],
+        communityRatingRows: [],
+        fileRows: [{ format: 'epub', role: 'primary', mediaOverlayAvailable: false }],
+      });
+      pipeline.runWithSources.mockResolvedValue({
+        cache: NO_CACHE_USE,
+        resolved: { tags: ['Favourite', 'Isekai'] },
+        sources: {},
+        providerIds: {},
+        diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 1 }),
+      });
+      coverStore.fetchState.mockResolvedValue({ media: { hasEbook: true, hasAudio: false }, filled: { ebook: true, audio: false }, locked: [] });
+
+      const result = (await service.refreshMetadata(1, true, makeUser())) as { metadata: Record<string, unknown> };
+
+      expect(pipeline.runWithSources.mock.calls[0]?.[1]).toMatchObject({ tags: ['Favourite'] });
+      expect(result.metadata).toEqual({ tags: ['Favourite', 'Isekai'] });
+    });
+
     it('refreshMetadata updates mapped fields and downloads cover when provided', async () => {
       const { service, bookRepo, pipeline, metadataService } = makeService();
       const user = makeUser();
@@ -1135,6 +1163,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1173,6 +1202,7 @@ describe('BookService', () => {
         },
         authorRows: [],
         genreRows: [],
+        tagRows: [],
         narratorRows: [],
         fileRows: [
           { format: 'epub', role: 'primary', mediaOverlayAvailable: false },
@@ -1215,6 +1245,7 @@ describe('BookService', () => {
         book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old', chapters } },
         authorRows: [],
         genreRows: [],
+        tagRows: [],
         narratorRows: [],
         communityRatingRows: [],
         fileRows: [{ format: 'm4b', role: 'content', mediaOverlayAvailable: false }],
@@ -1233,6 +1264,7 @@ describe('BookService', () => {
         book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old' } },
         authorRows: [],
         genreRows: [],
+        tagRows: [],
         narratorRows: [],
         fileRows: [],
       });
@@ -1249,6 +1281,7 @@ describe('BookService', () => {
         book: { books: { id: 1, libraryId: 7 }, book_metadata: { title: 'Old' } },
         authorRows: [],
         genreRows: [],
+        tagRows: [],
         narratorRows: [],
         fileRows: [],
       });
@@ -1280,6 +1313,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1317,6 +1351,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
         communityRatingRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
@@ -1350,6 +1385,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1396,6 +1432,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Terry Goodkind', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1438,6 +1475,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [],
         genreRows: [],
+        tagRows: [],
       });
       const fallback = { provider: MetadataProviderKey.GOODREADS, source: 'fallback' as const, stale: true, cachedAt: '2026-01-01T00:00:00.000Z' };
       pipeline.runWithSources.mockResolvedValue({
@@ -1467,6 +1505,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1511,6 +1550,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Patrick Rothfuss', sortName: null }],
         genreRows: [],
+        tagRows: [],
         communityRatingRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
@@ -1548,6 +1588,7 @@ describe('BookService', () => {
         narratorRows: [{ id: 4, name: 'Simon Vance', sortName: null, displayOrder: 0 }],
         authorRows: [],
         genreRows: [],
+        tagRows: [],
         communityRatingRows: [],
         fileRows: [
           { id: 1, format: 'epub', role: 'content' },
@@ -1575,6 +1616,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Patrick Rothfuss', sortName: null }],
         genreRows: [],
+        tagRows: [],
         communityRatingRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({ cache: NO_CACHE_USE, resolved: {}, sources: {}, providerIds: {} });
@@ -1600,6 +1642,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
         communityRatingRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
@@ -1640,6 +1683,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Terry Goodkind', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1689,6 +1733,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1738,6 +1783,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -1787,6 +1833,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author One', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockResolvedValue({
         cache: NO_CACHE_USE,
@@ -3830,6 +3877,7 @@ describe('BookService', () => {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
         total: 1,
@@ -4082,6 +4130,7 @@ describe('BookService', () => {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
         total: 0,
@@ -4107,6 +4156,7 @@ describe('BookService', () => {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
         total: 0,
@@ -4139,6 +4189,7 @@ describe('BookService', () => {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
         total: 0,
@@ -4165,6 +4216,7 @@ describe('BookService', () => {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
         total: 0,
@@ -4210,6 +4262,7 @@ describe('BookService', () => {
         authorRows: [],
         fileRows: [],
         genreRows: [],
+        tagRows: [],
         progressRows: [],
         statusRows: [],
         total: 0,
@@ -4504,6 +4557,7 @@ describe('BookService', () => {
         narratorRows: [],
         authorRows: [{ id: 1, name: 'Author', sortName: null }],
         genreRows: [],
+        tagRows: [],
       });
       pipeline.runWithSources.mockRejectedValue(new Error('provider timeout'));
 

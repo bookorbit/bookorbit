@@ -387,6 +387,7 @@ export type BookMetadataRefreshPreviewFields = {
   description?: string | null;
   authors?: string[];
   genres?: string[];
+  tags?: string[];
   publisher?: string | null;
   publishedDate?: string | null;
   publishedYear?: number | null;

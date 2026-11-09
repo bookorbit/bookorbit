@@ -763,6 +763,7 @@ function buildPreviewPatch(preview: MetadataRefreshPreview): MetadataPatch {
     description: preview.description,
     authors: preview.authors,
     genres: preview.genres,
+    tags: preview.tags,
     publisher: preview.publisher,
     publishedDate: preview.publishedDate,
     publishedYear: preview.publishedYear,
