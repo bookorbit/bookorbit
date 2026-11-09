@@ -56,7 +56,7 @@ Some routes are for a person at the keyboard and refuse every key with `403` and
 - creating, listing, renaming, regenerating, and revoking API keys, including an administrator's view of someone else's keys;
 - changing a password, listing or ending sessions, and editing one's own profile;
 - changing another person's permissions or superuser status, or resetting their password;
-- App Attest registration and every route that requires an App Attest assertion from the iOS app.
+- App Attest registration and every route that requires an App Attest assertion from the iOS or Android app.
 
 Sign-in, registration, and the other public routes do not need a credential, and a key adds nothing to them.
 

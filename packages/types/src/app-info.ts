@@ -79,6 +79,11 @@ export const SERVER_FEATURES = [
    * `collapseLinked`, cards carry `linked` and `BooksPage.bookTotal`, and book detail `linkedBooks`.
    */
   "book-links",
+  /**
+   * `POST /app-attest/android-keys` registers an Android Key Attestation key, and the routes App
+   * Attest guards accept its signature with `X-BookOrbit-Attest-Nonce` beside the other three headers.
+   */
+  "android-key-attest",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

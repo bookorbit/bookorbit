@@ -234,6 +234,19 @@
     "apiKey": "interactive"
   },
   {
+    "file": "server/src/modules/app-attest/app-attest.controller.ts",
+    "className": "AppAttestController",
+    "methodName": "registerAndroidKey",
+    "httpMethod": "POST",
+    "path": "/app-attest/android-keys",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "interactive"
+  },
+  {
     "file": "server/src/modules/app-settings/app-settings.controller.ts",
     "className": "AppSettingsController",
     "methodName": "listSettings",
