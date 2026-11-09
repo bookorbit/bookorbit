@@ -1,5 +1,7 @@
 import { ConflictException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { DrizzleQueryError } from 'drizzle-orm';
+import { DatabaseError } from 'pg';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookDuplicatesService, otherFormatKeys } from './book-duplicates.service';
@@ -216,18 +218,19 @@ describe('BookDuplicatesService', () => {
     expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
   });
 
-  it('logs the PostgreSQL cause and SQLSTATE instead of a wrapped SQL query', async () => {
+  it('logs the PostgreSQL reason and SQLSTATE instead of the SQL Drizzle reports', async () => {
     const { service, repo } = setup();
     const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     try {
       repo.countScopedBooks.mockResolvedValue(10);
-      const cause = Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
-      repo.createOtherFormatPairs.mockRejectedValue(new Error('Failed query: WITH ebook_keys AS (...)', { cause }));
+      const timeout = Object.assign(new DatabaseError('canceling statement due to statement timeout', 0, 'error'), { code: '57014' });
+      repo.createOtherFormatPairs.mockRejectedValue(new DrizzleQueryError('WITH matched AS (...)', [11, 11, 0.85], timeout));
 
       await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
 
-      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('postgresCode=57014')));
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('duplicate scan failed')));
       const message = String(warn.mock.calls.at(-1)?.[0]);
+      expect(message).toContain('postgresCode=57014');
       expect(message).toContain('error="canceling statement due to statement timeout"');
       expect(message).not.toContain('Failed query:');
       expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
@@ -238,40 +241,19 @@ describe('BookDuplicatesService', () => {
   });
 
   it.each([
-    { case: 'no cause', failure: new Error('database unavailable'), code: 'unknown', message: 'database unavailable' },
+    { case: 'a plain error', failure: new Error('database unavailable'), message: 'database unavailable' },
     {
-      case: 'cause without SQLSTATE',
-      failure: new Error('query failed', { cause: new Error('connection reset') }),
-      code: 'unknown',
-      message: 'connection reset',
+      case: 'a Node system error under Drizzle',
+      failure: new DrizzleQueryError('select 1', [], Object.assign(new Error('write EPIPE'), { code: 'EPIPE' })),
+      message: 'write EPIPE',
     },
     {
-      case: 'invalid SQLSTATE',
-      failure: new Error('query failed', { cause: Object.assign(new Error('invalid code'), { code: '5701!' }) }),
-      code: 'unknown',
-      message: 'invalid code',
+      case: 'a wrapped error that is not a failed query',
+      failure: new Error('stage failed', { cause: Object.assign(new Error('inner'), { code: '57014' }) }),
+      message: 'stage failed',
     },
-    {
-      case: 'non-string SQLSTATE',
-      failure: new Error('query failed', { cause: Object.assign(new Error('numeric code'), { code: 57014 }) }),
-      code: 'unknown',
-      message: 'numeric code',
-    },
-    {
-      case: 'non-Error cause with SQLSTATE',
-      failure: new Error('query failed', { cause: { code: '23505' } }),
-      code: '23505',
-      message: 'query failed',
-    },
-    {
-      case: 'non-Error cause without SQLSTATE',
-      failure: new Error('query failed', { cause: { detail: 'other' } }),
-      code: 'unknown',
-      message: 'query failed',
-    },
-    { case: 'primitive cause', failure: new Error('query failed', { cause: 'network error' }), code: 'unknown', message: 'query failed' },
-    { case: 'non-Error rejection', failure: 'plain failure', code: 'unknown', message: 'plain failure' },
-  ])('logs the safe fallback for $case', async ({ failure, code, message }) => {
+    { case: 'a non-Error rejection', failure: 'plain failure', message: 'plain failure' },
+  ])('logs no SQLSTATE for $case', async ({ failure, message }) => {
     const { service, repo } = setup();
     const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
     try {
@@ -280,8 +262,9 @@ describe('BookDuplicatesService', () => {
 
       await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
 
-      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining(`postgresCode=${code}`)));
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('duplicate scan failed')));
       const logged = String(warn.mock.calls.at(-1)?.[0]);
+      expect(logged).toContain('postgresCode=none');
       expect(logged).toContain(`error="${message}"`);
       expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
       expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11);
@@ -339,16 +322,25 @@ describe('BookDuplicatesService', () => {
     expect(repo.analyzeScanKeys.mock.invocationCallOrder[0]).toBeLessThan(repo.createOtherFormatPairs.mock.invocationCallOrder[0]!);
   });
 
-  it('fails a scan rather than matching against stale statistics when ANALYZE fails', async () => {
+  it('still matches and completes the scan when refreshing statistics fails', async () => {
     const { service, repo } = setup();
-    repo.countScopedBooks.mockResolvedValue(2);
-    repo.analyzeScanKeys.mockRejectedValue(new Error('cannot analyze scan keys'));
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      repo.countScopedBooks.mockResolvedValue(2);
+      const lockTimeout = Object.assign(new DatabaseError('canceling statement due to lock timeout', 0, 'error'), { code: '55P03' });
+      repo.analyzeScanKeys.mockRejectedValue(new DrizzleQueryError('ANALYZE "book_duplicate_scan_keys"', [], lockTimeout));
 
-    await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
+      await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
 
-    await vi.waitFor(() => expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed' })));
-    expect(repo.createOtherFormatPairs).not.toHaveBeenCalled();
-    expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11);
+      await vi.waitFor(() => expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed' })));
+      expect(repo.createOtherFormatPairs).toHaveBeenCalledWith(11, 85);
+      expect(repo.deleteScanArtifacts).not.toHaveBeenCalled();
+      const logged = String(warn.mock.calls.find(([line]) => String(line).includes('[book_duplicates.scan_keys_analyze] [fail]'))?.[0]);
+      expect(logged).toContain('postgresCode=55P03');
+      expect(logged).toContain('error="canceling statement due to lock timeout"');
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('runs every bounded scan stage and completes a non-empty library', async () => {

@@ -2,7 +2,7 @@ import { DrizzleQueryError } from 'drizzle-orm';
 import { DatabaseError } from 'pg';
 import { describe, expect, it } from 'vitest';
 
-import { isUniqueViolation, queryFailureReason } from './db-error.utils';
+import { isUniqueViolation, postgresErrorCode, queryFailureReason } from './db-error.utils';
 
 describe('isUniqueViolation', () => {
   it('matches the driver error raised straight off the pool', () => {
@@ -60,5 +60,32 @@ describe('queryFailureReason', () => {
     expect(queryFailureReason(checkViolation())).toBeNull();
     expect(queryFailureReason('Failed query')).toBeNull();
     expect(queryFailureReason(null)).toBeNull();
+  });
+});
+
+describe('postgresErrorCode', () => {
+  function statementTimeout(): DatabaseError {
+    return Object.assign(new DatabaseError('canceling statement due to statement timeout', 0, 'error'), { code: '57014' });
+  }
+
+  it('reads the SQLSTATE of a driver error Drizzle has wrapped', () => {
+    expect(postgresErrorCode(new DrizzleQueryError('select 1', [], statementTimeout()))).toBe('57014');
+  });
+
+  it('reads the SQLSTATE of a driver error raised straight off the pool', () => {
+    expect(postgresErrorCode(statementTimeout())).toBe('57014');
+  });
+
+  it('does not mistake a Node system error code for a SQLSTATE', () => {
+    const socketError = Object.assign(new Error('write EPIPE'), { code: 'EPIPE' });
+    expect(postgresErrorCode(new DrizzleQueryError('select 1', [], socketError))).toBeNull();
+    expect(postgresErrorCode(socketError)).toBeNull();
+  });
+
+  it('returns null when there is no driver error', () => {
+    expect(postgresErrorCode(new DrizzleQueryError('select 1', []))).toBeNull();
+    expect(postgresErrorCode(new Error('query failed', { cause: { code: '23505' } }))).toBeNull();
+    expect(postgresErrorCode('57014')).toBeNull();
+    expect(postgresErrorCode(null)).toBeNull();
   });
 });
