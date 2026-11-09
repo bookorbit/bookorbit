@@ -1,4 +1,4 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Logger, NotFoundException } from '@nestjs/common';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -213,6 +213,48 @@ describe('BookDuplicatesService', () => {
 
     await vi.waitFor(() => expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11));
     expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
+  });
+
+  it('logs the PostgreSQL cause and SQLSTATE instead of a wrapped SQL query', async () => {
+    const { service, repo } = setup();
+    const warn = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    try {
+      repo.countScopedBooks.mockResolvedValue(10);
+      const cause = Object.assign(new Error('canceling statement due to statement timeout'), { code: '57014' });
+      repo.createOtherFormatPairs.mockRejectedValue(new Error('Failed query: WITH ebook_keys AS (...)', { cause }));
+
+      await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
+
+      await vi.waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining('postgresCode=57014')));
+      const message = String(warn.mock.calls.at(-1)?.[0]);
+      expect(message).toContain('error="canceling statement due to statement timeout"');
+      expect(message).not.toContain('Failed query:');
+      expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
+      expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it('scans all accessible libraries when no library is selected', async () => {
+    const { service, repo } = setup([2, 3]);
+    repo.countScopedBooks.mockResolvedValue(2);
+    repo.findScan.mockResolvedValue(scanRow({ libraryIds: [2, 3], requestedLibraryId: null }));
+    repo.createScanUnlessActive.mockResolvedValue(scanRow({ libraryIds: [2, 3], requestedLibraryId: null }));
+
+    await service.createScan({ similarityPercent: 85 }, user);
+
+    await vi.waitFor(() => expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed' })));
+    expect(repo.createScanUnlessActive).toHaveBeenCalledWith({
+      userId: 7,
+      libraryIds: [2, 3],
+      requestedLibraryId: null,
+      similarityPercent: 85,
+    });
+    expect(repo.insertFileHashKeys).toHaveBeenCalledWith(11, [2, 3], user);
+    expect(repo.findIsbnBatch).toHaveBeenCalledWith([2, 3], user, 0, 500);
+    expect(repo.findOtherFormatBatch).toHaveBeenCalledWith([2, 3], user, 0, 500);
+    expect(repo.createOtherFormatPairs).toHaveBeenCalledWith(11, 85);
   });
 
   it('runs every bounded scan stage and completes a non-empty library', async () => {

@@ -342,11 +342,16 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       );
     } catch (error) {
       const errorClass = error instanceof Error ? error.name : 'Error';
-      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      const cause = error instanceof Error ? error.cause : undefined;
+      const postgresCode =
+        cause && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string' && /^[0-9A-Z]{5}$/.test(cause.code)
+          ? cause.code
+          : 'unknown';
+      const errorMessage = sanitizeLogValue(cause instanceof Error ? cause.message : error instanceof Error ? error.message : String(error));
       await this.repo.updateScan(scanId, { status: 'failed', errorCode: 'scan_failed', completedAt: new Date() }).catch(() => undefined);
       await this.repo.deleteScanArtifacts(scanId).catch(() => undefined);
       this.logger.warn(
-        `[${event}] [fail] scanId=${scanId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - duplicate scan failed`,
+        `[${event}] [fail] scanId=${scanId} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} postgresCode=${postgresCode} error="${errorMessage}" - duplicate scan failed`,
       );
     }
   }

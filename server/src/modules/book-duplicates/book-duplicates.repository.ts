@@ -534,22 +534,20 @@ export class BookDuplicatesRepository {
     const titleA = crossFormatTitleSql(sql`metadata_a.title`);
     const titleB = crossFormatTitleSql(sql`metadata_b.title`);
     const result = await this.db.execute(sql`
-      WITH ebook_keys AS (
-        SELECT book_id, kind, substr(value, 3) AS key
-        FROM ${bookDuplicateScanKeys}
-        WHERE scan_id = ${scanId} AND kind IN ('of_work', 'of_title', 'of_series') AND value LIKE 'e|%'
-      ), audio_keys AS (
-        SELECT book_id, kind, substr(value, 3) AS key
-        FROM ${bookDuplicateScanKeys}
-        WHERE scan_id = ${scanId} AND kind IN ('of_work', 'of_title', 'of_series') AND value LIKE 'a|%'
-      ), matched AS (
+      WITH matched AS (
         SELECT DISTINCT
           least(ebook_keys.book_id, audio_keys.book_id) AS book_id_a,
           greatest(ebook_keys.book_id, audio_keys.book_id) AS book_id_b,
           ebook_keys.kind
-        FROM ebook_keys
-        JOIN audio_keys ON audio_keys.kind = ebook_keys.kind AND audio_keys.key = ebook_keys.key
-        WHERE audio_keys.book_id <> ebook_keys.book_id
+        FROM ${bookDuplicateScanKeys} ebook_keys
+        JOIN ${bookDuplicateScanKeys} audio_keys
+          ON audio_keys.scan_id = ebook_keys.scan_id
+          AND audio_keys.kind = ebook_keys.kind
+          AND audio_keys.value = 'a|' || substr(ebook_keys.value, 3)
+        WHERE ebook_keys.scan_id = ${scanId}
+          AND ebook_keys.kind IN ('of_work', 'of_title', 'of_series')
+          AND ebook_keys.value LIKE 'e|%'
+          AND audio_keys.book_id <> ebook_keys.book_id
       ), scored AS (
         SELECT
           matched.book_id_a,

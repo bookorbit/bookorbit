@@ -146,6 +146,29 @@ describe('BookDuplicatesRepository', () => {
     expect(rendered.params).toContain(0.85);
   });
 
+  it('joins ebook and audiobook keys through the indexed value without changing pair rules', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 2 });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await expect(repo.createOtherFormatPairs(9, 90)).resolves.toBe(2);
+
+    const rendered = renderSql(execute.mock.calls[0]![0]);
+    const query = rendered.sql.replace(/\s+/g, ' ');
+    expect(query).toContain('FROM "book_duplicate_scan_keys" ebook_keys JOIN "book_duplicate_scan_keys" audio_keys');
+    expect(query).toContain('audio_keys.scan_id = ebook_keys.scan_id');
+    expect(query).toContain('audio_keys.kind = ebook_keys.kind');
+    expect(query).toContain("audio_keys.value = 'a|' || substr(ebook_keys.value, 3)");
+    expect(query).toContain("ebook_keys.value LIKE 'e|%'");
+    expect(query).toContain("ebook_keys.kind IN ('of_work', 'of_title', 'of_series')");
+    expect(query).toContain("WHEN 'of_work' THEN 'same_work'");
+    expect(query).toContain("WHEN 'of_title' THEN 'title_author'");
+    expect(query).toContain("WHEN matched.kind = 'of_series' THEN similarity(");
+    expect(query).toContain("scored.reason <> 'series_position' OR scored.title_similarity >=");
+    expect(query).toContain('FROM book_links link_a JOIN book_links link_b ON link_b.group_id = link_a.group_id');
+    expect(query).not.toContain('substr(audio_keys.value, 3)');
+    expect(rendered.params).toEqual([9, 9, 0.9]);
+  });
+
   it('persists and retrieves user scan lifecycle state atomically', async () => {
     const created = { id: 9, userId: 7 };
     const db = mockDb({ selectResults: [[], [created], [created], [{ count: 3 }]], insertResults: [[created]] });
