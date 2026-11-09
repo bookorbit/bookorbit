@@ -146,6 +146,17 @@ describe('BookDuplicatesRepository', () => {
     expect(rendered.params).toContain(0.85);
   });
 
+  it('refreshes PostgreSQL statistics for populated duplicate scan keys', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await repo.analyzeScanKeys();
+
+    const rendered = renderSql(execute.mock.calls[0]![0]);
+    expect(rendered.sql.trim()).toBe('ANALYZE "book_duplicate_scan_keys"');
+    expect(rendered.params).toEqual([]);
+  });
+
   it('joins ebook and audiobook keys through the indexed value without changing pair rules', async () => {
     const execute = vi.fn().mockResolvedValue({ rowCount: 2 });
     const repo = new BookDuplicatesRepository({ execute } as never);

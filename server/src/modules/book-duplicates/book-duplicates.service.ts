@@ -318,6 +318,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       await this.repo.createFuzzyPairs(scanId, scan.libraryIds, user, scan.similarityPercent);
       await this.updateProgress(scanId, totalBooks, 75);
       await this.insertOtherFormatKeys(scanId, scan.libraryIds, user);
+      await this.repo.analyzeScanKeys();
       await this.repo.createOtherFormatPairs(scanId, scan.similarityPercent);
       await this.updateProgress(scanId, totalBooks, 85);
       const dismissedPairs = await this.repo.deleteDismissedPairs(scanId, user.id);

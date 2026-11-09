@@ -51,6 +51,7 @@ function setup(accessibleLibraryIds = [2]) {
     findGroupKind: vi.fn().mockResolvedValue('duplicate'),
     findOtherFormatBatch: vi.fn().mockResolvedValue([]),
     insertScanKeys: vi.fn().mockResolvedValue(undefined),
+    analyzeScanKeys: vi.fn().mockResolvedValue(undefined),
     createOtherFormatPairs: vi.fn().mockResolvedValue(undefined),
     finalizeOtherFormatGroups: vi.fn().mockResolvedValue(0),
     insertDismissals: vi.fn().mockResolvedValue(undefined),
@@ -308,6 +309,46 @@ describe('BookDuplicatesService', () => {
     expect(repo.findIsbnBatch).toHaveBeenCalledWith([2, 3], user, 0, 500);
     expect(repo.findOtherFormatBatch).toHaveBeenCalledWith([2, 3], user, 0, 500);
     expect(repo.createOtherFormatPairs).toHaveBeenCalledWith(11, 85);
+  });
+
+  it('analyzes populated cross-format keys before running the indexed matching query', async () => {
+    const { service, repo } = setup();
+    repo.countScopedBooks.mockResolvedValue(2);
+    repo.findOtherFormatBatch
+      .mockResolvedValueOnce([
+        {
+          id: 4,
+          title: 'Dune',
+          hardcover_id: '123',
+          open_library_id: null,
+          series_id: null,
+          series_index: null,
+          formats: ['epub'],
+          authors: ['Frank Herbert'],
+          narrators: [],
+        },
+      ])
+      .mockResolvedValueOnce([]);
+
+    await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
+
+    await vi.waitFor(() => expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed' })));
+    expect(repo.insertScanKeys).toHaveBeenCalledTimes(1);
+    expect(repo.analyzeScanKeys).toHaveBeenCalledTimes(1);
+    expect(repo.insertScanKeys.mock.invocationCallOrder[0]).toBeLessThan(repo.analyzeScanKeys.mock.invocationCallOrder[0]!);
+    expect(repo.analyzeScanKeys.mock.invocationCallOrder[0]).toBeLessThan(repo.createOtherFormatPairs.mock.invocationCallOrder[0]!);
+  });
+
+  it('fails a scan rather than matching against stale statistics when ANALYZE fails', async () => {
+    const { service, repo } = setup();
+    repo.countScopedBooks.mockResolvedValue(2);
+    repo.analyzeScanKeys.mockRejectedValue(new Error('cannot analyze scan keys'));
+
+    await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
+
+    await vi.waitFor(() => expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed' })));
+    expect(repo.createOtherFormatPairs).not.toHaveBeenCalled();
+    expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11);
   });
 
   it('runs every bounded scan stage and completes a non-empty library', async () => {

@@ -524,6 +524,11 @@ export class BookDuplicatesRepository {
     await this.db.insert(bookDuplicateScanKeys).values(values).onConflictDoNothing();
   }
 
+  /** Refresh planner statistics while the scan-key table is populated, before cross-format matching. */
+  async analyzeScanKeys(): Promise<void> {
+    await this.db.execute(sql`ANALYZE ${bookDuplicateScanKeys}`);
+  }
+
   /**
    * Pairs an ebook with an audiobook that share a work id, a title and a person, or a series
    * position and a similar title. Each key carries its side (`e|` or `a|`), so only a cross-media
