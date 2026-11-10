@@ -30,8 +30,8 @@
     "privacySharing": {
       "title": "Privacidad y uso compartido",
       "subtitle": "Controla si los administradores pueden ver un resumen identificable de tu actividad de lectura.",
-      "levelLegend": "Nivel de compartición de estadísticas de lectura",
-      "current": "Configuración actual",
+      "levelLegend": "Nivel de uso compartido de las estadísticas de lectura",
+      "current": "Ajuste actual",
       "levels": {
         "private": {
           "title": "Privado",
@@ -39,18 +39,18 @@
         },
         "summary": {
           "title": "Compartir resumen",
-          "description": "Compartir hábitos agregados sin títulos de libros, autores, series o narradores."
+          "description": "Comparte hábitos de lectura agregados sin títulos de libros, autores, series ni narradores."
         },
         "detailed": {
           "title": "Compartir información detallada",
-          "description": "También comparte libros recientes y de primer nivel, autores, series, géneros y narradores."
+          "description": "Comparte también los libros recientes y más leídos, autores, series, géneros y narradores."
         }
       },
       "fields": {
         "frequency": "Frecuencia de lectura y días activos",
-        "completion": "Agregar libros iniciados y completados",
-        "formats": "Distribución de formato",
-        "genres": "Amplia distribución de géneros",
+        "completion": "Totales de libros iniciados y completados",
+        "formats": "Distribución por formato",
+        "genres": "Distribución general por géneros",
         "trend": "Tendencia de lectura agregada",
         "books": "Títulos de libros actuales, recientes y más leídos",
         "authors": "Autores principales",
@@ -61,11 +61,11 @@
         "shareTitle": "¿Habilitar {level}?",
         "shareDescription": "Los administradores con permiso podrán ver la siguiente información.",
         "stopTitle": "¿Dejar de compartir información sobre la lectura?",
-        "stopDescription": "El acceso del administrador se bloqueará inmediatamente. Los registros de acceso existentes permanecen en su historial.",
-        "recordedNotice": "Cada vista del perfil de administrador se registra y aparece en su historial de acceso."
+        "stopDescription": "El acceso del administrador se bloqueará inmediatamente. Los registros de acceso existentes permanecen en tu historial.",
+        "recordedNotice": "Cada consulta de tu perfil por parte de un administrador se registra y aparece en tu historial de acceso."
       },
       "preview": {
-        "title": "Vista previa de su perfil compartido",
+        "title": "Vista previa de tu perfil compartido",
         "description": "Consulta la información disponible actualmente para los administradores autorizados.",
         "action": "Cargar vista previa",
         "readingTime": "Tiempo de lectura",
@@ -84,8 +84,8 @@
       "durationHours": "{count, plural, one {# hora} other {# horas} many {# horas}}",
       "unknownTitle": "Libro sin título",
       "errors": {
-        "load": "Error al cargar la configuración de compartir.",
-        "save": "Error al actualizar la configuración de compartir.",
+        "load": "Error al cargar los ajustes de compartir.",
+        "save": "Error al actualizar los ajustes de compartir.",
         "preview": "Error al cargar la vista previa del perfil compartido."
       }
     },
@@ -98,7 +98,7 @@
         "saveError": "Error al guardar preferencias de idioma"
       },
       "pageTitle": "Visualización",
-      "pageSubtitle": "Controle los temas, las portadas, el diseño y cómo se presenta su biblioteca.",
+      "pageSubtitle": "Controla los temas, las cubiertas, la distribución y la presentación de tu biblioteca.",
       "mobileSummary": "Tema: {theme} • Acento: {accent} • Fondo: {background}",
       "themeMode": {
         "light": "Claro",
@@ -135,7 +135,7 @@
             "steel": "Madera",
             "ash": "Ceniza",
             "smoke": "Humo",
-            "charcoal": "Carbón Vegetal",
+            "charcoal": "Carbón vegetal",
             "slate": "Pizarra",
             "midnight-blue": "Azul medianoche",
             "ocean": "Océano",

@@ -825,10 +825,12 @@
         "updatesGroup": "Uppdateringar",
         "bookloreImportConfigured": "Booklore import konfigurerad",
         "importLibraryData": "Importera biblioteksdata",
+        "migrationConfigured": "Migreringskälla konfigurerad",
         "migrationRunning": "Migrering igång",
         "migrationCompleted": "Migration slutförd",
         "migrationFailed": "Migrering misslyckades",
         "importDescription": "Engångsimport av böcker, metadata och läsframsteg från en tidigare Booklore installation.",
+        "migrationDescription": "Engångsimport av böcker, metadata och läsförloppet från en annan biblioteksprogram.",
         "configuredDescription": "Källa: {name}. Ingen migrering kör ännu - fortsätt installationen för att köra importen.",
         "runningDescription": "Stage: {stage} - startat {started}",
         "completedDescription": "Från {name} - klart {date}",
@@ -970,6 +972,7 @@
         "reasonAmbiguousTitleAuthorMatch": "Flera böcker matchade samma titel och författare",
         "reasonUnknown": "Kunde inte bestämma orsak",
         "strategyIsbn": "Matchad av ISBN",
+        "strategyAsin": "Matchad av ASIN",
         "strategyFileHash": "Matchade med filhash",
         "strategyPathMapping": "Matchad av mappad sökväg",
         "strategyTitleAuthor": "Matchad av titel och författare",
@@ -1110,6 +1113,7 @@
         "syncMetadataToFiles": "Synkronisera metadata till filer",
         "deleteLibrary": "Ta bort bibliotek",
         "bookCount": "{count, plural, =0 {inga böcker} one {# bok} other {# böcker}}",
+        "booksUnit": "{count, plural, one {bok} other {böcker}}",
         "folderCount": "{count, plural, =0 {inga mappar} one {# mapp} other {# mappar}}",
         "fileMode": "Fil läge",
         "folderMode": "Mappläge",
@@ -1138,6 +1142,9 @@
         "deleteFailed": "Kunde inte ta bort bibliotek",
         "refreshingCovers": "Uppdatering av omslag {pct}% ({processed}/{total})",
         "coversRefreshed": "Omslag uppdaterat ({count} bearbetade)",
+        "onDiskUnit": "{size} på disk",
+        "noFilesIndexed": "Inga filer indexerade",
+        "formatEntry": "{format} {count}",
         "openLibrary": "Öppna {name}",
         "moreActions": "Fler åtgärder för {name}",
         "filterLabel": "Filtrera bibliotek",
@@ -1145,9 +1152,19 @@
         "filterClear": "Rensa filter",
         "sortLabel": "Sortera",
         "noMatchesTitle": "Inga bibliotek matchar filtret",
+        "neverScanned": "Aldrig skannad",
+        "neverScannedHint": "Kör en skanning för att indexera mappar",
+        "scanFailedAt": "Misslyckades {time}",
+        "scanningPercent": "Skannar {pct}%",
         "scanCounting": "Räknar filer",
+        "scanCounts": "{processed} av {total}",
+        "scanAdded": "{count, plural, one {+# tillagd} other {+# tillagda}}",
+        "scanUpdated": "{count, plural, one {# uppdaterad} other {# uppdaterade}}",
+        "scanMissing": "{count, plural, one {# saknas} other {# saknas}}",
         "scanNoChange": "ingen förändring",
         "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} · {outcome}",
+        "syncConfirmBody": "Detta kommer att skriva över metadata inuti alla filer som stöds i {name} direkt på disken. Detta kan inte ångras.",
         "columns": {
           "library": "Bibliotek",
           "contents": "Innehåll",
@@ -1156,7 +1173,18 @@
           "lastScan": "Senaste scanning",
           "actions": "Åtgärder"
         },
+        "sort": {
+          "default": "Standardordning",
+          "name": "Namn",
+          "books": "Böcker",
+          "size": "Storlek på disk",
+          "lastScan": "Senaste genomsökning"
+        },
+        "trigger": {
+          "schedule": "Schemalägg"
+        },
         "capability": {
+          "schedule": "Schemalagd skanning",
           "fileWrite": "Skriv till fil",
           "fileRename": "Döp om filer",
           "on": "{name}: på",
@@ -1164,14 +1192,28 @@
         },
         "stateOn": "På",
         "stateOff": "Av",
+        "toggleDetail": "Visa detaljer för {name}",
         "durationMs": "{ms} ms",
         "durationSeconds": "{seconds}s",
         "durationMinutes": "{minutes}m {seconds}s",
         "history": {
-          "status": "Status"
+          "trigger": "Utlösare",
+          "result": "Resultat",
+          "status": "Status",
+          "statusValue": {
+            "running": "Körs",
+            "completed": "Slutförd",
+            "failed": "Misslyckades"
+          }
         },
         "detail": {
+          "foldersTitle": "Mappar & layout",
+          "metadataTitle": "Metadata och läsning",
+          "historyTitle": "Skanningshistorik",
+          "path": "Sökväg {index}",
           "organization": "Organisation",
+          "countsAsStarted": "Räknas som startat",
+          "countsAsFinished": "Räknas som avslutad",
           "coverShape": "Form på omslag",
           "coverShapeValue": {
             "portrait": "2:3 porträtt",
@@ -1182,6 +1224,11 @@
         "scanTrigger": {
           "manual": "Manuellt",
           "schedule": "Schemalagt"
+        },
+        "quick": {
+          "saveFailed": "Kunde inte uppdatera \"{name}\"",
+          "fileWriteAria": "Skriv till fil för {name}",
+          "renameAria": "Döp om filer för {name}"
         }
       },
       "authorEnrichment": {
@@ -1239,6 +1286,21 @@
         "table": {
           "field": "Fält",
           "weight": "Vikt"
+        },
+        "groups": {
+          "classification": "Klassificering",
+          "providers": "Leverantörens ID"
+        },
+        "rail": {
+          "bands": {
+            "poor": "UNDER 50",
+            "fair": "50-69",
+            "good": "70-89",
+            "great": "90+"
+          },
+          "median": "Median",
+          "belowFifty": "Under 50",
+          "ninetyPlus": "90 och uppåt"
         }
       },
       "tabs": {
@@ -1254,6 +1316,8 @@
         "fieldTypeOpenAi": "OpenAI-kompatibel",
         "fieldApiKey": "API-nyckel",
         "fieldModel": "Standardmodell",
+        "discoverySupported": "Stöds",
+        "discoveryUnsupported": "Stöds inte",
         "testConnection": "Testa anslutning",
         "testFailed": "Anslutning misslyckades",
         "delete": "Radera",

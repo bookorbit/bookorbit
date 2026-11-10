@@ -111,7 +111,7 @@
           "label": "CSS",
           "hint": "Het algehele uiterlijk van de app. Modus, accent, hoeken en achtergrond behouden hun instellingen.",
           "bookorbit": {
-            "label": "Boekenorbit",
+            "label": "BookOrbit",
             "description": "Tinted oppervlakken, glazen panelen en serif headings."
           },
           "nostalgia": {
@@ -1954,6 +1954,11 @@
         }
       },
       "providers": {
+        "tabs": {
+          "builtIn": "Ingebouwd",
+          "external": "Extern",
+          "attention": "Vereist aandacht"
+        },
         "availableSources": "Beschikbare bronnen",
         "saveChanges": "Wijzigingen opslaan",
         "discard": "Weggooien",
@@ -2024,6 +2029,21 @@
           "comicvine": "ComicVine vereist een API-sleutel voordat het kan worden ingeschakeld",
           "aladin": "Aladin vereist een TTB-sleutel voordat het kan worden ingeschakeld"
         }
+      },
+      "providerDirectory": {
+        "title": "Beschikbaar voor installatie",
+        "hint": "Elke aanbieder loopt als een kleine container naast BookOrbit. Kopieer zijn Compose service naar het bestand met BookOrbit, start het met docker compose -d, kies dan 'Toevoegen'.",
+        "updated": "{time} bijgewerkt",
+        "bundled": "Lijst inbegrepen in deze versie",
+        "loadFailed": "De lijst van kant-en-klare aanbieders kon niet worden geladen. U kunt nog steeds elke provider toevoegen via zijn adres.",
+        "copy": "Kopieer Compose",
+        "copyLabel": "Kopieer de Compose service voor {name}",
+        "copied": "{name} gekopieerd. Plak het onder services: in uw Compose bestand, en voer vervolgens docker compose -d uit.",
+        "copyFailed": "Kan niet kopiëren naar klembord. De documenten van de provider bevatten dezelfde snippet.",
+        "add": "Toevoegen",
+        "addLabel": "{name} toevoegen",
+        "alreadyAdded": "Al toegevoegd: {names}",
+        "allAdded": "U heeft elke provider uit deze lijst toegevoegd."
       },
       "fieldRules": {
         "clearAllProviders": "Alle providers wissen",
