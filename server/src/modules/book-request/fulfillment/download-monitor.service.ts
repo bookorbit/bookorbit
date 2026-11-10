@@ -426,6 +426,19 @@ export class DownloadMonitorService implements OnModuleDestroy {
       const adapter = this.registry.require(config.adapterType);
       if (typeof adapter.stage !== 'function') return;
 
+      // Config resolution can cross a cancellation. Re-read immediately before invoking stage;
+      // stage registers its cancellation-aware job synchronously before its first await, so no
+      // removal can slip between this check and that registration.
+      const fresh = await this.downloads.findById(job.downloadId);
+      if (
+        !fresh ||
+        !ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES.includes(fresh.status as BookRequestDownloadStatus) ||
+        fresh.clientKey !== job.clientKey ||
+        fresh.downloadClientId !== job.clientId
+      ) {
+        return;
+      }
+
       await adapter.stage(job.clientKey, config);
       this.stageFailures.delete(key);
       this.stageRetryAt.delete(key);

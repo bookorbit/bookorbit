@@ -369,6 +369,24 @@ describe('DownloadMonitorService.tick', () => {
     }
   });
 
+  it('does not start staging when cancellation lands during client config resolution', async () => {
+    const { service, downloads, clients, adapter } = makeService({
+      stageCapable: true,
+      statuses: [status({ state: 'completed', contentPath: null, progressPercent: 100, downloadedBytes: 1000 })],
+    });
+    let configCalls = 0;
+    clients.resolveConfig.mockImplementation(() => {
+      configCalls += 1;
+      if (configCalls === 2) downloads.findById.mockResolvedValue(row({ status: 'failed' }));
+      return Promise.resolve({ id: 4, adapterType: 'torbox' });
+    });
+
+    await polled(service);
+    await service.whenStagingSettles();
+
+    expect(adapter.stage).not.toHaveBeenCalled();
+  });
+
   it('does not carry a cancelled attempt staging backoff into its replacement', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(100_000);
