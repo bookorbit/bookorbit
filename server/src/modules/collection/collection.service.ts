@@ -55,6 +55,19 @@ export class CollectionService {
     }
   }
 
+  private assertItemWriteAccess(collection: CollectionRow, user: RequestUser): void {
+    const canWrite = (collection.isPublic && collection.isCollaborative) || collection.userId === user.id || user.isSuperuser;
+    if (!canWrite) {
+      throw new ForbiddenException('Cannot modify this collection');
+    }
+  }
+
+  private async getItemModifiableCollectionOrThrow(id: number, user: RequestUser): Promise<CollectionRow> {
+    const collection = await this.getCollectionOrThrow(id);
+    this.assertItemWriteAccess(collection, user);
+    return collection;
+  }
+
   private async getCollectionOrThrow(id: number): Promise<CollectionRow> {
     const [collection] = await this.collectionRepo.findById(id);
     if (!collection) throw new NotFoundException(COLLECTION_NOT_FOUND_MESSAGE);
@@ -130,7 +143,7 @@ export class CollectionService {
     const visibleBooksWhere = await this.buildViewerBookWhere(user);
     if (bookIds.length > 0) return this.collectionRepo.findAllOwnedForUserWithMembership(user.id, bookIds, visibleBooksWhere);
     const collections = await this.collectionRepo.findAllVisibleForUser(user.id, visibleBooksWhere);
-    return collections.filter((collection) => collection.userId === user.id);
+    return collections.filter((collection) => collection.userId === user.id || (collection.isPublic && collection.isCollaborative));
   }
 
   async findOne(id: number, user: RequestUser) {
@@ -144,12 +157,15 @@ export class CollectionService {
       throw new BadRequestException('Icon is required');
     }
     try {
+      const isPublic = dto.isPublic ?? false;
+      const isCollaborative = isPublic ? (dto.isCollaborative ?? false) : false;
       const [inserted] = await this.collectionRepo.insert({
         userId: user.id,
         name: dto.name,
         icon,
         description: dto.description ?? null,
-        isPublic: dto.isPublic ?? false,
+        isPublic,
+        isCollaborative,
         coverAspectRatio: dto.coverAspectRatio,
         syncToKobo: dto.syncToKobo ?? false,
       });
@@ -173,12 +189,15 @@ export class CollectionService {
       throw new BadRequestException('Icon is required');
     }
 
+    const effPublic = dto.isPublic !== undefined ? dto.isPublic : existing.isPublic;
+    const effCollab = !effPublic ? false : (dto.isCollaborative !== undefined ? dto.isCollaborative : existing.isCollaborative);
     try {
       await this.collectionRepo.update(id, existing.userId, {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.icon !== undefined && { icon }),
         ...(dto.description !== undefined && { description: dto.description }),
         ...(dto.isPublic !== undefined && { isPublic: dto.isPublic }),
+        isCollaborative: effCollab,
         ...(dto.coverAspectRatio !== undefined && { coverAspectRatio: dto.coverAspectRatio }),
         ...(dto.syncToKobo !== undefined && { syncToKobo: dto.syncToKobo }),
       });
@@ -231,7 +250,7 @@ export class CollectionService {
       `[${event}] [start] collectionId=${id} userId=${user.id} selectionMode=${this.getSelectionMode(dto)} requestedCount=${this.getRequestedCount(dto)} - add books started`,
     );
     try {
-      const collection = await this.getWritableCollectionOrThrow(id, user);
+      const collection = await this.getItemModifiableCollectionOrThrow(id, user);
       const bookIds = await this.resolveSelectionBookIds(dto, user);
       if (bookIds.length > 0) {
         await this.collectionRepo.addBooks(id, bookIds);
@@ -254,7 +273,7 @@ export class CollectionService {
       `[${event}] [start] collectionId=${id} userId=${user.id} selectionMode=${this.getSelectionMode(dto)} requestedCount=${this.getRequestedCount(dto)} - remove books started`,
     );
     try {
-      const collection = await this.getWritableCollectionOrThrow(id, user);
+      const collection = await this.getItemModifiableCollectionOrThrow(id, user);
       const bookIds = await this.resolveSelectionBookIds(dto, user);
       if (bookIds.length > 0) {
         await this.collectionRepo.removeBooks(id, bookIds);

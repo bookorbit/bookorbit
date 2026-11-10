@@ -17,6 +17,7 @@ const { t } = useI18n()
 const name = ref('')
 const icon = ref('')
 const isPublic = ref(false)
+const isCollaborative = ref(false)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const trimmedName = computed(() => name.value.trim())
@@ -34,10 +35,11 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    const collection = await createCollection(trimmedName.value, trimmedIcon.value, undefined, isPublic.value || undefined)
+    const collection = await createCollection(trimmedName.value, trimmedIcon.value, undefined, isPublic.value || undefined, (isPublic.value && isCollaborative.value) || undefined)
     name.value = ''
     icon.value = ''
     isPublic.value = false
+    isCollaborative.value = false
     emit('close')
     router.push({ name: 'collection', params: { id: collection.id } })
   } catch {
@@ -82,7 +84,15 @@ async function submit() {
               <p class="text-sm font-medium text-foreground">{{ t('collection.visibleToAll') }}</p>
               <p class="mt-0.5 text-xs text-muted-foreground">{{ t('collection.visibleToAllHint') }}</p>
             </div>
-            <ToggleSwitch v-model="isPublic" :aria-label="t('collection.visibleToAll')" />
+            <ToggleSwitch v-model="isPublic" @update:model-value="(val) => { if (!val) isCollaborative = false }" :aria-label="t('collection.visibleToAll')" />
+          </div>
+
+          <div v-if="isPublic" class="flex items-center justify-between py-1">
+            <div>
+              <p class="text-sm font-medium text-foreground">{{ t('collection.collaborative') }}</p>
+              <p class="mt-0.5 text-xs text-muted-foreground">{{ t('collection.collaborativeHint') }}</p>
+            </div>
+            <ToggleSwitch v-model="isCollaborative" :aria-label="t('collection.collaborative')" />
           </div>
 
           <p v-if="error" class="text-sm text-destructive">{{ error }}</p>

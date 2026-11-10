@@ -58,12 +58,19 @@ export function useCollections() {
     return res.json()
   }
 
-  async function createCollection(name: string, icon: string, description?: string, isPublic?: boolean): Promise<Collection> {
+  async function createCollection(
+    name: string,
+    icon: string,
+    description?: string,
+    isPublic?: boolean,
+    isCollaborative?: boolean,
+  ): Promise<Collection> {
     const payload: CreateCollectionPayload = {
       name,
       icon,
       description,
       ...(isPublic !== undefined && { isPublic }),
+      ...(isCollaborative !== undefined && { isCollaborative }),
     }
     const res = await api('/api/v1/collections', {
       method: 'POST',
@@ -83,6 +90,7 @@ export function useCollections() {
     syncToKobo?: boolean,
     isPublic?: boolean,
     coverAspectRatio?: CoverAspectRatio,
+    isCollaborative?: boolean,
   ): Promise<Collection> {
     const res = await api(`/api/v1/collections/${id}`, {
       method: 'PATCH',
@@ -92,6 +100,7 @@ export function useCollections() {
         icon,
         ...(syncToKobo !== undefined && { syncToKobo }),
         ...(isPublic !== undefined && { isPublic }),
+        ...(isCollaborative !== undefined && { isCollaborative }),
         ...(coverAspectRatio !== undefined && { coverAspectRatio }),
       }),
     })

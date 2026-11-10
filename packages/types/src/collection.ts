@@ -7,6 +7,7 @@ export type Collection = {
   icon: string | null;
   description: string | null;
   isPublic: boolean;
+  isCollaborative: boolean;
   isOwner: boolean;
   /** The grid's tile shape, set by the owner. Square also draws each book that has an audiobook as that audiobook. */
   coverAspectRatio: CoverAspectRatio;
@@ -23,6 +24,7 @@ export type CreateCollectionPayload = {
   icon: string;
   description?: string;
   isPublic?: boolean;
+  isCollaborative?: boolean;
   coverAspectRatio?: CoverAspectRatio;
   syncToKobo?: boolean;
 };

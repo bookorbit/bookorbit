@@ -21,6 +21,7 @@ const name = ref('')
 const icon = ref('')
 const syncToKobo = ref(false)
 const isPublic = ref(false)
+const isCollaborative = ref(false)
 const coverAspectRatio = ref<CoverAspectRatio>('2/3')
 const saving = ref(false)
 const deleting = ref(false)
@@ -37,6 +38,7 @@ watch(
       icon.value = props.collection.icon ?? ''
       syncToKobo.value = props.collection.syncToKobo
       isPublic.value = props.collection.isPublic
+      isCollaborative.value = props.collection.isCollaborative ?? false
       coverAspectRatio.value = normalizeCoverAspectRatio(props.collection.coverAspectRatio)
       error.value = null
       confirmingDelete.value = false
@@ -56,7 +58,7 @@ async function submit() {
   saving.value = true
   error.value = null
   try {
-    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value, isPublic.value, coverAspectRatio.value)
+    await updateCollection(props.collection.id, trimmedName.value, trimmedIcon.value, syncToKobo.value, isPublic.value, coverAspectRatio.value, isPublic.value ? isCollaborative.value : false)
     emit('close')
   } catch {
     error.value = t('collection.editDialog.updateFailed')
@@ -144,7 +146,15 @@ async function confirmDelete() {
               <p class="text-sm font-medium text-foreground">{{ t('collection.visibleToAll') }}</p>
               <p class="text-xs text-muted-foreground mt-0.5">{{ t('collection.visibleToAllHint') }}</p>
             </div>
-            <ToggleSwitch v-model="isPublic" :aria-label="t('collection.visibleToAll')" />
+            <ToggleSwitch v-model="isPublic" @update:model-value="(val) => { if (!val) isCollaborative = false }" :aria-label="t('collection.visibleToAll')" />
+          </div>
+
+          <div v-if="isPublic" class="flex items-center justify-between py-1">
+            <div>
+              <p class="text-sm font-medium text-foreground">{{ t('collection.collaborative') }}</p>
+              <p class="text-xs text-muted-foreground mt-0.5">{{ t('collection.collaborativeHint') }}</p>
+            </div>
+            <ToggleSwitch v-model="isCollaborative" :aria-label="t('collection.collaborative')" />
           </div>
 
           <div class="flex items-center justify-between py-1">
