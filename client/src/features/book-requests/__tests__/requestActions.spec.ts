@@ -96,6 +96,17 @@ describe('cancelStopsATransfer', () => {
     expect(cancelStopsATransfer(withDownload('imported'))).toBe(false)
     expect(cancelStopsATransfer(withDownload('failed'))).toBe(false)
   })
+
+  it('warns before deleting a remote item even when its transfer is no longer active', () => {
+    expect(
+      cancelStopsATransfer(
+        request({
+          status: 'failed',
+          download: { id: 7, status: 'failed', alwaysDeletesRemote: true } as BookRequestDownloadItem,
+        }),
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('canBulkActRequest', () => {

@@ -114,6 +114,11 @@ export interface DownloadClientAdapter {
   status(clientKeys: string[], config: ResolvedClientConfig): Promise<DownloadStatus[]>;
   listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory>;
   remove(clientKey: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void>;
+  /**
+   * Stop a local staging transfer without deleting the remote item. Used when a request is being
+   * settled by owner deletion or manual fulfillment, where the cloud copy must be preserved.
+   */
+  cancelStaging?(clientKey: string, config: ResolvedClientConfig): Promise<void>;
   test(config: ResolvedClientConfig): Promise<DownloadClientTestResult>;
   /**
    * Cloud clients that hold the finished files remotely implement this. The monitor calls it when

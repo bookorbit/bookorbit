@@ -149,21 +149,23 @@ export class DownloadRemovalService {
 
     const isDirect = download.source === 'direct_url';
     const stagesLocally = !isDirect && download.downloadClientId !== null && (await this.clients.stagesLocally(download.downloadClientId));
-    if (stagesLocally && !deleteFiles) {
-      throw new BadRequestException('This download client can only remove the item by permanently deleting its remote files');
-    }
-    const shouldDeleteFiles = isDirect || deleteFiles;
 
     if (isDirect) {
-      await this.direct.remove(download.clientKey, { deleteFiles: shouldDeleteFiles });
+      await this.direct.remove(download.clientKey, { deleteFiles: true });
     } else {
       const config = await this.clients.resolveConfig(download.downloadClientId as number);
       const adapter = this.registry.require(config.adapterType);
-      await adapter.remove(download.clientKey, config, { deleteFiles: shouldDeleteFiles });
+      if (stagesLocally && !deleteFiles) {
+        await adapter.cancelStaging?.(download.clientKey, config);
+        await rm(stagedClientDir(this.appDataPath, config.adapterType, config.id, download.clientKey), { recursive: true, force: true });
+        await rm(legacyStagedClientDir(this.appDataPath, config.adapterType, download.clientKey), { recursive: true, force: true });
+      } else {
+        await adapter.remove(download.clientKey, config, { deleteFiles: deleteFiles });
+      }
     }
 
     this.logger.log(
-      `[book_request.remove_download] [end] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId ?? 'direct'} source=${download.source} deleteFiles=${shouldDeleteFiles} - download removed`,
+      `[book_request.remove_download] [end] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId ?? 'direct'} source=${download.source} deleteFiles=${isDirect || deleteFiles} - download removed`,
     );
   }
 

@@ -128,7 +128,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
 
   async remove(clientKey: string, config: ResolvedClientConfig, opts: { deleteFiles: boolean }): Promise<void> {
     const key = normalizeKey(clientKey);
-    await this.cancelStaging(config.id, key);
+    await this.cancelStagingJob(config.id, key);
 
     try {
       const found = await this.api.findByHashes(config, new Set([key]));
@@ -146,6 +146,10 @@ export class TorboxAdapter implements DownloadClientAdapter {
     }
 
     if (opts.deleteFiles) await this.cleanStaged(config.id, key);
+  }
+
+  async cancelStaging(clientKey: string, config: ResolvedClientConfig): Promise<void> {
+    await this.cancelStagingJob(config.id, normalizeKey(clientKey));
   }
 
   /** Both staging layouts, so a release fetched before directories were isolated by client id goes too. */
@@ -448,7 +452,7 @@ export class TorboxAdapter implements DownloadClientAdapter {
     return url;
   }
 
-  private async cancelStaging(clientId: number, clientKey: string): Promise<void> {
+  private async cancelStagingJob(clientId: number, clientKey: string): Promise<void> {
     const jobs = this.staging.get(clientId);
     const job = jobs?.get(clientKey);
     if (!job) return;

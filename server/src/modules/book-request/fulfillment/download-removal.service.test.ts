@@ -38,7 +38,10 @@ async function makeService(options: { latest?: BookRequestDownloadRow | null; re
   const adapter = {
     remove: options.removeError ? vi.fn().mockRejectedValue(options.removeError) : vi.fn().mockResolvedValue(undefined),
   };
-  if (options.stageCapable) (adapter as Record<string, unknown>).stage = vi.fn();
+  if (options.stageCapable) {
+    (adapter as Record<string, unknown>).stage = vi.fn();
+    (adapter as Record<string, unknown>).cancelStaging = vi.fn().mockResolvedValue(undefined);
+  }
   const registry = { require: vi.fn().mockReturnValue(adapter) };
   const direct = {
     remove: options.removeError ? vi.fn().mockRejectedValue(options.removeError) : vi.fn().mockResolvedValue(undefined),
@@ -181,13 +184,14 @@ describe('DownloadRemovalService.cleanupStagedClientDownload', () => {
 });
 
 describe('DownloadRemovalService.detachAttempt', () => {
-  it('refuses to remove from a staging-capable client without consent to delete its remote files', async () => {
+  it('stops local staging and preserves the remote item without deletion consent', async () => {
     const staged = download();
     const { service, adapter } = await makeService({ latest: staged, stageCapable: true });
 
-    await expect(service.detachAttempt(staged, false)).resolves.toContain('permanently deleting its remote files');
+    await expect(service.detachAttempt(staged, false)).resolves.toBeNull();
 
     expect(adapter.remove).not.toHaveBeenCalled();
+    expect(adapter.cancelStaging).toHaveBeenCalledWith(INFO_HASH, expect.anything());
   });
 
   it('removes from a staging-capable client after explicit consent to delete its remote files', async () => {
