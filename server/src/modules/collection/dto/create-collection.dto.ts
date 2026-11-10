@@ -28,6 +28,10 @@ export class CreateCollectionDto {
   isPublic?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  isCollaborative?: boolean;
+
+  @IsOptional()
   @IsIn(COVER_ASPECT_RATIOS)
   coverAspectRatio?: CoverAspectRatio;
 

@@ -10502,7 +10502,7 @@
   },
   "collection": {
     "visibleToAll": "Visible to all users",
-    "visibleToAllHint": "Every user can see this collection, but only you can change its books",
+    "visibleToAllHint": "Every user can see this collection",
     "dialog": {
       "name": "Name",
       "icon": "Icon",
@@ -10552,7 +10552,9 @@
       "addFailed": "Failed to add to collection",
       "removedFromCollection": "{count, plural, =0 {Removed no books from \"{name}\"} one {Removed one book from \"{name}\"} other {Removed # books from \"{name}\"}}",
       "removeFailed": "Failed to remove from collection"
-    }
+    },
+    "collaborative": "Collaborative collection",
+    "collaborativeHint": "Allow other library users to add and remove books"
   },
   "components": {
     "appHeader": {

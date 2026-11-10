@@ -17,6 +17,7 @@ const collectionFields = {
   icon: collections.icon,
   description: collections.description,
   isPublic: collections.isPublic,
+  isCollaborative: collections.isCollaborative,
   coverAspectRatio: collections.coverAspectRatio,
   syncToKobo: collections.syncToKobo,
   displayOrder: collections.displayOrder,
@@ -57,7 +58,7 @@ export class CollectionRepository {
       .from(collections)
       .leftJoin(collectionBooks, eq(collections.id, collectionBooks.collectionId))
       .leftJoin(books, and(eq(books.id, collectionBooks.bookId), ne(books.status, 'processing'), visibleBooksWhere))
-      .where(eq(collections.userId, userId))
+      .where(or(eq(collections.userId, userId), and(eq(collections.isPublic, true), eq(collections.isCollaborative, true))))
       .groupBy(collections.id, collections.userId)
       .orderBy(collections.displayOrder, collections.name);
   }

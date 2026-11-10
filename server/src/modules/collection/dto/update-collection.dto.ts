@@ -30,6 +30,10 @@ export class UpdateCollectionDto {
   isPublic?: boolean;
 
   @ValidateIf((_, value) => value !== undefined)
+  @IsBoolean()
+  isCollaborative?: boolean;
+
+  @ValidateIf((_, value) => value !== undefined)
   @IsIn(COVER_ASPECT_RATIOS)
   coverAspectRatio?: CoverAspectRatio;
 
