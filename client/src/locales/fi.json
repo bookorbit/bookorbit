@@ -111,7 +111,7 @@
           "label": "Tyyli",
           "hint": "Sovelluksen yleinen ulkoasu. Tila, aksentti, kulmat ja tausta pitävät niiden asetukset.",
           "bookorbit": {
-            "label": "Kirjankierto",
+            "label": "BookOrbit",
             "description": "Tiivistetyt pinnat, lasiset paneelit ja sarjanumerot."
           },
           "nostalgia": {

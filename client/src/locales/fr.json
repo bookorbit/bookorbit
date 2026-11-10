@@ -111,7 +111,7 @@
           "label": "Style",
           "hint": "L'aspect général de l'application. Mode, accent, coins et arrière-plan gardent leurs paramètres.",
           "bookorbit": {
-            "label": "Orbite des livres",
+            "label": "BookOrbit",
             "description": "Surfaces teintées, panneaux de verre et titres à empattements."
           },
           "nostalgia": {
