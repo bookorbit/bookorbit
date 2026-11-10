@@ -111,7 +111,7 @@
           "label": "Stil",
           "hint": "Das Gesamtbild der App. Modus, Akzenten, Ecken und Hintergrund behalten ihre Einstellungen.",
           "bookorbit": {
-            "label": "Buch-Orbit",
+            "label": "BookOrbit",
             "description": "Gefärbte Oberflächen, Glasplatten und Serifenüberschriften."
           },
           "nostalgia": {

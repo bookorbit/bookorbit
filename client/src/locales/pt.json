@@ -389,6 +389,28 @@
             "label": "Status de bloqueio",
             "hint": "Ícone de bloqueio de metadados no canto superior direito - laranja quando bloqueado, verde quando desbloqueado"
           }
+        },
+        "formatBadgeStyle": {
+          "title": "Formatar estilo do emblema",
+          "hint": "Como o distintivo mostra um livro que tem vários formatos. Um livro com um formato sempre mostra sua pílula comum.",
+          "options": {
+            "primary": {
+              "label": "Formato principal"
+            },
+            "bubble": {
+              "label": "Bolha de contagem",
+              "hint": "A pílula primária com uma pequena contagem dos outros formatos em seu canto."
+            },
+            "underline": {
+              "label": "Sublinhado"
+            },
+            "pips": {
+              "label": "Posição"
+            },
+            "seal": {
+              "label": "Proteger"
+            }
+          }
         }
       },
       "layout": {
@@ -5478,6 +5500,8 @@
       "BookBulkSetMetadataLock": "Definir bloqueios de metadados",
       "BookBulkEditMetadata": "Editar metadados do livro",
       "BookBulkMoveLibrary": "Mover livros para outra biblioteca",
+      "BookMerge": "Mesclar livros",
+      "BookDuplicatesResolve": "Resolver livros duplicados",
       "BookReadingStateReset": "Redefinir estado de leitura",
       "BookWriteAndRename": "Escrever metadados e renomear arquivo",
       "CollectionCreate": "Criar nova coleção",
@@ -8628,6 +8652,14 @@
       "toast": {
         "success": "Foram movidos {count} livros para {library}",
         "partial": "Os livros {moved} movidos, {failed} falharam"
+      }
+    },
+    "gridShape": {
+      "tallTitle": "Células altas"
+    },
+    "merge": {
+      "keeper": {
+        "processing": "Processando"
       }
     }
   },
@@ -13875,6 +13907,29 @@
         "hide": "Ocultar pares dispensados",
         "restore": "Restaurar este par",
         "restored": "Pareamento restaurado. Ele pode coincidir novamente na próxima digitalização."
+      },
+      "outcomes": {
+        "pending": "Aguardando",
+        "done": "Concluído",
+        "partial": "Parcialmente concluído",
+        "skipped": "Ignorado",
+        "failed": "Falhou",
+        "withReason": "{status}: {reason}"
+      },
+      "bookOutcomes": {
+        "merged": "Mesclado",
+        "deleted": "Excluído",
+        "linked": "Vinculado",
+        "skipped": "Ignorado",
+        "failed": "Falhou"
+      },
+      "outcomeReasons": {
+        "STALE": "mudou desde a verificação",
+        "NOT_SELECTED": "deixado como está",
+        "ALREADY_RESOLVED": "já resolvido",
+        "MERGE_FAILED": "a mesclagem falhou",
+        "MERGE_IN_PROGRESS": "estes livros já estão sendo mesclados",
+        "LINK_GROUP_FULL": "o link está completo"
       }
     },
     "entityManager": {
