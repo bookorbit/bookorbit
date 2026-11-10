@@ -380,11 +380,12 @@ export function useBookRequestActions(canManage: () => boolean) {
     dismissMany,
     /** The language the request asks for, which decides which releases can match it at all. */
     setLanguage: (id: number, language: string | null) => run(id, `/api/v1/book-requests/${id}/language`, { language }),
-    cancelDownload: (id: number, downloadId: number) => run(id, `/api/v1/book-requests/${id}/downloads/${downloadId}/cancel`),
-    cancel: (id: number) => run(id, `/api/v1/book-requests/${id}/cancel`),
+    cancelDownload: (id: number, downloadId: number, body?: RemoveBookRequestDownloadPayload) =>
+      run(id, `/api/v1/book-requests/${id}/downloads/${downloadId}/cancel`, body),
+    cancel: (id: number, body?: RemoveBookRequestDownloadPayload) => run(id, `/api/v1/book-requests/${id}/cancel`, body),
     dismiss: (id: number) => run(id, `/api/v1/book-requests/${id}/dismiss`),
     restore: (id: number) => run(id, `/api/v1/book-requests/${id}/restore`),
-    remove: (id: number) => runDelete(id, `/api/v1/admin/book-requests/${id}`),
+    remove: (id: number, deleteFiles = false) => runDelete(id, `/api/v1/admin/book-requests/${id}${deleteFiles ? '?deleteFiles=true' : ''}`),
     /** Leaving a request somebody else made. 204, so there is no row to hand back afterwards. */
     leave: (id: number) => runDelete(id, `/api/v1/book-requests/${id}/subscription`),
   }

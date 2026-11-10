@@ -34,6 +34,11 @@ function queryBuilder<T>(result: T) {
   return builder;
 }
 
+/** A db whose transactions run on the same `execute`, so a scan stage's `SET LOCAL` and its statement are both recorded. */
+function transactionalDb(execute: ReturnType<typeof vi.fn>) {
+  return { execute, transaction: vi.fn((callback: (tx: { execute: typeof execute }) => unknown) => callback({ execute })) } as never;
+}
+
 function mockDb(options: { selectResults?: unknown[]; insertResults?: unknown[]; executeResults?: unknown[] } = {}) {
   const selectResults = [...(options.selectResults ?? [])];
   const insertResults = [...(options.insertResults ?? [])];
@@ -55,11 +60,11 @@ function mockDb(options: { selectResults?: unknown[]; insertResults?: unknown[];
 describe('BookDuplicatesRepository', () => {
   it('builds identical-file keys from the complete ordered content-file signature', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new BookDuplicatesRepository({ execute } as never);
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
 
     await repo.insertFileHashKeys(9, [1, 2], { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never);
 
-    const query = renderSql(execute.mock.calls[0]![0]).sql.replace(/\s+/g, ' ');
+    const query = renderSql(execute.mock.calls[1]![0]).sql.replace(/\s+/g, ' ');
     expect(query).toContain('array_agg');
     expect(query).toContain('array_to_string');
     expect(query).toContain('file_hash');
@@ -72,11 +77,11 @@ describe('BookDuplicatesRepository', () => {
 
   it('hashes the file-hash signature with md5 so the stored value stays within the btree index limit (regression: #762)', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new BookDuplicatesRepository({ execute } as never);
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
 
     await repo.insertFileHashKeys(9, [1, 2], { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never);
 
-    const query = renderSql(execute.mock.calls[0]![0]).sql.replace(/\s+/g, ' ');
+    const query = renderSql(execute.mock.calls[1]![0]).sql.replace(/\s+/g, ' ');
     // A book with an arbitrarily large number of content files (e.g. a chapterized
     // audiobook) must never write its full, unbounded concatenated signature as the
     // indexed `value` - only its fixed-size md5 digest.
@@ -87,11 +92,11 @@ describe('BookDuplicatesRepository', () => {
 
   it('hashes the exact-metadata signature with md5 so an unbounded author list cannot overflow the btree index (regression: #762)', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new BookDuplicatesRepository({ execute } as never);
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
 
     await repo.insertExactMetadataKeys(9, [1, 2], { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never);
 
-    const query = renderSql(execute.mock.calls[0]![0]).sql.replace(/\s+/g, ' ');
+    const query = renderSql(execute.mock.calls[1]![0]).sql.replace(/\s+/g, ' ');
     // A book with an arbitrarily large author list (e.g. an anthology) must never write
     // the raw title|authors|family concatenation as the indexed `value` - only its
     // fixed-size md5 digest.
@@ -104,11 +109,11 @@ describe('BookDuplicatesRepository', () => {
 
   it('limits identical-file signatures to content files in accessible, non-processing books', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new BookDuplicatesRepository({ execute } as never);
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
 
     await repo.insertFileHashKeys(4, [12], { id: 3, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never);
 
-    const rendered = renderSql(execute.mock.calls[0]![0]);
+    const rendered = renderSql(execute.mock.calls[1]![0]);
     const query = rendered.sql.replace(/\s+/g, ' ');
     expect(query).toContain('library_id');
     expect(query).toContain('status');
@@ -131,11 +136,11 @@ describe('BookDuplicatesRepository', () => {
 
   it('blocks fuzzy candidates by normalized author and media family before comparing titles', async () => {
     const execute = vi.fn().mockResolvedValue({ rows: [] });
-    const repo = new BookDuplicatesRepository({ execute } as never);
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
 
     await repo.createFuzzyPairs(9, [12], { id: 3, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never, 85);
 
-    const rendered = renderSql(execute.mock.calls[0]![0]);
+    const rendered = renderSql(execute.mock.calls[1]![0]);
     const query = rendered.sql.replace(/\s+/g, ' ');
     expect(query).toContain('blocked AS');
     expect(query).toContain('a.author_key = b.author_key');
@@ -144,6 +149,42 @@ describe('BookDuplicatesRepository', () => {
     expect(query).toContain("author_key <> ''");
     expect(query).toContain('GROUP BY a.book_id, b.book_id');
     expect(rendered.params).toContain(0.85);
+  });
+
+  it('refreshes PostgreSQL statistics for populated duplicate scan keys', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
+
+    await repo.analyzeScanKeys();
+
+    expect(renderSql(execute.mock.calls[0]![0]).sql).toBe('SET LOCAL lock_timeout = 5000');
+    const rendered = renderSql(execute.mock.calls[1]![0]);
+    expect(rendered.sql.trim()).toBe('ANALYZE "book_duplicate_scan_keys"');
+    expect(rendered.params).toEqual([]);
+  });
+
+  it('joins ebook and audiobook keys through the indexed value without changing pair rules', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 2 });
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
+
+    await expect(repo.createOtherFormatPairs(9, 90)).resolves.toBe(2);
+
+    expect(renderSql(execute.mock.calls[0]![0]).sql).toBe('SET LOCAL statement_timeout = 600000');
+    const rendered = renderSql(execute.mock.calls[1]![0]);
+    const query = rendered.sql.replace(/\s+/g, ' ');
+    expect(query).toContain('FROM "book_duplicate_scan_keys" ebook_keys JOIN "book_duplicate_scan_keys" audio_keys');
+    expect(query).toContain('audio_keys.scan_id = ebook_keys.scan_id');
+    expect(query).toContain('audio_keys.kind = ebook_keys.kind');
+    expect(query).toContain("audio_keys.value = 'a|' || substr(ebook_keys.value, 3)");
+    expect(query).toContain("ebook_keys.value LIKE 'e|%'");
+    expect(query).toContain("ebook_keys.kind IN ('of_work', 'of_title', 'of_series')");
+    expect(query).toContain("WHEN 'of_work' THEN 'same_work'");
+    expect(query).toContain("WHEN 'of_title' THEN 'title_author'");
+    expect(query).toContain("WHEN matched.kind = 'of_series' THEN similarity(");
+    expect(query).toContain("scored.reason <> 'series_position' OR scored.title_similarity >=");
+    expect(query).toContain('FROM book_links link_a JOIN book_links link_b ON link_b.group_id = link_a.group_id');
+    expect(query).not.toContain('substr(audio_keys.value, 3)');
+    expect(rendered.params).toEqual([9, 9, 0.9]);
   });
 
   it('persists and retrieves user scan lifecycle state atomically', async () => {
@@ -206,12 +247,22 @@ describe('BookDuplicatesRepository', () => {
   it('finalizes connected components and returns the persisted group count', async () => {
     const db = mockDb({
       selectResults: [[{ count: 2 }]],
-      executeResults: [{ rowCount: 0 }, { rowCount: 0 }, { rowCount: 1 }, { rowCount: 0 }, { rowCount: 0 }, { rowCount: 0 }, { rowCount: 0 }],
+      executeResults: [
+        { rowCount: 0 },
+        { rowCount: 0 },
+        { rowCount: 0 },
+        { rowCount: 1 },
+        { rowCount: 0 },
+        { rowCount: 0 },
+        { rowCount: 0 },
+        { rowCount: 0 },
+      ],
     });
     const repo = new BookDuplicatesRepository(db as never);
 
     await expect(repo.finalizeGroups(9)).resolves.toBe(2);
     expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(renderSql((db.execute as ReturnType<typeof vi.fn>).mock.calls[0]![0]).sql).toBe('SET LOCAL statement_timeout = 600000');
   });
 
   it('paginates only groups with at least two currently accessible members', async () => {

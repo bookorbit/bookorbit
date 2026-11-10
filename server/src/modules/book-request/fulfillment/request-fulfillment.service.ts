@@ -796,13 +796,24 @@ export class RequestFulfillmentService {
    * A client with no path mapping declares no directory the import is allowed to read out of, so
    * the attempt would seed for hours and then be refused the moment it finished. Rows that predate
    * mappings being mandatory are what reaches this; refusing now says so while somebody is looking.
+   *
+   * A client that stages its own files is the exception: it lands them under a root BookOrbit owns,
+   * so it has no import root to declare and is saved without mappings by design.
    */
-  private assertClientCanImport(client: { name: string; pathMappings: readonly unknown[] }): void {
-    if (client.pathMappings.length > 0) return;
+  private assertClientCanImport(client: {
+    name: string;
+    adapterType: keyof typeof DOWNLOAD_CLIENT_DELIVERY;
+    pathMappings: readonly unknown[];
+  }): void {
+    if (client.pathMappings.length > 0 || this.stagesLocally(client.adapterType)) return;
     throw grabError(
       'GRAB_CLIENT_REFUSED',
       `Download client "${client.name}" has no path mapping, so nothing it downloads could be imported. ${ADD_PATH_MAPPING_HINT}`,
     );
+  }
+
+  private stagesLocally(adapterType: keyof typeof DOWNLOAD_CLIENT_DELIVERY): boolean {
+    return typeof this.registry.find(adapterType)?.stage === 'function';
   }
 
   private assertClientCanDeliver(client: { name: string; adapterType: keyof typeof DOWNLOAD_CLIENT_DELIVERY }, source: BookRequestDownloadSource) {

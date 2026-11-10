@@ -26,6 +26,13 @@ type ScanRow = typeof bookDuplicateScans.$inferSelect;
 
 const BOOK_DUPLICATE_SCAN_LOCK_NAMESPACE = 1_112_493_899;
 
+// Whole-library scan statements run in the background on the request pool, whose 30s statement
+// timeout a large library can outlast, so they get a wider but still finite budget of their own.
+const SCAN_STATEMENT_TIMEOUT_MS = 10 * 60 * 1000;
+// ANALYZE queues behind a running VACUUM of the table; matching proceeds on older statistics instead.
+const SCAN_KEYS_ANALYZE_LOCK_TIMEOUT_MS = 5 * 1000;
+const SET_SCAN_STATEMENT_TIMEOUT = sql.raw(`SET LOCAL statement_timeout = ${SCAN_STATEMENT_TIMEOUT_MS}`);
+
 export type OtherFormatBookRow = {
   id: number;
   title: string | null;
@@ -81,6 +88,14 @@ export class BookDuplicatesRepository {
 
   private scopeWhere(libraryIds: number[], user: RequestUser): SQL {
     return duplicateScopeWhere(this.db, libraryIds, user);
+  }
+
+  /** Runs one whole-library scan statement under the scan's statement budget rather than the pool's. */
+  private withScanBudget<T>(run: (db: Pick<Db, 'execute'>) => Promise<T>): Promise<T> {
+    return this.db.transaction(async (tx) => {
+      await tx.execute(SET_SCAN_STATEMENT_TIMEOUT);
+      return run(tx);
+    });
   }
 
   async findActiveForUser(userId: number): Promise<ScanRow | null> {
@@ -156,7 +171,8 @@ export class BookDuplicatesRepository {
     const scope = this.scopeWhere(libraryIds, user);
     // A chapterized audiobook can have enough content files for the raw signature to
     // exceed PostgreSQL's btree tuple limit, so only its fixed-size digest is indexed.
-    await this.db.execute(sql`
+    await this.withScanBudget((db) =>
+      db.execute(sql`
       INSERT INTO ${bookDuplicateScanKeys} (scan_id, book_id, kind, value)
       SELECT
         CAST(${scanId} AS integer),
@@ -180,7 +196,8 @@ export class BookDuplicatesRepository {
         AND count(*) = count(NULLIF(btrim(${bookFiles.fileHash}), ''))
         AND count(*) = count(${bookFiles.sizeBytes})
       ON CONFLICT DO NOTHING
-    `);
+    `),
+    );
   }
 
   async findIsbnBatch(
@@ -224,7 +241,8 @@ export class BookDuplicatesRepository {
     const scope = this.scopeWhere(libraryIds, user);
     // Long titles and author lists can exceed PostgreSQL's btree tuple limit, so only
     // the fixed-size digest of the normalized metadata signature is indexed.
-    await this.db.execute(sql`
+    await this.withScanBudget((db) =>
+      db.execute(sql`
       WITH eligible AS (
         SELECT
           ${books.id} AS book_id,
@@ -261,11 +279,13 @@ export class BookDuplicatesRepository {
       CROSS JOIN LATERAL unnest(eligible.families) AS family
       WHERE eligible.title_key <> '' AND cardinality(eligible.author_keys) > 0
       ON CONFLICT DO NOTHING
-    `);
+    `),
+    );
   }
 
   async createExactPairs(scanId: number): Promise<void> {
-    await this.db.execute(sql`
+    await this.withScanBudget((db) =>
+      db.execute(sql`
       WITH keyed AS (
         SELECT
           kind,
@@ -297,13 +317,15 @@ export class BookDuplicatesRepository {
         FROM unnest(book_duplicate_pairs.reasons || EXCLUDED.reasons) AS reason
         ORDER BY reason
       )
-    `);
+    `),
+    );
   }
 
   async createFuzzyPairs(scanId: number, libraryIds: number[], user: RequestUser, similarityPercent: number): Promise<void> {
     const scope = this.scopeWhere(libraryIds, user);
     const threshold = similarityPercent / 100;
-    await this.db.execute(sql`
+    await this.withScanBudget((db) =>
+      db.execute(sql`
       WITH eligible AS (
         SELECT
           ${books.id} AS book_id,
@@ -367,11 +389,13 @@ export class BookDuplicatesRepository {
           ORDER BY reason
         ),
         title_similarity = GREATEST(book_duplicate_pairs.title_similarity, EXCLUDED.title_similarity)
-    `);
+    `),
+    );
   }
 
   async finalizeGroups(scanId: number): Promise<number> {
     return this.db.transaction(async (tx) => {
+      await tx.execute(SET_SCAN_STATEMENT_TIMEOUT);
       await tx.execute(sql`CREATE TEMP TABLE tmp_book_duplicate_components (book_id integer PRIMARY KEY, root_id integer NOT NULL) ON COMMIT DROP`);
       await tx.execute(sql`
         INSERT INTO tmp_book_duplicate_components (book_id, root_id)
@@ -524,6 +548,14 @@ export class BookDuplicatesRepository {
     await this.db.insert(bookDuplicateScanKeys).values(values).onConflictDoNothing();
   }
 
+  /** Refresh planner statistics while the scan-key table is populated, before cross-format matching. */
+  async analyzeScanKeys(): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx.execute(sql.raw(`SET LOCAL lock_timeout = ${SCAN_KEYS_ANALYZE_LOCK_TIMEOUT_MS}`));
+      await tx.execute(sql`ANALYZE ${bookDuplicateScanKeys}`);
+    });
+  }
+
   /**
    * Pairs an ebook with an audiobook that share a work id, a title and a person, or a series
    * position and a similar title. Each key carries its side (`e|` or `a|`), so only a cross-media
@@ -533,23 +565,22 @@ export class BookDuplicatesRepository {
     const threshold = similarityPercent / 100;
     const titleA = crossFormatTitleSql(sql`metadata_a.title`);
     const titleB = crossFormatTitleSql(sql`metadata_b.title`);
-    const result = await this.db.execute(sql`
-      WITH ebook_keys AS (
-        SELECT book_id, kind, substr(value, 3) AS key
-        FROM ${bookDuplicateScanKeys}
-        WHERE scan_id = ${scanId} AND kind IN ('of_work', 'of_title', 'of_series') AND value LIKE 'e|%'
-      ), audio_keys AS (
-        SELECT book_id, kind, substr(value, 3) AS key
-        FROM ${bookDuplicateScanKeys}
-        WHERE scan_id = ${scanId} AND kind IN ('of_work', 'of_title', 'of_series') AND value LIKE 'a|%'
-      ), matched AS (
+    const result = await this.withScanBudget((db) =>
+      db.execute(sql`
+      WITH matched AS (
         SELECT DISTINCT
           least(ebook_keys.book_id, audio_keys.book_id) AS book_id_a,
           greatest(ebook_keys.book_id, audio_keys.book_id) AS book_id_b,
           ebook_keys.kind
-        FROM ebook_keys
-        JOIN audio_keys ON audio_keys.kind = ebook_keys.kind AND audio_keys.key = ebook_keys.key
-        WHERE audio_keys.book_id <> ebook_keys.book_id
+        FROM ${bookDuplicateScanKeys} ebook_keys
+        JOIN ${bookDuplicateScanKeys} audio_keys
+          ON audio_keys.scan_id = ebook_keys.scan_id
+          AND audio_keys.kind = ebook_keys.kind
+          AND audio_keys.value = 'a|' || substr(ebook_keys.value, 3)
+        WHERE ebook_keys.scan_id = ${scanId}
+          AND ebook_keys.kind IN ('of_work', 'of_title', 'of_series')
+          AND ebook_keys.value LIKE 'e|%'
+          AND audio_keys.book_id <> ebook_keys.book_id
       ), scored AS (
         SELECT
           matched.book_id_a,
@@ -578,13 +609,15 @@ export class BookDuplicatesRepository {
         )
       GROUP BY scored.book_id_a, scored.book_id_b
       ON CONFLICT (scan_id, kind, book_id_a, book_id_b) DO NOTHING
-    `);
+    `),
+    );
     return result.rowCount ?? 0;
   }
 
   /** Every other-format pair becomes a group of its own: pairs never chain, so one book can sit in several. */
   async finalizeOtherFormatGroups(scanId: number): Promise<number> {
-    const result = await this.db.execute(sql`
+    const result = await this.withScanBudget((db) =>
+      db.execute(sql`
       WITH numbered AS (
         SELECT
           nextval(pg_get_serial_sequence('book_duplicate_groups', 'id'))::integer AS group_id,
@@ -628,7 +661,8 @@ export class BookDuplicatesRepository {
         AND pair.kind = 'other_format'
         AND pair.book_id_a = numbered.book_id_a
         AND pair.book_id_b = numbered.book_id_b
-    `);
+    `),
+    );
     return result.rowCount ?? 0;
   }
 

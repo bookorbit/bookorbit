@@ -174,8 +174,12 @@ export class BookRequestAdminController {
     getResourceId: (req) => Number(req.params.id),
     description: 'Deleted a book request',
   })
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    return this.service.remove(id, user);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('deleteFiles', new DefaultValuePipe(false), ParseBoolPipe) deleteFiles: boolean,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.service.remove(id, user, deleteFiles);
   }
 
   @Post(':id/fulfill')

@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { DELIVERY_BY_DOWNLOAD_SOURCE, WORKER_WRITABLE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
+import { DELIVERY_BY_DOWNLOAD_SOURCE, DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE, WORKER_WRITABLE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
 import type { BookRequestItem, BookRequestSeedStatus } from '@bookorbit/types';
 
 import type { RequestUser } from '../../../common/types/request-user';
@@ -55,6 +55,7 @@ export class RequestSeedService {
       downloadClientId: download.downloadClientId,
       downloadClientName,
       clientKey,
+      alwaysDeletesRemote: DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE[config.adapterType],
       seeding: status.seed?.seeding ?? false,
       ratio: status.seed?.ratio ?? null,
       ratioGoal: status.seed?.ratioGoal ?? null,

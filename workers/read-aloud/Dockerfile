@@ -39,9 +39,12 @@ RUN cd /deploy && \
 
 FROM ${NODE_IMAGE} AS runtime
 WORKDIR /app
+# The worker never runs npm, and the npm bundled with the base image carries its own copies of
+# packages such as undici and brace-expansion that the workspace overrides cannot reach.
 RUN apt-get update && \
+    apt-get upgrade -y --no-install-recommends && \
     apt-get install -y --no-install-recommends ca-certificates ffmpeg tini && \
-    rm -rf /var/lib/apt/lists/* && \
+    rm -rf /var/lib/apt/lists/* /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx && \
     mkdir -p /data/read-aloud/jobs /data/read-aloud/tmp /data/read-aloud/ghost-story && \
     chown -R node:node /data
 

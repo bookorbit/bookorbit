@@ -11,6 +11,7 @@ import type {
   DownloadClientTestResult,
   PathMappingHardlinkTestResult,
   UpdateDownloadClientPayload,
+  ValidateDownloadClientPayload,
 } from '@bookorbit/types'
 
 const BASE_PATH = '/api/v1/admin/download-clients'
@@ -125,6 +126,23 @@ export function useDownloadClients() {
     }
   }
 
+  /**
+   * Checks a typed credential against the chosen adapter before any row exists. Nothing is saved,
+   * so a failure comes back as a result rather than a page-level error, and the list is untouched.
+   */
+  async function validate(payload: ValidateDownloadClientPayload): Promise<DownloadClientTestResult> {
+    try {
+      const res = await api(`${BASE_PATH}/validate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      return res.ok ? ((await res.json()) as DownloadClientTestResult) : { success: false, error: (await toFailure(res)).message ?? undefined }
+    } catch {
+      return { success: false }
+    }
+  }
+
   /** The mapping is named by id: the server probes the directory it stored, never one sent to it. */
   async function testPathMapping(id: number, mappingId: number): Promise<PathMappingHardlinkTestResult> {
     const unavailable = { localPathExists: false, bookDockPathExists: false, hardlinkWorks: false }
@@ -201,6 +219,7 @@ export function useDownloadClients() {
     save,
     remove,
     test,
+    validate,
     testPathMapping,
     reconcile,
     adopt,

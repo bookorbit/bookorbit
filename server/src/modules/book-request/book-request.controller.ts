@@ -13,6 +13,7 @@ import { CreateBookRequestPairDto } from './dto/create-book-request-pair.dto';
 import { BulkBookRequestsDto } from './dto/bulk-book-requests.dto';
 import { ListBookRequestsDto } from './dto/list-book-requests.dto';
 import { UpdateBookRequestLanguageDto } from './dto/update-book-request-language.dto';
+import { RemoveDownloadDto } from './dto/remove-download.dto';
 
 @Controller('book-requests')
 @RequirePermission(Permission.BookRequestAccess)
@@ -116,8 +117,8 @@ export class BookRequestController {
     getResourceId: (req) => Number(req.params.id),
     description: 'Cancelled a book request',
   })
-  cancel(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
-    return this.service.cancel(id, user);
+  cancel(@Param('id', ParseIntPipe) id: number, @Body() dto: RemoveDownloadDto, @CurrentUser() user: RequestUser) {
+    return this.service.cancel(id, user, dto?.deleteFiles ?? false);
   }
 
   @Post(':id/downloads/:downloadId/cancel')
@@ -128,8 +129,13 @@ export class BookRequestController {
     getResourceId: (req) => Number(req.params.id),
     description: 'Cancelled an active book request download',
   })
-  cancelDownload(@Param('id', ParseIntPipe) id: number, @Param('downloadId', ParseIntPipe) downloadId: number, @CurrentUser() user: RequestUser) {
-    return this.service.cancelDownload(id, downloadId, user);
+  cancelDownload(
+    @Param('id', ParseIntPipe) id: number,
+    @Param('downloadId', ParseIntPipe) downloadId: number,
+    @Body() dto: RemoveDownloadDto,
+    @CurrentUser() user: RequestUser,
+  ) {
+    return this.service.cancelDownload(id, downloadId, user, dto?.deleteFiles ?? false);
   }
 
   /**
