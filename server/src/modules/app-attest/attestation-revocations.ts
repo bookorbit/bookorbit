@@ -48,12 +48,12 @@ export class AttestationRevocations {
           .map(([serial]) => normalizeSerial(serial)),
       );
       this.nextRefreshAt = now + REFRESH_MS;
-      this.logger.log(`[app-attest.revocations] [end] entries=${this.revoked.size} durationMs=${Date.now() - startedAt} - status list refreshed`);
+      this.logger.debug(`[app-attest.revocations] [end] entries=${this.revoked.size} durationMs=${Date.now() - startedAt} - status list refreshed`);
     } catch (error) {
       this.nextRefreshAt = now + RETRY_MS;
       const errorClass = error instanceof Error ? error.name : 'UnknownError';
       const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(
+      this.logger.debug(
         `[app-attest.revocations] [fail] durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${sanitizeLogValue(message)}" - status list unavailable, using the last one`,
       );
     }

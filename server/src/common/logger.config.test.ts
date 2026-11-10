@@ -1,3 +1,5 @@
+import { markHttpLogAsDebug } from './utils/http-log-level.utils';
+
 type LoggerConfigModule = typeof import('./logger.config');
 
 async function loadLoggerConfig(nodeEnv: 'development' | 'production', logLevel?: string): Promise<LoggerConfigModule['loggerConfig']> {
@@ -57,6 +59,9 @@ describe('loggerConfig', () => {
 
     expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 200 } as never)).toBe('debug');
     expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 404 } as never)).toBe('warn');
+    const appAttestRequest = {} as never;
+    markHttpLogAsDebug(appAttestRequest);
+    expect(pinoHttp.customLogLevel?.(appAttestRequest, { headersSent: true, statusCode: 403 } as never)).toBe('debug');
     expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 503 } as never)).toBe('error');
     expect(pinoHttp.customLogLevel?.({} as never, { headersSent: true, statusCode: 200 } as never, new Error('fail'))).toBe('error');
     expect(pinoHttp.customProps).toBeUndefined();

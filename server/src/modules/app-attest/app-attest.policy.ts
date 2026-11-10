@@ -10,11 +10,19 @@ export const BOOKORBIT_ANDROID_PACKAGE = 'app.bookorbit.reader';
 export const BOOKORBIT_ANDROID_DEBUG_PACKAGE = 'app.bookorbit.reader.debug';
 
 /**
- * SHA-256 of the certificates the release app is signed with, lowercase hex: Play App Signing's,
- * for a build from Play, and the upload key's, for a release build the owner installs. Empty until
- * the app is in Play Console, so until then a production server accepts no Android key.
+ * SHA-256 of the certificates the release app is signed with, lowercase hex: Play App Signing's
+ * keys, for a build from Play, and the upload key's, for a release build the owner installs. Read
+ * from Play Console's App signing page on 2026-11-10; a key Play adds there is listed here before
+ * it signs a build.
  */
-export const BOOKORBIT_ANDROID_RELEASE_DIGESTS: readonly string[] = [];
+export const BOOKORBIT_ANDROID_RELEASE_DIGESTS: readonly string[] = [
+  // Play App Signing: the key in use and the previous keys.
+  '012316fc783d25d118fdc13681f5f4ae388e7f1d12914f8ea74b8eab7dd2637e',
+  'de6ee3afa930eb0d162846d22fb7c08f22159610ea17dcb1f340bd83509331cf',
+  '3e59ca69776c7211636c8975e632fd8f3d86e45dca146904165aba7cc46dccc9',
+  // The upload key.
+  '49a23669832e9defc4bdbec975ae28c1c6337689dc2c81ca3b4a6cef2e4ff485',
+];
 
 export const ANDROID_KEY_ATTEST_POLICY = Symbol('ANDROID_KEY_ATTEST_POLICY');
 

@@ -85,13 +85,13 @@ export class AppAttestService {
         this.policy,
       );
       this.store.saveKey({ ...attested, userId: user.id, counter: 0, recentCounters: new Set(), registeredAt: new Date() });
-      this.logger.log(
+      this.logger.debug(
         `[app-attest.register] [end] userId=${user.id} keyId=${attested.keyId} environment=${attested.environment} durationMs=${Date.now() - startedAt} - key registered`,
       );
       return { keyId: attested.keyId, environment: attested.environment };
     } catch (error) {
       if (!(error instanceof AppAttestVerificationError)) throw error;
-      this.logger.warn(
+      this.logger.debug(
         `[app-attest.register] [fail] userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${error.name} error="${sanitizeLogValue(error.reason)}" - attestation rejected`,
       );
       throw new BadRequestException({ message: 'App Attest attestation was rejected', errorCode: APP_ATTEST_ERROR_CODES.invalid });
@@ -141,7 +141,7 @@ export class AppAttestService {
       this.logger.debug(`[app-attest.assert] [end] userId=${user.id} keyId=${key.keyId} counter=${result.counter} - assertion verified`);
     } catch (error) {
       if (!(error instanceof AppAttestVerificationError)) throw error;
-      this.logger.warn(
+      this.logger.debug(
         `[app-attest.assert] [fail] userId=${user.id} keyId=${key.keyId} errorClass=${error.name} error="${sanitizeLogValue(error.reason)}" - assertion rejected`,
       );
       throw refusal(APP_ATTEST_ERROR_CODES.invalid, 'App Attest assertion was rejected');
@@ -168,7 +168,7 @@ export class AppAttestService {
       this.logger.debug(`[app-attest.assert] [end] userId=${user.id} keyId=${key.keyId} platform=android - assertion verified`);
     } catch (error) {
       if (!(error instanceof AppAttestVerificationError)) throw error;
-      this.logger.warn(
+      this.logger.debug(
         `[app-attest.assert] [fail] userId=${user.id} keyId=${key.keyId} platform=android errorClass=${error.name} error="${sanitizeLogValue(error.reason)}" - assertion rejected`,
       );
       throw refusal(APP_ATTEST_ERROR_CODES.invalid, 'App Attest assertion was rejected');
