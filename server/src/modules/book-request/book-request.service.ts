@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, ForbiddenException, HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
@@ -47,7 +48,7 @@ import type {
 import { StatsCache } from '../../common/cache/stats-cache';
 import { isUniqueViolation } from '../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import type { RequestUser } from '../../common/types/request-user';
+import { principalCacheKey, type RequestUser } from '../../common/types/request-user';
 import type { BookRequestRow, NewBookRequestRow } from '../../db/schema';
 import { LibraryService } from '../library/library.service';
 import { BookRequestAttributionService } from './book-request-attribution.service';
@@ -222,6 +223,7 @@ export class BookRequestService {
     private readonly attribution: BookRequestAttributionService,
     private readonly indexers: IndexerConfigService,
     private readonly companions: RequestCompanionService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   canManageAll(user: RequestUser): boolean {
@@ -243,7 +245,7 @@ export class BookRequestService {
    * instance with hundreds of libraries.
    */
   private async reachableLibraryIds(user: RequestUser): Promise<number[] | null> {
-    return user.isSuperuser ? null : this.libraryService.findAccessibleLibraryIds(user);
+    return this.libraryScope.visibleIdsOrAll(user);
   }
 
   /**
@@ -786,7 +788,7 @@ export class BookRequestService {
   private async resolveRequestedLibrary(targetLibraryId: number | null, user: RequestUser): Promise<number | null> {
     if (targetLibraryId === null) return null;
     try {
-      await this.libraryService.verifyUserAccess(user.id, targetLibraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, targetLibraryId);
     } catch (error) {
       // The rule belongs to the library service; only the sentence is ours, and the form has to be
       // able to translate this the way it translates every other reason a submission is refused.
@@ -935,7 +937,7 @@ export class BookRequestService {
    * reason a stuck request stays stuck, so the cancellation stands either way and the request
    * carries a note that a transfer may still be sitting in the client.
    */
-  async cancel(id: number, user: RequestUser): Promise<BookRequestItem> {
+  async cancel(id: number, user: RequestUser, deleteFiles = false): Promise<BookRequestItem> {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
 
@@ -960,7 +962,7 @@ export class BookRequestService {
     });
     if (!updated) throw await this.staleLifecycleTransition(id, 'cancel');
 
-    const outcome = await this.removal.removeLatestForRequest(id, false, user.username);
+    const outcome = await this.removal.removeLatestForRequest(id, deleteFiles, user.username);
     // The cancellation stands either way; the note is what tells the requester a transfer may
     // still be sitting in the client. Conditional, so it cannot resurrect a row a delete removed.
     if (outcome.error) {
@@ -982,7 +984,7 @@ export class BookRequestService {
    * This is intentionally separate from `cancel`: the request, its subscribers, and its approval
    * remain intact.
    */
-  async cancelDownload(id: number, downloadId: number, user: RequestUser): Promise<BookRequestItem> {
+  async cancelDownload(id: number, downloadId: number, user: RequestUser, deleteFiles = false): Promise<BookRequestItem> {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
     if (!this.canDrive(joined.request, user)) throw new ForbiddenException('You cannot cancel this book request download');
@@ -993,7 +995,7 @@ export class BookRequestService {
       throw new BadRequestException(`A download that is ${download.status} can no longer be cancelled`);
     }
 
-    const stopped = await this.removal.removeAttempt(id, downloadId, false, user.username);
+    const stopped = await this.removal.removeAttempt(id, downloadId, deleteFiles, user.username);
     if (!stopped) throw new BadRequestException('The download finished before it could be cancelled');
 
     await this.repo.updateIf(id, ACTIVE_TRANSFER_REQUEST_STATUSES, { status: 'approved', statusReason: null });
@@ -1072,9 +1074,10 @@ export class BookRequestService {
    *
    * A settled request can still own client state, especially a torrent that keeps seeding after
    * import, so the attempt is detached first. Deleting the row before that would leave client work
-   * with nothing pointing at it. Torrent files are kept; direct-download staging is disposable.
+   * with nothing pointing at it. Torrent files require explicit deletion consent; direct-download
+   * staging is disposable.
    */
-  async remove(id: number, user: RequestUser): Promise<void> {
+  async remove(id: number, user: RequestUser, deleteFiles = false): Promise<void> {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
     if (!this.canManageAll(user)) throw new ForbiddenException('You cannot delete book requests');
@@ -1090,7 +1093,7 @@ export class BookRequestService {
       throw await this.staleTransition(id, (status) => `A request that is ${status} is still being worked on; cancel it before deleting it`);
     }
 
-    const outcome = await this.removal.removeLatestForRequest(id, false, user.username);
+    const outcome = await this.removal.removeLatestForRequest(id, deleteFiles, user.username);
     if (outcome.error) {
       if (reservedFailed) await this.repo.updateIf(id, ['cancelled'], { status: 'failed' });
       throw new BadRequestException(`Remove the download from its client first: ${outcome.error}`);
@@ -1124,7 +1127,7 @@ export class BookRequestService {
     // The approver may reroute, but only somewhere they can reach themselves.
     let targetLibraryId = joined.request.targetLibraryId;
     if (dto.targetLibraryId !== undefined && dto.targetLibraryId !== null) {
-      await this.libraryService.verifyUserAccess(user.id, dto.targetLibraryId, user.isSuperuser);
+      await this.libraryService.verifyAccess(user, dto.targetLibraryId);
       targetLibraryId = dto.targetLibraryId;
     }
 
@@ -1380,12 +1383,14 @@ export class BookRequestService {
   }
 
   async checkAvailability(queries: BookRequestAvailabilityQuery[], user: RequestUser): Promise<BookRequestAvailability[]> {
-    const libraryIds = user.isSuperuser ? null : await this.libraryService.findAccessibleLibraryIds(user);
+    const libraryIds = await this.libraryScope.visibleIdsOrAll(user);
     return this.dedupe.checkAvailability(queries, user.id, libraryIds);
   }
 
   getSummary(user: RequestUser): Promise<BookRequestSummary> {
-    return this.summaryCache.get('book-request-summary', `${user.id}:${this.gateway.changeVersion}`, () => this.loadSummary(user));
+    return this.summaryCache.get('book-request-summary', principalCacheKey(user, `${user.id}:${this.gateway.changeVersion}`), () =>
+      this.loadSummary(user),
+    );
   }
 
   private async loadSummary(user: RequestUser): Promise<BookRequestSummary> {

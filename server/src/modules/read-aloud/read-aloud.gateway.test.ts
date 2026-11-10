@@ -3,11 +3,12 @@ import { Permission } from '@bookorbit/types';
 
 import { WS_UNAUTHORIZED_EVENT } from '../../common/utils/ws-auth.utils';
 import { ReadAloudGateway } from './read-aloud.gateway';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeGateway(user: { id: number; isSuperuser: boolean; permissions: string[] } | null) {
   const jwtService = { verify: vi.fn().mockReturnValue({ sub: 7, ver: 1 }) };
   const authService = { validateSessionUser: vi.fn().mockResolvedValue(user) };
-  const gateway = new ReadAloudGateway(jwtService as never, authService as never);
+  const gateway = new ReadAloudGateway(new AuthenticatorService(jwtService as never, authService as never) as never);
   const client = { id: 'sock-1', handshake: { auth: { token: 'jwt' } }, emit: vi.fn(), disconnect: vi.fn(), join: vi.fn() };
   return { gateway, client };
 }

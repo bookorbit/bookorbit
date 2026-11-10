@@ -1,12 +1,14 @@
 import type { CallHandler, ExecutionContext } from '@nestjs/common';
-import { firstValueFrom, of } from 'rxjs';
+import { defer, firstValueFrom, of } from 'rxjs';
 
+import { currentApiKeyActor } from '../../modules/audit/api-key-audit-context';
 import { AUDIT_EVENT } from '../../modules/audit/audit-events.service';
 import { AUDITABLE_KEY } from '../decorators/auditable.decorator';
 import { AuditInterceptor } from './audit.interceptor';
 
 function makeContext(request: Record<string, unknown>): ExecutionContext {
   return {
+    getType: () => 'http',
     getHandler: vi.fn(),
     switchToHttp: () => ({
       getRequest: () => request,
@@ -220,5 +222,47 @@ describe('AuditInterceptor', () => {
       expect(auditEvents.emit).toHaveBeenCalledWith(AUDIT_EVENT, expect.objectContaining({ resourceId: 5 }));
       expect(auditEvents.emit.mock.calls[0][1]).not.toHaveProperty('resourceLabel');
     });
+  });
+
+  it('runs a request made with an API key inside that key, so every audit event it causes names it', async () => {
+    const reflector = { get: vi.fn().mockReturnValue(undefined) };
+    const interceptor = new AuditInterceptor(reflector as never, { emit: vi.fn() } as never);
+    const credential = { kind: 'api_key', keyId: 12, keyName: 'nightly export' };
+    const seen: unknown[] = [];
+    const next: CallHandler = {
+      handle: () => {
+        seen.push(currentApiKeyActor());
+        return of('done');
+      },
+    };
+
+    await firstValueFrom(interceptor.intercept(makeContext({ user: { id: 1, credential } }), next));
+    await firstValueFrom(interceptor.intercept(makeContext({ user: { id: 1 } }), next));
+
+    expect(seen).toEqual([{ keyId: 12, keyName: 'nightly export' }, undefined]);
+  });
+
+  it('keeps the key for a handler that only runs on subscription and for the audit event after it', async () => {
+    const reflector = { get: vi.fn().mockReturnValue({ action: 'collection.create', resource: 'collection' }) };
+    const seenAtEmit: unknown[] = [];
+    const auditEvents = { emit: vi.fn(() => seenAtEmit.push(currentApiKeyActor())) };
+    const interceptor = new AuditInterceptor(reflector as never, auditEvents as never);
+    const credential = { kind: 'api_key', keyId: 31, keyName: 'backup script' };
+    const seenInHandler: unknown[] = [];
+    const next: CallHandler = {
+      handle: () =>
+        defer(async () => {
+          await Promise.resolve();
+          seenInHandler.push(currentApiKeyActor());
+          return { id: 1 };
+        }),
+    };
+
+    const observable = interceptor.intercept(makeContext({ ip: '::1', user: { id: 1, username: 'reader', credential } }), next);
+    expect(currentApiKeyActor()).toBeUndefined();
+    await firstValueFrom(observable);
+
+    expect(seenInHandler).toEqual([{ keyId: 31, keyName: 'backup script' }]);
+    expect(seenAtEmit).toEqual([{ keyId: 31, keyName: 'backup script' }]);
   });
 });

@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
@@ -109,6 +110,7 @@ export class KoreaderAnnotationExchangeService {
     private readonly koreaderRepo: KoreaderRepository,
     private readonly annotationSync: AnnotationSyncService,
     private readonly positionConverter: PositionConverterService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async exchange(user: RequestUser, dto: AnnotationExchangeDto): Promise<ExchangeResponse> {
@@ -123,7 +125,7 @@ export class KoreaderAnnotationExchangeService {
         throw new BadRequestException(`Too many annotation changes in one request (max ${MAX_CHANGES_PER_REQUEST})`);
       }
 
-      const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
       const deviceClockOffsetMs = this.deviceClockOffsetMs(dto.deviceTime);
@@ -178,7 +180,7 @@ export class KoreaderAnnotationExchangeService {
    */
   async pendingBooks(user: RequestUser, dto: AnnotationPendingDto): Promise<{ pending: string[] }> {
     const startedAtMs = Date.now();
-    const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const hashes = [...new Set(dto.hashes.map((hash) => hash.toLowerCase()))];
     const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
     const pairs = hashes.flatMap((hash) => {
@@ -203,7 +205,7 @@ export class KoreaderAnnotationExchangeService {
   async exchangeAck(user: RequestUser, dto: AnnotationExchangeAckDto): Promise<ExchangeAckResponse> {
     const startedAtMs = Date.now();
     try {
-      const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
 

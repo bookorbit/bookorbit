@@ -29,7 +29,6 @@ import {
   readingAttempts,
   readingSessions,
   userBookRatings,
-  userLibraryAccess,
   userReadingDailyStats,
 } from '../../db/schema';
 import { finishedReadScope } from '../user-book-status/finished-read-scope';
@@ -81,15 +80,6 @@ function escapeLike(value: string): string {
 @Injectable()
 export class ReadingHistoryRepository {
   constructor(@Inject(DB) private readonly db: NodePgDatabase<typeof schema>) {}
-
-  async getAccessibleLibraryIds(userId: number, isSuperuser: boolean): Promise<number[] | null> {
-    if (isSuperuser) return null;
-    const rows = await this.db
-      .select({ libraryId: userLibraryAccess.libraryId })
-      .from(userLibraryAccess)
-      .where(sql`${userLibraryAccess.userId} = ${userId}`);
-    return rows.map((row) => row.libraryId);
-  }
 
   private numbered(userId: number): SQL {
     return sql`numbered as (

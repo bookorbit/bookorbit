@@ -5,15 +5,19 @@ import { BadRequestException, ForbiddenException, Inject, Injectable, Logger } f
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { AppAttestVerificationError, verifyAssertion, verifyAttestation, type AppAttestEnvironment } from './app-attest-verifier';
+import { verifyAndroidAssertion } from './android-key-verifier';
+import { acceptNonce, isFreshNonce } from './android-nonces';
 import { acceptCounter, isFreshCounter } from './app-attest-counter';
 import { APP_ATTEST_POLICY, type AppAttestPolicy } from './app-attest.policy';
-import { AppAttestStore } from './app-attest.store';
+import { AppAttestStore, type StoredAppAttestKey } from './app-attest.store';
 import type { RegisterAppAttestKeyDto } from './dto/register-app-attest-key.dto';
 
 export const APP_ATTEST_HEADERS = {
   keyId: 'x-bookorbit-attest-key',
   assertion: 'x-bookorbit-attest-assertion',
   timestamp: 'x-bookorbit-attest-time',
+  /** Android only: a fresh value per request, since an Android key keeps no counter. */
+  nonce: 'x-bookorbit-attest-nonce',
 } as const;
 
 export const APP_ATTEST_ERROR_CODES = {
@@ -23,6 +27,7 @@ export const APP_ATTEST_ERROR_CODES = {
 } as const;
 
 const CLIENT_DATA_VERSION = 'bookorbit-app-attest-v1';
+const ANDROID_CLIENT_DATA_VERSION = 'bookorbit-android-attest-v1';
 const MAX_CLOCK_SKEW_MS = 5 * 60_000;
 
 export const appAttestBodySha256 = (body: Buffer): string => createHash('sha256').update(body).digest('hex');
@@ -45,6 +50,13 @@ export function appAttestClientData(method: string, url: string, timestamp: stri
   const at = url.indexOf('/api/v1/');
   const path = at >= 0 ? url.slice(at) : url;
   return Buffer.from([CLIENT_DATA_VERSION, method.toUpperCase(), path, timestamp, bodySha256].join('\n'));
+}
+
+/** What the Android app signs: the same lines under its own version, then the request's nonce. */
+export function androidAttestClientData(method: string, url: string, timestamp: string, bodySha256: string, nonce: string): Buffer {
+  const at = url.indexOf('/api/v1/');
+  const path = at >= 0 ? url.slice(at) : url;
+  return Buffer.from([ANDROID_CLIENT_DATA_VERSION, method.toUpperCase(), path, timestamp, bodySha256, nonce].join('\n'));
 }
 
 @Injectable()
@@ -73,13 +85,13 @@ export class AppAttestService {
         this.policy,
       );
       this.store.saveKey({ ...attested, userId: user.id, counter: 0, recentCounters: new Set(), registeredAt: new Date() });
-      this.logger.log(
+      this.logger.debug(
         `[app-attest.register] [end] userId=${user.id} keyId=${attested.keyId} environment=${attested.environment} durationMs=${Date.now() - startedAt} - key registered`,
       );
       return { keyId: attested.keyId, environment: attested.environment };
     } catch (error) {
       if (!(error instanceof AppAttestVerificationError)) throw error;
-      this.logger.warn(
+      this.logger.debug(
         `[app-attest.register] [fail] userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${error.name} error="${sanitizeLogValue(error.reason)}" - attestation rejected`,
       );
       throw new BadRequestException({ message: 'App Attest attestation was rejected', errorCode: APP_ATTEST_ERROR_CODES.invalid });
@@ -87,9 +99,10 @@ export class AppAttestService {
   }
 
   listKeys(user: RequestUser) {
-    return this.store.keysForUser(user.id).map(({ keyId, environment, counter, registeredAt, lastAssertionAt }) => ({
+    return this.store.keysForUser(user.id).map(({ keyId, environment, platform, counter, registeredAt, lastAssertionAt }) => ({
       keyId,
       environment,
+      platform: platform ?? 'ios',
       counter,
       registeredAt: registeredAt.toISOString(),
       lastAssertionAt: lastAssertionAt?.toISOString() ?? null,
@@ -110,6 +123,10 @@ export class AppAttestService {
     if (!Number.isSafeInteger(sentAt) || Math.abs(Date.now() - sentAt) > MAX_CLOCK_SKEW_MS || request.body === null) {
       throw refusal(APP_ATTEST_ERROR_CODES.invalid, 'App Attest assertion is stale or unsupported for this request');
     }
+    if (key.platform === 'android') {
+      this.verifyAndroidRequest(user, key, request, { assertion, timestamp, sentAt, body: request.body });
+      return;
+    }
 
     try {
       const result = verifyAssertion({
@@ -124,8 +141,35 @@ export class AppAttestService {
       this.logger.debug(`[app-attest.assert] [end] userId=${user.id} keyId=${key.keyId} counter=${result.counter} - assertion verified`);
     } catch (error) {
       if (!(error instanceof AppAttestVerificationError)) throw error;
-      this.logger.warn(
+      this.logger.debug(
         `[app-attest.assert] [fail] userId=${user.id} keyId=${key.keyId} errorClass=${error.name} error="${sanitizeLogValue(error.reason)}" - assertion rejected`,
+      );
+      throw refusal(APP_ATTEST_ERROR_CODES.invalid, 'App Attest assertion was rejected');
+    }
+  }
+
+  private verifyAndroidRequest(
+    user: RequestUser,
+    key: StoredAppAttestKey,
+    request: AttestedRequest,
+    signed: { assertion: string; timestamp: string; sentAt: number; body: Buffer },
+  ): void {
+    const nonce = header(request, APP_ATTEST_HEADERS.nonce);
+    if (!nonce) throw refusal(APP_ATTEST_ERROR_CODES.required, 'This route requires App Attest');
+    try {
+      if (!isFreshNonce(key, nonce)) throw new AppAttestVerificationError('nonce was already used or is malformed');
+      verifyAndroidAssertion({
+        signature: Buffer.from(signed.assertion, 'base64'),
+        clientData: androidAttestClientData(request.method, request.url, signed.timestamp, appAttestBodySha256(signed.body), nonce),
+        publicKeyPem: key.publicKeyPem,
+      });
+      acceptNonce(key, nonce, signed.sentAt, MAX_CLOCK_SKEW_MS);
+      key.lastAssertionAt = new Date();
+      this.logger.debug(`[app-attest.assert] [end] userId=${user.id} keyId=${key.keyId} platform=android - assertion verified`);
+    } catch (error) {
+      if (!(error instanceof AppAttestVerificationError)) throw error;
+      this.logger.debug(
+        `[app-attest.assert] [fail] userId=${user.id} keyId=${key.keyId} platform=android errorClass=${error.name} error="${sanitizeLogValue(error.reason)}" - assertion rejected`,
       );
       throw refusal(APP_ATTEST_ERROR_CODES.invalid, 'App Attest assertion was rejected');
     }

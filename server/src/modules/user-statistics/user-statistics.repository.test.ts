@@ -52,12 +52,11 @@ describe('UserStatisticsRepository', () => {
     vi.useRealTimers();
   });
 
-  it('handles library scope helper methods and day helpers', async () => {
-    const db = makeDb([[{ libraryId: 1 }, { libraryId: 3 }]]);
-    const repo = new UserStatisticsRepository(db as never);
+  it('handles library scope helper methods and day helpers', () => {
+    const repo = new UserStatisticsRepository(makeDb([]) as never);
 
-    await expect((repo as any).getAccessibleLibraryIds(9, true)).resolves.toBeNull();
-    await expect((repo as any).getAccessibleLibraryIds(9, false)).resolves.toEqual([1, 3]);
+    expect(repo.resolveActivityLibraryIds(null, [4])).toEqual([4]);
+    expect(repo.resolveActivityLibraryIds([1, 3], [3, 9])).toEqual([3]);
 
     expect((repo as any).intersectLibraryIds(null, undefined)).toBeNull();
     expect((repo as any).intersectLibraryIds(null, [4, 5])).toEqual([4, 5]);
@@ -73,9 +72,8 @@ describe('UserStatisticsRepository', () => {
   it('returns summary defaults when aggregate rows are missing', async () => {
     const db = makeDb([[], [], []]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
 
-    await expect(repo.getSummary(5, false, [1])).resolves.toEqual({
+    await expect(repo.getSummary(5, [1, 2, 3], [1])).resolves.toEqual({
       trackedBooks: 0,
       startedBooks: 0,
       inProgressBooks: 0,
@@ -94,19 +92,18 @@ describe('UserStatisticsRepository', () => {
       [{ year: 2026, month: 4, count: 2 }],
     ]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1, 2]);
 
-    await expect(repo.getDailyReadingStats(5, false, [2], 30)).resolves.toEqual([
+    await expect(repo.getDailyReadingStats(5, [1, 2, 3], [2], 30)).resolves.toEqual([
       { day: '2026-04-15', readingSeconds: 120, progressDelta: 1.5, eventsCount: 2 },
     ]);
-    await expect(repo.getPeakReadingHours(5, false, [2], 30)).resolves.toEqual([
+    await expect(repo.getPeakReadingHours(5, [1, 2, 3], [2], 30)).resolves.toEqual([
       { hour: 9, format: 'EPUB', source: 'koreader', readingSeconds: 500, eventsCount: 3 },
     ]);
-    await expect(repo.getFavoriteReadingDays(5, false, [2], 30)).resolves.toEqual([
+    await expect(repo.getFavoriteReadingDays(5, [1, 2, 3], [2], 30)).resolves.toEqual([
       { dayOfWeek: 2, source: 'manual', format: 'EPUB', readingSeconds: 900, eventsCount: 4 },
     ]);
-    await expect(repo.getCompletionTimeline(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
-    await expect(repo.getMonthlyCompletions(5, false, [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
+    await expect(repo.getCompletionTimeline(5, [1, 2, 3], [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
+    await expect(repo.getMonthlyCompletions(5, [1, 2, 3], [2], 365)).resolves.toEqual([{ year: 2026, month: 4, count: 2 }]);
   });
 
   it('counts completed reading attempts when their sessions finish below 99 percent', async () => {
@@ -121,7 +118,7 @@ describe('UserStatisticsRepository', () => {
     const db = drizzle({ client: fakeClient as never, schema });
     const repo = new UserStatisticsRepository(db as never);
 
-    await expect(repo.getCompletionTimeline(5, true, undefined, 365)).resolves.toEqual([{ year: 2026, month: 8, count: 3 }]);
+    await expect(repo.getCompletionTimeline(5, null, undefined, 365)).resolves.toEqual([{ year: 2026, month: 8, count: 3 }]);
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.text).toContain('"reading_attempts"');
@@ -196,7 +193,7 @@ describe('UserStatisticsRepository', () => {
     const db = drizzle({ client: fakeClient as never, schema });
     const repo = new UserStatisticsRepository(db as never);
 
-    await expect(repo.getCompletionLatencyDays(5, true, undefined, 365)).resolves.toEqual([2]);
+    await expect(repo.getCompletionLatencyDays(5, null, undefined, 365)).resolves.toEqual([2]);
 
     expect(calls).toHaveLength(1);
     expect(calls[0]!.text).toContain('"reading_attempts"');
@@ -207,9 +204,8 @@ describe('UserStatisticsRepository', () => {
   it('returns peak reading hour buckets in the provided timezone', async () => {
     const db = makeDb([[], [{ hour: 23, format: 'EPUB', source: 'kobo', readingSeconds: 1800, eventsCount: 1 }]]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([2]);
 
-    await expect(repo.getPeakReadingHours(5, false, [2], 30, 'Australia/Brisbane')).resolves.toEqual([
+    await expect(repo.getPeakReadingHours(5, [1, 2, 3], [2], 30, 'Australia/Brisbane')).resolves.toEqual([
       { hour: 23, format: 'EPUB', source: 'kobo', readingSeconds: 1800, eventsCount: 1 },
     ]);
   });
@@ -225,7 +221,7 @@ describe('UserStatisticsRepository', () => {
     const db = drizzle({ client: fakeClient as never, schema });
     const repo = new UserStatisticsRepository(db as never);
 
-    await expect(repo.getPeakReadingHours(5, true, [2], 30, 'Australia/Brisbane')).resolves.toEqual([]);
+    await expect(repo.getPeakReadingHours(5, null, [2], 30, 'Australia/Brisbane')).resolves.toEqual([]);
 
     expect(calls).toHaveLength(1);
     const [{ text, params }] = calls;
@@ -247,9 +243,9 @@ describe('UserStatisticsRepository', () => {
     const db = drizzle({ client: fakeClient as never, schema });
     const repo = new UserStatisticsRepository(db as never);
 
-    await repo.getSessionArchetypePoints(5, true, [2], 30, 'Australia/Brisbane');
-    await repo.getSessionArchetypePoints(5, true, [2], 30, 'Not/AZone');
-    await repo.getSessionArchetypePoints(5, true, [2], 30);
+    await repo.getSessionArchetypePoints(5, null, [2], 30, 'Australia/Brisbane');
+    await repo.getSessionArchetypePoints(5, null, [2], 30, 'Not/AZone');
+    await repo.getSessionArchetypePoints(5, null, [2], 30);
 
     expect(calls).toHaveLength(3);
     const [brisbane, invalid, fallback] = calls;
@@ -271,9 +267,8 @@ describe('UserStatisticsRepository', () => {
       ],
     ]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([2]);
 
-    await expect(repo.getDailyReadingSecondsBySource(5, false, [2], 30)).resolves.toEqual([
+    await expect(repo.getDailyReadingSecondsBySource(5, [1, 2, 3], [2], 30)).resolves.toEqual([
       { day: '2026-04-15', source: 'web', readingSeconds: 120 },
       { day: '2026-04-15', source: 'kobo', readingSeconds: 60 },
     ]);
@@ -296,10 +291,9 @@ describe('UserStatisticsRepository', () => {
     };
     const db = makeDb([[timelineRow], [sessionRow]]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([3]);
 
     await expect(
-      repo.getSessionTimelineItems(5, false, [3], new Date('2026-04-15T00:00:00.000Z'), new Date('2026-04-16T00:00:00.000Z'), 100),
+      repo.getSessionTimelineItems(5, [1, 2, 3], [3], new Date('2026-04-15T00:00:00.000Z'), new Date('2026-04-16T00:00:00.000Z'), 100),
     ).resolves.toEqual([
       {
         sessionId: 10,
@@ -312,7 +306,7 @@ describe('UserStatisticsRepository', () => {
         durationSeconds: 1800,
       },
     ]);
-    await expect(repo.getSessionTimelineSessionById(5, false, [3], 10)).resolves.toEqual(sessionRow);
+    await expect(repo.getSessionTimelineSessionById(5, [1, 2, 3], [3], 10)).resolves.toEqual(sessionRow);
   });
 
   it('returns conflict when moving timeline sessions into an overlap', async () => {
@@ -446,10 +440,9 @@ describe('UserStatisticsRepository', () => {
   it('returns progress funnel values and defaults when aggregate row is missing', async () => {
     const db = makeDb([[], [{ started: 5, reached25: 4, reached50: 3, reached75: 2, completed: 1 }], [], []]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
 
     await expect(
-      repo.getProgressFunnelInRange(5, false, [1], new Date('2026-04-01T00:00:00.000Z'), new Date('2026-05-01T00:00:00.000Z')),
+      repo.getProgressFunnelInRange(5, [1, 2, 3], [1], new Date('2026-04-01T00:00:00.000Z'), new Date('2026-05-01T00:00:00.000Z')),
     ).resolves.toEqual({
       started: 5,
       reached25: 4,
@@ -458,7 +451,7 @@ describe('UserStatisticsRepository', () => {
       completed: 1,
     });
 
-    await expect(repo.getProgressFunnelInRange(5, false, [1], new Date('2026-04-01T00:00:00.000Z'))).resolves.toEqual({
+    await expect(repo.getProgressFunnelInRange(5, [1, 2, 3], [1], new Date('2026-04-01T00:00:00.000Z'))).resolves.toEqual({
       started: 0,
       reached25: 0,
       reached50: 0,
@@ -482,39 +475,35 @@ describe('UserStatisticsRepository', () => {
       [{ genre: 'Sci-Fi', source: 'web', readingSeconds: 1200 }],
     ]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
 
-    await expect(repo.getCompletionLatencyDays(5, false, [1], 365)).resolves.toEqual([3.5, 7]);
-    await expect(repo.getReadingPacePoints(5, false, [1], 365)).resolves.toEqual([
+    await expect(repo.getCompletionLatencyDays(5, [1, 2, 3], [1], 365)).resolves.toEqual([3.5, 7]);
+    await expect(repo.getReadingPacePoints(5, [1, 2, 3], [1], 365)).resolves.toEqual([
       { durationSeconds: 300, progressDelta: 1.25, bucket: 'kobo', format: 'PDF' },
     ]);
-    await expect(repo.getReadingSurvivalMaxProgress(5, false, [1], 365)).resolves.toEqual([50]);
-    await expect(repo.getCompletionRaceRawSessions(5, false, [1], 365, 15)).resolves.toEqual([
+    await expect(repo.getReadingSurvivalMaxProgress(5, [1, 2, 3], [1], 365)).resolves.toEqual([50]);
+    await expect(repo.getCompletionRaceRawSessions(5, [1, 2, 3], [1], 365, 15)).resolves.toEqual([
       { bookId: 1, title: 'Dune', startedAt: new Date('2026-04-01T10:00:00.000Z'), endProgress: 40 },
       { bookId: 1, title: 'Dune', startedAt: new Date('2026-04-02T10:00:00.000Z'), endProgress: 70 },
     ]);
-    await expect(repo.getSessionArchetypePoints(5, false, [1], 365)).resolves.toEqual([{ hour: 9.5, durationMinutes: 15, dayOfWeek: 2 }]);
-    await expect(repo.getGenreReadingTime(5, false, [1], 365)).resolves.toEqual([{ genre: 'Sci-Fi', source: 'web', readingSeconds: 1200 }]);
+    await expect(repo.getSessionArchetypePoints(5, [1, 2, 3], [1], 365)).resolves.toEqual([{ hour: 9.5, durationMinutes: 15, dayOfWeek: 2 }]);
+    await expect(repo.getGenreReadingTime(5, [1, 2, 3], [1], 365)).resolves.toEqual([{ genre: 'Sci-Fi', source: 'web', readingSeconds: 1200 }]);
   });
 
   it('returns empty completion race when no top books exist', async () => {
     const db = makeDb([[]]);
     const repo = new UserStatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
 
-    await expect(repo.getCompletionRaceRawSessions(5, false, [1], 365, 15)).resolves.toEqual([]);
+    await expect(repo.getCompletionRaceRawSessions(5, [1, 2, 3], [1], 365, 15)).resolves.toEqual([]);
   });
 
   it('builds chord diagram nodes/links and returns empty chord when no rows exist', async () => {
     const emptyDb = makeDb([], [{ rows: [] }]);
     const emptyRepo = new UserStatisticsRepository(emptyDb as never);
-    vi.spyOn(emptyRepo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
-    await expect(emptyRepo.getAuthorGenreChord(5, false, [1], 365)).resolves.toEqual({ nodes: [], links: [] });
+    await expect(emptyRepo.getAuthorGenreChord(5, [1, 2, 3], [1], 365)).resolves.toEqual({ nodes: [], links: [] });
 
     const filledDb = makeDb([], [{ rows: [{ author: 'Author A', genre: 'Sci-Fi', reading_seconds: 600 }] }]);
     const filledRepo = new UserStatisticsRepository(filledDb as never);
-    vi.spyOn(filledRepo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
-    await expect(filledRepo.getAuthorGenreChord(5, false, [1], 365)).resolves.toEqual({
+    await expect(filledRepo.getAuthorGenreChord(5, [1, 2, 3], [1], 365)).resolves.toEqual({
       nodes: [{ name: 'Author A' }, { name: 'Sci-Fi' }],
       links: [{ source: 'Author A', target: 'Sci-Fi', value: 600 }],
     });

@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { createHash } from 'crypto';
 
@@ -79,6 +80,7 @@ export class KoreaderBookmarkExchangeService {
     private readonly bookmarkRepo: KoreaderBookmarkRepository,
     private readonly bookmarkSync: BookmarkSyncService,
     private readonly positionConverter: PositionConverterService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async exchange(user: RequestUser, dto: BookmarkExchangeDto): Promise<BookmarkExchangeResponse> {
@@ -157,7 +159,7 @@ export class KoreaderBookmarkExchangeService {
   }
 
   private async resolveBooks(userId: number, books: { hash: string }[]) {
-    const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(userId);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAllForUserId(userId);
     const hashes = [...new Set(books.map((book) => book.hash.toLowerCase()))];
     return this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, userId);
   }

@@ -43,6 +43,8 @@ const DEFAULT_APP_SETTINGS: Array<typeof schema.appSettings.$inferInsert> = [
   { key: APP_SETTING_KEYS.UPDATE_CHECK_ENABLED, value: 'true' },
   { key: APP_SETTING_KEYS.CROSS_PLATFORM_PATH_SANITIZATION_ENABLED, value: 'true' },
   { key: APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB, value: String(DEFAULT_MAX_UPLOAD_SIZE_MB) },
+  { key: APP_SETTING_KEYS.API_KEYS_ENABLED, value: 'true' },
+  { key: APP_SETTING_KEYS.API_KEYS_MAX_LIFETIME_DAYS, value: '' },
 ];
 
 @Injectable()

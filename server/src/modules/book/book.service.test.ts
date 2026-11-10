@@ -189,8 +189,8 @@ function makeService(
     checkBookPassesContentFilters: vi.fn().mockResolvedValue(true),
   };
   const libraryService = {
-    verifyUserAccess: vi.fn().mockResolvedValue(undefined),
-    verifyUserAccessLevel: vi.fn().mockResolvedValue(undefined),
+    verifyAccess: vi.fn().mockResolvedValue(undefined),
+    verifyAccessLevel: vi.fn().mockResolvedValue(undefined),
     findAll: vi.fn().mockResolvedValue([]),
     findOne: vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 }),
   };
@@ -597,7 +597,7 @@ describe('BookService', () => {
 
       const plan = await service.getExportFiles([1, 2], user, 'primary');
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(user.id, 77, false);
+      expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: false }), 77);
       expect(plan.projectedBytes).toBe(300);
       expect(plan.files).toEqual([
         { absolutePath: '/books/a.epub', zipPath: 'Duplicate.epub', sizeBytes: 100 },
@@ -999,7 +999,7 @@ describe('BookService', () => {
     it('does not resolve a cover for a book the user cannot access', async () => {
       const { service, bookRepo, libraryService, coverStore } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
-      libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('no access'));
+      libraryService.verifyAccess.mockRejectedValue(new ForbiddenException('no access'));
 
       await expect(service.getThumbnailPath(9, makeUser())).rejects.toThrow(NotFoundException);
 
@@ -1082,7 +1082,7 @@ describe('BookService', () => {
         metadata: { title: 'New Title', isbn10: '0306406152', isbn13: '9780306406157' },
         diagnostics: makeMetadataFetchDiagnostics({ resolvedFieldCount: 3 }),
       });
-      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 7, false, 'editor');
+      expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: false }), 7, 'editor');
       expect(pipeline.runWithSources).toHaveBeenCalledWith(
         {
           title: 'Old Title',
@@ -2569,7 +2569,7 @@ describe('BookService', () => {
       const result = await service.bulkReExtractCover([1, 2], user, onProgress);
 
       expect(result).toEqual({ processed: 2, updated: 1 });
-      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 7, false, 'editor');
+      expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: false }), 7, 'editor');
       expect(onProgress).toHaveBeenCalledTimes(2);
       expect(onProgress).toHaveBeenNthCalledWith(1, 1);
       expect(onProgress).toHaveBeenNthCalledWith(2, 2);
@@ -2875,7 +2875,7 @@ describe('BookService', () => {
 
       const result = await service.deleteBooks([3, 4], user);
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledTimes(2);
+      expect(libraryService.verifyAccess).toHaveBeenCalledTimes(2);
       expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([3, 4]);
       expect(mockRm).toHaveBeenCalledWith('/tmp/books/covers/3', { recursive: true, force: true });
       expect(mockRm).toHaveBeenCalledWith('/tmp/books/covers/4', { recursive: true, force: true });
@@ -3133,7 +3133,7 @@ describe('BookService', () => {
         { id: 3, libraryId: 7 },
         { id: 4, libraryId: 9 },
       ]);
-      libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException());
+      libraryService.verifyAccess.mockRejectedValue(new ForbiddenException());
       await expect(service.deleteBooks([3, 4], makeUser())).rejects.toBeInstanceOf(ForbiddenException);
       expect(bookRepo.findAllFilesByBookIds).not.toHaveBeenCalled();
       expect(bookRepo.deleteByIdsAndInvalidateScanState).not.toHaveBeenCalled();
@@ -3333,7 +3333,7 @@ describe('BookService', () => {
 
       bookRepo.findFileById.mockResolvedValue({ id: 7, bookId: 10, libraryId: 1, absolutePath: '/books/a.m4b', format: 'm4b' });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.verifyAccess.mockResolvedValue(undefined);
       libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
 
       await service.saveProgress(user.id, 7, { percentage: 25, positionSeconds: 900 } as never, user);
@@ -3363,7 +3363,7 @@ describe('BookService', () => {
 
       bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.verifyAccess.mockResolvedValue(undefined);
       libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 3, markAsFinishedPercentComplete: 97 });
 
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
@@ -3400,7 +3400,7 @@ describe('BookService', () => {
 
       bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format: 'epub' });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.verifyAccess.mockResolvedValue(undefined);
       libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 3, markAsFinishedPercentComplete: 97 });
       userBookStatusService.autoUpdate.mockRejectedValueOnce(new Error('status update failed'));
 
@@ -3440,7 +3440,7 @@ describe('BookService', () => {
       bookRepo.upsertProgress.mockResolvedValue(undefined);
       bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(true);
       bookRepo.syncKoboReadingStateFromProgress.mockResolvedValue(true);
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.verifyAccess.mockResolvedValue(undefined);
       libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
 
       await service.saveProgress(
@@ -3472,7 +3472,7 @@ describe('BookService', () => {
       bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
       bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.verifyAccess.mockResolvedValue(undefined);
       libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
 
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
@@ -3492,7 +3492,7 @@ describe('BookService', () => {
         made.bookRepo.findProgress.mockResolvedValue(
           previousPercentage == null ? null : { percentage: previousPercentage, cfi: 'epubcfi(/6/40)', pageNumber: null },
         );
-        made.libraryService.verifyUserAccess.mockResolvedValue(undefined);
+        made.libraryService.verifyAccess.mockResolvedValue(undefined);
         made.libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
         return { ...made, user };
       };
@@ -3603,7 +3603,7 @@ describe('BookService', () => {
           made.bookRepo.upsertProgress.mockResolvedValue(undefined);
           made.bookRepo.isKoboTwoWayProgressSyncEnabled.mockResolvedValue(false);
           made.bookRepo.findProgress.mockResolvedValue({ percentage: 32, cfi: 'epubcfi(/6/40!/4/20/1:0)', pageNumber: null });
-          made.libraryService.verifyUserAccess.mockResolvedValue(undefined);
+          made.libraryService.verifyAccess.mockResolvedValue(undefined);
           made.libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 4, markAsFinishedPercentComplete: 90 });
           return { ...made, user, positionConverter, audiobookEbookProgressSync };
         };
@@ -3678,7 +3678,7 @@ describe('BookService', () => {
 
       bookRepo.findFileById.mockResolvedValue({ id: 8, bookId: 11, libraryId: 2, absolutePath: '/books/b.epub', format });
       bookRepo.upsertProgress.mockResolvedValue(undefined);
-      libraryService.verifyUserAccess.mockResolvedValue(undefined);
+      libraryService.verifyAccess.mockResolvedValue(undefined);
       libraryService.findOne = vi.fn().mockResolvedValue({ readingThreshold: 1, markAsFinishedPercentComplete: 99 });
 
       await service.saveProgress(user.id, 8, { percentage: 50 } as never, user);
@@ -3787,7 +3787,7 @@ describe('BookService', () => {
         pagination: { page: 1, size: 5 },
       } as never);
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
+      expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: 42, isSuperuser: false }), 7);
       expect(bookRepo.findCards).toHaveBeenCalledWith({
         where: 'WHERE',
         orderBy: ['ORDER'],
@@ -3873,7 +3873,7 @@ describe('BookService', () => {
         maxBuckets: 24,
       } as never);
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
+      expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: 42, isSuperuser: false }), 7);
       expect(queryBuilder.buildOrderBy).toHaveBeenCalledWith([{ field: 'title', dir: 'asc' }], 42, undefined, {});
       expect(bookRepo.findJumpBuckets).toHaveBeenCalledWith(
         expect.objectContaining({ where: 'WHERE', field: 'title', kind: 'letter', userId: 42, maxBuckets: 24, orderBy: ['ORDER'] }),
@@ -5866,7 +5866,7 @@ describe('BookService', () => {
 
       const result = await service.facetsForLibrary(user, 7, facetQuery(filter, 'dune'));
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 7, false);
+      expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: 42, isSuperuser: false }), 7);
       const scope = { accessibleLibraryIds: [7], implicitLibraryId: 7, userId: 42, timeZone: 'Europe/Berlin', contentFilters };
       expect(queryBuilder.buildWhere).toHaveBeenCalledWith(filter, { ...scope, q: 'dune' });
       expect(queryBuilder.buildWhere).toHaveBeenCalledWith(undefined, scope);
@@ -5884,7 +5884,7 @@ describe('BookService', () => {
 
       await service.facetsForLibrary(user, 7, facetQuery({ type: 'group', join: 'AND', rules: [unreadRule] }));
 
-      expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(3, 7, true);
+      expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: 3, isSuperuser: true }), 7);
       expect(queryBuilder.buildWhere.mock.calls.length).toBeGreaterThan(0);
       for (const [, ctx] of queryBuilder.buildWhere.mock.calls) {
         expect((ctx as { contentFilters?: unknown }).contentFilters).toBeUndefined();
@@ -5988,7 +5988,7 @@ describe('BookService', () => {
 
     it('refuses before querying when the user cannot see the library', async () => {
       const { service, libraryService, bookRepo } = makeFacetService();
-      libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No library access'));
+      libraryService.verifyAccess.mockRejectedValue(new ForbiddenException('No library access'));
 
       await expect(service.facetsForLibrary(makeUser(), 7, facetQuery(undefined))).rejects.toBeInstanceOf(ForbiddenException);
       expect(bookRepo.countWhere).not.toHaveBeenCalled();
@@ -6514,14 +6514,14 @@ describe('BookService', () => {
       queryBuilder.buildWhere.mockReturnValue('where-clause');
       bookRepo.findDistinctLibraryIdsByWhere.mockResolvedValue([5, 9]);
       const error = new ForbiddenException('Insufficient library access level');
-      libraryService.verifyUserAccessLevel.mockImplementation((_userId: number, libraryId: number) =>
+      libraryService.verifyAccessLevel.mockImplementation((_userId: number, libraryId: number) =>
         libraryId === 9 ? Promise.reject(error) : Promise.resolve(),
       );
 
       await expect(service.resolveSelectionToIds({ query: {} }, user, 'editor')).rejects.toBe(error);
       expect(bookRepo.findDistinctLibraryIdsByWhere).toHaveBeenCalledWith('where-clause');
-      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 5, false, 'editor');
-      expect(libraryService.verifyUserAccessLevel).toHaveBeenCalledWith(user.id, 9, false, 'editor');
+      expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: false }), 5, 'editor');
+      expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(expect.objectContaining({ id: user.id, isSuperuser: false }), 9, 'editor');
       expect(bookRepo.findIdsByWhere).not.toHaveBeenCalled();
       expect(bookRepo.findLibraryIdsByBookIds).not.toHaveBeenCalled();
     });

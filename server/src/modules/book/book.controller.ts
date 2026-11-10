@@ -21,6 +21,7 @@ import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import type { FastifyReply } from 'fastify';
 import { RouteConfig } from '@nestjs/platform-fastify';
+import { KeyReadSafe } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { contentDispositionHeader } from '../../common/utils/content-disposition.utils';
@@ -153,6 +154,7 @@ export class BookController {
   }
 
   @Post('query')
+  @KeyReadSafe()
   globalQuery(@Body(BookQueryPipe) query: BookQuery, @CurrentUser() user: RequestUser) {
     return this.bookService.globalQuery(user, query);
   }
@@ -226,6 +228,7 @@ export class BookController {
   }
 
   @Post('export')
+  @KeyReadSafe()
   @RequirePermission(Permission.LibraryDownload)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
   async exportBooks(@Body() dto: ExportBooksDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
@@ -248,6 +251,7 @@ export class BookController {
   }
 
   @Post('metadata-export/preflight')
+  @KeyReadSafe()
   @RequirePermission(Permission.LibraryDownload)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
   metadataExportPreflight(@Body() dto: MetadataExportDto, @CurrentUser() user: RequestUser) {
@@ -255,6 +259,7 @@ export class BookController {
   }
 
   @Post('metadata-export/download')
+  @KeyReadSafe()
   @RequirePermission(Permission.LibraryDownload)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk downloads')
   async downloadMetadataExport(@Body() dto: MetadataExportDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {

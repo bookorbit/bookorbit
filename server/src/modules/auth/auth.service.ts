@@ -421,7 +421,7 @@ export class AuthService {
     if (!Number.isSafeInteger(sessionId) || !sessionId || sessionId < 1) throw new UnauthorizedException();
     if (!(await this.sessionRepo.isActive(sessionId, userId, tokenVersion, authenticationMethod))) throw new UnauthorizedException();
     const user = await this.validateUser(userId, tokenVersion, authenticationMethod);
-    return { ...user, sessionId };
+    return { ...user, sessionId, credential: { kind: 'session' as const, sessionId } };
   }
 
   async validateUser(userId: number, tokenVersion: number, authenticationMethod: AuthenticationMethodValue) {

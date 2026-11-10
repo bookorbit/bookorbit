@@ -9,6 +9,7 @@ export const AuthenticationMethod = {
   MagicLink: "magic_link",
   Setup: "setup",
   Legacy: "legacy",
+  ApiKey: "api_key",
 } as const;
 
 export type AuthenticationMethod = (typeof AuthenticationMethod)[keyof typeof AuthenticationMethod];

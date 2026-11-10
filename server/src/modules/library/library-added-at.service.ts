@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import {
   BadRequestException,
   ConflictException,
@@ -39,6 +40,7 @@ export class LibraryAddedAtService implements OnModuleDestroy {
   constructor(
     private readonly libraryRepo: LibraryRepository,
     private readonly pathPolicy: PathPolicyService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async start(libraryId: number, user: RequestUser): Promise<AddedAtRecomputeJob> {
@@ -96,9 +98,7 @@ export class LibraryAddedAtService implements OnModuleDestroy {
   }
 
   private async assertAccess(libraryId: number, user: RequestUser): Promise<void> {
-    if (!user.isSuperuser && !(await this.libraryRepo.hasUserAccess(user.id, libraryId))) {
-      throw new ForbiddenException('No access to this library');
-    }
+    await this.libraryScope.assertVisible(user, libraryId);
   }
 
   private snapshot(job: AddedAtRecomputeJob): AddedAtRecomputeJob {

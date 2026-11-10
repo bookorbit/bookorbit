@@ -4,6 +4,7 @@ import type { FastifyReply } from 'fastify';
 import type { BookMoveProgressEvent } from '@bookorbit/types';
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
+import { KeyReadSafe } from '../../common/decorators/api-key-policy.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -21,6 +22,7 @@ export class BookMoveController {
   constructor(private readonly bookMoveService: BookMoveService) {}
 
   @Post('preview')
+  @KeyReadSafe()
   @RequirePermission(Permission.LibraryEditMetadata)
   preview(@Body() dto: MovePreviewDto, @CurrentUser() user: RequestUser) {
     return this.bookMoveService.preview(dto, user);

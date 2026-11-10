@@ -135,10 +135,16 @@ function makeService(
     ...overrides.dedupe,
   };
   const libraryService = {
-    verifyUserAccess: vi.fn().mockResolvedValue(undefined),
+    verifyAccess: vi.fn().mockResolvedValue(undefined),
     findAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
     findUserIdsWithAccess: vi.fn().mockResolvedValue(new Set([1])),
     ...overrides.libraryService,
+  };
+  // Answers the way the real scope does: every library for a superuser, the user's grants otherwise.
+  const libraryScope = {
+    visibleIdsOrAll: vi.fn((subject: RequestUser) =>
+      subject.isSuperuser ? Promise.resolve(null) : libraryService.findAccessibleLibraryIds(subject),
+    ),
   };
   const notifications = { notify: vi.fn().mockResolvedValue(undefined) };
   const contentFilterRepo = {
@@ -190,6 +196,7 @@ function makeService(
     attribution,
     {} as never,
     companions as never,
+    libraryScope as never,
   );
 
   return { service, repo, dedupe, libraryService, notifications, downloads, automation, automationSettings, removal, gateway, auth, companions };
@@ -583,7 +590,7 @@ describe('BookRequestService.submit', () => {
 
     await service.submit(dto, user());
 
-    expect(libraryService.verifyUserAccess).not.toHaveBeenCalled();
+    expect(libraryService.verifyAccess).not.toHaveBeenCalled();
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ targetLibraryId: 7 }), expect.any(Array));
   });
 
@@ -596,7 +603,7 @@ describe('BookRequestService.submit', () => {
 
   it('rejects a target library the requester cannot reach', async () => {
     const { service, repo, libraryService } = makeService();
-    libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
+    libraryService.verifyAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
 
     await expect(service.submit({ ...dto, targetLibraryId: 9 }, user())).rejects.toThrow(ForbiddenException);
     expect(repo.create).not.toHaveBeenCalled();
@@ -771,7 +778,7 @@ describe('BookRequestService.submit on behalf of another user', () => {
 
     await service.submit({ ...dto, userId: 42, targetLibraryId: 5 }, moderator());
 
-    expect(libraryService.verifyUserAccess).toHaveBeenCalledWith(42, 5, false);
+    expect(libraryService.verifyAccess).toHaveBeenCalledWith(expect.objectContaining({ id: 42, isSuperuser: false }), 5);
   });
 
   /**
@@ -917,6 +924,14 @@ describe('BookRequestService.cancel', () => {
     expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, false, 'reader');
   });
 
+  it('passes explicit file-deletion consent to the download client', async () => {
+    const { service, removal } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) } });
+
+    await service.cancel(10, user(), true);
+
+    expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, true, 'reader');
+  });
+
   /** A download client that is down must not be the reason a stuck request stays stuck. */
   it('cancels anyway when the download client will not let go, and says so on the row', async () => {
     const { service, repo } = makeService({
@@ -972,6 +987,16 @@ describe('BookRequestService.cancelDownload', () => {
     expect(repo.updateIf).toHaveBeenCalledWith(10, ['grabbed', 'downloading'], { status: 'approved', statusReason: null });
     expect(repo.updateIf).not.toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ status: 'cancelled' }));
     expect(gateway.emitChanged).toHaveBeenCalled();
+  });
+
+  it('passes explicit file-deletion consent when cancelling one transfer', async () => {
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) },
+    });
+
+    await service.cancelDownload(10, 11, user(), true);
+
+    expect(removal.removeAttempt).toHaveBeenCalledWith(10, 11, true, 'reader');
   });
 
   it('refuses someone who cannot drive the request', async () => {
@@ -1137,6 +1162,14 @@ describe('BookRequestService.remove', () => {
     expect(repo.remove).toHaveBeenCalled();
   });
 
+  it('passes explicit file-deletion consent before deleting the request', async () => {
+    const { service, removal } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'available' })) } });
+
+    await service.remove(10, approver, true);
+
+    expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, true, 'reader');
+  });
+
   it('keeps the row when the torrent could not be removed, rather than orphaning it', async () => {
     const { service, repo } = makeService({
       repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'available' })) },
@@ -1219,7 +1252,7 @@ describe('BookRequestService.approve', () => {
 
   it('refuses a reroute to a library the approver cannot reach', async () => {
     const { service, repo, libraryService } = makeService();
-    libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
+    libraryService.verifyAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
     await expect(service.approve(10, { targetLibraryId: 5 }, approver)).rejects.toThrow(ForbiddenException);
     expect(repo.updateIf).not.toHaveBeenCalled();
   });
@@ -1373,7 +1406,7 @@ describe('BookRequestService.submit refusal codes', () => {
 
   it('codes a destination library the caller cannot reach', async () => {
     const { service, libraryService } = makeService();
-    libraryService.verifyUserAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
+    libraryService.verifyAccess.mockRejectedValue(new ForbiddenException('No access to this library'));
 
     const body = await refusal(service.submit({ ...dto, targetLibraryId: 9 }, user()));
     expect(body.errorCode).toBe('SUBMIT_LIBRARY_FORBIDDEN');
@@ -2241,12 +2274,12 @@ describe('BookRequestService.submitPair', () => {
   });
 
   it('refuses the whole pair before writing either half when one half is refused', async () => {
-    const verifyUserAccess = vi
+    const verifyAccess = vi
       .fn()
       .mockImplementation((_userId: number, libraryId: number) =>
         libraryId === 9 ? Promise.reject(new ForbiddenException('No access to that library')) : Promise.resolve(undefined),
       );
-    const { service, repo } = makeService({ libraryService: { verifyUserAccess }, repo: { createPair: vi.fn() } });
+    const { service, repo } = makeService({ libraryService: { verifyAccess }, repo: { createPair: vi.fn() } });
 
     await expect(service.submitPair({ ...pairDto, audiobook: { targetLibraryId: 9 } }, user())).rejects.toMatchObject({
       response: expect.objectContaining({ errorCode: 'SUBMIT_LIBRARY_FORBIDDEN' }),

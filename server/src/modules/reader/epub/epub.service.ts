@@ -470,7 +470,7 @@ export class EpubService {
   private async resolveEpubFile(bookId: number, fileId: number | undefined, user: RequestUser): Promise<EpubFileResolution> {
     const libraryId = await this.bookReadService.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+    await this.libraryService.verifyAccess(user, libraryId);
 
     if (fileId != null) {
       const file = await this.bookReadService.findFileById(fileId);

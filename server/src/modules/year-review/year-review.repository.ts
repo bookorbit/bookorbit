@@ -17,7 +17,6 @@ import {
   readingAttempts,
   readingSessions,
   userBookRatings,
-  userLibraryAccess,
 } from '../../db/schema';
 import { finishedReadScope } from '../user-book-status/finished-read-scope';
 import type { YearSessionInput } from './year-review.calculations';
@@ -67,15 +66,6 @@ const ID_CHUNK = 500;
 @Injectable()
 export class YearReviewRepository {
   constructor(@Inject(DB) private readonly db: NodePgDatabase<typeof schema>) {}
-
-  async getAccessibleLibraryIds(userId: number, isSuperuser: boolean): Promise<number[] | null> {
-    if (isSuperuser) return null;
-    const rows = await this.db
-      .select({ libraryId: userLibraryAccess.libraryId })
-      .from(userLibraryAccess)
-      .where(sql`${userLibraryAccess.userId} = ${userId}`);
-    return rows.map((row) => row.libraryId);
-  }
 
   private libraryClause(libraryIds: number[] | null): SQL | undefined {
     if (libraryIds === null) return undefined;

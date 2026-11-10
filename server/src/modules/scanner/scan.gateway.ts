@@ -1,12 +1,11 @@
-import { Inject, Logger, OnModuleDestroy, OnModuleInit, Optional, UnauthorizedException } from '@nestjs/common';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
+import { Inject, Logger, OnModuleDestroy, OnModuleInit, Optional } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
 import type {
-  AuthenticationMethod,
   BookMergedEvent,
   BookLinksChangedEvent,
   BookDuplicateResolutionEvent,
@@ -21,7 +20,6 @@ import type {
   ScanBooksAddedEvent,
   ScanProgressEvent,
 } from '@bookorbit/types';
-import { AuthService } from '../auth/auth.service';
 import {
   ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
   AchievementEventsService,
@@ -33,6 +31,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { rejectSocketConnection, resolveSocketUser, trackSocketHandshake } from '../../common/utils/ws-auth.utils';
 import { appConfig } from '../../config/config';
 import { BOOK_COVER_CHANGED, BookCoverEventsService } from '../book-cover-store/book-cover-events.service';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 @WebSocketGateway({ namespace: '/scan', cors: { credentials: true } })
 export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect, OnModuleInit, OnModuleDestroy {
@@ -47,11 +46,11 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   };
 
   constructor(
-    private readonly jwtService: JwtService,
-    private readonly authService: AuthService,
+    private readonly authenticator: AuthenticatorService,
     private readonly scanJobStore: ScanJobStore,
     private readonly scannerRepository: ScannerRepository,
     private readonly achievementEvents: AchievementEventsService,
+    private readonly libraryScope: LibraryScopeService,
     @Inject(appConfig.KEY) app: ConfigType<typeof appConfig>,
     @Optional() private readonly coverEvents?: BookCoverEventsService,
   ) {
@@ -83,13 +82,7 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   private async authenticate(client: Socket): Promise<RequestUser | null> {
     try {
-      const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new UnauthorizedException('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }>(token, {
-        algorithms: ['HS256'],
-      });
-      const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
-      if (!user) throw new UnauthorizedException('User not found or token revoked');
+      const user = await this.authenticator.authenticateSocket(client);
       (client.data as Record<string, unknown>).user = user;
       await client.join(`user:${user.id}`);
       this.logger.debug(`[scanner.ws_connection] [start] userId=${user.id} socketId=${client.id} - websocket connected`);
@@ -115,7 +108,7 @@ export class ScanGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   async handleSubscribeLibrary(client: Socket, libraryId: number): Promise<void> {
     const user = await resolveSocketUser(client);
     if (!user || !Number.isSafeInteger(libraryId) || libraryId <= 0) return;
-    if (!user.isSuperuser && !(await this.scannerRepository.hasLibraryAccess(user.id, libraryId))) {
+    if (!(await this.libraryScope.canSee(user, libraryId))) {
       this.logger.debug(`[scanner.ws_subscribe] [fail] userId=${user.id} libraryId=${libraryId} socketId=${client.id} - no library access`);
       return;
     }

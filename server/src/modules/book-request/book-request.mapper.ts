@@ -8,6 +8,7 @@ import type {
   BookRequestStatus,
   BookRequestSubscriber,
 } from '@bookorbit/types';
+import { DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE } from '@bookorbit/types';
 
 import type { BookRequestJoinedRow } from './book-request.repository';
 import type { BookRequestDownloadJoinedRow } from './fulfillment/book-request-download.repository';
@@ -74,6 +75,7 @@ export function mapBookRequestDownload({
   download,
   downloadClientName,
   downloadClientColor,
+  downloadClientAdapterType,
   indexerName,
   indexerColor,
 }: BookRequestDownloadJoinedRow): BookRequestDownloadItem {
@@ -83,6 +85,10 @@ export function mapBookRequestDownload({
     downloadClientId: download.downloadClientId,
     downloadClientName,
     downloadClientColor,
+    // A refused attempt never reached the client, so nothing is held and nothing gets deleted
+    // there: the generic copy is the honest one for it.
+    alwaysDeletesRemote:
+      download.clientKey !== null && downloadClientAdapterType !== null && DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE[downloadClientAdapterType],
     source: download.source as BookRequestDownloadSource,
     indexerId: download.indexerId,
     indexerName,

@@ -58,6 +58,7 @@ export function canDeleteRequest(request: BookRequestItem, canManage: boolean): 
  * Mirrors the in-flight statuses the server removes on.
  */
 export function cancelStopsATransfer(request: BookRequestItem): boolean {
+  if (request.download?.alwaysDeletesRemote) return true
   const status = request.download?.status
   return status === 'queued' || status === 'downloading' || status === 'completed' || status === 'importing'
 }

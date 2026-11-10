@@ -1,6 +1,7 @@
 import type { Params } from 'nestjs-pino';
 import type { IncomingMessage, ServerResponse } from 'http';
 
+import { isHttpLogMarkedAsDebug } from './utils/http-log-level.utils';
 import { redactUrlCredentials } from './utils/log-url.utils';
 
 const isDev = process.env.NODE_ENV !== 'production';
@@ -49,8 +50,9 @@ export const loggerConfig: Params = {
     customErrorMessage: (req: IncomingMessage, res: ServerResponse, err: Error) => {
       return `[HTTP] ${req.method} ${redactUrlCredentials(req.url ?? '')} ${outcomeOf(res)} - ${err?.message ?? 'error'}`;
     },
-    customLogLevel: (_req: IncomingMessage, res: ServerResponse, err?: Error) => {
+    customLogLevel: (req: IncomingMessage, res: ServerResponse, err?: Error) => {
       if (err || res.statusCode >= 500) return 'error';
+      if (res.headersSent && isHttpLogMarkedAsDebug(req)) return 'debug';
       // A response that never reached the client is a failed request, not a quiet success.
       if (isFailure(res)) return 'warn';
       return 'debug';

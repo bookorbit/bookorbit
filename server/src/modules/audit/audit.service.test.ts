@@ -1,5 +1,6 @@
 import { APP_SETTING_KEYS, DEFAULT_AUDIT_RETENTION_DAYS } from '../../common/constants/app-settings.constants';
 import { AuditAction, AuditResource } from '@bookorbit/types';
+import { runAsApiKey } from './api-key-audit-context';
 import { AUDIT_EVENT, AuditEventsService } from './audit-events.service';
 import { AuditService } from './audit.service';
 
@@ -91,8 +92,20 @@ describe('AuditService', () => {
       description: 'updated book metadata',
       ip: null,
       meta: null,
+      apiKeyId: null,
     });
 
+    await service.onModuleDestroy();
+  });
+
+  it('names the API key an event was caused by, including events a service emits directly', async () => {
+    const { service, auditEvents, auditRepository } = makeService();
+    service.onModuleInit();
+
+    runAsApiKey({ keyId: 31, keyName: 'backup script' }, () => auditEvents.emit(AUDIT_EVENT, makePayload({ meta: { count: 2 } })));
+    await flushMicrotasks();
+
+    expect(auditRepository.insert).toHaveBeenCalledWith(expect.objectContaining({ apiKeyId: 31, meta: { count: 2, viaApiKey: 'backup script' } }));
     await service.onModuleDestroy();
   });
 

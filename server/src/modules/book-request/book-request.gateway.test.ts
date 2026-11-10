@@ -1,11 +1,12 @@
 import { Permission } from '@bookorbit/types';
 
 import { BookRequestGateway } from './book-request.gateway';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateSessionUser: vi.fn() };
-  const gateway = new BookRequestGateway(jwtService as any, authService as any);
+  const gateway = new BookRequestGateway(new AuthenticatorService(jwtService as never, authService as never) as any);
   return { gateway, jwtService, authService };
 }
 

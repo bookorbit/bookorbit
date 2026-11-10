@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { REQUEST_LANGUAGE_CODES, normalizeLanguage } from '@bookorbit/types';
 import type { AchievementHint, AchievementHintResumeTarget, AchievementHintsResponse } from '@bookorbit/types';
@@ -30,12 +31,18 @@ export class AchievementHintsService {
   constructor(
     private readonly achievements: AchievementRepository,
     private readonly hints: AchievementHintsRepository,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async getHints(user: RequestUser): Promise<AchievementHintsResponse> {
     const [catalogue, earnedKeys] = await Promise.all([this.achievements.findAllAchievements(), this.achievements.findUserEarnedKeys(user.id)]);
     const targets = nextTargets(catalogue, earnedKeys);
-    const scope: HintScope = { userId: user.id, isSuperuser: user.isSuperuser, contentFilters: user.isSuperuser ? undefined : user.contentFilters };
+    const scope: HintScope = {
+      userId: user.id,
+      isSuperuser: user.isSuperuser,
+      libraryIds: await this.libraryScope.visibleIdsOrAll(user),
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    };
     const timeZone = resolveTimeZone((user.settings as { timezone?: unknown } | undefined)?.timezone, 'UTC');
 
     let unrated: Promise<HintBookGroup> | null = null;

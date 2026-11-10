@@ -40,6 +40,7 @@ const domainByResource: Record<AuditResource, AuditResourceDomain> = {
   [AuditResource.Series]: 'metadata',
   [AuditResource.OidcIdentity]: 'integrations',
   [AuditResource.MagicLinkToken]: 'integrations',
+  [AuditResource.ApiKey]: 'integrations',
   [AuditResource.ReadingInsightsProfile]: 'insights',
 }
 

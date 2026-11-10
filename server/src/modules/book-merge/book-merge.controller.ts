@@ -2,6 +2,7 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Post 
 
 import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
+import { KeyReadSafe } from '../../common/decorators/api-key-policy.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
@@ -18,6 +19,7 @@ export class BookMergeController {
   constructor(private readonly bookMergeService: BookMergeService) {}
 
   @Post('preview')
+  @KeyReadSafe()
   @HttpCode(HttpStatus.OK)
   @RequirePermission(Permission.LibraryMergeBooks)
   preview(@Body() dto: BookMergePreviewDto, @CurrentUser() user: RequestUser) {

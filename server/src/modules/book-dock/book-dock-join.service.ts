@@ -250,7 +250,7 @@ export class BookDockJoinService {
     if (library.organizationMode !== 'book_per_folder') return false;
     let answer = cache.get(library.id);
     if (!answer) {
-      answer = this.libraryService.verifyUserAccessLevel(requester.id, library.id, requester.isSuperuser, 'editor').then(
+      answer = this.libraryService.verifyAccessLevel(requester, library.id, 'editor').then(
         () => true,
         (error: unknown) => {
           if (error instanceof ForbiddenException) return false;

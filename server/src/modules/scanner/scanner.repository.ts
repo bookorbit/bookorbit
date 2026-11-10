@@ -172,15 +172,6 @@ export class ScannerRepository {
     return row?.name ?? null;
   }
 
-  async hasLibraryAccess(userId: number, libraryId: number): Promise<boolean> {
-    const [row] = await this.db
-      .select({ userId: userLibraryAccess.userId })
-      .from(userLibraryAccess)
-      .where(and(eq(userLibraryAccess.userId, userId), eq(userLibraryAccess.libraryId, libraryId)))
-      .limit(1);
-    return row !== undefined;
-  }
-
   async findLibraryAccessibleUserIds(libraryId: number): Promise<number[]> {
     const [accessRows, superuserRows] = await Promise.all([
       this.db.select({ userId: userLibraryAccess.userId }).from(userLibraryAccess).where(eq(userLibraryAccess.libraryId, libraryId)),

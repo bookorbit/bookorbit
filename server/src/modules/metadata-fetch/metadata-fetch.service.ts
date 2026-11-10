@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { ForbiddenException, Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
 import {
   CoverMedia,
@@ -92,6 +93,7 @@ export class MetadataFetchService {
     private readonly throttleTracker: ProviderThrottleTracker,
     private readonly metadataFetchRepository: MetadataFetchRepository,
     private readonly executor: ProviderOperationExecutor,
+    private readonly libraryScope: LibraryScopeService,
     @Optional() private readonly providerIdStore?: ProviderIdStore,
   ) {}
 
@@ -159,11 +161,8 @@ export class MetadataFetchService {
       throw new NotFoundException(`Book ${bookId} not found`);
     }
 
-    if (!user.isSuperuser) {
-      const hasAccess = await this.metadataFetchRepository.hasLibraryAccess(user.id, row.libraryId);
-      if (!hasAccess) {
-        throw new ForbiddenException(`No access to book ${bookId}`);
-      }
+    if (!(await this.libraryScope.canSee(user, row.libraryId))) {
+      throw new ForbiddenException(`No access to book ${bookId}`);
     }
 
     return row;

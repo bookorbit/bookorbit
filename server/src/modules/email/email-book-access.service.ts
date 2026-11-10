@@ -30,7 +30,7 @@ export class EmailBookAccessService {
       uniqueBookIds.map(async (bookId) => {
         const libraryId = libraryByBookId.get(bookId);
         if (libraryId === undefined) throw new NotFoundException(`Book ${bookId} not found`);
-        await this.libraryService.verifyUserAccess(user.id, libraryId, user.isSuperuser);
+        await this.libraryService.verifyAccess(user, libraryId);
       }),
     );
 

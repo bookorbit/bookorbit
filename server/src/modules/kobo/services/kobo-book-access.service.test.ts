@@ -1,5 +1,6 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 
+import { LibraryScopeService } from '../../../common/library-scope/library-scope.service';
 import { KoboBookAccessService } from './kobo-book-access.service';
 
 describe('KoboBookAccessService', () => {
@@ -33,8 +34,13 @@ describe('KoboBookAccessService', () => {
       }),
     };
 
+    const libraryScope = new LibraryScopeService({
+      findIsSuperuser: () => Promise.resolve(options.user?.isSuperuser === true),
+      findGrantedLevels: () => Promise.resolve((options.accessRows ?? []).map(({ libraryId }) => ({ id: libraryId, accessLevel: 'viewer' }))),
+    } as never);
+
     return {
-      service: new KoboBookAccessService(db as never, contentFilterRepository as never),
+      service: new KoboBookAccessService(db as never, contentFilterRepository as never, libraryScope),
       db,
       contentFilterRepository,
     };

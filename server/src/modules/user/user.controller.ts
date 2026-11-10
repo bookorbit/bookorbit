@@ -22,6 +22,7 @@ import type { FastifyReply } from 'fastify';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 
+import { InteractiveOnly } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
@@ -78,6 +79,7 @@ export class UserController {
   }
 
   @Patch('me')
+  @InteractiveOnly()
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot edit account settings')
   @Auditable({
     action: AuditAction.UserSelfUpdate,
@@ -242,6 +244,7 @@ export class UserController {
   }
 
   @Put(':id/permissions')
+  @InteractiveOnly()
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.ManageUsers)
   @Auditable({
@@ -255,6 +258,7 @@ export class UserController {
   }
 
   @Put(':id/superuser')
+  @InteractiveOnly()
   @HttpCode(HttpStatus.NO_CONTENT)
   @RequirePermission(Permission.ManageUsers)
   @Auditable({
@@ -297,6 +301,7 @@ export class UserController {
   }
 
   @Post(':id/reset-password')
+  @InteractiveOnly()
   @RequirePermission(Permission.ManageUsers)
   @Auditable({
     action: AuditAction.AuthPasswordAdminReset,

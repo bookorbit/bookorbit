@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import {
   BadRequestException,
   ConflictException,
@@ -41,7 +42,6 @@ import { BookMoveRepository } from './book-move.repository';
 import type { MoveBooksDto, MovePreviewDto } from './dto/move-books.dto';
 
 const MOVE_EVENT = 'book_move.job';
-const EDITOR_LEVELS = new Set(['editor', 'owner']);
 const MAX_PLAN_ROUNDS = 5;
 
 export interface BookMoveStreamOptions {
@@ -71,6 +71,7 @@ export class BookMoveService implements OnApplicationBootstrap {
     private readonly scanGateway: ScanGateway,
     private readonly notificationService: NotificationService,
     private readonly libraryGate: LibraryOperationGate,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   /**
@@ -342,11 +343,9 @@ export class BookMoveService implements OnApplicationBootstrap {
   }
 
   private async assertEditorAccess(user: RequestUser, libraryIds: number[]): Promise<void> {
-    if (user.isSuperuser || libraryIds.length === 0) return;
+    if (libraryIds.length === 0) return;
 
-    const access = await this.moveRepo.findLibraryAccess(libraryIds);
-    const granted = new Set(access.filter((row) => row.userId === user.id && EDITOR_LEVELS.has(row.accessLevel)).map((row) => row.libraryId));
-
+    const granted = new Set(await this.libraryScope.editableIds(user));
     const missing = libraryIds.filter((id) => !granted.has(id));
     if (missing.length > 0) {
       throw new ForbiddenException(`Editor access is required for library ${missing[0]} to move books`);

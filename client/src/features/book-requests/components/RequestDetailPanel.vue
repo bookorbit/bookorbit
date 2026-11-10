@@ -178,13 +178,21 @@ const CONFIRM_COPY = {
 const confirmTitle = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].title))
 
 const confirmDescription = computed(() => {
-  if (confirming.value === 'delete') return t('bookRequests.confirm.deleteDescription')
+  const alwaysDeletesRemote = request.value?.download?.alwaysDeletesRemote ?? false
+  if (confirming.value === 'delete') {
+    return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteDescriptionRemoteDelete' : 'bookRequests.confirm.deleteDescription')
+  }
   if (confirming.value === 'leave') return t('bookRequests.confirm.leaveDescription')
   if (confirming.value === 'discardImport') return t('bookRequests.confirm.discardImportDescription')
-  if (confirming.value === 'cancelDownload') return t('bookRequests.confirm.cancelDownloadDescription')
-  return request.value && cancelStopsATransfer(request.value)
-    ? t('bookRequests.confirm.cancelDescriptionWithDownload')
-    : t('bookRequests.confirm.cancelDescription')
+  if (confirming.value === 'cancelDownload') {
+    return t(alwaysDeletesRemote ? 'bookRequests.confirm.cancelDownloadDescriptionRemoteDelete' : 'bookRequests.confirm.cancelDownloadDescription')
+  }
+  if (request.value && cancelStopsATransfer(request.value)) {
+    return t(
+      alwaysDeletesRemote ? 'bookRequests.confirm.cancelDescriptionWithDownloadRemoteDelete' : 'bookRequests.confirm.cancelDescriptionWithDownload',
+    )
+  }
+  return t('bookRequests.confirm.cancelDescription')
 })
 
 const confirmLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].label))
@@ -472,19 +480,21 @@ async function handleReject() {
 
 async function cancelRequest() {
   if (!request.value) return
-  const outcome = await actions.cancel(request.value.id)
+  const outcome = await actions.cancel(request.value.id, { deleteFiles: request.value.download?.alwaysDeletesRemote ?? false })
   if (applyUpdate(outcome, 'bookRequests.errors.cancelFailed')) toast.success(t('bookRequests.toasts.cancelled'))
 }
 
 async function cancelDownload() {
   if (!request.value?.download) return
-  const outcome = await actions.cancelDownload(request.value.id, request.value.download.id)
+  const outcome = await actions.cancelDownload(request.value.id, request.value.download.id, {
+    deleteFiles: request.value.download.alwaysDeletesRemote,
+  })
   if (applyUpdate(outcome, 'bookRequests.errors.cancelDownloadFailed')) toast.success(t('bookRequests.toasts.downloadCancelled'))
 }
 
 async function deleteRequest() {
   if (!request.value) return
-  const outcome = await actions.remove(request.value.id)
+  const outcome = await actions.remove(request.value.id, request.value.download?.alwaysDeletesRemote ?? false)
   if (!outcome.ok) {
     toast.error(t('bookRequests.errors.deleteFailed'), outcome.reason ? { description: outcome.reason } : undefined)
     return

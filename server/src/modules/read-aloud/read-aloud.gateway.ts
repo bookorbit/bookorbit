@@ -1,19 +1,12 @@
-import { ForbiddenException, Logger, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { ForbiddenException, Logger } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import {
-  Permission,
-  READ_ALOUD_JOB_UPDATED_EVENT,
-  READ_ALOUD_SOCKET_NAMESPACE,
-  type AuthenticationMethod,
-  type ReadAloudJob,
-} from '@bookorbit/types';
+import { Permission, READ_ALOUD_JOB_UPDATED_EVENT, READ_ALOUD_SOCKET_NAMESPACE, type ReadAloudJob } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 import { wsCorsOrigin } from '../../common/utils/ws-cors.utils';
-import { AuthService } from '../auth/auth.service';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function userRoom(userId: number): string {
   return `read-aloud:user:${userId}`;
@@ -28,20 +21,11 @@ export class ReadAloudGateway implements OnGatewayConnection, OnGatewayDisconnec
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(ReadAloudGateway.name);
 
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly authenticator: AuthenticatorService) {}
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new UnauthorizedException('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }>(token, {
-        algorithms: ['HS256'],
-      });
-      const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
-      if (!user) throw new UnauthorizedException('User not found or token revoked');
+      const user = await this.authenticator.authenticateSocket(client);
       // Forbidden, not Unauthorized: a fresh token would be refused the same way, so the client must not retry.
       if (!user.isSuperuser && !user.permissions.includes(Permission.LibraryGenerateReadAloud)) {
         throw new ForbiddenException('Missing read-aloud permission');

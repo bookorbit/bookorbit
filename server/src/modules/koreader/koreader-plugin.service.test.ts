@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { Logger } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -25,9 +26,11 @@ function deviceFields() {
   return { deviceId: DEVICE_ID, deviceModel: 'Kobo Libra 2', pluginVersion: '0.1.0' };
 }
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderPluginService', () => {
   let koreaderRepo: {
-    getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
     resolveBookFilesByHashes: ReturnType<typeof vi.fn>;
     upsertUnmatchedBooks: ReturnType<typeof vi.fn>;
     clearUnmatchedBooks: ReturnType<typeof vi.fn>;
@@ -60,12 +63,12 @@ describe('KoreaderPluginService', () => {
   let service: KoreaderPluginService;
 
   beforeEach(async () => {
+    accessibleLibraryIds = vi.fn().mockResolvedValue([1]);
     vi.restoreAllMocks();
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
 
     koreaderRepo = {
-      getAccessibleLibraryIds: vi.fn().mockResolvedValue([1]),
       resolveBookFilesByHashes: vi.fn().mockResolvedValue(new Map([[HASH_A, { bookFileId: 10, bookId: 20, libraryId: 1 }]])),
       upsertUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
       clearUnmatchedBooks: vi.fn().mockResolvedValue(undefined),
@@ -101,6 +104,7 @@ describe('KoreaderPluginService', () => {
     const module = await Test.createTestingModule({
       providers: [
         KoreaderPluginService,
+        { provide: LibraryScopeService, useValue: libraryScopeStub() },
         { provide: KoreaderRepository, useValue: koreaderRepo },
         { provide: KoreaderPluginRepository, useValue: pluginRepo },
         { provide: KoreaderService, useValue: koreaderService },
@@ -338,7 +342,7 @@ describe('KoreaderPluginService', () => {
     });
 
     it('skips the global file timestamp when no library is accessible', async () => {
-      koreaderRepo.getAccessibleLibraryIds.mockResolvedValue([]);
+      accessibleLibraryIds.mockResolvedValue([]);
       await service.getLibraryVersion(7);
       expect(pluginRepo.getGlobalMaxFileTimestamp).not.toHaveBeenCalled();
       expect(pluginRepo.getHashHistoryVersion).toHaveBeenCalledWith([]);
@@ -348,7 +352,7 @@ describe('KoreaderPluginService', () => {
       const dto = { ...deviceFields(), hashes: [HASH_A] } as MatchCheckDto;
 
       const first = await service.matchCheck(makeUser(), dto);
-      koreaderRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+      accessibleLibraryIds.mockResolvedValue([1, 2]);
       const second = await service.matchCheck(makeUser(), dto);
 
       expect(second.libraryVersion).not.toBe(first.libraryVersion);

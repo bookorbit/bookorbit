@@ -27,6 +27,7 @@ export type MetadataNoopMock = {
   extractAndSave: ReturnType<typeof vi.fn>;
   refreshCoverForBook: ReturnType<typeof vi.fn>;
   extractAudioFileDuration: ReturnType<typeof vi.fn>;
+  measureAudioFile: ReturnType<typeof vi.fn>;
   aggregateAudioDuration: ReturnType<typeof vi.fn>;
   extractAudioChaptersAndNarrators: ReturnType<typeof vi.fn>;
 };
@@ -47,6 +48,7 @@ export function makeMetadataNoopMock(): MetadataNoopMock {
     extractAndSave: vi.fn().mockResolvedValue(undefined),
     refreshCoverForBook: vi.fn().mockResolvedValue(false),
     extractAudioFileDuration: vi.fn().mockResolvedValue(undefined),
+    measureAudioFile: vi.fn().mockResolvedValue(null),
     aggregateAudioDuration: vi.fn().mockResolvedValue(undefined),
     extractAudioChaptersAndNarrators: vi.fn().mockResolvedValue(undefined),
   };

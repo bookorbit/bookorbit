@@ -1,14 +1,14 @@
 {
-  "totalRoutes": 674,
+  "totalRoutes": 687,
   "byPermission": {
-    "(none)": 265,
+    "(none)": 270,
     "Permission.ManageMetadataConfig": 47,
     "Permission.EmailSend": 34,
     "Permission.LibraryEditMetadata": 59,
     "Permission.BookDockAccess": 17,
-    "Permission.ManageAppSettings": 62,
+    "Permission.ManageAppSettings": 64,
     "Permission.ManageLibraries": 33,
-    "Permission.ManageUsers": 14,
+    "Permission.ManageUsers": 18,
     "Permission.ManageEmail": 8,
     "Permission.KoboSync": 13,
     "Permission.NotificationAccess": 6,
@@ -29,7 +29,8 @@
     "Permission.ManageBookRequests": 21,
     "Permission.BookRequestSelfFulfill": 12,
     "Permission.LibraryGenerateReadAloud": 10,
-    "Permission.LibraryMergeBooks": 15
+    "Permission.LibraryMergeBooks": 15,
+    "Permission.ApiKeys": 2
   },
   "byLibraryAccess": {
     "'viewer'": 6,

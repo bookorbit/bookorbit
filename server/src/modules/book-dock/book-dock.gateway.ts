@@ -1,33 +1,21 @@
-import { Logger, UnauthorizedException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
+import { Logger } from '@nestjs/common';
 import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 
-import type { AuthenticationMethod } from '@bookorbit/types';
-
-import { AuthService } from '../auth/auth.service';
 import { rejectSocketConnection } from '../../common/utils/ws-auth.utils';
 import { wsCorsOrigin } from '../../common/utils/ws-cors.utils';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 @WebSocketGateway({ namespace: '/book-dock', cors: { origin: wsCorsOrigin() } })
 export class BookDockGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(BookDockGateway.name);
 
-  constructor(
-    private readonly jwtService: JwtService,
-    private readonly authService: AuthService,
-  ) {}
+  constructor(private readonly authenticator: AuthenticatorService) {}
 
   async handleConnection(client: Socket): Promise<void> {
     try {
-      const token = client.handshake.auth?.token as string | undefined;
-      if (!token) throw new UnauthorizedException('No token provided');
-      const payload = this.jwtService.verify<{ sub: number; ver: number; sid?: number; amr?: AuthenticationMethod }>(token, {
-        algorithms: ['HS256'],
-      });
-      const user = await this.authService.validateSessionUser(payload.sub, payload.ver, payload.amr ?? 'legacy', payload.sid);
-      if (!user) throw new UnauthorizedException('User not found or token revoked');
+      const user = await this.authenticator.authenticateSocket(client);
       (client.data as Record<string, unknown>).user = user;
       this.logger.debug(`WS connected: user=${user.id} socket=${client.id}`);
     } catch (err) {

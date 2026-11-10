@@ -1,6 +1,7 @@
 import { Permission } from '@bookorbit/types';
 
 import { BOOK_METADATA_FETCH_STATUS_EVENT, BookMetadataFetchGateway } from './book-metadata-fetch.gateway';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
@@ -9,8 +10,7 @@ function makeGateway() {
   const configService = { isPaused: vi.fn() };
   const session = { getSnapshot: vi.fn() };
   const gateway = new BookMetadataFetchGateway(
-    jwtService as never,
-    authService as never,
+    new AuthenticatorService(jwtService as never, authService as never) as never,
     queueRepo as never,
     configService as never,
     session as never,

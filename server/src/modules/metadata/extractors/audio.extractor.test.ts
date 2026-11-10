@@ -4,13 +4,16 @@ vi.mock('child_process', async (importOriginal) => {
   const actual = await importOriginal<typeof import('child_process')>();
   return { ...actual, execFile: vi.fn(), spawn: vi.fn() };
 });
+vi.mock('music-metadata', () => ({ parseFile: vi.fn() }));
 
 import { execFile as execFileCallback, spawn } from 'child_process';
-import { extractAudioMetadata, parseAudioDuration, probeAudioChapters } from './audio.extractor';
+import { parseFile } from 'music-metadata';
+import { extractAudioMetadata, probeAudioChapters, probeAudioFile } from './audio.extractor';
 import { EventEmitter } from 'events';
 
 const mockExecFile = execFileCallback as unknown as Mock;
 const mockSpawn = spawn as unknown as Mock;
+const mockParseFile = parseFile as unknown as Mock;
 
 interface FfprobeOutput {
   format?: {
@@ -73,6 +76,12 @@ function makeSpawnError() {
 function resetMocks() {
   vi.resetAllMocks();
   mockSpawn.mockReturnValue(makeSpawnProcess(null));
+  // Unreadable in-process by default, so the ffprobe path stays what these tests exercise.
+  mockParseFile.mockRejectedValue(new Error('unsupported file'));
+}
+
+function makeParsed(format: Record<string, unknown>) {
+  mockParseFile.mockResolvedValue({ format, common: {}, native: {}, quality: { warnings: [] } });
 }
 
 // ── AUTHOR / NARRATOR SPLIT ───────────────────────────────────────────────────
@@ -807,54 +816,221 @@ describe('extractAudioMetadata — failure tolerance', () => {
   });
 });
 
-// ── parseAudioDuration ────────────────────────────────────────────────────────
+// ── probeAudioFile ────────────────────────────────────────────────────────────
 
-describe('parseAudioDuration', () => {
+describe('probeAudioFile', () => {
   beforeEach(() => resetMocks());
 
-  it('returns rounded duration in seconds', async () => {
-    makeExecFileSuccess(JSON.stringify({ format: { duration: '7200.4' } }));
+  it('returns the rounded length in seconds alongside the exact milliseconds and chapters', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '7200.4' }, chapters: [{ start_time: '0.000000', tags: { title: 'Opening' } }] }));
 
-    const result = await parseAudioDuration('/path/book.m4b');
+    const result = await probeAudioFile('/path/book.m4b');
 
-    expect(result).toBe(7200);
+    expect(result).toEqual({ durationSeconds: 7200, durationMs: 7_200_400, chapters: [{ title: 'Opening', startMs: 0 }] });
   });
 
-  it('returns null when format.duration is missing', async () => {
+  it('rounds seconds from the raw value, not from the rounded milliseconds', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '2.4996' } }));
+
+    const result = await probeAudioFile('/path/book.m4b');
+
+    expect(result).toMatchObject({ durationSeconds: 2, durationMs: 2_500 });
+  });
+
+  it('reports an unknown length when format.duration is missing', async () => {
     makeExecFileSuccess(JSON.stringify({ format: {} }));
 
-    const result = await parseAudioDuration('/path/no-duration.mp3');
+    const result = await probeAudioFile('/path/no-duration.mp3');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ durationSeconds: null, durationMs: null, chapters: [] });
   });
 
-  it('returns null when format.duration is not numeric', async () => {
+  it('reports an unknown length when format.duration is not numeric', async () => {
     makeExecFileSuccess(JSON.stringify({ format: { duration: 'N/A' } }));
 
-    const result = await parseAudioDuration('/path/bad-duration.mp3');
+    const result = await probeAudioFile('/path/bad-duration.mp3');
 
-    expect(result).toBeNull();
+    expect(result).toEqual({ durationSeconds: null, durationMs: null, chapters: [] });
   });
 
-  it('returns null when ffprobe throws', async () => {
+  it('returns null when ffprobe throws, so a failed read is never taken for a chapterless file', async () => {
     makeExecFileError('read error');
 
-    const result = await parseAudioDuration('/path/bad.mp3');
+    const result = await probeAudioFile('/path/bad.mp3');
 
     expect(result).toBeNull();
   });
 
-  it('invokes ffprobe with format-only arguments (no chapters or streams)', async () => {
-    makeExecFileSuccess(JSON.stringify({ format: { duration: '100' } }));
+  it('reads format and chapters in one ffprobe run, and never extracts a cover', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '100' }, chapters: [] }));
 
-    await parseAudioDuration('/books/test.mp3');
+    await probeAudioFile('/books/test.mp3');
 
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
     expect(mockExecFile).toHaveBeenCalledWith(
       'ffprobe',
-      ['-v', 'quiet', '-print_format', 'json', '-show_format', '/books/test.mp3'],
+      ['-v', 'quiet', '-print_format', 'json', '-show_format', '-show_chapters', '/books/test.mp3'],
       expect.objectContaining({ maxBuffer: expect.any(Number) }),
       expect.any(Function),
     );
+    expect(mockSpawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('probeAudioFile with the built-in reader', () => {
+  beforeEach(() => resetMocks());
+
+  it('reads length and MP4 chapters without launching ffprobe, counting chapter starts in their time scale', async () => {
+    makeParsed({
+      duration: 21148.235464,
+      containerDuration: 21148.235011,
+      chapters: [
+        { title: 'Chapter 1', timeScale: 44100, start: 0 },
+        { title: 'Chapter 2', timeScale: 44100, start: 24227702 },
+      ],
+    });
+
+    const result = await probeAudioFile('/books/Book/book.m4b', 'builtin');
+
+    expect(result).toEqual({
+      durationSeconds: 21148,
+      durationMs: 21_148_235,
+      chapters: [
+        { title: 'Chapter 1', startMs: 0 },
+        { title: 'Chapter 2', startMs: 549_381 },
+      ],
+    });
+    expect(mockExecFile).not.toHaveBeenCalled();
+    expect(mockParseFile).toHaveBeenCalledWith('/books/Book/book.m4b', {
+      duration: false,
+      includeChapters: true,
+      maxChapterCount: 1000,
+      skipCovers: true,
+    });
+  });
+
+  it('takes ID3v2 chapter starts as seconds and names an untitled one after its element ID, as ffprobe does', async () => {
+    makeParsed({
+      duration: 180,
+      chapters: [
+        { id: 'ch0', title: 'Opening', start: 0 },
+        { id: 'ch1', title: '', start: 61.5 },
+        { id: 'ch2', start: 125.25 },
+      ],
+    });
+
+    const result = await probeAudioFile('/books/Book/part-01.mp3', 'builtin');
+
+    expect(result?.chapters).toEqual([
+      { title: 'Opening', startMs: 0 },
+      { title: 'ch1', startMs: 61_500 },
+      { title: 'ch2', startMs: 125_250 },
+    ]);
+  });
+
+  it('keeps an untitled MP4 chapter untitled, as ffprobe does', async () => {
+    makeParsed({ duration: 180, chapters: [{ title: '', timeScale: 1000, start: 0 }] });
+
+    expect((await probeAudioFile('/books/Book/book.m4b', 'builtin'))?.chapters).toEqual([{ title: '', startMs: 0 }]);
+  });
+
+  it('prefers the container length, which is what ffprobe reports for MP4', async () => {
+    makeParsed({ duration: 180.023, containerDuration: 180 });
+
+    expect(await probeAudioFile('/books/Book/book.m4b', 'builtin')).toMatchObject({ durationSeconds: 180, durationMs: 180_000 });
+  });
+
+  it('asks for the end-of-file read only for Ogg, whose length is in its last page', async () => {
+    makeParsed({ duration: 228.107 });
+
+    await probeAudioFile('/books/Book/part.opus', 'builtin');
+    await probeAudioFile('/books/Book/part.OGG', 'builtin');
+    await probeAudioFile('/books/Book/part.flac', 'builtin');
+
+    expect(mockParseFile.mock.calls.map(([, options]) => (options as { duration: boolean }).duration)).toEqual([true, true, false]);
+  });
+
+  it('falls back to ffprobe when the parser states no length', async () => {
+    makeParsed({ duration: undefined, chapters: [{ title: 'Ignored', start: 0 }] });
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '142.958' }, chapters: [] }));
+
+    const result = await probeAudioFile('/books/Book/part.ogg', 'builtin');
+
+    expect(result).toEqual({ durationSeconds: 143, durationMs: 142_958, chapters: [] });
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to ffprobe when the parser cannot read the file', async () => {
+    mockParseFile.mockRejectedValue(new Error('Unexpected end of stream'));
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '60' }, chapters: [] }));
+
+    expect(await probeAudioFile('/books/Book/odd.m4a', 'builtin')).toMatchObject({ durationSeconds: 60 });
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [
+      'a chapter starts before the one ahead of it',
+      [
+        { title: 'B', start: 20 },
+        { title: 'A', start: 10 },
+      ],
+    ],
+    [
+      'a chapter starts past the end of the file',
+      [
+        { title: 'A', start: 0 },
+        { title: 'B', start: 102 },
+      ],
+    ],
+    ['a chapter start is not a number', [{ title: 'A', start: Number.NaN }]],
+    ['a chapter starts before zero', [{ title: 'A', start: -1 }]],
+  ])('hands the file to ffprobe when %s', async (_case, chapters) => {
+    makeParsed({ duration: 100, chapters });
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '100' }, chapters: [{ start_time: '0.000000', tags: { title: 'From ffprobe' } }] }));
+
+    expect((await probeAudioFile('/books/Book/part.mp3', 'builtin'))?.chapters).toEqual([{ title: 'From ffprobe', startMs: 0 }]);
+  });
+
+  it('hands the file to ffprobe when the parser hits its chapter cap, which drops the rest', async () => {
+    makeParsed({ duration: 100_000, chapters: Array.from({ length: 1000 }, (_, index) => ({ title: `C${index}`, timeScale: 1, start: index })) });
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '100000' }, chapters: [] }));
+
+    await probeAudioFile('/books/Book/huge.m4b', 'builtin');
+
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('hands the file to ffprobe when the length is implausibly long', async () => {
+    makeParsed({ duration: 8 * 24 * 60 * 60 });
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '3600' }, chapters: [] }));
+
+    expect(await probeAudioFile('/books/Book/part.mp3', 'builtin')).toMatchObject({ durationSeconds: 3600 });
+  });
+
+  it('hands the file to ffprobe when the parser has not answered within 30 seconds', async () => {
+    vi.useFakeTimers();
+    try {
+      mockParseFile.mockReturnValue(new Promise(() => undefined));
+      makeExecFileSuccess(JSON.stringify({ format: { duration: '60' }, chapters: [] }));
+
+      const pending = probeAudioFile('/books/Book/stuck.mp3', 'builtin');
+      await vi.advanceTimersByTimeAsync(30_000);
+
+      expect(await pending).toMatchObject({ durationSeconds: 60 });
+      expect(mockExecFile).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('reads with ffprobe alone unless the built-in reader is asked for', async () => {
+    makeExecFileSuccess(JSON.stringify({ format: { duration: '60' }, chapters: [] }));
+
+    await probeAudioFile('/books/Book/part.mp3');
+
+    expect(mockParseFile).not.toHaveBeenCalled();
+    expect(mockExecFile).toHaveBeenCalledTimes(1);
   });
 });
 

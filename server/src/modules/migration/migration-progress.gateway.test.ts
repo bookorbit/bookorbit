@@ -3,6 +3,7 @@ import { Permission } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { MigrationProgressGateway } from './migration-progress.gateway';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
+import { AuthenticatorService } from '../auth/authenticator.service';
 
 function makeUser(overrides?: Partial<RequestUser>): RequestUser {
   return {
@@ -37,7 +38,11 @@ function makeGateway() {
   };
   const appConfiguration = { appUrl: 'http://localhost:6263' };
 
-  const gateway = new MigrationProgressGateway(jwtService as never, authService as never, repo as never, appConfiguration as never);
+  const gateway = new MigrationProgressGateway(
+    new AuthenticatorService(jwtService as never, authService as never) as never,
+    repo as never,
+    appConfiguration as never,
+  );
   return { gateway, jwtService, authService, repo };
 }
 

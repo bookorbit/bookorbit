@@ -394,12 +394,8 @@ export class BookService {
   }
 
   private async verifyLibraryAccessLevels(libraryIds: number[], user: RequestUser, required: AccessLevel): Promise<void> {
-    const isSuperuser = this.isSuperuser(user);
-    if (isSuperuser) return;
     await mapWithConcurrency([...new Set(libraryIds)], 8, (libraryId) =>
-      required === 'viewer'
-        ? this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser)
-        : this.libraryService.verifyUserAccessLevel(user.id, libraryId, isSuperuser, required),
+      required === 'viewer' ? this.libraryService.verifyAccess(user, libraryId) : this.libraryService.verifyAccessLevel(user, libraryId, required),
     );
   }
 
@@ -616,7 +612,7 @@ export class BookService {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw await this.missingBookError(bookId, user);
     if (!(await this.canSeeBook(bookId, libraryId, user))) throw new NotFoundException(`Book ${bookId} not found`);
-    if (required !== 'viewer') await this.libraryService.verifyUserAccessLevel(user.id, libraryId, this.isSuperuser(user), required);
+    if (required !== 'viewer') await this.libraryService.verifyAccessLevel(user, libraryId, required);
   }
 
   /**
@@ -628,7 +624,7 @@ export class BookService {
    */
   private async canSeeBook(bookId: number, libraryId: number, user: RequestUser): Promise<boolean> {
     try {
-      await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+      await this.libraryService.verifyAccess(user, libraryId);
     } catch (error) {
       if (error instanceof ForbiddenException) return false;
       throw error;
@@ -665,7 +661,7 @@ export class BookService {
   async verifyFileAccess(fileId: number, user: RequestUser): Promise<NonNullable<Awaited<ReturnType<BookRepository['findFileById']>>>> {
     const file = await this.bookRepo.findFileById(fileId);
     if (!file) throw new NotFoundException(`No file with id ${fileId}`);
-    await this.libraryService.verifyUserAccess(user.id, file.libraryId, this.isSuperuser(user));
+    await this.libraryService.verifyAccess(user, file.libraryId);
 
     if (!this.isSuperuser(user) && user.contentFilters) {
       const passes = await this.checkBookPassesContentFilters(file.bookId, user.contentFilters);
@@ -1196,7 +1192,7 @@ export class BookService {
 
   async queryForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<BooksPage> {
     this.assertPaginationWindow(query.pagination.page, query.pagination.size);
-    await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    await this.libraryService.verifyAccess(user, libraryId);
     const timeZone = this.resolveUserTimeZone(user);
     const where = this.queryBuilder.buildWhere(query.filter, {
       accessibleLibraryIds: [libraryId],
@@ -1211,7 +1207,7 @@ export class BookService {
 
   /** Browse-header counts from the listing's own where clause; sort, paging and collapse are ignored. */
   async facetsForLibrary(user: RequestUser, libraryId: number, query: BookQuery): Promise<LibraryBookFacets> {
-    await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    await this.libraryService.verifyAccess(user, libraryId);
     const start = Date.now();
     const scope = {
       accessibleLibraryIds: [libraryId],
@@ -1441,7 +1437,7 @@ export class BookService {
   }
 
   async queryJumpBucketsForLibrary(user: RequestUser, libraryId: number, query: JumpBucketsQuery): Promise<JumpBucketsResponse> {
-    await this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user));
+    await this.libraryService.verifyAccess(user, libraryId);
     const timeZone = this.resolveUserTimeZone(user);
     const where = this.queryBuilder.buildWhere(query.filter, {
       accessibleLibraryIds: [libraryId],
@@ -1787,7 +1783,7 @@ export class BookService {
     this.logger.log(`[${event}] [start] fileId=${fileId} userId=${user.id} - rename file started`);
     try {
       const file = await this.verifyFileAccess(fileId, user);
-      await this.libraryService.verifyUserAccessLevel(user.id, file.libraryId, this.isSuperuser(user), 'editor');
+      await this.libraryService.verifyAccessLevel(user, file.libraryId, 'editor');
 
       let newAbsolutePath = file.absolutePath;
       if (dto.filename && dto.filename !== basename(file.absolutePath)) {
@@ -2425,7 +2421,7 @@ export class BookService {
   async saveAudioProgress(userId: number, bookId: number, dto: UpsertAudioProgressDto, user: RequestUser) {
     const libraryId = await this.bookRepo.findLibraryIdByBookId(bookId);
     if (libraryId === null) throw new NotFoundException(`Book ${bookId} not found`);
-    await this.libraryService.verifyUserAccess(userId, libraryId, this.isSuperuser(user));
+    await this.libraryService.verifyAccess(user, libraryId);
     const currentFile = await this.verifyFileAccess(dto.currentFileId, user);
     if (currentFile.bookId !== bookId) {
       throw new BadRequestException(`currentFileId ${dto.currentFileId} does not belong to book ${bookId}`);
@@ -3251,7 +3247,7 @@ export class BookService {
       if (!found) throw new NotFoundException(`Book ${id} not found`);
 
       const { book, authorRows, genreRows, communityRatingRows, fileRows, narratorRows } = found;
-      await this.libraryService.verifyUserAccessLevel(user.id, book.books.libraryId, this.isSuperuser(user), 'editor');
+      await this.libraryService.verifyAccessLevel(user, book.books.libraryId, 'editor');
       const meta = book.book_metadata;
 
       const providerIds = { ...this.collectExistingProviderIds(meta ?? {}), ...(await this.providerIdStore?.read(id)) };
@@ -3591,7 +3587,7 @@ export class BookService {
       }
 
       const uniqueLibraryIds = [...new Set(rows.map((row) => row.libraryId))];
-      await Promise.all(uniqueLibraryIds.map((libraryId) => this.libraryService.verifyUserAccess(user.id, libraryId, this.isSuperuser(user))));
+      await Promise.all(uniqueLibraryIds.map((libraryId) => this.libraryService.verifyAccess(user, libraryId)));
 
       const bookOrder = new Map(uniqueBookIds.map((id, index) => [id, index]));
       const fetchedFiles: ExportCandidateFile[] =

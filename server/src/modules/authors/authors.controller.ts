@@ -24,6 +24,7 @@ import type { FastifyReply } from 'fastify';
 import { map, Observable } from 'rxjs';
 
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
+import { KeyReadSafe } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
 import { ForbidPermission } from '../../common/decorators/forbid-permission.decorator';
@@ -154,6 +155,7 @@ export class AuthorsController {
   }
 
   @Post('enrichment/preview-count')
+  @KeyReadSafe()
   @RequirePermission(Permission.ManageMetadataConfig)
   async previewCount(@Body() body: PreviewAuthorEnrichmentCountDto) {
     const count = await this.queueRepo.countEligibleLinkedAuthors(body.conditions);

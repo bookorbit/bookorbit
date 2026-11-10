@@ -1,6 +1,7 @@
 import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { FastifyReply, FastifyRequest } from 'fastify';
 
+import { markHttpLogAsDebug } from '../utils/http-log-level.utils';
 import { redactUrlCredentials } from '../utils/log-url.utils';
 
 @Catch()
@@ -29,6 +30,9 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     const rawObject = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : undefined;
     const message = typeof raw === 'string' ? raw : ((rawObject?.message as string) ?? (exc?.message as string) ?? 'An error occurred');
     const errorCode = typeof rawObject?.errorCode === 'string' ? rawObject.errorCode : undefined;
+    if (errorCode?.startsWith('APP_ATTEST_')) {
+      markHttpLogAsDebug(request.raw);
+    }
     // The code's parameters, and useless without them: a client translating "you can have {limit}
     // in flight at once" has the sentence but not the number, and renders the placeholder empty.
     // Scalars only, so a thrower cannot smuggle a nested object of internals into an error body.

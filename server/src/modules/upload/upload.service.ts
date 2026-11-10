@@ -116,10 +116,9 @@ export class UploadService {
     this.logger.log(
       `[${event}] [start] libraryId=${libraryId} userId=${user.id} folderId=${folderId ?? 'auto'} rawFilename="${rawFilename}" - upload started`,
     );
-    const isSuperuser = user.isSuperuser;
 
     const library = await this.findLibraryOrFail(libraryId);
-    await this.libraryService.verifyUserAccess(user.id, libraryId, isSuperuser);
+    await this.libraryService.verifyAccess(user, libraryId);
 
     const folder = await this.resolveFolder(libraryId, folderId);
 
@@ -219,7 +218,7 @@ export class UploadService {
 
     if (!bookRow) throw new NotFoundException(`Book ${bookId} not found`);
 
-    await this.libraryService.verifyUserAccess(user.id, bookRow.libraryId, user.isSuperuser);
+    await this.libraryService.verifyAccess(user, bookRow.libraryId);
 
     if (bookRow.organizationMode === 'book_per_file') {
       throw new BadRequestException('Cannot add files to a book in a single-file library. Upload a new book instead.');
@@ -436,7 +435,7 @@ export class UploadService {
 
     if (!bookRow) throw new NotFoundException(`Book ${bookId} not found`);
 
-    await this.libraryService.verifyUserAccessLevel(user.id, bookRow.libraryId, user.isSuperuser, 'editor');
+    await this.libraryService.verifyAccessLevel(user, bookRow.libraryId, 'editor');
 
     const fileRenameService = this.resolveFileRenameService();
     if (!fileRenameService) {

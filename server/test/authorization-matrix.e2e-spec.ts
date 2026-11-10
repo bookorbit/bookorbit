@@ -5,10 +5,15 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 
 import { ConfigService } from '@nestjs/config';
+import { RequestMethod } from '@nestjs/common';
+import { METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
+import { MetadataScanner, ModulesContainer } from '@nestjs/core';
 import { Permission } from '@bookorbit/types';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { and, eq, inArray } from 'drizzle-orm';
 
+import { ALLOW_API_KEY_KEY, INTERACTIVE_ONLY_KEY, KEY_READ_SAFE_KEY } from '../src/common/decorators/api-key-policy.decorator';
+import { IS_PUBLIC_KEY } from '../src/common/decorators/public.decorator';
 import { createCoverToken } from '../src/modules/opds/opds-auth.guard';
 import * as schema from '../src/db/schema';
 import {
@@ -52,7 +57,14 @@ interface RouteInventoryRoute {
   isPublic: boolean;
   allowDefault: boolean;
   useGuards: string[];
+  /**
+   * What an API key may do here: `public` needs no credential, `read` admits read-only keys,
+   * `write` needs a read-and-write key, and `interactive` refuses every key.
+   */
+  apiKey: ApiKeyRouteClass;
 }
+
+type ApiKeyRouteClass = 'public' | 'read' | 'write' | 'interactive';
 
 interface RouteInventory {
   totalRoutes: number;
@@ -94,6 +106,7 @@ interface Personas {
   uploadUser: TestUserSession;
   readAloudUser: TestUserSession;
   downloadOnlyUser: TestUserSession;
+  apiKeyOwner: TestUserSession;
   ownerUser: TestUserSession;
   otherUser: TestUserSession;
   targetSuperuser: TestUserSession;
@@ -166,6 +179,35 @@ function liveRouteLabels(app: NestFastifyApplication): string[] {
   return [...labels].sort();
 }
 
+/** Every routed handler the application registered, keyed the way the inventory labels routes. */
+function liveRouteHandlers(app: NestFastifyApplication): Map<string, Array<{ handler: object; controller: object }>> {
+  const scanner = new MetadataScanner();
+  const handlers = new Map<string, Array<{ handler: object; controller: object }>>();
+  const segments = (value: unknown): string[] => (Array.isArray(value) ? (value as string[]) : [typeof value === 'string' ? value : '']);
+  const join = (...parts: string[]): string => `/${parts.join('/')}`.replace(/\/{2,}/g, '/').replace(/(.)\/$/, '$1');
+
+  for (const module of app.get(ModulesContainer).values()) {
+    for (const wrapper of module.controllers.values()) {
+      const controller = wrapper.metatype as (new (...args: never[]) => unknown) | null;
+      if (!controller?.prototype) continue;
+      const prototype = controller.prototype as Record<string, unknown>;
+      for (const name of scanner.getAllMethodNames(prototype)) {
+        const handler = prototype[name];
+        if (typeof handler !== 'function' || Reflect.getMetadata(PATH_METADATA, handler) === undefined) continue;
+        const method = RequestMethod[Reflect.getMetadata(METHOD_METADATA, handler) as RequestMethod];
+        for (const base of segments(Reflect.getMetadata(PATH_METADATA, controller))) {
+          for (const path of segments(Reflect.getMetadata(PATH_METADATA, handler))) {
+            const label = `${method} ${join(base, path)}`;
+            handlers.set(label, [...(handlers.get(label) ?? []), { handler, controller }]);
+          }
+        }
+      }
+    }
+  }
+
+  return handlers;
+}
+
 describe('Authorization matrix (e2e)', () => {
   let ctx: AuthorizationMatrixE2EContext;
   let libraryA: CreatedLibrary;
@@ -233,6 +275,7 @@ describe('Authorization matrix (e2e)', () => {
         permissions: [Permission.LibraryUpload, Permission.LibraryGenerateReadAloud],
       }),
       downloadOnlyUser: await createUserAndLogin(ctx, { permissions: [Permission.LibraryDownload] }),
+      apiKeyOwner: await createUserAndLogin(ctx, { permissions: [Permission.ApiKeys] }),
       ownerUser: await createUserAndLogin(ctx),
       otherUser: await createUserAndLogin(ctx),
       targetSuperuser: await createUserAndLogin(ctx, { isSuperuser: true }),
@@ -640,6 +683,69 @@ describe('Authorization matrix (e2e)', () => {
       assertNoFailures('permission denial matrix', failures);
     }, 180_000);
 
+    /**
+     * The inventory's `apiKey` column is what the sweeps below probe, so it has to say what the
+     * decorators on the live handlers say. A route that gains or loses `@InteractiveOnly`,
+     * `@AllowApiKey` or `@KeyReadSafe` without the inventory following fails here.
+     */
+    it('keeps the API key classification of every route in parity with its decorators', () => {
+      const handlers = liveRouteHandlers(ctx.app);
+      const mismatches: string[] = [];
+
+      for (const route of routeInventory.routes.filter((candidate) => isSupportedMethod(candidate.httpMethod))) {
+        const label = routeLabel(route);
+        const resolved = handlers.get(label) ?? [];
+        if (resolved.length !== 1) {
+          mismatches.push(`${label}: resolves to ${resolved.length} handlers`);
+          continue;
+        }
+        const live = apiKeyClassOf(route.httpMethod, resolved[0].handler, resolved[0].controller);
+        if (live !== route.apiKey) mismatches.push(`${label}: inventory says ${route.apiKey}, decorators say ${live}`);
+      }
+
+      expect(mismatches).toEqual([]);
+    });
+
+    it('refuses a read-only key on every route that writes, before anything else runs', async () => {
+      const token = await createApiKey(personas.apiKeyOwner, 'read');
+      const failures: MatrixFailure[] = [];
+
+      for (const route of routeInventory.routes.filter((candidate) => candidate.apiKey === 'write' && isSupportedMethod(candidate.httpMethod))) {
+        const response = await invokeRoute(route, { apiKey: token });
+        if (response.statusCode !== 403 || parseBody(response)?.errorCode !== 'API_KEY_READ_ONLY') {
+          failures.push({
+            route: routeLabel(route),
+            status: response.statusCode,
+            reason: 'expected API_KEY_READ_ONLY',
+            message: extractMessage(response),
+          });
+        }
+      }
+
+      assertNoFailures('read-only API key matrix', failures);
+    }, 180_000);
+
+    it('refuses every API key on the routes only a signed-in session may use', async () => {
+      const token = await createApiKey(personas.apiKeyOwner, 'write');
+      const failures: MatrixFailure[] = [];
+
+      for (const route of routeInventory.routes.filter(
+        (candidate) => candidate.apiKey === 'interactive' && isSupportedMethod(candidate.httpMethod),
+      )) {
+        const response = await invokeRoute(route, { apiKey: token });
+        if (response.statusCode !== 403 || parseBody(response)?.errorCode !== 'API_KEY_ROUTE_FORBIDDEN') {
+          failures.push({
+            route: routeLabel(route),
+            status: response.statusCode,
+            reason: 'expected API_KEY_ROUTE_FORBIDDEN',
+            message: extractMessage(response),
+          });
+        }
+      }
+
+      assertNoFailures('interactive-only API key matrix', failures);
+    }, 180_000);
+
     it('allows a settings operator to read book-request source status without request access', async () => {
       const response = await ctx.app.inject({
         method: 'GET',
@@ -821,6 +927,12 @@ describe('Authorization matrix (e2e)', () => {
           method: 'GET',
           path: '/books/merge/jobs/:jobId',
           params: { jobId: '2147483000' },
+          token: 'allPerms',
+        },
+        [Permission.ApiKeys]: {
+          method: 'POST',
+          path: '/api-keys/:id/regenerate',
+          params: { id: '2147483000' },
           token: 'allPerms',
         },
       };
@@ -1812,6 +1924,7 @@ describe('Authorization matrix (e2e)', () => {
     route: RouteInventoryRoute,
     options: {
       token?: string;
+      apiKey?: string;
       query?: string;
       payload?: Record<string, unknown>;
       params?: Record<string, string>;
@@ -1834,6 +1947,8 @@ describe('Authorization matrix (e2e)', () => {
 
     if (options.token) {
       request.headers = authHeader(options.token);
+    } else if (options.apiKey) {
+      request.headers = { 'x-api-key': options.apiKey };
     }
 
     if (method !== 'GET') {
@@ -1841,6 +1956,26 @@ describe('Authorization matrix (e2e)', () => {
     }
 
     return ctx.app.inject(request);
+  }
+
+  /** Mirrors `ApiKeyPolicyGuard`, read from the same metadata the guard reads. */
+  function apiKeyClassOf(httpMethod: string, handler: object, controller: object): ApiKeyRouteClass {
+    const read = (key: string): unknown => Reflect.getMetadata(key, handler) ?? Reflect.getMetadata(key, controller);
+    if (read(IS_PUBLIC_KEY)) return 'public';
+    if (!Reflect.getMetadata(ALLOW_API_KEY_KEY, handler) && read(INTERACTIVE_ONLY_KEY)) return 'interactive';
+    if (['GET', 'HEAD', 'OPTIONS'].includes(httpMethod) || read(KEY_READ_SAFE_KEY)) return 'read';
+    return 'write';
+  }
+
+  async function createApiKey(owner: TestUserSession, access: 'read' | 'write'): Promise<string> {
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/api-keys',
+      headers: authHeader(owner.accessToken),
+      payload: { name: `authz-${access}-${randomUUID().slice(0, 8)}`, access },
+    });
+    expect(response.statusCode, response.body).toBe(201);
+    return (response.json() as { token: string }).token;
   }
 
   function parseBody(response: InjectResponse): Record<string, unknown> | null {

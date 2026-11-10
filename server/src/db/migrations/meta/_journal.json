@@ -988,6 +988,20 @@
       "when": 1794068460741,
       "tag": "0140_add_merge_job_library_ids",
       "breakpoints": true
+    },
+    {
+      "idx": 141,
+      "version": "7",
+      "when": 1794108034255,
+      "tag": "0141_add_api_keys",
+      "breakpoints": true
+    },
+    {
+      "idx": 142,
+      "version": "7",
+      "when": 1794325724032,
+      "tag": "0142_torbox_download_client",
+      "breakpoints": true
     }
   ]
 }

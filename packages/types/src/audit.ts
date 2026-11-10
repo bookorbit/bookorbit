@@ -8,6 +8,11 @@ export enum AuditAction {
   AuthPasswordReset = "auth.password.reset",
   AuthPasswordAdminReset = "auth.password.admin_reset",
   AuthSessionRevoke = "auth.session.revoke",
+  ApiKeyCreate = "auth.api_key.create",
+  ApiKeyRename = "auth.api_key.rename",
+  ApiKeyRegenerate = "auth.api_key.regenerate",
+  ApiKeyRevoke = "auth.api_key.revoke",
+  ApiKeyRevokeAll = "auth.api_key.revoke_all",
 
   MagicLinkCreate = "magic_link.create",
   MagicLinkLogin = "magic_link.login",
@@ -178,6 +183,7 @@ export enum AuditResource {
   Series = "series",
   OidcIdentity = "oidc_identity",
   MagicLinkToken = "magic_link_token",
+  ApiKey = "api_key",
   ReadingInsightsProfile = "reading_insights_profile",
 }
 
@@ -285,6 +291,10 @@ export const AUDIT_SECURITY_GROUPS = {
   ],
   links: [
     AuditAction.AuthSessionRevoke,
+    AuditAction.ApiKeyCreate,
+    AuditAction.ApiKeyRegenerate,
+    AuditAction.ApiKeyRevoke,
+    AuditAction.ApiKeyRevokeAll,
     AuditAction.MagicLinkCreate,
     AuditAction.MagicLinkRevoke,
     AuditAction.MagicLinkActivate,

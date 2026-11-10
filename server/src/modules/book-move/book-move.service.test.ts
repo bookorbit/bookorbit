@@ -1,6 +1,8 @@
 import type { Mock } from 'vitest';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
+import type { AccessLevel } from '@bookorbit/types';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookMovePlannerService } from './book-move-planner.service';
@@ -75,6 +77,20 @@ let notificationService: { notify: ReturnType<typeof vi.fn> };
 let service: BookMoveService;
 let libraryGate: LibraryOperationGate;
 
+type GrantRow = { libraryId: number; userId: number; accessLevel: AccessLevel };
+
+/** Reads the grant rows each test hands the move repository, so one fixture drives both. */
+function scopeFromGrants(): LibraryScopeService {
+  const grants = async () => (await moveRepo.findLibraryAccess([])) as GrantRow[];
+  return new LibraryScopeService({
+    findAllIds: () => Promise.resolve([1, 2, 3]),
+    findGrantedLevels: async (userId: number, levels?: readonly AccessLevel[]) =>
+      (await grants())
+        .filter((row) => row.userId === userId && (!levels || levels.includes(row.accessLevel)))
+        .map((row) => ({ id: row.libraryId, accessLevel: row.accessLevel })),
+  } as never);
+}
+
 function buildService(): BookMoveService {
   return new BookMoveService(
     moveRepo as never,
@@ -87,6 +103,7 @@ function buildService(): BookMoveService {
     scanGateway as never,
     notificationService as never,
     libraryGate,
+    scopeFromGrants(),
   );
 }
 

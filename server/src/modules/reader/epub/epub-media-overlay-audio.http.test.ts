@@ -37,7 +37,7 @@ const bookReadService = {
   providers: [
     EpubService,
     { provide: BookReadService, useValue: bookReadService },
-    { provide: LibraryService, useValue: { verifyUserAccess: vi.fn().mockResolvedValue(undefined) } },
+    { provide: LibraryService, useValue: { verifyAccess: vi.fn().mockResolvedValue(undefined) } },
     { provide: APP_GUARD, useClass: StubAuthGuard },
   ],
 })

@@ -49,6 +49,9 @@ function makeKoreaderUserRow(overrides?: Record<string, unknown>) {
   };
 }
 
+let accessibleLibraryIds: ReturnType<typeof vi.fn>;
+const libraryScopeStub = () => ({ visibleIdsOrAll: accessibleLibraryIds, visibleIdsOrAllForUserId: accessibleLibraryIds });
+
 describe('KoreaderService', () => {
   let service: KoreaderService;
   let mockRepo: {
@@ -58,7 +61,6 @@ describe('KoreaderService', () => {
     createKoreaderUser: ReturnType<typeof vi.fn>;
     updateKoreaderUser: ReturnType<typeof vi.fn>;
     deleteKoreaderUser: ReturnType<typeof vi.fn>;
-    getAccessibleLibraryIds: ReturnType<typeof vi.fn>;
     resolveBookFileByHash: ReturnType<typeof vi.fn>;
     upsertDeviceProgress: ReturnType<typeof vi.fn>;
     upsertDeviceProgressMany: ReturnType<typeof vi.fn>;
@@ -117,6 +119,7 @@ describe('KoreaderService', () => {
     getVersionInfo: ReturnType<typeof vi.fn>;
   };
   beforeEach(() => {
+    accessibleLibraryIds = vi.fn();
     vi.restoreAllMocks();
     vi.clearAllMocks();
 
@@ -141,7 +144,6 @@ describe('KoreaderService', () => {
       createKoreaderUser: vi.fn(),
       updateKoreaderUser: vi.fn(),
       deleteKoreaderUser: vi.fn(),
-      getAccessibleLibraryIds: vi.fn(),
       resolveBookFileByHash: vi.fn(),
       upsertDeviceProgress: vi.fn(),
       upsertDeviceProgressMany: vi.fn(),
@@ -223,7 +225,7 @@ describe('KoreaderService', () => {
     mockRepo.upsertDeviceProgress.mockResolvedValue(undefined);
     mockRepo.upsertDeviceProgressMany.mockResolvedValue(undefined);
     mockRepo.upsertReadingProgress.mockResolvedValue(undefined);
-    mockRepo.getAccessibleLibraryIds.mockResolvedValue([1, 2]);
+    accessibleLibraryIds.mockResolvedValue([1, 2]);
     mockChapterService.parseChapterIndexFromProgress.mockReturnValue(null);
     mockChapterExtractor.extractAndStoreChapters.mockResolvedValue([]);
 
@@ -240,6 +242,7 @@ describe('KoreaderService', () => {
       mockPositionConverter as never,
       mockBookService as never,
       mockPackageService as unknown as KoreaderPackageService,
+      libraryScopeStub() as never,
     );
   });
 
@@ -606,7 +609,7 @@ describe('KoreaderService', () => {
     });
 
     it('passes empty accessible library lists to hash resolution', async () => {
-      mockRepo.getAccessibleLibraryIds.mockResolvedValue([]);
+      accessibleLibraryIds.mockResolvedValue([]);
       mockRepo.resolveBookFileByHash.mockResolvedValue(null);
 
       await expect(
@@ -1115,7 +1118,7 @@ describe('KoreaderService', () => {
       mockRepo.getChapters.mockResolvedValue([]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(null);
 
-      const info = await service.getBookProgress(7, 20);
+      const info = await service.getBookProgress({ id: 7, isSuperuser: false }, 20);
 
       expect(info?.canonicalSource).toBe('web_reader');
       expect(info?.canonicalPercentage).toBe(0);
@@ -1136,7 +1139,7 @@ describe('KoreaderService', () => {
       mockRepo.getChapters.mockResolvedValue([]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(null);
 
-      const info = await service.getBookProgress(7, 20);
+      const info = await service.getBookProgress({ id: 7, isSuperuser: false }, 20);
 
       expect(info?.canonicalSource).toBe('koreader');
       expect(info?.heldByReset).toEqual([]);
@@ -1147,7 +1150,7 @@ describe('KoreaderService', () => {
       mockRepo.getDeviceProgressForDevice.mockResolvedValue({ percentage: 0.42, progress: '/body/DocFragment[6]/body', syncTimestamp: null });
       mockRepo.getProgressReset.mockResolvedValue(resetAt);
 
-      await service.releaseResetHold(7, 20, 'device-1');
+      await service.releaseResetHold({ id: 7, isSuperuser: false }, 20, 'device-1');
 
       // Recording convergence instead would leave the marker live, and the next pull would ask
       // this same device to go back to the start.
@@ -1159,7 +1162,7 @@ describe('KoreaderService', () => {
       mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 10, bookId: 20, libraryId: 1, format: 'epub' });
       mockRepo.getDeviceProgressForDevice.mockResolvedValue(null);
 
-      await expect(service.releaseResetHold(7, 20, 'device-1')).rejects.toThrow(NotFoundException);
+      await expect(service.releaseResetHold({ id: 7, isSuperuser: false }, 20, 'device-1')).rejects.toThrow(NotFoundException);
     });
 
     it('answers a release with no pending reset as not found rather than a database error', async () => {
@@ -1167,17 +1170,17 @@ describe('KoreaderService', () => {
       mockRepo.getDeviceProgressForDevice.mockResolvedValue({ percentage: 0.42, progress: '/body/DocFragment[6]/body', syncTimestamp: null });
       mockRepo.getProgressReset.mockResolvedValue(null);
 
-      await expect(service.releaseResetHold(7, 20, 'device-1')).rejects.toThrow(NotFoundException);
+      await expect(service.releaseResetHold({ id: 7, isSuperuser: false }, 20, 'device-1')).rejects.toThrow(NotFoundException);
       expect(mockRepo.upsertReadingProgress).not.toHaveBeenCalled();
     });
 
     it('resolves the release target only within libraries the user can still reach', async () => {
-      mockRepo.getAccessibleLibraryIds.mockResolvedValue([3]);
+      accessibleLibraryIds.mockResolvedValue([3]);
       mockRepo.findProgressBookFileByBookId.mockResolvedValue(null);
 
       // A device progress row outlives the library grant that created it, so holding a row is
       // not proof of access to the book it points at.
-      await expect(service.releaseResetHold(7, 20, 'device-1')).rejects.toThrow(NotFoundException);
+      await expect(service.releaseResetHold({ id: 7, isSuperuser: false }, 20, 'device-1')).rejects.toThrow(NotFoundException);
       expect(mockRepo.findProgressBookFileByBookId).toHaveBeenCalledWith(20, 7, [3]);
     });
   });
@@ -1914,7 +1917,7 @@ describe('KoreaderService', () => {
       ]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(new Date('2026-03-01T12:00:00.000Z'));
 
-      await expect(service.getBookProgress(7, 99)).resolves.toEqual({
+      await expect(service.getBookProgress({ id: 7, isSuperuser: false }, 99)).resolves.toEqual({
         bookId: 99,
         bookFileId: 31,
         canonicalPercentage: 75,
@@ -1948,11 +1951,11 @@ describe('KoreaderService', () => {
     it('returns null when the book has no file to report on', async () => {
       mockRepo.findProgressBookFileByBookId.mockResolvedValue(null);
 
-      await expect(service.getBookProgress(7, 99)).resolves.toBeNull();
+      await expect(service.getBookProgress({ id: 7, isSuperuser: false }, 99)).resolves.toBeNull();
     });
 
     it('reports the file the user devices sync, resolved within libraries the user can reach', async () => {
-      mockRepo.getAccessibleLibraryIds.mockResolvedValue([3]);
+      accessibleLibraryIds.mockResolvedValue([3]);
       mockRepo.findProgressBookFileByBookId.mockResolvedValue({ id: 44, bookId: 99, libraryId: 3, format: 'epub' });
       mockRepo.getBookProgressForDashboard.mockResolvedValue({
         deviceProgress: [
@@ -1963,7 +1966,7 @@ describe('KoreaderService', () => {
       mockRepo.getChapters.mockResolvedValue([]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(null);
 
-      const info = await service.getBookProgress(7, 99);
+      const info = await service.getBookProgress({ id: 7, isSuperuser: false }, 99);
 
       // The same resolver the release action uses, so a hold shown here is one it can release.
       expect(mockRepo.findProgressBookFileByBookId).toHaveBeenCalledWith(99, 7, [3]);
@@ -1978,7 +1981,7 @@ describe('KoreaderService', () => {
         readingProgress: null,
       });
 
-      await expect(service.getBookProgress(7, 99)).resolves.toBeNull();
+      await expect(service.getBookProgress({ id: 7, isSuperuser: false }, 99)).resolves.toBeNull();
     });
 
     it('uses web reader as the canonical source when its progress is newer', async () => {
@@ -2001,7 +2004,7 @@ describe('KoreaderService', () => {
       mockRepo.getChapters.mockResolvedValue([{ chapterIndex: 1, title: 'Chapter 2' }]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(new Date('2026-03-01T07:00:00.000Z'));
 
-      await expect(service.getBookProgress(7, 99)).resolves.toEqual({
+      await expect(service.getBookProgress({ id: 7, isSuperuser: false }, 99)).resolves.toEqual({
         bookId: 99,
         bookFileId: 31,
         canonicalPercentage: 64.3,
@@ -2054,7 +2057,7 @@ describe('KoreaderService', () => {
       ]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(new Date('2026-03-01T12:00:00.000Z'));
 
-      const result = await service.getBookProgress(7, 99);
+      const result = await service.getBookProgress({ id: 7, isSuperuser: false }, 99);
 
       expect(result?.canonicalSource).toBe('koreader');
       expect(result?.fileModifiedSinceLastSync).toBe(true);
@@ -2090,7 +2093,7 @@ describe('KoreaderService', () => {
       ]);
       mockRepo.getLastFileWriteTime.mockResolvedValue(new Date('2026-03-01T12:00:00.000Z'));
 
-      const result = await service.getBookProgress(7, 99);
+      const result = await service.getBookProgress({ id: 7, isSuperuser: false }, 99);
 
       expect(result?.canonicalSource).toBe('koreader');
       expect(result?.fileModifiedSinceLastSync).toBe(false);

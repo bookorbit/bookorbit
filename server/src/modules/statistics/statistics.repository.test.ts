@@ -52,12 +52,11 @@ describe('StatisticsRepository', () => {
     vi.clearAllMocks();
   });
 
-  it('handles helper library-scope methods for superusers and restricted users', async () => {
-    const db = makeDb([[{ libraryId: 1 }, { libraryId: 3 }]]);
-    const repo = new StatisticsRepository(db as never);
+  it('handles helper library-scope methods for superusers and restricted users', () => {
+    const repo = new StatisticsRepository(makeDb([]) as never);
 
-    await expect((repo as any).getAccessibleLibraryIds(2, true)).resolves.toBeNull();
-    await expect((repo as any).getAccessibleLibraryIds(2, false)).resolves.toEqual([1, 3]);
+    expect((repo as any).resolveLibraryFilter(null, undefined)).toBeUndefined();
+    expect((repo as any).resolveLibraryFilter([1, 3], [3, 9])).toBeDefined();
 
     expect((repo as any).intersectLibraryIds(null, undefined)).toBeNull();
     expect((repo as any).intersectLibraryIds(null, [5, 6])).toEqual([5, 6]);
@@ -175,19 +174,18 @@ describe('StatisticsRepository', () => {
     );
     const repo = new StatisticsRepository(db as never);
 
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1, 2, 3]);
-    vi.spyOn(repo as any, 'resolveLibraryFilter').mockResolvedValue({ op: 'filter' });
+    vi.spyOn(repo as any, 'resolveLibraryFilter').mockReturnValue({ op: 'filter' });
 
-    await expect(repo.formatDistribution(1, false, [1])).resolves.toEqual([{ format: 'epub', count: 4 }]);
-    await expect(repo.languageDistribution(1, false, [1])).resolves.toEqual({
+    await expect(repo.formatDistribution([1, 2, 3], false, [1])).resolves.toEqual([{ format: 'epub', count: 4 }]);
+    await expect(repo.languageDistribution([1, 2, 3], false, [1])).resolves.toEqual({
       items: [{ language: 'en', count: 8 }],
       unknownCount: 2,
     });
 
-    await expect(repo.booksAddedOverTime(1, false, [1], 'yearly', 'last-year')).resolves.toEqual([{ year: 2026, month: 0, count: 5 }]);
-    await expect(repo.booksAddedOverTime(1, false, [1], 'monthly', 'all-time')).resolves.toEqual([{ year: 2026, month: 4, count: 3 }]);
+    await expect(repo.booksAddedOverTime([1, 2, 3], false, [1], 'yearly', 'last-year')).resolves.toEqual([{ year: 2026, month: 0, count: 5 }]);
+    await expect(repo.booksAddedOverTime([1, 2, 3], false, [1], 'monthly', 'all-time')).resolves.toEqual([{ year: 2026, month: 4, count: 3 }]);
 
-    await expect(repo.metadataScoreDistribution(1, false, [1])).resolves.toEqual({
+    await expect(repo.metadataScoreDistribution([1, 2, 3], false, [1])).resolves.toEqual({
       bins: [{ minScore: 20, count: 7 }],
       unknownCount: 1,
       totalCount: 7,
@@ -197,47 +195,47 @@ describe('StatisticsRepository', () => {
       percentile90: 40,
     });
 
-    await expect(repo.libraryMetadataCompleteness(1, false, [1])).resolves.toHaveLength(1);
-    await expect(repo.formatShareOverTime(1, false, [1])).resolves.toEqual([{ year: 2026, month: 1, format: 'epub', count: 10 }]);
-    await expect(repo.pageCountDistributionByFormat(1, false, [1])).resolves.toEqual({
+    await expect(repo.libraryMetadataCompleteness([1, 2, 3], false, [1])).resolves.toHaveLength(1);
+    await expect(repo.formatShareOverTime([1, 2, 3], false, [1])).resolves.toEqual([{ year: 2026, month: 1, format: 'epub', count: 10 }]);
+    await expect(repo.pageCountDistributionByFormat([1, 2, 3], false, [1])).resolves.toEqual({
       items: [{ format: 'epub', count: 2, min: 50, q1: 100, median: 200, q3: 300, max: 500 }],
       unknownCount: 6,
     });
-    await expect(repo.storageByFormat(1, false, [1])).resolves.toEqual([{ format: 'epub', sizeBytes: 1024 }]);
+    await expect(repo.storageByFormat([1, 2, 3], false, [1])).resolves.toEqual([{ format: 'epub', sizeBytes: 1024 }]);
 
-    const publicationTimeline = await repo.publicationYearTimeline(1, false, [1]);
+    const publicationTimeline = await repo.publicationYearTimeline([1, 2, 3], false, [1]);
     expect(publicationTimeline.items).toEqual([
       expect.objectContaining({
         year: 2020,
       }),
     ]);
-    const publicationDecade = await repo.publicationDecade(1, false, [1]);
+    const publicationDecade = await repo.publicationDecade([1, 2, 3], false, [1]);
     expect(publicationDecade.items).toHaveLength(1);
-    await expect(repo.topAuthors(1, false, [1])).resolves.toEqual(expect.any(Array));
+    await expect(repo.topAuthors([1, 2, 3], false, [1])).resolves.toEqual(expect.any(Array));
 
-    const metadataCompleteness = await repo.metadataCompleteness(1, false, [1]);
+    const metadataCompleteness = await repo.metadataCompleteness([1, 2, 3], false, [1]);
     expect(metadataCompleteness).toBeDefined();
 
-    const genreDistribution = await repo.genreDistribution(1, false, [1]);
+    const genreDistribution = await repo.genreDistribution([1, 2, 3], false, [1]);
     expect(genreDistribution).toHaveProperty('items');
     expect(genreDistribution).toHaveProperty('unknownCount');
 
-    const summary = await repo.getSummary(1, false, [1]);
+    const summary = await repo.getSummary([1, 2, 3], false, [1]);
     expect(summary).toBeDefined();
 
-    const freshness = await repo.metadataFreshnessGauge(1, false, [1]);
+    const freshness = await repo.metadataFreshnessGauge([1, 2, 3], false, [1]);
     expect(freshness).toHaveProperty('totalBooks');
 
-    const integrity = await repo.libraryIntegrityGauge(1, false, [1]);
+    const integrity = await repo.libraryIntegrityGauge([1, 2, 3], false, [1]);
     expect(integrity).toHaveProperty('totalBooks');
 
-    const lagScatter = await repo.acquisitionLagScatter(1, false, [1]);
+    const lagScatter = await repo.acquisitionLagScatter([1, 2, 3], false, [1]);
     expect(lagScatter).toHaveProperty('items');
 
-    await expect(repo.largestBooks(1, false, [1])).resolves.toEqual(expect.any(Array));
-    await expect(repo.topSeries(1, false, [1])).resolves.toEqual(expect.any(Array));
+    await expect(repo.largestBooks([1, 2, 3], false, [1])).resolves.toEqual(expect.any(Array));
+    await expect(repo.topSeries([1, 2, 3], false, [1])).resolves.toEqual(expect.any(Array));
 
-    const cooccurrence = await repo.getGenreCooccurrence(1, false, [1], 15);
+    const cooccurrence = await repo.getGenreCooccurrence([1, 2, 3], false, [1], 15);
     expect(cooccurrence).toHaveProperty('nodes');
     expect(cooccurrence).toHaveProperty('links');
   });
@@ -245,14 +243,13 @@ describe('StatisticsRepository', () => {
   it('returns fallback structures when optional query rows are missing', async () => {
     const db = makeDb([[{ id: 1, name: 'Only one' }], []]);
     const repo = new StatisticsRepository(db as never);
-    vi.spyOn(repo as any, 'getAccessibleLibraryIds').mockResolvedValue([1]);
-    vi.spyOn(repo as any, 'resolveLibraryFilter').mockResolvedValue({ op: 'filter' });
+    vi.spyOn(repo as any, 'resolveLibraryFilter').mockReturnValue({ op: 'filter' });
 
-    await expect(repo.getGenreCooccurrence(1, false, [1], 15)).resolves.toEqual({
+    await expect(repo.getGenreCooccurrence([1, 2, 3], false, [1], 15)).resolves.toEqual({
       nodes: [{ name: 'Only one' }],
       links: [],
     });
-    await expect(repo.metadataCompleteness(1, false, [1])).resolves.toEqual({
+    await expect(repo.metadataCompleteness([1, 2, 3], false, [1])).resolves.toEqual({
       total: 0,
       hasTitle: 0,
       hasCover: 0,

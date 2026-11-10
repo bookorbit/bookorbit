@@ -46,7 +46,7 @@ function makeService() {
     deleteByIds: vi.fn(),
   };
   const libraryService = {
-    verifyUserAccess: vi.fn().mockResolvedValue(undefined),
+    verifyAccess: vi.fn().mockResolvedValue(undefined),
   };
   const appSettings = {
     getAutoFinalizeSettings: vi.fn(),

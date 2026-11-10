@@ -107,6 +107,43 @@ describe('AppSettingsService', () => {
     });
   });
 
+  describe('API key settings', () => {
+    it('defaults to keys on with no lifetime limit when nothing is stored', async () => {
+      repo.findMany.mockResolvedValue([] as never);
+      await expect(service.getApiKeySettings()).resolves.toEqual({ enabled: true, maxLifetimeDays: null });
+    });
+
+    it('reads a stored limit and ignores an invalid one', async () => {
+      repo.findMany.mockResolvedValue([
+        { key: 'api_keys_enabled', value: 'false' },
+        { key: 'api_keys_max_lifetime_days', value: '30' },
+      ] as never);
+      await expect(service.getApiKeySettings()).resolves.toEqual({ enabled: false, maxLifetimeDays: 30 });
+
+      repo.findMany.mockResolvedValue([{ key: 'api_keys_max_lifetime_days', value: 'soon' }] as never);
+      await service.updateApiKeySettings({ enabled: true, maxLifetimeDays: null });
+      await expect(service.getApiKeySettings()).resolves.toEqual({ enabled: true, maxLifetimeDays: null });
+    });
+
+    it('writes both values together, drops the cached copy, and refuses an out-of-range limit', async () => {
+      repo.findMany.mockResolvedValue([] as never);
+      await service.getApiKeySettings();
+      repo.findMany.mockResolvedValue([{ key: 'api_keys_max_lifetime_days', value: '365' }] as never);
+
+      await expect(service.updateApiKeySettings({ enabled: true, maxLifetimeDays: 365 })).resolves.toEqual({ enabled: true, maxLifetimeDays: 365 });
+      expect(repo.upsertMany).toHaveBeenCalledWith([
+        { key: 'api_keys_enabled', value: 'true' },
+        { key: 'api_keys_max_lifetime_days', value: '365' },
+      ]);
+      await expect(service.updateApiKeySettings({ enabled: true, maxLifetimeDays: 0 })).rejects.toBeInstanceOf(BadRequestException);
+    });
+
+    it('keeps the generic setting route away from the API key settings', async () => {
+      await expect(service.update('api_keys_enabled', 'false')).rejects.toBeInstanceOf(BadRequestException);
+      expect(repo.updateByKey).not.toHaveBeenCalled();
+    });
+  });
+
   describe('isBookDockAutoFetchEnabled', () => {
     it('returns true by default when setting is absent', async () => {
       repo.findByKey.mockResolvedValue(undefined);

@@ -4,12 +4,13 @@
     "className": "DownloadClientController",
     "methodName": "removeOrphan",
     "httpMethod": "DELETE",
-    "path": "/admin/download-clients/:id/reconciliation/:hash",
+    "path": "/admin/download-clients/:id/reconciliation/:clientKey",
     "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -21,7 +22,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -33,7 +35,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -45,7 +48,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/upload/upload-session.controller.ts",
@@ -57,7 +61,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-request/download-clients/download-client.controller.ts",
@@ -69,7 +74,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/annotation/annotation-hub.controller.ts",
@@ -81,7 +87,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/authors/authors.controller.ts",
@@ -93,7 +100,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/book/book.controller.ts",
@@ -105,7 +113,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reader/epub/epub.controller.ts",
@@ -117,7 +126,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reader/epub/epub.controller.ts",
@@ -129,7 +139,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/search/search.controller.ts",
@@ -141,7 +152,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -153,7 +165,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -165,7 +178,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -177,7 +191,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -189,7 +204,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -201,7 +217,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -213,7 +230,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -225,7 +243,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -237,7 +256,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/upload/upload-session.controller.ts",
@@ -249,7 +269,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/upload/upload-session.controller.ts",
@@ -261,7 +282,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -273,7 +295,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -285,7 +308,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -297,7 +321,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -309,7 +334,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -321,7 +347,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -333,7 +360,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/user-statistics/user-statistics.controller.ts",
@@ -345,7 +373,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reading-history/reading-history.controller.ts",
@@ -357,7 +386,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reading-history/reading-history.controller.ts",
@@ -369,7 +399,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reading-history/reading-history.controller.ts",
@@ -381,7 +412,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reading-history/reading-history.controller.ts",
@@ -393,7 +425,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/watch-download/watch-download.controller.ts",
@@ -405,7 +438,8 @@
     "libraryAccess": [],
     "isPublic": true,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "public"
   },
   {
     "file": "server/src/modules/watch-download/watch-download.controller.ts",
@@ -417,7 +451,8 @@
     "libraryAccess": [],
     "isPublic": true,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "public"
   },
   {
     "file": "server/src/modules/watch-download/watch-download.controller.ts",
@@ -429,7 +464,8 @@
     "libraryAccess": [],
     "isPublic": true,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "public"
   },
   {
     "file": "server/src/modules/book/book.controller.ts",
@@ -441,7 +477,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/achievement/achievement.controller.ts",
@@ -453,7 +490,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": ["JwtAuthGuard"]
+    "useGuards": ["JwtAuthGuard"],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/achievement/achievement.controller.ts",
@@ -465,7 +503,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": ["JwtAuthGuard"]
+    "useGuards": ["JwtAuthGuard"],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/achievement/achievement.controller.ts",
@@ -477,19 +516,21 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": ["JwtAuthGuard"]
+    "useGuards": ["JwtAuthGuard"],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-request/download-clients/download-client.controller.ts",
     "className": "DownloadClientController",
     "methodName": "adopt",
     "httpMethod": "POST",
-    "path": "/admin/download-clients/:id/reconciliation/:hash/adopt",
+    "path": "/admin/download-clients/:id/reconciliation/:clientKey/adopt",
     "permissions": ["Permission.ManageAppSettings"],
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/dashboard/dashboard.controller.ts",
@@ -501,7 +542,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -513,7 +555,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -525,7 +568,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -537,7 +581,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -549,7 +594,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -561,7 +607,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/upload/upload-session.controller.ts",
@@ -573,7 +620,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/upload/upload-session.controller.ts",
@@ -585,7 +633,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/upload/upload-session.controller.ts",
@@ -597,7 +646,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/watch-download/watch-download.controller.ts",
@@ -609,7 +659,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/watch-download/watch-download.controller.ts",
@@ -621,7 +672,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -633,7 +685,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts-admin.controller.ts",
@@ -645,7 +698,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -657,7 +711,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -669,7 +724,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/tts/tts.controller.ts",
@@ -681,7 +737,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-journal/book-journal.controller.ts",
@@ -693,7 +750,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/book-journal/book-journal.controller.ts",
@@ -705,7 +763,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-journal/book-journal.controller.ts",
@@ -717,7 +776,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-journal/book-journal.controller.ts",
@@ -729,7 +789,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-journal/book-journal.controller.ts",
@@ -741,7 +802,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book-journal/book-journal.controller.ts",
@@ -753,7 +815,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/notebook/notebook.controller.ts",
@@ -765,7 +828,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/notebook/notebook.controller.ts",
@@ -777,7 +841,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/notebook/notebook.controller.ts",
@@ -789,7 +854,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/notebook/notebook.controller.ts",
@@ -801,7 +867,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/notebook/notebook.controller.ts",
@@ -813,7 +880,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/notebook/notebook.controller.ts",
@@ -825,7 +893,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/dashboard/dashboard.controller.ts",
@@ -837,7 +906,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
@@ -849,7 +919,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
@@ -861,7 +932,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
@@ -873,7 +945,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/metadata-cache/metadata-cache.controller.ts",
@@ -885,7 +958,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/server-identity/server-identity.controller.ts",
@@ -897,7 +971,8 @@
     "libraryAccess": [],
     "isPublic": true,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "public"
   },
   {
     "file": "server/src/modules/reader/djvu/djvu.controller.ts",
@@ -909,7 +984,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reader/djvu/djvu.controller.ts",
@@ -921,7 +997,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/reader/djvu/djvu.controller.ts",
@@ -933,7 +1010,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/koreader/koreader-catalog.controller.ts",
@@ -945,7 +1023,8 @@
     "libraryAccess": [],
     "isPublic": true,
     "allowDefault": false,
-    "useGuards": ["KoreaderAuthGuard"]
+    "useGuards": ["KoreaderAuthGuard"],
+    "apiKey": "public"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -957,7 +1036,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -969,7 +1049,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -981,7 +1062,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -993,7 +1075,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -1005,7 +1088,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -1017,7 +1101,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -1029,7 +1114,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -1041,7 +1127,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -1053,7 +1140,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
@@ -1065,7 +1153,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/book/reading-progress.controller.ts",
@@ -1077,7 +1166,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/book/reading-progress.controller.ts",
@@ -1089,7 +1179,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/book/reading-progress.controller.ts",
@@ -1101,7 +1192,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-http-provider.controller.ts",
@@ -1113,7 +1205,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-http-provider.controller.ts",
@@ -1125,7 +1218,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-http-provider.controller.ts",
@@ -1137,7 +1231,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-http-provider.controller.ts",
@@ -1149,7 +1244,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-http-provider.controller.ts",
@@ -1161,7 +1257,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-http-provider.controller.ts",
@@ -1173,7 +1270,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/metadata-http-provider/metadata-provider-icon.controller.ts",
@@ -1185,7 +1283,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/page-locator/page-locator.controller.ts",
@@ -1197,7 +1296,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/year-review/year-review.controller.ts",
@@ -1209,7 +1309,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/visual-match/visual-match.controller.ts",
@@ -1221,7 +1322,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/visual-match/shelf-match.controller.ts",
@@ -1233,7 +1335,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   },
   {
     "file": "server/src/modules/story-edits/story-edits.controller.ts",
@@ -1245,7 +1348,8 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "read"
   },
   {
     "file": "server/src/modules/story-edits/story-edits.controller.ts",
@@ -1257,6 +1361,7 @@
     "libraryAccess": [],
     "isPublic": false,
     "allowDefault": false,
-    "useGuards": []
+    "useGuards": [],
+    "apiKey": "write"
   }
 ]

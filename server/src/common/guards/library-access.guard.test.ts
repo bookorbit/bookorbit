@@ -2,6 +2,8 @@ import { BadRequestException, ExecutionContext, ForbiddenException } from '@nest
 
 import type { RequestUser } from '../types/request-user';
 import { LibraryAccessGuard } from './library-access.guard';
+import { LibraryScopeRepository } from '../library-scope/library-scope.repository';
+import { LibraryScopeService } from '../library-scope/library-scope.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 import { LIBRARY_ACCESS_KEY } from '../decorators/require-library-access.decorator';
 
@@ -53,7 +55,7 @@ function makeGuard(
     },
   };
 
-  const guard = new LibraryAccessGuard(reflector as never, db as never);
+  const guard = new LibraryAccessGuard(reflector as never, new LibraryScopeService(new LibraryScopeRepository(db as never)));
   return { guard, findFirst };
 }
 

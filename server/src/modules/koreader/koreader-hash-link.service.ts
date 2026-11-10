@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import { isAudioFormat } from '@bookorbit/types';
@@ -40,13 +41,14 @@ export class KoreaderHashLinkService {
   constructor(
     private readonly repo: KoreaderRepository,
     private readonly bookService: BookService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async listUnmatchedBooks(user: RequestUser): Promise<KoreaderUnmatchedBook[]> {
     const rows = await this.repo.listUnmatchedBooks(user.id, UNMATCHED_BOOK_LIMIT);
     if (rows.length === 0) return [];
 
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(user.id);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const hashes = rows.filter((row) => !row.manualLinkRequested).map((row) => row.hash);
     const resolved = await this.repo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);
     if (resolved.size > 0) {
@@ -83,7 +85,7 @@ export class KoreaderHashLinkService {
     });
     if (wanted.length === 0) return [];
 
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(user.id);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const books = await this.repo.findBooksByTitleKeys(
       [...new Set(wanted.map((entry) => entry.titleKey))],
       accessibleLibraryIds,
@@ -167,7 +169,7 @@ export class KoreaderHashLinkService {
   }
 
   async listManualHashLinks(user: RequestUser): Promise<KoreaderManualHashLink[]> {
-    const accessibleLibraryIds = await this.repo.getAccessibleLibraryIds(user.id);
+    const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
     const rows = await this.repo.listBookHashLinks(user.id, MANUAL_HASH_LINK_LIMIT, accessibleLibraryIds);
 
     return rows.map((row) => ({

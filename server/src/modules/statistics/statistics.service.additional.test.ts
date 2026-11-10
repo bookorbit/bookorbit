@@ -2,6 +2,8 @@ import type { RequestUser } from '../../common/types/request-user';
 import { StatisticsService } from './statistics.service';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
+const libraryScopeStub = { visibleIdsOrAll: vi.fn((user: { isSuperuser: boolean }) => Promise.resolve(user.isSuperuser ? null : [1])) };
+
 function makeUser(isSuperuser = false): RequestUser {
   return {
     id: 2,
@@ -46,7 +48,7 @@ function makeService() {
   };
   return {
     repo,
-    service: new StatisticsService(repo as never),
+    service: new StatisticsService(repo as never, libraryScopeStub as never),
   };
 }
 

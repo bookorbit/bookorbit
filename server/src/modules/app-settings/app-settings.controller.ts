@@ -9,6 +9,7 @@ import { OidcProviderService } from './oidc-provider.service';
 import { UpdateAppSettingDto } from './dto/update-app-setting.dto';
 import { UpdateFilePatternDto } from './dto/update-file-pattern.dto';
 import { UpdateBooleanSettingDto } from './dto/update-boolean-setting.dto';
+import { UpdateApiKeySettingsDto } from './dto/update-api-key-settings.dto';
 import { UpdateDefaultLibraryAccessDto } from './dto/update-default-library-access.dto';
 import { CreateOidcProviderDto } from './dto/create-oidc-provider.dto';
 import { UpdateOidcProviderDto } from './dto/update-oidc-provider.dto';
@@ -97,6 +98,18 @@ export class AppSettingsController {
   async setCrossPlatformPathSanitization(@Body() dto: UpdateBooleanSettingDto) {
     await this.appSettingsService.setCrossPlatformPathSanitizationEnabled(dto.enabled);
     return { enabled: dto.enabled };
+  }
+
+  @Get('api-keys')
+  getApiKeySettings() {
+    return this.appSettingsService.getApiKeySettings();
+  }
+
+  @Put('api-keys')
+  @HttpCode(HttpStatus.OK)
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated API key settings' })
+  updateApiKeySettings(@Body() dto: UpdateApiKeySettingsDto) {
+    return this.appSettingsService.updateApiKeySettings({ enabled: dto.enabled, maxLifetimeDays: dto.maxLifetimeDays });
   }
 
   @Get('default-library-access')

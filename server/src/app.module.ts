@@ -24,6 +24,7 @@ import {
 import { validateEnv } from './config/env.validation';
 import { loggerConfig } from './common/logger.config';
 import { CommonModule } from './common/common.module';
+import { LibraryScopeModule } from './common/library-scope/library-scope.module';
 import { SeriesIdentityModule } from './common/series-identity.module';
 import { AuditInterceptor } from './common/interceptors/audit.interceptor';
 import { MergedBookAliasInterceptor } from './common/interceptors/merged-book-alias.interceptor';
@@ -148,6 +149,7 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
     DbModule,
     SeriesIdentityModule,
     CommonModule,
+    LibraryScopeModule,
     SeedModule,
     AuthModule,
     AppSettingsModule,

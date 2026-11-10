@@ -1,13 +1,15 @@
 import type { ArgumentsHost } from '@nestjs/common';
 import { BadRequestException, HttpException, HttpStatus, Logger } from '@nestjs/common';
 
+import { isHttpLogMarkedAsDebug } from '../utils/http-log-level.utils';
 import { GlobalExceptionFilter } from './http-exception.filter';
 
 function makeHost(options: { sent?: boolean } = {}) {
   const send = vi.fn();
   const status = vi.fn().mockReturnValue({ send });
   const reply = { status, sent: options.sent ?? false };
-  const request = { url: '/api/books/1', id: 'req-123' };
+  const raw = {};
+  const request = { url: '/api/books/1', id: 'req-123', raw };
 
   const host = {
     switchToHttp: () => ({
@@ -16,7 +18,7 @@ function makeHost(options: { sent?: boolean } = {}) {
     }),
   } as unknown as ArgumentsHost;
 
-  return { host, status, send };
+  return { host, raw, status, send };
 }
 
 describe('GlobalExceptionFilter', () => {
@@ -48,6 +50,15 @@ describe('GlobalExceptionFilter', () => {
     filter.catch(new HttpException({ message: 'sharing disabled', errorCode: 'READING_INSIGHTS_PRIVATE' }, HttpStatus.FORBIDDEN), host);
 
     expect(send).toHaveBeenCalledWith(expect.objectContaining({ errorCode: 'READING_INSIGHTS_PRIVATE' }));
+  });
+
+  it('marks App Attest failures for debug-level HTTP logging', () => {
+    const filter = new GlobalExceptionFilter();
+    const { host, raw } = makeHost();
+
+    filter.catch(new HttpException({ message: 'attestation required', errorCode: 'APP_ATTEST_REQUIRED' }, HttpStatus.FORBIDDEN), host);
+
+    expect(isHttpLogMarkedAsDebug(raw as never)).toBe(true);
   });
 
   /**

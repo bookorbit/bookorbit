@@ -1,3 +1,4 @@
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 
 import type { UserSettings } from '@bookorbit/types';
@@ -39,6 +40,7 @@ export class KoreaderStatsService {
     private readonly pluginRepo: KoreaderPluginRepository,
     private readonly achievementEvents: AchievementEventsService,
     private readonly bookService: BookService,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async uploadPageStats(user: RequestUser, dto: PageStatsUploadDto): Promise<PageStatsUploadResult> {
@@ -53,7 +55,7 @@ export class KoreaderStatsService {
         throw new BadRequestException(`Too many page stat events in one request (max ${MAX_EVENTS_PER_REQUEST})`);
       }
 
-      const accessibleLibraryIds = await this.koreaderRepo.getAccessibleLibraryIds(user.id);
+      const accessibleLibraryIds = await this.libraryScope.visibleIdsOrAll(user);
       const timeZone = resolveTimeZone((user.settings as unknown as UserSettings | undefined)?.timezone, 'UTC');
       const hashes = [...new Set(dto.books.map((book) => book.hash.toLowerCase()))];
       const matches = await this.koreaderRepo.resolveBookFilesByHashes(hashes, accessibleLibraryIds, user.id);

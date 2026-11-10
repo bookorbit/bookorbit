@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookNarrators, narrators } from '../../db/schema';
+import { inNameOrder } from '../../common/utils/insert-lock-order.utils';
 import {
   chooseCanonicalMetadataTextRow,
   normalizeMetadataText,
@@ -64,7 +65,7 @@ export class NarratorRepository {
     if (missingNames.length > 0) {
       const insertedNarrators = await executor
         .insert(narrators)
-        .values(missingNames)
+        .values(inNameOrder(missingNames))
         .onConflictDoNothing()
         .returning({ id: narrators.id, name: narrators.name });
       for (const row of insertedNarrators) {

@@ -1,5 +1,6 @@
 vi.mock('fs/promises', () => ({
   readFile: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock('./lib/cbz-metadata', () => ({
@@ -71,13 +72,13 @@ vi.mock('./extractors/audio.extractor', () => ({
       coverBytes: null,
     }),
   ),
-  parseAudioDuration: vi.fn().mockImplementation(() => Promise.resolve(null)),
+  probeAudioFile: vi.fn().mockImplementation(() => Promise.resolve(null)),
   probeAudioChapters: vi.fn().mockImplementation(() => Promise.resolve({ chapters: [], durationMs: null })),
 }));
 
 import sharp from 'sharp';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import { readFile } from 'fs/promises';
+import { readFile, stat } from 'fs/promises';
 import { Logger } from '@nestjs/common';
 
 import { authors, bookAuthors, bookGenres, bookTags, genres, tags } from '../../db/schema';
@@ -88,7 +89,7 @@ import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
 import { parsePdfFile } from './lib/pdf-parser';
-import { extractAudioMetadata, parseAudioDuration, probeAudioChapters } from './extractors/audio.extractor';
+import { extractAudioMetadata, probeAudioChapters, probeAudioFile, type AudioFileProbe } from './extractors/audio.extractor';
 import { METADATA_AUTHORS_REPLACED } from './metadata-events.service';
 import { MetadataService } from './metadata.service';
 import { MetadataExtractionService } from './metadata-extraction.service';
@@ -102,7 +103,9 @@ const mockExtractEpubMetadata = extractEpubMetadata as MockedFunction<typeof ext
 const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extractCbzMetadata>;
 const mockExtractCbzCover = extractCbzCover as MockedFunction<typeof extractCbzCover>;
 const mockExtractAudioMetadata = extractAudioMetadata as MockedFunction<typeof extractAudioMetadata>;
-const mockParseAudioDuration = parseAudioDuration as MockedFunction<typeof parseAudioDuration>;
+const mockProbeAudioFile = probeAudioFile as MockedFunction<typeof probeAudioFile>;
+const audioProbe = (durationSeconds: number | null): AudioFileProbe | null =>
+  durationSeconds === null ? null : { durationSeconds, durationMs: durationSeconds * 1000, chapters: [] };
 const mockProbeAudioChapters = probeAudioChapters as MockedFunction<typeof probeAudioChapters>;
 
 const makeDb = () => {
@@ -196,7 +199,7 @@ describe('MetadataService', () => {
       chapters: [],
       coverBytes: null,
     });
-    mockParseAudioDuration.mockResolvedValue(null);
+    mockProbeAudioFile.mockResolvedValue(null);
     mockProbeAudioChapters.mockResolvedValue({ chapters: [], durationMs: null });
   });
 
@@ -234,6 +237,7 @@ describe('MetadataService', () => {
       }) as never,
       (overrides?.coverStore ?? defaultCoverStore) as never,
       audiobookChapters as never,
+      { ffmpegPath: 'ffmpeg', ffprobePath: 'ffprobe', scanReader: 'builtin' },
       (overrides?.embedder ?? embedder) as never,
       metadataEvents as never,
       undefined,
@@ -1544,10 +1548,11 @@ describe('MetadataService', () => {
 
     expect(transaction).toHaveBeenCalledTimes(1);
     expect(db.delete).toHaveBeenCalledWith(bookGenres);
-    expect(insertedGenres).toEqual(['Fantasy', 'Epic Fantasy', 'X'.repeat(200)]);
+    // Inserted in name order so two books saving the same new genres cannot deadlock; links keep the book's order.
+    expect(insertedGenres).toEqual(['Epic Fantasy', 'Fantasy', 'X'.repeat(200)]);
     expect(insertedBookGenres).toEqual([
-      { bookId: 12, genreId: 77 },
       { bookId: 12, genreId: 78 },
+      { bookId: 12, genreId: 77 },
       { bookId: 12, genreId: 79 },
     ]);
   });
@@ -1857,8 +1862,8 @@ describe('MetadataService', () => {
       await service.extractMergedAudioChapters(42, [partOne, partTwo], { filesChanged: true });
 
       expect(mockProbeAudioChapters).toHaveBeenCalledTimes(2);
-      expect(mockProbeAudioChapters).toHaveBeenNthCalledWith(1, partOne);
-      expect(mockProbeAudioChapters).toHaveBeenNthCalledWith(2, partTwo);
+      expect(mockProbeAudioChapters).toHaveBeenNthCalledWith(1, partOne, 'builtin');
+      expect(mockProbeAudioChapters).toHaveBeenNthCalledWith(2, partTwo, 'builtin');
       expect(audiobookChapters.applyFileChapters).toHaveBeenCalledWith(42, [
         { title: 'Chapter 1', startMs: 0 },
         { title: 'Chapter 2', startMs: 120_000 },
@@ -2095,6 +2100,83 @@ describe('MetadataService', () => {
 
       expect(audiobookChapters.applyFileChapters).not.toHaveBeenCalled();
     });
+
+    it('reuses files the caller already probed and probes only the rest', async () => {
+      const { db } = makeDb();
+      const service = makeService(db, undefined, { bookMetadataLockService: makeLockService() });
+      probeReturns({ [partTwo]: { chapters: [{ title: 'Chapter 2', startMs: 0 }], durationMs: 240_000 } });
+
+      await service.extractMergedAudioChapters(42, [partOne, partTwo], {
+        filesChanged: true,
+        probes: new Map([[partOne, { chapters: [{ title: 'Chapter 1', startMs: 0 }], durationMs: 360_000 }]]),
+      });
+
+      expect(mockProbeAudioChapters).toHaveBeenCalledExactlyOnceWith(partTwo, 'builtin');
+      expect(audiobookChapters.applyFileChapters).toHaveBeenCalledWith(42, [
+        { title: 'Chapter 1', startMs: 0 },
+        { title: 'Chapter 2', startMs: 360_000 },
+      ]);
+    });
+
+    it('re-reads a file holding a chapter write with ffprobe, the reading that write was verified against', async () => {
+      const { db } = makeDb();
+      const service = makeService(db, undefined, { bookMetadataLockService: makeLockService() });
+      const written = [
+        { title: 'Chapter 1', startMs: 0 },
+        { title: 'Chapter 2', startMs: 61_000 },
+      ];
+      audiobookChapters.fileChapterHints.mockResolvedValue([
+        {
+          absolutePath: partOne,
+          durationSeconds: 360,
+          chapterWriteProvenance: { mtimeMs: 1_000, sizeBytes: 2_048, chapters: written, startsMs: [0, 61_250], continuation: false },
+        },
+      ]);
+      vi.mocked(stat).mockResolvedValue({ size: 2_048, mtime: new Date(1_000) } as never);
+      probeReturns({
+        [partOne]: { chapters: written, durationMs: 360_000 },
+        [partTwo]: { chapters: [{ title: 'Chapter 3', startMs: 0 }], durationMs: 240_000 },
+      });
+
+      await service.extractMergedAudioChapters(42, [partOne, partTwo], {
+        filesChanged: true,
+        probes: new Map([[partOne, { chapters: [{ title: 'Read in-process', startMs: 0 }], durationMs: 360_000 }]]),
+      });
+
+      expect(mockProbeAudioChapters).toHaveBeenCalledWith(partOne);
+      expect(mockProbeAudioChapters).toHaveBeenCalledWith(partTwo, 'builtin');
+      expect(audiobookChapters.applyFileChapters).toHaveBeenCalledWith(
+        42,
+        expect.arrayContaining([
+          expect.objectContaining({ title: 'Chapter 2', startMs: 61_250 }),
+          expect.objectContaining({ title: 'Chapter 3', startMs: 360_000 }),
+        ]),
+      );
+    });
+
+    it('keeps playback order when files are probed together and finish out of order', async () => {
+      const { db } = makeDb();
+      const service = makeService(db, undefined, { bookMetadataLockService: makeLockService() });
+      const paths = Array.from({ length: 6 }, (_, index) => `/books/Long/part-${index + 1}.mp3`);
+      let inFlight = 0;
+      let peak = 0;
+      mockProbeAudioChapters.mockImplementation(async (absolutePath: string) => {
+        const index = paths.indexOf(absolutePath);
+        inFlight++;
+        peak = Math.max(peak, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, (paths.length - index) * 2));
+        inFlight--;
+        return { chapters: [{ title: `Part ${index + 1}`, startMs: 0 }], durationMs: 10_000 };
+      });
+
+      await service.extractMergedAudioChapters(42, paths, { filesChanged: true });
+
+      expect(peak).toBe(4);
+      expect(audiobookChapters.applyFileChapters).toHaveBeenCalledWith(
+        42,
+        paths.map((_, index) => ({ title: `Part ${index + 1}`, startMs: index * 10_000 })),
+      );
+    });
   });
 
   describe('readEmbeddedChapters', () => {
@@ -2219,7 +2301,7 @@ describe('MetadataService', () => {
     const { db, updateSet } = makeDb();
     const service = makeService(db);
 
-    mockParseAudioDuration.mockResolvedValueOnce(null).mockResolvedValueOnce(4321);
+    mockProbeAudioFile.mockResolvedValueOnce(null).mockResolvedValueOnce(audioProbe(4321));
     await service.extractAudioFileDuration(99, '/tmp/book.m4b');
     await service.extractAudioFileDuration(99, '/tmp/book.m4b');
 
@@ -2230,10 +2312,33 @@ describe('MetadataService', () => {
     const { db } = makeDb();
     const service = makeService(db);
 
-    mockParseAudioDuration.mockResolvedValueOnce(null).mockResolvedValueOnce(4321);
+    mockProbeAudioFile.mockResolvedValueOnce(null).mockResolvedValueOnce(audioProbe(4321));
 
     await expect(service.extractAudioFileDuration(99, '/tmp/book.m4b')).resolves.toBeNull();
     await expect(service.extractAudioFileDuration(99, '/tmp/book.m4b')).resolves.toBe(4321);
+  });
+
+  it('measureAudioFile saves the length and hands back the chapters from the same probe', async () => {
+    const { db, updateSet } = makeDb();
+    const service = makeService(db);
+    const probe = { durationSeconds: 3600, durationMs: 3_600_250, chapters: [{ title: 'Intro', startMs: 0 }] };
+    mockProbeAudioFile.mockResolvedValueOnce(probe);
+
+    await expect(service.measureAudioFile(99, '/tmp/part-01.mp3')).resolves.toEqual(probe);
+
+    expect(mockProbeAudioFile).toHaveBeenCalledExactlyOnceWith('/tmp/part-01.mp3', 'builtin');
+    expect(updateSet).toHaveBeenCalledExactlyOnceWith({ durationSeconds: 3600 });
+  });
+
+  it('measureAudioFile writes nothing for a file whose length cannot be read', async () => {
+    const { db, updateSet } = makeDb();
+    const service = makeService(db);
+    mockProbeAudioFile.mockResolvedValueOnce({ durationSeconds: null, durationMs: null, chapters: [] }).mockResolvedValueOnce(null);
+
+    await expect(service.measureAudioFile(99, '/tmp/part-01.mp3')).resolves.toEqual({ durationSeconds: null, durationMs: null, chapters: [] });
+    await expect(service.measureAudioFile(99, '/tmp/part-02.mp3')).resolves.toBeNull();
+
+    expect(updateSet).not.toHaveBeenCalled();
   });
 
   describe('measureMissingAudioDurations', () => {
@@ -2262,12 +2367,12 @@ describe('MetadataService', () => {
     it('measures each file, then re-totals the book from the durations it wrote', async () => {
       const { db, updateSet, updateWhere } = makeDurationDb([{ absolutePath: '/books/a/01.mp3' }, { absolutePath: '/books/a/02.mp3' }]);
       const service = makeService(db);
-      mockParseAudioDuration.mockImplementation((path) => Promise.resolve(path.endsWith('01.mp3') ? 600 : 900));
+      mockProbeAudioFile.mockImplementation((path) => Promise.resolve(audioProbe(path.endsWith('01.mp3') ? 600 : 900)));
       const aggregate = vi.spyOn(service, 'aggregateAudioDuration').mockResolvedValue(undefined);
 
       await expect(service.measureMissingAudioDurations(42)).resolves.toEqual({ measured: 2, failed: 0 });
 
-      expect(mockParseAudioDuration.mock.calls.map((call) => call[0]).sort()).toEqual(['/books/a/01.mp3', '/books/a/02.mp3']);
+      expect(mockProbeAudioFile.mock.calls.map((call) => call[0]).sort()).toEqual(['/books/a/01.mp3', '/books/a/02.mp3']);
       expect(updateSet.mock.calls.map((call) => call[0]).sort((a, b) => a.durationSeconds - b.durationSeconds)).toEqual([
         { durationSeconds: 600 },
         { durationSeconds: 900 },
@@ -2279,7 +2384,7 @@ describe('MetadataService', () => {
     it('leaves the total alone when a file cannot be measured, so the rest cannot shrink it', async () => {
       const { db, updateSet } = makeDurationDb([{ absolutePath: '/books/a/01.mp3' }, { absolutePath: '/books/a/02.mp3' }]);
       const service = makeService(db);
-      mockParseAudioDuration.mockImplementation((path) => Promise.resolve(path.endsWith('01.mp3') ? 600 : null));
+      mockProbeAudioFile.mockImplementation((path) => Promise.resolve(audioProbe(path.endsWith('01.mp3') ? 600 : null)));
       const aggregate = vi.spyOn(service, 'aggregateAudioDuration').mockResolvedValue(undefined);
 
       await expect(service.measureMissingAudioDurations(42)).resolves.toEqual({ measured: 1, failed: 1 });
@@ -2291,7 +2396,7 @@ describe('MetadataService', () => {
     it('treats a duration that rounds to zero as unmeasured', async () => {
       const { db } = makeDurationDb([{ absolutePath: '/books/a/blip.m4b' }]);
       const service = makeService(db);
-      mockParseAudioDuration.mockResolvedValue(0);
+      mockProbeAudioFile.mockResolvedValue(audioProbe(0));
       const aggregate = vi.spyOn(service, 'aggregateAudioDuration').mockResolvedValue(undefined);
 
       await expect(service.measureMissingAudioDurations(42)).resolves.toEqual({ measured: 0, failed: 1 });
@@ -2306,7 +2411,7 @@ describe('MetadataService', () => {
 
       await expect(service.measureMissingAudioDurations(42)).resolves.toEqual({ measured: 0, failed: 0 });
 
-      expect(mockParseAudioDuration).not.toHaveBeenCalled();
+      expect(mockProbeAudioFile).not.toHaveBeenCalled();
       expect(db.update).not.toHaveBeenCalled();
       expect(aggregate).not.toHaveBeenCalled();
     });
@@ -2317,19 +2422,19 @@ describe('MetadataService', () => {
       const service = makeService(db);
       let inFlight = 0;
       let peak = 0;
-      mockParseAudioDuration.mockImplementation(async () => {
+      mockProbeAudioFile.mockImplementation(async () => {
         inFlight++;
         peak = Math.max(peak, inFlight);
         await new Promise((resolve) => setTimeout(resolve, 1));
         inFlight--;
-        return 60;
+        return audioProbe(60);
       });
       vi.spyOn(service, 'aggregateAudioDuration').mockResolvedValue(undefined);
 
       await expect(service.measureMissingAudioDurations(42)).resolves.toEqual({ measured: 10, failed: 0 });
 
       expect(peak).toBe(4);
-      expect(mockParseAudioDuration).toHaveBeenCalledTimes(10);
+      expect(mockProbeAudioFile).toHaveBeenCalledTimes(10);
     });
   });
 

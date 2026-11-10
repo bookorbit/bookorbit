@@ -305,12 +305,18 @@ export async function createOpdsUserCredential(
 
 function makeMetadataNoopMock(): Pick<
   MetadataService,
-  'extractAndSave' | 'refreshCoverForBook' | 'extractAudioFileDuration' | 'aggregateAudioDuration' | 'extractAudioChaptersAndNarrators'
+  | 'extractAndSave'
+  | 'refreshCoverForBook'
+  | 'extractAudioFileDuration'
+  | 'measureAudioFile'
+  | 'aggregateAudioDuration'
+  | 'extractAudioChaptersAndNarrators'
 > {
   return {
     extractAndSave: () => Promise.resolve(undefined),
     refreshCoverForBook: () => Promise.resolve(false),
     extractAudioFileDuration: () => Promise.resolve(undefined),
+    measureAudioFile: () => Promise.resolve(null),
     aggregateAudioDuration: () => Promise.resolve(undefined),
     extractAudioChaptersAndNarrators: () => Promise.resolve(undefined),
   };

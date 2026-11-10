@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm';
 import { bigserial, index, integer, jsonb, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
+import { apiKeys } from './api-keys';
 import { users } from './auth';
 
 export const auditLog = pgTable(
@@ -17,6 +18,8 @@ export const auditLog = pgTable(
     description: text('description').notNull(),
     ip: varchar('ip', { length: 45 }),
     meta: jsonb('meta'),
+    /** The API key the action was made with, when it was made with one. */
+    apiKeyId: integer('api_key_id').references(() => apiKeys.id, { onDelete: 'set null' }),
     createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   },
   (t) => [
@@ -32,6 +35,7 @@ export const auditLog = pgTable(
     index('idx_audit_resource_label_trgm').using('gin', t.resourceLabel.op('gin_trgm_ops')),
     index('idx_audit_meta_text_trgm').using('gin', sql`(${t.meta}::text) gin_trgm_ops`),
     index('idx_audit_ip').on(t.ip),
+    index('idx_audit_api_key_id').on(t.apiKeyId),
     index('idx_audit_created_at').on(t.createdAt),
     index('idx_audit_reading_insights_access').on(t.resource, t.resourceId, t.action, t.createdAt),
   ],

@@ -78,6 +78,7 @@ const defaultLibraryAccessError = ref<string | null>(null)
 
 const canManageUserDefaults = computed(() => hasPermission(Permission.ManageUsers))
 const canManageAppSettings = computed(() => hasPermission(Permission.ManageAppSettings))
+const canManageUserApiKeys = computed(() => hasPermission(Permission.ManageUsers))
 const showDefaults = computed(() => !initialLoad.value && !error.value && (canManageAppSettings.value || canManageUserDefaults.value))
 
 const {
@@ -529,6 +530,7 @@ async function saveDefaultLibraryAccess() {
       :current-user-id="currentUser?.id"
       :can-delete="canDeleteEditingUser"
       :password-login-enabled="passwordLoginEnabled"
+      :can-manage-api-keys="canManageUserApiKeys"
       @close="closeDrawer"
       @saved="onSaved"
       @request-superuser-change="requestSuperuserChange"

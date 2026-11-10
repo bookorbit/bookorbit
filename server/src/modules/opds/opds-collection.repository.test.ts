@@ -27,7 +27,7 @@ describe('OpdsCollectionRepository', () => {
       ],
     });
 
-    await expect(repository.findVisibleForUser(7, false)).resolves.toEqual([
+    await expect(repository.findVisibleForUser(7, [1, 2], false)).resolves.toEqual([
       { id: 4, name: 'Favorites', bookCount: 1 },
       { id: 9, name: 'Empty public', bookCount: 0 },
     ]);
@@ -37,10 +37,9 @@ describe('OpdsCollectionRepository', () => {
     expect(text).toContain('count("books"."id")::int');
     expect(text).toContain('left join "books" on');
     expect(text).toContain('"books"."status" = $1');
-    expect(text).toContain('exists (select 1 from "user_library_access"');
-    expect(text).toContain('"user_library_access"."library_id" = "books"."library_id"');
-    expect(text).toContain('("collections"."user_id" = $3 or "collections"."is_public" = $4)');
-    expect(params).toEqual(['present', 7, 7, true]);
+    expect(text).toContain('"books"."library_id" in ($2, $3)');
+    expect(text).toContain('("collections"."user_id" = $4 or "collections"."is_public" = $5)');
+    expect(params).toEqual(['present', 1, 2, 7, true]);
   });
 
   it('applies include and exclude content filters inside the book join', () => {
@@ -51,7 +50,7 @@ describe('OpdsCollectionRepository', () => {
       excludeTagIds: [13],
       excludeGenreIds: [14],
     };
-    const { sql, params } = repository.findVisibleForUser(7, false, filters).toSQL();
+    const { sql, params } = repository.findVisibleForUser(7, [1, 2], false, filters).toSQL();
     const bookJoin = sql.slice(sql.indexOf('left join "books"'), sql.indexOf(' where (('));
 
     expect(bookJoin).toContain('"books"."status"');
@@ -60,18 +59,25 @@ describe('OpdsCollectionRepository', () => {
     expect(bookJoin).toContain(' or exists');
     expect(bookJoin).toContain('not exists (select 1 from "book_tags"');
     expect(bookJoin).toContain('not exists (select 1 from "book_genres"');
-    expect(params).toEqual(['present', 7, 11, 12, 13, 14, 7, true]);
+    expect(params).toEqual(['present', 1, 2, 11, 12, 13, 14, 7, true]);
   });
 
   it('lets superusers count every library but still excludes foreign private collections', () => {
     const filters = { ...EMPTY_CONTENT_FILTER_RULES, excludeTagIds: [13] };
-    const { sql, params } = repository.findVisibleForUser(7, true, filters).toSQL();
+    const { sql, params } = repository.findVisibleForUser(7, null, true, filters).toSQL();
 
-    expect(sql).not.toContain('user_library_access');
+    expect(sql).not.toContain('"books"."library_id" in');
     expect(sql).not.toContain('book_tags');
     expect(sql).toContain('"books"."status"');
     expect(sql).toContain('"collections"."user_id"');
     expect(sql).toContain('"collections"."is_public"');
+    expect(params).toEqual(['present', 7, true]);
+  });
+
+  it('counts no books once the viewer can reach no library', () => {
+    const { sql, params } = repository.findVisibleForUser(7, [], false).toSQL();
+
+    expect(sql).toContain('"books"."status" = $1 and false');
     expect(params).toEqual(['present', 7, true]);
   });
 

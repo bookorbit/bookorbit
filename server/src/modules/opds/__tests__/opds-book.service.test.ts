@@ -6,6 +6,7 @@ import { PgDialect } from 'drizzle-orm/pg-core';
 import { authors, bookSeries, bookSeriesMemberships } from '../../../db/schema';
 import { OpdsBookService, readStatusBucket } from '../opds-book.service';
 import { OpdsCollectionRepository } from '../opds-collection.repository';
+import { LibraryScopeService } from '../../../common/library-scope/library-scope.service';
 
 type BookPageResult = { entries: unknown[]; total: number };
 
@@ -70,6 +71,18 @@ function orderText(chain: ChainMock): string {
   return (chain.orderBy.mock.calls[0] as unknown[]).map((clause) => renderSql(clause).sql).join(', ');
 }
 
+/** Every library is 1 to 4; a regular user is granted 2 and 3. */
+function makeScope(): LibraryScopeService {
+  return new LibraryScopeService({
+    findAllIds: () => Promise.resolve([1, 2, 3, 4]),
+    findGrantedLevels: () =>
+      Promise.resolve([
+        { id: 2, accessLevel: 'viewer' },
+        { id: 3, accessLevel: 'editor' },
+      ]),
+  } as never);
+}
+
 function makeService(selectQueue: unknown[] = [], queryBuilderOverrides: Record<string, unknown> = {}, distinctOnQueue: unknown[] = []) {
   const db = makeDb(selectQueue, distinctOnQueue);
   const queryBuilder = {
@@ -77,7 +90,7 @@ function makeService(selectQueue: unknown[] = [], queryBuilderOverrides: Record<
     ...queryBuilderOverrides,
   };
   const collectionRepository = new OpdsCollectionRepository(db as never);
-  const service = new OpdsBookService(db as never, queryBuilder as never, collectionRepository);
+  const service = new OpdsBookService(db as never, queryBuilder as never, collectionRepository, makeScope());
   return { service, db, queryBuilder, collectionRepository };
 }
 
@@ -96,13 +109,9 @@ function collectValues(value: unknown, seen = new WeakSet<object>()): unknown[] 
 
 describe('OpdsBookService', () => {
   it('returns accessible library ids for superusers and regular users', async () => {
-    const superDb = makeDb([[{ id: 1 }, { id: 4 }]]);
-    const superService = new OpdsBookService(superDb as never, {} as never, new OpdsCollectionRepository(superDb as never));
-    await expect(superService.getAccessibleLibraryIds(7, true)).resolves.toEqual([1, 4]);
-
-    const userDb = makeDb([[{ libraryId: 2 }, { libraryId: 3 }]]);
-    const userService = new OpdsBookService(userDb as never, {} as never, new OpdsCollectionRepository(userDb as never));
-    await expect(userService.getAccessibleLibraryIds(7, false)).resolves.toEqual([2, 3]);
+    const { service } = makeService();
+    await expect(service.getAccessibleLibraryIds(7, true)).resolves.toEqual([1, 2, 3, 4]);
+    await expect(service.getAccessibleLibraryIds(7, false)).resolves.toEqual([2, 3]);
   });
 
   it('handles getBooksPage access checks and smartScope delegation', async () => {
@@ -283,7 +292,7 @@ describe('OpdsBookService', () => {
     const listSpy = vi.spyOn(collectionRepository, 'findVisibleForUser').mockResolvedValue([{ id: 4, name: 'Favorites', bookCount: 1 }]);
     const countSpy = vi.spyOn(collectionRepository, 'countVisibleForUser').mockResolvedValue(3);
     await expect(service.getUserCollections(8, false, filters)).resolves.toEqual([{ id: 4, name: 'Favorites', bookCount: 1 }]);
-    expect(listSpy).toHaveBeenCalledWith(8, false, filters, []);
+    expect(listSpy).toHaveBeenCalledWith(8, [2, 3], false, filters, []);
     await expect(service.countUserCollections(8)).resolves.toBe(3);
     expect(countSpy).toHaveBeenCalledWith(8);
   });

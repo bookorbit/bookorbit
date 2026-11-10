@@ -14,11 +14,14 @@ import { GLOBAL_GUARDS } from '../../common/guards/global-guards';
 import { AuditInterceptor } from '../../common/interceptors/audit.interceptor';
 import { PermissionService } from '../../common/services/permission.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { appConfig } from '../../config/config';
 import { DB } from '../../db';
 import { AchievementEventsService } from '../achievement/achievement-events.service';
 import { AuditEventsService } from '../audit/audit-events.service';
 import { AuthService } from '../auth/auth.service';
+import { ApiKeyAuthenticator } from '../api-key/api-key.authenticator';
+import { AuthenticatorService } from '../auth/authenticator.service';
 import { ScanGateway } from './scan.gateway';
 import { ScanJobStore } from './scan-job-store.service';
 import { ScannerRepository } from './scanner.repository';
@@ -46,8 +49,8 @@ describe('scan gateway over socket.io behind the global guards', () => {
   let scanJobStore: ScanJobStore;
   let token: string;
   const authService = { validateSessionUser: vi.fn<(...args: unknown[]) => Promise<RequestUser | null>>() };
-  const scannerRepository = {
-    hasLibraryAccess: vi.fn((_userId: number, libraryId: number) => Promise.resolve(libraryId === READABLE_LIBRARY)),
+  const scopeRepo = {
+    findGrantedLevel: vi.fn((_userId: number, libraryId: number) => Promise.resolve(libraryId === READABLE_LIBRARY ? 'viewer' : null)),
   };
   const clients: ClientSocket[] = [];
 
@@ -61,7 +64,10 @@ describe('scan gateway over socket.io behind the global guards', () => {
         AuditEventsService,
         { provide: JwtService, useValue: new JwtService({ secret: 'scan-gateway-socket-test' }) },
         { provide: AuthService, useValue: authService },
-        { provide: ScannerRepository, useValue: scannerRepository },
+        AuthenticatorService,
+        { provide: ApiKeyAuthenticator, useValue: { authenticate: vi.fn() } },
+        { provide: ScannerRepository, useValue: {} },
+        { provide: LibraryScopeService, useValue: new LibraryScopeService(scopeRepo as never) },
         { provide: appConfig.KEY, useValue: { appUrl: 'http://localhost:6263' } },
         { provide: PermissionService, useValue: {} },
         { provide: DB, useValue: {} },
@@ -84,7 +90,7 @@ describe('scan gateway over socket.io behind the global guards', () => {
 
   beforeEach(() => {
     authService.validateSessionUser.mockReset();
-    scannerRepository.hasLibraryAccess.mockClear();
+    scopeRepo.findGrantedLevel.mockClear();
   });
 
   afterEach(() => {
@@ -140,7 +146,7 @@ describe('scan gateway over socket.io behind the global guards', () => {
     const snapshot = await nextEvent<ScanProgressEvent>(client, 'scan:progress');
 
     expect(snapshot).toMatchObject({ jobId: 31, libraryId: READABLE_LIBRARY, status: 'running', total: 200 });
-    expect(scannerRepository.hasLibraryAccess).toHaveBeenCalledWith(reader.id, READABLE_LIBRARY);
+    expect(scopeRepo.findGrantedLevel).toHaveBeenCalledWith(reader.id, READABLE_LIBRARY);
     expect(exceptions).toEqual([]);
   });
 
@@ -173,6 +179,6 @@ describe('scan gateway over socket.io behind the global guards', () => {
     await expect(nextEvent(client, 'disconnect')).resolves.toBe('io server disconnect');
 
     expect(unauthorized).toEqual([{ reason: 'invalid_token' }]);
-    expect(scannerRepository.hasLibraryAccess).not.toHaveBeenCalled();
+    expect(scopeRepo.findGrantedLevel).not.toHaveBeenCalled();
   });
 });

@@ -1,20 +1,15 @@
-import { BadRequestException, CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import { BadRequestException, CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { eq, and } from 'drizzle-orm';
-import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { DB } from '../../db';
-import * as schema from '../../db/schema';
 import { LIBRARY_ACCESS_KEY, LibraryAccessLevel } from '../decorators/require-library-access.decorator';
+import { LibraryScopeService, meetsAccessLevel } from '../library-scope/library-scope.service';
 import { RequestUser } from '../types/request-user';
-
-const ACCESS_RANK: Record<LibraryAccessLevel, number> = { viewer: 1, editor: 2, owner: 3 };
 
 @Injectable()
 export class LibraryAccessGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    @Inject(DB) private readonly db: NodePgDatabase<typeof schema>,
+    private readonly libraryScope: LibraryScopeService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -30,15 +25,10 @@ export class LibraryAccessGuard implements CanActivate {
       throw new BadRequestException('Missing or invalid libraryId');
     }
 
-    if (user.isSuperuser) return true;
+    const level = await this.libraryScope.levelFor(user, libraryId);
+    if (level === null) throw new ForbiddenException('No library access');
 
-    const row = await this.db.query.userLibraryAccess.findFirst({
-      where: and(eq(schema.userLibraryAccess.userId, user.id), eq(schema.userLibraryAccess.libraryId, libraryId)),
-    });
-
-    if (!row) throw new ForbiddenException('No library access');
-
-    if (ACCESS_RANK[row.accessLevel] < ACCESS_RANK[required]) {
+    if (!meetsAccessLevel(level, required)) {
       throw new ForbiddenException('Insufficient library access level');
     }
 

@@ -1,7 +1,4 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import type { StringValue } from 'ms';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AuditModule } from '../audit/audit.module';
@@ -37,6 +34,8 @@ import { RtorrentAdapter } from './download-clients/adapters/rtorrent.adapter';
 import { DownloadContentRemovalService } from './download-clients/download-content-removal.service';
 import { NzbgetAdapter } from './download-clients/adapters/nzbget.adapter';
 import { SabnzbdAdapter } from './download-clients/adapters/sabnzbd.adapter';
+import { TorboxAdapter } from './download-clients/adapters/torbox.adapter';
+import { TorboxApiClient } from './download-clients/adapters/torbox.api';
 import { INDEXER_ADAPTERS } from './indexers/indexer-adapter';
 import { IndexerConfigService } from './indexers/indexer-config.service';
 import { IndexerController } from './indexers/indexer.controller';
@@ -84,13 +83,6 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     AuthModule,
     UserModule,
     forwardRef(() => NotificationModule),
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('auth.jwtSecret'),
-        signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn') },
-      }),
-    }),
   ],
   controllers: [
     BookRequestController,
@@ -123,6 +115,8 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     RtorrentAdapter,
     NzbgetAdapter,
     SabnzbdAdapter,
+    TorboxApiClient,
+    TorboxAdapter,
     {
       provide: DOWNLOAD_CLIENT_ADAPTERS,
       useFactory: (
@@ -132,8 +126,9 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
         rtorrent: RtorrentAdapter,
         nzbget: NzbgetAdapter,
         sabnzbd: SabnzbdAdapter,
-      ) => [qbittorrent, transmission, deluge, rtorrent, nzbget, sabnzbd],
-      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, RtorrentAdapter, NzbgetAdapter, SabnzbdAdapter],
+        torbox: TorboxAdapter,
+      ) => [qbittorrent, transmission, deluge, rtorrent, nzbget, sabnzbd, torbox],
+      inject: [QbittorrentAdapter, TransmissionAdapter, DelugeAdapter, RtorrentAdapter, NzbgetAdapter, SabnzbdAdapter, TorboxAdapter],
     },
 
     IndexerRepository,

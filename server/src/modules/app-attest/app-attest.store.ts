@@ -1,13 +1,18 @@
 import { Injectable } from '@nestjs/common';
 
+import type { NonceState } from './android-nonces';
 import type { AppAttestEnvironment } from './app-attest-verifier';
 
-export interface StoredAppAttestKey {
+export type AppAttestPlatform = 'ios' | 'android';
+
+export interface StoredAppAttestKey extends NonceState {
   keyId: string;
   userId: number;
   publicKeyPem: string;
   appId: string;
   environment: AppAttestEnvironment;
+  /** Absent for a key iOS registered. */
+  platform?: AppAttestPlatform;
   counter: number;
   recentCounters: Set<number>;
   registeredAt: Date;

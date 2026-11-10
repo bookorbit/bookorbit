@@ -1,7 +1,4 @@
 import { Module, forwardRef } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtModule } from '@nestjs/jwt';
-import type { StringValue } from 'ms';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AuthModule } from '../auth/auth.module';
@@ -47,13 +44,6 @@ const AUTHOR_PROVIDER_CLASSES = [AudnexusAuthorMetadataProvider, GoodreadsAuthor
     MetadataScoreModule,
     forwardRef(() => NotificationModule),
     AuthModule,
-    JwtModule.registerAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        secret: config.getOrThrow<string>('auth.jwtSecret'),
-        signOptions: { expiresIn: config.getOrThrow<StringValue | number>('auth.jwtExpiresIn') },
-      }),
-    }),
   ],
   controllers: [AuthorsController],
   providers: [

@@ -1,12 +1,12 @@
 import { CallHandler, ExecutionContext, Injectable, NestInterceptor, Optional } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
-import { from, of } from 'rxjs';
+import { from, Observable, of } from 'rxjs';
 import { switchMap, tap } from 'rxjs/operators';
-import type { Observable } from 'rxjs';
 
-import type { RequestUser } from '../types/request-user';
+import { apiKeyCredentialOf, type RequestUser } from '../types/request-user';
 import { AUDITABLE_KEY, AuditableOptions, AuditRequest } from '../decorators/auditable.decorator';
+import { runAsApiKey } from '../../modules/audit/api-key-audit-context';
 import { AUDIT_EVENT, AuditEventsService } from '../../modules/audit/audit-events.service';
 import { AuditTargetLabelService } from '../../modules/audit/audit-target-label.service';
 
@@ -21,6 +21,15 @@ export class AuditInterceptor implements NestInterceptor {
   ) {}
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
+    const credential = context.getType() === 'http' ? apiKeyCredentialOf(context.switchToHttp().getRequest<{ user?: RequestUser }>().user) : null;
+    if (!credential) return this.audit(context, next);
+    // The handler only runs once the response is subscribed to, so the subscription is what has to
+    // happen inside the key's async context for every audit event the request causes to name the key.
+    const actor = { keyId: credential.keyId, keyName: credential.keyName };
+    return new Observable((subscriber) => runAsApiKey(actor, () => this.audit(context, next).subscribe(subscriber)));
+  }
+
+  private audit(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const options = this.reflector.get<AuditableOptions | undefined>(AUDITABLE_KEY, context.getHandler());
     if (!options) return next.handle();
 
