@@ -81,7 +81,7 @@ function makeService(
     ...overrides.clients,
   };
   const adapter = { add: vi.fn().mockResolvedValue({ clientKey: INFO_HASH }) };
-  const registry = { require: vi.fn().mockReturnValue(adapter) };
+  const registry = { find: vi.fn().mockReturnValue(undefined), require: vi.fn().mockReturnValue(adapter) };
   const direct = { add: vi.fn().mockResolvedValue({ clientKey: INFO_HASH }) };
   const indexers = {
     resolveConfig: vi.fn().mockResolvedValue({ id: 9, name: 'tracker', adapterType: 'torznab' }),
@@ -328,6 +328,25 @@ describe('RequestFulfillmentService.grab', () => {
 
     await expect(service.grab(7, { downloadClientId: 4, magnet: MAGNET }, user())).rejects.toThrow(BadRequestException);
     expect(downloads.create).not.toHaveBeenCalled();
+  });
+
+  /**
+   * A client that stages its own files lands them under a root BookOrbit owns, so it has no import
+   * root to declare and is saved without mappings by design. The rule that lets it be saved without
+   * one has to let it grab without one too, or the saved config can never be used.
+   */
+  it('grabs through a staging client that has no path mapping', async () => {
+    const { service, downloads, registry } = makeService({
+      clients: {
+        findOne: vi.fn().mockResolvedValue({ id: 4, name: 'torbox', adapterType: 'torbox', enabled: true, pathMappings: [] }),
+        resolveConfig: vi.fn().mockResolvedValue({ id: 4, adapterType: 'torbox' }),
+      },
+    });
+    registry.find.mockReturnValue({ stage: vi.fn() });
+
+    await service.grab(7, { downloadClientId: 4, magnet: MAGNET }, user());
+
+    expect(downloads.create).toHaveBeenCalledWith(expect.objectContaining({ downloadClientId: 4 }));
   });
 
   it('404s an unknown request', async () => {

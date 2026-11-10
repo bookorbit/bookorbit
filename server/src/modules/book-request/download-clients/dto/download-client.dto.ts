@@ -170,3 +170,27 @@ export class TestPathMappingDto {
   @Min(1)
   mappingId!: number;
 }
+
+/**
+ * A credential the operator has typed but not saved, checked against the adapter they picked so
+ * the form can say whether an API key is right before a row exists to test.
+ */
+export class ValidateDownloadClientDto {
+  @IsIn(DOWNLOAD_CLIENT_TYPES)
+  adapterType!: DownloadClientType;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(2048)
+  baseUrl!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  username?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1024)
+  password?: string;
+}

@@ -178,13 +178,21 @@ const CONFIRM_COPY = {
 const confirmTitle = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].title))
 
 const confirmDescription = computed(() => {
-  if (confirming.value === 'delete') return t('bookRequests.confirm.deleteDescription')
+  const alwaysDeletesRemote = request.value?.download?.alwaysDeletesRemote ?? false
+  if (confirming.value === 'delete') {
+    return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteDescriptionRemoteDelete' : 'bookRequests.confirm.deleteDescription')
+  }
   if (confirming.value === 'leave') return t('bookRequests.confirm.leaveDescription')
   if (confirming.value === 'discardImport') return t('bookRequests.confirm.discardImportDescription')
-  if (confirming.value === 'cancelDownload') return t('bookRequests.confirm.cancelDownloadDescription')
-  return request.value && cancelStopsATransfer(request.value)
-    ? t('bookRequests.confirm.cancelDescriptionWithDownload')
-    : t('bookRequests.confirm.cancelDescription')
+  if (confirming.value === 'cancelDownload') {
+    return t(alwaysDeletesRemote ? 'bookRequests.confirm.cancelDownloadDescriptionRemoteDelete' : 'bookRequests.confirm.cancelDownloadDescription')
+  }
+  if (request.value && cancelStopsATransfer(request.value)) {
+    return t(
+      alwaysDeletesRemote ? 'bookRequests.confirm.cancelDescriptionWithDownloadRemoteDelete' : 'bookRequests.confirm.cancelDescriptionWithDownload',
+    )
+  }
+  return t('bookRequests.confirm.cancelDescription')
 })
 
 const confirmLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].label))

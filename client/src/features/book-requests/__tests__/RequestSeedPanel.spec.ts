@@ -12,7 +12,7 @@ import RequestSeedPanel from '../components/RequestSeedPanel.vue'
 /** The dialog only matters here as something that emits confirm, so it stays a stub. */
 const ConfirmDialogStub = defineComponent({
   name: 'ConfirmDialogStub',
-  props: { open: { type: Boolean, default: false } },
+  props: { open: { type: Boolean, default: false }, title: { type: String, default: '' }, description: { type: String, default: '' } },
   emits: ['confirm', 'cancel'],
   template: '<div />',
 })
@@ -27,6 +27,7 @@ function seed(overrides: Partial<BookRequestSeedStatus> = {}): BookRequestSeedSt
     downloadClientId: 4,
     downloadClientName: 'qbit',
     clientKey: 'c9e15763f722f23e98a29decdfae341b98d53056',
+    alwaysDeletesRemote: false,
     seeding: true,
     ratio: 1.25,
     ratioGoal: 2,
@@ -228,5 +229,23 @@ describe('RequestSeedPanel', () => {
     wrapper.getComponent(ConfirmDialogStub).vm.$emit('confirm')
 
     expect(wrapper.emitted('remove')?.[0]?.[0]).toMatchObject({ deleteFiles: true })
+  })
+
+  /**
+   * A cloud client cannot hand a torrent back: the removal deletes the item and its files there
+   * whatever the operator chooses. Offering the choice would promise a copy nothing can keep.
+   */
+  it('warns that a cloud client deletes the files and offers no choice about it', async () => {
+    apiMock.mockResolvedValue(response(JSON.stringify(seed({ alwaysDeletesRemote: true }))))
+    const wrapper = await mountPanel()
+
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Remove from client')!
+      .trigger('click')
+
+    expect(wrapper.getComponent(ConfirmDialogStub).props('description')).toContain('deletes it and its files there for good')
   })
 })

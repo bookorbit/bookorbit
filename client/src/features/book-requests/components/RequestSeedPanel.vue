@@ -33,6 +33,14 @@ const removalInFlight = ref(false)
 const download = computed(() => props.request.download)
 const isTorrentDownload = computed(() => download.value?.source === 'magnet' || download.value?.source === 'torrent_file')
 
+/** A cloud client cannot hand a torrent back, so its removal copy is fixed and the file choice is not offered. */
+const alwaysDeletesRemote = computed(() => status.value?.alwaysDeletesRemote ?? false)
+
+const confirmDescription = computed(() => {
+  if (alwaysDeletesRemote.value) return t('bookRequests.seed.confirm.descriptionRemoteDelete')
+  return t(deleteFiles.value ? 'bookRequests.seed.confirm.descriptionWithFiles' : 'bookRequests.seed.confirm.description')
+})
+
 const clientActivity = computed(() => {
   if (!status.value) return null
   if (status.value.seeding) {
@@ -198,7 +206,7 @@ function confirmRemove() {
       <div v-if="canManage" class="space-y-2.5 border-t border-border pt-3.5">
         <p class="text-xs text-muted-foreground">{{ t('bookRequests.seed.removeHint') }}</p>
 
-        <label class="flex items-center gap-2 text-sm text-foreground">
+        <label v-if="!alwaysDeletesRemote" class="flex items-center gap-2 text-sm text-foreground">
           <input v-model="deleteFiles" type="checkbox" class="h-3.5 w-3.5 rounded-xs border-border accent-primary" />
           {{ t('bookRequests.seed.deleteFiles') }}
         </label>
@@ -212,7 +220,7 @@ function confirmRemove() {
     <ConfirmDialog
       :open="confirming"
       :title="t('bookRequests.seed.confirm.title')"
-      :description="deleteFiles ? t('bookRequests.seed.confirm.descriptionWithFiles') : t('bookRequests.seed.confirm.description')"
+      :description="confirmDescription"
       :confirm-label="t('bookRequests.seed.remove')"
       :busy="busy"
       @confirm="confirmRemove"

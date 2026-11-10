@@ -14,6 +14,8 @@ import { BookRequestDownloadRepository } from './book-request-download.repositor
 import { DirectDownloadService } from './direct-download.service';
 import { RequestFulfillmentService } from './request-fulfillment.service';
 import { RequestImportQueue } from './request-import-queue';
+import { RequestStageQueue } from './request-stage-queue';
+import type { StageJob } from './request-stage-queue';
 
 import { RequestImportService } from './request-import.service';
 
@@ -52,6 +54,15 @@ const IMPORT_HEARTBEAT_INTERVAL_MS = 60_000;
 const IMPORT_CONCURRENCY = 1;
 
 /**
+ * Two fetches at a time across the whole process. Staging is bandwidth-bound, not command-bound,
+ * and a busy account's CDN reads must leave the progress polls room to answer.
+ */
+const STAGE_CONCURRENCY = 2;
+/** Consecutive failures before a download is declared unstageable; one CDN hiccup should not end it. */
+const STAGE_FAILURE_LIMIT = 3;
+const STAGE_RETRY_BACKOFF_MS = 30_000;
+
+/**
  * The request states a live transfer may move to `downloading` from. Narrow on purpose: anything
  * else has either not been grabbed yet or has already moved past the transfer, and a poll that
  * started before a person settled the request must not drag it back.
@@ -76,6 +87,14 @@ export class DownloadMonitorService implements OnModuleDestroy {
     (downloadId) => this.runImport(downloadId),
     (downloadId, error) => this.logImportFailure(downloadId, error),
   );
+  private readonly stageQueue = new RequestStageQueue(
+    STAGE_CONCURRENCY,
+    (job) => this.runStage(job),
+    (job, error) => this.logStageFailure(job, error),
+  );
+  /** Consecutive staging failures per client and key, and when each may be attempted again. */
+  private readonly stageFailures = new Map<string, number>();
+  private readonly stageRetryAt = new Map<string, number>();
 
   constructor(
     private readonly downloads: BookRequestDownloadRepository,
@@ -90,6 +109,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
 
   onModuleDestroy(): void {
     this.importQueue.stop();
+    this.stageQueue.stop();
   }
 
   /** Direct transfers report once a second; external torrent clients are polled every five. */
@@ -161,6 +181,11 @@ export class DownloadMonitorService implements OnModuleDestroy {
     }
   }
 
+  /** For tests, which are the only callers that need a dispatched staging fetch to have finished. */
+  async whenStagingSettles(): Promise<void> {
+    await this.stageQueue.waitForIdle();
+  }
+
   /**
    * A download that finished but whose import never ran - the process died between the two, or the
    * import threw before it could claim a Book Dock row. Nothing else would ever look at it again:
@@ -227,12 +252,14 @@ export class DownloadMonitorService implements OnModuleDestroy {
     const clientKeys = polled.map((row) => row.clientKey);
 
     let statuses: DownloadStatus[];
+    let stageCapable = false;
     try {
       if (target === DIRECT) {
         statuses = await this.direct.status(clientKeys);
       } else {
         const config = await this.clients.resolveConfig(target);
         const adapter = this.registry.require(config.adapterType);
+        stageCapable = typeof adapter.stage === 'function';
         statuses = await adapter.status(clientKeys, config);
       }
     } catch (error) {
@@ -256,7 +283,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
         await this.handleMissing(row);
         continue;
       }
-      await this.applyStatus(row, status, viewers.get(row.requestId) ?? []);
+      await this.applyStatus(row, status, viewers.get(row.requestId) ?? [], target, stageCapable);
     }
   }
 
@@ -279,7 +306,13 @@ export class DownloadMonitorService implements OnModuleDestroy {
     return Date.now() - (row.grabbedAt ?? row.createdAt).getTime() >= graceMs;
   }
 
-  private async applyStatus(row: BookRequestDownloadRow, status: DownloadStatus, viewerUserIds: readonly number[]): Promise<void> {
+  private async applyStatus(
+    row: BookRequestDownloadRow,
+    status: DownloadStatus,
+    viewerUserIds: readonly number[],
+    target: PollTarget,
+    stageCapable: boolean,
+  ): Promise<void> {
     if (status.state === 'failed') {
       await this.fulfillment.failDownload(row, status.errorMessage ?? 'The download client reported an error');
       return;
@@ -298,11 +331,28 @@ export class DownloadMonitorService implements OnModuleDestroy {
       return;
     }
 
+    // A cloud client reports the download finished where BookOrbit cannot open it: the adapter
+    // has no local path yet, and fetching the files is a job of its own. The attempt stays
+    // `downloading` so polling keeps watching it, and `queueStaging` dispatches the fetch.
+    const needsStaging = stageCapable && status.state === 'completed' && status.contentPath === null;
+
     // `unknown` is a state this adapter has no mapping for, not an idle one: a torrent the client
     // is working on must not read as queued, so it keeps the in-flight spelling.
-    const nextStatus: BookRequestDownloadStatus = status.state === 'completed' ? 'completed' : status.state === 'queued' ? 'queued' : 'downloading';
+    const nextStatus: BookRequestDownloadStatus = needsStaging
+      ? 'downloading'
+      : status.state === 'completed'
+        ? 'completed'
+        : status.state === 'queued'
+          ? 'queued'
+          : 'downloading';
 
     const movedBytes = status.downloadedBytes > row.downloadedBytes;
+    // A finished cloud download waiting for a staging slot reports the same bytes every poll, so
+    // queue membership is what tells the stall watchdog the attempt is still alive. Running
+    // fetches are excluded on purpose: their own job reports growing bytes, and stamping those
+    // too would mask a transfer that has genuinely stalled.
+    const awaitingStagingSlot =
+      needsStaging && target !== DIRECT && row.clientKey !== null && this.stageQueue.isPending({ clientId: target, clientKey: row.clientKey });
     // Conditional on the attempt still being active, because this row was read before a poll that
     // can take twenty seconds to answer. A cancellation that landed inside that window has already
     // taken the attempt out of the active set, and writing this back would undo it: the request
@@ -315,8 +365,8 @@ export class DownloadMonitorService implements OnModuleDestroy {
       downloadedBytes: status.downloadedBytes,
       totalBytes: status.totalBytes,
       contentPath: status.contentPath ?? row.contentPath,
-      ...(movedBytes ? { lastProgressAt: new Date() } : {}),
-      ...(status.state === 'completed' ? { completedAt: row.completedAt ?? new Date() } : {}),
+      ...(movedBytes || awaitingStagingSlot ? { lastProgressAt: new Date() } : {}),
+      ...(status.state === 'completed' && !needsStaging ? { completedAt: row.completedAt ?? new Date() } : {}),
       ...(row.source === 'direct_url' && status.state === 'completed' ? { directUrl: null, directEtag: null, directLastModified: null } : {}),
     });
     if (!updated) return;
@@ -337,10 +387,78 @@ export class DownloadMonitorService implements OnModuleDestroy {
       viewerUserIds,
     );
 
+    if (status.state !== 'completed') return;
+    if (needsStaging) {
+      if (target !== DIRECT) this.queueStaging(target, updated);
+      return;
+    }
+
     // Handed off rather than awaited: extracting a release takes minutes, and this runs inside the
     // tick's process-wide guard, so awaiting it would stop progress polling for every other
     // download until it finished.
-    if (status.state === 'completed') this.importQueue.enqueue(updated.id);
+    this.importQueue.enqueue(updated.id);
+  }
+
+  private queueStaging(clientId: number, row: BookRequestDownloadRow): void {
+    const clientKey = row.clientKey;
+    if (clientKey === null) return;
+    const key = `${clientId}:${clientKey}`;
+    if (Date.now() < (this.stageRetryAt.get(key) ?? 0)) return;
+    if (!this.stageQueue.enqueue({ clientId, clientKey, downloadId: row.id })) return;
+    this.logger.log(
+      `[book_request.monitor] [start] requestId=${row.requestId} downloadId=${row.id} clientId=${clientId} - fetching a cloud download for import`,
+    );
+  }
+
+  /**
+   * Runs one fetch outside the tick, like an import: staging a release takes minutes. The row is
+   * re-read because the attempt may have been cancelled while this waited its turn, and the
+   * adapter is idempotent per file, so a retry after a partial fetch resumes rather than restarts.
+   */
+  private async runStage(job: StageJob): Promise<void> {
+    const key = `${job.clientId}:${job.clientKey}`;
+    const row = await this.downloads.findById(job.downloadId);
+    if (!row || !ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES.includes(row.status as BookRequestDownloadStatus)) return;
+
+    try {
+      const config = await this.clients.resolveConfig(job.clientId);
+      const adapter = this.registry.require(config.adapterType);
+      if (typeof adapter.stage !== 'function') return;
+
+      await adapter.stage(job.clientKey, config);
+      this.stageFailures.delete(key);
+      this.stageRetryAt.delete(key);
+      this.logger.log(
+        `[book_request.monitor] [end] requestId=${row.requestId} downloadId=${row.id} clientId=${job.clientId} - cloud download fetched for import`,
+      );
+    } catch (error) {
+      const failures = (this.stageFailures.get(key) ?? 0) + 1;
+      this.stageFailures.set(key, failures);
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (failures < STAGE_FAILURE_LIMIT) {
+        this.stageRetryAt.set(key, Date.now() + STAGE_RETRY_BACKOFF_MS);
+        this.logger.warn(
+          `[book_request.monitor] [fail] requestId=${row.requestId} downloadId=${job.downloadId} clientId=${job.clientId} attempt=${failures} error="${sanitizeLogValue(message)}" - fetching a cloud download failed; will retry`,
+        );
+        return;
+      }
+
+      this.stageFailures.delete(key);
+      this.stageRetryAt.delete(key);
+      const fresh = await this.downloads.findById(job.downloadId);
+      if (!fresh || !ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES.includes(fresh.status as BookRequestDownloadStatus)) return;
+      await this.fulfillment.failDownload(fresh, `The download could not be fetched from the cloud for import: ${message}`);
+    }
+  }
+
+  private logStageFailure(job: StageJob, error: unknown): void {
+    const message = error instanceof Error ? error.message : String(error);
+    this.logger.error(
+      `[book_request.monitor] [fail] downloadId=${job.downloadId} clientId=${job.clientId} errorClass="${
+        error instanceof Error ? error.name : typeof error
+      }" error="${sanitizeLogValue(message)}" - staging a cloud download failed outside its own error handling`,
+    );
   }
 }
 
