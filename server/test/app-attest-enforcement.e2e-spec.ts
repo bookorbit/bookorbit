@@ -45,9 +45,6 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['DELETE', `/books/1/journal/${ID}`],
   ['POST', `/books/1/journal/${ID}/restore`],
   ['DELETE', `/books/1/journal/${ID}/permanent`],
-  ['GET', '/books/files/1/progress'],
-  ['POST', '/books/files/1/progress'],
-  ['DELETE', '/books/files/1/progress'],
   ['GET', '/user-preferences/annotation-colors'],
   ['PUT', '/user-preferences/annotation-colors'],
   ['GET', '/uploads/capabilities'],
@@ -73,6 +70,12 @@ const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['GET', '/search?q=dune'],
   ['GET', '/notebook/trash'],
   ['GET', '/reading-history/summary'],
+];
+
+const THIRD_PARTY_PROGRESS_ROUTES: Array<[method: string, path: string]> = [
+  ['GET', '/books/files/1/progress'],
+  ['POST', '/books/files/1/progress'],
+  ['DELETE', '/books/files/1/progress'],
 ];
 
 describe('App Attest enforcement (e2e)', { timeout: TIMEOUT }, () => {
@@ -126,6 +129,12 @@ describe('App Attest enforcement (e2e)', { timeout: TIMEOUT }, () => {
   it('leaves the routes the web client shares open', async () => {
     for (const [method, path] of UNGUARDED_ROUTES) {
       expect((await send(method, path)).statusCode, `${method} ${path}`).toBe(200);
+    }
+  });
+
+  it('leaves per-file progress routes open to third-party clients', async () => {
+    for (const [method, path] of THIRD_PARTY_PROGRESS_ROUTES) {
+      expect((await send(method, path)).statusCode, `${method} ${path}`).not.toBe(403);
     }
   });
 

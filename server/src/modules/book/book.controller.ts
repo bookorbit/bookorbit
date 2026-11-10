@@ -32,7 +32,6 @@ import { ForbidPermission } from '../../common/decorators/forbid-permission.deco
 import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
-import { RequireAppAttest } from '../app-attest/app-attest.guard';
 import { FileWriteService } from '../file-write/file-write.service';
 import { BookService } from './book.service';
 import { openDeliveryStream } from './delivery-stream';
@@ -527,7 +526,6 @@ export class BookController {
   }
 
   @Get('files/:fileId/progress')
-  @RequireAppAttest()
   async getFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
     return (
       (await this.bookService.getProgress(user.id, fileId, user)) ?? {
@@ -550,13 +548,11 @@ export class BookController {
   }
 
   @Post('files/:fileId/progress')
-  @RequireAppAttest()
   async saveFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @Body() dto: SaveProgressDto, @CurrentUser() user: RequestUser) {
     await this.bookService.saveProgress(user.id, fileId, dto, user);
   }
 
   @Delete('files/:fileId/progress')
-  @RequireAppAttest()
   @HttpCode(HttpStatus.NO_CONTENT)
   async clearFileProgress(@Param('fileId', ParseIntPipe) fileId: number, @CurrentUser() user: RequestUser) {
     await this.bookService.clearFileProgress(user.id, fileId, user);
