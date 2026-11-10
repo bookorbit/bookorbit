@@ -12,13 +12,12 @@ import { DownloadClientRegistry } from '../download-clients/download-client-regi
 import type { DownloadStatus } from '../download-clients/download-client-adapter';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DirectDownloadService } from './direct-download.service';
+import { DownloadRemovalService } from './download-removal.service';
 import { RequestFulfillmentService } from './request-fulfillment.service';
+import { RequestImportService } from './request-import.service';
 import { RequestImportQueue } from './request-import-queue';
 import { RequestStageQueue } from './request-stage-queue';
 import type { StageJob } from './request-stage-queue';
-
-import { RequestImportService } from './request-import.service';
-
 /**
  * A torrent the client has never heard of is usually one it has not indexed yet. Only treat it
  * as gone once it has had time to appear.
@@ -92,9 +91,9 @@ export class DownloadMonitorService implements OnModuleDestroy {
     (job) => this.runStage(job),
     (job, error) => this.logStageFailure(job, error),
   );
-  /** Consecutive staging failures per client and key, and when each may be attempted again. */
-  private readonly stageFailures = new Map<string, number>();
-  private readonly stageRetryAt = new Map<string, number>();
+  /** Consecutive staging failures per download attempt, and when each may be attempted again. */
+  private readonly stageFailures = new Map<number, number>();
+  private readonly stageRetryAt = new Map<number, number>();
 
   constructor(
     private readonly downloads: BookRequestDownloadRepository,
@@ -104,6 +103,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
     private readonly direct: DirectDownloadService,
     private readonly imports: RequestImportService,
     private readonly fulfillment: RequestFulfillmentService,
+    private readonly removal: DownloadRemovalService,
     private readonly gateway: BookRequestGateway,
   ) {}
 
@@ -140,6 +140,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
     }
 
     const active = await this.downloads.findActive();
+    this.pruneStageRetryState(active);
     if (active.length === 0) return;
 
     const byTarget = new Map<PollTarget, BookRequestDownloadRow[]>();
@@ -402,7 +403,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
   private queueStaging(clientId: number, row: BookRequestDownloadRow): void {
     const clientKey = row.clientKey;
     if (clientKey === null) return;
-    const key = `${clientId}:${clientKey}`;
+    const key = row.id;
     if (Date.now() < (this.stageRetryAt.get(key) ?? 0)) return;
     if (!this.stageQueue.enqueue({ clientId, clientKey, downloadId: row.id })) return;
     this.logger.log(
@@ -416,7 +417,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
    * adapter is idempotent per file, so a retry after a partial fetch resumes rather than restarts.
    */
   private async runStage(job: StageJob): Promise<void> {
-    const key = `${job.clientId}:${job.clientKey}`;
+    const key = job.downloadId;
     const row = await this.downloads.findById(job.downloadId);
     if (!row || !ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES.includes(row.status as BookRequestDownloadStatus)) return;
 
@@ -448,7 +449,18 @@ export class DownloadMonitorService implements OnModuleDestroy {
       this.stageRetryAt.delete(key);
       const fresh = await this.downloads.findById(job.downloadId);
       if (!fresh || !ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES.includes(fresh.status as BookRequestDownloadStatus)) return;
+      await this.removal.cleanupStagedClientDownload(fresh);
       await this.fulfillment.failDownload(fresh, `The download could not be fetched from the cloud for import: ${message}`);
+    }
+  }
+
+  private pruneStageRetryState(active: BookRequestDownloadRow[]): void {
+    const activeIds = new Set(active.map((row) => row.id));
+    for (const downloadId of this.stageFailures.keys()) {
+      if (!activeIds.has(downloadId)) this.stageFailures.delete(downloadId);
+    }
+    for (const downloadId of this.stageRetryAt.keys()) {
+      if (!activeIds.has(downloadId)) this.stageRetryAt.delete(downloadId);
     }
   }
 

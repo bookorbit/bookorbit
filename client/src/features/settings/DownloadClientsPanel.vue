@@ -250,7 +250,11 @@ async function handleValidateKey() {
   // The answer only speaks for the fields as they were sent: an edit, or another draft opened,
   // while the round trip is in flight makes it stale, and a stale "ok" would vouch for a key
   // that was never tested.
-  const sent = { baseUrl: current.baseUrl, password: current.password }
+  const sent = {
+    baseUrl: current.baseUrl,
+    password: current.password,
+    allowPrivateAddress: current.allowPrivateAddress,
+  }
   validating.value = true
   resetKeyCheck()
   try {
@@ -259,8 +263,16 @@ async function handleValidateKey() {
       baseUrl: current.baseUrl.trim() || TORBOX_DEFAULT_URL,
       username: current.username.trim(),
       password: current.password,
+      allowPrivateAddress: current.allowPrivateAddress,
     })
-    if (draft.value !== current || current.baseUrl !== sent.baseUrl || current.password !== sent.password) return
+    if (
+      draft.value !== current ||
+      current.baseUrl !== sent.baseUrl ||
+      current.password !== sent.password ||
+      current.allowPrivateAddress !== sent.allowPrivateAddress
+    ) {
+      return
+    }
     const client = t(`settings.system.requests.clientTypes.${current.adapterType}`)
     if (result.success) {
       keyCheck.value = 'ok'
@@ -285,8 +297,13 @@ watch(usesApiKey, (apiKey) => {
 
 const TORBOX_DEFAULT_URL = 'https://api.torbox.app'
 
-// A cloud client has one public host. Prefilling it saves typing and it stays editable for a
-// self-hosted proxy.
+const apiKeyRequiredMessage = computed(() =>
+  draft.value?.adapterType === 'torbox'
+    ? t('settings.system.requests.errors.torboxApiKeyRequired')
+    : t('settings.system.requests.errors.apiKeyRequired'),
+)
+
+// Start with TorBox's hosted endpoint while keeping it editable for a private reverse proxy.
 watch(
   () => draft.value?.adapterType,
   (type, previous) => {
@@ -388,10 +405,10 @@ async function handleSave() {
   if (!current.name.trim()) fieldErrors.name = t('settings.system.requests.errors.nameRequired')
   if (!current.baseUrl.trim()) fieldErrors.baseUrl = t('settings.system.requests.errors.urlRequired')
   if (usesApiKey.value && current.id === null && !current.password.trim()) {
-    fieldErrors.password = t('settings.system.requests.errors.apiKeyRequired')
+    fieldErrors.password = apiKeyRequiredMessage.value
   }
   if (usesApiKey.value && current.id !== null && !hasStoredCredential.value && !current.password.trim()) {
-    fieldErrors.password = t('settings.system.requests.errors.apiKeyRequired')
+    fieldErrors.password = apiKeyRequiredMessage.value
   }
   if (!stagesLocally.value && filledMappings(current).length === 0) fieldErrors.mappings = t('settings.system.requests.errors.mappingRequired')
   if (Object.keys(fieldErrors).length > 0) return
@@ -517,7 +534,7 @@ async function confirmOrphanRemoval() {
       v-if="clients.length === 0"
       :title="t('settings.system.requests.clientsEmpty.title')"
       :body="t('settings.system.requests.clientsEmpty.body')"
-      :note="t('settings.system.requests.clientsEmpty.note')"
+      :note="t('settings.system.requests.clientsEmpty.noteWithTorbox')"
     >
       <template #icon>
         <Download :size="18" />

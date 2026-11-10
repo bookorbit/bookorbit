@@ -155,7 +155,7 @@ function cancelRemove() {
 function confirmRemove() {
   if (download.value) {
     removalInFlight.value = true
-    emit('remove', { request: props.request, downloadId: download.value.id, deleteFiles: deleteFiles.value })
+    emit('remove', { request: props.request, downloadId: download.value.id, deleteFiles: alwaysDeletesRemote.value || deleteFiles.value })
   }
   confirming.value = false
 }

@@ -180,6 +180,27 @@ describe('useBookRequestActions with more than one row in flight', () => {
     })
   })
 
+  it('sends explicit file-deletion consent for irreversible clients', async () => {
+    const actions = await freshActions()
+    apiMock.mockResolvedValue(response({ id: 1, status: 'cancelled' }))
+
+    await actions.cancel(1, { deleteFiles: true })
+    await actions.cancelDownload(1, 11, { deleteFiles: true })
+    await actions.remove(1, true)
+
+    expect(apiMock).toHaveBeenNthCalledWith(1, '/api/v1/book-requests/1/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"deleteFiles":true}',
+    })
+    expect(apiMock).toHaveBeenNthCalledWith(2, '/api/v1/book-requests/1/downloads/11/cancel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{"deleteFiles":true}',
+    })
+    expect(apiMock).toHaveBeenNthCalledWith(3, '/api/v1/admin/book-requests/1?deleteFiles=true', { method: 'DELETE' })
+  })
+
   /**
    * The single id described only the last action started, so finishing row B re-enabled row A's
    * buttons while A's own call was still running.

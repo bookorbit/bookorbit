@@ -224,7 +224,7 @@ export class DownloadClientConfigService {
         username: dto.username?.trim() || null,
         password: dto.password ?? null,
         category: 'bookorbit',
-        allowPrivateAddress: false,
+        allowPrivateAddress: dto.allowPrivateAddress ?? false,
         settings: null,
       });
     } finally {

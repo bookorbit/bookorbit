@@ -181,11 +181,20 @@ describe('DownloadRemovalService.cleanupStagedClientDownload', () => {
 });
 
 describe('DownloadRemovalService.detachAttempt', () => {
-  it('always asks a staging-capable client to delete files', async () => {
+  it('refuses to remove from a staging-capable client without consent to delete its remote files', async () => {
     const staged = download();
     const { service, adapter } = await makeService({ latest: staged, stageCapable: true });
 
-    await expect(service.detachAttempt(staged, false)).resolves.toBeNull();
+    await expect(service.detachAttempt(staged, false)).resolves.toContain('permanently deleting its remote files');
+
+    expect(adapter.remove).not.toHaveBeenCalled();
+  });
+
+  it('removes from a staging-capable client after explicit consent to delete its remote files', async () => {
+    const staged = download();
+    const { service, adapter } = await makeService({ latest: staged, stageCapable: true });
+
+    await expect(service.detachAttempt(staged, true)).resolves.toBeNull();
 
     expect(adapter.remove).toHaveBeenCalledWith(INFO_HASH, expect.anything(), { deleteFiles: true });
   });

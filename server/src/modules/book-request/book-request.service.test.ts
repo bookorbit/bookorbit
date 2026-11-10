@@ -917,6 +917,14 @@ describe('BookRequestService.cancel', () => {
     expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, false, 'reader');
   });
 
+  it('passes explicit file-deletion consent to the download client', async () => {
+    const { service, removal } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) } });
+
+    await service.cancel(10, user(), true);
+
+    expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, true, 'reader');
+  });
+
   /** A download client that is down must not be the reason a stuck request stays stuck. */
   it('cancels anyway when the download client will not let go, and says so on the row', async () => {
     const { service, repo } = makeService({
@@ -972,6 +980,16 @@ describe('BookRequestService.cancelDownload', () => {
     expect(repo.updateIf).toHaveBeenCalledWith(10, ['grabbed', 'downloading'], { status: 'approved', statusReason: null });
     expect(repo.updateIf).not.toHaveBeenCalledWith(10, expect.anything(), expect.objectContaining({ status: 'cancelled' }));
     expect(gateway.emitChanged).toHaveBeenCalled();
+  });
+
+  it('passes explicit file-deletion consent when cancelling one transfer', async () => {
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'downloading' })) },
+    });
+
+    await service.cancelDownload(10, 11, user(), true);
+
+    expect(removal.removeAttempt).toHaveBeenCalledWith(10, 11, true, 'reader');
   });
 
   it('refuses someone who cannot drive the request', async () => {
@@ -1135,6 +1153,14 @@ describe('BookRequestService.remove', () => {
 
     expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, false, 'reader');
     expect(repo.remove).toHaveBeenCalled();
+  });
+
+  it('passes explicit file-deletion consent before deleting the request', async () => {
+    const { service, removal } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'available' })) } });
+
+    await service.remove(10, approver, true);
+
+    expect(removal.removeLatestForRequest).toHaveBeenCalledWith(10, true, 'reader');
   });
 
   it('keeps the row when the torrent could not be removed, rather than orphaning it', async () => {

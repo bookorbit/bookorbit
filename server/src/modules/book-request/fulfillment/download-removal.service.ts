@@ -148,9 +148,11 @@ export class DownloadRemovalService {
     if (download.clientKey === null) return;
 
     const isDirect = download.source === 'direct_url';
-    // There is no swarm to preserve on a staged file, so its bytes always go with the attempt.
     const stagesLocally = !isDirect && download.downloadClientId !== null && (await this.clients.stagesLocally(download.downloadClientId));
-    const shouldDeleteFiles = isDirect || stagesLocally || deleteFiles;
+    if (stagesLocally && !deleteFiles) {
+      throw new BadRequestException('This download client can only remove the item by permanently deleting its remote files');
+    }
+    const shouldDeleteFiles = isDirect || deleteFiles;
 
     if (isDirect) {
       await this.direct.remove(download.clientKey, { deleteFiles: shouldDeleteFiles });

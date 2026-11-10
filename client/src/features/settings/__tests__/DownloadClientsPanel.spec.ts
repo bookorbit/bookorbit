@@ -251,6 +251,18 @@ describe('DownloadClientsPanel', () => {
     expect(sheet().textContent).not.toContain('SABnzbd under Config')
   })
 
+  it('names TorBox when its API key is missing', async () => {
+    const wrapper = await mountPanel()
+    await openTorboxCreate(wrapper)
+    typeInto('#download-client-name', 'TorBox')
+
+    clickInSheet('Save')
+    await flushPromises()
+
+    expect(sheet().textContent).toContain('Enter the TorBox API key from the TorBox account settings')
+    expect(sheet().textContent).not.toContain('Enter the SABnzbd API key')
+  })
+
   it('hides path mappings and saves a TorBox client without mappings', async () => {
     const wrapper = await mountPanel()
     await clickInPanel(wrapper, 'Add client')
@@ -298,7 +310,11 @@ describe('DownloadClientsPanel', () => {
     await flushPromises()
 
     const validateCall = apiMock.mock.calls.find(([url, init]) => String(url).endsWith('/validate') && init?.method === 'POST')
-    expect(JSON.parse(String(validateCall?.[1]?.body))).toMatchObject({ adapterType: 'torbox', password: 'typed-key' })
+    expect(JSON.parse(String(validateCall?.[1]?.body))).toMatchObject({
+      adapterType: 'torbox',
+      password: 'typed-key',
+      allowPrivateAddress: true,
+    })
     expect(sheet().textContent).toContain('Connected to TorBox')
 
     apiMock.mockImplementation((url: string, init?: RequestInit) =>

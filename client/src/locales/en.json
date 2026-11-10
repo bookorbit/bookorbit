@@ -3796,7 +3796,8 @@
         "clientsEmpty": {
           "title": "No download client yet",
           "body": "A direct HTTP download needs no client. Connect one so BookOrbit can fetch releases delivered by torrent or Usenet too.",
-          "note": "qBittorrent, Transmission, Deluge, rTorrent, NZBGet, SABnzbd and TorBox are supported."
+          "note": "qBittorrent, Transmission, Deluge, rTorrent, NZBGet and SABnzbd are supported.",
+          "noteWithTorbox": "qBittorrent, Transmission, Deluge, rTorrent, NZBGet, SABnzbd and TorBox are supported."
         },
         "summary": "{type} - category {category}, priority {priority}",
         "disabled": "Disabled",
@@ -3901,7 +3902,8 @@
           "nameRequired": "Give this client a name.",
           "urlRequired": "Enter the address BookOrbit should reach this client at.",
           "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from.",
-          "apiKeyRequired": "Enter the SABnzbd API key from Config > General."
+          "apiKeyRequired": "Enter the SABnzbd API key from Config > General.",
+          "torboxApiKeyRequired": "Enter the TorBox API key from the TorBox account settings."
         },
         "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client credential cannot be saved. Generate one with: openssl rand -hex 32",
         "confirmDelete": {

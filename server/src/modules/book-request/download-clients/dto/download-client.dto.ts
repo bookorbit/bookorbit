@@ -193,4 +193,8 @@ export class ValidateDownloadClientDto {
   @IsString()
   @MaxLength(1024)
   password?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  allowPrivateAddress?: boolean;
 }

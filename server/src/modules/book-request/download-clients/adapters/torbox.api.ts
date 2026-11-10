@@ -86,6 +86,8 @@ export class TorboxApiClient {
     const found = new Map<string, TorboxTorrent>();
     if (hashes.size === 0) return found;
 
+    let listingTruncated = false;
+
     for (let page = 0; page < LIST_PAGE_LIMIT; page += 1) {
       const data = await this.call(
         config,
@@ -98,6 +100,9 @@ export class TorboxApiClient {
           limit: String(LIST_PAGE_SIZE),
         },
       );
+      // TorBox represents an empty account as a successful ITEM_NOT_FOUND envelope whose data is
+      // null. It is the normal empty-list case, including the first grab on a fresh account.
+      if (data === null) break;
       // `mylist` answers with a list unless an id was asked for; anything else is a contract
       // breach that must surface as a failed read, not as an account that holds no torrents.
       if (!Array.isArray(data)) throw new BadRequestException('TorBox answered the torrent list with something that is not a list');
@@ -108,6 +113,11 @@ export class TorboxApiClient {
         if (torrent.hash !== null && hashes.has(torrent.hash)) found.set(torrent.hash, torrent);
       }
       if (records.length < LIST_PAGE_SIZE || found.size >= hashes.size) break;
+      listingTruncated = page === LIST_PAGE_LIMIT - 1;
+    }
+
+    if (listingTruncated && found.size < hashes.size) {
+      throw new ServiceUnavailableException('TorBox has more torrents than BookOrbit can search in one bounded lookup');
     }
 
     return found;
@@ -156,8 +166,8 @@ export class TorboxApiClient {
   ): Promise<unknown> {
     const apiKey = this.requireApiKey(config);
     const base = await ensureSafeUrl(config.baseUrl, { allowPrivate: config.allowPrivateAddress });
-    // TorBox is a hosted service, never a LAN daemon, so a plain-http base URL can only be a way to
-    // carry the API key in cleartext. Refuse it before the key reaches the URL or the headers.
+    // The API key must not cross a cleartext connection, including when the operator points this
+    // client at a private reverse proxy. Refuse it before the key reaches the URL or the headers.
     if (base.protocol !== 'https:') throw new BadRequestException('TorBox requires an https:// base URL');
     const target = endpointUrl(base, path);
     for (const [name, value] of Object.entries(params)) target.searchParams.set(name, value);

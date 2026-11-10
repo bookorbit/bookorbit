@@ -205,6 +205,7 @@ export interface ValidateDownloadClientPayload {
   baseUrl: string;
   username?: string | null;
   password?: string | null;
+  allowPrivateAddress?: boolean;
 }
 
 export interface DownloadClientTestResult {

@@ -935,7 +935,7 @@ export class BookRequestService {
    * reason a stuck request stays stuck, so the cancellation stands either way and the request
    * carries a note that a transfer may still be sitting in the client.
    */
-  async cancel(id: number, user: RequestUser): Promise<BookRequestItem> {
+  async cancel(id: number, user: RequestUser, deleteFiles = false): Promise<BookRequestItem> {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
 
@@ -960,7 +960,7 @@ export class BookRequestService {
     });
     if (!updated) throw await this.staleLifecycleTransition(id, 'cancel');
 
-    const outcome = await this.removal.removeLatestForRequest(id, false, user.username);
+    const outcome = await this.removal.removeLatestForRequest(id, deleteFiles, user.username);
     // The cancellation stands either way; the note is what tells the requester a transfer may
     // still be sitting in the client. Conditional, so it cannot resurrect a row a delete removed.
     if (outcome.error) {
@@ -982,7 +982,7 @@ export class BookRequestService {
    * This is intentionally separate from `cancel`: the request, its subscribers, and its approval
    * remain intact.
    */
-  async cancelDownload(id: number, downloadId: number, user: RequestUser): Promise<BookRequestItem> {
+  async cancelDownload(id: number, downloadId: number, user: RequestUser, deleteFiles = false): Promise<BookRequestItem> {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
     if (!this.canDrive(joined.request, user)) throw new ForbiddenException('You cannot cancel this book request download');
@@ -993,7 +993,7 @@ export class BookRequestService {
       throw new BadRequestException(`A download that is ${download.status} can no longer be cancelled`);
     }
 
-    const stopped = await this.removal.removeAttempt(id, downloadId, false, user.username);
+    const stopped = await this.removal.removeAttempt(id, downloadId, deleteFiles, user.username);
     if (!stopped) throw new BadRequestException('The download finished before it could be cancelled');
 
     await this.repo.updateIf(id, ACTIVE_TRANSFER_REQUEST_STATUSES, { status: 'approved', statusReason: null });
@@ -1072,9 +1072,10 @@ export class BookRequestService {
    *
    * A settled request can still own client state, especially a torrent that keeps seeding after
    * import, so the attempt is detached first. Deleting the row before that would leave client work
-   * with nothing pointing at it. Torrent files are kept; direct-download staging is disposable.
+   * with nothing pointing at it. Torrent files require explicit deletion consent; direct-download
+   * staging is disposable.
    */
-  async remove(id: number, user: RequestUser): Promise<void> {
+  async remove(id: number, user: RequestUser, deleteFiles = false): Promise<void> {
     const joined = await this.repo.findById(id);
     if (!joined) throw new NotFoundException('Book request not found');
     if (!this.canManageAll(user)) throw new ForbiddenException('You cannot delete book requests');
@@ -1090,7 +1091,7 @@ export class BookRequestService {
       throw await this.staleTransition(id, (status) => `A request that is ${status} is still being worked on; cancel it before deleting it`);
     }
 
-    const outcome = await this.removal.removeLatestForRequest(id, false, user.username);
+    const outcome = await this.removal.removeLatestForRequest(id, deleteFiles, user.username);
     if (outcome.error) {
       if (reservedFailed) await this.repo.updateIf(id, ['cancelled'], { status: 'failed' });
       throw new BadRequestException(`Remove the download from its client first: ${outcome.error}`);

@@ -94,6 +94,7 @@ function makeService(
   };
   const imports = { importDownload: vi.fn().mockResolvedValue(true) };
   const fulfillment = { failDownload: vi.fn().mockResolvedValue(undefined) };
+  const removal = { cleanupStagedClientDownload: vi.fn().mockResolvedValue(undefined) };
   const gateway = { emitProgress: vi.fn(), emitChanged: vi.fn() };
 
   const service = new DownloadMonitorService(
@@ -104,10 +105,11 @@ function makeService(
     direct as never,
     imports as never,
     fulfillment as never,
+    removal as never,
     gateway as never,
   );
 
-  return { service, downloads, requests, clients, adapter, direct, imports, fulfillment, gateway };
+  return { service, downloads, requests, clients, adapter, direct, imports, fulfillment, removal, gateway };
 }
 
 /**
@@ -347,7 +349,7 @@ describe('DownloadMonitorService.tick', () => {
     vi.useFakeTimers();
     vi.setSystemTime(100_000);
     try {
-      const { service, fulfillment, adapter } = makeService({
+      const { service, fulfillment, removal, adapter } = makeService({
         stageCapable: true,
         stageError: new Error('CDN unavailable'),
         statuses: [status({ state: 'completed', contentPath: null, progressPercent: 100, downloadedBytes: 1000 })],
@@ -360,7 +362,41 @@ describe('DownloadMonitorService.tick', () => {
       }
 
       expect(adapter.stage).toHaveBeenCalledTimes(3);
+      expect(removal.cleanupStagedClientDownload).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 11 }));
       expect(fulfillment.failDownload).toHaveBeenCalledWith(expect.objectContaining({ id: 11 }), expect.stringContaining('fetched from the cloud'));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not carry a cancelled attempt staging backoff into its replacement', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(100_000);
+    try {
+      const replacement = row({ id: 12 });
+      const { service, downloads, adapter } = makeService({
+        stageCapable: true,
+        stageError: new Error('CDN unavailable'),
+        statuses: [status({ state: 'completed', contentPath: null, progressPercent: 100, downloadedBytes: 1000 })],
+      });
+
+      await polled(service);
+      await service.whenStagingSettles();
+
+      downloads.findActive.mockResolvedValue([replacement]);
+      downloads.findById.mockImplementation((id: number) => Promise.resolve(id === replacement.id ? replacement : undefined));
+      vi.setSystemTime(Date.now() + 5_001);
+      await polled(service);
+      await service.whenStagingSettles();
+
+      expect(adapter.stage).toHaveBeenCalledTimes(2);
+
+      downloads.findActive.mockResolvedValue([]);
+      vi.setSystemTime(Date.now() + 5_001);
+      await polled(service);
+      const retryState = service as unknown as { stageFailures: Map<number, number>; stageRetryAt: Map<number, number> };
+      expect(retryState.stageFailures.size).toBe(0);
+      expect(retryState.stageRetryAt.size).toBe(0);
     } finally {
       vi.useRealTimers();
     }

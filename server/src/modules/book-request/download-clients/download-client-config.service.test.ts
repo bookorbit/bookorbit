@@ -393,6 +393,19 @@ describe('DownloadClientConfigService', () => {
     expect(repo.update).not.toHaveBeenCalled();
   });
 
+  it('uses the transient private-address choice when validating a client', async () => {
+    const { service, adapter } = makeService();
+
+    await service.validate({
+      adapterType: 'torbox',
+      baseUrl: 'https://torbox-proxy.internal',
+      password: 'key',
+      allowPrivateAddress: true,
+    });
+
+    expect(adapter.test).toHaveBeenCalledWith(expect.objectContaining({ allowPrivateAddress: true }));
+  });
+
   it('gives each validation its own session slot and disposes it', async () => {
     const { service, adapter, registry } = makeService();
     registry.require.mockReturnValue({ label: 'qBittorrent', test: adapter.test, forget: adapter.forget });

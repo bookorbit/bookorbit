@@ -311,7 +311,7 @@ async function rejectRequest(request: BookRequestItem) {
 }
 
 async function cancelRequest(request: BookRequestItem) {
-  const outcome = await actions.cancel(request.id)
+  const outcome = await actions.cancel(request.id, { deleteFiles: request.download?.alwaysDeletesRemote ?? false })
   if (applyUpdate(outcome, 'bookRequests.errors.cancelFailed')) toast.success(t('bookRequests.toasts.cancelled'))
 }
 
@@ -335,7 +335,7 @@ async function restoreRequest(request: BookRequestItem) {
 }
 
 async function deleteRequest(request: BookRequestItem) {
-  const outcome = await actions.remove(request.id)
+  const outcome = await actions.remove(request.id, request.download?.alwaysDeletesRemote ?? false)
   if (!outcome.ok) {
     toast.error(t('bookRequests.errors.deleteFailed'), outcome.reason ? { description: outcome.reason } : undefined)
     return

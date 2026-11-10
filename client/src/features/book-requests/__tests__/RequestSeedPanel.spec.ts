@@ -247,5 +247,7 @@ describe('RequestSeedPanel', () => {
       .trigger('click')
 
     expect(wrapper.getComponent(ConfirmDialogStub).props('description')).toContain('deletes it and its files there for good')
+    wrapper.getComponent(ConfirmDialogStub).vm.$emit('confirm')
+    expect(wrapper.emitted('remove')?.[0]?.[0]).toMatchObject({ deleteFiles: true })
   })
 })

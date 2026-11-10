@@ -96,6 +96,12 @@ describe('TorboxApiClient.findByHashes', () => {
     await expect(new TorboxApiClient().findByHashes(config(), new Set([HASH]))).rejects.toThrow('not a list');
   });
 
+  it('treats TorBox empty-account null data as an empty listing', async () => {
+    safeFetchMock.mockResolvedValueOnce(envelopeResponse(null));
+
+    await expect(new TorboxApiClient().findByHashes(config(), new Set([HASH]))).resolves.toEqual(new Map());
+  });
+
   it('pages forward while a page comes back full without the wanted hash', async () => {
     const fullPage = Array.from({ length: 1000 }, (_, index) => ({ id: index + 1, hash: 'b'.repeat(64) }));
     safeFetchMock.mockResolvedValueOnce(envelopeResponse(fullPage));
@@ -106,5 +112,13 @@ describe('TorboxApiClient.findByHashes', () => {
     expect(found.has(HASH)).toBe(true);
     expect(safeFetchMock).toHaveBeenCalledTimes(2);
     expect(String(safeFetchMock.mock.calls[1][0])).toBe('https://api.torbox.app/v1/api/torrents/mylist?bypass_cache=true&offset=1000&limit=1000');
+  });
+
+  it('fails an incomplete bounded lookup instead of reporting a missing torrent', async () => {
+    const fullPage = Array.from({ length: 1000 }, (_, index) => ({ id: index + 1, hash: 'b'.repeat(64) }));
+    for (let page = 0; page < 5; page += 1) safeFetchMock.mockResolvedValueOnce(envelopeResponse(fullPage));
+
+    await expect(new TorboxApiClient().findByHashes(config(), new Set([HASH]))).rejects.toThrow('more torrents than BookOrbit can search');
+    expect(safeFetchMock).toHaveBeenCalledTimes(5);
   });
 });

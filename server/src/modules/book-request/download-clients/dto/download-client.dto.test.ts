@@ -31,6 +31,7 @@ describe('ValidateDownloadClientDto', () => {
       baseUrl: 'https://api.torbox.app',
       username: 'operator',
       password: 'api-key',
+      allowPrivateAddress: true,
     });
 
     await expect(validate(dto, validationOptions)).resolves.toEqual([]);
@@ -58,5 +59,15 @@ describe('ValidateDownloadClientDto', () => {
     const dto = plainToInstance(ValidateDownloadClientDto, { adapterType: 'torbox', baseUrl: 'https://example.com' });
 
     await expect(validate(dto, validationOptions)).resolves.toEqual([]);
+  });
+
+  it('rejects a non-boolean private-address choice', async () => {
+    const dto = plainToInstance(ValidateDownloadClientDto, {
+      adapterType: 'torbox',
+      baseUrl: 'https://example.com',
+      allowPrivateAddress: 'true',
+    });
+
+    expect(await validate(dto, validationOptions)).not.toEqual([]);
   });
 });
