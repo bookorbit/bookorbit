@@ -67,6 +67,7 @@ const parser = new XMLParser({
   isArray: (name) => ['creator', 'contributor', 'identifier', 'subject', 'title', 'meta', 'item', 'reference'].includes(name),
   textNodeName: '#text',
   allowBooleanAttributes: true,
+  htmlEntities: true,
   parseTagValue: false, // keep all values as strings to preserve ISBNs with leading zeroes
 });
 

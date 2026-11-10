@@ -106,6 +106,20 @@ describe('parseOpf', () => {
       expect(parseOpf(epub2Opf('<dc:title>Mr. Penumbra&apos;s 24-Hour Bookstore</dc:title>')).title).toBe("Mr. Penumbra's 24-Hour Bookstore");
     });
 
+    it('decodes numeric character references in metadata text', () => {
+      const xml = epub2Opf(`
+        <dc:title>Shadow&#39;s Messenger</dc:title>
+        <dc:description>Line one&#xA;Line two &#34;quoted&#34;</dc:description>
+        <dc:creator>Author &#38; Co</dc:creator>
+      `);
+
+      expect(parseOpf(xml)).toMatchObject({
+        title: "Shadow's Messenger",
+        description: 'Line one\nLine two "quoted"',
+        authors: [{ name: 'Author & Co', sortName: null }],
+      });
+    });
+
     it('uses first title as main title when multiple titles but no refinements', () => {
       const xml = epub3Opf(`
         <dc:title id="t1">First Title</dc:title>
