@@ -6,7 +6,7 @@ import type { IndexerColor, ReleaseUnitChoice } from "./indexer";
  * deliberately absent: it has no address, no credentials and nothing to choose, so making it a
  * configurable client type would only ask an operator to create a record of nothing.
  */
-export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "rtorrent", "nzbget", "sabnzbd"] as const;
+export const DOWNLOAD_CLIENT_TYPES = ["qbittorrent", "transmission", "deluge", "rtorrent", "nzbget", "sabnzbd", "torbox"] as const;
 export type DownloadClientType = (typeof DOWNLOAD_CLIENT_TYPES)[number];
 
 /**
@@ -23,6 +23,7 @@ export const DOWNLOAD_CLIENT_DELIVERY: Record<DownloadClientType, DownloadDelive
   rtorrent: "torrent",
   nzbget: "usenet",
   sabnzbd: "usenet",
+  torbox: "torrent",
 };
 
 export type DownloadClientCredentialKind = "usernamePassword" | "apiKey";
@@ -35,6 +36,36 @@ export const DOWNLOAD_CLIENT_CREDENTIAL_KIND: Record<DownloadClientType, Downloa
   rtorrent: "usernamePassword",
   nzbget: "usernamePassword",
   sabnzbd: "apiKey",
+  torbox: "apiKey",
+};
+
+/**
+ * A cloud client fetches finished files into BookOrbit's own staging root instead of exposing a
+ * filesystem the import could map, so it needs no path mappings and the form hides them.
+ */
+export const DOWNLOAD_CLIENT_STAGES_LOCALLY: Record<DownloadClientType, boolean> = {
+  qbittorrent: false,
+  transmission: false,
+  deluge: false,
+  rtorrent: false,
+  nzbget: false,
+  sabnzbd: false,
+  torbox: true,
+};
+
+/**
+ * A cloud client offers no way to hand a download back: removing it from BookOrbit deletes the
+ * item and its files on the client's side whatever the operator chose, so the UI must say that
+ * rather than promise a copy nothing can keep.
+ */
+export const DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE: Record<DownloadClientType, boolean> = {
+  qbittorrent: false,
+  transmission: false,
+  deluge: false,
+  rtorrent: false,
+  nzbget: false,
+  sabnzbd: false,
+  torbox: true,
 };
 
 export interface DownloadClientPathMapping {
@@ -164,6 +195,19 @@ export interface CreateDownloadClientPayload {
 
 export type UpdateDownloadClientPayload = Partial<Omit<CreateDownloadClientPayload, "adapterType">>;
 
+/**
+ * What the settings form sends to check a credential before anything is saved: enough to reach a
+ * client and nothing persisted, so an operator finds out their API key is wrong while they are
+ * still looking at the field they typed it into.
+ */
+export interface ValidateDownloadClientPayload {
+  adapterType: DownloadClientType;
+  baseUrl: string;
+  username?: string | null;
+  password?: string | null;
+  allowPrivateAddress?: boolean;
+}
+
 export interface DownloadClientTestResult {
   success: boolean;
   /** Client-reported version on success, so the operator can see what answered. */
@@ -242,6 +286,11 @@ export interface BookRequestDownloadItem {
   downloadClientId: number | null;
   downloadClientName: string | null;
   downloadClientColor: IndexerColor | null;
+  /**
+   * True when this attempt is held by a client that deletes it, files included, when removed:
+   * the operator is not offered a copy that client cannot keep.
+   */
+  alwaysDeletesRemote: boolean;
   source: BookRequestDownloadSource;
   /** Where the release came from, and null once that indexer row has been deleted. */
   indexerId: number | null;
@@ -283,6 +332,8 @@ export interface BookRequestSeedStatus {
   downloadClientId: number;
   downloadClientName: string | null;
   clientKey: string;
+  /** True when removing this torrent deletes it and its files on the client's side for good. */
+  alwaysDeletesRemote: boolean;
   /** False once the client has stopped the torrent, whether by goal, by pause or by error. */
   seeding: boolean;
   ratio: number | null;
