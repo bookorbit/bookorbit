@@ -17095,7 +17095,7 @@
       "checkConstraints": {
         "download_clients_adapter_type_chk": {
           "name": "download_clients_adapter_type_chk",
-          "value": "\"download_clients\".\"adapter_type\" in ('qbittorrent', 'transmission', 'deluge', 'rtorrent', 'nzbget', 'sabnzbd', 'torbox')"
+          "value": "\"download_clients\".\"adapter_type\" in ('qbittorrent', 'transmission', 'deluge', 'rtorrent', 'nzbget', 'sabnzbd')"
         },
         "download_clients_priority_range_chk": {
           "name": "download_clients_priority_range_chk",
