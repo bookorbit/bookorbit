@@ -1,6 +1,3 @@
-> [!IMPORTANT]
-> **Android beta testers needed:** The official BookOrbit Android app is in closed testing. [Join the Google Play beta](https://github.com/bookorbit/bookorbit/issues/2001) and stay enrolled for at least 14 days to help unlock its public release.
-
 <div align="center">
 
 <h1>
