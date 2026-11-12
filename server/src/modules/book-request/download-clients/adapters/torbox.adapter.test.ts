@@ -422,7 +422,10 @@ describe('TorboxAdapter', () => {
     expect(fetchMock).toHaveBeenCalledWith('https://example.com/final.epub?token=SECRET', expect.anything());
   });
 
-  it('does not forward the CDN token across a cross-origin redirect', async () => {
+  it.each([
+    ['a query-less target', 'https://cdn.example.com/final.epub'],
+    ['a target with its own query', 'https://cdn.example.com/final.epub?sig=X'],
+  ])('does not forward the CDN token across a cross-origin redirect to %s', async (_case, location) => {
     api.findByHashes.mockResolvedValue(
       new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
     );
@@ -430,9 +433,9 @@ describe('TorboxAdapter', () => {
     const fetchMock = vi.fn((input: URL | string) => {
       const url = String(input);
       if (url === 'https://example.com/book.epub?token=SECRET') {
-        return Promise.resolve(new Response(null, { status: 302, headers: { location: 'https://cdn.example.com/final.epub?sig=X' } }));
+        return Promise.resolve(new Response(null, { status: 302, headers: { location } }));
       }
-      if (url === 'https://cdn.example.com/final.epub?sig=X') {
+      if (url === location) {
         return Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }));
       }
       return Promise.resolve(new Response('unexpected', { status: 400 }));
@@ -441,7 +444,10 @@ describe('TorboxAdapter', () => {
 
     const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
     await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
-    expect(fetchMock).toHaveBeenCalledWith('https://cdn.example.com/final.epub?sig=X', expect.anything());
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const followUpUrl = String(fetchMock.mock.calls[1][0]);
+    expect(followUpUrl).toBe(location);
+    expect(followUpUrl).not.toContain('token=SECRET');
   });
 
   it('stages a multi-file release when a later file redirects to a relative path', async () => {
