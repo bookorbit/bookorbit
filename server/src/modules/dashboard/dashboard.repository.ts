@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, max, min, notExists, notInArray, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, inArray, isNotNull, isNull, lt, max, min, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { BOOK_FORMATS, isAudioFormat, type ContentFilterRules, type ReadStatus } from '@bookorbit/types';
 
@@ -24,6 +24,9 @@ const DISCOVERY_EXCLUDED_READ_STATUSES = ['reading', 'rereading', 'on_hold', 're
 // sparse eligibility. The ceiling prevents large requests from multiplying probes.
 const RANDOM_PIVOT_MULTIPLIER = 3;
 const RANDOM_MAX_PIVOTS = 60;
+// books.id is serial (int4). An explicit ceiling keeps the highest pivot's upper bound an index
+// condition; a null test in its place would leave the bound as a filter the scan cannot stop on.
+const POSTGRES_INTEGER_MAX = 2_147_483_647;
 
 function selectionClauses(options: ScrollerSelectionOptions): SQL[] {
   return options.excludeAudioOnly ? [excludeAudioOnlyBooks()] : [];
@@ -398,33 +401,46 @@ export class DashboardRepository {
     const bounds = await this.findRandomIdBounds(accessibleLibraryIds);
     if (!bounds) return [];
     const cfClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
-    // OFFSET 0 keeps these as correlated index lookups. Without it PostgreSQL
-    // can flatten them into anti-joins that rescan a user's full status set.
-    const hasNoProgress = notExists(
-      this.db
-        .select({ one: sql`1` })
-        .from(readingProgress)
-        .where(and(eq(readingProgress.bookFileId, books.primaryFileId), eq(readingProgress.userId, userId), sql`${readingProgress.percentage} <> 0`))
-        .offset(0),
-    );
-    const hasNoExcludedReadStatus = notExists(
-      this.db
-        .select({ one: sql`1` })
-        .from(userBookStatus)
-        .where(
-          and(
-            eq(userBookStatus.bookId, books.id),
-            eq(userBookStatus.userId, userId),
-            inArray(userBookStatus.status, [...DISCOVERY_EXCLUDED_READ_STATUSES]),
-          ),
-        )
-        .offset(0),
-    );
+    // OFFSET 0 keeps these as correlated index lookups. Without it PostgreSQL flattens them into
+    // anti-joins that rescan a user's full status set for every pivot. They are raw SQL because
+    // Drizzle's query builder omits `.offset(0)` from the statement it renders.
+    const hasNoProgress = sql`not exists (
+      select 1
+      from ${readingProgress}
+      where ${readingProgress.bookFileId} = ${books.primaryFileId}
+        and ${readingProgress.userId} = ${userId}
+        and ${readingProgress.percentage} <> 0
+      offset 0
+    )`;
+    const hasNoExcludedReadStatus = sql`not exists (
+      select 1
+      from ${userBookStatus}
+      where ${userBookStatus.bookId} = ${books.id}
+        and ${userBookStatus.userId} = ${userId}
+        and ${inArray(userBookStatus.status, [...DISCOVERY_EXCLUDED_READ_STATUSES])}
+      offset 0
+    )`;
+    // Discovery offers a series only at its first volume present in the library; a started series
+    // belongs to Up Next in Series. Earlier volumes count whatever the reader's filters or status,
+    // so the series stays out rather than surfacing mid-way. The probe stops at the first earlier
+    // present volume it finds.
+    const isSeriesOpener = sql`not exists (
+      select 1
+      from ${bookMetadata} candidate_metadata
+      inner join ${bookMetadata} earlier_metadata on earlier_metadata.series_id = candidate_metadata.series_id
+        and ${seriesIndexSortKey(sql.raw('earlier_metadata.series_index'))} < ${seriesIndexSortKey(sql.raw('candidate_metadata.series_index'))}
+      inner join ${books} earlier_book on earlier_book.id = earlier_metadata.book_id
+      where candidate_metadata.book_id = ${books.id}
+        and earlier_book.library_id = ${books.libraryId}
+        and earlier_book.status = 'present'
+      offset 0
+    )`;
     const eligibility = and(
       inArray(books.libraryId, accessibleLibraryIds),
       eq(books.status, 'present'),
       hasNoProgress,
       hasNoExcludedReadStatus,
+      isSeriesOpener,
       ...cfClauses,
       ...selectionClauses(options),
     )!;
@@ -454,13 +470,26 @@ export class DashboardRepository {
     return [...sampledIds, ...fallbackRows.map((row) => row.id)].slice(0, limit);
   }
 
+  /**
+   * Each pivot searches only up to the next pivot, and only the highest searches to the end and
+   * wraps. A pivot with nothing eligible before the next one would otherwise reach whatever that
+   * pivot reaches, so the set of ids is unchanged, but a long ineligible run (a started series, a
+   * shelf of read books) is walked once rather than once for every pivot that lands in it.
+   */
   private async findDistributedRandomCandidates(pivots: number[], eligibility: SQL): Promise<number[]> {
+    const ordered = pivots
+      .map((pivot, sampleIndex) => ({ pivot, sampleIndex }))
+      .sort((left, right) => left.pivot - right.pivot || left.sampleIndex - right.sampleIndex);
     const pivotValues = sql.join(
-      pivots.map((pivot, sampleIndex) => sql`(${sampleIndex}::integer, ${pivot}::integer)`),
+      ordered.map(({ pivot, sampleIndex }, position) => {
+        const next = ordered[position + 1];
+        const lastId = next ? next.pivot - 1 : POSTGRES_INTEGER_MAX;
+        return sql`(${sampleIndex}::integer, ${pivot}::integer, ${lastId}::integer, ${next === undefined}::boolean)`;
+      }),
       sql`, `,
     );
     const result = await this.db.execute<RandomCandidateRow>(sql`
-      with pivots(sample_index, pivot_id) as (
+      with pivots(sample_index, pivot_id, last_id, wraps) as (
         values ${pivotValues}
       )
       select p.sample_index as "sampleIndex", coalesce(forward_candidate.id, wrap_candidate.id) as id
@@ -468,7 +497,7 @@ export class DashboardRepository {
       left join lateral (
         select ${books.id} as id
         from ${books}
-        where ${eligibility} and ${books.id} >= p.pivot_id
+        where ${eligibility} and ${books.id} >= p.pivot_id and ${books.id} <= p.last_id
         order by ${books.id} asc
         limit 1
       ) forward_candidate on true
@@ -476,6 +505,7 @@ export class DashboardRepository {
         select ${books.id} as id
         from ${books}
         where forward_candidate.id is null
+          and p.wraps
           and ${eligibility}
           and ${books.id} < p.pivot_id
         order by ${books.id} desc
