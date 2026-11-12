@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -50,6 +50,7 @@ import RequestEmptyState from './RequestEmptyState.vue'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import { formatKey, formatKeys, languageKey } from '../releaseFacets'
 import { requestBookCoverSources } from '../requestBookCover'
+import { REQUEST_DRAWER } from '../requestDrawerContext'
 import { requestFailureText } from '../requestOutcome'
 import { protocolChipClass, sourceChipClass } from '../sourceColors'
 import { useBookRequestActions } from '../composables/useBookRequests'
@@ -472,6 +473,8 @@ function afterGrab(item: BookRequestItem): void {
     void router.push({ name: 'book-request-releases', params: { id: partner.id }, query: listQuery.value })
     return
   }
+  // Picking releases for a selection: this request is done, so the run moves on to the next one.
+  if (pickRunActive.value && drawer?.pickRun?.advance()) return
   if (partner && SETTLED_STATUSES.includes(partner.status)) {
     finished.value = true
     return
@@ -481,6 +484,13 @@ function afterGrab(item: BookRequestItem): void {
 
 function closeDrawer(): void {
   void router.push({ name: 'book-requests', query: listQuery.value })
+}
+
+const drawer = inject(REQUEST_DRAWER, null)
+const pickRunActive = computed(() => (drawer?.pickRun?.position.value ?? 0) > 0)
+
+function skipInRun(): void {
+  drawer?.pickRun?.skip()
 }
 
 function releaseKey(release: ReleaseCandidateItem): string {
@@ -800,8 +810,12 @@ function showEverySource(): void {
         <p class="truncate text-sm font-medium text-foreground">
           {{ isRetry ? t('bookRequests.releases.retryTitle') : pairTabs ? t('bookRequests.releases.pairTitle') : t('bookRequests.releases.title') }}
         </p>
+        <p v-if="pickRunActive && drawer?.pickRun" class="truncate text-xs text-muted-foreground tabular-nums">
+          {{ t('bookRequests.pickRun.progress', { position: drawer.pickRun.position.value, total: drawer.pickRun.total.value }) }}
+        </p>
       </template>
       <template v-if="!finished" #actions>
+        <Button v-if="pickRunActive" variant="outline" size="sm" @click="skipInRun">{{ t('bookRequests.pickRun.skip') }}</Button>
         <Button variant="ghost" size="sm" :disabled="loading" @click="handleRefresh">
           <RefreshCw :size="14" aria-hidden="true" />
           {{ t('bookRequests.releases.refresh') }}

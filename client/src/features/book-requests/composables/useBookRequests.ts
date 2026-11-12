@@ -1,7 +1,8 @@
 import { computed, onScopeDispose, ref } from 'vue'
-import { bookRequestActionErrorCode, bookRequestSubmitErrorCode, grabFailureCode } from '@bookorbit/types'
+import { BOOK_REQUEST_BULK_LIMIT, bookRequestActionErrorCode, bookRequestSubmitErrorCode, grabFailureCode } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { fulfilmentBase } from '../fulfilmentBase'
+import type { RequestListState, RequestListView } from '../requestListQuery'
 import type {
   BookRequestItem,
   BookRequestActionErrorCode,
@@ -14,7 +15,8 @@ import type {
   BookRequestStatus,
   BookRequestSubmitErrorCode,
   BookRequestBulkResult,
-  BulkBookRequestsPayload,
+  BookRequestSelection,
+  BookRequestViewCounts,
   BulkRejectBookRequestsPayload,
   DecideBookRequestPayload,
   FulfillBookRequestPayload,
@@ -26,18 +28,30 @@ import type {
 
 export type RequestScope = 'mine' | 'all'
 
-const PAGE_SIZE = 20
+export const REQUEST_PAGE_SIZE = 20
+
+/** Every count the view switcher shows, before the first answer arrives. */
+const EMPTY_VIEW_COUNTS: BookRequestViewCounts = {
+  active: 0,
+  needs_action: 0,
+  in_progress: 0,
+  finished: 0,
+  closed: 0,
+  hidden: 0,
+  awaitingManualPick: 0,
+}
 
 export function useBookRequests(scope: RequestScope) {
   const items = ref<BookRequestItem[]>([])
   const total = ref(0)
   const page = ref(1)
+  const view = ref<RequestListView>('all')
+  const q = ref('')
   const status = ref<BookRequestStatus | ''>('')
   const mediaKind = ref<BookRequestMediaKind | ''>('')
   const requesterUserId = ref<number | ''>('')
   const requesterOptions = ref<BookRequestRequesterOption[]>([])
   let requesterOptionsInitialized = false
-  const includeDismissed = ref(false)
   /** '' is "either", so the control has a third state rather than a checkbox that means two. */
   const selfServe = ref<'' | 'true' | 'false'>('')
   const sortBy = ref<BookRequestSortField>('createdAt')
@@ -45,8 +59,10 @@ export function useBookRequests(scope: RequestScope) {
   const loading = ref(false)
   const initialized = ref(false)
   const error = ref<string | null>(null)
+  const viewCounts = ref<BookRequestViewCounts>({ ...EMPTY_VIEW_COUNTS })
+  const viewCountsLoaded = ref(false)
 
-  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+  const pageCount = computed(() => Math.max(1, Math.ceil(total.value / REQUEST_PAGE_SIZE)))
   const basePath = scope === 'all' ? '/api/v1/admin/book-requests' : '/api/v1/book-requests'
 
   /**
@@ -57,28 +73,57 @@ export function useBookRequests(scope: RequestScope) {
    * this the page shows whichever finished last, which is a filter the user has already changed.
    */
   let fetchGeneration = 0
+  let countsGeneration = 0
   /**
    * Bumped whenever the page writes a row itself, so a fetch that was already in flight when a
    * decision landed discards its answer instead of putting the old status back.
    */
   let localEdits = 0
 
+  /** The URL state, written onto the refs the fetches read. */
+  function applyState(state: RequestListState): void {
+    view.value = state.view
+    q.value = state.q
+    status.value = state.status
+    mediaKind.value = state.format
+    requesterUserId.value = scope === 'all' ? state.requester : ''
+    selfServe.value = state.approval === 'skipped' ? 'true' : state.approval === 'needed' ? 'false' : ''
+    sortBy.value = state.sort
+    sortDir.value = state.dir
+    page.value = state.page
+  }
+
+  /** The filters that narrow the list, shared by the list, its counts and "select all matching". */
+  function filterParams(): URLSearchParams {
+    const query = new URLSearchParams()
+    if (q.value) query.set('q', q.value)
+    if (status.value) query.set('status', status.value)
+    if (mediaKind.value) query.set('mediaKind', mediaKind.value)
+    // Only the approver queue accepts a requester filter; the personal list refuses the parameter.
+    if (scope === 'all' && requesterUserId.value !== '') query.set('requesterUserId', String(requesterUserId.value))
+    if (selfServe.value !== '') query.set('selfServe', selfServe.value)
+    return query
+  }
+
+  /** The filters plus the section and order, which together name exactly the rows on screen. */
+  function listParams(): URLSearchParams {
+    const query = filterParams()
+    if (view.value !== 'all') query.set('view', view.value)
+    query.set('sortBy', sortBy.value)
+    query.set('sortDir', sortDir.value)
+    // A pair is one row here, led by its ebook, with the audiobook riding along as its companion.
+    query.set('groupPairs', 'true')
+    return query
+  }
+
   async function fetchRequests(): Promise<void> {
     const generation = ++fetchGeneration
     const edits = localEdits
     loading.value = true
     error.value = null
-    const query = new URLSearchParams({ page: String(page.value), limit: String(PAGE_SIZE) })
-    if (status.value) query.set('status', status.value)
-    if (mediaKind.value) query.set('mediaKind', mediaKind.value)
-    // Only the approver queue accepts a requester filter; the personal list refuses the parameter.
-    if (scope === 'all' && requesterUserId.value !== '') query.set('requesterUserId', String(requesterUserId.value))
-    if (includeDismissed.value) query.set('includeDismissed', 'true')
-    if (selfServe.value !== '') query.set('selfServe', selfServe.value)
-    query.set('sortBy', sortBy.value)
-    query.set('sortDir', sortDir.value)
-    // A pair is one row here, led by its ebook, with the audiobook riding along as its companion.
-    query.set('groupPairs', 'true')
+    const query = listParams()
+    query.set('page', String(page.value))
+    query.set('limit', String(REQUEST_PAGE_SIZE))
 
     try {
       const res = await api(`${basePath}?${query}`)
@@ -102,6 +147,47 @@ export function useBookRequests(scope: RequestScope) {
     }
   }
 
+  /**
+   * How many rows each section holds under the current filters. A failure keeps the last answer:
+   * the counts are a guide, and blanking them would make every section look empty.
+   */
+  async function fetchViewCounts(): Promise<void> {
+    const generation = ++countsGeneration
+    try {
+      const res = await api(`${basePath}/view-counts?${filterParams()}`)
+      if (generation !== countsGeneration || !res.ok) return
+      const payload = (await res.json()) as BookRequestViewCounts
+      if (generation !== countsGeneration) return
+      viewCounts.value = payload
+      viewCountsLoaded.value = true
+    } catch {
+      // The list stays usable without counts, and the next change asks again.
+    }
+  }
+
+  /**
+   * Every request behind the current list, not only the page on screen: what "select all matching"
+   * acts on. Capped by the server, which says so through `truncated`.
+   */
+  async function fetchSelection(override: { view?: RequestListView; status?: BookRequestStatus | '' } = {}): Promise<BookRequestSelection | null> {
+    const query = listParams()
+    if (override.view !== undefined) {
+      if (override.view === 'all') query.delete('view')
+      else query.set('view', override.view)
+    }
+    if (override.status !== undefined) {
+      if (override.status) query.set('status', override.status)
+      else query.delete('status')
+    }
+    try {
+      const res = await api(`${basePath}/selection?${query}`)
+      if (!res.ok) return null
+      return (await res.json()) as BookRequestSelection
+    } catch {
+      return null
+    }
+  }
+
   /** The requesters the filter offers, fetched once when the tab that has the filter first opens. */
   async function fetchRequesterOptions(): Promise<void> {
     if (scope !== 'all' || requesterOptionsInitialized) return
@@ -117,34 +203,8 @@ export function useBookRequests(scope: RequestScope) {
 
   onScopeDispose(() => {
     fetchGeneration += 1
+    countsGeneration += 1
   })
-
-  /** Filters reset paging: page 3 of the old filter is rarely page 3 of the new one. */
-  async function applyFilters(): Promise<void> {
-    page.value = 1
-    await fetchRequests()
-  }
-
-  /**
-   * Clicking the column already sorted on flips its direction; a new column starts at the reading
-   * most people want first, which is newest for a date and A to Z for everything else.
-   */
-  async function applySort(field: BookRequestSortField): Promise<void> {
-    if (sortBy.value === field) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
-    else {
-      sortBy.value = field
-      sortDir.value = field === 'createdAt' ? 'desc' : 'asc'
-    }
-    page.value = 1
-    await fetchRequests()
-  }
-
-  async function goToPage(next: number): Promise<void> {
-    const clamped = Math.min(Math.max(1, next), pageCount.value)
-    if (clamped === page.value) return
-    page.value = clamped
-    await fetchRequests()
-  }
 
   /**
    * Replaces one row in place so a decision does not flash the whole list.
@@ -199,22 +259,25 @@ export function useBookRequests(scope: RequestScope) {
     total,
     page,
     pageCount,
+    view,
+    q,
     status,
     mediaKind,
     requesterUserId,
     requesterOptions,
-    includeDismissed,
     selfServe,
     sortBy,
     sortDir,
     loading,
     initialized,
     error,
+    viewCounts,
+    viewCountsLoaded,
+    applyState,
     fetchRequests,
+    fetchViewCounts,
+    fetchSelection,
     fetchRequesterOptions,
-    applyFilters,
-    applySort,
-    goToPage,
     replaceItem,
     dropItem,
   }
@@ -323,36 +386,64 @@ export function useBookRequestActions(canManage: () => boolean) {
     }
   }
 
+  /** One batch request. `null` means the call itself failed, not that nothing was applied. */
+  async function postBulk(path: string, payload: BulkRejectBookRequestsPayload): Promise<BookRequestBulkResult | null> {
+    const res = await api(path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    if (!res.ok) {
+      const body = (await res.json().catch(() => null)) as { message?: string | string[] } | null
+      const message = Array.isArray(body?.message) ? body.message.join('. ') : body?.message
+      lastReason.value = message?.trim() ? message.trim() : null
+      return null
+    }
+    return (await res.json()) as BookRequestBulkResult
+  }
+
   /**
    * The batch reports per-row outcomes, so `null` here means the call itself failed rather than
    * that nothing was applied. The two need different messages.
+   *
+   * A selection can be larger than one batch the server accepts, so it goes in slices, one after
+   * another, and their outcomes are added up. A slice that fails outright after earlier ones
+   * succeeded still reports what landed, with the rest listed as failed.
    */
-  async function runBulk(path: string, payload: BulkBookRequestsPayload): Promise<BookRequestBulkResult | null> {
+  async function runBulk(path: string, ids: number[], extra: Omit<BulkRejectBookRequestsPayload, 'ids'> = {}): Promise<BookRequestBulkResult | null> {
     bulkPending.value = true
     lastReason.value = null
+    const merged: Required<BookRequestBulkResult> = { updated: [], failed: [], removed: [] }
     try {
-      const res = await api(path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) {
-        const payload = (await res.json().catch(() => null)) as { message?: string | string[] } | null
-        const message = Array.isArray(payload?.message) ? payload.message.join('. ') : payload?.message
-        lastReason.value = message?.trim() ? message.trim() : null
-        return null
+      for (let start = 0; start < ids.length; start += BOOK_REQUEST_BULK_LIMIT) {
+        const slice = ids.slice(start, start + BOOK_REQUEST_BULK_LIMIT)
+        const result = await postBulk(path, { ...extra, ids: slice })
+        if (!result) {
+          if (start === 0) return null
+          merged.failed.push(...ids.slice(start).map((id) => ({ id, title: '', reason: lastReason.value ?? '', errorCode: null, errorMeta: null })))
+          break
+        }
+        merged.updated.push(...result.updated)
+        merged.failed.push(...result.failed)
+        merged.removed.push(...(result.removed ?? []))
       }
-      return (await res.json()) as BookRequestBulkResult
+      return merged
     } finally {
       bulkPending.value = false
     }
   }
 
-  const approveMany = (ids: number[]) => runBulk('/api/v1/admin/book-requests/approve', { ids })
-  const dismissMany = (ids: number[]) => runBulk('/api/v1/book-requests/dismiss', { ids })
+  const approveMany = (ids: number[]) => runBulk('/api/v1/admin/book-requests/approve', ids)
+  const dismissMany = (ids: number[]) => runBulk('/api/v1/book-requests/dismiss', ids)
+  const restoreMany = (ids: number[]) => runBulk('/api/v1/book-requests/restore', ids)
+  /** Leaving answers with the ids that were left in `removed`, since there is no row to hand back. */
+  const leaveMany = (ids: number[]) => runBulk('/api/v1/book-requests/leave', ids)
+  /** The server decides per request whether the download client deletes the transfer's files. */
+  const cancelMany = (ids: number[]) => runBulk('/api/v1/book-requests/cancel', ids)
+  const deleteMany = (ids: number[]) => runBulk('/api/v1/admin/book-requests/delete', ids)
   /** One sentence for the whole selection, since a batch is refused for one reason or none. */
   const rejectMany = (ids: number[], decisionNote?: string) =>
-    runBulk('/api/v1/admin/book-requests/reject', { ids, ...(decisionNote ? { decisionNote } : {}) } satisfies BulkRejectBookRequestsPayload)
+    runBulk('/api/v1/admin/book-requests/reject', ids, decisionNote ? { decisionNote } : {})
 
   return {
     pendingIds,
@@ -378,6 +469,10 @@ export function useBookRequestActions(canManage: () => boolean) {
     approveMany,
     rejectMany,
     dismissMany,
+    restoreMany,
+    leaveMany,
+    cancelMany,
+    deleteMany,
     /** The language the request asks for, which decides which releases can match it at all. */
     setLanguage: (id: number, language: string | null) => run(id, `/api/v1/book-requests/${id}/language`, { language }),
     cancelDownload: (id: number, downloadId: number, body?: RemoveBookRequestDownloadPayload) =>

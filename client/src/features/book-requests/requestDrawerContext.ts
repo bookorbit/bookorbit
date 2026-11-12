@@ -14,6 +14,24 @@ export interface RequestDrawerContext {
   goPrevious: () => void
   goNext: () => void
   close: () => void
+  /**
+   * "Pick releases" over a selection walks the picker from one request to the next. Absent when
+   * the drawer was opened any other way.
+   */
+  pickRun?: PickRunContext
+}
+
+export interface PickRunContext {
+  /** 1-based position in the run, or 0 when no run is going. */
+  position: Ref<number>
+  total: Ref<number>
+  /** Moves on without picking anything for the request on screen. */
+  skip: () => void
+  /**
+   * Called once a release went out and nothing more is needed on this request. Moves to the next
+   * one, or ends the run, and reports whether it took over the navigation.
+   */
+  advance: () => boolean
 }
 
 export const REQUEST_DRAWER: InjectionKey<RequestDrawerContext> = Symbol('request-drawer')

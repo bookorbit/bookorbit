@@ -167,20 +167,29 @@ const showFooter = computed(() => canDecide.value || (canGrab.value && !showTran
 
 const confirming = ref<'cancel' | 'cancelDownload' | 'delete' | 'leave' | 'discardImport' | null>(null)
 
+/**
+ * Each dialog names both of its answers, so "Cancel" never stands beside "Cancel request" meaning
+ * the opposite thing. The counted keys are shared with the list's bulk dialogs, at a count of one.
+ */
 const CONFIRM_COPY = {
-  delete: { title: 'bookRequests.confirm.deleteTitle', label: 'bookRequests.actions.delete' },
-  leave: { title: 'bookRequests.confirm.leaveTitle', label: 'bookRequests.actions.leave' },
-  discardImport: { title: 'bookRequests.confirm.discardImportTitle', label: 'bookRequests.review.discard' },
-  cancelDownload: { title: 'bookRequests.confirm.cancelDownloadTitle', label: 'bookRequests.actions.cancelDownload' },
-  cancel: { title: 'bookRequests.confirm.cancelTitle', label: 'bookRequests.actions.cancel' },
+  delete: { title: 'bookRequests.confirm.deleteTitle', label: 'bookRequests.confirm.deleteConfirm', keep: 'bookRequests.confirm.keep' },
+  leave: { title: 'bookRequests.confirm.leaveTitle', label: 'bookRequests.confirm.leaveConfirm', keep: 'bookRequests.confirm.stay' },
+  discardImport: { title: 'bookRequests.confirm.discardImportTitle', label: 'bookRequests.review.discard', keep: 'bookRequests.confirm.goBack' },
+  cancelDownload: {
+    title: 'bookRequests.confirm.cancelDownloadTitle',
+    label: 'bookRequests.actions.cancelDownload',
+    keep: 'bookRequests.confirm.goBack',
+  },
+  cancel: { title: 'bookRequests.confirm.cancelTitle', label: 'bookRequests.confirm.stopConfirm', keep: 'bookRequests.confirm.keep' },
 } as const
 
 const confirmTitle = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].title))
+const confirmKeepLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].keep, { count: 1 }))
 
 const confirmDescription = computed(() => {
   const alwaysDeletesRemote = request.value?.download?.alwaysDeletesRemote ?? false
   if (confirming.value === 'delete') {
-    return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteDescriptionRemoteDelete' : 'bookRequests.confirm.deleteDescription')
+    return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteHideDescriptionRemoteDelete' : 'bookRequests.confirm.deleteHideDescription')
   }
   if (confirming.value === 'leave') return t('bookRequests.confirm.leaveDescription')
   if (confirming.value === 'discardImport') return t('bookRequests.confirm.discardImportDescription')
@@ -195,11 +204,10 @@ const confirmDescription = computed(() => {
   return t('bookRequests.confirm.cancelDescription')
 })
 
-const confirmLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].label))
+const confirmLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].label, { count: 1 }))
 
 const selectedLibrary = computed(() => libraries.value.find((library) => library.id === targetLibraryId.value) ?? null)
 const folders = computed(() => selectedLibrary.value?.folders ?? [])
-const grabLabel = computed(() => (request.value?.status === 'failed' ? 'bookRequests.actions.retryRelease' : 'bookRequests.actions.grab'))
 
 const pickerResults = computed(() => (picker.source.value === 'book' ? picker.books.value : picker.dockFiles.value))
 const hasSearched = computed(() => picker.query.value.trim() !== '')
@@ -655,10 +663,10 @@ function dockFileMeta(file: BookDockFile): string {
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem v-if="canDismiss && !request?.dismissed" :disabled="busy" @click="handleDismiss">
-              {{ t('bookRequests.actions.dismiss') }}
+              {{ t('bookRequests.actions.hide') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="canDismiss && request?.dismissed" :disabled="busy" @click="handleRestore">
-              {{ t('bookRequests.actions.restore') }}
+              {{ t('bookRequests.actions.unhide') }}
             </DropdownMenuItem>
             <!-- Only for somebody who joined this rather than made it: the way back out of the
                  attach that folds a second request for the same book into the first. -->
@@ -1085,7 +1093,7 @@ function dockFileMeta(file: BookDockFile): string {
         <Button variant="destructive-outline" :disabled="busy" @click="handleReject">{{ t('bookRequests.actions.reject') }}</Button>
       </template>
 
-      <Button v-else-if="canGrab" :disabled="busy" @click="goToReleases">{{ t(grabLabel) }}</Button>
+      <Button v-else-if="canGrab" :disabled="busy" @click="goToReleases">{{ t('bookRequests.actions.pickRelease') }}</Button>
 
       <!-- A keyboard hint the keyboard user cannot see is not a hint. The footer already wraps. -->
       <p class="ms-auto text-xs text-muted-foreground">{{ t('bookRequests.drawer.shortcuts') }}</p>
@@ -1096,6 +1104,7 @@ function dockFileMeta(file: BookDockFile): string {
       :title="confirmTitle"
       :description="confirmDescription"
       :confirm-label="confirmLabel"
+      :cancel-label="confirmKeepLabel"
       :busy="busy"
       @confirm="handleConfirm"
       @cancel="handleConfirmCancel"

@@ -10395,7 +10395,8 @@
       "moreActions": "More actions for {title}",
       "settledIn": "Filed in {library}, {time}",
       "settledAt": "Closed {time}",
-      "dismissedBadge": "Dismissed"
+      "dismissedBadge": "Dismissed",
+      "requestedByDot": "{name} · {time}"
     },
     "detail": {
       "unknownAuthor": "Author unknown",
@@ -10481,7 +10482,10 @@
         "chooseReleases": "Choose releases",
         "openEbook": "Open the e-book request",
         "openAudiobook": "Open the audiobook request"
-      }
+      },
+      "hide": "Hide",
+      "unhide": "Unhide",
+      "pickRelease": "Pick release"
     },
     "filters": {
       "status": "Status",
@@ -10502,7 +10506,18 @@
       "emptyAll": "No book requests yet.",
       "pagination": "Request pages",
       "pageOf": "Page {page} of {total}",
-      "emptyHint": "Search for a book and it will show up here once you ask for it."
+      "emptyHint": "Search for a book and it will show up here once you ask for it.",
+      "range": "{from}–{to} of {total}",
+      "emptyView": {
+        "needs_action": "Nothing needs action.",
+        "in_progress": "Nothing is in progress.",
+        "finished": "Nothing has finished yet.",
+        "closed": "No rejected or cancelled requests.",
+        "hidden": "Nothing is hidden."
+      },
+      "emptyFiltered": "No requests match.",
+      "emptyFilteredHint": "Try another search or clear the filters.",
+      "clearFilters": "Clear filters"
     },
     "toasts": {
       "approved": "Request approved",
@@ -10526,7 +10541,11 @@
       "bulkRejectedPartial": "{done} rejected, {failed} could not be",
       "importDiscarded": "The imported file was discarded",
       "pairApproved": "Approved both",
-      "pairRejected": "Rejected both"
+      "pairRejected": "Rejected both",
+      "bulkUnhidden": "{count, plural, one {# request back on your list} other {# requests back on your list}}",
+      "bulkLeft": "{count, plural, one {Left # request} other {Left # requests}}",
+      "bulkCancelled": "{count, plural, one {# request cancelled} other {# requests cancelled}}",
+      "bulkDeleted": "{count, plural, one {# request deleted} other {# requests deleted}}"
     },
     "errors": {
       "loadFailed": "Could not load requests",
@@ -10548,7 +10567,12 @@
       "bulkRejectFailed": "That selection could not be rejected",
       "discardImportFailed": "That import could not be discarded",
       "approveCompanionFailedEbook": "Approved this one, but the e-book could not be approved",
-      "approveCompanionFailedAudiobook": "Approved this one, but the audiobook could not be approved"
+      "approveCompanionFailedAudiobook": "Approved this one, but the audiobook could not be approved",
+      "bulkRestoreFailed": "Could not unhide the selected requests",
+      "bulkLeaveFailed": "Could not leave the selected requests",
+      "bulkCancelFailed": "Could not cancel the selected requests",
+      "bulkDeleteFailed": "Could not delete the selected requests",
+      "selectAllFailed": "Could not select every matching request"
     },
     "grab": {
       "title": "Send to a download client",
@@ -10908,7 +10932,15 @@
       "decisionNote": "Decision note",
       "requestNote": "Request note",
       "openDetail": "Open full detail",
-      "pairMedia": "E-book and audiobook"
+      "pairMedia": "E-book and audiobook",
+      "book": "Book",
+      "requested": "Requested",
+      "status": "Status",
+      "nextStep": "Next step",
+      "selectPage": "Select every request on this page",
+      "formatPair": "E-book + audiobook",
+      "skippedApproval": "Skipped approval",
+      "skippedApprovalHint": "Downloaded directly by the requester, with no approval step"
     },
     "confirm": {
       "cancelDownloadTitle": "Cancel this download?",
@@ -10925,7 +10957,21 @@
       "discardImportDescription": "The downloaded files are removed from the Book Dock and the request is marked failed. The torrent keeps seeding; stop it separately if you want it gone.",
       "leaveTitle": "Leave this request?",
       "leaveDescription": "You stop following it and stop being notified about it. Whoever asked for it keeps their request.",
-      "rejectDescription": "Everyone waiting on these requests is told they were turned down. Nothing is downloaded."
+      "rejectDescription": "Everyone waiting on these requests is told they were turned down. Nothing is downloaded.",
+      "stopTitle": "{count, plural, one {Stop this request?} other {Stop # requests?}}",
+      "stopManyDescription": "They move to cancelled and nobody waiting on them gets the book. Any transfer still running stops too.",
+      "stopConfirm": "{count, plural, one {Stop request} other {Stop # requests}}",
+      "keep": "{count, plural, one {Keep request} other {Keep them}}",
+      "deleteManyTitle": "{count, plural, one {Delete this request?} other {Delete # requests?}}",
+      "deleteManyDescription": "They go for good, for everyone, along with the record of who asked. Hiding instead only takes them off your own list.",
+      "deleteHideDescription": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client with its files kept. Direct-download staging is cleaned automatically. Hiding the request instead only takes it off your own list.",
+      "deleteHideDescriptionRemoteDelete": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client, which deletes it and its files there for good. Hiding the request instead only takes it off your own list.",
+      "deleteConfirm": "{count, plural, one {Delete request} other {Delete # requests}}",
+      "leaveManyTitle": "{count, plural, one {Leave this request?} other {Leave # requests?}}",
+      "leaveManyDescription": "You stop following them and stop being notified about them. Whoever asked for them keeps their request.",
+      "leaveConfirm": "{count, plural, one {Leave request} other {Leave # requests}}",
+      "stay": "{count, plural, one {Stay on it} other {Stay on them}}",
+      "goBack": "Go back"
     },
     "outcome": {
       "filedIn": "Filed in {library} {time}",
@@ -11089,6 +11135,191 @@
       "viewRequest": "View request",
       "submittedAudiobook": "Requested. The audiobook will join this book when it arrives",
       "submittedEbook": "Requested. The e-book will join this book when it arrives"
+    },
+    "pageTitle": "Requests",
+    "betaTag": "Beta",
+    "tagline": "Ask for books the library does not have yet.",
+    "tabsShort": {
+      "search": "Request",
+      "mine": "Mine",
+      "all": "All"
+    },
+    "views": {
+      "label": "Request views",
+      "all": "All",
+      "needs_action": "Needs action",
+      "in_progress": "In progress",
+      "finished": "Finished",
+      "closed": "Closed",
+      "hidden": "Hidden"
+    },
+    "listSearch": {
+      "label": "Search requests",
+      "placeholder": "Search title or author",
+      "placeholderShort": "Search"
+    },
+    "filterMenu": {
+      "button": "Filters",
+      "status": "Status",
+      "format": "Format",
+      "requester": "Requester",
+      "approval": "Approval",
+      "approvalAny": "Any",
+      "approvalNeeded": "Needed approval",
+      "approvalSkipped": "Skipped approval",
+      "sort": "Sort by",
+      "sortFields": {
+        "createdAt": "Date requested",
+        "title": "Title",
+        "mediaKind": "Format",
+        "requester": "Requester",
+        "status": "Status"
+      },
+      "direction": "Order",
+      "directions": {
+        "asc": "Ascending",
+        "desc": "Descending"
+      },
+      "clear": "Clear all",
+      "done": "Done"
+    },
+    "activeFilters": {
+      "label": "Active filters",
+      "remove": "Remove filter: {value}",
+      "status": "Status: {value}",
+      "format": "Format: {value}",
+      "requester": "Requester: {value}",
+      "approval": "Approval: {value}",
+      "clearAll": "Clear all"
+    },
+    "densityToggle": {
+      "compact": "Compact rows"
+    },
+    "banner": {
+      "automationOff": "Automatic grabbing is off.",
+      "needsPick": "{count, plural, one {# approved request needs a release picked by hand.} other {# approved requests need a release picked by hand.}}",
+      "pick": "Pick releases",
+      "settings": "Request settings"
+    },
+    "nextStep": {
+      "needsRelease": "Needs a release",
+      "approve": "Approve",
+      "approveBoth": "Approve both",
+      "pick": "Pick release",
+      "pickBoth": "Pick releases",
+      "review": "Review"
+    },
+    "rowMenu": {
+      "label": "More actions for {title}",
+      "open": "Open request",
+      "openEbook": "Open e-book",
+      "openAudiobook": "Open audiobook",
+      "approve": {
+        "one": "Approve",
+        "both": "Approve both",
+        "ebook": "Approve e-book",
+        "audiobook": "Approve audiobook"
+      },
+      "reject": {
+        "one": "Reject",
+        "both": "Reject both",
+        "ebook": "Reject e-book",
+        "audiobook": "Reject audiobook"
+      },
+      "pick": {
+        "one": "Pick release",
+        "both": "Pick releases",
+        "ebook": "Pick e-book release",
+        "audiobook": "Pick audiobook release"
+      },
+      "hide": {
+        "one": "Hide",
+        "both": "Hide both",
+        "ebook": "Hide e-book",
+        "audiobook": "Hide audiobook"
+      },
+      "unhide": {
+        "one": "Unhide",
+        "both": "Unhide both",
+        "ebook": "Unhide e-book",
+        "audiobook": "Unhide audiobook"
+      },
+      "leave": {
+        "one": "Leave request",
+        "both": "Leave both",
+        "ebook": "Leave e-book",
+        "audiobook": "Leave audiobook"
+      },
+      "cancel": {
+        "one": "Cancel request",
+        "both": "Cancel both",
+        "ebook": "Cancel e-book",
+        "audiobook": "Cancel audiobook"
+      },
+      "delete": {
+        "one": "Delete request",
+        "both": "Delete both",
+        "ebook": "Delete e-book",
+        "audiobook": "Delete audiobook"
+      }
+    },
+    "bulkBar": {
+      "label": "Selection actions",
+      "total": "{count, plural, one {# request} other {# requests}}",
+      "selected": "{count, plural, one {# selected} other {# selected}}",
+      "allSelected": "{count, plural, one {All # selected} other {All # selected}}",
+      "firstSelected": "{count, plural, one {First # selected} other {First # selected}}",
+      "truncatedHint": "Bulk actions stop at {limit} requests. Narrow the list to reach the rest.",
+      "selectAll": "{count, plural, one {Select all #} other {Select all #}}",
+      "selecting": "Selecting all",
+      "clear": "Clear selection",
+      "actions": "Actions",
+      "groups": {
+        "decide": "Decide",
+        "keep": "Keep",
+        "remove": "Remove"
+      },
+      "action": {
+        "approve": "Approve",
+        "reject": "Reject",
+        "pick": "Pick releases",
+        "hide": "Hide",
+        "unhide": "Unhide",
+        "leave": "Leave",
+        "cancel": "Cancel",
+        "delete": "Delete"
+      },
+      "why": {
+        "approve": "None pending",
+        "reject": "None pending",
+        "pick": "None waiting on a release",
+        "hide": "None finished",
+        "unhide": "None hidden",
+        "leave": "None joined",
+        "cancel": "None still open",
+        "delete": "None finished"
+      }
+    },
+    "bulkResult": {
+      "partial": {
+        "approve": "Approved {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}",
+        "reject": "Rejected {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}",
+        "hide": "Hid {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}",
+        "unhide": "Unhid {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}",
+        "leave": "Left {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}",
+        "cancel": "Cancelled {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}",
+        "delete": "Deleted {done} of {total}. {failed, plural, one {The # left is still selected.} other {The # left are still selected.}}"
+      },
+      "showWhy": "Show why",
+      "hideWhy": "Hide why",
+      "dismiss": "Dismiss",
+      "failure": "{title}: {reason}"
+    },
+    "pickRun": {
+      "progress": "Picking {position} of {total}",
+      "skip": "Skip",
+      "done": "{count, plural, one {Picked a release for # request} other {Picked releases for # requests}}",
+      "nothing": "Nothing in the selection is waiting on a release."
     }
   },
   "collection": {

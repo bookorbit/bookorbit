@@ -434,3 +434,126 @@ describe('BookRequestRepository.findRequestViewerIds', () => {
     expect(viewers.get(4)).toEqual([9]);
   });
 });
+
+/**
+ * The list search, the hidden view and "select all matching", read off the SQL the repository
+ * actually sends. What the rows then contain is the e2e suite's job, against a real database.
+ */
+describe('BookRequestRepository list views', () => {
+  function makeRepo(answer: (text: string) => unknown[][] = () => []) {
+    const query = vi.fn((config: { text: string }) => Promise.resolve({ rows: answer(config.text) }));
+    const repo = new BookRequestRepository(drizzle({ query } as never) as never);
+    const statements = () =>
+      query.mock.calls.map((call) => ({ text: (call as unknown[])[0] as { text: string }, params: (call as unknown[])[1] as unknown[] }));
+    return { repo, query, statements };
+  }
+
+  it('matches the title or any one author, with the wildcards a person typed taken literally', async () => {
+    const { repo, statements } = makeRepo();
+
+    await repo.findAll({ page: 1, limit: 20, search: '50%_off\\' });
+
+    for (const { text, params } of statements()) {
+      expect(text.text).toContain('"book_requests"."title" ilike');
+      expect(text.text).toContain('jsonb_array_elements_text("book_requests"."authors")');
+      expect(params).toContain('%50\\%\\_off\\\\%');
+    }
+  });
+
+  /** A pair is one row, so the search has to be asked of the folded-away half as well. */
+  it('asks the search of both halves of a grouped pair', async () => {
+    const { repo, statements } = makeRepo();
+
+    await repo.findAll({ page: 1, limit: 20, search: 'dune', groupPairs: true });
+
+    for (const { text } of statements()) {
+      expect(text.text).toContain('jsonb_array_elements_text("book_requests"."authors")');
+      expect(text.text).toContain('jsonb_array_elements_text("companion"."authors")');
+    }
+  });
+
+  it('keeps only the rows the viewer hid for the hidden view, on both halves', async () => {
+    const { repo, statements } = makeRepo(() => [[3]]);
+
+    expect(await repo.countRows({ onlyDismissedFor: 7 })).toBe(3);
+
+    const [{ text, params }] = statements();
+    expect(text.text).toContain('"book_requests"."id" in (select');
+    expect(text.text).toContain('"companion"."id" in (select');
+    expect(text.text).not.toContain('not in');
+    expect(text.text).toContain('left join "book_requests" "companion"');
+    expect(params).toContain(7);
+  });
+
+  it('narrows to every status of a view and to one handback reason', async () => {
+    const { repo, statements } = makeRepo(() => [[0]]);
+
+    await repo.countRows({ statuses: ['rejected', 'cancelled'], failureCode: 'AUTOMATION_DISABLED' }, false);
+
+    const [{ text, params }] = statements();
+    expect(text.text).toContain('"book_requests"."status" in');
+    expect(text.text).toContain('"book_requests"."failure_code" =');
+    expect(text.text).not.toContain('companion');
+    expect(params).toEqual(expect.arrayContaining(['rejected', 'cancelled', 'AUTOMATION_DISABLED']));
+  });
+
+  it('selects the grouped rows with the viewer flags in one statement and the total in another', async () => {
+    const { repo, statements } = makeRepo((text) =>
+      text.startsWith('select count(*)')
+        ? [[2]]
+        : [
+            [10, 'Dune', 'ebook', 'pending', 1, null, false, true, 11, 'Dune', 'audiobook', 'rejected', 1, null, true, false],
+            [12, 'Emma', 'ebook', 'available', 5, 3, false, false, null, null, null, null, null, null, false, false],
+          ],
+    );
+
+    const result = await repo.findSelection({ userId: 1, excludeDismissedFor: 1, sortBy: 'requester' }, 1, 5000);
+
+    expect(statements()).toHaveLength(2);
+    const select = statements().find(({ text }) => !text.text.startsWith('select count(*)'))!;
+    expect(select.text.text).toContain('"book_request_dismissals"."request_id" = "companion"."id"');
+    expect(select.text.text).toContain('"book_request_subscribers"."request_id" = "book_requests"."id"');
+    expect(select.text.text).toContain('order by "users"."name" desc');
+    expect(select.params).toContain(5000);
+    expect(result).toEqual({
+      totalRows: 2,
+      rows: [
+        {
+          lead: {
+            id: 10,
+            title: 'Dune',
+            mediaKind: 'ebook',
+            status: 'pending',
+            userId: 1,
+            fulfillerUserId: null,
+            dismissed: false,
+            subscribed: true,
+          },
+          companion: {
+            id: 11,
+            title: 'Dune',
+            mediaKind: 'audiobook',
+            status: 'rejected',
+            userId: 1,
+            fulfillerUserId: null,
+            dismissed: true,
+            subscribed: false,
+          },
+        },
+        {
+          lead: {
+            id: 12,
+            title: 'Emma',
+            mediaKind: 'ebook',
+            status: 'available',
+            userId: 5,
+            fulfillerUserId: 3,
+            dismissed: false,
+            subscribed: false,
+          },
+          companion: null,
+        },
+      ],
+    });
+  });
+});

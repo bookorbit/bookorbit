@@ -1,12 +1,4 @@
-import {
-  BOOK_REQUEST_MEDIA_KINDS,
-  isBookRequestFulfiller,
-  isGrabbableBookRequestStatus,
-  type BookRequestAvailability,
-  type BookRequestItem,
-  type BookRequestMediaKind,
-} from '@bookorbit/types'
-import { canCancelRequest, canDismissRequest } from './requestActions'
+import { BOOK_REQUEST_MEDIA_KINDS, type BookRequestAvailability, type BookRequestItem, type BookRequestMediaKind } from '@bookorbit/types'
 
 /**
  * What one medium of a work looks like from the search list: on the shelf, already asked for by
@@ -100,45 +92,4 @@ export function flattenRequestRows(rows: readonly BookRequestItem[]): BookReques
 /** The halves of a row in a stable reading order: the ebook first, whichever half leads it. */
 export function orderedHalves(row: BookRequestItem): BookRequestItem[] {
   return rowRequests(row).sort((a, b) => (a.mediaKind === b.mediaKind ? 0 : a.mediaKind === 'ebook' ? -1 : 1))
-}
-
-/**
- * What a pair row can do to its halves in one press. Each entry is the subset that action applies
- * to, so the label can say "both" or name the one medium, and nothing is offered for a half the
- * endpoint would refuse.
- */
-export interface PairRowActions {
-  approve: BookRequestItem[]
-  reject: BookRequestItem[]
-  cancel: BookRequestItem[]
-  dismiss: BookRequestItem[]
-  restore: BookRequestItem[]
-  /** The half a release would be found for next, if any half is waiting on one. */
-  grab: BookRequestItem | null
-  /** Every half waiting on a release this viewer can pick, so the button can say "releases". */
-  grabHalves: BookRequestItem[]
-}
-
-export function pairRowActions(row: BookRequestItem, viewer: { userId: number | null; canManage: boolean; canSelfFulfil: boolean }): PairRowActions {
-  const halves = orderedHalves(row)
-  const pending = halves.filter((half) => viewer.canManage && half.status === 'pending')
-  const grabHalves = halves.filter(
-    (half) =>
-      isGrabbableBookRequestStatus(half.status) && (viewer.canManage || (viewer.canSelfFulfil && isBookRequestFulfiller(half, viewer.userId))),
-  )
-  return {
-    approve: pending,
-    reject: pending,
-    cancel: halves.filter((half) => canCancelRequest(half, viewer.userId, viewer.canManage, viewer.canSelfFulfil)),
-    dismiss: halves.filter((half) => canDismissRequest(half) && !half.dismissed),
-    restore: halves.filter((half) => canDismissRequest(half) && half.dismissed),
-    grab: grabHalves[0] ?? null,
-    grabHalves,
-  }
-}
-
-/** The locale key naming one medium of a pair inside an action, as in "Approve ebook". */
-export function pairActionKey(action: 'approve' | 'reject' | 'cancel' | 'dismiss' | 'restore', halves: readonly BookRequestItem[]): string {
-  if (halves.length > 1) return `bookRequests.actions.pair.${action}Both`
-  return `bookRequests.actions.pair.${action}${halves[0]?.mediaKind === 'audiobook' ? 'Audiobook' : 'Ebook'}`
 }

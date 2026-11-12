@@ -4,9 +4,12 @@ import {
   ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
   ACTIVE_BOOK_REQUEST_STATUSES,
   BOOK_REQUEST_ACTION_ERROR_CODES,
+  BOOK_REQUEST_LIST_VIEWS,
   BOOK_REQUEST_MEDIA_KINDS,
+  BOOK_REQUEST_SELECT_ALL_LIMIT,
   BOOK_REQUEST_STATUSES,
   BOOK_REQUEST_SUBMIT_ERROR_CODES,
+  BOOK_REQUEST_VIEW_STATUSES,
   CANCELLABLE_BOOK_REQUEST_STATUSES,
   emptyResolvedRequestDestinations,
   NO_RESOLVED_REQUEST_DESTINATION,
@@ -29,6 +32,7 @@ import type {
   BookRequestFailureMeta,
   BookRequestSubmitErrorCode,
   BookRequestItem,
+  BookRequestListView,
   BookRequestMediaKind,
   BookRequestMetadataSource,
   BookRequestPage,
@@ -38,8 +42,11 @@ import type {
   BookRequestSubmitResult,
   BookRequestBulkFailure,
   BookRequestBulkResult,
+  BookRequestSelection,
+  BookRequestSelectionEntry,
   BookRequestSourceStatus,
   BookRequestSummary,
+  BookRequestViewCounts,
   LegacyBookRequestMediaKind,
   ResolvedRequestDestination,
   ResolvedRequestDestinations,
@@ -55,10 +62,17 @@ import { BookRequestAttributionService } from './book-request-attribution.servic
 import { BookRequestDedupeService, dedupeKeyCandidates, primaryDedupeKey, type WorkIdentity } from './book-request-dedupe.service';
 import { BookRequestGateway } from './book-request.gateway';
 import { BookRequestNotifier } from './book-request-notifier.service';
-import { mapBookRequestRow } from './book-request.mapper';
+import { downloadAlwaysDeletesRemote, mapBookRequestRow } from './book-request.mapper';
 import { BookRequestDownloadRepository } from './fulfillment/book-request-download.repository';
 import { DownloadRemovalService } from './fulfillment/download-removal.service';
-import { BookRequestRepository, type BookPlacement, type BookRequestJoinedRow, type BookRequestListRow } from './book-request.repository';
+import {
+  BookRequestRepository,
+  type BookPlacement,
+  type BookRequestJoinedRow,
+  type BookRequestListRow,
+  type BookRequestSelectionRequest,
+  type RequestListFilters,
+} from './book-request.repository';
 import { RequestAutomationService } from './fulfillment/request-automation.service';
 import { RequestCompanionService } from './fulfillment/request-companion.service';
 import { RETIRED_MEDIUM_REFUSAL } from './retired-media';
@@ -146,6 +160,21 @@ function actionRefusal(errorCode: BookRequestActionErrorCode, message: string, e
 
 function actionForbidden(errorCode: BookRequestActionErrorCode, message: string, errorMeta?: BookRequestFailureMeta): ForbiddenException {
   return new ForbiddenException({ message, errorCode, ...(errorMeta ? { errorMeta } : {}), statusCode: HttpStatus.FORBIDDEN });
+}
+
+/**
+ * A list's filters with one view applied. Without a view the list is exactly what it was before
+ * views existed; with one, the view alone decides whether the viewer's hidden rows are included.
+ */
+function withView(
+  filters: RequestListFilters,
+  viewerId: number,
+  view: BookRequestListView | undefined,
+  includeDismissed: boolean | undefined,
+): RequestListFilters {
+  if (view === undefined) return { ...filters, excludeDismissedFor: includeDismissed ? undefined : viewerId };
+  if (view === 'hidden') return { ...filters, onlyDismissedFor: viewerId };
+  return { ...filters, statuses: BOOK_REQUEST_VIEW_STATUSES[view], excludeDismissedFor: viewerId };
 }
 
 /** What one medium of a submission decides for itself; the work is shared. */
@@ -837,13 +866,9 @@ export class BookRequestService {
 
   async listMine(dto: ListBookRequestsDto, user: RequestUser): Promise<BookRequestPage> {
     const { items, total } = await this.repo.findAll({
+      ...withView(this.mineFilters(dto, user), user.id, dto.view, dto.includeDismissed),
       page: dto.page ?? 1,
       limit: dto.limit ?? 20,
-      status: dto.status,
-      mediaKind: dto.mediaKind,
-      userId: user.id,
-      selfServe: dto.selfServe,
-      excludeDismissedFor: dto.includeDismissed ? undefined : user.id,
       sortBy: dto.sortBy,
       sortDir: dto.sortDir,
       groupPairs: dto.groupPairs,
@@ -854,18 +879,90 @@ export class BookRequestService {
   async listAll(dto: ListAllBookRequestsDto, user: RequestUser): Promise<BookRequestPage> {
     if (!this.canManageAll(user)) throw new ForbiddenException('You cannot view all book requests');
     const { items, total } = await this.repo.findAll({
+      ...withView(this.allFilters(dto), user.id, dto.view, dto.includeDismissed),
       page: dto.page ?? 1,
       limit: dto.limit ?? 20,
-      status: dto.status,
-      mediaKind: dto.mediaKind,
-      requesterUserId: dto.requesterUserId,
-      selfServe: dto.selfServe,
-      excludeDismissedFor: dto.includeDismissed ? undefined : user.id,
       sortBy: dto.sortBy,
       sortDir: dto.sortDir,
       groupPairs: dto.groupPairs,
     });
     return { items: await this.toListItems(items, user.id, dto.groupPairs === true), total };
+  }
+
+  async getMineViewCounts(dto: ListBookRequestsDto, user: RequestUser): Promise<BookRequestViewCounts> {
+    return this.countViews(this.mineFilters(dto, user), user.id);
+  }
+
+  async getAllViewCounts(dto: ListAllBookRequestsDto, user: RequestUser): Promise<BookRequestViewCounts> {
+    if (!this.canManageAll(user)) throw new ForbiddenException('You cannot view all book requests');
+    return this.countViews(this.allFilters(dto), user.id);
+  }
+
+  async selectMine(dto: ListBookRequestsDto, user: RequestUser): Promise<BookRequestSelection> {
+    return this.selectMatching(withView(this.mineFilters(dto, user), user.id, dto.view, dto.includeDismissed), dto, user.id);
+  }
+
+  async selectAll(dto: ListAllBookRequestsDto, user: RequestUser): Promise<BookRequestSelection> {
+    if (!this.canManageAll(user)) throw new ForbiddenException('You cannot view all book requests');
+    return this.selectMatching(withView(this.allFilters(dto), user.id, dto.view, dto.includeDismissed), dto, user.id);
+  }
+
+  /** The personal list: what the caller asked for or follows, narrowed by what they filtered on. */
+  private mineFilters(dto: ListBookRequestsDto, user: RequestUser): RequestListFilters {
+    return { status: dto.status, mediaKind: dto.mediaKind, selfServe: dto.selfServe, search: dto.q, userId: user.id };
+  }
+
+  /** The approver queue: everybody's requests, narrowed by what the approver filtered on. */
+  private allFilters(dto: ListAllBookRequestsDto): RequestListFilters {
+    return { status: dto.status, mediaKind: dto.mediaKind, selfServe: dto.selfServe, search: dto.q, requesterUserId: dto.requesterUserId };
+  }
+
+  /**
+   * One count per view, each the total the grouped list would report for that view under the same
+   * filters. Read in parallel, and through the same where clause the list is built from.
+   */
+  private async countViews(filters: RequestListFilters, viewerId: number): Promise<BookRequestViewCounts> {
+    const unhidden: RequestListFilters = { ...filters, excludeDismissedFor: viewerId };
+    const [active, awaitingManualPick, ...perView] = await Promise.all([
+      this.repo.countRows(unhidden),
+      this.repo.countRows({ ...unhidden, statuses: ['approved'], failureCode: 'AUTOMATION_DISABLED' }),
+      ...BOOK_REQUEST_LIST_VIEWS.map((view) => this.repo.countRows(withView(filters, viewerId, view, undefined))),
+    ]);
+    const byView = Object.fromEntries(BOOK_REQUEST_LIST_VIEWS.map((view, index) => [view, perView[index] ?? 0])) as Record<
+      BookRequestListView,
+      number
+    >;
+    return { active, ...byView, awaitingManualPick };
+  }
+
+  /**
+   * "Select all matching": every request in the first rows of the grouped list, in list order. A
+   * pair's companion is reported alongside its lead and under the lead's row, because that is the
+   * row a selection on the page holds it by.
+   */
+  private async selectMatching(
+    filters: RequestListFilters,
+    dto: Pick<ListBookRequestsDto, 'sortBy' | 'sortDir'>,
+    viewerId: number,
+  ): Promise<BookRequestSelection> {
+    const { rows, totalRows } = await this.repo.findSelection(
+      { ...filters, sortBy: dto.sortBy, sortDir: dto.sortDir },
+      viewerId,
+      BOOK_REQUEST_SELECT_ALL_LIMIT,
+    );
+    const entry = (request: BookRequestSelectionRequest, rowId: number): BookRequestSelectionEntry => ({
+      id: request.id,
+      rowId,
+      title: request.title,
+      mediaKind: request.mediaKind as BookRequestMediaKind,
+      status: request.status as BookRequestStatus,
+      userId: request.userId,
+      fulfillerUserId: request.fulfillerUserId,
+      dismissed: request.dismissed,
+      subscribed: request.subscribed && request.userId !== viewerId,
+    });
+    const items = rows.flatMap(({ lead, companion }) => (companion ? [entry(lead, lead.id), entry(companion, lead.id)] : [entry(lead, lead.id)]));
+    return { items, totalRows, truncated: totalRows > BOOK_REQUEST_SELECT_ALL_LIMIT };
   }
 
   listRequesterOptions(dto: ListRequesterOptionsDto): Promise<BookRequestRequesterOption[]> {
@@ -1191,24 +1288,32 @@ export class BookRequestService {
    * from the other side. Nothing is rolled back on a failure either, because an approval that has
    * already reached automation cannot be taken back cleanly; the caller is told which ids fell out
    * instead.
+   *
+   * An action that takes the request off the caller's list has no item to report, so its `run`
+   * resolves to null and the id lands in `removed`. Only those actions report `removed` at all; the
+   * ones that existed before it keep the two-list answer released clients decode.
    */
   private async runBulk(
     event: string,
     ids: number[],
     user: RequestUser,
     fallbackReason: string,
-    run: (id: number) => Promise<BookRequestItem>,
+    run: (id: number) => Promise<BookRequestItem | null>,
+    options: { reportsRemoved?: boolean } = {},
   ): Promise<BookRequestBulkResult> {
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] userId=${user.id} count=${ids.length} - applying an action to a selection of book requests`);
 
     const updated: BookRequestItem[] = [];
+    const removed: number[] = [];
     const failed: BookRequestBulkFailure[] = [];
 
     for (const id of ids) {
       const itemStartedAt = Date.now();
       try {
-        updated.push(await run(id));
+        const item = await run(id);
+        if (item === null) removed.push(id);
+        else updated.push(item);
       } catch (error) {
         // An HttpException is this service refusing on a rule it states, and the reason is the
         // sentence the operator reads. Anything else is a defect, and folding it into the same
@@ -1233,10 +1338,10 @@ export class BookRequestService {
     }
 
     this.logger.log(
-      `[${event}] [end] userId=${user.id} updated=${updated.length} failed=${failed.length} durationMs=${Date.now() - startedAt} - selection applied`,
+      `[${event}] [end] userId=${user.id} updated=${updated.length} removed=${removed.length} failed=${failed.length} durationMs=${Date.now() - startedAt} - selection applied`,
     );
 
-    return { updated, failed };
+    return options.reportsRemoved ? { updated, failed, removed } : { updated, failed };
   }
 
   async approveMany(dto: BulkBookRequestsDto, user: RequestUser): Promise<BookRequestBulkResult> {
@@ -1259,6 +1364,63 @@ export class BookRequestService {
   /** Hiding is personal, so this needs no moderator permission and touches nobody else's list. */
   async dismissMany(dto: BulkBookRequestsDto, user: RequestUser): Promise<BookRequestBulkResult> {
     return this.runBulk('book_request.dismiss_many', [...new Set(dto.ids)], user, 'Could not hide that request', (id) => this.dismiss(id, user));
+  }
+
+  /**
+   * Cancelling a selection. Each request's files are deleted exactly when cancelling that one row
+   * from the page would delete them: only where its client always removes the data with the
+   * transfer, so the bulk action never deletes more than the single one would have.
+   */
+  async cancelMany(dto: BulkBookRequestsDto, user: RequestUser): Promise<BookRequestBulkResult> {
+    const ids = [...new Set(dto.ids)];
+    const deletesRemote = await this.remoteDeletingRequestIds(ids);
+    return this.runBulk('book_request.cancel_many', ids, user, 'Could not cancel that request', (id) => this.cancel(id, user, deletesRemote.has(id)));
+  }
+
+  async restoreMany(dto: BulkBookRequestsDto, user: RequestUser): Promise<BookRequestBulkResult> {
+    return this.runBulk('book_request.restore_many', [...new Set(dto.ids)], user, 'Could not restore that request', (id) => this.restore(id, user));
+  }
+
+  /** Leaving a selection of requests somebody else made. Each one leaves the caller's list. */
+  async leaveMany(dto: BulkBookRequestsDto, user: RequestUser): Promise<BookRequestBulkResult> {
+    return this.runBulk(
+      'book_request.leave_many',
+      [...new Set(dto.ids)],
+      user,
+      'Could not leave that request',
+      async (id) => {
+        await this.unsubscribe(id, user);
+        return null;
+      },
+      { reportsRemoved: true },
+    );
+  }
+
+  /** Deleting a selection, with the same file rule `cancelMany` applies. */
+  async removeMany(dto: BulkBookRequestsDto, user: RequestUser): Promise<BookRequestBulkResult> {
+    const ids = [...new Set(dto.ids)];
+    const deletesRemote = await this.remoteDeletingRequestIds(ids);
+    return this.runBulk(
+      'book_request.delete_many',
+      ids,
+      user,
+      'Could not delete that request',
+      async (id) => {
+        await this.remove(id, user, deletesRemote.has(id));
+        return null;
+      },
+      { reportsRemoved: true },
+    );
+  }
+
+  /**
+   * The requests whose latest attempt sits with a client that always deletes the data along with
+   * the transfer, read in one batch. The same test the request's own `download.alwaysDeletesRemote`
+   * answers, which is what the page consults before a single cancel or delete.
+   */
+  private async remoteDeletingRequestIds(ids: number[]): Promise<Set<number>> {
+    const latest = await this.downloads.findLatestForRequests(ids);
+    return new Set([...latest].filter(([, download]) => downloadAlwaysDeletesRemote(download)).map(([id]) => id));
   }
 
   /**
