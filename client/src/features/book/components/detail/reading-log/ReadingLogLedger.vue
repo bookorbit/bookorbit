@@ -8,6 +8,7 @@ import { formatDate } from '@/i18n/formatters'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import { buildReadingCheckpointRoute } from '@/lib/reading-checkpoint'
 import { compareReadingOrder } from '@/features/book/lib/reading-attempt-order'
+import { koreaderOptionalDeviceLabel } from '@/features/koreader/lib/device-label'
 
 const props = defineProps<{
   bookId: number
@@ -29,13 +30,17 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-// Eight columns wide, dropping the two least load-bearing ones as the pane narrows. Hidden grid
-// items are removed from the grid entirely, so each breakpoint declares exactly the columns it
-// still renders.
+// Eight columns wide, dropping the two least load-bearing ones as the ledger narrows. The steps
+// follow the ledger's own width, not the window's: in the three-column layout a wide window still
+// leaves the ledger narrow. Each step adds a column only once the position bar keeps at least 5rem
+// beside it. Hidden grid items are removed from the grid entirely, so each step declares exactly
+// the columns it still renders.
 const ROW_GRID =
   'grid items-center gap-x-2.5 grid-cols-[4.5rem_3.25rem_2.75rem_minmax(0,1fr)_3rem_1.5rem] ' +
-  'sm:grid-cols-[5rem_3.5rem_3rem_3.5rem_minmax(0,1fr)_3.25rem_1.5rem] ' +
-  'lg:grid-cols-[5.5rem_3.5rem_3rem_3.5rem_minmax(0,1fr)_3.25rem_4.75rem_1.5rem]'
+  '@[30rem]/ledger:grid-cols-[5rem_3.5rem_3rem_3.5rem_minmax(0,1fr)_3.25rem_1.5rem] ' +
+  '@[36rem]/ledger:grid-cols-[5.5rem_3.5rem_3rem_3.5rem_minmax(0,1fr)_3.25rem_4.75rem_1.5rem]'
+// The source column makes room for a device name only when a listed session has one.
+const ROW_GRID_WITH_DEVICE = `${ROW_GRID} @[42rem]/ledger:grid-cols-[5.5rem_3.5rem_3rem_3.5rem_minmax(0,1fr)_3.25rem_10rem_1.5rem]`
 
 const BUCKET_TOKEN: Record<ReadingSessionSourceBucket, string> = {
   bookorbit: '--pill-web',
@@ -108,6 +113,18 @@ function checkpointRoute(session: BookReadingSession) {
 function sourceLabel(session: BookReadingSession): string {
   return READING_SESSION_SOURCE_BUCKET_LABELS[toReadingSessionSourceBucket(session.source)]
 }
+
+function deviceLabel(session: BookReadingSession): string | null {
+  return session.device ? koreaderOptionalDeviceLabel(session.device.model, session.device.name) : null
+}
+
+function sourceTitle(session: BookReadingSession): string {
+  const device = deviceLabel(session)
+  const source = sourceLabel(session)
+  return device ? t('book.detail.readingLog.ledger.sourceWithDevice', { source, device }) : source
+}
+
+const rowGrid = computed(() => (props.sessions.some((session) => deviceLabel(session) !== null) ? ROW_GRID_WITH_DEVICE : ROW_GRID))
 
 function sourceColor(session: BookReadingSession): string {
   return `var(${BUCKET_TOKEN[toReadingSessionSourceBucket(session.source)]})`
@@ -236,7 +253,7 @@ function handleLoadMore() {
 
 <template>
   <section
-    class="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
+    class="@container/ledger flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card"
     :aria-label="t('book.detail.readingLog.ledger.title')"
   >
     <header class="flex flex-none flex-wrap items-center gap-2 border-b border-border px-3 py-2">
@@ -261,7 +278,7 @@ function handleLoadMore() {
     </div>
 
     <template v-else>
-      <div :class="[ROW_GRID, 'group/ledgerhead flex-none border-b border-border bg-muted/40 px-3 py-1.5']">
+      <div :class="[rowGrid, 'group/ledgerhead flex-none border-b border-border bg-muted/40 px-3 py-1.5']">
         <button
           :data-sort-column="columnFor('day').id"
           class="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider transition-colors"
@@ -287,7 +304,7 @@ function handleLoadMore() {
         </button>
         <button
           :data-sort-column="columnFor('change').id"
-          class="hidden items-center gap-1 text-[10px] font-semibold uppercase tracking-wider transition-colors sm:flex"
+          class="hidden items-center gap-1 text-[10px] font-semibold uppercase tracking-wider transition-colors @[30rem]/ledger:flex"
           :class="sortBy === columnFor('change').id ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
           @click="handleSortClick"
         >
@@ -310,7 +327,7 @@ function handleLoadMore() {
           <ChevronDown v-else-if="sortBy === columnFor('reached').id" :size="10" />
           <ChevronsUpDown v-else :size="10" class="opacity-0 transition-opacity group-hover/ledgerhead:opacity-50" />
         </button>
-        <span class="hidden text-[10px] font-semibold uppercase tracking-wider text-muted-foreground lg:block">{{
+        <span class="hidden text-[10px] font-semibold uppercase tracking-wider text-muted-foreground @[36rem]/ledger:block">{{
           t('book.detail.readingLog.ledger.colSource')
         }}</span>
         <span />
@@ -339,7 +356,7 @@ function handleLoadMore() {
           <div
             v-else
             :class="[
-              ROW_GRID,
+              rowGrid,
               'h-[30px] border-t px-3 transition-colors hover:bg-muted/40',
               row.startsDay && chronological ? 'border-border' : 'border-border/50',
             ]"
@@ -355,7 +372,7 @@ function handleLoadMore() {
               formatDuration(row.session.durationSeconds)
             }}</span>
             <span
-              class="hidden whitespace-nowrap text-xs font-semibold leading-4 tabular-nums sm:block"
+              class="hidden whitespace-nowrap text-xs font-semibold leading-4 tabular-nums @[30rem]/ledger:block"
               :class="
                 (row.session.progressDelta ?? 0) > 0.05
                   ? 'text-primary'
@@ -385,14 +402,29 @@ function handleLoadMore() {
               </RouterLink>
               <template v-else>{{ formatEndProgress(row.session.endProgress) }}</template>
             </span>
-            <span class="hidden min-w-0 items-center gap-1.5 lg:flex">
-              <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: sourceColor(row.session) }" :title="sourceLabel(row.session)" />
+            <span class="hidden min-w-0 items-center gap-1.5 @[36rem]/ledger:flex">
+              <span
+                role="img"
+                class="size-1.5 shrink-0 rounded-full"
+                :style="{ backgroundColor: sourceColor(row.session) }"
+                :title="sourceTitle(row.session)"
+                :aria-label="sourceTitle(row.session)"
+              />
               <span
                 v-if="row.session.format"
                 class="inline-flex h-4 shrink-0 items-center rounded-xs border px-1 text-[10px] font-bold uppercase leading-none tracking-wider"
                 :style="formatBadgeStyle(row.session.format)"
               >
                 {{ row.session.format }}
+              </span>
+              <span
+                v-if="deviceLabel(row.session)"
+                data-session-device
+                aria-hidden="true"
+                class="hidden min-w-0 truncate text-[11px] leading-4 text-muted-foreground @[42rem]/ledger:block"
+                :title="sourceTitle(row.session)"
+              >
+                {{ deviceLabel(row.session) }}
               </span>
             </span>
             <span class="flex items-center justify-end">

@@ -69,3 +69,10 @@ export function koreaderDeviceLabel(model: string, deviceName?: string | null): 
 export function koreaderDeviceModelHint(model: string, deviceName?: string | null): string | null {
   return koreaderDeviceLabel(model, deviceName) === model ? null : model
 }
+
+/** The label for a device whose model may be unknown, or null when nothing names it. */
+export function koreaderOptionalDeviceLabel(model: string | null | undefined, deviceName?: string | null): string | null {
+  const name = deviceName?.trim()
+  if (name) return name
+  return model ? koreaderDeviceLabel(model) : null
+}

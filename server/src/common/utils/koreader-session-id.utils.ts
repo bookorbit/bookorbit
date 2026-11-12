@@ -38,3 +38,12 @@ export function parseKoreaderSessionId(sessionId: string | null | undefined): Pa
   if (!match) return null;
   return { deviceKey: match[1]!, bookFileId: Number(match[2]), clusterStartEpoch: Number(match[3]) };
 }
+
+/**
+ * The device among `candidateDeviceIds` whose key a session id carries, or null when none or
+ * several match. A legacy key holds only the first eight characters, so two devices can share it.
+ */
+export function matchKoreaderSessionDevice(deviceKey: string, candidateDeviceIds: readonly string[]): string | null {
+  const matches = candidateDeviceIds.filter((deviceId) => koreaderSessionDeviceKey(deviceId) === deviceKey || deviceId.slice(0, 8) === deviceKey);
+  return matches.length === 1 ? matches[0]! : null;
+}

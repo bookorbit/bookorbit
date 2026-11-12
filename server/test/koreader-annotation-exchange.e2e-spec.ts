@@ -2,7 +2,7 @@ import { randomUUID } from 'crypto';
 import { and, eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
-import { exchangeDeviceId } from '../src/modules/koreader/koreader-exchange-device';
+import { exchangeDeviceId } from '../src/common/utils/koreader-exchange-device.utils';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -725,5 +725,56 @@ describe('KOReader annotation exchange (e2e)', { timeout: 120_000 }, () => {
 
     await deliverEverything();
     expect(await pending()).toEqual([]);
+  });
+  it('names the device behind a highlight in its sync detail', async () => {
+    const NAMED_DEVICE_ID = 'e2e-device-0005';
+    const made = await exchange(
+      [
+        {
+          hash: fileHash,
+          keys: [],
+          keysComplete: false,
+          changes: [
+            {
+              datetime: '2026-06-05 09:00:00',
+              drawer: 'lighten',
+              color: 'blue',
+              text: 'fixture',
+              posFormat: 'xpointer',
+              pos0: FIXTURE_XPOINTER_0,
+              pos1: FIXTURE_XPOINTER_1,
+            },
+          ],
+        },
+      ],
+      NAMED_DEVICE_ID,
+    );
+    expect(made.results[0].applied.created).toBe(1);
+    const [row] = await ctx.db
+      .select()
+      .from(schema.annotations)
+      .where(and(eq(schema.annotations.deviceCreatedAt, '2026-06-05 09:00:00'), eq(schema.annotations.bookId, epub.bookId)));
+
+    await ctx.db
+      .insert(schema.koreaderDeviceSweeps)
+      .values({ userId: row.userId, deviceId: NAMED_DEVICE_ID, deviceModel: 'Kobo_io', lastSweepAt: new Date() });
+    const named = await ctx.app.inject({
+      method: 'PUT',
+      url: `/api/v1/koreader/devices/${NAMED_DEVICE_ID}/name`,
+      headers: authHeader(ctx.adminToken),
+      payload: { name: 'Bedside' },
+    });
+    expect(named.statusCode).toBeLessThan(300);
+
+    const detail = await ctx.app.inject({ method: 'GET', url: `/api/v1/annotations/${row.id}/sync-detail`, headers: authHeader(ctx.adminToken) });
+    expect(detail.statusCode).toBe(200);
+    const devices = (detail.json() as { devices: { deviceId: string; deviceName: string | null; deviceModel?: string | null }[] }).devices;
+    expect(devices.find((device) => device.deviceId === exchangeDeviceId(NAMED_DEVICE_ID, fileHash))).toMatchObject({
+      deviceName: 'Bedside',
+      deviceModel: 'Kobo_io',
+    });
+
+    const overview = await ctx.app.inject({ method: 'GET', url: '/api/v1/annotations/overview', headers: authHeader(ctx.adminToken) });
+    expect(overview.statusCode).toBe(200);
   });
 });

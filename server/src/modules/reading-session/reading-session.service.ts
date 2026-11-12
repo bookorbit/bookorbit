@@ -2,7 +2,14 @@ import { randomUUID } from 'node:crypto';
 
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
-import type { BookReadingSession, BookReadingSessionListResponse, ReadingSessionSource, UserSettings } from '@bookorbit/types';
+import type {
+  BookReadingSession,
+  BookReadingSessionDevice,
+  BookReadingSessionListResponse,
+  ReadingSessionSource,
+  UserSettings,
+} from '@bookorbit/types';
+import { KoreaderDeviceDirectoryService } from '../../common/koreader-devices/koreader-device-directory.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
@@ -28,6 +35,7 @@ export class ReadingSessionService {
     private readonly bookService: BookService,
     private readonly achievementEvents: AchievementEventsService,
     private readonly userStatistics: UserStatisticsService,
+    private readonly koreaderDevices: KoreaderDeviceDirectoryService,
   ) {}
 
   private resolveUserTimeZone(user: RequestUser): string {
@@ -236,7 +244,7 @@ export class ReadingSessionService {
     this.logger.log(`[${event}] [start] bookId=${bookId} userId=${user.id} - list reading sessions started`);
     try {
       await this.bookService.verifyBookAccess(bookId, user);
-      const result = await this.repo.listByBook(
+      const { koreaderSessionIds, ...page } = await this.repo.listByBook(
         user.id,
         bookId,
         query.page ?? 1,
@@ -248,6 +256,11 @@ export class ReadingSessionService {
         query.format,
         this.resolveUserTimeZone(user),
       );
+      const devices = await this.describeSessionDevices(user.id, bookId, koreaderSessionIds);
+      const result: BookReadingSessionListResponse = {
+        ...page,
+        items: page.items.map((item) => ({ ...item, device: devices.get(koreaderSessionIds.get(item.id) ?? '') ?? null })),
+      };
       this.logger.log(
         `[${event}] [end] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAtMs} total=${result.total} - list reading sessions completed`,
       );
@@ -258,6 +271,20 @@ export class ReadingSessionService {
         `[${event}] [fail] bookId=${bookId} userId=${user.id} durationMs=${Date.now() - startedAtMs} errorClass=${errorClass} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - list reading sessions failed`,
       );
       throw error;
+    }
+  }
+
+  // The device is a label on the row, so a failed lookup leaves sessions unlabelled rather than
+  // failing the whole reading log.
+  private async describeSessionDevices(userId: number, bookId: number, koreaderSessionIds: ReadonlyMap<number, string>) {
+    try {
+      return await this.koreaderDevices.describeSessionDevices(userId, [...koreaderSessionIds.values()]);
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      this.logger.warn(
+        `[book.reading_sessions.devices] [fail] bookId=${bookId} userId=${userId} errorClass=${errorClass} error="${sanitizeLogValue(error instanceof Error ? error.message : 'unknown error')}" - session devices unresolved`,
+      );
+      return new Map<string, BookReadingSessionDevice>();
     }
   }
 

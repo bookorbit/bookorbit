@@ -8,6 +8,7 @@ import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import AnnotationBookThumb from '../AnnotationBookThumb.vue'
 import AnnotationActivitySpark from '../shared/AnnotationActivitySpark.vue'
 import { annotationSourceKey } from '@/features/annotations/lib/source-label'
+import { koreaderOptionalDeviceLabel } from '@/features/koreader/lib/device-label'
 
 const props = defineProps<{
   overview: AnnotationHubOverview
@@ -45,7 +46,10 @@ function colorName(hex: string): string {
 }
 
 function deviceLabel(device: AnnotationHubOverview['devices'][number]): string {
-  return device.deviceName ?? t(annotationSourceKey(device.source))
+  const source = t(annotationSourceKey(device.source))
+  if (device.source !== 'koreader') return device.deviceName ?? source
+  const label = koreaderOptionalDeviceLabel(device.deviceModel, device.deviceName)
+  return label ? t('annotations.hub.deviceWithSource', { source, device: label }) : source
 }
 
 function handleReview() {

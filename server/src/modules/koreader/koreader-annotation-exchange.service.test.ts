@@ -5,7 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import type { AnnotationSyncService } from '../annotation/annotation-sync.service';
 import type { PositionConverterService } from '../position-converter/position-converter.service';
 import type { AnnotationExchangeAckDto, AnnotationExchangeDto } from './dto';
-import { exchangeDeviceId } from './koreader-exchange-device';
+import { exchangeDeviceId } from '../../common/utils/koreader-exchange-device.utils';
 import { KoreaderAnnotationExchangeService, parseKoreaderSourceCreatedAt } from './koreader-annotation-exchange.service';
 import type { KoreaderRepository } from './koreader.repository';
 

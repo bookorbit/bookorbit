@@ -5,7 +5,9 @@ import { formatDate as formatLocaleDate } from '@/i18n/formatters'
 import { Globe, Loader2, MonitorSmartphone, RefreshCw, Tablet } from '@lucide/vue'
 import type { AnnotationPositionFormat } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { koreaderOptionalDeviceLabel } from '@/features/koreader/lib/device-label'
 import { useAnnotationSyncDetail } from '../composables/useAnnotationSyncDetail'
+import { annotationSourceKey } from '../lib/source-label'
 
 const { t } = useI18n()
 
@@ -44,9 +46,13 @@ function statusClass(status: string): string {
   return 'border-border bg-muted text-muted-foreground'
 }
 
-function deviceLabel(device: { source: string; deviceId: string; deviceName: string | null }): string {
+function deviceLabel(device: { source: string; deviceId: string; deviceName: string | null; deviceModel?: string | null }): string {
+  if (device.source === 'koreader') {
+    const label = koreaderOptionalDeviceLabel(device.deviceModel, device.deviceName)
+    if (label) return t('annotations.hub.deviceWithSource', { source: t(annotationSourceKey(device.source)), device: label })
+    return `KOReader ${device.deviceId.slice(0, 8)}`
+  }
   if (device.deviceName) return device.deviceName
-  if (device.source === 'koreader') return `KOReader ${device.deviceId.slice(0, 8)}`
   return `Kobo ${device.deviceId}`
 }
 

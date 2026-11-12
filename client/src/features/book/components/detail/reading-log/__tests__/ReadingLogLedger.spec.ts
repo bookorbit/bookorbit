@@ -1,6 +1,7 @@
 import { mount, RouterLinkStub } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import type { BookReadingSession, ReadingAttempt } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 import ReadingLogLedger from '../ReadingLogLedger.vue'
 
 function makeSession(overrides: Partial<BookReadingSession> = {}): BookReadingSession {
@@ -169,5 +170,72 @@ describe('ReadingLogLedger', () => {
 
     const settled = mountLedger({ hasMore: false })
     expect(settled.findAll('button').some((button) => button.text() === 'Load more')).toBe(false)
+  })
+
+  describe('session source', () => {
+    beforeEach(() => {
+      i18n.global.locale.value = 'en'
+    })
+
+    function sourceLabels(wrapper: ReturnType<typeof mountLedger>) {
+      return wrapper.findAll('[role="img"]').map((dot) => ({ title: dot.attributes('title'), label: dot.attributes('aria-label') }))
+    }
+
+    it('names the KOReader device after the source', () => {
+      const wrapper = mountLedger({
+        sessions: [
+          makeSession({ id: 1, source: 'koreader', device: { deviceId: 'kobo-1', model: 'Kobo_io', name: null } }),
+          makeSession({
+            id: 2,
+            source: 'koreader',
+            startedAt: '2026-04-14T10:00:00.000Z',
+            device: { deviceId: 'phone-1', model: 'husky', name: 'Pixel' },
+          }),
+        ],
+        total: 2,
+      })
+
+      expect(sourceLabels(wrapper)).toEqual([
+        { title: 'KOReader · Kobo Libra 2', label: 'KOReader · Kobo Libra 2' },
+        { title: 'KOReader · Pixel', label: 'KOReader · Pixel' },
+      ])
+    })
+
+    it('names only the source when the session has no known device', () => {
+      const wrapper = mountLedger({
+        sessions: [
+          makeSession({ id: 1, source: 'web', startedAt: '2026-04-15T10:00:00.000Z' }),
+          makeSession({ id: 2, source: 'koreader', startedAt: '2026-04-14T10:00:00.000Z', device: { deviceId: 'bare-1', model: null, name: null } }),
+          makeSession({ id: 3, source: 'koreader', startedAt: '2026-04-13T10:00:00.000Z', device: null }),
+          makeSession({ id: 4, source: 'koreader', startedAt: '2026-04-12T10:00:00.000Z' }),
+        ],
+        total: 4,
+      })
+
+      expect(sourceLabels(wrapper).map((dot) => dot.label)).toEqual(['BookOrbit', 'KOReader', 'KOReader', 'KOReader'])
+    })
+
+    it('writes the device beside the source once the ledger has room, and widens that column only then', () => {
+      const withDevice = mountLedger({
+        sessions: [makeSession({ id: 1, source: 'koreader', device: { deviceId: 'kobo-1', model: 'Kobo_io', name: null } })],
+      })
+      const label = withDevice.get('[data-session-device]')
+      expect(label.text()).toBe('Kobo Libra 2')
+      expect(label.attributes('aria-hidden')).toBe('true')
+      expect(label.classes()).toEqual(expect.arrayContaining(['hidden', '@[42rem]/ledger:block']))
+      expect(withDevice.html()).toContain('3.25rem_10rem_1.5rem')
+
+      const withoutDevice = mountLedger({
+        sessions: [makeSession({ id: 1, source: 'koreader', device: { deviceId: 'bare-1', model: null, name: null } })],
+      })
+      expect(withoutDevice.find('[data-session-device]').exists()).toBe(false)
+      expect(withoutDevice.html()).not.toContain('10rem')
+    })
+
+    it('steps its columns by its own width rather than the window width', () => {
+      const wrapper = mountLedger()
+      expect(wrapper.get('section').classes()).toContain('@container/ledger')
+      expect(wrapper.html()).not.toMatch(/\b(sm|lg):(grid-cols|flex|block)/)
+    })
   })
 })

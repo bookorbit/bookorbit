@@ -658,4 +658,65 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     expect(after.json().heldByReset).toEqual([]);
     expect(after.json().canonicalPercentage).toBe(42);
   });
+  it('names the device behind each KOReader session in the reading log', async () => {
+    const base = BASE_EPOCH + 40_000_000;
+    const phone = 'device-attribution-phone-0001';
+    const kobo = 'device-attribution-kobo-0002';
+    const unknown = 'device-attribution-bare-0003';
+    const phoneEvents = cluster(base, 3, 10);
+    const koboEvents = cluster(base + 4 * KOREADER_SESSION_GAP_SECONDS, 3, 20);
+    const unknownEvents = cluster(base + 8 * KOREADER_SESSION_GAP_SECONDS, 3, 30);
+    await uploadPageStats(phoneEvents, epub.bookFileId, phone);
+    await uploadPageStats(koboEvents, epub.bookFileId, kobo);
+    await uploadPageStats(unknownEvents, epub.bookFileId, unknown);
+
+    const lastSweepAt = new Date();
+    await ctx.db.insert(schema.koreaderDeviceSweeps).values([
+      { userId: ownerId, deviceId: phone, deviceModel: 'Android', lastSweepAt },
+      { userId: ownerId, deviceId: kobo, deviceModel: 'Kobo_io', lastSweepAt },
+    ]);
+    await ctx.db
+      .insert(schema.koreaderDeviceProgress)
+      .values({ userId: ownerId, bookFileId: epub.bookFileId, device: 'husky', deviceId: phone, percentage: 0.1 });
+    const named = await ctx.app.inject({
+      method: 'PUT',
+      url: `/api/v1/koreader/devices/${phone}/name`,
+      headers: authHeader(ctx.adminToken),
+      payload: { name: 'Pixel' },
+    });
+    expect(named.statusCode).toBeLessThan(300);
+
+    const from = new Date(base * 1000).toISOString();
+    const to = new Date((base + 9 * KOREADER_SESSION_GAP_SECONDS) * 1000).toISOString();
+    const log = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${epub.bookId}/sessions?sortBy=startedAt&sortDir=asc&pageSize=100&dateFrom=${from}&dateTo=${to}`,
+      headers: authHeader(ctx.adminToken),
+    });
+    expect(log.statusCode).toBe(200);
+    const items = log.json().items as { startedAt: string; source: string; device: unknown }[];
+    expect(items.map((item) => ({ startedAt: item.startedAt, source: item.source, device: item.device }))).toEqual([
+      { startedAt: new Date(base * 1000).toISOString(), source: 'koreader', device: { deviceId: phone, model: 'husky', name: 'Pixel' } },
+      {
+        startedAt: new Date(koboEvents[0]!.startTime * 1000).toISOString(),
+        source: 'koreader',
+        device: { deviceId: kobo, model: 'Kobo_io', name: null },
+      },
+      {
+        startedAt: new Date(unknownEvents[0]!.startTime * 1000).toISOString(),
+        source: 'koreader',
+        device: { deviceId: unknown, model: null, name: null },
+      },
+    ]);
+
+    const otherUser = await createUserAndLogin(ctx);
+    await grantLibraryAccess(ctx, otherUser.userId, library.libraryId);
+    const otherLog = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${epub.bookId}/sessions?pageSize=100&dateFrom=${from}&dateTo=${to}`,
+      headers: authHeader(otherUser.accessToken),
+    });
+    expect(otherLog.statusCode).toBe(200);
+    expect(otherLog.json().items).toEqual([]);
+  });
 });

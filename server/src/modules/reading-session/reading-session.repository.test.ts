@@ -477,6 +477,26 @@ describe('ReadingSessionRepository - listByBook', () => {
     expect(result.items.map((item) => item.sessionType)).toEqual(['listen', 'tts', 'read', 'read', 'read']);
   });
 
+  it('keeps the stored id of each KOReader session for device lookup without returning it on the item', async () => {
+    const now = new Date('2026-04-15T10:00:00.000Z');
+    const later = new Date('2026-04-15T10:30:00.000Z');
+    const base = { bookFileId: 42, startedAt: now, endedAt: later, durationSeconds: 1800, progressDelta: 1, endProgress: 50, format: 'epub' };
+    const { db } = makeListDb({
+      rows: [
+        { ...base, id: 1, source: 'koreader', sessionId: 'kor:v2-aaaa:42:1' },
+        { ...base, id: 2, source: 'web', sessionId: '3f1c2f9e-0d6b-4d5e-9a51-2b2c1d8e7f60' },
+        { ...base, id: 3, source: 'kobo', sessionId: 'kst:30:42:1:2' },
+      ],
+      count: [{ total: 3 }],
+    });
+    const repo = new ReadingSessionRepository(db as never);
+
+    const result = await repo.listByBook(1, 2, 1, 25, 'startedAt', 'desc');
+
+    expect(result.koreaderSessionIds).toEqual(new Map([[1, 'kor:v2-aaaa:42:1']]));
+    expect(result.items[0]).not.toHaveProperty('sessionId');
+  });
+
   it('fires six select queries', async () => {
     const { db, select } = makeListDb({});
     const repo = new ReadingSessionRepository(db as never);
