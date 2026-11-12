@@ -1,0 +1,31 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "data": [
+      {
+        "id": "openai/gpt-6-luna",
+        "name": "OpenAI: GPT-6 Luna",
+        "context_length": 400000,
+        "pricing": {
+          "prompt": "0.0000001",
+          "completion": "0.0000005"
+        },
+        "top_provider": {
+          "max_completion_tokens": 128000
+        }
+      },
+      {
+        "id": "anthropic/claude-sonnet-5.5",
+        "name": "Anthropic: Claude Sonnet 5.5",
+        "context_length": 1000000,
+        "pricing": {
+          "prompt": "0.000003",
+          "completion": "0.000015"
+        }
+      }
+    ]
+  }
+}

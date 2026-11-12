@@ -20,6 +20,7 @@ import * as schema from '../../src/db/schema';
 import { books, bookFiles, libraries, libraryFolders, scanJobs } from '../../src/db/schema';
 import { MetadataService } from '../../src/modules/metadata/metadata.service';
 import { allowAppAttest } from './allow-app-attest';
+import { APP_ATTEST_POLICY, appAttestPolicy } from '../../src/modules/app-attest/app-attest.policy';
 
 export type Db = NodePgDatabase<typeof schema>;
 type OrganizationMode = 'book_per_file' | 'book_per_folder';
@@ -121,7 +122,13 @@ export interface E2EContext {
  * upload files pass `multipart`, which `main.ts` registers for the real server.
  */
 export async function createE2EContext(
-  options: { isolateAppData?: boolean; multipart?: boolean; realAppAttest?: boolean } = {},
+  options: {
+    isolateAppData?: boolean;
+    multipart?: boolean;
+    realAppAttest?: boolean;
+    /** With `realAppAttest`: the App Attest policy of a server in this environment, such as `production`. */
+    appAttestNodeEnv?: string;
+  } = {},
 ): Promise<E2EContext> {
   let isolatedAppData: E2EContext['isolatedAppData'] = null;
   if (options.isolateAppData) {
@@ -133,6 +140,7 @@ export async function createE2EContext(
   })
     .overrideProvider(MetadataService)
     .useValue(makeMetadataNoopMock());
+  if (options.appAttestNodeEnv) builder.overrideProvider(APP_ATTEST_POLICY).useValue(appAttestPolicy(options.appAttestNodeEnv));
   const moduleFixture = await (options.realAppAttest ? builder : allowAppAttest(builder)).compile();
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());

@@ -42,6 +42,8 @@ const domainByResource: Record<AuditResource, AuditResourceDomain> = {
   [AuditResource.MagicLinkToken]: 'integrations',
   [AuditResource.ApiKey]: 'integrations',
   [AuditResource.ReadingInsightsProfile]: 'insights',
+  [AuditResource.AiConnection]: 'integrations',
+  [AuditResource.AiSettings]: 'settings',
 }
 
 const badgeClassByDomain: Record<AuditResourceDomain, string> = {

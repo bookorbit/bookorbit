@@ -92,6 +92,7 @@ const TARGET_LABELS: Partial<Record<AuditResource, { table: PgTable; id: PgColum
   },
   [AuditResource.Author]: { table: schema.authors, id: schema.authors.id, label: sql`${schema.authors.name}` },
   [AuditResource.ApiKey]: { table: schema.apiKeys, id: schema.apiKeys.id, label: sql`${schema.apiKeys.name}` },
+  [AuditResource.AiConnection]: { table: schema.aiConnections, id: schema.aiConnections.id, label: sql`${schema.aiConnections.name}` },
 };
 
 export function hasTargetLabels(resource: string | null | undefined): resource is AuditResource {

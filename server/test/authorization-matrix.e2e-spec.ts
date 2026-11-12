@@ -800,6 +800,12 @@ describe('Authorization matrix (e2e)', () => {
           params: { bookId: String(bookA.bookId) },
           token: 'readAloudUser',
         },
+        [Permission.LibraryGenerateStoryGuide]: {
+          method: 'POST',
+          path: '/books/:bookId/story-guide/cancel',
+          params: { bookId: String(bookA.bookId) },
+          token: 'allPerms',
+        },
         [Permission.LibraryEditMetadata]: {
           method: 'GET',
           path: '/books/:id/write-log',

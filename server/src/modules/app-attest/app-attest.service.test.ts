@@ -58,6 +58,9 @@ describe('appAttestPolicy', () => {
     expect(appAttestPolicy('production')).toEqual(expect.objectContaining({ appIds: [BOOKORBIT_IOS_APP_ID], allowDevelopment: false }));
     expect(appAttestPolicy('development').allowDevelopment).toBe(true);
     expect(appAttestPolicy('production').trustedRoots).toHaveLength(1);
+    expect(appAttestPolicy('production').acceptUnsigned).toBe(false);
+    expect(appAttestPolicy('development').acceptUnsigned).toBe(true);
+    expect(appAttestPolicy('test').acceptUnsigned).toBe(true);
   });
 });
 

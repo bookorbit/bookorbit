@@ -11,5 +11,6 @@ import { VisualMatchService } from './visual-match.service';
   imports: [AppAttestModule, BookModule],
   controllers: [VisualMatchController, ShelfMatchController],
   providers: [VisualMatchService, VisualMatchRepository],
+  exports: [VisualMatchService],
 })
 export class VisualMatchModule {}

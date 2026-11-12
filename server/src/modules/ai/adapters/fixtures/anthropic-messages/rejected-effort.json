@@ -1,0 +1,13 @@
+{
+  "status": 400,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "type": "error",
+    "error": {
+      "type": "invalid_request_error",
+      "message": "output_config.effort: Extra inputs are not permitted"
+    }
+  }
+}

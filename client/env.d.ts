@@ -7,7 +7,8 @@ import type { RouteLocationNormalizedLoaded } from 'vue-router'
 declare module 'vue-router' {
   interface RouteMeta {
     public?: boolean
-    requiredPermission?: Permission
+    /** A list is any of them: one is enough. */
+    requiredPermission?: Permission | readonly Permission[]
     forbiddenPermission?: Permission
     permissionFallback?: string
     maxWidth?: string

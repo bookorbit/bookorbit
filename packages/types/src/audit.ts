@@ -84,6 +84,15 @@ export enum AuditAction {
 
   BookDockFinalize = "book_dock.finalize",
 
+  AiJobBuild = "ai_job.build",
+  AiJobUpdate = "ai_job.update",
+  AiJobRebuild = "ai_job.rebuild",
+  AiJobRetry = "ai_job.retry",
+  AiJobCancel = "ai_job.cancel",
+  AiJobPause = "ai_job.pause",
+  AiJobPrioritize = "ai_job.prioritize",
+  AiJobOutputDelete = "ai_job.output.delete",
+
   BookRequestCreate = "book_request.create",
   BookRequestApprove = "book_request.approve",
   BookRequestReject = "book_request.reject",
@@ -108,6 +117,17 @@ export enum AuditAction {
   MetadataHttpProviderCreate = "metadata_http_provider.create",
   MetadataHttpProviderUpdate = "metadata_http_provider.update",
   MetadataHttpProviderDelete = "metadata_http_provider.delete",
+
+  AiConnectionCreate = "ai.connection.create",
+  AiConnectionUpdate = "ai.connection.update",
+  AiConnectionDelete = "ai.connection.delete",
+  AiConnectionKeyReplace = "ai.connection.key_replace",
+  AiConnectionKeyRemove = "ai.connection.key_remove",
+  AiSlotsUpdate = "ai.slots.update",
+  AiFeatureUpdate = "ai.feature.update",
+  AiBudgetUpdate = "ai.budget.update",
+  AiSpeedsReset = "ai.speeds.reset",
+  AiPrivacyConfirm = "ai.privacy.confirm",
 
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
@@ -168,6 +188,8 @@ export enum AuditResource {
   DownloadClient = "download_client",
   RequestIndexer = "request_indexer",
   MetadataHttpProvider = "metadata_http_provider",
+  AiConnection = "ai_connection",
+  AiSettings = "ai_settings",
   Author = "author",
   AppSettings = "app_settings",
   Genre = "genre",
@@ -241,11 +263,11 @@ export const AUDIT_CATEGORY_PREFIXES: Record<Exclude<AuditCategory, "other">, re
   access: ["auth.", "magic_link."],
   users: ["user.", "reading_insights."],
   libraries: ["library."],
-  books: ["book.", "book_dock."],
+  books: ["book.", "book_dock.", "ai_job."],
   requests: ["book_request.", "download_client.", "request_indexer."],
   collections: ["collection.", "smart_scope."],
   devices: ["kobo.", "email."],
-  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider."],
+  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider.", "ai."],
 };
 
 export function getAuditCategory(action: string): AuditCategory {

@@ -1522,6 +1522,7 @@
         "magic-links": "Magic Links",
         "oidc": "OIDC / SSO",
         "tts": "Text-to-Speech",
+        "ai": "AI",
         "server-fonts": "Server Fonts",
         "api-keys": "API keys"
       },
@@ -1616,6 +1617,441 @@
           "previewVoice": "Preview {name}",
           "stopPreview": "Stop preview for {name}",
           "saveVoices": "{count, plural, one {Save # voice} other {Save # voices}}"
+        }
+      },
+      "ai": {
+        "title": "AI",
+        "mobileAppsSubtitle": "Connect an AI provider to power Constellations and other AI features in the official BookOrbit iOS and Android apps. Setup is only needed if you use these apps. Book text is sent to the provider you choose; information about your readers is not.",
+        "loading": "Loading",
+        "costBelow": "< {cost}",
+        "apiTypes": {
+          "openai-chat": "OpenAI-compatible",
+          "anthropic-messages": "Anthropic Messages",
+          "openai-responses": "OpenAI Responses",
+          "unknown": "Not supported by this server version"
+        },
+        "slots": {
+          "fast": "Fast",
+          "careful": "Careful",
+          "vision": "Vision"
+        },
+        "featureNames": {
+          "story-guides": "Story guides for Constellations",
+          "connection-test": "Connection tests",
+          "try-it": "Try it",
+          "vision-scan": "Photo scans"
+        },
+        "overview": {
+          "title": "This month",
+          "loadFailed": "Couldn't load this month's AI usage.",
+          "requestsLabel": "Requests",
+          "costLabel": "Estimated cost",
+          "errorsLabel": "Errors",
+          "cost": "{cost}",
+          "costOfBudget": "{cost} of {budget}",
+          "unknownCost": "{count, plural, one {# request has no price, so its cost is unknown.} other {# requests have no price, so their cost is unknown.}}",
+          "budgetWarning": "{percent} of this month's budget is used.",
+          "budgetExhausted": "This month's budget is used up. Builds wait until the budget is raised or the month turns.",
+          "builds": "{count, plural, one {# build} other {# builds}} of {limit} this month.",
+          "failingConnection": "{name} failing since {time}",
+          "failingSlot": "{slot} slot ({model}) failing",
+          "viewUsage": "View usage",
+          "encryptionMissing": "Set AI_ENCRYPTION_KEY on the server before saving a provider key or header value. Generate one with: openssl rand -hex 32"
+        },
+        "connections": {
+          "title": "Connections",
+          "add": "Add provider",
+          "emptyTitle": "No AI provider yet",
+          "emptyBrief": "Presets cover OpenAI, Anthropic, Google Gemini, OpenRouter, CLIProxyAPI, Ollama, LM Studio, vLLM and Azure OpenAI, and any other server that speaks the OpenAI API.",
+          "loadFailed": "Couldn't load the AI connections.",
+          "noKey": "No key",
+          "keySaved": "Key saved",
+          "statusWorking": "Working, tested {time}",
+          "statusFailing": "Failing since {time}",
+          "statusUntested": "Not tested",
+          "month": "{count, plural, one {# request} other {# requests}} this month, {cost}",
+          "unusable": "This server version doesn't support this connection's API type.",
+          "providerSaid": "The provider said: {message}",
+          "test": "Test",
+          "edit": "Edit",
+          "delete": "Delete",
+          "deleteNamed": "Delete {name}",
+          "testPassed": "{name} passed the test",
+          "testFailed": "{name} failed the test",
+          "deleteTitle": "Delete {name}?",
+          "deleteConfirm": "Usage already recorded through this connection stays in the usage view. This can't be undone.",
+          "deleted": "{name} deleted",
+          "deleteFailed": "Couldn't delete the connection.",
+          "inUseTitle": "{name} is in use",
+          "inUseSlots": "{count, plural, one {The {slots} slot uses this connection. Choose another connection for it before deleting this one.} other {The {slots} slots use this connection. Choose another connection for them before deleting this one.}}",
+          "goToModels": "Go to models"
+        },
+        "models": {
+          "title": "Models",
+          "brief": "Story guides send quick, repeated steps to the Fast slot and the steps that need the best judgement to the Careful slot. Photo scans use the Vision slot. Slots may share a model.",
+          "loadFailed": "Couldn't load the AI settings.",
+          "listFailed": "Couldn't load the model list.",
+          "noConnections": "Add a connection above before choosing models.",
+          "measured": "Story guides were measured with GPT-6 Luna in the Fast slot and GPT-6.1 Terra in the Careful slot. Other models work, but may be less accurate.",
+          "slotBriefs": {
+            "fast": "Many small requests, such as reading each passage. A quick, low-cost model fits.",
+            "careful": "Fewer requests that need the best judgement, such as the final review.",
+            "vision": "Reads book covers and shelves in photos from the iOS app. Needs a model that takes pictures; the connection test shows whether it does."
+          },
+          "failing": "Failing since {time}: {reason}",
+          "connection": "Connection",
+          "none": "None",
+          "model": "Model",
+          "deployment": "Deployment name",
+          "modelPlaceholder": "Search or type a model ID",
+          "listLoading": "Loading the model list",
+          "listFailedHint": "Couldn't load the model list. Type the model ID, or retry.",
+          "bothRequired": "Choose a connection and a model, or neither.",
+          "priceShort": "{input} in, {output} out per million tokens",
+          "contextShort": "{tokens} context",
+          "anthropicOffer": "Claude through this server's OpenAI endpoint gets its JSON schema as a plain instruction, so the schema isn't enforced. A Messages connection to the same server enforces it.",
+          "anthropicAdd": "Add Messages connection",
+          "anthropicName": "{name} (Messages)",
+          "priceInput": "Input price",
+          "priceOutput": "Output price",
+          "priceBrief": "Dollars per million tokens. Without prices, costs are unknown and budgets count builds.",
+          "priceInvalid": "Enter both prices as numbers, or leave both empty.",
+          "advanced": "Advanced",
+          "jsonMode": "JSON mode",
+          "jsonModeBrief": "Automatic uses what the last connection test found.",
+          "jsonModes": {
+            "auto": "Automatic",
+            "schema": "JSON schema",
+            "json": "JSON mode",
+            "instructions": "Instructions only"
+          },
+          "save": "Save",
+          "saved": "{slot} slot saved",
+          "saveFailed": "Couldn't save the slot.",
+          "try": "Try it",
+          "trying": "Trying",
+          "tryFailed": "Couldn't run Try it.",
+          "saveBeforeTry": "Save to try the new choice.",
+          "tryDone": "{count, plural, one {{model} found # name} other {{model} found # names}} in {time}, {cost}.",
+          "tryDoneBooks": "{count, plural, one {{model} read # book} other {{model} read # books}} in {time}, {cost}.",
+          "durationMs": "{ms} ms",
+          "durationSeconds": "{seconds} s",
+          "tryJson": "Answer format: {how}",
+          "costUnknown": "cost unknown",
+          "kinds": {
+            "person": "Person",
+            "place": "Place",
+            "group": "Group",
+            "thing": "Thing"
+          },
+          "tryErrors": {
+            "off": "AI requests are turned off on this server.",
+            "slot-empty": "Choose a connection and a model for this slot first.",
+            "budget": "This month's budget is used up.",
+            "provider-auth": "The provider rejected the key. Check the connection's key.",
+            "model-missing": "The provider doesn't have this model.",
+            "provider-down": "The provider couldn't be reached or answered with an error. Try again in a moment.",
+            "invalid-json": "The model didn't answer in the JSON asked for. A stronger model may do better.",
+            "too-long": "The sample passage is too long for this model.",
+            "bad-request": "The provider refused the request's parameters.",
+            "cancelled": "Try it was cancelled.",
+            "refused": "The model declined to read the sample passage."
+          }
+        },
+        "features": {
+          "title": "Features",
+          "brief": "Each feature has its own switch and limits. Turning one off stops new builds and pauses running ones; what it already built stays available.",
+          "loadFailed": "Couldn't load the AI features.",
+          "empty": "This server has no AI features yet.",
+          "briefs": {
+            "story-guides": "Builds the guide to each book's people, places and groups that Constellations shows.",
+            "vision-scan": "Reads book covers and shelves in photos taken in the iOS app, and finds the books in the reader's libraries. Readers choose in the app when it is used."
+          },
+          "on": "On. New builds can start.",
+          "off": "Off. New builds don't start, and guides already built stay available.",
+          "requests": {
+            "on": "On. Readers can use it in the iOS app.",
+            "off": "Off. The iOS app doesn't offer it.",
+            "missingSlots": "{count, plural, one {Can't run until the {slots} slot has a model.} other {Can't run until the {slots} slots have models.}}"
+          },
+          "missingSlots": "{count, plural, one {Can't build until the {slots} slot has a model.} other {Can't build until the {slots} slots have models.}}",
+          "goToModels": "Go to models",
+          "privacyConfirmed": "Sending book text confirmed by {name}, {time}",
+          "maxWords": "Longest book (words)",
+          "maxWordsBrief": "Longer books aren't built.",
+          "concurrentBuilds": "Builds at once",
+          "concurrentBuildsBrief": "Further builds wait their turn.",
+          "monthlyBudget": "Monthly budget (dollars)",
+          "monthlyBudgetBrief": "Empty to share the server's budget.",
+          "buildsPerMonth": "Builds per month",
+          "buildsPerMonthBrief": "Applies when a slot has no prices. Empty for no limit.",
+          "save": "Save",
+          "saved": "{name} saved",
+          "saveFailed": "Couldn't save the feature.",
+          "turnedOn": "{name} turned on",
+          "turnedOff": "{name} turned off",
+          "privacyTitle": "Turn on {name}?",
+          "privacyBody": "The whole text of each book built is sent to the provider you chose. Readers' accounts, reading positions and notes are not.",
+          "privacy": {
+            "vision-scan": {
+              "privacyBody": "Photos readers take of covers and shelves in the iOS app are sent to the provider you chose, without location or camera details. Readers' accounts, reading positions and notes are not.",
+              "privacyConfirmed": "Sending photos confirmed by {name}, {time}"
+            }
+          },
+          "turnOn": "Turn on",
+          "storyGuides": {
+            "movedBrief": "Stored story guides and how fast each model builds them are in the AI area.",
+            "movedLink": "Open story guides",
+            "loading": "Counting story guides",
+            "loadFailed": "Couldn't count the story guides.",
+            "data": "{count, plural, =0 {No story guides built yet.} one {# story guide built, {size}.} other {# story guides built, {size}.}}",
+            "deleteAll": "Delete all story guides",
+            "deleteTitle": "Delete all story guides?",
+            "deleteBody": "{count, plural, one {# story guide is deleted for everyone, and builds in progress are cancelled.} other {# story guides are deleted for everyone, and builds in progress are cancelled.}}",
+            "fixesQuestion": "{count, plural, one {# fix has been made for everyone.} other {# fixes have been made for everyone.}}",
+            "keepFixes": "Keep fixes made for everyone",
+            "keepFixesBrief": "Building a guide again applies them.",
+            "deleteFixes": "Delete them too",
+            "continue": "Continue",
+            "typeTitle": "This can't be undone",
+            "typeBody": "Building them again sends each book's text to the provider again.",
+            "delete": "Delete all",
+            "deleted": "{count, plural, one {# story guide deleted} other {# story guides deleted}}",
+            "countChanged": "The number of story guides changed, so nothing was deleted. Check the new number and try again.",
+            "deleteFailed": "Couldn't delete the story guides.",
+            "speeds": {
+              "title": "Model speed",
+              "brief": "Build times are estimated from the newest finished builds on each model. Until a model has finished one, only the cost is shown.",
+              "loading": "Reading model speeds",
+              "loadFailed": "Couldn't read the model speeds.",
+              "none": "No model has a measured speed yet. Each model's speed is learned from the next build it finishes.",
+              "learned": "{count, plural, one {Learned from # build, the newest on {date}} other {Learned from up to # builds, the newest on {date}}}",
+              "onConnection": "on {connection}",
+              "perCall": "{time} per call",
+              "steps": {
+                "names": "Finding names",
+                "review": "Checking who's who",
+                "ties": "Finding ties",
+                "lines": "Writing descriptions",
+                "profiles": "Writing profiles"
+              },
+              "reset": "Reset",
+              "resetLabel": "Reset the speed of {model}",
+              "resetTitle": "Reset this model's speed?",
+              "resetBody": "Builds on {model} show no time again until one of them finishes.",
+              "resetDone": "Speed reset for {model}",
+              "resetFailed": "Couldn't reset the speed."
+            }
+          },
+          "errors": {
+            "range": "Enter a whole number from {min} to {max}.",
+            "dollars": "Enter an amount in dollars up to {max}, or leave it empty."
+          }
+        },
+        "budget": {
+          "title": "Budget",
+          "brief": "Months run in the server's time zone. At 80% this page warns; at 100% new requests stop and builds pause until the budget is raised or the month turns.",
+          "loadFailed": "Couldn't load the budget.",
+          "monthlyBudget": "Monthly budget (dollars)",
+          "monthlyBudgetBrief": "For the whole server. Empty for no budget.",
+          "buildsPerMonth": "Builds per month",
+          "buildsPerMonthBrief": "Applies when a slot in use has no prices. Empty for no limit.",
+          "save": "Save",
+          "saved": "Budget saved",
+          "saveFailed": "Couldn't save the budget.",
+          "spentOf": "{spent} of {budget} spent this month ({percent}).",
+          "spent": "{spent} spent this month.",
+          "reserved": "{amount} is reserved for builds in progress.",
+          "buildsOf": "{count, plural, one {# build} other {# builds}} of {limit} this month.",
+          "builds": "{count, plural, one {# build} other {# builds}} this month.",
+          "countsBuilds": "A slot in use has no prices, so its cost can't be counted. Builds per month is the limit that applies."
+        },
+        "usage": {
+          "title": "Usage",
+          "brief": "This month and the previous eleven.",
+          "range": "{from} to {to}",
+          "back": "Back to AI settings",
+          "export": "Export CSV",
+          "exportFailed": "Couldn't export the usage.",
+          "loadFailed": "Couldn't load the usage.",
+          "months": "By month",
+          "byFeature": "By feature",
+          "byModel": "By model",
+          "costliest": "Costliest builds",
+          "recentErrors": "Recent errors",
+          "empty": "No requests in this period.",
+          "noJobs": "No builds in this period.",
+          "noErrors": "No errors in this period.",
+          "unnamedJob": "Unnamed build",
+          "modelOn": "{model} on {connection}",
+          "costPartial": "{cost} + unknown",
+          "costUnknown": "Unknown",
+          "columns": {
+            "month": "Month",
+            "feature": "Feature",
+            "model": "Model",
+            "requests": "Requests",
+            "input": "Input",
+            "output": "Output",
+            "reasoning": "Reasoning",
+            "cost": "Cost",
+            "errors": "Errors",
+            "job": "Build",
+            "at": "When",
+            "slot": "Slot",
+            "outcome": "Outcome"
+          },
+          "outcomes": {
+            "ok": "OK",
+            "refused": "Refused by the model",
+            "filtered": "Blocked by the provider's filter",
+            "length": "Cut short at the output limit",
+            "rate-limited": "Rate limited",
+            "timeout": "Timed out",
+            "invalid-json": "Answer wasn't valid JSON"
+          },
+          "errorCodes": {
+            "off": "AI off",
+            "slot-empty": "Slot empty",
+            "budget": "Over budget",
+            "provider-auth": "Key rejected",
+            "model-missing": "Model not found",
+            "provider-down": "Provider down",
+            "invalid-json": "Invalid JSON",
+            "too-long": "Too long for the model",
+            "bad-request": "Request refused",
+            "cancelled": "Cancelled"
+          }
+        },
+        "presets": {
+          "other": "Other",
+          "otherBrief": "Any server that speaks the OpenAI API",
+          "warnings": {
+            "anthropic": "Use Anthropic Messages with this URL. Anthropic's OpenAI-style /v1/ endpoint is not meant for production and ignores JSON schemas.",
+            "gemini": "Google calls this endpoint beta, and rejects API keys that have no restrictions.",
+            "openrouter": "Requests ask OpenRouter to use only providers that support every parameter, so a model without JSON schema support fails instead of returning loose text.",
+            "cliproxyapi": "Use a client key from its api-keys list, not the Management Center key. Its model list mixes every signed-in account.",
+            "ollama": "Small local models are unreliable at JSON.",
+            "lmstudio": "LM Studio warns that models under 7B often can't follow a JSON schema.",
+            "azure": "The model field takes a deployment name. Put the key in the api-key header below."
+          }
+        },
+        "sheet": {
+          "addTitle": "Add AI provider",
+          "editTitle": "Edit {name}",
+          "stepOf": "Step {step} of 3",
+          "steps": {
+            "provider": "Provider",
+            "details": "Details",
+            "test": "Test"
+          },
+          "descriptions": {
+            "provider": "Choose a provider, or paste its URL. Choosing one only fills in the next step.",
+            "details": "Where to reach the provider, and the key it expects.",
+            "test": "Each check runs against the provider with a very small request."
+          },
+          "next": "Next",
+          "back": "Back",
+          "runTest": "Test",
+          "save": "Save",
+          "saving": "Saving",
+          "pasteLabel": "Or paste a URL",
+          "pasteBrief": "The provider and API type are picked from the address.",
+          "pastePlaceholder": "https://api.example.com/v1",
+          "pasteUse": "Use URL",
+          "name": "Name",
+          "baseUrl": "Base URL",
+          "calls": "Calls {url}",
+          "apiType": "API type",
+          "apiTypeBrief": "How requests are written. Most providers speak OpenAI-compatible.",
+          "key": "API key",
+          "keyOptional": "API key (optional)",
+          "keyStored": "Saved key {hint}. Type a new key to replace it.",
+          "keyRemoved": "The saved key will be removed when you save.",
+          "keepKey": "Keep key",
+          "removeKey": "Remove key",
+          "showKey": "Show key",
+          "hideKey": "Hide key",
+          "advanced": "Advanced",
+          "headers": "Extra headers",
+          "headersBrief": "Sent with every request. Values are hidden after saving.",
+          "headerName": "Header name",
+          "headerValue": "Value",
+          "addHeader": "Add header",
+          "removeHeader": "Remove {name}",
+          "proxyUrl": "Proxy URL",
+          "proxyBrief": "Reach the provider through an HTTP proxy.",
+          "resolvers": "DNS servers",
+          "resolversBrief": "Look up the provider with these servers instead of the system's.",
+          "timeout": "Timeout (seconds)",
+          "secondsRange": "Per request, {min} to {max} seconds.",
+          "parallel": "Parallel requests",
+          "range": "{min} to {max}.",
+          "perMinute": "Requests per minute",
+          "perMinuteBrief": "Empty for no limit.",
+          "testModel": "Test model",
+          "testDeployment": "Test deployment",
+          "testModelBrief": "The model the test asks. Change it to test another.",
+          "testAgain": "Test again",
+          "saveWithFailureTitle": "Save without a passing test?",
+          "saveWithFailureBody": "A provider can be briefly down. The connection shows as not tested until a test passes.",
+          "saveAnyway": "Save anyway",
+          "saved": "{name} saved",
+          "saveFailed": "Couldn't save the connection.",
+          "errors": {
+            "nameRequired": "Enter a name.",
+            "urlRequired": "Enter the provider's URL.",
+            "urlInvalid": "Enter a URL that starts with http:// or https://.",
+            "keyRequired": "Enter the API key.",
+            "headerNameRequired": "Enter a name for each header.",
+            "headerValueRequired": "Enter a value for {name}.",
+            "headerReserved": "{name} is set by the API type and can't be changed here.",
+            "range": "Enter a whole number from {min} to {max}."
+          }
+        },
+        "test": {
+          "failed": "Couldn't run the test.",
+          "notRun": "Not checked, because an earlier check failed.",
+          "steps": {
+            "reach": "Reached the server",
+            "reachDone": "Reached {host} in {ms} ms",
+            "key": "Key accepted",
+            "models": "Models found",
+            "modelsDone": "{count, plural, one {# model found} other {# models found}}",
+            "json": "Answered in JSON",
+            "jsonDone": "Answered in JSON: {how}",
+            "usage": "Token usage reported",
+            "image": "Read a picture"
+          },
+          "jsonSupport": {
+            "schema": "JSON schema enforced",
+            "json": "JSON mode",
+            "instructions": "Instructions only"
+          }
+        },
+        "failures": {
+          "unreachable": "Couldn't reach the server. Check the URL and that the server is running.",
+          "timeout": "The server took too long to answer.",
+          "tls": "The server's certificate wasn't accepted.",
+          "redirect": "This URL redirects somewhere else. Enter the address it points to.",
+          "web-page": "This URL answered with a web page, not an API.",
+          "blocked-address": "This address isn't allowed.",
+          "invalid-url": "This isn't a provider URL the server can use.",
+          "key-rejected": "The provider rejected the key. Check the key.",
+          "key-unreadable": "The saved key can't be read. Enter it again.",
+          "out-of-credit": "The provider account is out of credit.",
+          "spend-limit": "The provider account reached its spending limit.",
+          "rate-limited": "The provider limited requests. Try again in a moment.",
+          "rateLimitedRetry": "The provider limited requests. Try again in {seconds} s.",
+          "model-missing": "Model not found.",
+          "no-model": "No model to test with. Type the model name.",
+          "no-model-list": "This provider has no model list; type the model name.",
+          "no-json": "The model didn't answer in JSON.",
+          "no-usage": "The provider didn't report token usage, so costs can't be counted.",
+          "unsupported-api-type": "This server version doesn't support this API type.",
+          "provider-error": "The provider answered with an error.",
+          "no-image-input": "This model can't read pictures. Photo scans need one that can; story guides don't.",
+          "unknown": "The provider answered with an error."
         }
       },
       "serverFonts": {
@@ -4413,6 +4849,7 @@
         "requests": "Sources, download clients, and what happens to a book once it downloads.",
         "readerTts": "Read-aloud voice, speed, and narration defaults.",
         "adminTts": "Text-to-speech engines available to every reader on this server.",
+        "adminAi": "AI providers, models and budgets for AI features.",
         "apiKeys": "Keys that let scripts and other apps use BookOrbit as you.",
         "adminApiKeys": "Allow API keys on this server and limit how long they last."
       },
@@ -5611,6 +6048,8 @@
       "DownloadClient": "Download client",
       "RequestIndexer": "Indexer",
       "MetadataHttpProvider": "Metadata provider",
+      "AiConnection": "AI connection",
+      "AiSettings": "AI settings",
       "Author": "Author",
       "AppSettings": "Application settings",
       "Genre": "Genre",
@@ -5700,6 +6139,14 @@
       "SmartScopeUpdate": "Update smart scope",
       "SmartScopeDelete": "Delete smart scope",
       "BookDockFinalize": "Finalize Book Dock file",
+      "AiJobBuild": "Start AI build",
+      "AiJobUpdate": "Update AI build",
+      "AiJobRebuild": "Rebuild AI output",
+      "AiJobRetry": "Try AI build again",
+      "AiJobCancel": "Cancel AI build",
+      "AiJobPause": "Pause AI build",
+      "AiJobPrioritize": "Move AI build to the front of the queue",
+      "AiJobOutputDelete": "Delete AI output",
       "BookRequestCreate": "Create book request",
       "BookRequestApprove": "Approve book request",
       "BookRequestReject": "Reject book request",
@@ -5721,6 +6168,16 @@
       "MetadataHttpProviderCreate": "Metadata provider added",
       "MetadataHttpProviderUpdate": "Metadata provider updated",
       "MetadataHttpProviderDelete": "Metadata provider removed",
+      "AiConnectionCreate": "AI connection added",
+      "AiConnectionUpdate": "AI connection edited",
+      "AiConnectionDelete": "AI connection deleted",
+      "AiConnectionKeyReplace": "AI connection key replaced",
+      "AiConnectionKeyRemove": "AI connection key removed",
+      "AiSlotsUpdate": "AI models changed",
+      "AiFeatureUpdate": "AI feature changed",
+      "AiBudgetUpdate": "AI budget changed",
+      "AiSpeedsReset": "AI model speed reset",
+      "AiPrivacyConfirm": "AI privacy notice confirmed",
       "AuthorUpdate": "Update author",
       "AuthorDelete": "Delete author",
       "AuthorMerge": "Merge authors",
@@ -8744,6 +9201,101 @@
         "totalLabel": "Books in series",
         "totalPlaceholder": "of",
         "totalHint": "Total books in this series. Shared with everyone who has this series."
+      },
+      "storyGuide": {
+        "title": "Story guide",
+        "menu": "Story guide actions",
+        "cardBody": "Builds the story guide that Constellations uses in the BookOrbit apps.",
+        "build": "Build",
+        "update": "Update",
+        "estimate": "{count, plural, one {About # minute} other {About # minutes}}",
+        "estimateWithCost": "{count, plural, one {About # minute and {cost}} other {About # minutes and {cost}}}",
+        "estimateCostNoTime": "About {cost}. The time shows after the first finished build.",
+        "estimateNoTime": "The time shows after the first finished build.",
+        "checking": "Checking this book",
+        "waiting": "Story guide waiting to start",
+        "ahead": "{count, plural, one {# book ahead} other {# books ahead}}",
+        "minutesLeft": "{count, plural, one {About # minute left} other {About # minutes left}}",
+        "updating": "Updating the story guide",
+        "rebuilding": "Rebuilding the story guide",
+        "updateAvailable": "An improved story guide is available",
+        "builtOn": "Built {date}",
+        "builtWith": "Built {date} with {models}",
+        "stillTheCase": "Still the case",
+        "settingsHint": "Change this in the server's AI settings.",
+        "phases": {
+          "reading": "Reading the book",
+          "findingNames": "Finding names",
+          "checkingWho": "Checking who's who",
+          "findingTies": "Finding ties",
+          "writing": "Writing descriptions",
+          "writingChapter": "Writing descriptions, chapter {chapter} of {total}",
+          "finishing": "Finishing up",
+          "building": "Building"
+        },
+        "reasons": {
+          "pausedBudget": "Paused: this month's AI budget is used up.",
+          "pausedOverEstimate": "Paused: this build is costing more than expected.",
+          "pausedProviderAuth": "Paused: the AI provider didn't accept the key.",
+          "pausedProviderDown": "Paused: the AI provider isn't responding. It'll keep trying.",
+          "pausedModelMissing": "Paused: the AI model is no longer available.",
+          "pausedSlotEmpty": "Paused: no AI model is chosen for story guides.",
+          "pausedOff": "Paused: story guides were turned off on this server.",
+          "pausedUser": "Paused. It waits until someone resumes it.",
+          "turnedOff": "Story guides are turned off on this server.",
+          "tooLarge": "This book's file is too large for a story guide.",
+          "tooLong": "This book is longer than this server's limit of {limit} words.",
+          "tooShort": "This book is too short for a story guide.",
+          "unreadable": "This book's file couldn't be read.",
+          "lowCoverage": "The AI provider refused too much of this book. A different model may work.",
+          "requester": "The person who started this build can no longer build story guides.",
+          "sourceChanged": "This book's file changed during the build.",
+          "couldNotBuild": "The story guide couldn't be built."
+        },
+        "actions": {
+          "build": "Build story guide",
+          "update": "Update story guide",
+          "rebuild": "Rebuild from scratch",
+          "retry": "Try again",
+          "keepBuilding": "Continue",
+          "resume": "Resume",
+          "cancelBuild": "Cancel build",
+          "dismiss": "Dismiss",
+          "delete": "Delete story guide"
+        },
+        "confirm": {
+          "estimate": "{count, plural, one {About # minute.} other {About # minutes.}}",
+          "estimateCostNoTime": "About {cost}. The time shows after the first finished build.",
+          "estimateWithCost": "{count, plural, one {About # minute and {cost}.} other {About # minutes and {cost}.}}",
+          "buildTitle": "Build a story guide?",
+          "buildBody": "Your server's AI reads the whole book once. Everyone who reads this book can use it.",
+          "buildAction": "Build",
+          "updateTitle": "Update the story guide?",
+          "updateBody": "Only the parts improved since it was built are redone.",
+          "updateAction": "Update",
+          "rebuildTitle": "Rebuild the story guide from scratch?",
+          "rebuildBody": "Replaces the guide for everyone who reads this book. Fixes made for everyone are kept.",
+          "rebuildAction": "Rebuild",
+          "deleteTitle": "Delete the story guide?",
+          "deleteBody": "Everyone who reads this book loses it.",
+          "deleteBodyStopsBuild": "Everyone who reads this book loses it. The build in progress stops too.",
+          "deleteKeepFixes": "Delete guide, keep fixes",
+          "deleteWithFixes": "Delete guide and fixes",
+          "cancelTitle": "Cancel the build?",
+          "cancelBodyBuild": "Work done so far is kept for next time.",
+          "cancelBodyRebuild": "The current guide stays.",
+          "keepBuilding": "Keep building",
+          "continueTitle": "Keep building?",
+          "continueBodyCost": "This build has cost {cost}, three times the estimate. It can cost up to {cost} more before it asks again.",
+          "continueBody": "This build is using much more of the AI budget than expected. It can use as much again before it asks."
+        },
+        "failed": {
+          "load": "Couldn't load the story guide.",
+          "build": "Couldn't start the story guide build.",
+          "retry": "Couldn't restart the story guide build.",
+          "cancel": "Couldn't stop the story guide build.",
+          "delete": "Couldn't delete the story guide."
+        }
       }
     },
     "table": {
@@ -11721,7 +12273,14 @@
       "API_KEY_SCOPE_EXCEEDS_OWNER": "A key cannot be given access its owner does not have.",
       "API_KEY_EXPIRY_EXCEEDS_CAP": "Keys on this server can last at most {cap} days.",
       "API_KEY_ADMIN_WITH_LIBRARIES": "A key with administrator access cannot be limited to some libraries.",
-      "API_KEY_OWNER_NOT_PERMITTED": "This person cannot have API keys. They need an active account and the Create API keys permission."
+      "API_KEY_OWNER_NOT_PERMITTED": "This person cannot have API keys. They need an active account and the Create API keys permission.",
+      "AI_ENCRYPTION_KEY_MISSING": "Set AI_ENCRYPTION_KEY on the server before saving a provider key or header value.",
+      "AI_INVALID_URL": "Enter the provider's URL with http:// or https://, and put the key in the API key field, not in the URL.",
+      "AI_CONNECTION_NAME_TAKEN": "A connection with this name already exists.",
+      "AI_CONNECTION_IN_USE": "{unfinishedJobs, plural, =0 {A slot uses this connection. Choose another connection for it first.} one {# unfinished build is using this connection.} other {# unfinished builds are using this connection.}}",
+      "AI_PRIVACY_CONFIRMATION_REQUIRED": "Confirm what is sent to the provider before turning this feature on.",
+      "AI_SLOT_EMPTY": "Choose a connection and a model for this slot first.",
+      "AI_PROVIDER_FAILED": "The provider couldn't be reached, or refused the request."
     }
   },
   "hardcover": {
@@ -13276,6 +13835,10 @@
         "readAloud": {
           "label": "Read-aloud generation",
           "description": "When a read-aloud you started is ready, needs your review, or fails."
+        },
+        "storyGuides": {
+          "label": "Story guides",
+          "description": "When a story guide you started building is ready or fails."
         },
         "migration": {
           "label": "Data migration",
@@ -15259,6 +15822,204 @@
     "previousImage": "Previous image",
     "nextImage": "Next image"
   },
+  "aiArea": {
+    "title": "AI",
+    "subtitle": "AI builds on your books, and where each one stands.",
+    "settingsLink": "AI settings",
+    "sectionsLabel": "AI sections",
+    "sections": {
+      "activity": "Activity",
+      "storyGuides": "Story guides"
+    },
+    "storyGuides": {
+      "overview": {
+        "stored": "Guides stored",
+        "storage": "Storage",
+        "spent": "Spent on guides",
+        "typical": "Typical build",
+        "notTimed": "Not timed yet",
+        "unknown": "Unknown",
+        "loadFailed": "Couldn't read the story guide totals."
+      },
+      "columns": {
+        "book": "Book",
+        "built": "Built",
+        "models": "Models",
+        "time": "Time",
+        "cost": "Cost",
+        "size": "Size",
+        "actions": "Actions"
+      },
+      "list": {
+        "title": "Stored guides",
+        "search": "Search by title",
+        "loading": "Loading story guides",
+        "loadFailed": "Couldn't read the story guides.",
+        "empty": "No story guides yet.",
+        "emptyHint": "Build one from a book's page. Finished guides show up here.",
+        "noMatch": "No stored guide matches that title.",
+        "clearSearch": "Clear search",
+        "noBook": "A book no longer in any library",
+        "rebuild": "Rebuild",
+        "rebuildOn": "Rebuild the story guide for {name}",
+        "delete": "Delete",
+        "deleteOn": "Delete the story guide for {name}"
+      },
+      "models": {
+        "title": "Builds by model",
+        "brief": "Averages over the builds of the guides stored now.",
+        "unknown": "Unknown models",
+        "columns": {
+          "models": "Models",
+          "builds": "Builds",
+          "time": "Average time",
+          "cost": "Average cost"
+        }
+      },
+      "rebuild": {
+        "title": "Rebuild this story guide?",
+        "body": "The text of {name} is sent to the AI provider again, and the new guide replaces the current one for everyone. Fixes made for everyone are kept.",
+        "bodyCost": "The text of {name} is sent to the AI provider again, and the new guide replaces the current one for everyone. Fixes made for everyone are kept. Its last build cost {cost}.",
+        "confirm": "Rebuild",
+        "queued": "Rebuild of {name} queued.",
+        "refused": "{name} can't be rebuilt now. Its book page says why.",
+        "failed": "Couldn't rebuild the story guide."
+      },
+      "delete": {
+        "title": "Delete this story guide?",
+        "body": "The story guide for {name} is deleted for everyone. Fixes made for everyone are kept, so building it again applies them.",
+        "confirm": "Delete",
+        "done": "Story guide for {name} deleted.",
+        "failed": "Couldn't delete the story guide."
+      },
+      "modelPair": "{fast} + {careful}",
+      "time": {
+        "seconds": "{seconds}s",
+        "minutes": "{minutes}m {seconds}s",
+        "hours": "{hours}h {minutes}m"
+      }
+    },
+    "activity": {
+      "viewsLabel": "Show jobs",
+      "views": {
+        "queue": "Queue",
+        "failed": "Failed",
+        "history": "History"
+      },
+      "scope": {
+        "label": "Whose jobs",
+        "mine": "Mine",
+        "all": "Everyone's"
+      },
+      "columns": {
+        "position": "Place in queue",
+        "book": "Book",
+        "status": "Status",
+        "details": "Details",
+        "when": "When",
+        "requester": "Asked for by",
+        "cost": "Cost",
+        "actions": "Actions"
+      },
+      "loading": "Loading AI jobs",
+      "loadFailed": "Couldn't read the AI jobs.",
+      "actionFailed": "Couldn't change the AI jobs.",
+      "empty": {
+        "queue": "Nothing is queued, running or paused.",
+        "failed": "No failed jobs.",
+        "history": "No finished jobs yet."
+      },
+      "emptyHints": {
+        "queue": "Story guides started from a book's page wait and run here.",
+        "failed": "Builds that stop on a problem show up here, ready to try again.",
+        "history": "Finished, failed and cancelled builds are kept here."
+      },
+      "kinds": {
+        "build": "Build",
+        "update": "Update",
+        "rebuild": "Rebuild"
+      },
+      "status": {
+        "queued": "Queued",
+        "running": "Running",
+        "paused": "Paused",
+        "completed": "Completed",
+        "failed": "Failed",
+        "cancelled": "Cancelled"
+      },
+      "reasons": {
+        "budget": "This month's AI budget is used up.",
+        "over-estimate": "It cost more than expected and waits for Resume.",
+        "provider-auth": "The AI provider didn't accept the key.",
+        "provider-down": "The AI provider isn't responding.",
+        "model-missing": "The AI model is no longer available.",
+        "off": "This AI feature is turned off.",
+        "slot-empty": "No AI model is chosen for it.",
+        "user": "Paused until someone resumes it.",
+        "low-coverage": "The AI provider refused too much of the book.",
+        "requester": "The person who asked can no longer build it.",
+        "source-changed": "The book's file changed during the build.",
+        "unreadable": "The book's file couldn't be read.",
+        "error": "Something went wrong on the server.",
+        "pausedOther": "Waiting for its cause to clear."
+      },
+      "nextUp": "Next to start",
+      "position": "Place {position} in the queue",
+      "progress": "{done} of {total}",
+      "progressLabel": "Progress of {name}",
+      "untitled": "Untitled book",
+      "unavailable": "A book you can no longer open",
+      "times": {
+        "queued": "Queued {time}",
+        "started": "Started {time}",
+        "paused": "Paused {time}",
+        "finished": "Ended {time}"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "pause": "Pause",
+        "resume": "Resume",
+        "retry": "Try again",
+        "dismiss": "Dismiss",
+        "prioritize": "Move to front"
+      },
+      "actionsOn": {
+        "cancel": "Cancel {name}",
+        "pause": "Pause {name}",
+        "resume": "Resume {name}",
+        "retry": "Try again: {name}",
+        "dismiss": "Dismiss {name}",
+        "prioritize": "Move to front: {name}"
+      },
+      "select": "Select {name}",
+      "selectAll": "Select all on this page",
+      "selected": "{count, plural, one {# job selected} other {# jobs selected}}",
+      "bulkLabel": "Selected jobs",
+      "clearSelection": "Clear selection",
+      "results": {
+        "cancel": "{count, plural, one {Cancelled # job.} other {Cancelled # jobs.}}",
+        "pause": "{count, plural, one {Paused # job.} other {Paused # jobs.}}",
+        "resume": "{count, plural, one {Resumed # job.} other {Resumed # jobs.}}",
+        "retry": "{count, plural, one {Queued # job again.} other {Queued # jobs again.}}",
+        "dismiss": "{count, plural, one {Dismissed # job.} other {Dismissed # jobs.}}",
+        "prioritize": "{count, plural, one {Moved # job to the front.} other {Moved # jobs to the front.}}",
+        "stillPaused": "{count, plural, one {# job is still held by its cause and resumes on its own once it clears.} other {# jobs are still held by their cause and resume on their own once it clears.}}",
+        "unchanged": "{count, plural, one {# job couldn't be changed. The list now shows where it stands.} other {# jobs couldn't be changed. The list now shows where they stand.}}"
+      },
+      "confirmCancel": {
+        "title": "{count, plural, one {Cancel this job?} other {Cancel # jobs?}}",
+        "body": "Work already done is kept, so building again later picks up from it.",
+        "confirm": "{count, plural, one {Cancel job} other {Cancel jobs}}"
+      },
+      "pager": {
+        "label": "Pages",
+        "range": "{from}-{to} of {total}",
+        "previous": "Previous page",
+        "next": "Next page"
+      },
+      "deletedAccountName": "Deleted account"
+    }
+  },
   "titles": {
     "dashboard": "Dashboard",
     "libraries": "Libraries",
@@ -15333,6 +16094,7 @@
       "oidc": "OIDC / SSO",
       "server-fonts": "Server Fonts",
       "tts": "Text-to-Speech",
+      "ai": "AI",
       "api-keys": "API Keys"
     },
     "system": {
@@ -15357,7 +16119,9 @@
     "bookRequestReleases": "Pick a release",
     "tts": "Text-to-Speech",
     "chapterHealth": "Chapter Health",
-    "readingHistory": "Reading History"
+    "readingHistory": "Reading History",
+    "aiActivity": "AI activity",
+    "aiStoryGuides": "Story guides"
   },
   "tts": {
     "readerControls": {

@@ -1,0 +1,14 @@
+{
+  "status": 400,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "Unsupported value: 'temperature' does not support 0 with this model. Only the default (1) value is supported.",
+      "type": "invalid_request_error",
+      "param": "temperature",
+      "code": "unsupported_value"
+    }
+  }
+}

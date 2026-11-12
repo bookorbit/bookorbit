@@ -60,6 +60,7 @@ file_env() {
 
 load_file_env() {
   for pending_env_name in \
+    AI_ENCRYPTION_KEY \
     BOOK_REQUEST_ENCRYPTION_KEY \
     DATABASE_URL \
     EMAIL_ENCRYPTION_KEY \

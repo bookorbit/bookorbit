@@ -76,6 +76,7 @@ COPY --from=client-builder --chown=node:node /app/client/src/locales ./locales
 COPY --from=server-builder --chown=node:node /app/server/entrypoint.sh /app/server/file-env.sh ./
 COPY --chown=node:node LICENSE NOTICE ADDITIONAL_TERMS.md ./
 COPY --chown=node:node server/bin/kepubify/ ./bin/kepubify/
+COPY --chown=node:node server/vendor/foliate/ ./vendor/foliate/
 COPY --chown=node:node koreader-plugin/bookorbit.koplugin/ ./koreader-plugin/bookorbit.koplugin/
 
 RUN sed -i 's/\r$//' /app/entrypoint.sh /app/file-env.sh && chmod +x /app/entrypoint.sh /app/bin/kepubify/* && mkdir -p /books /data/covers /data/book-bucket /tmp && chown -R node:node /data /tmp

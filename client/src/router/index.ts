@@ -496,6 +496,17 @@ export const routes: RouteRecordRaw[] = [
             meta: { maxWidth: 'max-w-4xl', title: () => t('titles.admin.tts') },
           },
           {
+            path: 'admin/ai',
+            name: 'settings-admin-ai',
+            component: () => import('@/features/ai/AiAdminSettings.vue'),
+            meta: {
+              maxWidth: 'max-w-4xl',
+              requiredPermission: Permission.ManageAppSettings,
+              permissionFallback: 'settings-account-profile',
+              title: () => t('titles.admin.ai'),
+            },
+          },
+          {
             path: 'admin/book-dock',
             name: 'settings-admin-book-dock',
             component: () => import('@/features/settings/BookDockSettings.vue'),
@@ -671,6 +682,31 @@ export const routes: RouteRecordRaw[] = [
         meta: {
           title: (to) => fallbackById('titles.seriesItem', numericParam(to, 'seriesId')),
         },
+      },
+      {
+        path: '/ai',
+        component: () => import('@/features/ai/views/AiAreaView.vue'),
+        meta: { titleRow: true, requiredPermission: [Permission.ManageAppSettings, Permission.LibraryGenerateStoryGuide] },
+        children: [
+          { path: '', redirect: { name: 'ai-activity' } },
+          {
+            path: 'activity',
+            name: 'ai-activity',
+            component: () => import('@/features/ai/views/AiActivityView.vue'),
+            meta: { title: () => t('titles.aiActivity') },
+          },
+          {
+            path: 'story-guides',
+            name: 'ai-story-guides',
+            component: () => import('@/features/ai/views/AiStoryGuidesView.vue'),
+            meta: {
+              requiredPermission: Permission.ManageAppSettings,
+              permissionFallback: 'ai-activity',
+              title: () => t('titles.aiStoryGuides'),
+            },
+          },
+          { path: ':pathMatch(.*)*', redirect: { name: 'ai-activity' } },
+        ],
       },
       {
         path: '/tools',

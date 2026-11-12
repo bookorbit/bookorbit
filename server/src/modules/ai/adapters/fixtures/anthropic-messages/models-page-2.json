@@ -1,0 +1,19 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "data": [
+      {
+        "type": "model",
+        "id": "claude-haiku-5-5",
+        "display_name": "Claude Haiku 5.5",
+        "created_at": "2026-09-01T00:00:00Z"
+      }
+    ],
+    "has_more": false,
+    "first_id": "claude-haiku-5-5",
+    "last_id": "claude-haiku-5-5"
+  }
+}

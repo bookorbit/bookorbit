@@ -1,12 +1,12 @@
 {
-  "totalRoutes": 691,
+  "totalRoutes": 723,
   "byPermission": {
-    "(none)": 270,
+    "(none)": 273,
     "Permission.ManageMetadataConfig": 47,
     "Permission.EmailSend": 34,
     "Permission.LibraryEditMetadata": 60,
     "Permission.BookDockAccess": 17,
-    "Permission.ManageAppSettings": 65,
+    "Permission.ManageAppSettings": 88,
     "Permission.ManageLibraries": 33,
     "Permission.ManageUsers": 18,
     "Permission.ManageEmail": 8,
@@ -30,7 +30,8 @@
     "Permission.BookRequestSelfFulfill": 12,
     "Permission.LibraryGenerateReadAloud": 10,
     "Permission.LibraryMergeBooks": 15,
-    "Permission.ApiKeys": 2
+    "Permission.ApiKeys": 2,
+    "Permission.LibraryGenerateStoryGuide": 8
   },
   "byLibraryAccess": {
     "'viewer'": 6,

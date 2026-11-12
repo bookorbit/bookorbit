@@ -5,6 +5,7 @@ import {
   Bell,
   BookMarked,
   BookOpen,
+  BrainCircuit,
   Database,
   DownloadCloud,
   FileText,
@@ -535,6 +536,15 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         descriptionKey: 'settings.nav.descriptions.adminTts',
         icon: Speech,
         keywords: 'tts text to speech provider voice engine openai kokoro',
+        isVisible: anyPermission('manage_app_settings'),
+      },
+      {
+        id: 'admin-ai',
+        routeName: 'settings-admin-ai',
+        labelKey: 'settings.admin.tabs.ai',
+        descriptionKey: 'settings.nav.descriptions.adminAi',
+        icon: BrainCircuit,
+        keywords: 'ai llm model provider openai anthropic gemini openrouter ollama budget story guides constellations',
         isVisible: anyPermission('manage_app_settings'),
       },
       {

@@ -1,11 +1,13 @@
 import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 
-import { SERVER_FEATURES, type AppInfoResponse } from '@bookorbit/types';
+import { SERVER_FEATURES, type AppInfoResponse, type StoryGuidesAppInfo, type VisionScanAppInfo } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { ServerIdentityService } from '../server-identity/server-identity.service';
+import { StoryGuidesService } from '../story-guides/story-guides.service';
+import { VisionScanService } from '../vision-scan/vision-scan.service';
 import { GITHUB_RELEASES_API, SEMVER_RE, UPDATE_CHECK_TIMEOUT_MS } from './app-info.constants';
 
 @Injectable()
@@ -19,6 +21,8 @@ export class AppInfoService implements OnApplicationBootstrap {
     private readonly config: ConfigService,
     private readonly appSettingsService: AppSettingsService,
     private readonly identity: ServerIdentityService,
+    private readonly storyGuides: StoryGuidesService,
+    private readonly visionScan: VisionScanService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -45,7 +49,7 @@ export class AppInfoService implements OnApplicationBootstrap {
     }
 
     const maxUploadSizeMb = await this.appSettingsService.getMaxUploadSizeMb();
-    const instanceId = await this.instanceId();
+    const [instanceId, storyGuides, visionScan] = await Promise.all([this.instanceId(), this.storyGuidesInfo(), this.visionScanInfo()]);
 
     return {
       ...(instanceId ? { instanceId } : {}),
@@ -54,7 +58,33 @@ export class AppInfoService implements OnApplicationBootstrap {
       latestVersion: this.latestVersion,
       maxUploadSizeMb,
       features: [...SERVER_FEATURES],
+      ...(storyGuides ? { storyGuides } : {}),
+      ...(visionScan ? { visionScan } : {}),
     };
+  }
+
+  /** A failure omits the field, and the app then relies on the `story-guides` feature alone. */
+  private async storyGuidesInfo(): Promise<StoryGuidesAppInfo | undefined> {
+    try {
+      return await this.storyGuides.appInfo();
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[app-info.story_guides] [fail] errorClass=${errorClass} error="${sanitizeLogValue(message)}" - omitting storyGuides`);
+      return undefined;
+    }
+  }
+
+  /** A failure omits the field, which the app reads as photo scans being off. */
+  private async visionScanInfo(): Promise<VisionScanAppInfo | undefined> {
+    try {
+      return await this.visionScan.appInfo();
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.constructor.name : 'UnknownError';
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[app-info.vision_scan] [fail] errorClass=${errorClass} error="${sanitizeLogValue(message)}" - omitting visionScan`);
+      return undefined;
+    }
   }
 
   /** Clients detect features through app-info, so an identity failure omits only the identity. */

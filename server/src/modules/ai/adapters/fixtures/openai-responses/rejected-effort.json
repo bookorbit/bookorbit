@@ -1,0 +1,14 @@
+{
+  "status": 400,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "Unsupported parameter: 'reasoning.effort' is not supported with this model.",
+      "type": "invalid_request_error",
+      "param": "reasoning.effort",
+      "code": "unsupported_parameter"
+    }
+  }
+}

@@ -190,6 +190,7 @@ Full documentation lives at **[bookorbit.app](https://bookorbit.app/what-is-book
 **Guides**
 
 - **Book requests**: indexers, download clients, path mappings, automation and the encryption key they need. See the [book requests guide](https://bookorbit.app/book-requests/).
+- **AI providers**: connect OpenAI, Anthropic, Gemini, OpenRouter, a proxy or a local runner for AI features such as story guides, and the `AI_ENCRYPTION_KEY` that keeps provider keys encrypted. See [docs/AI_PROVIDERS.md](docs/AI_PROVIDERS.md).
 - **Read-aloud**: optional STAlign generation and QuartzNet hardware acceleration. See [docs/READ_ALOUD.md](docs/READ_ALOUD.md).
 - **API keys**: script and automation access with read-only, permission and library limits. See [docs/API_KEYS.md](docs/API_KEYS.md).
 - **External metadata providers**: add a source that runs beside BookOrbit, such as FantLab or MangaBaka, with [docs/METADATA_PROVIDERS.md](docs/METADATA_PROVIDERS.md), or build your own with [docs/BUILDING_METADATA_PROVIDERS.md](docs/BUILDING_METADATA_PROVIDERS.md).

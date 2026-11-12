@@ -37,6 +37,8 @@ function makeContext(
     outstandingRequestTotal: number
     outstandingRequestLabel: string
     browseCounts: BrowseCounts | null
+    storyGuidesBuilding: boolean
+    storyGuidesServed: boolean
   }> = {},
 ) {
   const permissions = overrides.permissions ?? []
@@ -48,6 +50,8 @@ function makeContext(
     outstandingRequestTotal: overrides.outstandingRequestTotal ?? 0,
     outstandingRequestLabel: overrides.outstandingRequestLabel ?? '',
     browseCounts: overrides.browseCounts ?? null,
+    storyGuidesBuilding: overrides.storyGuidesBuilding,
+    storyGuidesServed: overrides.storyGuidesServed,
   }
 }
 
@@ -74,10 +78,33 @@ describe('sidebar nav registry', () => {
     expect(allowedIds(makeContext())).toEqual(['dashboard', 'statistics', 'reading-history', 'achievements', 'authors', 'series', 'annotations'])
   })
 
-  it('places Dashboard, Book Dock, Requests and Tools in the primary zone, above the entity sections', () => {
+  it('places Dashboard, Book Dock, Requests, Tools and AI in the primary zone, above the entity sections', () => {
     const primary = SIDEBAR_NAV_REGISTRY.filter((candidate) => candidate.zone === 'primary').map((candidate) => candidate.id)
 
-    expect(primary).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools'])
+    expect(primary).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools', 'ai'])
+  })
+
+  it('hides AI from settings managers until story guides are building or exist', () => {
+    const manager = ['manage_app_settings']
+
+    expect(allowedIds(makeContext({ permissions: manager }))).not.toContain('ai')
+    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: false, storyGuidesServed: false }))).not.toContain('ai')
+    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: true }))).toContain('ai')
+    expect(allowedIds(makeContext({ permissions: manager, storyGuidesServed: true }))).toContain('ai')
+  })
+
+  it('shows AI to builders only while the server builds story guides', () => {
+    const builder = ['library_generate_story_guide']
+
+    expect(allowedIds(makeContext({ permissions: builder }))).not.toContain('ai')
+    expect(allowedIds(makeContext({ permissions: builder, storyGuidesServed: true }))).not.toContain('ai')
+    expect(allowedIds(makeContext({ permissions: builder, storyGuidesBuilding: true }))).toContain('ai')
+  })
+
+  it('never shows AI without either permission, and keeps it lit on every AI route', () => {
+    expect(allowedIds(makeContext({ storyGuidesBuilding: true, storyGuidesServed: true }))).not.toContain('ai')
+    expect(entry('ai').isActive(makeRoute('ai-activity'))).toBe(true)
+    expect(entry('ai').isActive(makeRoute('ai-story-guides'))).toBe(true)
   })
 
   it('groups Statistics, History, Achievements and Annotations in the Reading zone', () => {

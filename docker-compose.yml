@@ -6,6 +6,8 @@ services:
     image: ${APP_IMAGE?required}
     restart: unless-stopped
     init: true
+    # Optional secrets such as EMAIL_ENCRYPTION_KEY, BOOK_REQUEST_ENCRYPTION_KEY and AI_ENCRYPTION_KEY
+    # (needed before an AI provider key can be saved) reach the app from .env through env_file.
     env_file:
       - .env
     ports:

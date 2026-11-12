@@ -68,6 +68,11 @@ export class AppAttestService {
     private readonly store: AppAttestStore,
   ) {}
 
+  /** Outside production, a route marked for it accepts a request that carries no assertion. */
+  acceptsUnsigned(): boolean {
+    return this.policy.acceptUnsigned === true;
+  }
+
   issueChallenge(user: RequestUser): { challenge: string; expiresAt: string } {
     const challenge = randomBytes(32).toString('base64url');
     const expiresAt = this.store.addChallenge(challenge, user.id);

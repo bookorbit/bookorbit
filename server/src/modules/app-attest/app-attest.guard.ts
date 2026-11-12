@@ -1,9 +1,21 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Injectable, type RawBodyRequest, UseGuards } from '@nestjs/common';
+import {
+  applyDecorators,
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Injectable,
+  type RawBodyRequest,
+  SetMetadata,
+  UseGuards,
+} from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { FastifyRequest } from 'fastify';
 
 import { apiKeyCredentialOf, type RequestUser } from '../../common/types/request-user';
 import { hasInjectedEmptyBody } from '../../common/utils/bootstrap.utils';
-import { AppAttestService } from './app-attest.service';
+import { APP_ATTEST_HEADERS, AppAttestService } from './app-attest.service';
+
+export const APP_ATTEST_UNSIGNED_KEY = 'appAttest:unsignedOutsideProduction';
 
 /**
  * Runs after the global JWT guard, so the assertion is always checked against an authenticated user.
@@ -12,7 +24,10 @@ import { AppAttestService } from './app-attest.service';
  */
 @Injectable()
 export class AppAttestGuard implements CanActivate {
-  constructor(private readonly appAttest: AppAttestService) {}
+  constructor(
+    private readonly appAttest: AppAttestService,
+    private readonly reflector: Reflector = new Reflector(),
+  ) {}
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest<RawBodyRequest<FastifyRequest> & { user: RequestUser }>();
@@ -20,6 +35,7 @@ export class AppAttestGuard implements CanActivate {
     if (apiKeyCredentialOf(request.user)) {
       throw new ForbiddenException({ message: 'API keys cannot use this route', errorCode: 'API_KEY_ROUTE_FORBIDDEN' });
     }
+    if (this.acceptsUnsigned(context) && !carriesAssertion(request.headers)) return true;
     this.appAttest.verifyRequest(request.user, {
       method: request.method,
       url: request.url,
@@ -28,6 +44,16 @@ export class AppAttestGuard implements CanActivate {
     });
     return true;
   }
+
+  private acceptsUnsigned(context: ExecutionContext): boolean {
+    const marked = this.reflector.getAllAndOverride<boolean | undefined>(APP_ATTEST_UNSIGNED_KEY, [context.getHandler(), context.getClass()]);
+    return marked === true && this.appAttest.acceptsUnsigned();
+  }
+}
+
+/** Any of the assertion headers: a request that sends one is verified, wherever it runs. */
+function carriesAssertion(headers: FastifyRequest['headers']): boolean {
+  return Object.values(APP_ATTEST_HEADERS).some((name) => headers[name] !== undefined);
 }
 
 function rawBodyOf(request: RawBodyRequest<FastifyRequest>): Buffer | null {
@@ -37,4 +63,15 @@ function rawBodyOf(request: RawBodyRequest<FastifyRequest>): Buffer | null {
   return declared ? null : Buffer.alloc(0);
 }
 
-export const RequireAppAttest = () => UseGuards(AppAttestGuard);
+export interface RequireAppAttestOptions {
+  /**
+   * Outside production, also accept a request with no assertion headers. A request that carries any
+   * of them is verified as usual.
+   */
+  unsignedOutsideProduction?: boolean;
+}
+
+export const RequireAppAttest = (options: RequireAppAttestOptions = {}) =>
+  options.unsignedOutsideProduction
+    ? applyDecorators(SetMetadata(APP_ATTEST_UNSIGNED_KEY, true), UseGuards(AppAttestGuard))
+    : UseGuards(AppAttestGuard);

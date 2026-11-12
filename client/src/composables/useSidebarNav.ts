@@ -1,13 +1,14 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
-import { BarChart3, BookPlus, Highlighter, History, LayoutDashboard, Library, PackageOpen, Trophy, Users, Wrench } from '@lucide/vue'
+import { BarChart3, BookPlus, Highlighter, History, LayoutDashboard, Library, PackageOpen, Sparkles, Trophy, Users, Wrench } from '@lucide/vue'
 import { Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import { useBrowseCounts } from '@/composables/useBrowseCounts'
 import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
+import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
 /** `primary` is pinned on top; useSidebarLayout places the others among the list sections in the user's order. */
 export const SIDEBAR_ZONE_IDS = ['primary', 'browse', 'reading'] as const
@@ -21,6 +22,10 @@ interface NavContext {
   outstandingRequestTotal: number
   outstandingRequestLabel: string
   browseCounts: BrowseCounts | null
+  /** The server builds story guides now: the AI area has something to show those who may build. */
+  storyGuidesBuilding?: boolean
+  /** A story guide exists, so a settings manager still has the AI area to manage after building is switched off. */
+  storyGuidesServed?: boolean
 }
 
 export interface SidebarNavBadge {
@@ -166,6 +171,17 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     permission: ['manage_libraries', 'library_delete_books', 'library_merge_books', 'library_edit_metadata'],
   },
   {
+    id: 'ai',
+    labelKey: 'aiArea.title',
+    icon: Sparkles,
+    zone: 'primary',
+    to: { name: 'ai-activity' },
+    isActive: (route) => routeNameStartsWith(route, 'ai-'),
+    permission: [Permission.ManageAppSettings, Permission.LibraryGenerateStoryGuide],
+    visible: (context) =>
+      context.storyGuidesBuilding === true || (context.hasPermission(Permission.ManageAppSettings) && context.storyGuidesServed === true),
+  },
+  {
     id: 'authors',
     labelKey: 'components.sidebar.authors',
     icon: Users,
@@ -223,6 +239,7 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
   const { summary: bookDockSummary } = useBookDockSummary()
   const { counts: browseCounts } = useBrowseCounts()
   const { showBookRequests } = useBookRequestVisibility()
+  const { storyGuides } = useAppInfo()
 
   const context = computed<NavContext>(() => {
     const outstandingRequestTotal = getOutstandingRequestTotal()
@@ -238,6 +255,8 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
       outstandingRequestTotal,
       outstandingRequestLabel: t(outstandingRequestLabelKey, { count: outstandingRequestTotal }),
       browseCounts: browseCounts.value,
+      storyGuidesBuilding: storyGuides.value?.building === true,
+      storyGuidesServed: storyGuides.value?.served === true,
     }
   })
 

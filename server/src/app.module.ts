@@ -6,6 +6,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import {
+  aiConfig,
   appConfig,
   audiolessEpubConfig,
   audioToolsConfig,
@@ -103,6 +104,7 @@ import { AudiobookModule } from './modules/audiobook/audiobook.module';
 import { ChapterEditorModule } from './modules/chapter-editor/chapter-editor.module';
 import { ChapterHealthModule } from './modules/chapter-health/chapter-health.module';
 import { TtsModule } from './modules/tts/tts.module';
+import { AiModule } from './modules/ai/ai.module';
 import { SearchModule } from './modules/search/search.module';
 import { WatchDownloadModule } from './modules/watch-download/watch-download.module';
 import { AppAttestModule } from './modules/app-attest/app-attest.module';
@@ -110,7 +112,9 @@ import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
 import { PageLocatorModule } from './modules/page-locator/page-locator.module';
 import { YearReviewModule } from './modules/year-review/year-review.module';
 import { VisualMatchModule } from './modules/visual-match/visual-match.module';
+import { VisionScanModule } from './modules/vision-scan/vision-scan.module';
 import { StoryEditsModule } from './modules/story-edits/story-edits.module';
+import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
 
 @Module({
   imports: [
@@ -128,6 +132,7 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
         emailConfig,
         migrationConfig,
         bookRequestConfig,
+        aiConfig,
         oidcRuntimeConfig,
         audiolessEpubConfig,
         djvuConfig,
@@ -223,6 +228,7 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
     BookLinkModule,
     BrowseCountsModule,
     TtsModule,
+    AiModule,
     SearchModule,
     WatchDownloadModule,
     AppAttestModule,
@@ -230,7 +236,9 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
     PageLocatorModule,
     YearReviewModule,
     VisualMatchModule,
+    VisionScanModule,
     StoryEditsModule,
+    StoryGuidesModule,
   ],
   providers: [
     // Before the audit interceptor, so an audited route records the book the request now lands on.

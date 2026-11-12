@@ -105,6 +105,14 @@ describe('AppSettingsService', () => {
       await expect(service.update(key, 'anything')).rejects.toThrow(BadRequestException);
       expect(repo.updateByKey).not.toHaveBeenCalled();
     });
+
+    it.each(['ai.slots', 'ai.features', 'ai.budget', 'ai.privacy', 'ai.slot_health'])(
+      'rejects %s so it cannot bypass the AI settings validation',
+      async (key) => {
+        await expect(service.update(key, '{}')).rejects.toThrow(BadRequestException);
+        expect(repo.updateByKey).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('API key settings', () => {

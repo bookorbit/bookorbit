@@ -89,6 +89,7 @@ import StorygraphBookSyncGridItem from '@/features/storygraph/components/Storygr
 import BookEditionsCard, { type EditionProgress } from '@/features/book/components/detail/details/BookEditionsCard.vue'
 import BookReadingActivityCard from '@/features/book/components/detail/details/BookReadingActivityCard.vue'
 import ReadAloudSyncMeter from '@/features/book/components/detail/details/ReadAloudSyncMeter.vue'
+import StoryGuideCard from '@/features/story-guide/components/StoryGuideCard.vue'
 import BookMissingFormatRequest from '@/features/book-requests/components/BookMissingFormatRequest.vue'
 import { useBookReadingLog } from '@/features/book/composables/useBookReadingLog'
 import { useProviderLinkSettings } from '@/features/book/composables/useProviderLinkSettings'
@@ -2387,6 +2388,8 @@ watch(
           <BookMissingFormatRequest :book="book" />
         </template>
       </BookEditionsCard>
+
+      <StoryGuideCard :book-id="book.id" />
 
       <div v-if="filledCustomMetadata.length > 0" class="mt-6 pt-5 border-t border-border">
         <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.customMetadata') }}</p>

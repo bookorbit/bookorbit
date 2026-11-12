@@ -45,6 +45,11 @@ export interface AppAttestPolicy {
   appIds: readonly string[];
   allowDevelopment: boolean;
   trustedRoots: readonly string[];
+  /**
+   * Whether a route marked for it also accepts a request with no assertion at all. Never on a
+   * production server.
+   */
+  acceptUnsigned?: boolean;
 }
 
 export function appAttestPolicy(nodeEnv: string): AppAttestPolicy {
@@ -53,5 +58,6 @@ export function appAttestPolicy(nodeEnv: string): AppAttestPolicy {
     // Development attestations come only from builds our team signs; production refuses them anyway.
     allowDevelopment: nodeEnv !== 'production',
     trustedRoots: [APPLE_APP_ATTESTATION_ROOT_CA],
+    acceptUnsigned: nodeEnv !== 'production',
   };
 }

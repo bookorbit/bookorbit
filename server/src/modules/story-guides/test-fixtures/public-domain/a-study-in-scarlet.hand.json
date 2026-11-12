@@ -1,0 +1,240 @@
+[
+  {
+    "a": "Dr. Watson",
+    "type": "member_of",
+    "b": "Fifth Northumberland Fusiliers",
+    "quote": "the Fifth Northumberland Fusiliers as Assistant Surgeon",
+    "at": 261
+  },
+  {
+    "a": "Dr. Watson",
+    "type": "member_of",
+    "b": "Berkshires",
+    "quote": "Berkshires, with whom I served",
+    "at": 915
+  },
+  {
+    "a": "Murray",
+    "type": "works_for",
+    "b": "Dr. Watson",
+    "quote": "Murray, my\norderly",
+    "at": 1206
+  },
+  {
+    "a": "Stamford",
+    "type": "works_for",
+    "b": "Barts",
+    "quote": "who had been a dresser under me at Barts",
+    "at": 3217
+  },
+  {
+    "a": "Dr. Watson",
+    "type": "works_for",
+    "b": "Barts",
+    "quote": "who had been a dresser under me at Barts",
+    "at": 3217
+  },
+  {
+    "a": "Dr. Watson",
+    "type": "lives_at",
+    "b": "221B, Baker Street",
+    "quote": "That very evening I moved my things round from",
+    "at": 15797
+  },
+  {
+    "a": "Sherlock Holmes",
+    "type": "lives_at",
+    "b": "221B, Baker Street",
+    "quote": "on the following morning Sherlock Holmes followed me with",
+    "at": 15859
+  },
+  {
+    "a": "Dr. Watson",
+    "type": "friend_of",
+    "b": "Sherlock Holmes",
+    "quote": "handing my\nfriend the letter",
+    "at": 34592
+  },
+  {
+    "a": "Enoch J. Drebber",
+    "type": "lives_at",
+    "b": "Cleveland",
+    "quote": "Enoch J. Drebber, Cleveland, Ohio, U.S.A.",
+    "at": 37721
+  },
+  {
+    "a": "Tobias Gregson",
+    "type": "works_for",
+    "b": "Scotland Yard",
+    "quote": "Gregson is the smartest of the Scotland Yarders",
+    "at": 38340
+  },
+  {
+    "a": "John Rance",
+    "type": "lives_at",
+    "b": "46, Audley Court, Kennington Park Gate",
+    "quote": "You will find him at 46, Audley Court, Kennington Park Gate.",
+    "at": 55207
+  },
+  {
+    "a": "Tobias Gregson",
+    "type": "rival_of",
+    "b": "Lestrade",
+    "quote": "leaving the two rivals open-mouthed",
+    "at": 56370
+  },
+  {
+    "a": "Keswick",
+    "type": "owns",
+    "b": "13, Duncan Street, Houndsditch",
+    "quote": "the house belonged to a\nrespectable paperhanger, named Keswick",
+    "at": 82338
+  },
+  {
+    "a": "Enoch J. Drebber",
+    "type": "lives_at",
+    "b": "Charpentier’s Boarding Establishment",
+    "quote": "He had stayed at the boarding-house of Madame Charpentier",
+    "at": 84928
+  },
+  {
+    "a": "Madame Charpentier",
+    "type": "owns",
+    "b": "Charpentier’s Boarding Establishment",
+    "quote": "the boarding-house of Madame Charpentier",
+    "at": 84945
+  },
+  {
+    "a": "Joseph Stangerson",
+    "type": "works_for",
+    "b": "Enoch J. Drebber",
+    "quote": "his private\nsecretary, Mr. Joseph Stangerson",
+    "at": 85056
+  },
+  {
+    "a": "Joseph Stangerson",
+    "type": "lives_at",
+    "b": "Charpentier’s Boarding Establishment",
+    "quote": "The two bade adieu to their landlady",
+    "at": 85102
+  },
+  {
+    "a": "Lestrade",
+    "type": "works_for",
+    "b": "Scotland Yard",
+    "quote": "Mr. Lestrade and Mr. Gregson, of Scotland Yard",
+    "at": 85632
+  },
+  {
+    "a": "Wiggins",
+    "type": "member_of",
+    "b": "Baker Street division of the detective police force",
+    "quote": "Wiggins alone to report, and the rest of you",
+    "at": 87711
+  },
+  {
+    "a": "Wiggins",
+    "type": "works_for",
+    "b": "Sherlock Holmes",
+    "quote": "you are employing them",
+    "at": 88514
+  },
+  {
+    "a": "Arthur Charpentier",
+    "type": "member_of",
+    "b": "Her Majesty’s navy",
+    "quote": "Arthur Charpentier, sub-lieutenant in Her Majesty’s navy",
+    "at": 89342
+  },
+  {
+    "a": "Underwood",
+    "type": "works_for",
+    "b": "John Underwood and Sons",
+    "quote": "I went to Underwood, and asked him if he had sold a hat",
+    "at": 91400
+  },
+  {
+    "a": "Madame Charpentier",
+    "type": "lives_at",
+    "b": "Charpentier’s Boarding Establishment",
+    "quote": "leave your house for the train",
+    "at": 92434
+  },
+  {
+    "a": "Arthur Charpentier",
+    "type": "sibling_of",
+    "b": "Alice",
+    "quote": "You have murdered your brother.",
+    "at": 93263
+  },
+  {
+    "a": "Madame Charpentier",
+    "type": "parent_of",
+    "b": "Alice",
+    "quote": "‘On your head be it, Alice!’ cried her mother",
+    "at": 93510
+  },
+  {
+    "a": "Madame Charpentier",
+    "type": "parent_of",
+    "b": "Arthur Charpentier",
+    "quote": "my son Arthur came into the room",
+    "at": 97033
+  },
+  {
+    "a": "Joseph Stangerson",
+    "type": "lives_at",
+    "b": "Halliday’s Private Hotel",
+    "quote": "whether a Mr. Stangerson was living there",
+    "at": 103543
+  },
+  {
+    "a": "Lucy Ferrier",
+    "type": "sibling_of",
+    "b": "Bob",
+    "quote": "to brother Bob",
+    "at": 126072
+  },
+  {
+    "a": "Brother Stangerson",
+    "type": "member_of",
+    "b": "Mormons",
+    "quote": "Shall I go forward and see, Brother Stangerson",
+    "at": 133395
+  },
+  {
+    "a": "John Ferrier",
+    "type": "parent_of",
+    "b": "Lucy Ferrier",
+    "quote": "She’s Lucy Ferrier from this day on.",
+    "at": 136326
+  },
+  {
+    "a": "Brother Stangerson",
+    "type": "teaches",
+    "b": "John Ferrier",
+    "quote": "Let it be your task also to teach him our holy creed",
+    "at": 139112
+  },
+  {
+    "a": "John Ferrier",
+    "type": "member_of",
+    "b": "Mormons",
+    "quote": "now and for ever you are of our\nreligion",
+    "at": 139786
+  },
+  {
+    "a": "Lucy Ferrier",
+    "type": "member_of",
+    "b": "Mormons",
+    "quote": "now and for ever you are of our\nreligion",
+    "at": 139786
+  },
+  {
+    "a": "Brigham Young",
+    "type": "member_of",
+    "b": "Mormons",
+    "quote": "Brigham Young has said it",
+    "at": 139828
+  }
+]

@@ -21,6 +21,7 @@ import {
 import { StatsCache } from '../../common/cache/stats-cache';
 import { storageConfig } from '../../config/config';
 import {
+  AI_MANAGED_SETTING_PREFIX,
   API_KEY_MANAGED_SETTING_KEYS,
   APP_SETTING_KEYS,
   BOOK_DOCK_MANAGED_SETTING_KEYS,
@@ -96,6 +97,9 @@ export class AppSettingsService {
     }
     if (API_KEY_MANAGED_SETTING_KEYS.includes(key)) {
       throw new BadRequestException(`Setting '${key}' is managed by the API key settings endpoint and cannot be written here`);
+    }
+    if (key.startsWith(AI_MANAGED_SETTING_PREFIX)) {
+      throw new BadRequestException(`Setting '${key}' is managed by the AI settings endpoints and cannot be written here`);
     }
     if (key === APP_SETTING_KEYS.MAX_UPLOAD_SIZE_MB) {
       const parsed = parseInt(value, 10);

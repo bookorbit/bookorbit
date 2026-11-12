@@ -17,13 +17,22 @@ export class ApiError extends Error {
   readonly errorCode: string | null
   /** The server's untranslated text. Useful in a log line, never in the interface. */
   readonly serverMessage: string | null
+  /** The code's plain number and string details, for a caller that words the failure itself. */
+  readonly errorMeta: Record<string, string | number>
 
-  constructor(message: string, status: number, errorCode: string | null, serverMessage: string | null) {
+  constructor(
+    message: string,
+    status: number,
+    errorCode: string | null,
+    serverMessage: string | null,
+    errorMeta: Record<string, string | number> = {},
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.errorCode = errorCode
     this.serverMessage = serverMessage
+    this.errorMeta = errorMeta
   }
 }
 
@@ -32,7 +41,13 @@ export async function apiError(response: Response, fallbackKey: string): Promise
   const body = (await response.json().catch(() => null)) as ApiErrorBody | null
   const errorCode = typeof body?.errorCode === 'string' ? body.errorCode : null
   const serverMessage = typeof body?.message === 'string' && body.message.trim() ? body.message : null
-  return new ApiError(translateErrorCode(errorCode, body?.errorMeta) ?? i18n.global.t(fallbackKey), response.status, errorCode, serverMessage)
+  return new ApiError(
+    translateErrorCode(errorCode, body?.errorMeta) ?? i18n.global.t(fallbackKey),
+    response.status,
+    errorCode,
+    serverMessage,
+    errorCode ? messageParams(body?.errorMeta) : {},
+  )
 }
 
 function translateErrorCode(errorCode: string | null, errorMeta: unknown): string | null {
