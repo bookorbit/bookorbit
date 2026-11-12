@@ -87,7 +87,7 @@ watch(
 
 <template>
   <footer
-    class="fixed bottom-0 left-0 right-0 h-10 sm:h-11 z-50 flex items-center gap-2 px-2 sm:gap-3 sm:px-4 bg-background/90 backdrop-blur-md border-t border-border"
+    class="fixed bottom-0 left-0 right-0 h-[calc(2.5rem+env(safe-area-inset-bottom,0px))] sm:h-[calc(2.75rem+env(safe-area-inset-bottom,0px))] z-50 flex items-center gap-2 pb-[env(safe-area-inset-bottom,0px)] pl-[max(1rem,env(safe-area-inset-left,0px))] pr-[max(1rem,env(safe-area-inset-right,0px))] sm:gap-3 bg-background/90 backdrop-blur-md border-t border-border"
   >
     <Tooltip>
       <TooltipTrigger as-child>
