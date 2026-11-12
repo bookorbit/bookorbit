@@ -930,7 +930,8 @@ export class BookRequestService {
 
   /**
    * Stop, at any point before the request has settled. A request that is mid-download is stopped
-   * at its transfer handler too. Torrent data is kept because an import may hardlink from it;
+   * at its transfer handler too. Torrent data is kept because an import may hardlink from it, and a
+   * torrent that already finished is left seeding unless the caller asked for its files to go;
    * partial direct-download staging has no reuse and is deleted.
    *
    * The removal is best-effort on purpose. A download client that is unreachable must not be the
@@ -1072,10 +1073,10 @@ export class BookRequestService {
    * who decided goes with them, which is why this is a moderator action and dismissal is what
    * everyone else gets.
    *
-   * A settled request can still own client state, especially a torrent that keeps seeding after
-   * import, so the attempt is detached first. Deleting the row before that would leave client work
-   * with nothing pointing at it. Torrent files require explicit deletion consent; direct-download
-   * staging is disposable.
+   * A settled request can still own client state, so the attempt is detached first: deleting the
+   * row before that would leave a running transfer with nothing pointing at it. A finished torrent
+   * is the exception. Without consent to delete its files it is left seeding, and the client, not
+   * BookOrbit, owns it from then on. Direct-download staging is disposable.
    */
   async remove(id: number, user: RequestUser, deleteFiles = false): Promise<void> {
     const joined = await this.repo.findById(id);
@@ -1334,7 +1335,8 @@ export class BookRequestService {
     }
 
     // Before the transition, like cancel and delete: the person has the book already, so a transfer
-    // still running is work nothing will ever use. Detaching it after the row settled would leave
+    // still running is work nothing will ever use. A finished torrent is a seed, not unused work,
+    // and the removal leaves it in the client. Detaching after the row settled would leave
     // a window where the poll loop still owns an attempt against a filed request; leaving it out
     // altogether, as this used to, left a mid-download torrent running in the client with nothing
     // in BookOrbit pointing at it. Best-effort, so a client that is down cannot block the filing.

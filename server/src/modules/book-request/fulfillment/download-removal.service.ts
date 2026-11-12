@@ -2,7 +2,8 @@ import { rm } from 'node:fs/promises';
 
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
+import { DELIVERY_BY_DOWNLOAD_SOURCE, IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
+import type { BookRequestDownloadStatus } from '@bookorbit/types';
 
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
@@ -12,8 +13,11 @@ import { legacyStagedClientDir, stagedClientDir } from '../download-clients/down
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DirectDownloadService } from './direct-download.service';
 
+/** Statuses an attempt only reaches once the client holds every byte of it. */
+const FINISHED_DOWNLOAD_STATUSES: readonly BookRequestDownloadStatus[] = ['completed', 'importing', 'needs_review', 'imported'];
+
 export interface DownloadRemovalOutcome {
-  /** True when a download was actually handed to the client. False when there was nothing to remove. */
+  /** True when a download was actually handed to the client. False when there was nothing to remove, or a finished torrent was left seeding. */
   removed: boolean;
   /** The client's refusal, when it had one. Best-effort callers report it; strict callers throw. */
   error: string | null;
@@ -65,8 +69,10 @@ export class DownloadRemovalService {
     if (!download || (download.source !== 'direct_url' && download.downloadClientId === null)) return { removed: false, error: null };
 
     let error: string | null = null;
+    let kept = false;
     try {
-      await this.detach(download, deleteFiles);
+      kept = await this.keepsSeed(download, deleteFiles);
+      if (!kept) await this.detach(download, deleteFiles);
     } catch (caught: unknown) {
       error = caught instanceof Error ? caught.message : String(caught);
       this.logger.warn(
@@ -80,9 +86,13 @@ export class DownloadRemovalService {
     // row, and the monitor would go on asking the client about it forever.
     await this.failIfInFlight(
       download,
-      error ? `Removed by ${actor}, but the download client refused: ${error}` : `Removed from the download client by ${actor}`,
+      error
+        ? `Removed by ${actor}, but the download client refused: ${error}`
+        : kept
+          ? `Stopped by ${actor}; the finished torrent was left seeding in the download client`
+          : `Removed from the download client by ${actor}`,
     );
-    return { removed: error === null, error };
+    return { removed: !kept && error === null, error };
   }
 
   /**
@@ -95,7 +105,7 @@ export class DownloadRemovalService {
    */
   async detachAttempt(download: BookRequestDownloadRow, deleteFiles: boolean): Promise<string | null> {
     try {
-      await this.detach(download, deleteFiles);
+      if (!(await this.keepsSeed(download, deleteFiles))) await this.detach(download, deleteFiles);
       return null;
     } catch (caught: unknown) {
       const error = caught instanceof Error ? caught.message : String(caught);
@@ -140,6 +150,26 @@ export class DownloadRemovalService {
         `[book_request.staging_cleanup] [fail] requestId=${download.requestId} downloadId=${download.id} errorClass=${(error as Error)?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(message)}" - staged client download files were left on disk`,
       );
     }
+  }
+
+  /**
+   * A finished torrent is a seed, and settling the request it was grabbed for is no reason to stop
+   * it: the files stay either way, and pulling the torrent from under them turns a private-tracker
+   * grab into a hit-and-run. The client already holds the seed goals it was added with, so it
+   * decides when seeding is done. Only an explicit removal, or consent to delete the files, takes
+   * a finished torrent out. A cloud client that stages locally is left to `detach`, which already
+   * keeps its remote copy and is what clears the local staging.
+   */
+  private async keepsSeed(download: BookRequestDownloadRow, deleteFiles: boolean): Promise<boolean> {
+    if (deleteFiles || download.clientKey === null || download.downloadClientId === null) return false;
+    if (DELIVERY_BY_DOWNLOAD_SOURCE[download.source] !== 'torrent') return false;
+    if (download.completedAt === null && !FINISHED_DOWNLOAD_STATUSES.includes(download.status as BookRequestDownloadStatus)) return false;
+    if (await this.clients.stagesLocally(download.downloadClientId)) return false;
+
+    this.logger.log(
+      `[book_request.remove_download] [end] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId} source=${download.source} kept=true - finished torrent left seeding`,
+    );
+    return true;
   }
 
   /** A direct file is ours to drop; a torrent is detached from the client that holds it. */
