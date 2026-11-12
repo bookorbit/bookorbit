@@ -174,7 +174,10 @@ export type AnnotationHubGroupMode = (typeof ANNOTATION_HUB_GROUP_MODES)[number]
 export interface AnnotationHubDeviceSummary {
   source: "koreader" | "kobo";
   deviceId: string;
+  /** The Kobo's name, or the name a user gave a KOReader device. */
   deviceName: string | null;
+  /** The model a KOReader device reports; null for Kobo. Optional because older servers omit it. */
+  deviceModel?: string | null;
   /** Annotations this device has a sync row for. */
   annotations: number;
   /** How many of those are behind the canonical version. */
@@ -267,7 +270,10 @@ export interface AnnotationPositionInfo {
 export interface AnnotationDeviceSyncInfo {
   source: "koreader" | "kobo";
   deviceId: string;
+  /** The Kobo's name, or the name a user gave a KOReader device. */
   deviceName: string | null;
+  /** The model a KOReader device reports; null for Kobo. Optional because older servers omit it. */
+  deviceModel?: string | null;
   lastAppliedVersion: number;
   upToDate: boolean;
   deleteAckedAt: string | null;

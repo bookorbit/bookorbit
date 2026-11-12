@@ -54,6 +54,7 @@ const mockBookService = {
 };
 
 const mockUserStatistics = { invalidateUser: vi.fn() };
+const mockKoreaderDevices = { describeSessionDevices: vi.fn() };
 
 describe('ReadingSessionService', () => {
   let service: ReadingSessionService;
@@ -69,6 +70,7 @@ describe('ReadingSessionService', () => {
       mockBookService as unknown as BookService,
       { emit: vi.fn() } as never,
       mockUserStatistics as never,
+      mockKoreaderDevices as never,
     );
   });
 
@@ -256,6 +258,7 @@ function makeServiceExtended() {
     mockBookServiceExtended as unknown as BookService,
     { emit: vi.fn() } as never,
     mockUserStatistics as never,
+    mockKoreaderDevices as never,
   );
 }
 
@@ -263,6 +266,7 @@ describe('ReadingSessionService - listByBook', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockBookServiceExtended.verifyBookAccess.mockResolvedValue(undefined);
+    mockKoreaderDevices.describeSessionDevices.mockResolvedValue(new Map());
     vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
   });
@@ -275,13 +279,65 @@ describe('ReadingSessionService - listByBook', () => {
       pageSize: 25,
       stats: { totalSessions: 0, totalSeconds: 0, avgDurationSeconds: 0, firstSessionAt: null, lastSessionAt: null },
     };
-    mockRepoExtended.listByBook.mockResolvedValue(mockResult);
+    mockRepoExtended.listByBook.mockResolvedValue({ ...mockResult, koreaderSessionIds: new Map() });
 
     const svc = makeServiceExtended();
     const result = await svc.listByBook(10, makeUser({ id: 5 }), { page: 1, pageSize: 25, sortBy: 'startedAt', sortDir: 'desc' });
 
     expect(mockBookServiceExtended.verifyBookAccess).toHaveBeenCalledWith(10, expect.objectContaining({ id: 5 }));
-    expect(result).toBe(mockResult);
+    expect(result).toEqual(mockResult);
+  });
+
+  describe('session devices', () => {
+    const base = {
+      bookFileId: 42,
+      startedAt: '2026-04-15T10:00:00.000Z',
+      endedAt: '2026-04-15T10:30:00.000Z',
+      durationSeconds: 1800,
+      progressDelta: 1,
+      endProgress: 50,
+      format: 'epub',
+      attemptId: null,
+      sessionType: 'read' as const,
+    };
+    const page = {
+      items: [
+        { ...base, id: 1, source: 'koreader' as const },
+        { ...base, id: 2, source: 'web' as const },
+        { ...base, id: 3, source: 'koreader' as const },
+      ],
+      total: 3,
+      page: 1,
+      pageSize: 25,
+      stats: { totalSessions: 3 },
+      koreaderSessionIds: new Map([
+        [1, 'kor:v2-aaaa:42:1'],
+        [3, 'kor:old:42:2'],
+      ]),
+    };
+
+    it('labels each KOReader session with its device and leaves the rest without one', async () => {
+      const device = { deviceId: 'phone-1', model: 'husky', name: 'Pixel' };
+      mockRepoExtended.listByBook.mockResolvedValue(page);
+      mockKoreaderDevices.describeSessionDevices.mockResolvedValue(new Map([['kor:v2-aaaa:42:1', device]]));
+
+      const result = await makeServiceExtended().listByBook(10, makeUser({ id: 5 }), {});
+
+      expect(mockKoreaderDevices.describeSessionDevices).toHaveBeenCalledWith(5, ['kor:v2-aaaa:42:1', 'kor:old:42:2']);
+      expect(result.items.map((item) => item.device)).toEqual([device, null, null]);
+      expect(result).not.toHaveProperty('koreaderSessionIds');
+    });
+
+    it('still lists the sessions when their devices cannot be looked up', async () => {
+      mockRepoExtended.listByBook.mockResolvedValue(page);
+      mockKoreaderDevices.describeSessionDevices.mockRejectedValue(new Error('connection reset'));
+
+      const result = await makeServiceExtended().listByBook(10, makeUser({ id: 5 }), {});
+
+      expect(result.items.map((item) => item.id)).toEqual([1, 2, 3]);
+      expect(result.items.every((item) => item.device === null)).toBe(true);
+      expect(result.total).toBe(3);
+    });
   });
 
   it('rethrows when access check fails', async () => {
@@ -293,7 +349,7 @@ describe('ReadingSessionService - listByBook', () => {
 
   it('passes all query params to repo including optional dateFrom, dateTo, format', async () => {
     const emptyStats = { totalSessions: 0, totalSeconds: 0, avgDurationSeconds: 0, firstSessionAt: null, lastSessionAt: null, dailySummary: [] };
-    mockRepoExtended.listByBook.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 10, stats: emptyStats });
+    mockRepoExtended.listByBook.mockResolvedValue({ items: [], total: 0, page: 2, pageSize: 10, stats: emptyStats, koreaderSessionIds: new Map() });
 
     const svc = makeServiceExtended();
     await svc.listByBook(10, makeUser({ id: 5, settings: { timezone: 'Asia/Kolkata' } }), {
@@ -322,7 +378,7 @@ describe('ReadingSessionService - listByBook', () => {
 
   it('uses defaults when optional params are missing', async () => {
     const emptyStats = { totalSessions: 0, totalSeconds: 0, avgDurationSeconds: 0, firstSessionAt: null, lastSessionAt: null, dailySummary: [] };
-    mockRepoExtended.listByBook.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25, stats: emptyStats });
+    mockRepoExtended.listByBook.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 25, stats: emptyStats, koreaderSessionIds: new Map() });
 
     const svc = makeServiceExtended();
     await svc.listByBook(10, makeUser({ id: 5 }), {});
@@ -340,6 +396,7 @@ describe('ReadingSessionService - createManualSession', () => {
       mockBookServiceExtended as unknown as BookService,
       { emit: achievementEmit } as never,
       mockUserStatistics as never,
+      mockKoreaderDevices as never,
     );
   }
 
@@ -548,7 +605,13 @@ describe('ReadingSessionService - read status activity', () => {
     repo.saveSession.mockResolvedValue({ kind: 'saved' });
     bookService.verifyFileAccess.mockResolvedValue({ id: 6558, bookId: 2179, libraryId: 1 });
     bookService.autoUpdateReadStatusForProgress.mockResolvedValue(undefined);
-    service = new ReadingSessionService(repo as never, bookService as never, { emit: vi.fn() } as never, { invalidateUser: vi.fn() } as never);
+    service = new ReadingSessionService(
+      repo as never,
+      bookService as never,
+      { emit: vi.fn() } as never,
+      { invalidateUser: vi.fn() } as never,
+      mockKoreaderDevices as never,
+    );
   });
 
   async function saveFinishingSession(user: RequestUser) {

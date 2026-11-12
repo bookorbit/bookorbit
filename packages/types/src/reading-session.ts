@@ -25,6 +25,17 @@ export interface BookReadingSession {
   // How the session was spent: reading the text, listening to text to speech, or listening to
   // audio. Optional because servers before this field omit it; clients fall back to the format.
   sessionType?: ReadingSessionType;
+  // The KOReader device that recorded the session, when it can be told. Null for other sources,
+  // and optional because servers before this field omit it.
+  device?: BookReadingSessionDevice | null;
+}
+
+export interface BookReadingSessionDevice {
+  deviceId: string;
+  // The model the device reports, as the KOReader device settings list it.
+  model: string | null;
+  // The name the user gave the device.
+  name: string | null;
 }
 
 export interface BookReadingSourceSlice {

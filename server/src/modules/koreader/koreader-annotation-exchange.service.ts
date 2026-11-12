@@ -12,7 +12,7 @@ import { PositionConverterService } from '../position-converter/position-convert
 import type { AnnotationExchangeAckDto, AnnotationExchangeDto, AnnotationPendingDto, ExchangeBookDto } from './dto';
 import type { KoreaderAnnotationDto } from './dto';
 import { KoreaderRepository } from './koreader.repository';
-import { exchangeDeviceId } from './koreader-exchange-device';
+import { exchangeDeviceId } from '../../common/utils/koreader-exchange-device.utils';
 
 const EXCHANGE_EVENT = 'koreader.annotation_exchange';
 const ACK_EVENT = 'koreader.annotation_exchange_ack';

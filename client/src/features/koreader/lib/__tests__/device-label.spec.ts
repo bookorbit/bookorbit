@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { KOREADER_MODEL_NAMES, koreaderDeviceLabel, koreaderDeviceModelHint } from '../device-label'
+import { KOREADER_MODEL_NAMES, koreaderDeviceLabel, koreaderDeviceModelHint, koreaderOptionalDeviceLabel } from '../device-label'
 
 const pluginNamesPath = join(process.cwd(), '..', 'koreader-plugin', 'bookorbit.koplugin', 'bookorbit_device_names.lua')
 
@@ -34,6 +34,21 @@ describe('koreaderDeviceModelHint', () => {
     expect(koreaderDeviceModelHint('blazer', 'Pixel 8')).toBe('blazer')
     expect(koreaderDeviceModelHint('Kobo_monza')).toBe('Kobo_monza')
     expect(koreaderDeviceModelHint('blazer')).toBeNull()
+  })
+})
+
+describe('koreaderOptionalDeviceLabel', () => {
+  it('prefers the given name, then the retail name, then the model', () => {
+    expect(koreaderOptionalDeviceLabel('Kobo_io', ' Bedside ')).toBe('Bedside')
+    expect(koreaderOptionalDeviceLabel(null, 'Bedside')).toBe('Bedside')
+    expect(koreaderOptionalDeviceLabel('Kobo_io', null)).toBe('Kobo Libra 2')
+    expect(koreaderOptionalDeviceLabel('Marginalia')).toBe('Marginalia')
+  })
+
+  it('names nothing when neither a name nor a model is known', () => {
+    expect(koreaderOptionalDeviceLabel(null, null)).toBeNull()
+    expect(koreaderOptionalDeviceLabel(undefined, '  ')).toBeNull()
+    expect(koreaderOptionalDeviceLabel('', undefined)).toBeNull()
   })
 })
 

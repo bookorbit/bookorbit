@@ -5,7 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import type { BookmarkExchangeAckDto, BookmarkExchangeDto } from './dto';
 import { KoreaderBookmarkExchangeService, buildBookmarkKey } from './koreader-bookmark-exchange.service';
 
-import { exchangeDeviceId } from './koreader-exchange-device';
+import { exchangeDeviceId } from '../../common/utils/koreader-exchange-device.utils';
 
 const DEVICE_ID = 'device-1234';
 const HASH_A = 'a'.repeat(32);

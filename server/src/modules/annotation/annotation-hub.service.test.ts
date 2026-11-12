@@ -51,6 +51,11 @@ function makeService(rebuilderRegistered = false) {
     findHubById: vi.fn().mockResolvedValue(makeHubRow()),
     purge: vi.fn().mockResolvedValue('purged'),
     countHub: vi.fn().mockResolvedValue(18000),
+    getHubColorBreakdown: vi.fn().mockResolvedValue([]),
+    countHubNeedsReview: vi.fn().mockResolvedValue(0),
+    countHubTrashed: vi.fn().mockResolvedValue(0),
+    getHubActivityWeeks: vi.fn().mockResolvedValue([]),
+    getHubDeviceSummary: vi.fn().mockResolvedValue([]),
   };
   const exportService = { export: vi.fn().mockResolvedValue({ contentType: 'text/markdown', filename: 'x.md', content: '#' }) };
   const syncRepo = {
@@ -74,6 +79,10 @@ function makeService(rebuilderRegistered = false) {
   if (rebuilderRegistered) rebuilderRegistry.register(rebuilder);
   const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue([3]) };
   const bookService = { verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
+  const koreaderDevices = {
+    describeDevices: vi.fn().mockResolvedValue(new Map()),
+    describeExchangeDevices: vi.fn().mockResolvedValue(new Map()),
+  };
   const service = new AnnotationHubService(
     annotationRepo as never,
     exportService as never,
@@ -82,8 +91,20 @@ function makeService(rebuilderRegistered = false) {
     rebuilderRegistry,
     libraryService as never,
     bookService as never,
+    koreaderDevices as never,
   );
-  return { service, annotationRepo, exportService, syncRepo, conversionService, rebuilder, rebuilderRegistry, libraryService, bookService };
+  return {
+    service,
+    annotationRepo,
+    exportService,
+    syncRepo,
+    conversionService,
+    rebuilder,
+    rebuilderRegistry,
+    libraryService,
+    bookService,
+    koreaderDevices,
+  };
 }
 
 describe('AnnotationHubService', () => {
@@ -384,6 +405,54 @@ describe('AnnotationHubService', () => {
     });
   });
 
+  describe('overview', () => {
+    it('labels each synced device, KOReader ones with their given name and model', async () => {
+      const { service, annotationRepo, syncRepo, koreaderDevices } = makeService();
+      const lastSyncedAt = new Date('2026-01-10T00:00:00Z');
+      annotationRepo.getHubDeviceSummary.mockResolvedValueOnce([
+        { source: 'koreader', deviceId: 'phone-1', annotations: 4, behind: 0, lastSyncedAt },
+        { source: 'kobo', deviceId: '7', annotations: 2, behind: 1, lastSyncedAt },
+        { source: 'koreader', deviceId: 'rendition:abc', annotations: 1, behind: 0, lastSyncedAt },
+      ]);
+      koreaderDevices.describeDevices.mockResolvedValueOnce(new Map([['phone-1', { deviceId: 'phone-1', model: 'husky', name: null }]]));
+
+      const overview = await service.overview(USER, {});
+
+      expect(syncRepo.findKoboDeviceNames).toHaveBeenCalledWith([7]);
+      expect(koreaderDevices.describeDevices).toHaveBeenCalledWith(USER.id, ['phone-1']);
+      expect(koreaderDevices.describeExchangeDevices).not.toHaveBeenCalled();
+      expect(overview.devices).toEqual([
+        {
+          source: 'koreader',
+          deviceId: 'phone-1',
+          deviceName: null,
+          deviceModel: 'husky',
+          annotations: 4,
+          behind: 0,
+          lastSyncedAt: lastSyncedAt.toISOString(),
+        },
+        {
+          source: 'kobo',
+          deviceId: '7',
+          deviceName: 'Kobo Libra 2',
+          deviceModel: null,
+          annotations: 2,
+          behind: 1,
+          lastSyncedAt: lastSyncedAt.toISOString(),
+        },
+        {
+          source: 'koreader',
+          deviceId: 'rendition:abc',
+          deviceName: null,
+          deviceModel: null,
+          annotations: 1,
+          behind: 0,
+          lastSyncedAt: lastSyncedAt.toISOString(),
+        },
+      ]);
+    });
+  });
+
   describe('syncDetail', () => {
     it('returns positions and per-device sync info with kobo display names', async () => {
       const { service } = makeService();
@@ -420,6 +489,37 @@ describe('AnnotationHubService', () => {
       expect(detail.devices[0].upToDate).toBe(true);
       expect(detail.devices[0].deleteAckedAt).toBe('2026-01-06T00:00:00.000Z');
       expect(detail.devices[0].deviceName).toBeNull();
+    });
+
+    it('names a KOReader device by the name given to it and the model it reports', async () => {
+      const { service, syncRepo, koreaderDevices } = makeService();
+      const lastSyncedAt = new Date('2026-01-10T00:00:00Z');
+      syncRepo.findStatesByAnnotation.mockResolvedValueOnce([
+        { source: 'kobo', deviceId: '7', lastAppliedVersion: 3, deleteAckedAt: null, lastSyncedAt },
+        { source: 'koreader', deviceId: 'phone-1', lastAppliedVersion: 3, deleteAckedAt: null, lastSyncedAt },
+        { source: 'koreader', deviceId: 'gone-2', lastAppliedVersion: 3, deleteAckedAt: null, lastSyncedAt },
+        { source: 'koreader', deviceId: 'rendition:abc', lastAppliedVersion: 3, deleteAckedAt: null, lastSyncedAt },
+      ]);
+      koreaderDevices.describeExchangeDevices.mockResolvedValueOnce(
+        new Map([['rendition:abc', { deviceId: 'kobo-3', model: 'Kobo_io', name: null }]]),
+      );
+      koreaderDevices.describeDevices.mockResolvedValueOnce(
+        new Map([
+          ['phone-1', { deviceId: 'phone-1', model: 'husky', name: 'Pixel' }],
+          ['gone-2', { deviceId: 'gone-2', model: null, name: null }],
+        ]),
+      );
+
+      const detail = await service.syncDetail(USER, 1);
+
+      expect(koreaderDevices.describeDevices).toHaveBeenCalledWith(USER.id, ['phone-1', 'gone-2']);
+      expect(koreaderDevices.describeExchangeDevices).toHaveBeenCalledWith(USER.id, 5, ['phone-1', 'gone-2', 'rendition:abc']);
+      expect(detail.devices.map(({ source, deviceName, deviceModel }) => ({ source, deviceName, deviceModel }))).toEqual([
+        { source: 'kobo', deviceName: 'Kobo Libra 2', deviceModel: null },
+        { source: 'koreader', deviceName: 'Pixel', deviceModel: 'husky' },
+        { source: 'koreader', deviceName: null, deviceModel: null },
+        { source: 'koreader', deviceName: null, deviceModel: 'Kobo_io' },
+      ]);
     });
 
     it('throws NotFoundException for an unknown annotation', async () => {

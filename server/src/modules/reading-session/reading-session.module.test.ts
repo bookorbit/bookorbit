@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
+import { KoreaderDeviceDirectoryModule } from '../../common/koreader-devices/koreader-device-directory.module';
 import { AchievementModule } from '../achievement/achievement.module';
 import { BookModule } from '../book/book.module';
 import { UserStatisticsModule } from '../user-statistics/user-statistics.module';
@@ -13,7 +14,12 @@ import { ReadingSessionService } from './reading-session.service';
 
 describe('ReadingSessionModule', () => {
   it('registers expected imports, controller, and providers', () => {
-    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, ReadingSessionModule)).toEqual([BookModule, AchievementModule, UserStatisticsModule]);
+    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, ReadingSessionModule)).toEqual([
+      BookModule,
+      AchievementModule,
+      UserStatisticsModule,
+      KoreaderDeviceDirectoryModule,
+    ]);
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, ReadingSessionModule)).toEqual([ReadingSessionController, BookReadingSessionController]);
     expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, ReadingSessionModule)).toEqual([ReadingSessionService, ReadingSessionRepository]);
     expect(Reflect.getMetadata(MODULE_METADATA.EXPORTS, ReadingSessionModule)).toEqual([ReadingSessionService]);

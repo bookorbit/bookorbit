@@ -5,6 +5,7 @@ import {
   buildSessionId,
   buildSessionIdPrefix,
   koreaderSessionDeviceKey,
+  matchKoreaderSessionDevice,
   parseKoreaderSessionId,
 } from './koreader-session-id.utils';
 
@@ -54,5 +55,32 @@ describe('koreader session ids', () => {
     ['undefined', undefined],
   ])('rejects a %s', (_label, sessionId) => {
     expect(parseKoreaderSessionId(sessionId)).toBeNull();
+  });
+});
+
+describe('matchKoreaderSessionDevice', () => {
+  const OTHER_ID = 'fedcba98-7654-3210-fedc-ba9876543210';
+
+  it('finds the device whose complete identity the key was built from', () => {
+    expect(matchKoreaderSessionDevice(koreaderSessionDeviceKey(DEVICE_ID), [OTHER_ID, DEVICE_ID])).toBe(DEVICE_ID);
+  });
+
+  it('finds the one device a legacy eight-character key can belong to', () => {
+    expect(matchKoreaderSessionDevice('abcdef12', [OTHER_ID, DEVICE_ID])).toBe(DEVICE_ID);
+    expect(matchKoreaderSessionDevice('dev', ['dev', 'device-2'])).toBe('dev');
+  });
+
+  it('names no device when a legacy key fits several', () => {
+    expect(matchKoreaderSessionDevice('abcdef12', [DEVICE_ID, 'abcdef12-other-device'])).toBeNull();
+  });
+
+  it('names no device when none of the candidates built the key', () => {
+    expect(matchKoreaderSessionDevice(koreaderSessionDeviceKey(DEVICE_ID), [OTHER_ID])).toBeNull();
+    expect(matchKoreaderSessionDevice('abcdef12', [])).toBeNull();
+  });
+
+  it('does not read a hashed key as the prefix of a device id', () => {
+    const hashed = koreaderSessionDeviceKey(DEVICE_ID);
+    expect(matchKoreaderSessionDevice(hashed, [`${hashed}-device`])).toBeNull();
   });
 });
