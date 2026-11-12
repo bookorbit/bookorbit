@@ -399,6 +399,94 @@ describe('TorboxAdapter', () => {
     await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('book');
   });
 
+  it('carries the CDN link token across a same-origin relative redirect', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub?token=SECRET');
+    const fetchMock = vi.fn((input: URL | string) => {
+      const url = String(input);
+      if (url === 'https://example.com/book.epub?token=SECRET') {
+        return Promise.resolve(new Response(null, { status: 302, headers: { location: '/final.epub' } }));
+      }
+      if (url === 'https://example.com/final.epub?token=SECRET') {
+        return Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }));
+      }
+      return Promise.resolve(new Response('missing token', { status: 400 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
+    await expect(readFile(join(directory, 'book.epub'), 'utf8')).resolves.toBe('book');
+    expect(fetchMock).toHaveBeenCalledWith('https://example.com/final.epub?token=SECRET', expect.anything());
+  });
+
+  it('does not forward the CDN token across a cross-origin redirect', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
+    );
+    api.requestDownloadLink.mockResolvedValue('https://example.com/book.epub?token=SECRET');
+    const fetchMock = vi.fn((input: URL | string) => {
+      const url = String(input);
+      if (url === 'https://example.com/book.epub?token=SECRET') {
+        return Promise.resolve(new Response(null, { status: 302, headers: { location: 'https://cdn.example.com/final.epub?sig=X' } }));
+      }
+      if (url === 'https://cdn.example.com/final.epub?sig=X') {
+        return Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }));
+      }
+      return Promise.resolve(new Response('unexpected', { status: 400 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
+    expect(fetchMock).toHaveBeenCalledWith('https://cdn.example.com/final.epub?sig=X', expect.anything());
+  });
+
+  it('stages a multi-file release when a later file redirects to a relative path', async () => {
+    api.findByHashes.mockResolvedValue(
+      new Map([
+        [
+          CLIENT_KEY,
+          torrent({
+            downloadFinished: true,
+            files: [
+              { fileId: 7, name: '01.mp3', size: 4 },
+              { fileId: 8, name: '02.mp3', size: 4 },
+              { fileId: 9, name: '03.mp3', size: 4 },
+            ],
+          }),
+        ],
+      ]),
+    );
+    api.requestDownloadLink
+      .mockResolvedValueOnce('https://example.com/7.mp3?token=SECRET')
+      .mockResolvedValueOnce('https://example.com/8.mp3?token=SECRET')
+      .mockResolvedValueOnce('https://example.com/9.mp3?token=SECRET');
+    const fetchMock = vi.fn((input: URL | string) => {
+      const url = String(input);
+      if (url === 'https://example.com/8.mp3?token=SECRET') {
+        return Promise.resolve(new Response(null, { status: 302, headers: { location: '/redirected/8.mp3' } }));
+      }
+      if (url.endsWith('?token=SECRET')) {
+        return Promise.resolve(new Response(Buffer.from('book'), { headers: { 'content-length': '4' } }));
+      }
+      return Promise.resolve(new Response('missing token', { status: 400 }));
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const directory = stagedClientDir(appDataPath, 'torbox', CLIENT_ID, CLIENT_KEY);
+    await expect(adapter.stage(CLIENT_KEY, config())).resolves.toEqual({ contentPath: directory });
+    for (const name of ['01.mp3', '02.mp3', '03.mp3']) {
+      await expect(readFile(join(directory, name), 'utf8')).resolves.toBe('book');
+    }
+    expect(api.requestDownloadLink).toHaveBeenCalledTimes(3);
+    expect(api.requestDownloadLink).toHaveBeenNthCalledWith(1, config(), 42, 7);
+    expect(api.requestDownloadLink).toHaveBeenNthCalledWith(2, config(), 42, 8);
+    expect(api.requestDownloadLink).toHaveBeenNthCalledWith(3, config(), 42, 9);
+  });
+
   it('closes the CDN connection when TorBox answers with a web page', async () => {
     api.findByHashes.mockResolvedValue(
       new Map([[CLIENT_KEY, torrent({ downloadFinished: true, files: [{ fileId: 7, name: 'book.epub', size: 4 }] })]]),
