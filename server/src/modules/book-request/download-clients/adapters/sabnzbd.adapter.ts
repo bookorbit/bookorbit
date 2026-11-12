@@ -13,6 +13,7 @@ import type {
   OwnedDownloadClientInventory,
   ResolvedClientConfig,
 } from '../download-client-adapter';
+import { type ContentRemovalPlan, DownloadContentRemovalService, remoteFolderName } from '../download-content-removal.service';
 import { endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'SABnzbd';
@@ -50,6 +51,8 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
   readonly delivers = 'usenet' as const;
 
   private readonly logger = new Logger(SabnzbdAdapter.name);
+
+  constructor(private readonly contentRemoval: DownloadContentRemovalService) {}
 
   async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientKey: string }> {
     if (!release.nzbFile?.length) throw new BadRequestException('A SABnzbd grab needs an NZB file');
@@ -111,6 +114,11 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
     const id = stringField(located.slot.nzo_id);
     if (!id) throw new BadRequestException('SABnzbd returned an invalid download id');
 
+    // `del_files` only clears what a job left behind in the incomplete folder; a completed job's
+    // finished folder survives it. BookOrbit deletes that one itself, checked before SABnzbd lets
+    // go of the job so a removal that cannot delete the files is refused rather than half done.
+    const plan = opts.deleteFiles ? await this.planCompletedFolder(normalized, located, config) : null;
+
     const result = await this.call(config, located.location, {
       name: 'delete',
       value: id,
@@ -118,6 +126,23 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
       ...(located.location === 'history' ? { archive: '0' } : {}),
     });
     if (result.status !== true) throw new BadRequestException('SABnzbd refused to remove that download');
+
+    if (plan) await this.contentRemoval.executeAfterRemoval(plan, { clientId: config.id, clientKey: normalized, label: LABEL });
+  }
+
+  private async planCompletedFolder(key: string, located: LocatedSlot, config: ResolvedClientConfig): Promise<ContentRemovalPlan | null> {
+    if (located.location !== 'history' || toStatus(key, located).state !== 'completed') return null;
+    const storage = stringField(located.slot.storage);
+    if (!storage) return null;
+
+    // Everything in the folder is deleted, so it has to be the one SABnzbd made for this job, which
+    // carries the job's name. Sorting can file a job into a folder it shares with others.
+    if (!remoteFolderName(storage).startsWith(ownedPrefix(config.id, key))) {
+      throw new BadRequestException(
+        'SABnzbd filed this download into a folder that is not its own, so BookOrbit will not delete it. Nothing was removed.',
+      );
+    }
+    return this.contentRemoval.planFolder(config.id, storage);
   }
 
   async test(config: ResolvedClientConfig): Promise<DownloadClientTestResult> {

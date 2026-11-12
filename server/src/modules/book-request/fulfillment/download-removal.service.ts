@@ -172,6 +172,33 @@ export class DownloadRemovalService {
     return true;
   }
 
+  /**
+   * A Usenet job has nothing left to do once the Book Dock holds its import, so a client set to
+   * remove completed downloads drops the job and its folder. Best-effort: the book is already
+   * imported, and a client or filesystem that refuses leaves the job where it was, in the log.
+   */
+  async removeCompletedDownload(download: BookRequestDownloadRow): Promise<void> {
+    if (DELIVERY_BY_DOWNLOAD_SOURCE[download.source] !== 'usenet' || download.downloadClientId === null || download.clientKey === null) return;
+
+    const started = Date.now();
+    try {
+      if (!(await this.clients.removesCompletedDownloads(download.downloadClientId))) return;
+      this.logger.log(
+        `[book_request.remove_completed] [start] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId} - removing the imported download from its client`,
+      );
+      const config = await this.clients.resolveConfig(download.downloadClientId);
+      await this.registry.require(config.adapterType).remove(download.clientKey, config, { deleteFiles: true });
+      this.logger.log(
+        `[book_request.remove_completed] [end] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId} durationMs=${Date.now() - started} - imported download removed from its client`,
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[book_request.remove_completed] [fail] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId} durationMs=${Date.now() - started} errorClass=${(error as Error)?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(message)}" - the imported download was left in its client`,
+      );
+    }
+  }
+
   /** A direct file is ours to drop; a torrent is detached from the client that holds it. */
   private async detach(download: BookRequestDownloadRow, deleteFiles: boolean): Promise<void> {
     // An attempt a source refused was never handed to anything, so there is nothing holding it.

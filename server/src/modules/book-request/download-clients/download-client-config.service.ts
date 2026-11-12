@@ -10,7 +10,7 @@ import type {
   DownloadClientType,
   PathMappingHardlinkTestResult,
 } from '@bookorbit/types';
-import { DOWNLOAD_CLIENT_CREDENTIAL_KIND, DOWNLOAD_CLIENT_DELIVERY } from '@bookorbit/types';
+import { DOWNLOAD_CLIENT_CREDENTIAL_KIND, DOWNLOAD_CLIENT_DELIVERY, DOWNLOAD_CLIENT_REMOVES_COMPLETED } from '@bookorbit/types';
 
 import { isUniqueViolation } from '../../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
@@ -78,6 +78,7 @@ export class DownloadClientConfigService {
     await this.assertReachableUrl(dto.baseUrl, dto.allowPrivateAddress ?? true);
     const pathMappings = this.normalizeRequiredMappings(dto.adapterType, dto.pathMappings);
     this.assertCredentialPresent(dto.adapterType, Boolean(dto.password?.trim()));
+    this.assertRemoveCompletedSupported(dto.adapterType, dto.removeCompletedDownloads);
     const credentialsEnc = dto.password ? this.credentials.encrypt(dto.password) : null;
 
     let created: DownloadClientRow;
@@ -94,6 +95,7 @@ export class DownloadClientConfigService {
           priority: dto.priority ?? 1,
           category: dto.category?.trim() || 'bookorbit',
           useHardlinks: dto.useHardlinks ?? true,
+          removeCompletedDownloads: dto.removeCompletedDownloads ?? false,
           allowPrivateAddress: dto.allowPrivateAddress ?? true,
         },
         pathMappings,
@@ -113,6 +115,7 @@ export class DownloadClientConfigService {
     }
     const hasCredential = dto.password === undefined ? existing.client.credentialsEnc !== null : Boolean(dto.password.trim());
     this.assertCredentialPresent(existing.client.adapterType as DownloadClientType, hasCredential);
+    this.assertRemoveCompletedSupported(existing.client.adapterType as DownloadClientType, dto.removeCompletedDownloads);
 
     const baseUrl = dto.baseUrl?.trim() ?? existing.client.baseUrl;
     const allowPrivate = dto.allowPrivateAddress ?? existing.client.allowPrivateAddress;
@@ -136,6 +139,7 @@ export class DownloadClientConfigService {
     if (dto.priority !== undefined) patch.priority = dto.priority;
     if (dto.category !== undefined) patch.category = dto.category.trim() || 'bookorbit';
     if (dto.useHardlinks !== undefined) patch.useHardlinks = dto.useHardlinks;
+    if (dto.removeCompletedDownloads !== undefined) patch.removeCompletedDownloads = dto.removeCompletedDownloads;
     if (dto.allowPrivateAddress !== undefined) patch.allowPrivateAddress = dto.allowPrivateAddress;
     // An omitted password keeps the stored one, so the settings form never has to round-trip it.
     if (dto.password !== undefined) patch.credentialsEnc = dto.password ? this.credentials.encrypt(dto.password) : null;
@@ -280,6 +284,12 @@ export class DownloadClientConfigService {
     return client.useHardlinks;
   }
 
+  /** Re-checked against the type so a row written some other way cannot delete a torrent's seed. */
+  async removesCompletedDownloads(id: number): Promise<boolean> {
+    const { client } = await this.requireClient(id);
+    return client.removeCompletedDownloads && DOWNLOAD_CLIENT_REMOVES_COMPLETED[client.adapterType as DownloadClientType];
+  }
+
   private normalizeRequiredMappings(
     adapterType: DownloadClientType,
     mappings: Array<{ remotePath: string; localPath: string }> | undefined,
@@ -327,6 +337,16 @@ export class DownloadClientConfigService {
       return new ConflictException({ message: 'A download client with this name already exists', errorCode: 'DOWNLOAD_CLIENT_NAME_TAKEN' });
     }
     return error;
+  }
+
+  /** Turning it off is always allowed, so a form that sends the field for every type is never refused for false. */
+  private assertRemoveCompletedSupported(adapterType: DownloadClientType, removeCompleted: boolean | undefined): void {
+    if (removeCompleted !== true || DOWNLOAD_CLIENT_REMOVES_COMPLETED[adapterType]) return;
+    const label = this.registry.find(adapterType)?.label ?? adapterType;
+    throw downloadClientError(
+      'DOWNLOAD_CLIENT_REMOVE_COMPLETED_UNSUPPORTED',
+      `${label} keeps what it downloads for seeding, so BookOrbit does not remove its downloads after import`,
+    );
   }
 
   private assertCredentialPresent(adapterType: DownloadClientType, hasCredential: boolean): void {
@@ -384,6 +404,7 @@ function toItem({ client, pathMappings }: DownloadClientWithMappings): DownloadC
     hasPassword: client.credentialsEnc !== null,
     category: client.category,
     useHardlinks: client.useHardlinks,
+    removeCompletedDownloads: client.removeCompletedDownloads,
     allowPrivateAddress: client.allowPrivateAddress,
     lastTestedAt: client.lastTestedAt?.toISOString() ?? null,
     lastTestOk: client.lastTestOk,

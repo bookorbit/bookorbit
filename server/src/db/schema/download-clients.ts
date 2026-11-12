@@ -32,6 +32,8 @@ export const downloadClients = pgTable(
     /** Tags our torrents in the client so BookOrbit only ever touches its own. */
     category: varchar('category', { length: 100 }).notNull().default('bookorbit'),
     useHardlinks: boolean('use_hardlinks').notNull().default(true),
+    /** Drop a finished Usenet job and its folder once the Book Dock holds the import. */
+    removeCompletedDownloads: boolean('remove_completed_downloads').notNull().default(false),
     /** Per-row SSRF opt-in: clients usually live on the LAN, indexers do not. */
     allowPrivateAddress: boolean('allow_private_address').notNull().default(true),
     settings: jsonb('settings').$type<Record<string, unknown>>(),

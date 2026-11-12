@@ -19,7 +19,9 @@ function download(overrides: Partial<BookRequestDownloadRow> = {}): BookRequestD
   } as BookRequestDownloadRow;
 }
 
-async function makeService(options: { latest?: BookRequestDownloadRow | null; removeError?: Error; stageCapable?: boolean } = {}) {
+async function makeService(
+  options: { latest?: BookRequestDownloadRow | null; removeError?: Error; stageCapable?: boolean; removesCompleted?: boolean } = {},
+) {
   const appDataPath = await mkdtemp(join(tmpdir(), 'bookorbit-removal-'));
   const row = options.latest === undefined ? download() : options.latest;
   const downloads = {
@@ -35,6 +37,7 @@ async function makeService(options: { latest?: BookRequestDownloadRow | null; re
   const clients = {
     resolveConfig: vi.fn().mockResolvedValue({ id: 4, adapterType: options.stageCapable ? 'torbox' : 'qbittorrent' }),
     stagesLocally: vi.fn().mockResolvedValue(options.stageCapable ?? false),
+    removesCompletedDownloads: vi.fn().mockResolvedValue(options.removesCompleted ?? false),
   };
   const adapter = {
     remove: options.removeError ? vi.fn().mockRejectedValue(options.removeError) : vi.fn().mockResolvedValue(undefined),
@@ -251,6 +254,50 @@ describe('DownloadRemovalService.removeAttempt', () => {
     await expect(service.removeAttempt(7, 11, false, 'ann')).resolves.toBe(false);
 
     expect(adapter.remove).toHaveBeenCalledWith(INFO_HASH, expect.anything(), { deleteFiles: false });
+  });
+});
+
+describe('DownloadRemovalService.removeCompletedDownload', () => {
+  const usenet = (overrides: Partial<BookRequestDownloadRow> = {}) => download({ source: 'nzb_file', status: 'importing', ...overrides });
+
+  it('removes an imported Usenet job and its files when the client is set to', async () => {
+    const { service, adapter, clients } = await makeService({ removesCompleted: true });
+
+    await service.removeCompletedDownload(usenet());
+
+    expect(clients.removesCompletedDownloads).toHaveBeenCalledWith(4);
+    expect(adapter.remove).toHaveBeenCalledWith(INFO_HASH, expect.objectContaining({ id: 4 }), { deleteFiles: true });
+  });
+
+  it('keeps the job when the client is not set to remove completed downloads', async () => {
+    const { service, adapter, clients } = await makeService({ removesCompleted: false });
+
+    await service.removeCompletedDownload(usenet());
+
+    expect(clients.resolveConfig).not.toHaveBeenCalled();
+    expect(adapter.remove).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a torrent, which may still be seeding', download({ source: 'torrent_file' })],
+    ['a magnet', download({ source: 'magnet' })],
+    ['a direct file, cleaned up as staging instead', download({ source: 'direct_url', downloadClientId: null })],
+    ['an attempt whose client was deleted', usenet({ downloadClientId: null })],
+    ['an attempt never handed to a client', usenet({ clientKey: null })],
+  ])('never touches %s', async (_case, row) => {
+    const { service, adapter, clients } = await makeService({ removesCompleted: true });
+
+    await service.removeCompletedDownload(row);
+
+    expect(clients.removesCompletedDownloads).not.toHaveBeenCalled();
+    expect(adapter.remove).not.toHaveBeenCalled();
+  });
+
+  it('does not fail an imported book when the client refuses', async () => {
+    const { service, adapter } = await makeService({ removesCompleted: true, removeError: new Error('Nothing was removed.') });
+
+    await expect(service.removeCompletedDownload(usenet())).resolves.toBeUndefined();
+    expect(adapter.remove).toHaveBeenCalled();
   });
 });
 

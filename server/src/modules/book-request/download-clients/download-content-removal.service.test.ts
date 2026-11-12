@@ -191,4 +191,78 @@ describe('DownloadContentRemovalService', () => {
     expect(outcome.failures).toEqual([{ path: expect.stringContaining('was-a-file.jpg'), code: 'EISDIR' }]);
     expect(outcome.topDirectoryRemoved).toBe(false);
   });
+
+  describe('planFolder', () => {
+    it('deletes everything in a finished job folder, empty folders included, and the folder itself', async () => {
+      const folder = join(env.downloads, 'bookorbit', 'Dune');
+      await put(join(folder, 'Dune.epub'));
+      await put(join(folder, 'extras', 'cover.jpg'));
+      await mkdir(join(folder, 'sample', 'empty'), { recursive: true });
+      await put(join(env.downloads, 'bookorbit', 'Neighbour', 'keep.epub'));
+
+      const plan = await env.service.planFolder(CLIENT_ID, '/downloads/bookorbit/Dune');
+      const outcome = await env.service.execute(plan);
+
+      expect(outcome).toEqual({ deleted: 2, failures: [], topDirectoryRemoved: true });
+      expect(await readdir(join(env.downloads, 'bookorbit'))).toEqual(['Neighbour']);
+    });
+
+    it('accepts a Windows-style folder through a matching mapping', async () => {
+      const repo = { findPathMappings: vi.fn().mockResolvedValue([{ remotePath: 'D:\\usenet', localPath: env.downloads }]) };
+      const service = new DownloadContentRemovalService(new PathMappingService(repo as never));
+      await put(join(env.downloads, 'Dune', 'Dune.epub'));
+
+      await service.execute(await service.planFolder(CLIENT_ID, 'D:\\usenet\\Dune'));
+
+      expect(await readdir(env.downloads)).toEqual([]);
+    });
+
+    it('deletes a job that finished as a single file', async () => {
+      await put(join(env.downloads, 'bookorbit', 'Dune.epub'));
+      await put(join(env.downloads, 'bookorbit', 'Other.epub'));
+
+      const plan = await env.service.planFolder(CLIENT_ID, '/downloads/bookorbit/Dune.epub');
+      await env.service.execute(plan);
+
+      expect(await readdir(join(env.downloads, 'bookorbit'))).toEqual(['Other.epub']);
+    });
+
+    it('refuses the mapped directory itself before walking it', async () => {
+      await put(join(env.downloads, 'book.epub'));
+
+      await expect(env.service.planFolder(CLIENT_ID, '/downloads')).rejects.toThrow('mapped download directory itself');
+      expect(await exists(join(env.downloads, 'book.epub'))).toBe(true);
+    });
+
+    it('refuses a folder that is not where the mapping puts it', async () => {
+      await expect(env.service.planFolder(CLIENT_ID, '/downloads/bookorbit/Missing')).rejects.toThrow('cannot find this download');
+    });
+
+    it('refuses the whole folder when a link inside it leads outside the mapped directory', async () => {
+      const folder = join(env.downloads, 'bookorbit', 'Escape');
+      await put(join(folder, 'book.epub'));
+      await put(join(env.outside, 'precious.epub'));
+      await symlink(join(env.outside, 'precious.epub'), join(folder, 'link.epub'));
+
+      await expect(env.service.planFolder(CLIENT_ID, '/downloads/bookorbit/Escape')).rejects.toThrow('outside the directory it was downloaded into');
+      expect(await exists(join(folder, 'book.epub'))).toBe(true);
+      expect(await exists(join(env.outside, 'precious.epub'))).toBe(true);
+    });
+
+    it('refuses a folder holding far more than one release', async () => {
+      const folder = join(env.downloads, 'bookorbit', 'Everything');
+      await mkdir(folder, { recursive: true });
+      await Promise.all(Array.from({ length: 5001 }, (_, index) => writeFile(join(folder, `${index}.epub`), '')));
+
+      await expect(env.service.planFolder(CLIENT_ID, '/downloads/bookorbit/Everything')).rejects.toThrow('too many files');
+      expect(await exists(join(folder, '0.epub'))).toBe(true);
+    });
+
+    it('refuses a folder nested deeper than a release would be', async () => {
+      const deep = join(env.downloads, 'bookorbit', 'Deep', ...Array.from({ length: 17 }, (_, index) => `d${index}`));
+      await put(join(deep, 'book.epub'));
+
+      await expect(env.service.planFolder(CLIENT_ID, '/downloads/bookorbit/Deep')).rejects.toThrow('nested too deeply');
+    });
+  });
 });

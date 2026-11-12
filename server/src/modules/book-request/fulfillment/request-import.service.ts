@@ -335,6 +335,7 @@ export class RequestImportService implements OnApplicationBootstrap {
 
     await this.removal.cleanupStagedDirectDownload(download);
     await this.removal.cleanupStagedClientDownload(download);
+    await this.removal.removeCompletedDownload(download);
   }
 
   /**

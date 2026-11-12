@@ -16,6 +16,7 @@ function clientRow(overrides: Partial<DownloadClientRow> = {}): DownloadClientRo
     credentialsEnc: 'cipher',
     category: 'bookorbit',
     useHardlinks: true,
+    removeCompletedDownloads: false,
     allowPrivateAddress: false,
     settings: null,
     lastTestedAt: null,
@@ -445,6 +446,76 @@ describe('DownloadClientConfigService', () => {
 
     await expect(service.test(4)).resolves.toEqual({ success: true });
     expect(repo.recordTestResult).toHaveBeenCalledWith(4, true, null);
+  });
+
+  describe('removing completed downloads', () => {
+    const sabDto = { ...createDto, name: 'sab', adapterType: 'sabnzbd' as const, password: 'api-key' };
+
+    it('is off unless the save asks for it, which keeps every download in the client', async () => {
+      const { service, repo } = makeService();
+
+      await service.create(sabDto);
+
+      expect(repo.createWithPathMappings).toHaveBeenCalledWith(expect.objectContaining({ removeCompletedDownloads: false }), expect.anything());
+    });
+
+    it.each(['sabnzbd', 'nzbget'] as const)('can be turned on for %s', async (adapterType) => {
+      const { service, repo } = makeService();
+
+      await service.create({ ...sabDto, adapterType, removeCompletedDownloads: true });
+
+      expect(repo.createWithPathMappings).toHaveBeenCalledWith(expect.objectContaining({ removeCompletedDownloads: true }), expect.anything());
+    });
+
+    it.each(['qbittorrent', 'transmission', 'deluge', 'rtorrent', 'torbox'] as const)('is refused for %s, which seeds', async (adapterType) => {
+      const { service, repo } = makeService({ registry: { find: vi.fn().mockReturnValue({ label: adapterType }) } });
+
+      await expect(
+        service.create({ ...createDto, adapterType, password: 'secret', pathMappings: createDto.pathMappings, removeCompletedDownloads: true }),
+      ).rejects.toMatchObject({ response: { errorCode: 'DOWNLOAD_CLIENT_REMOVE_COMPLETED_UNSUPPORTED', statusCode: HttpStatus.BAD_REQUEST } });
+      expect(repo.createWithPathMappings).not.toHaveBeenCalled();
+    });
+
+    it('accepts an explicit false for a torrent client, so a form sending every field is never refused', async () => {
+      const { service, repo } = makeService();
+
+      await service.create({ ...createDto, removeCompletedDownloads: false });
+
+      expect(repo.createWithPathMappings).toHaveBeenCalled();
+    });
+
+    it('is refused on an edit of a torrent client and leaves the row alone', async () => {
+      const { service, repo } = makeService();
+
+      await expect(service.update(4, { removeCompletedDownloads: true })).rejects.toMatchObject({
+        response: { errorCode: 'DOWNLOAD_CLIENT_REMOVE_COMPLETED_UNSUPPORTED' },
+      });
+      expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it('is saved on an edit of a Usenet client and returned with it', async () => {
+      const sab = clientRow({ adapterType: 'sabnzbd', removeCompletedDownloads: true });
+      const { service, repo } = makeService({ repo: { findById: vi.fn().mockResolvedValue({ client: sab, pathMappings: [] }) } });
+
+      const item = await service.update(4, { removeCompletedDownloads: true });
+
+      expect(repo.update).toHaveBeenCalledWith(4, { removeCompletedDownloads: true });
+      expect(item.removeCompletedDownloads).toBe(true);
+    });
+
+    it('is only honoured for a type that allows it, whatever the row says', async () => {
+      const torrent = makeService({
+        repo: { findById: vi.fn().mockResolvedValue({ client: clientRow({ removeCompletedDownloads: true }), pathMappings: [] }) },
+      });
+      const usenet = makeService({
+        repo: {
+          findById: vi.fn().mockResolvedValue({ client: clientRow({ adapterType: 'nzbget', removeCompletedDownloads: true }), pathMappings: [] }),
+        },
+      });
+
+      await expect(torrent.service.removesCompletedDownloads(4)).resolves.toBe(false);
+      await expect(usenet.service.removesCompletedDownloads(4)).resolves.toBe(true);
+    });
   });
 
   it('decrypts credentials only into a value object, never onto the row', async () => {

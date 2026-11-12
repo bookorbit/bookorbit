@@ -1009,6 +1009,13 @@
       "when": 1794455449850,
       "tag": "0143_add_koreader_device_names",
       "breakpoints": true
+    },
+    {
+      "idx": 144,
+      "version": "7",
+      "when": 1794461433776,
+      "tag": "0144_add_download_client_remove_completed",
+      "breakpoints": true
     }
   ]
 }

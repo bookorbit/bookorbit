@@ -78,6 +78,11 @@ export class CreateDownloadClientDto {
   @IsBoolean()
   useHardlinks?: boolean;
 
+  /** Optional with a false default, so older callers keep every download in the client. */
+  @IsOptional()
+  @IsBoolean()
+  removeCompletedDownloads?: boolean;
+
   @IsOptional()
   @IsBoolean()
   allowPrivateAddress?: boolean;
@@ -146,6 +151,10 @@ export class UpdateDownloadClientDto {
   @IsOptional()
   @IsBoolean()
   useHardlinks?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  removeCompletedDownloads?: boolean;
 
   @IsOptional()
   @IsBoolean()

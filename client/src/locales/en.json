@@ -3861,7 +3861,9 @@
           "passwordBrief": "Stored encrypted.",
           "apiKeyBrief": "Found in SABnzbd under Config > General. Stored encrypted.",
           "torboxApiKeyBrief": "Can be found at https://torbox.app/settings?section=account. Stored encrypted.",
-          "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems."
+          "useHardlinksBrief": "Imports without using the disk twice. Falls back to a copy across filesystems.",
+          "removeCompletedDownloads": "Remove completed downloads",
+          "removeCompletedDownloadsBrief": "Deletes the download and its files from the client once the book is imported."
         },
         "mappings": {
           "title": "Path mappings",
@@ -3916,7 +3918,8 @@
           "urlRequired": "Enter the address BookOrbit should reach this client at.",
           "mappingRequired": "Add at least one path mapping, so BookOrbit knows which directory it may import from.",
           "apiKeyRequired": "Enter the SABnzbd API key from Config > General.",
-          "torboxApiKeyRequired": "Enter the TorBox API key from the TorBox account settings."
+          "torboxApiKeyRequired": "Enter the TorBox API key from the TorBox account settings.",
+          "removeCompletedUnsupported": "Only Usenet clients can remove completed downloads. Torrent clients keep them for seeding."
         },
         "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY is not set, so a client credential cannot be saved. Generate one with: openssl rand -hex 32",
         "confirmDelete": {

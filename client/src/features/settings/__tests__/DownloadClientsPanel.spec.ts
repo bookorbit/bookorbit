@@ -25,6 +25,7 @@ function client(overrides: Partial<DownloadClientItem> = {}): DownloadClientItem
     hasPassword: true,
     category: 'bookorbit',
     useHardlinks: true,
+    removeCompletedDownloads: false,
     allowPrivateAddress: true,
     // Required since a client without one declares no directory the import may read out of.
     pathMappings: [{ id: 1, remotePath: '/downloads', localPath: '/data/torrents' }],
@@ -410,6 +411,43 @@ describe('DownloadClientsPanel', () => {
     const body = JSON.parse(String(saveCall?.[1]?.body))
     expect(body.name).toBe('Renamed SABnzbd')
     expect(body).not.toHaveProperty('password')
+  })
+
+  describe('remove completed downloads', () => {
+    const toggle = () => sheet().querySelector<HTMLButtonElement>('#download-client-remove-completed')
+
+    it.each(['sabnzbd', 'nzbget'] as const)('is offered for %s and saved when switched on', async (adapterType) => {
+      const wrapper = await mountPanel([client({ name: 'My Usenet', adapterType, username: null })])
+      await clickInPanel(wrapper, 'Edit My Usenet')
+
+      expect(toggle()?.getAttribute('aria-checked')).toBe('false')
+      toggle()?.click()
+      await flushPromises()
+      clickInSheet('Save')
+      await flushPromises()
+
+      const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+      expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ removeCompletedDownloads: true })
+    })
+
+    it('shows the saved setting when a Usenet client is opened', async () => {
+      const wrapper = await mountPanel([client({ name: 'My SABnzbd', adapterType: 'sabnzbd', username: null, removeCompletedDownloads: true })])
+      await clickInPanel(wrapper, 'Edit My SABnzbd')
+
+      expect(toggle()?.getAttribute('aria-checked')).toBe('true')
+    })
+
+    it('is not offered for a torrent client, which never sends it switched on', async () => {
+      const wrapper = await mountPanel([client()])
+      await clickInPanel(wrapper, 'Edit My qBittorrent')
+
+      expect(toggle()).toBeNull()
+      clickInSheet('Save')
+      await flushPromises()
+
+      const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'PUT')
+      expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ removeCompletedDownloads: false })
+    })
   })
 
   it('keeps the list rendered while a row is being edited', async () => {

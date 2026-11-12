@@ -11,6 +11,7 @@ import type {
   OwnedDownloadClientInventory,
   ResolvedClientConfig,
 } from '../download-client-adapter';
+import { type ContentRemovalPlan, DownloadContentRemovalService, remoteFolderName } from '../download-content-removal.service';
 import { basicAuthHeader, endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'NZBGet';
@@ -51,6 +52,8 @@ export class NzbgetAdapter implements DownloadClientAdapter {
   readonly delivers = 'usenet' as const;
 
   private readonly logger = new Logger(NzbgetAdapter.name);
+
+  constructor(private readonly contentRemoval: DownloadContentRemovalService) {}
 
   async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientKey: string }> {
     if (!release.nzbFile?.length) throw new BadRequestException('An NZBGet grab needs an NZB file');
@@ -113,8 +116,33 @@ export class NzbgetAdapter implements DownloadClientAdapter {
         : opts.deleteFiles
           ? 'HistoryFinalDelete'
           : 'HistoryDelete';
+    // No history command deletes a completed job's folder, so BookOrbit deletes it itself, checked
+    // before NZBGet lets go of the job so a removal that cannot delete the files is refused whole.
+    const plan = opts.deleteFiles ? await this.planCompletedFolder(located, config) : null;
+
     const removed = await this.rpc<boolean>(config, 'editqueue', [command, '', [id]]);
     if (!removed) throw new BadRequestException('NZBGet refused to remove that download');
+
+    if (plan) await this.contentRemoval.executeAfterRemoval(plan, { clientId: config.id, clientKey: normalizeKey(key), label: LABEL });
+  }
+
+  private async planCompletedFolder(located: LocatedItem, config: ResolvedClientConfig): Promise<ContentRemovalPlan | null> {
+    const { item } = located;
+    if (located.location !== 'history' || historyState(item.Status) !== 'completed') return null;
+    const folder = completedFolder(item);
+    if (!folder) return null;
+
+    // Everything in the folder is deleted, so it has to be the one NZBGet made for this job: named
+    // after it, and reported by no other job. A post-processing script can move a job into a folder
+    // it shares, and two jobs with the same name can be unpacked into one.
+    const name = item.NZBName?.trim();
+    const sharedWith = (await this.history(config)).some((other) => other.NZBID !== item.NZBID && completedFolder(other) === folder);
+    if (!name || remoteFolderName(folder) !== name || sharedWith) {
+      throw new BadRequestException(
+        'NZBGet put this download into a folder that is not its own, so BookOrbit will not delete it. Nothing was removed.',
+      );
+    }
+    return this.contentRemoval.planFolder(config.id, folder);
   }
 
   async test(config: ResolvedClientConfig): Promise<DownloadClientTestResult> {
@@ -210,7 +238,7 @@ function toStatus(item: NzbGetItem, location: LocatedItem['location'], clientId:
   const remainingBytes = uint64(item.RemainingSizeHi, item.RemainingSizeLo) ?? 0;
   const downloadedBytes = uint64(item.DownloadedSizeHi, item.DownloadedSizeLo) ?? Math.max(0, (totalBytes ?? 0) - remainingBytes);
   const state = location === 'history' ? historyState(item.Status) : queueState(item.Status);
-  const path = item.FinalDir?.trim() || item.DestDir?.trim() || null;
+  const path = completedFolder(item);
   return {
     clientKey: key,
     state,
@@ -220,6 +248,10 @@ function toStatus(item: NzbGetItem, location: LocatedItem['location'], clientId:
     contentPath: state === 'completed' ? path : null,
     ...(state === 'failed' ? { errorMessage: `NZBGet finished with status ${item.Status ?? 'unknown'}` } : {}),
   };
+}
+
+function completedFolder(item: NzbGetItem): string | null {
+  return item.FinalDir?.trim() || item.DestDir?.trim() || null;
 }
 
 function queueState(status: string | undefined): DownloadState {

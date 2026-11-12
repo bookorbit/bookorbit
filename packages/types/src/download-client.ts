@@ -68,6 +68,20 @@ export const DOWNLOAD_CLIENT_ALWAYS_DELETES_REMOTE: Record<DownloadClientType, b
   torbox: true,
 };
 
+/**
+ * Whether a client may drop a download and its files once it is imported. A Usenet job has
+ * nothing left to do after that; a torrent is still seeding, and removing it is the operator's call.
+ */
+export const DOWNLOAD_CLIENT_REMOVES_COMPLETED: Record<DownloadClientType, boolean> = {
+  qbittorrent: false,
+  transmission: false,
+  deluge: false,
+  rtorrent: false,
+  nzbget: true,
+  sabnzbd: true,
+  torbox: false,
+};
+
 export interface DownloadClientPathMapping {
   id: number;
   /** The prefix the download client reports, in its own filesystem namespace. */
@@ -92,6 +106,7 @@ export const DOWNLOAD_CLIENT_ERROR_CODES = [
   "DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE",
   "DOWNLOAD_CLIENT_MAPPING_REQUIRED",
   "DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED",
+  "DOWNLOAD_CLIENT_REMOVE_COMPLETED_UNSUPPORTED",
   /** The test ran and the client refused or could not be reached. Carries the adapter's reason. */
   "DOWNLOAD_CLIENT_TEST_FAILED",
   "DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED",
@@ -114,6 +129,8 @@ export interface DownloadClientItem {
   hasPassword: boolean;
   category: string;
   useHardlinks: boolean;
+  /** Only ever true for a client `DOWNLOAD_CLIENT_REMOVES_COMPLETED` allows. */
+  removeCompletedDownloads: boolean;
   /** Download clients usually sit on the LAN, so reaching a private address is opt-in per row. */
   allowPrivateAddress: boolean;
   lastTestedAt: string | null;
@@ -189,6 +206,8 @@ export interface CreateDownloadClientPayload {
   priority?: number;
   category?: string;
   useHardlinks?: boolean;
+  /** Defaults to false, which keeps every download in the client as before. */
+  removeCompletedDownloads?: boolean;
   allowPrivateAddress?: boolean;
   pathMappings?: DownloadClientPathMappingInput[];
 }

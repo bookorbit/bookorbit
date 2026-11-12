@@ -66,6 +66,7 @@ async function makeHarness(options: { useHardlinks?: boolean; stagesLocally?: bo
   const removal = {
     cleanupStagedDirectDownload: vi.fn().mockResolvedValue(undefined),
     cleanupStagedClientDownload: vi.fn().mockResolvedValue(undefined),
+    removeCompletedDownload: vi.fn().mockResolvedValue(undefined),
   };
   // The real containment check over a stubbed mapping, so these tests exercise the boundary the
   // importer actually applies rather than a mock that always agrees with it.
@@ -216,6 +217,17 @@ describe('RequestImportService.importDownload', () => {
     await harness.service.importDownload(direct);
 
     expect(harness.removal.cleanupStagedDirectDownload).toHaveBeenCalledWith(direct);
+    expect(await readFile(join(harness.bookDockPath, 'request-7-dune.epub'), 'utf8')).toBe('book');
+  });
+
+  it('offers a finished Usenet job to be removed from its client once the Book Dock holds the import', async () => {
+    const harness = await makeHarness();
+    const source = await makeFile(join(harness.bookDockPath, '..', 'downloads', 'Dune'), 'dune.epub');
+    const usenet = download(source, { source: 'nzb_file' });
+
+    await harness.service.importDownload(usenet);
+
+    expect(harness.removal.removeCompletedDownload).toHaveBeenCalledWith(usenet);
     expect(await readFile(join(harness.bookDockPath, 'request-7-dune.epub'), 'utf8')).toBe('book');
   });
 
@@ -464,6 +476,8 @@ describe('RequestImportService.importDownload', () => {
 
     expect(harness.fulfillment.failDownload).not.toHaveBeenCalled();
     expect(harness.dockRepo.createUnit).not.toHaveBeenCalled();
+    // The books are still needed in the client's folder until somebody picks one.
+    expect(harness.removal.removeCompletedDownload).not.toHaveBeenCalled();
     expect(harness.fulfillment.holdForReview).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ id: 7 }),

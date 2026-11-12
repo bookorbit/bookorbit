@@ -3,7 +3,12 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Download, Link2, Loader2, Pencil, Plug, Plus, RefreshCw, Trash2, TriangleAlert } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import { DOWNLOAD_CLIENT_CREDENTIAL_KIND, DOWNLOAD_CLIENT_STAGES_LOCALLY, DOWNLOAD_CLIENT_TYPES } from '@bookorbit/types'
+import {
+  DOWNLOAD_CLIENT_CREDENTIAL_KIND,
+  DOWNLOAD_CLIENT_REMOVES_COMPLETED,
+  DOWNLOAD_CLIENT_STAGES_LOCALLY,
+  DOWNLOAD_CLIENT_TYPES,
+} from '@bookorbit/types'
 import type {
   CreateDownloadClientPayload,
   DownloadClientItem,
@@ -49,6 +54,7 @@ interface ClientDraft {
   priority: number
   category: string
   useHardlinks: boolean
+  removeCompletedDownloads: boolean
   allowPrivateAddress: boolean
   pathMappings: MappingDraft[]
 }
@@ -104,6 +110,7 @@ const SAVE_ERROR_KEYS: Record<string, string> = {
   DOWNLOAD_CLIENT_PATH_NOT_ABSOLUTE: 'settings.system.requests.errors.pathNotAbsolute',
   DOWNLOAD_CLIENT_MAPPING_REQUIRED: 'settings.system.requests.errors.mappingRequired',
   DOWNLOAD_CLIENT_CREDENTIAL_REQUIRED: 'settings.system.requests.errors.apiKeyRequired',
+  DOWNLOAD_CLIENT_REMOVE_COMPLETED_UNSUPPORTED: 'settings.system.requests.errors.removeCompletedUnsupported',
   DOWNLOAD_CLIENT_RECONCILIATION_UNSUPPORTED: 'settings.system.requests.reconciliation.unsupported',
   DOWNLOAD_CLIENT_RECONCILIATION_NOT_ORPHAN: 'settings.system.requests.reconciliation.notOrphan',
   DOWNLOAD_CLIENT_RECONCILIATION_NOT_ADOPTABLE: 'settings.system.requests.reconciliation.notAdoptable',
@@ -144,6 +151,7 @@ function emptyDraft(adapterType: DownloadClientType): ClientDraft {
     priority: 1,
     category: 'bookorbit',
     useHardlinks: true,
+    removeCompletedDownloads: false,
     allowPrivateAddress: true,
     // One row to fill in rather than none: a mapping is required, and starting with an empty
     // section reads as optional right up until the save is refused.
@@ -179,6 +187,7 @@ function startEdit(client: DownloadClientItem) {
     priority: client.priority,
     category: client.category,
     useHardlinks: client.useHardlinks,
+    removeCompletedDownloads: client.removeCompletedDownloads,
     allowPrivateAddress: client.allowPrivateAddress,
     pathMappings: client.pathMappings.map((mapping) => ({ remotePath: mapping.remotePath, localPath: mapping.localPath })),
   })
@@ -230,6 +239,7 @@ const baseUrlPlaceholder = computed(() => (isRtorrent.value ? 'http://localhost:
 const baseUrlBrief = computed(() => (isRtorrent.value ? t('settings.system.requests.fields.baseUrlRtorrentBrief') : undefined))
 
 const stagesLocally = computed(() => (draft.value ? DOWNLOAD_CLIENT_STAGES_LOCALLY[draft.value.adapterType] : false))
+const removesCompleted = computed(() => (draft.value ? DOWNLOAD_CLIENT_REMOVES_COMPLETED[draft.value.adapterType] : false))
 
 const validating = ref(false)
 const keyCheck = ref<'idle' | 'ok' | 'invalid'>('idle')
@@ -383,6 +393,7 @@ function toPayload(current: ClientDraft): CreateDownloadClientPayload | UpdateDo
     priority: current.priority,
     category: current.category.trim(),
     useHardlinks: current.useHardlinks,
+    removeCompletedDownloads: DOWNLOAD_CLIENT_REMOVES_COMPLETED[current.adapterType] && current.removeCompletedDownloads,
     allowPrivateAddress: current.allowPrivateAddress,
     pathMappings: filledMappings(current),
   }
@@ -917,6 +928,13 @@ async function confirmOrphanRemoval() {
               :label="t('settings.system.requests.fields.useHardlinks')"
               input-id="download-client-hardlinks"
               :brief="t('settings.system.requests.fields.useHardlinksBrief')"
+            />
+            <SettingsToggleField
+              v-if="removesCompleted"
+              v-model="draft.removeCompletedDownloads"
+              :label="t('settings.system.requests.fields.removeCompletedDownloads')"
+              input-id="download-client-remove-completed"
+              :brief="t('settings.system.requests.fields.removeCompletedDownloadsBrief')"
             />
             <SettingsToggleField
               v-model="draft.allowPrivateAddress"

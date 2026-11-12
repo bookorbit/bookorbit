@@ -1,0 +1,1 @@
+ALTER TABLE "download_clients" ADD COLUMN "remove_completed_downloads" boolean DEFAULT false NOT NULL;
