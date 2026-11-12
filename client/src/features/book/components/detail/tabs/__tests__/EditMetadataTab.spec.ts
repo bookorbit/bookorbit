@@ -103,6 +103,13 @@ function makeBook(overrides: Partial<BookDetail> = {}): BookDetail {
   } as unknown as BookDetail
 }
 
+const IsbnCandidatesPopoverStub = defineComponent({
+  name: 'IsbnCandidatesPopover',
+  props: { bookId: Number, isbn13: String, isbn10: String, disabled: Boolean },
+  emits: ['select'],
+  template: '<div />',
+})
+
 function json(body: unknown, ok = true): Response {
   return { ok, status: ok ? 200 : 500, json: async () => body } as Response
 }
@@ -119,7 +126,8 @@ function mountTab(book: BookDetail) {
         CoverEditorPanel: CoverEditorPanelStub,
         MetadataSearchDrawer: MetadataSearchDrawerStub,
         MetadataSourceCard: true,
-        MetadataFieldLabel: { props: ['field'], template: '<div :data-field="field"><slot /></div>' },
+        MetadataFieldLabel: { props: ['field'], template: '<div :data-field="field"><slot name="action" /><slot /></div>' },
+        IsbnCandidatesPopover: IsbnCandidatesPopoverStub,
         RichDescriptionEditor: true,
         SeriesMembershipEditor: true,
         ChipInput: true,
@@ -223,6 +231,40 @@ describe('EditMetadataTab cover tiles', () => {
     await flushPromises()
     const body = JSON.parse(patchCalls()[0]![1]!.body as string)
     expect(body.metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
+  })
+
+  it('fills both ISBN fields from a printed ISBN and saves them only after Save', async () => {
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (init?.method === 'PATCH') return json({ book: savedBook, write: null, libraryAutoWriteEnabled: false })
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+    const wrapper = mountTab(makeBook({ isbn13: '9781635766264' }))
+    await flushPromises()
+
+    const picker = wrapper.getComponent(IsbnCandidatesPopoverStub)
+    expect(picker.props()).toMatchObject({ bookId: 7, isbn13: '9781635766264' })
+    picker.vm.$emit('select', { isbn13: '9780306406157', isbn10: '0306406152', edition: 'ebook', context: '' })
+    await flushPromises()
+
+    expect(patchCalls()).toHaveLength(0)
+    expect((wrapper.get('[data-field="isbn13"] input').element as HTMLInputElement).value).toBe('9780306406157')
+    expect((wrapper.get('[data-field="isbn10"] input').element as HTMLInputElement).value).toBe('0306406152')
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+    expect(JSON.parse(patchCalls()[0]![1]!.body as string).metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
+  })
+
+  it('leaves a locked ISBN field alone when a printed ISBN is chosen', async () => {
+    vi.mocked(api).mockImplementation(async () => json([]))
+    const wrapper = mountTab(makeBook({ isbn10: '1635766265', lockedFields: ['isbn10'] }))
+    await flushPromises()
+
+    wrapper.getComponent(IsbnCandidatesPopoverStub).vm.$emit('select', { isbn13: '9780306406157', isbn10: '0306406152', edition: null, context: '' })
+    await flushPromises()
+
+    expect((wrapper.get('[data-field="isbn13"] input').element as HTMLInputElement).value).toBe('9780306406157')
+    expect((wrapper.get('[data-field="isbn10"] input').element as HTMLInputElement).value).toBe('1635766265')
   })
 
   it('renders a moved external provider only through its compatibility ID field', async () => {

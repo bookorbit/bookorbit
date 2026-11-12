@@ -38,4 +38,14 @@ describe('MetadataFieldLabel', () => {
 
     expect(wrapper.emitted('toggle')).toEqual([['title']])
   })
+
+  it('places an action beside the label when one is given', () => {
+    const wrapper = mount(MetadataFieldLabel, {
+      props: { label: 'ISBN-13', field: 'isbn13', locked: false },
+      slots: { default: '<input />', action: '<button data-test="action">Find</button>' },
+    })
+
+    const action = wrapper.get('[data-test="action"]')
+    expect(action.element.parentElement?.querySelector('label')?.textContent).toBe('ISBN-13')
+  })
 })

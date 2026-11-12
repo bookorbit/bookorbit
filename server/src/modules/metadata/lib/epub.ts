@@ -2,7 +2,8 @@ import { Logger } from '@nestjs/common';
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
-import { scanEpubSpineForIsbn } from './epub-isbn-scan';
+import { collectEpubIsbnHits, scanEpubSpineForIsbn } from './epub-isbn-scan';
+import type { IsbnHit } from './isbn-detect';
 import { ParsedOpf, parseOpf } from './opf-parser';
 
 const logger = new Logger('EpubMetadata');
@@ -53,6 +54,17 @@ export async function extractEpubFixedLayout(absolutePath: string): Promise<bool
     const zip = await unzipper.Open.file(absolutePath);
     const opfPath = await findOpfPath(zip);
     return isPrePaginated(parseOpf(await readFileFromZip(zip, opfPath)));
+  } catch {
+    return null;
+  }
+}
+
+/** Every ISBN the EPUB's front and back pages print, or null when the file cannot be opened. */
+export async function readEpubIsbnHits(absolutePath: string): Promise<IsbnHit[] | null> {
+  try {
+    const zip = await unzipper.Open.file(absolutePath);
+    const opfPath = await findOpfPath(zip);
+    return await collectEpubIsbnHits(zip, await readFileFromZip(zip, opfPath), opfPath);
   } catch {
     return null;
   }

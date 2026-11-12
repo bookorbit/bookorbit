@@ -3,7 +3,7 @@ vi.mock('fs/promises');
 import { readFile } from 'fs/promises';
 import iconv from 'iconv-lite';
 
-import { parseFb2File } from './fb2-parser';
+import { collectFb2IsbnHits, parseFb2File, readFb2IsbnHits } from './fb2-parser';
 
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
 
@@ -348,5 +348,51 @@ describe('parseFb2File', () => {
       mockReadFile.mockResolvedValue(Buffer.from('<FictionBook><description></description></FictionBook>'));
       expect(await parseFb2File('/bad.fb2')).toBeNull();
     });
+  });
+});
+
+describe('ISBN from the body', () => {
+  const titleInfo = '<book-title>Body Book</book-title>';
+  const body = (text: string) => `<body><section><p>${text}</p></section></body>`;
+
+  it('uses the one ISBN the body prints when the description has none', async () => {
+    mockReadFile.mockResolvedValue(fb2Buffer(titleInfo, '', body('ISBN 978-0-306-40615-7')) as never);
+    const result = await parseFb2File('/book.fb2');
+    expect(result?.isbn13).toBe('9780306406157');
+  });
+
+  it('puts a body ISBN-10 into the ISBN-10 field', async () => {
+    mockReadFile.mockResolvedValue(fb2Buffer(titleInfo, '', body('ISBN 0-306-40615-2')) as never);
+    const result = await parseFb2File('/book.fb2');
+    expect(result?.isbn13).toBeNull();
+    expect(result?.custom.isbn10).toBe('0306406152');
+  });
+
+  it('fills nothing when the body prints several ISBNs', async () => {
+    mockReadFile.mockResolvedValue(fb2Buffer(titleInfo, '', body('ISBN 978-0-306-40615-7 ISBN 978-1-63576-626-4')) as never);
+    expect((await parseFb2File('/book.fb2'))?.isbn13).toBeNull();
+  });
+
+  it('keeps the description ISBN without reading the body', async () => {
+    mockReadFile.mockResolvedValue(fb2Buffer(titleInfo, '<isbn>978-1-63576-626-4</isbn>', body('ISBN 978-0-306-40615-7')) as never);
+    expect((await parseFb2File('/book.fb2'))?.isbn13).toBe('978-1-63576-626-4');
+  });
+
+  it('never reads embedded binaries', () => {
+    const xml = makeFb2(titleInfo, '', `${body('No identifiers here')}<binary id="x" content-type="text/plain">ISBN 978-0-306-40615-7</binary>`);
+    expect(collectFb2IsbnHits(xml)).toEqual([]);
+  });
+
+  it('reads only the start and end of a long body', () => {
+    const filler = 'lorem ipsum '.repeat(30_000);
+    const middle = makeFb2(titleInfo, '', body(`${filler} ISBN 978-0-306-40615-7 ${filler}`));
+    expect(collectFb2IsbnHits(middle)).toEqual([]);
+    const end = makeFb2(titleInfo, '', body(`${filler}${filler} ISBN 978-0-306-40615-7`));
+    expect(collectFb2IsbnHits(end)).toMatchObject([{ value: '9780306406157' }]);
+  });
+
+  it('returns null from readFb2IsbnHits when the file cannot be read', async () => {
+    mockReadFile.mockRejectedValue(new Error('ENOENT'));
+    expect(await readFb2IsbnHits('/book.fb2')).toBeNull();
   });
 });

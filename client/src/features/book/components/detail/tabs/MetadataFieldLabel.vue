@@ -25,7 +25,11 @@ function handleToggle() {
 
 <template>
   <div class="group/field space-y-1" :class="grow ? 'flex min-h-0 flex-col' : ''">
-    <label class="text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">{{ label }}</label>
+    <div v-if="$slots.action" class="flex items-center justify-between gap-2">
+      <label class="text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">{{ label }}</label>
+      <slot name="action" />
+    </div>
+    <label v-else class="text-[10px] font-bold tracking-[0.1em] text-muted-foreground uppercase">{{ label }}</label>
     <div class="relative" :class="grow ? 'min-h-0 flex-1' : ''">
       <slot />
       <button

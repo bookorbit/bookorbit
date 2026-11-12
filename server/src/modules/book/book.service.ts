@@ -85,7 +85,7 @@ import type {
   WriteResult,
   EpubMediaOverlayCapability,
 } from '@bookorbit/types';
-import type { ContentFilterRules, LinkedBookSummary } from '@bookorbit/types';
+import type { BookIsbnCandidates, ContentFilterRules, LinkedBookSummary } from '@bookorbit/types';
 import { assembleBookCards, assembleCollapsedBookCards } from './utils/assemble-book-cards';
 import type { RequestUser } from '../../common/types/request-user';
 import { UpdateBookFileDto } from './dto/update-book-file.dto';
@@ -3949,6 +3949,14 @@ export class BookService {
     // routes; `null` clears it. The web and every iOS build send the key, null included.
     if (dto.note !== undefined) await this.userBookNoteService.setNote(user.id, id, dto.note);
     return this.getDetail(id, user);
+  }
+
+  async getIsbnCandidates(id: number, user: RequestUser): Promise<BookIsbnCandidates> {
+    await this.verifyBookAccess(id, user);
+    const file = await this.bookRepo.findPrimaryFile(id);
+    if (!file) throw new NotFoundException(`Book ${id} has no primary file`);
+    if (!file.format || !this.metadataExtraction) return { readable: false, candidates: [] };
+    return this.metadataExtraction.findIsbnCandidates(file.absolutePath, file.format);
   }
 
   async getMetadataFromFile(id: number, user: RequestUser): Promise<Record<string, unknown>> {

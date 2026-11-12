@@ -1,6 +1,9 @@
 import { readFile } from 'fs/promises';
 
+import { splitMetadataIsbn } from '../../../common/text-match/isbn-normalize';
 import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
+import { type IsbnHit, pickSingleIsbn } from './isbn-detect';
+import { collectMobiIsbnHits } from './mobi-text';
 
 // ── PalmDB / MOBI binary offsets ──────────────────────────────────────────────
 //
@@ -167,10 +170,27 @@ export function parseMobiBuffer(buf: Buffer): MobiParsed {
   };
 }
 
+/** Parse a MOBI/AZW3 file. With no usable EXTH ISBN, falls back to the one ISBN its text prints, if exactly one. */
 export async function parseMobiFile(absolutePath: string): Promise<MobiParsed | null> {
   try {
     const buf = await readFile(absolutePath);
-    return parseMobiBuffer(buf);
+    const parsed = parseMobiBuffer(buf);
+    const embedded = splitMetadataIsbn(parsed.isbn);
+    if (!embedded.isbn10 && !embedded.isbn13) {
+      const found = pickSingleIsbn(collectMobiIsbnHits(buf, parsed.recordOffsets) ?? []);
+      parsed.isbn = found.isbn13 ?? found.isbn10 ?? parsed.isbn;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/** Every ISBN printed in a MOBI/AZW3 file's front and back text, or null when its text cannot be read. */
+export async function readMobiIsbnHits(absolutePath: string): Promise<IsbnHit[] | null> {
+  try {
+    const buf = await readFile(absolutePath);
+    return collectMobiIsbnHits(buf, parseMobiBuffer(buf).recordOffsets);
   } catch {
     return null;
   }

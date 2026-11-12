@@ -26,6 +26,10 @@ vi.mock('./pdf-parse-worker-runner', () => ({
   parsePdfFileInWorker: vi.fn(),
 }));
 
+vi.mock('./pdf-isbn-scan', () => ({
+  readPdfIsbnHits: vi.fn(),
+}));
+
 import { readFile, stat } from 'fs/promises';
 import type { MockedFunction } from 'vitest';
 import { PDFDocument } from 'pdf-lib';
@@ -34,6 +38,7 @@ import { extractPdfCover } from './pdf-cover';
 import { extractPopplerPdfMetadata } from './pdf-poppler-metadata';
 import { parsePdfFile, PDF_BUFFER_WARNING_BYTES, type PdfParsed } from './pdf-parser';
 import { parsePdfFileInWorker } from './pdf-parse-worker-runner';
+import { readPdfIsbnHits } from './pdf-isbn-scan';
 import { extractXmpXml, parseXmp } from './pdf-xmp-reader';
 
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
@@ -44,6 +49,11 @@ const mockParseXmp = parseXmp as MockedFunction<typeof parseXmp>;
 const mockExtractPdfCover = extractPdfCover as MockedFunction<typeof extractPdfCover>;
 const mockExtractPopplerPdfMetadata = extractPopplerPdfMetadata as MockedFunction<typeof extractPopplerPdfMetadata>;
 const mockParsePdfFileInWorker = parsePdfFileInWorker as MockedFunction<typeof parsePdfFileInWorker>;
+const mockReadPdfIsbnHits = readPdfIsbnHits as MockedFunction<typeof readPdfIsbnHits>;
+
+function labeledHit(value: string) {
+  return { value, kind: value.length === 13 ? (13 as const) : (10 as const), labeled: true, edition: null, context: '' };
+}
 
 function makePdfDoc(overrides: Partial<Record<string, unknown>> = {}) {
   return {
@@ -103,6 +113,34 @@ describe('parsePdfFile', () => {
     mockExtractPdfCover.mockResolvedValue(Buffer.from([0xff, 0xd8, 0xff]));
     mockExtractPopplerPdfMetadata.mockResolvedValue(null);
     mockParsePdfFileInWorker.mockResolvedValue({ parsed: makeParsed(), warnings: [] });
+    mockReadPdfIsbnHits.mockResolvedValue([]);
+  });
+
+  it('uses the one ISBN the first and last pages print when the XMP has none', async () => {
+    mockReadPdfIsbnHits.mockResolvedValue([labeledHit('9780306406157')]);
+
+    const parsed = await parsePdfFile('/books/test.pdf');
+
+    expect(mockReadPdfIsbnHits).toHaveBeenCalledWith('/books/test.pdf', 123);
+    expect(parsed).toMatchObject({ isbn10: null, isbn13: '9780306406157' });
+  });
+
+  it('keeps an XMP ISBN without reading the pages', async () => {
+    mockExtractXmpXml.mockReturnValue('<xmp/>');
+    mockParseXmp.mockReturnValue({ authors: [], genres: [], tags: [], isbn10: null, isbn13: '9781635766264' } as never);
+
+    expect(await parsePdfFile('/books/test.pdf')).toMatchObject({ isbn13: '9781635766264' });
+    expect(mockReadPdfIsbnHits).not.toHaveBeenCalled();
+  });
+
+  it('fills no ISBN when the pages print several', async () => {
+    mockReadPdfIsbnHits.mockResolvedValue([labeledHit('9780306406157'), labeledHit('9781635766264')]);
+    expect(await parsePdfFile('/books/test.pdf')).toMatchObject({ isbn10: null, isbn13: null });
+  });
+
+  it('fills no ISBN when the text cannot be read', async () => {
+    mockReadPdfIsbnHits.mockResolvedValue(null);
+    expect(await parsePdfFile('/books/test.pdf')).toMatchObject({ isbn10: null, isbn13: null });
   });
 
   it('prefers XMP metadata and includes extracted cover when requested', async () => {

@@ -2,8 +2,7 @@ import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
 import { attr, findInZip, toRecordArray } from './epub-zip-utils';
-import { findIsbnInText, pickBestIsbn } from './isbn-detect';
-import { htmlToPlainText } from '../../../common/utils/html-to-text.utils';
+import { findIsbnInText, type IsbnHit, type IsbnResult, markupToScanText, mergeIsbnHits, pickSingleIsbn } from './isbn-detect';
 
 const SPINE_WINDOW_FRONT = 10;
 const SPINE_WINDOW_BACK = 5;
@@ -15,13 +14,6 @@ const parser = new XMLParser({
   removeNSPrefix: true,
   isArray: (name) => name === 'item' || name === 'itemref',
 });
-
-interface IsbnResult {
-  isbn10: string | null;
-  isbn13: string | null;
-}
-
-const EMPTY: IsbnResult = { isbn10: null, isbn13: null };
 
 async function readEntryCapped(file: unzipper.File): Promise<string> {
   const size = file.uncompressedSize ?? 0;
@@ -73,28 +65,28 @@ function windowDocs(docs: unzipper.File[]): unzipper.File[] {
 }
 
 /**
- * Fallback ISBN detection for EPUBs whose OPF metadata carries no ISBN. Scans a bounded
- * window of spine content documents (front + back matter, where the copyright/colophon
- * lives) for a labeled, checksum-valid ISBN. Reuses the already-open zip; never throws -
- * any failure yields { isbn10: null, isbn13: null } so the metadata path is unaffected.
+ * Every ISBN printed in a bounded window of spine content documents: front and back matter, where
+ * the copyright page and colophon live. Reuses the already-open zip and skips a document it cannot
+ * read; never throws.
  */
-export async function scanEpubSpineForIsbn(zip: unzipper.CentralDirectory, opfXml: string, opfPath: string): Promise<IsbnResult> {
+export async function collectEpubIsbnHits(zip: unzipper.CentralDirectory, opfXml: string, opfPath: string): Promise<IsbnHit[]> {
+  const passages: IsbnHit[][] = [];
   try {
     const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
-    const docs = windowDocs(resolveContentDocs(opfXml, opfDir, zip));
-
-    for (const doc of docs) {
-      let text: string;
+    for (const doc of windowDocs(resolveContentDocs(opfXml, opfDir, zip))) {
       try {
-        text = htmlToPlainText(await readEntryCapped(doc));
+        passages.push(findIsbnInText(markupToScanText(await readEntryCapped(doc))));
       } catch {
         continue;
       }
-      const hits = findIsbnInText(text);
-      if (hits.some((h) => h.labeled)) return pickBestIsbn(hits);
     }
-    return EMPTY;
   } catch {
-    return EMPTY;
+    // A malformed OPF or zip leaves whatever was read so far.
   }
+  return mergeIsbnHits(passages);
+}
+
+/** Fallback ISBN for an EPUB whose OPF carries none: the one ISBN its pages print, if they print exactly one. */
+export async function scanEpubSpineForIsbn(zip: unzipper.CentralDirectory, opfXml: string, opfPath: string): Promise<IsbnResult> {
+  return pickSingleIsbn(await collectEpubIsbnHits(zip, opfXml, opfPath));
 }

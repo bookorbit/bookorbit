@@ -64,20 +64,42 @@ describe('scanEpubSpineForIsbn', () => {
     expect(result).toEqual({ isbn10: null, isbn13: ISBN_13 });
   });
 
-  it('prefers ISBN-13 when both forms appear on the page', async () => {
+  it('returns both forms when the page prints the ISBN-10 and ISBN-13 of one ISBN', async () => {
     const manifest = htmlDoc([{ id: 'copy', href: 'copyright.xhtml' }]);
     const z = zip([file('copyright.xhtml', copyrightHtml(`ISBN-13: ${ISBN_13_HUMAN} ISBN-10: 0-306-40615-2`))]);
 
     const result = await scanEpubSpineForIsbn(z, opf(manifest, spine(['copy'])), 'content.opf');
-    expect(result).toEqual({ isbn10: null, isbn13: ISBN_13 });
+    expect(result).toEqual({ isbn10: '0306406152', isbn13: ISBN_13 });
   });
 
-  it('returns the front-matter ISBN first (document-level early exit)', async () => {
+  it('fills nothing when the copyright page lists several editions', async () => {
+    const manifest = htmlDoc([{ id: 'copy', href: 'copyright.xhtml' }]);
+    const z = zip([file('copyright.xhtml', copyrightHtml(`Hardcover ISBN ${ISBN_13_HUMAN} eBook ISBN ${ISBN_13_OTHER}`))]);
+
+    const result = await scanEpubSpineForIsbn(z, opf(manifest, spine(['copy'])), 'content.opf');
+    expect(result).toEqual({ isbn10: null, isbn13: null });
+  });
+
+  it('fills nothing when front and back matter print different ISBNs', async () => {
     const manifest = htmlDoc([
       { id: 'copy', href: 'copyright.xhtml' },
       { id: 'back', href: 'back.xhtml' },
     ]);
-    const z = zip([file('copyright.xhtml', copyrightHtml(`ISBN: ${ISBN_13_HUMAN}`)), file('back.xhtml', copyrightHtml(`ISBN: ${ISBN_13_OTHER}`))]);
+    const z = zip([
+      file('copyright.xhtml', copyrightHtml(`ISBN: ${ISBN_13_HUMAN}`)),
+      file('back.xhtml', copyrightHtml(`Also by the author. ISBN: ${ISBN_13_OTHER}`)),
+    ]);
+
+    const result = await scanEpubSpineForIsbn(z, opf(manifest, spine(['copy', 'back'])), 'content.opf');
+    expect(result).toEqual({ isbn10: null, isbn13: null });
+  });
+
+  it('counts one ISBN printed in several documents once', async () => {
+    const manifest = htmlDoc([
+      { id: 'copy', href: 'copyright.xhtml' },
+      { id: 'back', href: 'back.xhtml' },
+    ]);
+    const z = zip([file('copyright.xhtml', copyrightHtml(`ISBN: ${ISBN_13_HUMAN}`)), file('back.xhtml', copyrightHtml(`ISBN ${ISBN_13}`))]);
 
     const result = await scanEpubSpineForIsbn(z, opf(manifest, spine(['copy', 'back'])), 'content.opf');
     expect(result).toEqual({ isbn10: null, isbn13: ISBN_13 });

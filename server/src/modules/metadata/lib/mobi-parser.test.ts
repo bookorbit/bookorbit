@@ -1,9 +1,17 @@
 vi.mock('fs/promises');
+vi.mock('./mobi-text', () => ({ collectMobiIsbnHits: vi.fn() }));
 
 import { readFile } from 'fs/promises';
-import { parseMobiBuffer, parseMobiFile, extractMobiCover } from './mobi-parser';
+import { parseMobiBuffer, parseMobiFile, extractMobiCover, readMobiIsbnHits } from './mobi-parser';
+import { collectMobiIsbnHits } from './mobi-text';
+import type { IsbnHit } from './isbn-detect';
 
 const mockReadFile = readFile as MockedFunction<typeof readFile>;
+const mockCollectMobiIsbnHits = collectMobiIsbnHits as MockedFunction<typeof collectMobiIsbnHits>;
+
+function labeledHit(value: string): IsbnHit {
+  return { value, kind: value.length === 13 ? 13 : 10, labeled: true, edition: null, context: '' };
+}
 
 // ── Buffer builder ────────────────────────────────────────────────────────────
 //
@@ -263,6 +271,38 @@ describe('parseMobiFile', () => {
     const r = await parseMobiFile('/book.mobi');
     expect(r?.title).toBe('File Title');
     expect(r?.authors).toEqual(['File Author']);
+  });
+
+  it('keeps a usable EXTH ISBN without reading the text', async () => {
+    mockReadFile.mockResolvedValue(buildMobiBuffer({ isbn: '9780306406157' }) as never);
+    const r = await parseMobiFile('/book.mobi');
+    expect(r?.isbn).toBe('9780306406157');
+    expect(mockCollectMobiIsbnHits).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the one ISBN the text prints', async () => {
+    mockReadFile.mockResolvedValue(buildMobiBuffer({ isbn: 'unknown' }) as never);
+    mockCollectMobiIsbnHits.mockReturnValue([labeledHit('9780306406157'), labeledHit('0306406152')]);
+    expect((await parseMobiFile('/book.mobi'))?.isbn).toBe('9780306406157');
+  });
+
+  it('fills nothing when the text prints several ISBNs', async () => {
+    mockReadFile.mockResolvedValue(buildMobiBuffer({}) as never);
+    mockCollectMobiIsbnHits.mockReturnValue([labeledHit('9780306406157'), labeledHit('9781635766264')]);
+    expect((await parseMobiFile('/book.mobi'))?.isbn).toBeNull();
+  });
+});
+
+describe('readMobiIsbnHits', () => {
+  it('returns the text hits of a readable file', async () => {
+    mockReadFile.mockResolvedValue(buildMobiBuffer({}) as never);
+    mockCollectMobiIsbnHits.mockReturnValue([labeledHit('9780306406157')]);
+    expect(await readMobiIsbnHits('/book.mobi')).toEqual([labeledHit('9780306406157')]);
+  });
+
+  it('returns null when the file cannot be read', async () => {
+    mockReadFile.mockRejectedValue(new Error('ENOENT'));
+    expect(await readMobiIsbnHits('/book.mobi')).toBeNull();
   });
 });
 

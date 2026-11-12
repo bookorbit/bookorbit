@@ -4,7 +4,9 @@ import { PDFDocument } from 'pdf-lib';
 import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { parsePdfFileInWorker } from './pdf-parse-worker-runner';
+import { pickSingleIsbn } from './isbn-detect';
 import { extractPdfCover } from './pdf-cover';
+import { readPdfIsbnHits } from './pdf-isbn-scan';
 import { extractPopplerPdfMetadata, type PopplerPdfMetadata } from './pdf-poppler-metadata';
 import { extractXmpXml, parseXmp, type XmpParsed } from './pdf-xmp-reader';
 
@@ -144,6 +146,12 @@ export async function parsePdfBuffer(absolutePath: string, buf: Buffer, options:
   const isBookorbitInfo = infoCreator === BOOKORBIT_NS_PREFIX;
   const infoAuthors = splitAuthorList(infoAuthorRaw);
 
+  // With no ISBN in the XMP, the one ISBN the first and last pages print, if they print exactly one.
+  const isbn =
+    xmp?.isbn10 || xmp?.isbn13
+      ? { isbn10: xmp.isbn10 ?? null, isbn13: xmp.isbn13 ?? null }
+      : pickSingleIsbn((await readPdfIsbnHits(absolutePath, popplerMetadata?.pageCount ?? doc.getPageCount())) ?? []);
+
   let coverBuffer: Buffer | null = null;
   if (options.extractCover === true) {
     try {
@@ -165,8 +173,8 @@ export async function parsePdfBuffer(absolutePath: string, buf: Buffer, options:
     genres: xmp?.genres?.length ? xmp.genres : [],
     // Info Dict keywords are genres+tags mixed; only use as tags when XMP is absent.
     tags: hasXmp ? xmp.tags : infoKeywords,
-    isbn10: xmp?.isbn10 ?? null,
-    isbn13: xmp?.isbn13 ?? null,
+    isbn10: isbn.isbn10,
+    isbn13: isbn.isbn13,
     seriesName: xmp?.seriesName ?? null,
     seriesIndex: xmp?.seriesIndex ?? null,
     rating: xmp?.rating ?? null,

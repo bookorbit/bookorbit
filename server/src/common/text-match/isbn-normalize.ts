@@ -40,6 +40,16 @@ export function isValidIsbn13(n: string): boolean {
   return sum % 10 === 0;
 }
 
+/** The ISBN-10 form of a 978 ISBN-13. A 979 ISBN has none. */
+export function isbn10FromIsbn13(value: string | null | undefined): string | undefined {
+  const normalized = normalizeMetadataIsbn(value);
+  if (!isValidIsbn13(normalized) || !normalized.startsWith('978')) return undefined;
+  const body = normalized.slice(3, 12);
+  const sum = [...body].reduce((total, digit, index) => total + Number(digit) * (10 - index), 0);
+  const check = (11 - (sum % 11)) % 11;
+  return `${body}${check === 10 ? 'X' : String(check)}`;
+}
+
 export function canonicalIsbn13(value: string | null | undefined): string | undefined {
   const normalized = normalizeMetadataIsbn(value);
   if (isValidIsbn13(normalized)) return normalized;

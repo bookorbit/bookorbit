@@ -3,8 +3,14 @@ import { XMLParser } from 'fast-xml-parser';
 import { parseSeriesIndex } from '@bookorbit/types';
 
 import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
+import { canonicalIsbn13 } from '../../../common/text-match/isbn-normalize';
 import { decodeFb2Document } from '../../../common/utils/fb2-encoding.utils';
 import { parsePublishedDateKey } from '../../../common/utils/published-date.utils';
+import { findIsbnInText, type IsbnHit, markupToScanText, mergeIsbnHits, pickSingleIsbn } from './isbn-detect';
+
+// Characters of body markup read from each end; the copyright notice sits at the start or the end.
+const BODY_WINDOW_FRONT = 200_000;
+const BODY_WINDOW_BACK = 100_000;
 
 const parser = new XMLParser({
   ignoreAttributes: false,
@@ -145,6 +151,39 @@ function parseCustomInfo(description: Record<string, unknown> | undefined): Part
   return custom;
 }
 
+/** Every ISBN printed at the start and end of an FB2 body. Embedded `<binary>` images are never read. */
+export function collectFb2IsbnHits(xml: string): IsbnHit[] {
+  const bodyStart = xml.search(/<body[\s>]/);
+  if (bodyStart < 0) return [];
+  const binaryStart = xml.indexOf('<binary', bodyStart);
+  const body = xml.slice(bodyStart, binaryStart < 0 ? xml.length : binaryStart);
+  const passages = body.length <= BODY_WINDOW_FRONT + BODY_WINDOW_BACK ? [body] : [body.slice(0, BODY_WINDOW_FRONT), body.slice(-BODY_WINDOW_BACK)];
+  return mergeIsbnHits(passages.map((passage) => findIsbnInText(markupToScanText(passage))));
+}
+
+/** Every ISBN printed at the start and end of an FB2 file's body, or null when the file cannot be read. */
+export async function readFb2IsbnHits(absolutePath: string): Promise<IsbnHit[] | null> {
+  try {
+    return collectFb2IsbnHits(decodeFb2Document(await readFile(absolutePath)).text);
+  } catch {
+    return null;
+  }
+}
+
+/** The description's ISBNs; with no usable one, the one ISBN the body prints, if exactly one. */
+function isbnFields(
+  publishInfoIsbn: string | null,
+  custom: Partial<Record<Fb2CustomInfoField, string>>,
+  xml: string,
+): Pick<Fb2Metadata, 'isbn13' | 'custom'> {
+  if (canonicalIsbn13(publishInfoIsbn) || canonicalIsbn13(custom.isbn10)) return { isbn13: publishInfoIsbn, custom };
+  const found = pickSingleIsbn(collectFb2IsbnHits(xml));
+  return {
+    isbn13: found.isbn13 ?? publishInfoIsbn,
+    custom: found.isbn10 ? { ...custom, isbn10: found.isbn10 } : custom,
+  };
+}
+
 export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | null> {
   try {
     // FB2 is commonly published in windows-1251 or koi8-r, so honour the
@@ -235,8 +274,7 @@ export async function parseFb2File(absolutePath: string): Promise<Fb2Metadata | 
       genres,
       tags,
       publisher: text(publishInfo?.['publisher']),
-      isbn13: text(publishInfo?.['isbn']),
-      custom: parseCustomInfo(description),
+      ...isbnFields(text(publishInfo?.['isbn']), parseCustomInfo(description), xml),
     };
   } catch {
     return null;

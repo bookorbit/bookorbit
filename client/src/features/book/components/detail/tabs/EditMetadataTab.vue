@@ -16,7 +16,15 @@ import {
   X,
 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BookCommunityRating, BookDetail, BookMetadataLockField, CoverMedium, MetadataProviderInfo, WriteResult } from '@bookorbit/types'
+import type {
+  BookCommunityRating,
+  BookDetail,
+  BookIsbnCandidate,
+  BookMetadataLockField,
+  CoverMedium,
+  MetadataProviderInfo,
+  WriteResult,
+} from '@bookorbit/types'
 import {
   BOOK_FILE_WRITE_FIELD_LABELS,
   IDENTIFIER_INPUT_KIND_BY_FIELD,
@@ -36,6 +44,7 @@ import IdentifierInput from '@/components/ui/IdentifierInput.vue'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 import MetadataSearchDrawer from './MetadataSearchDrawer.vue'
 import MetadataFieldLabel from './MetadataFieldLabel.vue'
+import IsbnCandidatesPopover from './IsbnCandidatesPopover.vue'
 import RichDescriptionEditor from './RichDescriptionEditor.vue'
 import SeriesMembershipEditor from './SeriesMembershipEditor.vue'
 import WriteAndRenameResultPanel from '../WriteAndRenameResultPanel.vue'
@@ -833,6 +842,14 @@ function applyFileMetadataToForm(meta: FileMetadata): number {
   return updatedCount
 }
 
+const isbnPickerDisabled = computed(() => formDisabled.value || !primaryFile.value || (isLocked('isbn13') && isLocked('isbn10')))
+
+function handleIsbnCandidateSelect(candidate: BookIsbnCandidate) {
+  if (formDisabled.value) return
+  if (!isLocked('isbn13')) form.isbn13 = candidate.isbn13
+  if (candidate.isbn10 && !isLocked('isbn10')) form.isbn10 = candidate.isbn10
+}
+
 async function handleLoadFromFile() {
   if (formDisabled.value) return
   const meta = await loadFromFile(props.book.id)
@@ -1330,6 +1347,15 @@ function handleCoverChanged(medium: CoverMedium | null) {
                   :is-updating="isUpdatingLock"
                   @toggle="handleLockToggle"
                 >
+                  <template #action>
+                    <IsbnCandidatesPopover
+                      :book-id="book.id"
+                      :isbn13="form.isbn13"
+                      :isbn10="form.isbn10"
+                      :disabled="isbnPickerDisabled"
+                      @select="handleIsbnCandidateSelect"
+                    />
+                  </template>
                   <IdentifierInput v-model="form.isbn13" kind="isbn" :class="controlClass(!form.isbn13, true)" :disabled="isLocked('isbn13')" />
                 </MetadataFieldLabel>
 

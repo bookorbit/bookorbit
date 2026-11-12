@@ -159,6 +159,7 @@ function makeController() {
     updateMetadataLocks: vi.fn(),
     refreshMetadata: vi.fn(),
     getMetadataFromFile: vi.fn(),
+    getIsbnCandidates: vi.fn(),
     writeAndRename: vi.fn(),
     verifyBookAccess: vi.fn(),
     getKoboState: vi.fn(),
@@ -964,6 +965,7 @@ describe('BookController', () => {
     bookService.updateMetadataLocks.mockResolvedValue({ id: 7, lockedFields: ['title'] });
     bookService.refreshMetadata.mockResolvedValue({ id: 7 });
     bookService.getMetadataFromFile.mockResolvedValue({ title: 'File Title' });
+    bookService.getIsbnCandidates.mockResolvedValue({ readable: true, candidates: [] });
     bookService.getKoboState.mockResolvedValue({ eligibleForKoboSync: false, syncCollections: [], readingState: null, snapshots: [] });
     bookService.getDetail.mockResolvedValue({ id: 7, title: 'Detail' });
 
@@ -974,6 +976,7 @@ describe('BookController', () => {
     await controller.updateMetadataLocks(7, { lockedFields: ['title'] } as never, user);
     await controller.refreshMetadata(7, 'true', user);
     await controller.getMetadataFromFile(7, user);
+    await controller.getIsbnCandidates(7, user);
     await controller.getKoboState(7, user);
     await controller.setReadStatus(7, { status: 'reading' } as never, user);
     await controller.getDetail(7, user);
@@ -987,6 +990,7 @@ describe('BookController', () => {
     expect(bookService.updateMetadataLocks).toHaveBeenCalledWith(7, ['title'], user);
     expect(bookService.refreshMetadata).toHaveBeenCalledWith(7, true, user);
     expect(bookService.getMetadataFromFile).toHaveBeenCalledWith(7, user);
+    expect(bookService.getIsbnCandidates).toHaveBeenCalledWith(7, user);
     expect(bookService.getKoboState).toHaveBeenCalledWith(7, user);
     expect(bookService.setReadStatus).toHaveBeenCalledWith(7, { status: 'reading' }, user);
     expect(bookService.getDetail).toHaveBeenCalledWith(7, user);

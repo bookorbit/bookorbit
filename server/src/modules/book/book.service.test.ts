@@ -128,6 +128,7 @@ function makeService(
     positionConverter?: unknown;
     seriesMemberships?: unknown;
     seriesExpectedCount?: unknown;
+    metadataExtraction?: unknown;
   } = {},
 ) {
   const bookRepo = {
@@ -346,7 +347,7 @@ function makeService(
     undefined,
     readingEvents,
     undefined,
-    undefined,
+    overrides.metadataExtraction as never,
     overrides.positionConverter as never,
   );
 
@@ -5541,6 +5542,35 @@ describe('BookService', () => {
 
       await expect(service.getMetadataFromFile(1, user)).rejects.toThrow(NotFoundException);
       await expect(service.getMetadataFromFile(1, user)).resolves.toEqual({});
+    });
+
+    it('getIsbnCandidates reads the primary file through metadata extraction', async () => {
+      const candidates = {
+        readable: true,
+        candidates: [{ isbn13: '9780306406157', isbn10: '0306406152', edition: 'ebook', context: 'eISBN 978-0-306-40615-7' }],
+      };
+      const metadataExtraction = { findIsbnCandidates: vi.fn().mockResolvedValue(candidates) };
+      const { service, bookRepo } = makeService({ metadataExtraction });
+      const user = makeUser();
+      const access = vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookRepo.findPrimaryFile.mockResolvedValue({ updatedAt: new Date('2026-01-01'), absolutePath: '/books/dune.epub', format: 'epub' });
+
+      await expect(service.getIsbnCandidates(3, user)).resolves.toEqual(candidates);
+      expect(access).toHaveBeenCalledWith(3, user);
+      expect(metadataExtraction.findIsbnCandidates).toHaveBeenCalledWith('/books/dune.epub', 'epub');
+    });
+
+    it('getIsbnCandidates rejects a book without a primary file and reports a file without a format as unreadable', async () => {
+      const metadataExtraction = { findIsbnCandidates: vi.fn() };
+      const { service, bookRepo } = makeService({ metadataExtraction });
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookRepo.findPrimaryFile
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ updatedAt: new Date('2026-01-01'), absolutePath: '/books/a.bin', format: null });
+
+      await expect(service.getIsbnCandidates(1, makeUser())).rejects.toThrow(NotFoundException);
+      await expect(service.getIsbnCandidates(1, makeUser())).resolves.toEqual({ readable: false, candidates: [] });
+      expect(metadataExtraction.findIsbnCandidates).not.toHaveBeenCalled();
     });
 
     it('getMetadataFromFile returns an empty object for unsupported but known file formats', async () => {

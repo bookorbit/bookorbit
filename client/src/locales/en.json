@@ -7083,6 +7083,29 @@
         "pageCountLabel": "Page Count",
         "isbn13Label": "ISBN-13",
         "isbn10Label": "ISBN-10",
+        "isbnCandidates": {
+          "trigger": "Find in book",
+          "triggerLabel": "Find the ISBNs printed in this book",
+          "heading": "ISBNs printed in this book",
+          "description": "Read from the first and last pages. Books often list every edition and other titles, so choose the one that matches this file.",
+          "loading": "Reading the book…",
+          "current": "Current",
+          "isbn10": "ISBN-10 {isbn}",
+          "status": {
+            "failed": "The book could not be read. Try again.",
+            "unreadable": "This file's text cannot be searched for ISBNs.",
+            "empty": "No ISBN is printed in this book.",
+            "currentFound": "The current ISBN is printed in this book.",
+            "currentMissing": "The current ISBN is not printed in this book."
+          },
+          "editions": {
+            "ebook": "eBook",
+            "hardcover": "Hardcover",
+            "paperback": "Paperback",
+            "print": "Print",
+            "audio": "Audio"
+          }
+        },
         "durationLabel": "Duration (s)",
         "abridgedLabel": "Abridged",
         "providerIds": "Provider IDs",

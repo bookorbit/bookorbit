@@ -60,7 +60,7 @@ import { UpdateBookFileDto } from './dto/update-book-file.dto';
 import { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
 import type { BookDeletionAuditMeta } from '@bookorbit/types';
-import type { BookQuery } from '@bookorbit/types';
+import type { BookIsbnCandidates, BookQuery } from '@bookorbit/types';
 import { UpdateBookMetadataLocksDto } from '../book-metadata-lock/dto/update-book-metadata-locks.dto';
 import { UpdateReadAloudSyncSettingsDto } from './dto/update-read-aloud-sync-settings.dto';
 
@@ -678,6 +678,12 @@ export class BookController {
   @RequirePermission(Permission.LibraryEditMetadata)
   getMetadataFromFile(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.getMetadataFromFile(id, user);
+  }
+
+  @Get(':id/isbn-candidates')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  getIsbnCandidates(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser): Promise<BookIsbnCandidates> {
+    return this.bookService.getIsbnCandidates(id, user);
   }
 
   @Post(':id/write-and-rename')

@@ -1,4 +1,4 @@
-import { canonicalIsbn13, splitMetadataIsbn } from './isbn-normalize';
+import { canonicalIsbn13, isbn10FromIsbn13, splitMetadataIsbn } from './isbn-normalize';
 
 describe('ISBN identifiers', () => {
   it.each([
@@ -19,5 +19,13 @@ describe('ISBN identifiers', () => {
     expect(canonicalIsbn13('9798896602590')).toBe('9798896602590');
     expect(canonicalIsbn13('0306406153')).toBeUndefined();
     expect(canonicalIsbn13('9780306406158')).toBeUndefined();
+  });
+
+  it('derives the ISBN-10 form of a 978 ISBN-13 only', () => {
+    expect(isbn10FromIsbn13('978-0-306-40615-7')).toBe('0306406152');
+    expect(isbn10FromIsbn13('9781551923703')).toBe('155192370X');
+    expect(isbn10FromIsbn13('9798896602590')).toBeUndefined();
+    expect(isbn10FromIsbn13('9780306406158')).toBeUndefined();
+    expect(isbn10FromIsbn13(null)).toBeUndefined();
   });
 });
