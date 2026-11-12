@@ -32,6 +32,7 @@ const SYNC_EVENT = 'koreader.sync';
 const CREDENTIALS_EVENT = 'koreader.credentials';
 const DEVICE_REMOVE_EVENT = 'koreader.device_remove';
 const DEVICE_RETIRE_EVENT = 'koreader.device_retire';
+const DEVICE_RENAME_EVENT = 'koreader.device_rename';
 const FILE_NAMING_EVENT = 'koreader.file_naming';
 const DEFAULT_DEVICE = 'KOReader';
 const FILE_NAMING_CACHE_TTL_MS = 30_000;
@@ -601,12 +602,16 @@ export class KoreaderService {
     const readerTime = readingProg?.updatedAt?.getTime() ?? 0;
 
     if (latestDevice && deviceTime >= readerTime) {
+      const deviceName = (await this.repo.getDeviceNames(userId, [latestDevice.deviceId])).get(latestDevice.deviceId);
       return {
         document: documentHash,
         percentage: latestDevice.percentage,
         progress: bookFile.progressCompatible === false ? null : (latestDevice.progress ?? ''),
         device: latestDevice.device,
         device_id: latestDevice.deviceId,
+        // An addition to the kosync reply, read by the BookOrbit plugin only. `device` stays the
+        // reported model, because that is what a device recognises its own pushes by.
+        ...(deviceName ? { device_name: deviceName } : {}),
         timestamp: progressTimestamp(latestDevice.syncTimestamp, latestDevice.updatedAt),
       };
     }
@@ -651,22 +656,24 @@ export class KoreaderService {
   }
 
   async getSyncStatus(userId: number): Promise<KoreaderSyncStatus> {
-    const [credentials, deviceRows, deviceSettings, totalSyncedBooks, sweepRows, pluginTotals, versionInfo, retirements] = await Promise.all([
-      this.getCredentials(userId),
-      this.repo.getDevicesList(userId),
-      this.repo.getDeviceFileNamingPatterns(userId),
-      this.repo.getTotalSyncedBooks(userId),
-      this.pluginRepo.listSweeps(userId),
-      this.pluginRepo.getPluginTotals(userId),
-      this.packageService.getVersionInfo(),
-      this.repo.listRetiredDeviceIds(userId),
-    ]);
+    const [credentials, deviceRows, deviceSettings, totalSyncedBooks, sweepRows, pluginTotals, versionInfo, retirements, deviceNames] =
+      await Promise.all([
+        this.getCredentials(userId),
+        this.repo.getDevicesList(userId),
+        this.repo.getDeviceFileNamingPatterns(userId),
+        this.repo.getTotalSyncedBooks(userId),
+        this.pluginRepo.listSweeps(userId),
+        this.pluginRepo.getPluginTotals(userId),
+        this.packageService.getVersionInfo(),
+        this.repo.listRetiredDeviceIds(userId),
+        this.repo.getDeviceNames(userId),
+      ]);
     const deliveryRows = await this.repo.getDeviceDeliverySettingsForDevices(userId, [
       ...deviceRows.map((row) => row.deviceId),
       ...sweepRows.map((row) => row.deviceId),
     ]);
     const deliveryByDevice = new Map(deliveryRows.map((row) => [row.deviceId, row.readAloudDelivery]));
-    const devices = this.mapDevices(deviceRows, deviceSettings).map((device) => ({
+    const devices = this.mapDevices(deviceRows, deviceSettings, deviceNames).map((device) => ({
       ...device,
       readAloudDelivery: deliveryByDevice.get(device.deviceId) ?? null,
     }));
@@ -679,6 +686,7 @@ export class KoreaderService {
       return {
         deviceId: row.deviceId,
         deviceModel: row.deviceModel,
+        deviceName: deviceNames.get(row.deviceId) ?? null,
         readAloudDelivery: deliveryByDevice.get(row.deviceId) ?? null,
         pluginVersion: row.pluginVersion,
         latestPluginVersion,
@@ -700,19 +708,25 @@ export class KoreaderService {
   }
 
   async getDevices(userId: number): Promise<KoreaderDeviceInfo[]> {
-    const [rows, settings] = await Promise.all([this.repo.getDevicesList(userId), this.repo.getDeviceFileNamingPatterns(userId)]);
-    return this.mapDevices(rows, settings);
+    const [rows, settings, names] = await Promise.all([
+      this.repo.getDevicesList(userId),
+      this.repo.getDeviceFileNamingPatterns(userId),
+      this.repo.getDeviceNames(userId),
+    ]);
+    return this.mapDevices(rows, settings, names);
   }
 
   private mapDevices(
     rows: Awaited<ReturnType<KoreaderRepository['getDevicesList']>>,
     settings: Awaited<ReturnType<KoreaderRepository['getDeviceFileNamingPatterns']>>,
+    names: ReadonlyMap<string, string>,
   ): KoreaderDeviceInfo[] {
     const settingsByDevice = new Map(settings.map((setting) => [setting.deviceId, setting]));
     return rows.map((r) => {
       const setting = settingsByDevice.get(r.deviceId);
       return {
         device: r.device,
+        deviceName: names.get(r.deviceId) ?? null,
         deviceId: r.deviceId,
         lastSyncAt: r.lastSyncAt.toISOString(),
         lastBookTitle: r.lastBookTitle,
@@ -844,6 +858,26 @@ export class KoreaderService {
     );
   }
 
+  /** Sets the name BookOrbit shows for a device, or clears it with `null`. The reported model is left alone. */
+  async setDeviceName(userId: number, deviceId: string, name: string | null): Promise<void> {
+    const startedAt = Date.now();
+    const safeDeviceId = sanitizeLogValue(deviceId);
+
+    if (!(await this.repo.deviceExists(userId, deviceId))) {
+      this.logger.warn(
+        `[${DEVICE_RENAME_EVENT}] [fail] userId=${userId} deviceId="${safeDeviceId}" durationMs=${Date.now() - startedAt} errorClass=NotFoundException error="device not found" - set device name failed`,
+      );
+      throw new NotFoundException('KOReader device not found');
+    }
+
+    if (name === null) await this.repo.clearDeviceName(userId, deviceId);
+    else await this.repo.setDeviceName(userId, deviceId, name);
+
+    this.logger.log(
+      `[${DEVICE_RENAME_EVENT}] [end] userId=${userId} deviceId="${safeDeviceId}" named=${name !== null} durationMs=${Date.now() - startedAt} - set device name completed`,
+    );
+  }
+
   private fileNamingCacheScope(userId: number): string {
     return `koreader-file-naming:${userId}`;
   }
@@ -858,7 +892,13 @@ export class KoreaderService {
     const { deviceProgress, readingProgress } = await this.repo.getBookProgressForDashboard(bookFileId, userId);
     if (deviceProgress.length === 0 && !readingProgress) return null;
 
-    const chapters = await this.repo.getChapters(bookFileId);
+    const [chapters, deviceNames] = await Promise.all([
+      this.repo.getChapters(bookFileId),
+      this.repo.getDeviceNames(
+        userId,
+        deviceProgress.map((dp) => dp.deviceId),
+      ),
+    ]);
     const readerTime = readingProgress?.updatedAt?.getTime() ?? 0;
 
     // A held device's row can be newer than everything else and still not be the canonical
@@ -894,6 +934,7 @@ export class KoreaderService {
       canonicalUpdatedAt: new Date(canonicalTime).toISOString(),
       devices: deviceProgress.map((dp) => ({
         device: dp.device,
+        deviceName: deviceNames.get(dp.deviceId) ?? null,
         deviceId: dp.deviceId,
         percentage: toBookorbitPercentage(dp.percentage ?? 0),
         chapterIndex: dp.chapterIndex,
@@ -903,6 +944,7 @@ export class KoreaderService {
       fileModifiedSinceLastSync,
       heldByReset: heldDevices.map((dp) => ({
         device: dp.device,
+        deviceName: deviceNames.get(dp.deviceId) ?? null,
         deviceId: dp.deviceId,
         percentage: toBookorbitPercentage(dp.percentage ?? 0),
         updatedAt: dp.updatedAt!.toISOString(),

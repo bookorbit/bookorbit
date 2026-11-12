@@ -4,7 +4,11 @@ Names people know their readers by.
 KOReader reports devices by model id (Device.model): Kobos by codename
 ("Kobo_monza"), Kindles by a run-together name ("KindlePaperWhite5"). The
 progress prompt names the device that holds the other position, so it shows
-the name on the box. Anything not listed is shown as reported.
+the name the user gave that device in BookOrbit, else the name on the box.
+Anything not listed is shown as reported.
+
+The web app keeps its own copy of this list (client/src/features/koreader/lib/
+device-label.ts); a test there fails when the two differ.
 ]]
 
 local DeviceNames = {}
@@ -53,7 +57,22 @@ local NAMES = {
     KindleScribeColorSoft = "Kindle Scribe Colorsoft",
 }
 
-function DeviceNames.label(model)
+local MAX_NAME_LENGTH = 100
+
+-- A name from the server is shown on one line, so anything that would break
+-- that is ignored rather than trimmed into shape.
+local function givenName(name)
+    if type(name) ~= "string" then return nil end
+    name = name:match("^%s*(.-)%s*$")
+    if name == "" or #name > MAX_NAME_LENGTH * 4 or name:find("[%c]") then return nil end
+    return name
+end
+
+-- `name` is what the server calls the device (`device_name`); `model` is
+-- what the device reports, and what it is still recognised by.
+function DeviceNames.label(model, name)
+    local given = givenName(name)
+    if given then return given end
     if type(model) ~= "string" or model == "" then return nil end
     return NAMES[model] or model
 end

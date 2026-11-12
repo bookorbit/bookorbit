@@ -12,6 +12,7 @@ import {
   type KoreaderFileNamingRequestErrorCode,
 } from '@/features/koreader/composables/useKoreaderSync'
 import { useKoreaderFileNamingDrafts } from '@/features/koreader/composables/useKoreaderFileNamingDrafts'
+import { koreaderDeviceLabel } from '@/features/koreader/lib/device-label'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 const props = defineProps<{ devices: KoreaderDeviceSweepInfo[] }>()
@@ -42,6 +43,10 @@ const errorKeys: Record<KoreaderFileNamingRequestErrorCode, string> = {
   'account-save': 'settings.reader.koreader.fileNaming.accountSaveFailed',
   'device-save': 'settings.reader.koreader.fileNaming.deviceSaveFailed',
   'device-reset': 'settings.reader.koreader.fileNaming.deviceResetFailed',
+}
+
+function deviceLabel(device: KoreaderDeviceSweepInfo): string {
+  return koreaderDeviceLabel(device.deviceModel, device.deviceName)
 }
 
 function localizedRequestError(error: unknown, fallbackKey: string): string {
@@ -186,7 +191,7 @@ async function resetDevice(deviceId: string) {
             <div class="flex items-center gap-2">
               <Smartphone :size="17" class="text-muted-foreground" />
               <div>
-                <div class="font-medium text-foreground">{{ device.deviceModel }}</div>
+                <div class="font-medium text-foreground">{{ deviceLabel(device) }}</div>
                 <div class="text-xs text-muted-foreground">{{ device.deviceId }}</div>
               </div>
             </div>

@@ -38,6 +38,17 @@ describe('KoreaderResetHoldNotice', () => {
     expect(text[1]).toContain('Kobo Libra still has the old position (50%)')
   })
 
+  it('calls a held device by the name it was given, or by the model it is sold as', () => {
+    const wrapper = mountNotice(
+      [held({ device: 'blazer', deviceId: 'phone', deviceName: 'Pixel 8' }), held({ device: 'Kobo_monza', deviceId: 'kobo-1', percentage: 50 })],
+      vi.fn<Release>(),
+    )
+
+    const text = rows(wrapper).map((row) => row.text())
+    expect(text[0]).toContain('Pixel 8 still has the old position (27%)')
+    expect(text[1]).toContain('Kobo Libra Colour still has the old position (50%)')
+  })
+
   it('renders nothing for an empty list', () => {
     const wrapper = mountNotice([], vi.fn<Release>())
     expect(rows(wrapper)).toHaveLength(0)

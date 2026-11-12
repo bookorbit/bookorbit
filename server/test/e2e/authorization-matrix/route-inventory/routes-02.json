@@ -704,6 +704,19 @@
   {
     "file": "server/src/modules/book/book.controller.ts",
     "className": "BookController",
+    "methodName": "getIsbnCandidates",
+    "httpMethod": "GET",
+    "path": "/books/:id/isbn-candidates",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "read"
+  },
+  {
+    "file": "server/src/modules/book/book.controller.ts",
+    "className": "BookController",
     "methodName": "getWriteLog",
     "httpMethod": "GET",
     "path": "/books/:id/write-log",

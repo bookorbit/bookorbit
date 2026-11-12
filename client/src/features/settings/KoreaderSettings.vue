@@ -25,6 +25,7 @@ import {
   KeyRound,
   Library,
   Link2,
+  Pencil,
   RefreshCw,
   Search,
   Smartphone,
@@ -51,6 +52,8 @@ import ReadAloudDeliverySelect from '@/features/delivery/components/ReadAloudDel
 import { useReadAloudDelivery } from '@/features/delivery/composables/useReadAloudDelivery'
 import type { ReadAloudDeliveryPreference } from '@bookorbit/types'
 import KoreaderFileNamingSettings from './KoreaderFileNamingSettings.vue'
+import KoreaderDeviceRenameDialog from '@/features/koreader/components/KoreaderDeviceRenameDialog.vue'
+import { koreaderDeviceLabel, koreaderDeviceModelHint } from '@/features/koreader/lib/device-label'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useKoreaderSync } from '@/features/koreader/composables/useKoreaderSync'
@@ -134,6 +137,7 @@ const {
   relinkManualHashLink,
   unlinkManualHashLink,
   setDeviceRetired,
+  setDeviceName,
   removeDevice,
 } = useKoreaderSync()
 
@@ -163,6 +167,8 @@ const removeDeviceConfirmTarget = ref<KoreaderDeviceInfo | null>(null)
 const removingDeviceId = ref<string | null>(null)
 const retiringDeviceId = ref<string | null>(null)
 const retiredDevicesOpen = ref(false)
+const renameDeviceTarget = ref<KoreaderDeviceInfo | null>(null)
+const renamingDevice = ref(false)
 const dismissConfirmBook = ref<KoreaderUnmatchedBook | null>(null)
 const dismissingHash = ref<string | null>(null)
 const dismissAllConfirmOpen = ref(false)
@@ -773,6 +779,46 @@ function handleRestoreDevice(device: KoreaderDeviceInfo) {
   return applyDeviceRetired(device, false)
 }
 
+const renameDialogDevice = computed(() => {
+  const device = renameDeviceTarget.value
+  return device ? { deviceId: device.deviceId, model: device.device, deviceName: device.deviceName ?? null } : null
+})
+
+function deviceLabel(device: KoreaderDeviceInfo): string {
+  return koreaderDeviceLabel(device.device, device.deviceName)
+}
+
+function deviceModelHint(device: KoreaderDeviceInfo): string | null {
+  return koreaderDeviceModelHint(device.device, device.deviceName)
+}
+
+function sweepLabel(sweep: KoreaderDeviceSweepInfo): string {
+  return koreaderDeviceLabel(sweep.deviceModel, sweep.deviceName)
+}
+
+function handleOpenRenameDevice(device: KoreaderDeviceInfo) {
+  renameDeviceTarget.value = device
+}
+
+function handleCloseRenameDevice() {
+  if (!renamingDevice.value) renameDeviceTarget.value = null
+}
+
+async function handleSaveDeviceName(name: string) {
+  const device = renameDeviceTarget.value
+  if (!device || renamingDevice.value) return
+  renamingDevice.value = true
+  try {
+    await setDeviceName(device.deviceId, name)
+    toast.success(name ? t('settings.reader.koreader.renameDevice.saved') : t('settings.reader.koreader.renameDevice.cleared'))
+    renameDeviceTarget.value = null
+  } catch {
+    toast.error(t('settings.reader.koreader.renameDevice.failed'))
+  } finally {
+    renamingDevice.value = false
+  }
+}
+
 function handleOpenRemoveDevice(device: KoreaderDeviceInfo) {
   removeDeviceConfirmTarget.value = device
 }
@@ -1112,33 +1158,46 @@ async function handleDownloadPlugin() {
           </div>
           <div v-else class="settings-card">
             <div v-for="device in activeDevices" :key="device.deviceId" class="px-4 py-4 bg-card md:px-5">
-              <div class="flex items-start gap-3">
-                <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
-                  <Smartphone :size="16" />
-                </div>
-                <div class="flex-1 min-w-0">
-                  <p class="settings-label truncate">{{ device.device }}</p>
-                  <div class="mt-1 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-                    <p class="min-w-0">
-                      {{ t('settings.reader.koreader.lastSyncLabel') }}
-                      <span class="text-foreground">{{ formatLastSync(device.lastSyncAt) }}</span>
-                    </p>
-                    <p class="min-w-0 truncate">
-                      {{ t('settings.reader.koreader.lastBookLabel') }}
-                      <span class="text-foreground">{{ device.lastBookTitle ?? t('settings.reader.koreader.noneYet') }}</span>
-                    </p>
+              <div class="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <div class="flex flex-1 min-w-0 items-start gap-3">
+                  <div class="w-9 h-9 rounded-lg bg-muted flex items-center justify-center text-muted-foreground shrink-0 border border-border">
+                    <Smartphone :size="16" />
+                  </div>
+                  <div class="flex-1 min-w-0">
+                    <p class="settings-label truncate">{{ deviceLabel(device) }}</p>
+                    <p v-if="deviceModelHint(device)" class="truncate text-xs text-muted-foreground">{{ deviceModelHint(device) }}</p>
+                    <div class="mt-1 grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                      <p class="min-w-0">
+                        {{ t('settings.reader.koreader.lastSyncLabel') }}
+                        <span class="text-foreground">{{ formatLastSync(device.lastSyncAt) }}</span>
+                      </p>
+                      <p class="min-w-0 truncate">
+                        {{ t('settings.reader.koreader.lastBookLabel') }}
+                        <span class="text-foreground">{{ device.lastBookTitle ?? t('settings.reader.koreader.noneYet') }}</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
-                <Button
-                  variant="destructive-outline"
-                  size="sm"
-                  class="shrink-0"
-                  :disabled="retiringDeviceId === device.deviceId"
-                  @click="handleRetireDevice(device)"
-                >
-                  <Archive :size="12" />
-                  {{ retiringDeviceId === device.deviceId ? t('settings.reader.koreader.retiring') : t('settings.reader.koreader.retire') }}
-                </Button>
+                <div class="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    :aria-label="t('settings.reader.koreader.renameDevice.actionLabel', { device: deviceLabel(device) })"
+                    @click="handleOpenRenameDevice(device)"
+                  >
+                    <Pencil :size="12" aria-hidden="true" />
+                    {{ t('settings.reader.koreader.renameDevice.action') }}
+                  </Button>
+                  <Button
+                    variant="destructive-outline"
+                    size="sm"
+                    :disabled="retiringDeviceId === device.deviceId"
+                    @click="handleRetireDevice(device)"
+                  >
+                    <Archive :size="12" />
+                    {{ retiringDeviceId === device.deviceId ? t('settings.reader.koreader.retiring') : t('settings.reader.koreader.retire') }}
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
@@ -1164,7 +1223,8 @@ async function handleDownloadPlugin() {
                       <Archive :size="16" />
                     </div>
                     <div class="flex-1 min-w-0">
-                      <p class="settings-label truncate">{{ device.device }}</p>
+                      <p class="settings-label truncate">{{ deviceLabel(device) }}</p>
+                      <p v-if="deviceModelHint(device)" class="truncate text-xs text-muted-foreground">{{ deviceModelHint(device) }}</p>
                       <p class="mt-1 text-xs text-muted-foreground">
                         {{ t('settings.reader.koreader.retiredOnLabel') }}
                         <span class="text-foreground">{{ formatRetiredAt(device.retiredAt) }}</span>
@@ -1211,7 +1271,7 @@ async function handleDownloadPlugin() {
                 <div class="flex-1 min-w-0">
                   <div class="flex flex-wrap items-center gap-2">
                     <p class="settings-label truncate">
-                      {{ sweep.deviceModel }}
+                      {{ sweepLabel(sweep) }}
                       <span v-if="sweep.pluginVersion" class="font-normal text-muted-foreground"> v{{ sweep.pluginVersion }}</span>
                     </p>
                     <span class="rounded-md border px-2 py-0.5 text-[11px] font-medium" :class="pluginUpdateClass(sweep)">
@@ -1710,7 +1770,7 @@ async function handleDownloadPlugin() {
           <p class="text-base font-semibold text-foreground">
             {{
               t('settings.reader.koreader.deleteDeviceDataConfirmTitle', {
-                device: removeDeviceConfirmTarget.device,
+                device: deviceLabel(removeDeviceConfirmTarget),
               })
             }}
           </p>
@@ -2008,6 +2068,13 @@ async function handleDownloadPlugin() {
         </ul>
         <p class="mt-3 text-xs text-muted-foreground">{{ t('settings.reader.koreader.hashLinks.copyNote') }}</p>
       </ConfirmDialog>
+
+      <KoreaderDeviceRenameDialog
+        :device="renameDialogDevice"
+        :saving="renamingDevice"
+        @save="handleSaveDeviceName"
+        @cancel="handleCloseRenameDevice"
+      />
     </template>
   </div>
 

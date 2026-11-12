@@ -848,6 +848,19 @@
   {
     "file": "server/src/modules/book-request/download-clients/download-client.controller.ts",
     "className": "DownloadClientController",
+    "methodName": "validate",
+    "httpMethod": "POST",
+    "path": "/admin/download-clients/validate",
+    "permissions": ["Permission.ManageAppSettings"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/book-request/download-clients/download-client.controller.ts",
+    "className": "DownloadClientController",
     "methodName": "test",
     "httpMethod": "POST",
     "path": "/admin/download-clients/:id/test",

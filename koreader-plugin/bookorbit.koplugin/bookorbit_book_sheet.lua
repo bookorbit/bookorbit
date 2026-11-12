@@ -130,7 +130,8 @@ local function positions(page, w, remote, bold_remote)
     local there
     if remote and remote.percentage then
         local parts = { pct(remote.percentage) }
-        if remote.device and remote.device ~= "" then table.insert(parts, DeviceNames.label(remote.device)) end
+        local device = DeviceNames.label(remote.device, remote.device_name)
+        if device then table.insert(parts, device) end
         local when = MenuUI.ago(remote.timestamp)
         if when then table.insert(parts, when) end
         there = table.concat(parts, ", ")

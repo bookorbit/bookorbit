@@ -140,6 +140,26 @@ export const koreaderDeviceRetirements = pgTable(
   (t) => [primaryKey({ columns: [t.userId, t.deviceId] }), index('koreader_device_retirements_user_id_idx').on(t.userId)],
 );
 
+// The name a user gave a device. Kept apart from the model the device reports, because that
+// model is part of how progress rows are keyed and recognised as a device's own.
+export const koreaderDeviceNames = pgTable(
+  'koreader_device_names',
+  {
+    userId: integer('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    deviceId: varchar('device_id', { length: 100 }).notNull(),
+    name: varchar('name', { length: 100 }).notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => new Date()),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.deviceId] })],
+);
+
+export type KoreaderDeviceName = typeof koreaderDeviceNames.$inferSelect;
+
 export type KoreaderDeviceRetirement = typeof koreaderDeviceRetirements.$inferSelect;
 export type NewKoreaderDeviceRetirement = typeof koreaderDeviceRetirements.$inferInsert;
 

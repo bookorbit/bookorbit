@@ -35,6 +35,7 @@ import {
   TestConnectionDto,
   UpdateKoreaderDeviceDto,
   UpdateKoreaderDeviceFilePatternDto,
+  UpdateKoreaderDeviceNameDto,
   UpdateKoreaderFilePatternDto,
   UpdateKoreaderManualHashLinkDto,
   UpdateKoreaderUserDto,
@@ -158,6 +159,20 @@ export class KoreaderController {
   @Patch('devices/:deviceId')
   async updateDevice(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto, @Body() dto: UpdateKoreaderDeviceDto) {
     await this.koreaderService.setDeviceRetired(user.id, params.deviceId, dto.retired);
+    return { success: true };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Put('devices/:deviceId/name')
+  async setDeviceName(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto, @Body() dto: UpdateKoreaderDeviceNameDto) {
+    await this.koreaderService.setDeviceName(user.id, params.deviceId, dto.name);
+    return { deviceId: params.deviceId, name: dto.name };
+  }
+
+  @RequirePermission(Permission.KoreaderSync)
+  @Delete('devices/:deviceId/name')
+  async clearDeviceName(@CurrentUser() user: RequestUser, @Param() params: KoreaderDeviceParamDto) {
+    await this.koreaderService.setDeviceName(user.id, params.deviceId, null);
     return { success: true };
   }
 

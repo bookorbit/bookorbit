@@ -664,6 +664,44 @@ describe('useKoreaderSync', () => {
     expect(loading.value).toBe(false)
   })
 
+  it('setDeviceName saves a trimmed name and refreshes the sync status', async () => {
+    const refreshedStatus = makeSyncStatus()
+    apiMock.mockResolvedValueOnce(makeResponse({ deviceId: 'device 1', name: 'Pixel 8' })).mockResolvedValueOnce(makeResponse(refreshedStatus))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { syncStatus, setDeviceName } = useKoreaderSync()
+
+    await expect(setDeviceName('device 1', '  Pixel 8  ')).resolves.toBeUndefined()
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/koreader/devices/device%201/name', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Pixel 8' }),
+    })
+    expect(syncStatus.value).toEqual(refreshedStatus)
+  })
+
+  it('setDeviceName clears the name when it is blank', async () => {
+    apiMock.mockResolvedValueOnce(makeResponse({ success: true })).mockResolvedValueOnce(makeResponse(makeSyncStatus()))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { setDeviceName } = useKoreaderSync()
+
+    await setDeviceName('device-1', '   ')
+
+    expect(apiMock).toHaveBeenCalledWith('/api/v1/koreader/devices/device-1/name', { method: 'DELETE' })
+  })
+
+  it('setDeviceName throws without refreshing when the server refuses the name', async () => {
+    apiMock.mockResolvedValueOnce(makeResponse({ message: 'name must be shorter' }, { ok: false, status: 400 }))
+
+    const { useKoreaderSync } = await import('../useKoreaderSync')
+    const { setDeviceName } = useKoreaderSync()
+
+    await expect(setDeviceName('device-1', 'Pixel 8')).rejects.toThrow('Failed to rename KOReader device')
+    expect(apiMock).toHaveBeenCalledTimes(1)
+  })
+
   it('setDeviceRetired patches the device and refreshes the sync status', async () => {
     const refreshedStatus = makeSyncStatus()
     apiMock.mockResolvedValueOnce(makeResponse({ success: true })).mockResolvedValueOnce(makeResponse(refreshedStatus))

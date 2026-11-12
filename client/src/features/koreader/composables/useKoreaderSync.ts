@@ -307,6 +307,17 @@ export function useKoreaderSync() {
     await fetchSyncStatus(true)
   }
 
+  /** Saves the name BookOrbit shows for a device; a blank name goes back to the model. */
+  async function setDeviceName(deviceId: string, name: string): Promise<void> {
+    const trimmed = name.trim()
+    const url = `/api/v1/koreader/devices/${encodeURIComponent(deviceId)}/name`
+    const res = trimmed
+      ? await api(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: trimmed }) })
+      : await api(url, { method: 'DELETE' })
+    if (!res.ok) throw new Error('Failed to rename KOReader device')
+    await fetchSyncStatus(true)
+  }
+
   async function removeDevice(deviceId: string): Promise<void> {
     const res = await api(`/api/v1/koreader/devices/${deviceId}`, { method: 'DELETE' })
     if (!res.ok) {
@@ -347,6 +358,7 @@ export function useKoreaderSync() {
     saveDeviceFileNamingPattern,
     clearDeviceFileNamingPattern,
     setDeviceRetired,
+    setDeviceName,
     removeDevice,
   }
 }

@@ -5,6 +5,7 @@ import type { KoreaderCredentials, KoreaderDeviceInfo, KoreaderDeviceSweepInfo }
 import { Button } from '@/components/ui/button'
 import ReadAloudDeliverySelect from '@/features/delivery/components/ReadAloudDeliverySelect.vue'
 import { useKoreaderDeliverySettings } from '@/features/koreader/composables/useKoreaderDeliverySettings'
+import { koreaderDeviceLabel } from '@/features/koreader/lib/device-label'
 
 const props = defineProps<{ credentials: KoreaderCredentials | null; devices: KoreaderDeviceInfo[]; sweeps: KoreaderDeviceSweepInfo[] }>()
 const emit = defineEmits<{ updated: [] }>()
@@ -27,7 +28,7 @@ function saveDevice(deviceId: string) {
   void save(deviceId)
 }
 function deviceName(device: KoreaderDeviceInfo | KoreaderDeviceSweepInfo) {
-  return 'device' in device ? device.device : device.deviceModel
+  return koreaderDeviceLabel('device' in device ? device.device : device.deviceModel, device.deviceName)
 }
 </script>
 

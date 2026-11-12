@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { TriangleAlert } from '@lucide/vue'
 import type { KoreaderResetHeldDevice } from '@bookorbit/types'
 import { formatPercent } from '@/i18n/formatters'
+import { koreaderDeviceLabel } from '@/features/koreader/lib/device-label'
 
 // Release is a callback rather than an event because a successful release refetches the holds,
 // which unmounts this notice when it was the last one before an emitted event could be heard.
@@ -32,6 +33,10 @@ function heldPercent(percentage: number): string {
   return formatPercent(shown / 100)
 }
 
+function heldDeviceLabel(device: KoreaderResetHeldDevice): string {
+  return koreaderDeviceLabel(device.device, device.deviceName)
+}
+
 async function handleRelease(deviceId: string) {
   if (isReleasing(deviceId)) return
   releasingDeviceIds.value = [...releasingDeviceIds.value, deviceId]
@@ -52,7 +57,7 @@ async function handleRelease(deviceId: string) {
       <TriangleAlert class="mt-0.5 size-3 shrink-0 text-warning" aria-hidden="true" />
       <div class="min-w-0">
         <p class="text-[11px] text-warning">
-          {{ t('book.detail.details.resetHoldNotice', { device: device.device, percent: heldPercent(device.percentage) }) }}
+          {{ t('book.detail.details.resetHoldNotice', { device: heldDeviceLabel(device), percent: heldPercent(device.percentage) }) }}
         </p>
         <button
           type="button"

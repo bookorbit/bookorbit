@@ -3,6 +3,9 @@ import type { HighlightOfTheDayWidgetData, ReadingGoalWidgetData, ReadingStreakW
 import type { SeriesIndex } from "./series-index";
 import type { AchievementRarity } from "./achievement";
 
+/** Longest name a user can give a KOReader device. */
+export const KOREADER_DEVICE_NAME_MAX_LENGTH = 100;
+
 export interface KoreaderCredentials {
   readAloudDelivery?: ReadAloudDeliveryPreference;
   username: string;
@@ -15,6 +18,8 @@ export interface KoreaderCredentials {
 export interface KoreaderDeviceInfo {
   readAloudDelivery?: ReadAloudDeliveryPreference;
   device: string;
+  /** The name the user gave this device in BookOrbit, or null to show its model. */
+  deviceName?: string | null;
   deviceId: string;
   lastSyncAt: string;
   lastBookTitle: string | null;
@@ -27,6 +32,8 @@ export interface KoreaderDeviceInfo {
 
 export interface KoreaderBookProgress {
   device: string;
+  /** The name the user gave this device in BookOrbit, or null to show its model. */
+  deviceName?: string | null;
   deviceId: string;
   percentage: number;
   chapterIndex: number | null;
@@ -38,6 +45,8 @@ export interface KoreaderDeviceSweepInfo {
   readAloudDelivery?: ReadAloudDeliveryPreference;
   deviceId: string;
   deviceModel: string;
+  /** The name the user gave this device in BookOrbit, or null to show its model. */
+  deviceName?: string | null;
   pluginVersion: string | null;
   latestPluginVersion: string | null;
   updateAvailable: boolean | null;
@@ -97,6 +106,8 @@ export interface KoreaderBookSyncInfo {
 
 export interface KoreaderResetHeldDevice {
   device: string;
+  /** The name the user gave this device in BookOrbit, or null to show its model. */
+  deviceName?: string | null;
   deviceId: string;
   percentage: number;
   updatedAt: string;

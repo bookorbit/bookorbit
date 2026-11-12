@@ -340,6 +340,32 @@
   {
     "file": "server/src/modules/koreader/koreader.controller.ts",
     "className": "KoreaderController",
+    "methodName": "setDeviceName",
+    "httpMethod": "PUT",
+    "path": "/koreader/devices/:deviceId/name",
+    "permissions": ["Permission.KoreaderSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/koreader/koreader.controller.ts",
+    "className": "KoreaderController",
+    "methodName": "clearDeviceName",
+    "httpMethod": "DELETE",
+    "path": "/koreader/devices/:deviceId/name",
+    "permissions": ["Permission.KoreaderSync"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/koreader/koreader.controller.ts",
+    "className": "KoreaderController",
     "methodName": "getBookProgress",
     "httpMethod": "GET",
     "path": "/koreader/books/:bookId/progress",

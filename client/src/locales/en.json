@@ -3713,7 +3713,18 @@
         "retireDeviceFailed": "Failed to retire device",
         "restoreDeviceFailed": "Failed to restore device",
         "retiredDevices": "{count, plural, one {# retired device} other {# retired devices}}",
-        "retiredOnLabel": "Retired"
+        "retiredOnLabel": "Retired",
+        "renameDevice": {
+          "action": "Rename",
+          "actionLabel": "Rename {device}",
+          "title": "Rename device",
+          "description": "BookOrbit shows this name in place of the model the device reports, here and in the BookOrbit plugin on your other devices. Leave it empty to show the model again.",
+          "nameLabel": "Name",
+          "modelHint": "Reported model: {model}",
+          "saved": "Device renamed",
+          "cleared": "Device name removed",
+          "failed": "Failed to rename device"
+        }
       },
       "opds": {
         "title": "OPDS",

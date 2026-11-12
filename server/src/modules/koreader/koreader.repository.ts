@@ -1093,6 +1093,37 @@ export class KoreaderRepository {
       .where(and(eq(schema.koreaderDeviceRetirements.userId, userId), eq(schema.koreaderDeviceRetirements.deviceId, deviceId)));
   }
 
+  /** Names for the given devices, or for every named device of the user when none are given. */
+  async getDeviceNames(userId: number, deviceIds?: readonly string[]): Promise<Map<string, string>> {
+    if (deviceIds && deviceIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ deviceId: schema.koreaderDeviceNames.deviceId, name: schema.koreaderDeviceNames.name })
+      .from(schema.koreaderDeviceNames)
+      .where(
+        and(
+          eq(schema.koreaderDeviceNames.userId, userId),
+          deviceIds ? inArray(schema.koreaderDeviceNames.deviceId, [...new Set(deviceIds)]) : undefined,
+        ),
+      );
+    return new Map(rows.map((row) => [row.deviceId, row.name]));
+  }
+
+  async setDeviceName(userId: number, deviceId: string, name: string): Promise<void> {
+    await this.db
+      .insert(schema.koreaderDeviceNames)
+      .values({ userId, deviceId, name })
+      .onConflictDoUpdate({
+        target: [schema.koreaderDeviceNames.userId, schema.koreaderDeviceNames.deviceId],
+        set: { name, updatedAt: new Date() },
+      });
+  }
+
+  async clearDeviceName(userId: number, deviceId: string): Promise<void> {
+    await this.db
+      .delete(schema.koreaderDeviceNames)
+      .where(and(eq(schema.koreaderDeviceNames.userId, userId), eq(schema.koreaderDeviceNames.deviceId, deviceId)));
+  }
+
   async getKoreaderUserDefaultPattern(userId: number): Promise<string | null> {
     const row = await this.db.query.koreaderUserSettings.findFirst({
       where: eq(schema.koreaderUserSettings.userId, userId),
@@ -1202,10 +1233,13 @@ export class KoreaderRepository {
         .delete(schema.koreaderDeviceDeliverySettings)
         .where(and(eq(schema.koreaderDeviceDeliverySettings.userId, userId), eq(schema.koreaderDeviceDeliverySettings.deviceId, deviceId)));
 
-      // Not counted towards the deleted-row total: a marker on its own never made the device listable.
+      // Not counted towards the deleted-row total: a marker or a name on its own never made the device listable.
       await tx
         .delete(schema.koreaderDeviceRetirements)
         .where(and(eq(schema.koreaderDeviceRetirements.userId, userId), eq(schema.koreaderDeviceRetirements.deviceId, deviceId)));
+      await tx
+        .delete(schema.koreaderDeviceNames)
+        .where(and(eq(schema.koreaderDeviceNames.userId, userId), eq(schema.koreaderDeviceNames.deviceId, deviceId)));
 
       // Only drop unmatched-book rows this device orphaned - a hash still reported by another
       // device must stay visible until that device is removed (or the hash is matched/linked).

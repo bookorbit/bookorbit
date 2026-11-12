@@ -6,6 +6,7 @@ import { createCapturingDb } from '../../common/test-utils/capture-sql-db';
 import { sqlChunkText } from '../../common/test-utils/sql-chunk-text';
 import { KoreaderRepository } from './koreader.repository';
 import { DB } from '../../db';
+import * as schema from '../../db/schema';
 
 async function makeRepository(db: unknown) {
   const module = await Test.createTestingModule({ providers: [KoreaderRepository, { provide: DB, useValue: db }] }).compile();
@@ -1015,9 +1016,10 @@ describe('KoreaderRepository', () => {
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(9);
 
       expect(db.transaction).toHaveBeenCalledTimes(1);
-      // Delivery configuration and retirement markers are cleared without changing the data-row count.
-      expect(tx.delete).toHaveBeenCalledTimes(10);
-      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(10);
+      // Delivery configuration, retirement markers and names are cleared without changing the data-row count.
+      expect(tx.delete).toHaveBeenCalledTimes(11);
+      expect(txDeleteBuilder.where).toHaveBeenCalledTimes(11);
+      expect(tx.delete).toHaveBeenCalledWith(schema.koreaderDeviceNames);
       expect(returning).toHaveBeenCalledTimes(8);
       expect(tx.select).toHaveBeenCalledTimes(1);
 
@@ -1048,7 +1050,7 @@ describe('KoreaderRepository', () => {
 
       await expect(repo.removeDevice(42, 'device-1')).resolves.toBe(1);
 
-      expect(tx.delete).toHaveBeenCalledTimes(9);
+      expect(tx.delete).toHaveBeenCalledTimes(10);
       expect(tx.select).not.toHaveBeenCalled();
     });
 
@@ -1103,6 +1105,63 @@ describe('KoreaderRepository', () => {
       db.execute.mockResolvedValue({ rows: [] });
 
       await expect(repo.deviceExists(42, 'device-1')).resolves.toBe(false);
+    });
+  });
+
+  describe('device names', () => {
+    it('getDeviceNames maps device ids to names, scoped to the user and the requested devices', async () => {
+      const chain = makeQueryChain([{ deviceId: 'device-1', name: 'Pixel 8' }]);
+      db.select.mockReturnValue(chain);
+
+      await expect(repo.getDeviceNames(42, ['device-1', 'device-2', 'device-1'])).resolves.toEqual(new Map([['device-1', 'Pixel 8']]));
+
+      const query = new PgDialect().sqlToQuery((chain.where as ReturnType<typeof vi.fn>).mock.calls[0]![0] as SQL);
+      expect(query.sql).toContain('"koreader_device_names"."user_id" = $1');
+      expect(query.sql).toContain('"koreader_device_names"."device_id" in ($2, $3)');
+      expect(query.params).toEqual([42, 'device-1', 'device-2']);
+    });
+
+    it('getDeviceNames answers an empty device list without a query', async () => {
+      await expect(repo.getDeviceNames(42, [])).resolves.toEqual(new Map());
+      expect(db.select).not.toHaveBeenCalled();
+    });
+
+    it('getDeviceNames without devices reads every name the user gave', async () => {
+      const chain = makeQueryChain([]);
+      db.select.mockReturnValue(chain);
+
+      await repo.getDeviceNames(42);
+
+      const query = new PgDialect().sqlToQuery((chain.where as ReturnType<typeof vi.fn>).mock.calls[0]![0] as SQL);
+      expect(query.sql).toBe('"koreader_device_names"."user_id" = $1');
+    });
+
+    it('setDeviceName replaces an existing name for the same user and device', async () => {
+      const onConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+      const values = vi.fn().mockReturnValue({ onConflictDoUpdate });
+      db.insert.mockReturnValue({ values });
+
+      await repo.setDeviceName(42, 'device-1', 'Pixel 8');
+
+      expect(db.insert).toHaveBeenCalledWith(schema.koreaderDeviceNames);
+      expect(values).toHaveBeenCalledWith({ userId: 42, deviceId: 'device-1', name: 'Pixel 8' });
+      expect(onConflictDoUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          target: [schema.koreaderDeviceNames.userId, schema.koreaderDeviceNames.deviceId],
+          set: expect.objectContaining({ name: 'Pixel 8' }),
+        }),
+      );
+    });
+
+    it('clearDeviceName deletes the name for the given user and device', async () => {
+      const where = vi.fn().mockResolvedValue(undefined);
+      db.delete.mockReturnValue({ where });
+
+      await repo.clearDeviceName(42, 'device-1');
+
+      expect(db.delete).toHaveBeenCalledWith(schema.koreaderDeviceNames);
+      const query = new PgDialect().sqlToQuery(where.mock.calls[0]![0] as SQL);
+      expect(query.params).toEqual([42, 'device-1']);
     });
   });
 

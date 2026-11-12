@@ -41,7 +41,7 @@ end
 
 -- Where the reader now is, after following BookOrbit's position.
 local function showMoved(body)
-    local device = DeviceNames.label(body.device)
+    local device = DeviceNames.label(body.device, body.device_name)
     if device then
         Toast.show(T(_("Now at %1, from %2"), pctLabel(body.percentage), device))
     else
@@ -52,7 +52,7 @@ end
 -- The This book sheet, opened as the prompt.
 local function openPrompt(self, body, newer, before_upload, on_jump, on_stay)
     require("bookorbit_book_sheet").openPrompt(self, {
-        remote = { percentage = body.percentage, device = body.device, timestamp = body.timestamp },
+        remote = { percentage = body.percentage, device = body.device, device_name = body.device_name, timestamp = body.timestamp },
         newer = newer,
         before_upload = before_upload,
         on_jump = on_jump,
@@ -509,6 +509,7 @@ function ProgressSync:rememberRemoteProgress(digest, body)
         percentage = Math.roundPercent(body.percentage),
         progress = body.progress,
         device = body.device,
+        device_name = body.device_name,
         timestamp = body.timestamp,
         checked_at = os.time(),
     }
