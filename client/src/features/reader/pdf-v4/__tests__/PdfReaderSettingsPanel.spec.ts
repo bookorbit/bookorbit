@@ -60,4 +60,23 @@ describe('PdfReaderSettingsPanel', () => {
     expect(wrapper.emitted('setZoom')).toEqual([['automatic']])
     expect(wrapper.emitted('setSpread')).toEqual([['auto']])
   })
+
+  it('exposes page turn effect choices when in page mode', async () => {
+    const wrapper = mount(PdfReaderSettingsPanel, {
+      props: {
+        scrollMode: 'page',
+        spread: 'none',
+        rotation: 0,
+        zoomMode: 'fit-page',
+        customScale: 1,
+        pageTurnAnimation: 'slide',
+      },
+    })
+
+    const buttons = wrapper.findAll('button')
+    const curlButton = buttons.find((button) => button.text() === 'Paper Curl')!
+    await curlButton.trigger('click')
+
+    expect(wrapper.emitted('setPageTurnAnimation')).toEqual([['curl']])
+  })
 })

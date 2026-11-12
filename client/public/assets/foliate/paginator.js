@@ -18,6 +18,17 @@ const debounce = (f, wait, immediate) => {
 
 const lerp = (min, max, x) => x * (max - min) + min
 const easeOutQuad = (x) => 1 - (1 - x) * (1 - x)
+const cubicBezierCurl = (t) => {
+  let s = t
+  for (let i = 0; i < 5; i++) {
+    const currentX = 3 * (1 - s) * (1 - s) * s * 0.22 + 3 * (1 - s) * s * s * 0.36 + s * s * s
+    const currentSlope = 3 * (1 - s) * (1 - s) * 0.22 + 6 * (1 - s) * s * (0.36 - 0.22) + 3 * s * s * (1 - 0.36)
+    if (Math.abs(currentSlope) < 1e-6) break
+    s -= (currentX - t) / currentSlope
+    s = Math.max(0, Math.min(1, s))
+  }
+  return 1 - (1 - s) * (1 - s) * (1 - s)
+}
 const animate = (a, b, duration, ease, render) =>
   new Promise((resolve) => {
     let start
@@ -451,12 +462,19 @@ class View {
 
 // NOTE: everything here assumes the so-called "negative scroll type" for RTL
 export class Paginator extends HTMLElement {
-  static observedAttributes = ['flow', 'gap', 'margin', 'max-inline-size', 'max-block-size', 'max-column-count']
+  static observedAttributes = ['flow', 'gap', 'margin', 'max-inline-size', 'max-block-size', 'max-column-count', 'page-turn-animation', 'animated']
   #root = this.attachShadow({ mode: 'closed' })
   #observer = new ResizeObserver(() => this.render())
   #top
   #background
   #container
+  #curlStage
+  #curlSpineShadow
+  #curlLeaf
+  #curlLeafFront
+  #curlLeafBack
+  #curlCreaseShadow
+  #pageTurnAnimation = 'slide'
   #header
   #footer
   #view
@@ -475,6 +493,14 @@ export class Paginator extends HTMLElement {
   #touchState
   #touchScrolled
   #lastVisibleRange
+
+  get pageTurnAnimation() {
+    return this.getAttribute('page-turn-animation') || this.#pageTurnAnimation || 'slide'
+  }
+  set pageTurnAnimation(value) {
+    if (value) this.setAttribute('page-turn-animation', value)
+    else this.removeAttribute('page-turn-animation')
+  }
   constructor() {
     super()
     this.#root.innerHTML = `<style>
@@ -552,6 +578,65 @@ export class Paginator extends HTMLElement {
             display: grid;
             height: var(--_margin);
         }
+        #curl-stage {
+            grid-column: 2 / 5;
+            grid-row: 2;
+            position: relative;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            overflow: visible;
+            perspective: 1800px;
+            transform-style: preserve-3d;
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+        }
+        :host([flow="scrolled"]) #curl-stage {
+            display: none;
+        }
+        #curl-spine-shadow {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 60px;
+            pointer-events: none;
+            mix-blend-mode: multiply;
+            opacity: 0;
+            transition: opacity 150ms ease;
+        }
+        #curl-leaf {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            transform-style: preserve-3d;
+            will-change: transform, box-shadow;
+            pointer-events: none;
+        }
+        #curl-leaf-front, #curl-leaf-back {
+            position: absolute;
+            inset: 0;
+            box-sizing: border-box;
+            overflow: hidden;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
+        }
+        #curl-leaf-front {
+            z-index: 2;
+            transform: rotateY(0deg);
+        }
+        #curl-leaf-back {
+            transform: rotateY(180deg);
+            filter: brightness(0.96);
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.08);
+        }
+        #curl-crease-shadow {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            mix-blend-mode: multiply;
+            opacity: 0;
+        }
         :is(#header, #footer) > * {
             display: flex;
             align-items: center;
@@ -571,6 +656,14 @@ export class Paginator extends HTMLElement {
             <div id="background" part="filter"></div>
             <div id="header"></div>
             <div id="container"></div>
+            <div id="curl-stage" aria-hidden="true">
+                <div id="curl-spine-shadow"></div>
+                <div id="curl-leaf">
+                    <div id="curl-leaf-front"></div>
+                    <div id="curl-leaf-back"></div>
+                    <div id="curl-crease-shadow"></div>
+                </div>
+            </div>
             <div id="footer"></div>
         </div>
         `
@@ -578,6 +671,12 @@ export class Paginator extends HTMLElement {
     this.#top = this.#root.getElementById('top')
     this.#background = this.#root.getElementById('background')
     this.#container = this.#root.getElementById('container')
+    this.#curlStage = this.#root.getElementById('curl-stage')
+    this.#curlSpineShadow = this.#root.getElementById('curl-spine-shadow')
+    this.#curlLeaf = this.#root.getElementById('curl-leaf')
+    this.#curlLeafFront = this.#root.getElementById('curl-leaf-front')
+    this.#curlLeafBack = this.#root.getElementById('curl-leaf-back')
+    this.#curlCreaseShadow = this.#root.getElementById('curl-crease-shadow')
     this.#header = this.#root.getElementById('header')
     this.#footer = this.#root.getElementById('footer')
 
@@ -657,6 +756,9 @@ export class Paginator extends HTMLElement {
     switch (name) {
       case 'flow':
         this.render()
+        break
+      case 'page-turn-animation':
+        this.#pageTurnAnimation = value || 'slide'
         break
       case 'gap':
       case 'margin':
@@ -840,9 +942,11 @@ export class Paginator extends HTMLElement {
     this.#touchState = {
       x: touch?.screenX,
       y: touch?.screenY,
+      startX: touch?.screenX,
       t: e.timeStamp,
       vx: 0,
       xy: 0,
+      totalDx: 0,
     }
   }
   #onTouchMove(e) {
@@ -868,10 +972,90 @@ export class Paginator extends HTMLElement {
     state.t = e.timeStamp
     state.vx = dx / dt
     state.vy = dy / dt
+    state.totalDx = (state.totalDx || 0) + dx
     this.#touchScrolled = true
+
+    const isCurl = !this.scrolled && !this.#vertical && this.pageTurnAnimation === 'curl'
+    if (isCurl && this.#curlLeaf && this.#curlStage) {
+      const style = getComputedStyle(this.#top)
+      const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread')) || 1
+      const isTwoPage = maxColumnCount > 1
+      const leafWidth = isTwoPage ? this.size / 2 : this.size
+      const progress = Math.min(1, Math.max(0, Math.abs(state.totalDx) / leafWidth))
+      const dragDir = state.totalDx > 0 ? 1 : -1
+      const effectiveDir = this.#rtl ? -dragDir : dragDir
+
+      if (progress > 0.03) {
+        const bookBg = this.#background?.style?.background || getComputedStyle(this.#background).background || '#ffffff'
+        this.#curlLeafFront.style.background = bookBg
+        this.#curlLeafBack.style.background = bookBg
+
+        this.#curlLeaf.style.width = `${leafWidth}px`
+        this.#curlLeaf.style.height = `${this.#container.clientHeight}px`
+
+        if (isTwoPage) {
+          if (effectiveDir > 0) {
+            this.#curlLeaf.style.left = `${leafWidth}px`
+            this.#curlLeaf.style.transformOrigin = 'left center'
+          } else {
+            this.#curlLeaf.style.left = '0px'
+            this.#curlLeaf.style.transformOrigin = 'right center'
+          }
+        } else {
+          this.#curlLeaf.style.left = '0px'
+          this.#curlLeaf.style.transformOrigin = effectiveDir > 0 ? 'left center' : 'right center'
+        }
+
+        const startAngle = effectiveDir > 0 ? 0 : -180
+        const targetAngle = effectiveDir > 0 ? -180 : 0
+        const currentAngle = lerp(startAngle, targetAngle, progress)
+        const liftZ = Math.sin(progress * Math.PI) * 45
+        const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 2 : -2)
+        const shadowSpread = Math.sin(progress * Math.PI) * 20
+
+        this.#curlStage.style.visibility = 'visible'
+        this.#curlStage.style.opacity = '1'
+        this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`
+        this.#curlLeaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0,0,0,0.22)`
+        this.#curlCreaseShadow.style.opacity = String(Math.sin(progress * Math.PI) * 0.85)
+        this.#curlSpineShadow.style.opacity = String(Math.sin(progress * Math.PI) * 0.7)
+        return
+      }
+    }
+
     this.scrollBy(dx, dy)
   }
   #onTouchEnd(e) {
+    const isCurl = !this.scrolled && !this.#vertical && this.pageTurnAnimation === 'curl'
+    if (isCurl && this.#touchScrolled && this.#touchState && this.#curlStage) {
+      this.#touchScrolled = false
+      const state = this.#touchState
+      const style = getComputedStyle(this.#top)
+      const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread')) || 1
+      const leafWidth = maxColumnCount > 1 ? this.size / 2 : this.size
+      const progress = Math.min(1, Math.max(0, Math.abs(state.totalDx) / leafWidth))
+      const dragDir = state.totalDx > 0 ? 1 : -1
+
+      if (progress > 0.25 || Math.abs(state.vx) > 0.3) {
+        this.#curlStage.style.opacity = '0'
+        this.#curlStage.style.visibility = 'hidden'
+        this.#curlLeaf.style.transform = 'none'
+        if (dragDir > 0) this.next()
+        else this.prev()
+      } else {
+        animate(progress, 0, 200, easeOutQuad, (p) => {
+          const currentAngle = (dragDir > 0 ? 0 : -180) - (dragDir > 0 ? 180 : -180) * p
+          this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg)`
+          this.#curlCreaseShadow.style.opacity = String(Math.sin(p * Math.PI) * 0.85)
+        }).then(() => {
+          this.#curlStage.style.opacity = '0'
+          this.#curlStage.style.visibility = 'hidden'
+          this.#curlLeaf.style.transform = 'none'
+        })
+      }
+      return
+    }
+
     this.#touchScrolled = false
     if (this.scrolled) return
     const doc = e.currentTarget?.getSelection ? e.currentTarget : this.#view?.document
@@ -918,16 +1102,115 @@ export class Paginator extends HTMLElement {
     }
     // FIXME: vertical-rl only, not -lr
     if (this.scrolled && this.#vertical) offset = -offset
-    if ((reason === 'snap' || smooth) && this.hasAttribute('animated'))
+
+    const prefersReduced = globalThis.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    const animMode = prefersReduced ? 'none' : (this.getAttribute('page-turn-animation') || this.#pageTurnAnimation || 'slide')
+
+    if ((reason === 'snap' || smooth) && this.hasAttribute('animated') && animMode !== 'none') {
+      if (animMode === 'curl' && !this.scrolled && !this.#vertical) {
+        return this.#performCurlAnimation(element[scrollProp], offset, reason)
+      }
       return animate(element[scrollProp], offset, 300, easeOutQuad, (x) => (element[scrollProp] = x)).then(() => {
         this.#scrollBounds = [offset, this.atStart ? 0 : size, this.atEnd ? 0 : size]
         this.#afterScroll(reason)
       })
-    else {
+    } else {
       element[scrollProp] = offset
       this.#scrollBounds = [offset, this.atStart ? 0 : size, this.atEnd ? 0 : size]
       this.#afterScroll(reason)
     }
+  }
+  #performCurlAnimation(startOffset, targetOffset, reason) {
+    const element = this.#container
+    const { scrollProp, size } = this
+    const dir = targetOffset > startOffset ? 1 : -1
+    const isRtl = this.#rtl
+    const effectiveDir = isRtl ? -dir : dir
+
+    const style = getComputedStyle(this.#top)
+    const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread')) || 1
+    const isTwoPage = maxColumnCount > 1
+
+    const { width, height } = this.#container.getBoundingClientRect()
+    const leafWidth = isTwoPage ? width / 2 : width
+
+    const stage = this.#curlStage
+    const leaf = this.#curlLeaf
+    const front = this.#curlLeafFront
+    const back = this.#curlLeafBack
+    const crease = this.#curlCreaseShadow
+    const spine = this.#curlSpineShadow
+
+    if (!stage || !leaf || !front || !back || !crease || !spine) {
+      element[scrollProp] = targetOffset
+      this.#scrollBounds = [targetOffset, this.atStart ? 0 : size, this.atEnd ? 0 : size]
+      this.#afterScroll(reason)
+      return Promise.resolve()
+    }
+
+    const bookBg = this.#background?.style?.background || getComputedStyle(this.#background).background || '#ffffff'
+    front.style.background = bookBg
+    back.style.background = bookBg
+
+    const isDark = this.#mediaQuery?.matches || this.getAttribute('theme')?.includes('dark')
+    const shadowColor = isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.22)'
+    const highlightColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.32)'
+
+    crease.style.background = `linear-gradient(to right, transparent 0%, ${shadowColor} 30%, ${highlightColor} 50%, ${shadowColor} 70%, transparent 100%)`
+
+    leaf.style.width = `${leafWidth}px`
+    leaf.style.height = `${height}px`
+
+    if (isTwoPage) {
+      spine.style.left = '50%'
+      spine.style.transform = 'translateX(-50%)'
+      spine.style.background = `linear-gradient(to right, transparent, ${shadowColor} 50%, transparent 100%)`
+      if (effectiveDir > 0) {
+        leaf.style.left = `${leafWidth}px`
+        leaf.style.transformOrigin = 'left center'
+      } else {
+        leaf.style.left = '0px'
+        leaf.style.transformOrigin = 'right center'
+      }
+    } else {
+      spine.style.left = effectiveDir > 0 ? '0px' : '100%'
+      spine.style.transform = 'none'
+      spine.style.background = `linear-gradient(to right, ${shadowColor}, transparent)`
+      leaf.style.left = '0px'
+      leaf.style.transformOrigin = effectiveDir > 0 ? 'left center' : 'right center'
+    }
+
+    stage.style.visibility = 'visible'
+    stage.style.opacity = '1'
+
+    element[scrollProp] = targetOffset
+
+    const duration = 420
+    const startAngle = effectiveDir > 0 ? 0 : -180
+    const targetAngle = effectiveDir > 0 ? -180 : 0
+
+    return animate(0, 1, duration, cubicBezierCurl, (progress) => {
+      const currentAngle = lerp(startAngle, targetAngle, progress)
+      const liftZ = Math.sin(progress * Math.PI) * 45
+      const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 2 : -2)
+      const shadowSpread = Math.sin(progress * Math.PI) * 20
+      const shadowAlpha = Math.sin(progress * Math.PI) * (isDark ? 0.35 : 0.22)
+
+      leaf.style.transform = `rotateY(${currentAngle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`
+      leaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0,0,0,${shadowAlpha})`
+
+      crease.style.opacity = String(Math.sin(progress * Math.PI) * 0.85)
+      spine.style.opacity = String(Math.sin(progress * Math.PI) * 0.7)
+    }).then(() => {
+      stage.style.opacity = '0'
+      stage.style.visibility = 'hidden'
+      leaf.style.transform = 'none'
+      leaf.style.boxShadow = 'none'
+      crease.style.opacity = '0'
+      spine.style.opacity = '0'
+      this.#scrollBounds = [targetOffset, this.atStart ? 0 : size, this.atEnd ? 0 : size]
+      this.#afterScroll(reason)
+    })
   }
   async #scrollToPage(page, reason, smooth) {
     const offset = getPageScrollOffset(page, this.size, this.#vertical, this.#rtl)

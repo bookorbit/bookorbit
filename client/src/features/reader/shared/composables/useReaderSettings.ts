@@ -139,6 +139,9 @@ function sanitizeEpubPartialSettings(settings: unknown): Partial<EpubReaderSetti
   if (settings.fixedLayoutSpread === 'auto' || settings.fixedLayoutSpread === 'none') {
     out.fixedLayoutSpread = settings.fixedLayoutSpread
   }
+  if (settings.pageTurnAnimation === 'slide' || settings.pageTurnAnimation === 'none' || settings.pageTurnAnimation === 'curl') {
+    out.pageTurnAnimation = settings.pageTurnAnimation
+  }
 
   return out
 }
@@ -203,6 +206,9 @@ function sanitizePdfPartialSettings(settings: unknown): Partial<PdfReaderSetting
   }
   if (settings.rotation === 0 || settings.rotation === 90 || settings.rotation === 180 || settings.rotation === 270) {
     out.rotation = settings.rotation
+  }
+  if (settings.pageTurnAnimation === 'slide' || settings.pageTurnAnimation === 'none' || settings.pageTurnAnimation === 'curl') {
+    out.pageTurnAnimation = settings.pageTurnAnimation
   }
 
   return out

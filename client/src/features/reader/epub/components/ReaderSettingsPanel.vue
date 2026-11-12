@@ -99,6 +99,12 @@ const spreadOptions = computed(() => [
   },
 ])
 
+const pageTurnAnimationOptions = computed(() => [
+  { value: 'slide', label: t('reader.settings.pageTurnEffectOptions.slide') },
+  { value: 'curl', label: t('reader.settings.pageTurnEffectOptions.curl') },
+  { value: 'none', label: t('reader.settings.pageTurnEffectOptions.none') },
+])
+
 const typographySourceOptions = computed(() => [
   { value: 'book', label: t('reader.settings.bookDefault') },
   { value: 'custom', label: t('reader.settings.custom') },
@@ -225,6 +231,12 @@ function setFlow(value: string) {
 function setFixedLayoutSpread(value: string) {
   emit('update', {
     fixedLayoutSpread: value as ReaderState['fixedLayoutSpread'],
+  })
+}
+
+function setPageTurnAnimation(value: string) {
+  emit('update', {
+    pageTurnAnimation: value as ReaderState['pageTurnAnimation'],
   })
 }
 
@@ -598,6 +610,16 @@ const cardBaseClass =
             :model-value="state.flow"
             :aria-label="t('reader.settings.readingFlow')"
             @update:model-value="setFlow"
+          />
+        </div>
+
+        <div v-if="state.flow === 'paginated'" class="border-b border-border px-4 py-3.5">
+          <p :class="groupLabelClass">{{ t('reader.settings.pageTurnEffect') }}</p>
+          <ReaderSegmentedControl
+            :options="pageTurnAnimationOptions"
+            :model-value="state.pageTurnAnimation ?? 'slide'"
+            :aria-label="t('reader.settings.pageTurnEffect')"
+            @update:model-value="setPageTurnAnimation"
           />
         </div>
 

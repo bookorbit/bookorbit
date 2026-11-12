@@ -84,6 +84,40 @@ const {
   reveal: revealHeader,
   togglePinned: toggleHeaderPinned,
 } = usePdfFullscreenChrome(isFullscreen, hasOpenUi)
+
+const isCurling = ref(false)
+const curlDirection = ref<1 | -1>(1)
+const curlProgress = ref(0)
+let curlAnimationRaf: number | null = null
+
+function triggerPdfCurl(dir: 1 | -1) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+  if (curlAnimationRaf !== null) cancelAnimationFrame(curlAnimationRaf)
+  isCurling.value = true
+  curlDirection.value = dir
+  curlProgress.value = 0
+  const startTime = performance.now()
+  const duration = 420
+
+  function frame(now: number) {
+    const elapsed = now - startTime
+    const t = Math.min(1, elapsed / duration)
+    // cubic-bezier(0.22, 1, 0.36, 1) approximation
+    curlProgress.value = 1 - Math.pow(1 - t, 3)
+    if (t < 1) {
+      curlAnimationRaf = requestAnimationFrame(frame)
+    } else {
+      isCurling.value = false
+      curlAnimationRaf = null
+    }
+  }
+  curlAnimationRaf = requestAnimationFrame(frame)
+}
+
+onUnmounted(() => {
+  if (curlAnimationRaf !== null) cancelAnimationFrame(curlAnimationRaf)
+})
+
 const {
   pageRange,
   getPageRange,
@@ -100,6 +134,28 @@ const {
   scroll,
   touchPageTurningEnabled: isPanning,
   onActivity: revealHeader,
+  pageTurnAnimation: computed(() => props.settings.pageTurnAnimation),
+  onPageTurnAnimation: triggerPdfCurl,
+})
+
+const curlLeafStyle = computed(() => {
+  const isTwoPage = pageRange.value.end > pageRange.value.start
+  const dir = curlDirection.value
+  const p = curlProgress.value
+  const angle = dir > 0 ? -180 * p : -180 + 180 * p
+  const liftZ = Math.sin(p * Math.PI) * 40
+  const skew = Math.sin(p * Math.PI) * (dir > 0 ? 2 : -2)
+  const shadowSpread = Math.sin(p * Math.PI) * 20
+  const shadowAlpha = Math.sin(p * Math.PI) * 0.25
+
+  return {
+    width: isTwoPage ? '50%' : '100%',
+    left: isTwoPage ? (dir > 0 ? '50%' : '0%') : '0%',
+    transformOrigin: isTwoPage ? (dir > 0 ? 'left center' : 'right center') : dir > 0 ? 'left center' : 'right center',
+    transform: `rotateY(${angle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`,
+    boxShadow: `${dir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0, 0, 0, ${shadowAlpha})`,
+    transformStyle: 'preserve-3d' as const,
+  }
 })
 const { apply: applyResponsiveSpread } = usePdfResponsiveSpread(viewerSurface, currentSpreadPreference, spread)
 const highlights = usePdfHighlights({
@@ -185,6 +241,10 @@ function handleNavigateHighlight(annotation: AnnotationItem) {
 
 function handleDeleteHighlight(id: number) {
   void highlights.deleteAnnotation(id)
+}
+
+function handlePageTurnAnimation(animation: PdfReaderSettings['pageTurnAnimation']) {
+  emit('settingsChange', { pageTurnAnimation: animation })
 }
 
 function handleRetryHighlights() {
@@ -461,12 +521,14 @@ onUnmounted(() => {
           :rotation="currentRotation"
           :zoom-mode="currentZoomMode"
           :custom-scale="zoomState.currentZoomLevel"
+          :page-turn-animation="props.settings.pageTurnAnimation ?? 'slide'"
           @preview-zoom="handleZoomPreview"
           @set-scroll-mode="handleScrollMode"
           @set-spread="handleSpread"
           @set-zoom="handleZoom"
           @rotate-backward="handleRotateBackward"
           @rotate-forward="handleRotateForward"
+          @set-page-turn-animation="handlePageTurnAnimation"
         />
       </template>
     </PdfReaderToolbar>
@@ -500,6 +562,47 @@ onUnmounted(() => {
         @touchend="handleTouchEnd"
         @touchcancel="handleTouchCancel"
       >
+        <!-- 3D Paper Page Curl Transition Overlay -->
+        <div
+          v-if="isCurling"
+          class="pointer-events-none absolute inset-0 z-30 overflow-visible"
+          style="perspective: 1800px; transform-style: preserve-3d"
+          aria-hidden="true"
+        >
+          <div
+            class="pointer-events-none absolute inset-y-0 w-20 -translate-x-1/2 transition-opacity"
+            :style="{
+              left: pageRange.end > pageRange.start ? '50%' : curlDirection > 0 ? '0%' : '100%',
+              opacity: Math.sin(curlProgress * Math.PI) * 0.6,
+              background: 'linear-gradient(to right, transparent, rgba(0, 0, 0, 0.25) 50%, transparent)',
+            }"
+          />
+          <div :style="curlLeafStyle" class="pointer-events-none absolute inset-y-0 overflow-hidden">
+            <div class="absolute inset-0 bg-background" :style="{ backfaceVisibility: 'hidden', transform: 'rotateY(0deg)' }">
+              <div
+                class="pointer-events-none absolute inset-0"
+                :style="{
+                  opacity: Math.sin(curlProgress * Math.PI) * 0.85,
+                  background:
+                    'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.15) 30%, rgba(255,255,255,0.3) 50%, rgba(0,0,0,0.2) 70%, transparent 100%)',
+                }"
+              />
+            </div>
+            <div
+              class="absolute inset-0 bg-background brightness-95"
+              :style="{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', boxShadow: 'inset 0 0 30px rgba(0,0,0,0.08)' }"
+            >
+              <div
+                class="pointer-events-none absolute inset-0"
+                :style="{
+                  opacity: Math.sin(curlProgress * Math.PI) * 0.7,
+                  background: 'linear-gradient(to left, transparent 0%, rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.22) 70%, transparent 100%)',
+                }"
+              />
+            </div>
+          </div>
+        </div>
+
         <DocumentContent :document-id="props.documentId">
           <template #default="{ documentState, isLoading, isError, isLoaded }">
             <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-background">

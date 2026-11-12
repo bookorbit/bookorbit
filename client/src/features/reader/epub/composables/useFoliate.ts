@@ -7,7 +7,7 @@ import { useFoliateInput } from './useFoliateInput'
 import { ensureMediaOverlayActiveClass } from '../../media-overlay/lib/media-overlay-highlight'
 import { scalePublisherFontSizes } from '../lib/publisher-font-sizes'
 import { markBookAlignment } from '../lib/book-alignment'
-import type { EpubBookInfo, EpubReaderSettings } from '@bookorbit/types'
+import type { EpubBookInfo, EpubReaderSettings, PageTurnAnimation } from '@bookorbit/types'
 
 export interface RelocateDetail {
   /** Why the view moved: a user's `page`/`snap`/`scroll`, a programmatic `navigation`, or an `anchor` relayout. */
@@ -36,6 +36,7 @@ export interface FoliateRenderer {
   setAttribute: (name: string, value: string) => void
   removeAttribute: (name: string) => void
   getContents?: () => { index: number }[]
+  pageTurnAnimation?: 'slide' | 'none' | 'curl'
 }
 
 export interface FoliateLocationContext {
@@ -96,6 +97,7 @@ export interface FoliateOpenOptions extends EpubOpenOptions {
   fallbackFraction?: number
   mediaOverlayFragment?: string | null
   mediaOverlaySectionIndex?: number | null
+  pageTurnAnimation?: EpubReaderSettings['pageTurnAnimation']
 }
 
 export function useFoliate(
@@ -447,5 +449,11 @@ export function useFoliate(
     setTextSelectedHandler: selection.setHandler,
     setSelectionInteractionStartHandler: selection.setInteractionStartHandler,
     setAnnotationClickHandler,
+    setPageTurnAnimation: (animation: PageTurnAnimation = 'slide') => {
+      const view = getViewEl()
+      if (view?.renderer?.setAttribute) {
+        view.renderer.setAttribute('page-turn-animation', animation)
+      }
+    },
   }
 }

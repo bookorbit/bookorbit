@@ -11,9 +11,19 @@ export interface UsePdfPaginationOptions {
   scroll: ReadonlyRef<Readonly<ScrollScope> | null>
   touchPageTurningEnabled: ReadonlyRef<boolean>
   onActivity: () => void
+  pageTurnAnimation?: ReadonlyRef<PdfReaderSettings['pageTurnAnimation'] | undefined>
+  onPageTurnAnimation?: (direction: -1 | 1) => void
 }
 
-export function usePdfPagination({ mode, scrollState, scroll, touchPageTurningEnabled, onActivity }: UsePdfPaginationOptions) {
+export function usePdfPagination({
+  mode,
+  scrollState,
+  scroll,
+  touchPageTurningEnabled,
+  onActivity,
+  pageTurnAnimation,
+  onPageTurnAnimation,
+}: UsePdfPaginationOptions) {
   let wheelDelta = 0
   let wheelUnlockTimer: ReturnType<typeof setTimeout> | null = null
   let touchStart: { x: number; y: number } | null = null
@@ -39,7 +49,11 @@ export function usePdfPagination({ mode, scrollState, scroll, touchPageTurningEn
   }
 
   const pageRange = computed(() => getPageRange(scrollState.value.currentPage, scrollState.value.totalPages))
-  const behavior = computed(() => (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth'))
+  const behavior = computed(() => {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return 'instant'
+    if (pageTurnAnimation?.value === 'none' || pageTurnAnimation?.value === 'curl') return 'instant'
+    return 'smooth'
+  })
 
   function goToPage(page: number) {
     const clamped = Math.min(Math.max(page, 1), scrollState.value.totalPages || 1)
@@ -62,6 +76,9 @@ export function usePdfPagination({ mode, scrollState, scroll, touchPageTurningEn
       if (spreads.length === 0) return
       const target = findAdjacentPage(spreads, pageRange.value.start, direction, scrollState.value.totalPages)
       if (target === pageRange.value.start) return
+      if (mode.value === 'page' && pageTurnAnimation?.value === 'curl') {
+        onPageTurnAnimation?.(direction)
+      }
       scope.scrollToPage({ pageNumber: target, behavior: behavior.value })
     } catch {
       return
