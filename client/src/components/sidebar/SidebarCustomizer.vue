@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Search, SlidersHorizontal } from '@lucide/vue'
+import { LayoutGrid, Search, SlidersHorizontal } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
 import { SidebarGroup, SidebarSeparator } from '@/components/ui/sidebar'
 import SidebarCustomizeControls from '@/components/sidebar/SidebarCustomizeControls.vue'
 import SidebarCustomizeRow from '@/components/sidebar/SidebarCustomizeRow.vue'
 import SidebarCustomizeRows from '@/components/sidebar/SidebarCustomizeRows.vue'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import type { SidebarBlockKind } from '@/components/sidebar/sidebar-layout'
 import { formatCompactNumber, formatNumber } from '@/i18n/formatters'
 import { useListReorder } from '@/composables/useListReorder'
@@ -29,11 +30,13 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const { isHidden, toggleHidden, moveGroups } = useSidebarLayout()
+const { layout, isHidden, toggleHidden, moveGroups, setPrimaryStyle } = useSidebarLayout()
 const { stopCustomizing } = useSidebarCustomizeMode()
 
 const titleId = `sidebar-customize-${useId()}`
 const titleRef = ref<HTMLElement | null>(null)
+const primaryIconsId = `sidebar-primary-icons-${useId()}`
+const primaryIcons = computed(() => layout.primaryStyle === 'icons')
 const groupsById = computed(() => new Map(props.groups.map((group) => [group.id, group])))
 
 const {
@@ -67,6 +70,10 @@ function groupOf(id: string): SidebarCustomizeGroup {
 function separatorBefore(index: number): boolean {
   const previous = index === 0 ? 'nav' : groupOf(groupIds.value[index - 1] as string)?.kind
   return groupOf(groupIds.value[index] as string)?.kind !== previous
+}
+
+function handlePrimaryIcons(value: boolean) {
+  setPrimaryStyle(value ? 'icons' : 'list')
 }
 
 function handleToggle(id: string) {
@@ -122,6 +129,15 @@ onUnmounted(() => {
           <SidebarCustomizeRow :icon="Search" :label="t('common.search')" locked />
         </template>
       </SidebarCustomizeRows>
+      <div class="mt-1 flex min-h-8 items-center gap-2 px-2">
+        <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
+          <LayoutGrid :size="15" aria-hidden="true" />
+        </span>
+        <label :for="primaryIconsId" class="min-w-0 flex-1 cursor-pointer text-[13px] leading-snug text-sidebar-foreground">
+          {{ t('components.sidebar.customize.primaryIcons') }}
+        </label>
+        <ToggleSwitch :id="primaryIconsId" :model-value="primaryIcons" @update:model-value="handlePrimaryIcons" />
+      </div>
     </SidebarGroup>
 
     <VueDraggable

@@ -31,7 +31,12 @@ export interface SidebarLayout {
   groupOrder: string[];
   /** Row order inside each nav group, keyed by group id. */
   rowOrder: Record<string, string[]>;
+  /** How the pinned top group draws in the expanded sidebar. Layouts saved before this existed read as `list`. */
+  primaryStyle: SidebarPrimaryStyle;
 }
+
+export const SIDEBAR_PRIMARY_STYLES = ["list", "icons"] as const;
+export type SidebarPrimaryStyle = (typeof SIDEBAR_PRIMARY_STYLES)[number];
 
 /** Totals behind the sidebar Browse badges, served as one cached payload so the shell needs a single request. */
 export interface BrowseCounts {

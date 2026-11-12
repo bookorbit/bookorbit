@@ -11211,6 +11211,7 @@
         "allActive": "{count, plural, one {# active request across all users} other {# active requests across all users}}",
         "mineActive": "{count, plural, one {# active request of yours} other {# active requests of yours}}"
       },
+      "iconBadgeOverflow": "{count}+",
       "support": "Support BookOrbit",
       "supportAria": "Support BookOrbit on Ko-fi",
       "appLinks": {
@@ -11257,6 +11258,7 @@
         "open": "Customize sidebar",
         "title": "Customize sidebar",
         "hint": "Drag to reorder. Hidden pages stay in Search.",
+        "primaryIcons": "Show the pages above as icons",
         "reset": "Reset to default",
         "done": "Done",
         "resetDone": "Sidebar reset to default",

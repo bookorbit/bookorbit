@@ -5,7 +5,7 @@ import type { SidebarLayout } from '@bookorbit/types'
 import type { ResolvedSidebarNavEntry } from '@/composables/useSidebarNav'
 import type { SidebarCustomizeGroup } from '../SidebarCustomizer.vue'
 
-const layout = reactive<SidebarLayout>({ hidden: [], groupOrder: [], rowOrder: {} })
+const layout = reactive<SidebarLayout>({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' })
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key) }),
@@ -13,7 +13,7 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('@/composables/useSidebarPrefs', () => ({
   useSidebarPrefs: () => ({ layout }),
-  defaultSidebarLayout: () => ({ hidden: [], groupOrder: [], rowOrder: {} }),
+  defaultSidebarLayout: () => ({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' }),
 }))
 
 vi.mock('@/composables/useSidebarSections', () => ({
@@ -77,7 +77,7 @@ describe('SidebarCustomizer', () => {
   beforeEach(() => {
     wrapper?.unmount()
     wrapper = null
-    Object.assign(layout, { hidden: [], groupOrder: [], rowOrder: {} })
+    Object.assign(layout, { hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' })
     useSidebarCustomizeMode().startCustomizing()
   })
 
@@ -148,6 +148,21 @@ describe('SidebarCustomizer', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
     await nextTick()
     expect(isCustomizing.value).toBe(false)
+  })
+
+  it('switches the top pages to an icon row and back', async () => {
+    mountCustomizer()
+    const toggle = wrapper!.find('button[role="switch"]')
+    const label = wrapper!.find(`label[for="${toggle.attributes('id')}"]`)
+    expect(label.text()).toBe('components.sidebar.customize.primaryIcons')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+
+    await toggle.trigger('click')
+    expect(layout.primaryStyle).toBe('icons')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+
+    await toggle.trigger('click')
+    expect(layout.primaryStyle).toBe('list')
   })
 
   it('moves focus into the editor when it opens', () => {

@@ -3,11 +3,11 @@ import { reactive } from 'vue'
 import type { SidebarLayout } from '@bookorbit/types'
 import type { ResolvedSidebarNavEntry, SidebarNavBadge } from '../useSidebarNav'
 
-const layout = reactive<SidebarLayout>({ hidden: [], groupOrder: [], rowOrder: {} })
+const layout = reactive<SidebarLayout>({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' })
 
 vi.mock('@/composables/useSidebarPrefs', () => ({
   useSidebarPrefs: () => ({ layout }),
-  defaultSidebarLayout: () => ({ hidden: [], groupOrder: [], rowOrder: {} }),
+  defaultSidebarLayout: () => ({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' }),
 }))
 
 vi.mock('@/composables/useSidebarSections', () => ({
@@ -46,7 +46,7 @@ const ids = (entries: { id: string }[]) => entries.map((item) => item.id)
 
 describe('useSidebarLayout', () => {
   beforeEach(() => {
-    Object.assign(layout, { hidden: [], groupOrder: [], rowOrder: {} })
+    Object.assign(layout, { hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' })
   })
 
   it("keeps today's group order by default: Browse, the list sections, then Reading", () => {
@@ -158,14 +158,30 @@ describe('useSidebarLayout', () => {
     })
   })
 
+  it('switches the top group between rows and an icon row', () => {
+    const { setPrimaryStyle } = useSidebarLayout()
+
+    setPrimaryStyle('icons')
+    expect(layout.primaryStyle).toBe('icons')
+
+    setPrimaryStyle('list')
+    expect(layout.primaryStyle).toBe('list')
+  })
+
   it('resets to the stock layout and restores the previous one for Undo', () => {
     const { resetLayout, restoreLayout } = useSidebarLayout()
-    Object.assign(layout, { hidden: ['series'], groupOrder: ['reading', 'browse'], rowOrder: { browse: ['series', 'authors'] } })
+    const arranged: SidebarLayout = {
+      hidden: ['series'],
+      groupOrder: ['reading', 'browse'],
+      rowOrder: { browse: ['series', 'authors'] },
+      primaryStyle: 'icons',
+    }
+    Object.assign(layout, arranged)
 
     const previous = resetLayout()
-    expect(layout).toEqual({ hidden: [], groupOrder: [], rowOrder: {} })
+    expect(layout).toEqual({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list' })
 
     restoreLayout(previous)
-    expect(layout).toEqual({ hidden: ['series'], groupOrder: ['reading', 'browse'], rowOrder: { browse: ['series', 'authors'] } })
+    expect(layout).toEqual(arranged)
   })
 })

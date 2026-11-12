@@ -14,6 +14,7 @@ import SidebarSectionPopover from '@/components/sidebar/SidebarSectionPopover.vu
 import SidebarFooterBar from '@/components/sidebar/SidebarFooterBar.vue'
 import SidebarDock from '@/components/sidebar/SidebarDock.vue'
 import SidebarSearchItem from '@/components/sidebar/SidebarSearchItem.vue'
+import SidebarPrimaryIconRow from '@/components/sidebar/SidebarPrimaryIconRow.vue'
 import SidebarCustomizer, { type SidebarCustomizeGroup } from '@/components/sidebar/SidebarCustomizer.vue'
 import SidebarCustomizeBar from '@/components/sidebar/SidebarCustomizeBar.vue'
 import { groupRuns } from '@/components/sidebar/sidebar-layout'
@@ -37,7 +38,7 @@ const { zones } = useSidebarNav(() => outstandingRequestTotal.value)
 const { sections } = useSidebarSections()
 const { subscribe: subscribeLibraryActivity } = useSidebarLibraryActivity()
 const { handleLibraryCreated } = useLibraryCreationRedirect()
-const { isHidden, arrangeRows, visibleRows, arrangeGroups } = useSidebarLayout()
+const { layout, isHidden, arrangeRows, visibleRows, arrangeGroups } = useSidebarLayout()
 const { isCustomizing, stopCustomizing } = useSidebarCustomizeMode()
 
 const isRail = computed(() => state.value === 'collapsed' && !isMobile.value)
@@ -48,6 +49,8 @@ type SidebarBlock = { kind: 'nav'; id: string; zone: SidebarNavZone } | { kind: 
 /** Fixed destinations stay pinned on top: they are a known height, so nothing the user moves can push them off the first screenful. */
 const primaryZone = computed(() => zones.value.find((zone) => zone.id === 'primary') ?? null)
 const primaryEntries = computed(() => (primaryZone.value ? visibleRows('primary', primaryZone.value.entries) : []))
+/** The rail is already an icon column, so the icon row only applies to the expanded sidebar. */
+const showPrimaryIcons = computed(() => layout.primaryStyle === 'icons' && !isRail.value && primaryEntries.value.length > 0)
 
 /** Every movable group in the user's order, hidden ones included. */
 const arrangedBlocks = computed<SidebarBlock[]>(() =>
@@ -169,24 +172,27 @@ async function onLibrarySaved(library: Library) {
 
       <template v-else>
         <SidebarZone v-if="primaryZone" :label="null" :always-open="isRail">
-          <SidebarSearchItem />
-          <SidebarNavItem
-            v-for="entry in primaryEntries"
-            :key="entry.id"
-            :is-active="entry.isActive"
-            :tooltip="entry.badge?.label ?? entry.label"
-            :to="entry.to"
-            :icon="entry.icon"
-            :label="entry.label"
-            :data-tour="entry.tourId"
-            @navigate="handleNavigate"
-          >
-            <template #badge>
-              <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
-                formatCompactNumber(entry.badge.value)
-              }}</SidebarBadge>
-            </template>
-          </SidebarNavItem>
+          <SidebarSearchItem :framed="showPrimaryIcons" />
+          <SidebarPrimaryIconRow v-if="showPrimaryIcons" :entries="primaryEntries" @navigate="handleNavigate" />
+          <template v-else>
+            <SidebarNavItem
+              v-for="entry in primaryEntries"
+              :key="entry.id"
+              :is-active="entry.isActive"
+              :tooltip="entry.badge?.label ?? entry.label"
+              :to="entry.to"
+              :icon="entry.icon"
+              :label="entry.label"
+              :data-tour="entry.tourId"
+              @navigate="handleNavigate"
+            >
+              <template #badge>
+                <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
+                  formatCompactNumber(entry.badge.value)
+                }}</SidebarBadge>
+              </template>
+            </SidebarNavItem>
+          </template>
         </SidebarZone>
 
         <!-- Groups follow in the user's order. A separator sits wherever nav groups meet list

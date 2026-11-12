@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import type { SidebarLayout } from '@bookorbit/types'
+import type { SidebarLayout, SidebarPrimaryStyle } from '@bookorbit/types'
 import { arrangeIds, mergeSubsetOrder } from '@/components/sidebar/sidebar-layout'
 import { SIDEBAR_NAV_REGISTRY, type ResolvedSidebarNavEntry } from '@/composables/useSidebarNav'
 import { SIDEBAR_SECTIONS } from '@/composables/useSidebarSections'
@@ -20,6 +20,7 @@ function copyLayout(layout: SidebarLayout): SidebarLayout {
     hidden: [...layout.hidden],
     groupOrder: [...layout.groupOrder],
     rowOrder: Object.fromEntries(Object.entries(layout.rowOrder).map(([id, ids]) => [id, [...ids]])),
+    primaryStyle: layout.primaryStyle,
   }
 }
 
@@ -90,6 +91,10 @@ export function useSidebarLayout() {
     )
   }
 
+  function setPrimaryStyle(style: SidebarPrimaryStyle) {
+    layout.primaryStyle = style
+  }
+
   /** Restores the stock layout and hands back the one it replaced, for Undo. */
   function resetLayout(): SidebarLayout {
     const previous = copyLayout(layout)
@@ -101,5 +106,17 @@ export function useSidebarLayout() {
     Object.assign(layout, copyLayout(previous))
   }
 
-  return { layout, isHidden, toggleHidden, arrangeRows, visibleRows, arrangeGroups, moveRows, moveGroups, resetLayout, restoreLayout }
+  return {
+    layout,
+    isHidden,
+    toggleHidden,
+    arrangeRows,
+    visibleRows,
+    arrangeGroups,
+    moveRows,
+    moveGroups,
+    setPrimaryStyle,
+    resetLayout,
+    restoreLayout,
+  }
 }
