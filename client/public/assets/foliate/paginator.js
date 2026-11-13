@@ -1400,13 +1400,14 @@ export class Paginator extends HTMLElement {
     }
 
     const isDark = this.#mediaQuery?.matches || this.getAttribute('theme')?.includes('dark')
+    const isSepia = this.getAttribute('theme')?.includes('sepia') || (typeof document !== 'undefined' && document.documentElement.getAttribute('data-surface') === 'sepia')
     const shadowColor = isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.22)'
-    const highlightColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.32)'
+    const highlightColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.35)'
 
-    back.style.background = isDark ? '#27272a' : '#faf8f2'
-    back.style.boxShadow = 'inset 0 0 35px rgba(0, 0, 0, 0.08)'
+    back.style.background = isDark ? '#242428' : isSepia ? '#ECE2CC' : '#F3EFE6'
+    back.style.boxShadow = 'inset 0 0 35px rgba(0, 0, 0, 0.09)'
 
-    crease.style.background = `linear-gradient(to right, transparent 0%, ${shadowColor} 30%, ${highlightColor} 50%, ${shadowColor} 70%, transparent 100%)`
+    crease.style.background = `linear-gradient(to right, transparent 0%, ${shadowColor} 25%, ${highlightColor} 50%, ${shadowColor} 75%, transparent 100%)`
 
     leaf.style.width = `${leafWidth}px`
     leaf.style.height = `${height}px`

@@ -141,6 +141,124 @@ export function calculateFoldGeometry(width: number, height: number, corner: Cor
   }
 }
 
+let cachedPaperPatternCanvas: HTMLCanvasElement | null = null
+
+export function getPaperGrainCanvas(): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null
+  if (cachedPaperPatternCanvas) return cachedPaperPatternCanvas
+
+  try {
+    const canvas = document.createElement('canvas')
+    canvas.width = 256
+    canvas.height = 256
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    const imgData = ctx.createImageData(256, 256)
+    const data = imgData.data
+    for (let i = 0; i < data.length; i += 4) {
+      // Warm ivory/cream micro-speckle noise
+      const n = (Math.random() - 0.5) * 28
+      data[i] = Math.max(0, Math.min(255, 248 + n))
+      data[i + 1] = Math.max(0, Math.min(255, 244 + n))
+      data[i + 2] = Math.max(0, Math.min(255, 235 + n))
+      data[i + 3] = Math.floor(180 + Math.random() * 75)
+    }
+    ctx.putImageData(imgData, 0, 0)
+
+    // Fine organic paper fiber strands
+    ctx.lineWidth = 0.6
+    ctx.strokeStyle = 'rgba(165, 145, 115, 0.16)'
+    for (let i = 0; i < 40; i++) {
+      const x1 = Math.random() * 256
+      const y1 = Math.random() * 256
+      const cx = x1 + (Math.random() - 0.5) * 22
+      const cy = y1 + (Math.random() - 0.5) * 22
+      const x2 = cx + (Math.random() - 0.5) * 16
+      const y2 = cy + (Math.random() - 0.5) * 16
+      ctx.beginPath()
+      ctx.moveTo(x1, y1)
+      ctx.quadraticCurveTo(cx, cy, x2, y2)
+      ctx.stroke()
+    }
+
+    cachedPaperPatternCanvas = canvas
+    return canvas
+  } catch {
+    return null
+  }
+}
+
+export function applyPaperGrain(ctx: CanvasRenderingContext2D, width: number, height: number, isDark = false, isSepia = false) {
+  ctx.save()
+  // Subtle warm paper stock tint (#FCF9F2 in Light, #F4EAD5 in Sepia, #1E1E22 in Dark)
+  const paperTint = isDark ? '#1E1E22' : isSepia ? '#F4EAD5' : '#FCF9F2'
+  ctx.fillStyle = paperTint
+  ctx.globalCompositeOperation = isDark ? 'screen' : 'multiply'
+  ctx.globalAlpha = isDark ? 0.08 : 0.12
+  ctx.fillRect(0, 0, width, height)
+
+  const grainCanvas = getPaperGrainCanvas()
+  if (grainCanvas) {
+    try {
+      const pattern = ctx.createPattern(grainCanvas, 'repeat')
+      if (pattern) {
+        ctx.fillStyle = pattern
+        ctx.globalCompositeOperation = 'multiply'
+        ctx.globalAlpha = 0.035
+        ctx.fillRect(0, 0, width, height)
+      }
+    } catch {}
+  }
+  ctx.restore()
+}
+
+function isFoldEdge(a: Point, b: Point, p1: Point, p2: Point): boolean {
+  const d1 = Math.hypot(a.x - p1.x, a.y - p1.y) + Math.hypot(b.x - p2.x, b.y - p2.y)
+  const d2 = Math.hypot(a.x - p2.x, a.y - p2.y) + Math.hypot(b.x - p1.x, b.y - p1.y)
+  return d1 < 5 || d2 < 5
+}
+
+export function traceCurvedBacksidePath(ctx: CanvasRenderingContext2D, geometry: FoldGeometry) {
+  const { reflectedPolygon, foldLine, foldDistance } = geometry
+  if (reflectedPolygon.length < 3) return
+  const [p1, p2] = foldLine
+
+  const cx = reflectedPolygon.reduce((s, p) => s + p.x, 0) / reflectedPolygon.length
+  const cy = reflectedPolygon.reduce((s, p) => s + p.y, 0) / reflectedPolygon.length
+  // Dynamic outward curve along free edges (soft 3D paper cylinder curvature)
+  const bulge = Math.min(24, Math.max(4, foldDistance * 0.045))
+
+  ctx.beginPath()
+  const start = reflectedPolygon[0]!
+  ctx.moveTo(start.x, start.y)
+
+  for (let i = 0; i < reflectedPolygon.length; i++) {
+    const a = reflectedPolygon[i]!
+    const b = reflectedPolygon[(i + 1) % reflectedPolygon.length]!
+
+    if (isFoldEdge(a, b, p1, p2)) {
+      // Crease edge remains straight
+      ctx.lineTo(b.x, b.y)
+    } else {
+      // Free curling paper edge bows outward naturally with quadratic Bezier curve
+      const mx = (a.x + b.x) / 2
+      const my = (a.y + b.y) / 2
+      const dx = mx - cx
+      const dy = my - cy
+      const len = Math.hypot(dx, dy)
+      if (len > 1) {
+        const cpX = mx + (dx / len) * bulge
+        const cpY = my + (dy / len) * bulge
+        ctx.quadraticCurveTo(cpX, cpY, b.x, b.y)
+      } else {
+        ctx.lineTo(b.x, b.y)
+      }
+    }
+  }
+  ctx.closePath()
+}
+
 export function renderConicalFold(
   ctx: CanvasRenderingContext2D,
   width: number,
@@ -149,14 +267,24 @@ export function renderConicalFold(
   geometry: FoldGeometry,
   revealedCanvas: HTMLCanvasElement | null = null,
   isDark = false,
+  isSepiaOrShadow: boolean | number = false,
   shadowIntensity = 0.65,
 ) {
+  let isSepia = false
+  if (typeof isSepiaOrShadow === 'boolean') {
+    isSepia = isSepiaOrShadow
+  } else if (typeof isSepiaOrShadow === 'number') {
+    shadowIntensity = isSepiaOrShadow
+  }
+
   const { midpoint, foldLine, foldAngle, normal, reflectedPolygon, foldDistance } = geometry
   const [p1, p2] = foldLine
 
   ctx.clearRect(0, 0, width, height)
 
-  // 1. Base Layer: Unpeeled front page portion (page N)
+  // -------------------------------------------------------------
+  // Layer 1: Base unpeeled page N (with paper grain & ambient shadow)
+  // -------------------------------------------------------------
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, 0, width, height)
@@ -169,9 +297,31 @@ export function renderConicalFold(
   }
   ctx.clip('evenodd')
   ctx.drawImage(sourceCanvas, 0, 0, width, height)
+  applyPaperGrain(ctx, width, height, isDark, isSepia)
+
+  // Under-curl ambient shadow on page N (14px soft ambient shadow ahead of fold line)
+  const ambientWidth = 14
+  const ambGrad = ctx.createLinearGradient(midpoint.x, midpoint.y, midpoint.x + normal.x * ambientWidth, midpoint.y + normal.y * ambientWidth)
+  const ambAlpha = isDark ? 0.35 : 0.24
+  ambGrad.addColorStop(0, `rgba(0, 0, 0, ${ambAlpha})`)
+  ambGrad.addColorStop(0.4, `rgba(0, 0, 0, ${ambAlpha * 0.45})`)
+  ambGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  ctx.fillStyle = ambGrad
+  ctx.fillRect(0, 0, width, height)
+
+  // Book spine center gutter (left binding edge 0px to 28px)
+  const spineWidth = 28
+  const gutterGrad = ctx.createLinearGradient(0, 0, spineWidth, 0)
+  gutterGrad.addColorStop(0, isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.16)')
+  gutterGrad.addColorStop(0.35, isDark ? 'rgba(0, 0, 0, 0.14)' : 'rgba(0, 0, 0, 0.06)')
+  gutterGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+  ctx.fillStyle = gutterGrad
+  ctx.fillRect(0, 0, spineWidth, height)
   ctx.restore()
 
-  // 2. Revealed Layer: Page N+1 underneath in peel cutout
+  // -------------------------------------------------------------
+  // Layer 2: Revealed Page N+1 (with paper grain & dynamic drop shadow)
+  // -------------------------------------------------------------
   ctx.save()
   ctx.beginPath()
   if (geometry.peelPolygon.length >= 3) {
@@ -181,80 +331,111 @@ export function renderConicalFold(
     }
     ctx.closePath()
     ctx.clip()
+
     if (revealedCanvas) {
       ctx.drawImage(revealedCanvas, 0, 0, width, height)
+    } else {
+      ctx.fillStyle = isDark ? '#1E1E22' : isSepia ? '#F4EAD5' : '#FCF9F2'
+      ctx.fillRect(0, 0, width, height)
     }
+    applyPaperGrain(ctx, width, height, isDark, isSepia)
+
+    // Dynamic wide drop shadow cast onto revealed page
+    const dropShadowWidth = Math.min(180, Math.max(35, foldDistance * 0.45))
+    const dropGrad = ctx.createLinearGradient(
+      midpoint.x,
+      midpoint.y,
+      midpoint.x - normal.x * dropShadowWidth,
+      midpoint.y - normal.y * dropShadowWidth,
+    )
+    const dropAlpha = Math.min(0.55, shadowIntensity * (0.38 + (foldDistance / (width * 1.5)) * 0.25))
+    dropGrad.addColorStop(0, `rgba(0, 0, 0, ${dropAlpha})`)
+    dropGrad.addColorStop(0.35, `rgba(0, 0, 0, ${dropAlpha * 0.37})`)
+    dropGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    ctx.fillStyle = dropGrad
+    ctx.fillRect(0, 0, width, height)
+
+    // Revealed page spine gutter
+    const revealedGutter = ctx.createLinearGradient(0, 0, spineWidth, 0)
+    revealedGutter.addColorStop(0, isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.16)')
+    revealedGutter.addColorStop(0.35, isDark ? 'rgba(0, 0, 0, 0.14)' : 'rgba(0, 0, 0, 0.06)')
+    revealedGutter.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    ctx.fillStyle = revealedGutter
+    ctx.fillRect(0, 0, spineWidth, height)
   }
-
-  // Soft drop shadow cast from the fold line onto revealed page
-  const shadowWidth = Math.min(100, Math.max(25, foldDistance * 0.3))
-  ctx.translate(midpoint.x, midpoint.y)
-  ctx.rotate(foldAngle)
-
-  const outerGrad = ctx.createLinearGradient(0, -shadowWidth, 0, shadowWidth)
-  const shadowAlpha = Math.min(0.7, shadowIntensity * (0.35 + (foldDistance / (width * 1.5)) * 0.45))
-  outerGrad.addColorStop(0, `rgba(0, 0, 0, ${shadowAlpha})`)
-  outerGrad.addColorStop(0.2, `rgba(0, 0, 0, ${shadowAlpha * 0.6})`)
-  outerGrad.addColorStop(0.5, `rgba(0, 0, 0, ${shadowAlpha * 0.2})`)
-  outerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
-
-  ctx.fillStyle = outerGrad
-  ctx.fillRect(-width * 2, 0, width * 4, shadowWidth)
   ctx.restore()
 
-  // 3. Curled Backside Layer: Mirrored page N with warm cream texture & cylindrical lighting
+  // -------------------------------------------------------------
+  // Layer 3: Curled Backside (Google Play Books ink bleed-through & 3D roll)
+  // -------------------------------------------------------------
   ctx.save()
-  ctx.beginPath()
   if (reflectedPolygon.length >= 3) {
-    ctx.moveTo(reflectedPolygon[0]!.x, reflectedPolygon[0]!.y)
-    for (let i = 1; i < reflectedPolygon.length; i++) {
-      ctx.lineTo(reflectedPolygon[i]!.x, reflectedPolygon[i]!.y)
-    }
-    ctx.closePath()
+    // Clip using natural curved Bezier boundary
+    traceCurvedBacksidePath(ctx, geometry)
     ctx.clip()
 
-    // Mirror transform across fold line
+    // 1. Warm paper-back base color + grain
+    const backBaseColor = isDark ? '#242428' : isSepia ? '#ECE2CC' : '#F3EFE6'
+    ctx.fillStyle = backBaseColor
+    ctx.fillRect(0, 0, width, height)
+    applyPaperGrain(ctx, width, height, isDark, isSepia)
+
+    // 2. Translucent ink bleed-through: mirrored bitmap at 14% opacity with subtle blur
+    ctx.save()
+    ctx.globalAlpha = 0.14
+    try {
+      ctx.filter = 'blur(0.6px)'
+    } catch {}
     ctx.translate(midpoint.x, midpoint.y)
     ctx.rotate(foldAngle)
     ctx.scale(1, -1)
     ctx.rotate(-foldAngle)
     ctx.translate(-midpoint.x, -midpoint.y)
-
-    // Draw source page mirrored
     ctx.drawImage(sourceCanvas, 0, 0, width, height)
+    ctx.restore()
 
-    // Warm cream paper backside texture
-    const tintColor = isDark ? 'rgba(32, 32, 34, 0.94)' : 'rgba(248, 244, 236, 0.92)'
-    ctx.fillStyle = tintColor
-    ctx.fillRect(0, 0, width, height)
-
-    // Curved cylindrical highlight / shading across backside
-    const backGrad = ctx.createLinearGradient(midpoint.x, midpoint.y, midpoint.x + normal.x * 240, midpoint.y + normal.y * 240)
-    backGrad.addColorStop(0, isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.09)')
-    backGrad.addColorStop(0.3, isDark ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.02)')
-    backGrad.addColorStop(0.7, isDark ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.09)')
-    backGrad.addColorStop(1, isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.2)')
-    ctx.fillStyle = backGrad
+    // 3. Multi-stop Cylindrical 3D Roll Lighting Gradient
+    const rollLength = Math.max(70, Math.min(width * 0.9, foldDistance * 0.95))
+    const cylGrad = ctx.createLinearGradient(midpoint.x, midpoint.y, midpoint.x + normal.x * rollLength, midpoint.y + normal.y * rollLength)
+    if (isDark) {
+      cylGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.45)')
+      cylGrad.addColorStop(0.18, 'rgba(255, 255, 255, 0.28)')
+      cylGrad.addColorStop(0.65, 'rgba(255, 255, 255, 0.04)')
+      cylGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.35)')
+    } else if (isSepia) {
+      cylGrad.addColorStop(0.0, 'rgba(40, 30, 15, 0.22)')
+      cylGrad.addColorStop(0.18, 'rgba(255, 250, 230, 0.55)')
+      cylGrad.addColorStop(0.65, 'rgba(240, 225, 200, 0.05)')
+      cylGrad.addColorStop(1.0, 'rgba(40, 30, 15, 0.12)')
+    } else {
+      cylGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.22)')
+      cylGrad.addColorStop(0.18, 'rgba(255, 253, 245, 0.55)')
+      cylGrad.addColorStop(0.65, 'rgba(245, 239, 228, 0.05)')
+      cylGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.12)')
+    }
+    ctx.fillStyle = cylGrad
     ctx.fillRect(0, 0, width, height)
   }
   ctx.restore()
 
-  // 4. Crease Highlight & Inner Shadow along the fold edge
+  // -------------------------------------------------------------
+  // Layer 4: Crease Highlight & Inner Shadow along fold edge
+  // -------------------------------------------------------------
   ctx.save()
   ctx.beginPath()
   ctx.moveTo(p1.x, p1.y)
   ctx.lineTo(p2.x, p2.y)
-  ctx.lineWidth = 2.5
-  ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.75)'
+  ctx.lineWidth = 2.0
+  ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.85)'
   ctx.stroke()
 
   ctx.translate(midpoint.x, midpoint.y)
   ctx.rotate(foldAngle)
-  const creaseWidth = 32
+  const creaseWidth = 28
   const innerGrad = ctx.createLinearGradient(0, 0, 0, -creaseWidth)
-  innerGrad.addColorStop(0, isDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.4)')
-  innerGrad.addColorStop(0.2, isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.45)')
-  innerGrad.addColorStop(0.5, isDark ? 'rgba(0, 0, 0, 0.18)' : 'rgba(0, 0, 0, 0.12)')
+  innerGrad.addColorStop(0, isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.35)')
+  innerGrad.addColorStop(0.22, isDark ? 'rgba(255, 255, 255, 0.18)' : 'rgba(255, 255, 255, 0.4)')
+  innerGrad.addColorStop(0.6, isDark ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.08)')
   innerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
 
   ctx.fillStyle = innerGrad

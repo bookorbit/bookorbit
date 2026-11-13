@@ -98,7 +98,10 @@ function capturePageCanvas(pageNumber: number): HTMLCanvasElement | null {
   const ctx = offscreen.getContext('2d')
   if (!ctx) return null
 
-  ctx.fillStyle = props.isDark ? '#18181b' : '#ffffff'
+  const isSepia =
+    typeof document !== 'undefined' &&
+    (document.documentElement.getAttribute('data-surface') === 'sepia' || document.documentElement.classList.contains('sepia'))
+  ctx.fillStyle = props.isDark ? '#1E1E22' : isSepia ? '#F4EAD5' : '#FCF9F2'
   ctx.fillRect(0, 0, offscreen.width, offscreen.height)
 
   const canvases = Array.from(pageEl.querySelectorAll('canvas'))
@@ -140,9 +143,13 @@ function drawFold(corner: Corner, touchX: number, touchY: number) {
   ctx.save()
   ctx.scale(dpr, dpr)
 
+  const isSepia =
+    typeof document !== 'undefined' &&
+    (document.documentElement.getAttribute('data-surface') === 'sepia' || document.documentElement.classList.contains('sepia'))
+
   const geom = calculateFoldGeometry(width, height, corner, { x: touchX, y: touchY })
   if (geom) {
-    renderConicalFold(ctx, width, height, cachedSourceCanvas, geom, cachedRevealedCanvas, props.isDark, 0.65)
+    renderConicalFold(ctx, width, height, cachedSourceCanvas, geom, cachedRevealedCanvas, props.isDark, isSepia, 0.65)
   } else {
     ctx.clearRect(0, 0, width, height)
   }
