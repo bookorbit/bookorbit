@@ -10,7 +10,7 @@ BoardUI, so a dialog speaks the same language as the page it opens over.
 
 local Geom = require("ui/geometry")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")

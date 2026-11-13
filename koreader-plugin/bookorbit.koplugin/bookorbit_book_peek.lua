@@ -10,7 +10,7 @@ holds those facts.
 
 local UIManager = require("ui/uimanager")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local CatalogUtil = require("bookorbit_catalog_util")
@@ -85,7 +85,7 @@ local function body(page, w)
     }
     local pills = {}
     if d.on_device then
-        table.insert(pills, { label = _("Read"), icon = "book-open", action = { kind = "read" } })
+        table.insert(pills, { label = _.pgettext("action", "Read"), icon = "book-open", action = { kind = "read" } })
     elseif d.file then
         table.insert(pills, { label = _("Download"), icon = "download", action = { kind = "download" } })
     end

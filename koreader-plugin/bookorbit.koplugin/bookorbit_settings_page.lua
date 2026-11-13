@@ -12,7 +12,7 @@ local Geom = require("ui/geometry")
 local IconWidget = require("ui/widget/iconwidget")
 local UIManager = require("ui/uimanager")
 local VerticalSpan = require("ui/widget/verticalspan")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local BoardMetrics = require("bookorbit_board_metrics")

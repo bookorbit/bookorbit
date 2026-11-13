@@ -12,7 +12,7 @@ height before it is kept, so a page can never hold more than fits.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardLayout = require("bookorbit_board_layout")
 local BoardMetrics = require("bookorbit_board_metrics")
