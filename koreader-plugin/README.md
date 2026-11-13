@@ -82,6 +82,22 @@ Position-only bookmarks (dogears) sync the same way:
 
 New bookmarks retain their source file. Mapping into a structurally different sibling requires equivalent chapter text; otherwise the bookmark remains unresolved. Legacy bookmarks without source-file provenance remain listed, but the selected-file web reader and delivery to another device withhold their position until a source-device sync or a new bookmark request establishes it. Device-side renames update BookOrbit; an already-linked second device keeps its existing title because bookmark exchange has no edit operation.
 
+## Translations
+
+The plugin follows KOReader's interface language. Its strings live in `bookorbit.koplugin/l10n/<lang>.po`, one file per language (Spanish and Russian so far), named with the exact code of KOReader's own catalog for that language: `es`, `ru`, `it_IT`, `nl_NL`, `pt_BR`... Anything a catalog does not cover falls back to KOReader's translation and then to English. `bookorbit_gettext.lua` reads the file when the plugin loads; there is no compile step.
+
+Code calls it like KOReader's gettext: `_("Text")`, `T(_.ngettext("1 book", "%1 books", n), n)` for a count, and `_.pgettext("Book field", "Series")` only when the same English needs another translation where it is used.
+
+To add a language, extract the template and start a catalog from it:
+
+```sh
+cd koreader-plugin/bookorbit.koplugin
+xgettext --language=Lua --from-code=UTF-8 --keyword=_.ngettext:1,2 --keyword=_.pgettext:1c,2 --add-location=file -o /tmp/bookorbit.pot *.lua
+msginit --no-translator --no-wrap --width=1000 -l it_IT -i /tmp/bookorbit.pot -o l10n/it_IT.po
+```
+
+Set its `Plural-Forms` header to the one in KOReader's catalog for that language (`koreader-translations/<lang>/koreader.po`), even where it differs from gettext's usual rule, because the plugin picks the form with KOReader's rule. Translate every `msgstr` and plural form, keep each `%1` style marker, and add the language, with that header and its rule, to `PLURALS` in `spec/bookorbit_gettext_test.lua`, which checks every entry of the catalog. When strings change in the code, `msgmerge --no-wrap --width=1000 --add-location=file -U l10n/<lang>.po /tmp/bookorbit.pot` updates a catalog. References name the file without a line, all on one line, so editing the code doesn't rewrite every catalog.
+
 ## Limitations
 
 - Web highlight changes reach a closed book only via a manual sweep or its next open.

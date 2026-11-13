@@ -17,7 +17,7 @@ local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local ffiutil = require("ffi/util")
 local T = ffiutil.template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")
@@ -222,7 +222,7 @@ local function finish(ctx, err)
         logger.err("BookOrbit: lifecycle sync stopped because its durable state could not be updated")
     else
         if ctx.interactive and not ctx.quiet then
-            local text = T(_("%1 reading events."), ctx.counts.page_stats)
+            local text = T(_.ngettext("1 reading event.", "%1 reading events.", ctx.counts.page_stats), ctx.counts.page_stats)
             if ctx.highlight_summary and BookOrbitHighlightSummary.hasCounts(ctx.highlight_summary) then
                 text = text .. "\n" .. BookOrbitHighlightSummary.message(ctx.highlight_summary)
             else

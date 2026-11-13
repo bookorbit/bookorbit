@@ -7,7 +7,7 @@ caption steps down, how a series counts) are tested without KOReader.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardData = require("bookorbit_board_data")
 
@@ -40,13 +40,8 @@ function ListData.pctLabel(book)
     return tostring(math.floor(p + 0.5)) .. "%"
 end
 
-function ListData.plural(n, one, many)
-    if n == 1 then return T(one, n) end
-    return T(many, n)
-end
-
 function ListData.bookCount(n)
-    return ListData.plural(n, _("%1 book"), _("%1 books"))
+    return T(_.ngettext("%1 book", "%1 books", n), n)
 end
 
 local function formats(book)
@@ -195,7 +190,7 @@ end
 function ListData.seriesCounts(entry)
     local count = tonumber(entry.count) or 0
     local expected = tonumber(entry.expectedCount)
-    if expected and expected > count then return T(_("%1 of %2 books"), count, expected) end
+    if expected and expected > count then return T(_.ngettext("%1 of 1 book", "%1 of %2 books", expected), count, expected) end
     return ListData.bookCount(count)
 end
 
@@ -259,7 +254,7 @@ function ListData.authorCell(entry)
         return { kind = "finished", label = _("Read"), bottom = count > 1 and T(_("all %1"), count) or (first and ListData.finishedOn(first)) }
     end
     if finished > 0 then
-        return { kind = "partial", label = T(_("%1 of %2"), finished, count), bottom = _("read") }
+        return { kind = "partial", label = T(_("%1 of %2"), finished, count), bottom = _.pgettext("Books read", "read") }
     end
     return nil
 end

@@ -15,7 +15,7 @@ local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local Geom = require("ui/geometry")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = require("bookorbit_catalog_util")
 local DetailData = require("bookorbit_detail_data")
@@ -121,7 +121,7 @@ function CatalogDetail.bookInfoRows(detail)
         table.insert(rows, row)
     end
 
-    add(_("Series"), CatalogDetail.detailSeriesText(detail), {
+    add(_.pgettext("Book field", "Series"), CatalogDetail.detailSeriesText(detail), {
         series_params = CatalogDetail.detailSeriesParams(detail),
         series_title = cleanInlineText(detail.seriesName),
     })
@@ -156,7 +156,7 @@ end
 function CatalogDetail:openDetailSeries(detail)
     local params = CatalogDetail.detailSeriesParams(detail)
     if not params then return end
-    self:loadBooks(params, cleanInlineText(detail.seriesName) or _("Series"), true)
+    self:loadBooks(params, cleanInlineText(detail.seriesName) or _.pgettext("Book field", "Series"), true)
 end
 
 function CatalogDetail:detailReadPath(detail)

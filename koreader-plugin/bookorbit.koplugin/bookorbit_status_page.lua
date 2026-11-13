@@ -8,7 +8,7 @@ one tap down as Technical details.
 
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local Activity = require("bookorbit_activity")
@@ -59,7 +59,7 @@ local function hero(d, w, sync)
         sub = sync.text
     elseif not d.online then
         glyph, inverted = "wifi-off", true
-        title = d.waiting > 0 and T(_("Offline: %1 changes waiting"), d.waiting) or _("Offline")
+        title = d.waiting > 0 and T(_.ngettext("Offline: 1 change waiting", "Offline: %1 changes waiting", d.waiting), d.waiting) or _("Offline")
         sub = _("Kept on this device and sent when Wi-Fi is back")
     elseif d.error then
         glyph, inverted = "triangle-alert", true
@@ -67,7 +67,7 @@ local function hero(d, w, sync)
         sub = d.error.when and T(_("%1, %2"), d.error.message or _("unknown error"), d.error.when) or d.error.message
     elseif d.waiting > 0 then
         glyph, inverted = "clock", true
-        title = T(_("%1 changes waiting to send"), d.waiting)
+        title = T(_.ngettext("1 change waiting to send", "%1 changes waiting to send", d.waiting), d.waiting)
         sub = _("They go out with the next sync")
     elseif not d.synced then
         glyph, inverted = "refresh-cw", true

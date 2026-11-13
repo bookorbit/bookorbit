@@ -10,7 +10,7 @@ dimensions and spacing are in dp and mirror the design mocks one for one.
 
 local datetime = require("datetime")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardColour = require("bookorbit_board_colour")
 local BoardData = require("bookorbit_board_data")
@@ -415,7 +415,7 @@ W.streak = function(ctx, w, hh)
     local val_s = fillSize(hh - 2 * pad - lh1(13) - px(18), 20, wide and 40 or 36)
     local function count(width)
         if n > 0 then
-            return runs({ { t = tostring(n), b = true, s = val_s }, { t = " " .. (n == 1 and _("day") or _("days")), col = INK.g4 } }, { s = 13, w = width })
+            return runs({ { t = tostring(n), b = true, s = val_s }, { t = " " .. _.ngettext("day", "days", n), col = INK.g4 } }, { s = 13, w = width })
         end
         local rs = math.min(val_s, 18)
         if width then rs = BoardUI.fitSize(_("Read today"), { s = rs, b = true }, width, 12) end
@@ -600,7 +600,7 @@ W.goalpace = function(ctx, w, hh)
     local val_s = fillSize(hh - 2 * pad - lh1(13) - lh1(12) - px(10), 20, 32)
     local variants = {}
     for _i, st in ipairs(statuses) do
-        for _i, unit in ipairs({ T(_(" of %1 books"), goal), T(_(" of %1"), goal) }) do
+        for _i, unit in ipairs({ T(_.ngettext(" of 1 book", " of %1 books", goal), goal), T(_(" of %1"), goal) }) do
             table.insert(variants, function()
                 return vstack({ w = w, h = hh, pad = pad }, {
                     head(iw, T(_("%1 goal"), g.year), trophy),
@@ -614,7 +614,7 @@ W.goalpace = function(ctx, w, hh)
         end
     end
     for _i, st in ipairs(statuses) do
-        for _i, unit in ipairs({ T(_(" of %1 books"), goal), T(_(" of %1"), goal) }) do
+        for _i, unit in ipairs({ T(_.ngettext(" of 1 book", " of %1 books", goal), goal), T(_(" of %1"), goal) }) do
             table.insert(variants, function()
                 return vstack({ w = w, h = hh, pad = pad }, {
                     head(iw, T(_("%1 goal"), g.year), trophy),
@@ -730,11 +730,12 @@ W.heatmap = function(ctx, w, hh)
         if lv == 0 then return hstack({ w = grid_w, h = legend_h }, { flex(0), swatches(true) }) end
         return BoardUI.spread(grid_w, bestEl(), swatches(lv == 2), legend_h)
     end
-    local label = weeks >= 52 and _("Year in reading") or T(_("Past %1 months"), math.floor(weeks / 4.35 + 0.5))
+    local months = math.floor(weeks / 4.35 + 0.5)
+    local label = weeks >= 52 and _("Year in reading") or T(_.ngettext("Past 1 month", "Past %1 months", months), months)
     local used = lh1(13) + px(8) + month_h + px(3) + 7 * cell + 6 * g + px(8) + legend_h
     local figs = {
-        { T(_("%1 h"), math.floor(total / 60 + 0.5)), _("read") },
-        { tostring(days_read), _("days") },
+        { T(_("%1 h"), math.floor(total / 60 + 0.5)), _.pgettext("Time read", "read") },
+        { tostring(days_read), _.ngettext("day", "days", days_read) },
         { tostring(d.streak.longest), _("best streak") },
         { T(_("%1 min"), math.floor(total / math.max(1, days_read) + 0.5)), _("a reading day") },
     }
@@ -751,7 +752,7 @@ W.heatmap = function(ctx, w, hh)
             end
             local totals = nil
             if head_totals and total > 0 then
-                totals = runs({ { t = T(_("%1 h"), math.floor(total / 60 + 0.5)), b = true }, { t = " · " .. T(_("%1 days"), days_read), col = INK.g4 } }, { s = 13 })
+                totals = runs({ { t = T(_("%1 h"), math.floor(total / 60 + 0.5)), b = true }, { t = " · " .. T(_.ngettext("1 day", "%1 days", days_read), days_read), col = INK.g4 } }, { s = 13 })
             end
             return vstack({ w = w, h = hh, pad = pad, align = "center" }, {
                 head(iw, label, totals),
@@ -836,12 +837,12 @@ W.calendar = function(ctx, w, hh)
         local items = {}
         for i = 1, 7 do
             local wd_t = os.time({ year = 2026, month = 10, day = 3 + i, hour = 12 }) -- Sunday 4 Oct 2026
-            table.insert(items, text(BoardData.shortWeekday(wd_t):sub(1, 1), { s = 11, col = INK.g4, w = cell, align = "center" }))
+            table.insert(items, text(BoardData.weekdayInitial(wd_t), { s = 11, col = INK.g4, w = cell, align = "center" }))
         end
         header = vstack({ w = grid_w, h = head_row_h }, { hstack({ gap = gap }, items) })
     end
     return vstack({ w = w, h = hh, pad = pad, align = "center" }, {
-        head(iw, BoardData.longMonth(now), text(T(_("%1 days read"), read_count), { s = 12, col = INK.g4 })),
+        head(iw, BoardData.longMonth(now), text(T(_.ngettext("1 day read", "%1 days read", read_count), read_count), { s = 12, col = INK.g4 })),
         space(nil, px(8)),
         header or false,
         grid,
@@ -1052,12 +1053,12 @@ end
 
 -- --------------------------------------------------------------- shortcuts
 local LINKS = {
-    library = { "book-copy", function() return _("Library") end, function(d) return d.counts.library end, function() return _("books") end },
-    series = { "layers-2", function() return _("Series") end, function(d) return d.counts.series end, function() return _("series") end },
-    authors = { "feather", function() return _("Authors") end, function(d) return d.counts.authors end, function() return _("authors") end },
+    library = { "book-copy", function() return _("Library") end, function(d) return d.counts.library end, function(n) return _.ngettext("book", "books", n) end },
+    series = { "layers-2", function() return _("Series") end, function(d) return d.counts.series end, function(n) return _.ngettext("series", "series", n) end },
+    authors = { "feather", function() return _("Authors") end, function(d) return d.counts.authors end, function(n) return _.ngettext("author", "authors", n) end },
     collections = { "folder-open", function() return _("Collections") end, function(d) return d.counts.collections end,
-        function(n) return n == 1 and _("collection") or _("collections") end },
-    scopes = { "aperture", function() return _("SmartScopes") end, function(d) return d.counts.scopes end, function() return _("scopes") end },
+        function(n) return _.ngettext("collection", "collections", n) end },
+    scopes = { "aperture", function() return _("SmartScopes") end, function(d) return d.counts.scopes end, function(n) return _.ngettext("scope", "scopes", n) end },
     device = { "tablet", function() return _("On device") end, function(d) return d.counts.device end,
         function(n) return _.ngettext("book here", "books here", n) end },
     search = { "search", function() return _("Search") end, function() return nil end, function() return "" end },
@@ -1482,7 +1483,7 @@ W.toggles = function(ctx, w, hh)
     -- A row of five whose labels do not fit even at 10 is drawn as the grid.
     local label_s
     if not small then
-        local names = { _("Wi-Fi"), _("Light"), _("Night"), _("Rotate"), _("Sync") }
+        local names = { _("Wi-Fi"), _("Light"), _("Night"), _("Rotate"), _.pgettext("Action", "Sync") }
         local cw5 = math.floor(iw / (d.light ~= nil and 5 or 4))
         for _i, size in ipairs({ 12, 11, 10 }) do
             local widest = 0
@@ -1502,7 +1503,7 @@ W.toggles = function(ctx, w, hh)
     if has_light then table.insert(items, { "sun", _("Light"), false, "frontlight" }) end
     table.insert(items, { "moon", _("Night"), G_reader_settings:isTrue("night_mode"), "night" })
     if not (has_light and small) then table.insert(items, { "rotate-cw-square", _("Rotate"), false, "rotate" }) end
-    table.insert(items, { "refresh-cw", _("Sync"), false, "sync" })
+    table.insert(items, { "refresh-cw", _.pgettext("Action", "Sync"), false, "sync" })
     local function circleBtn(size, it)
         local on = it[3]
         return BoardUI.hit(BoardUI.circle(size, { bg = on and BoardColour.ink(ctx, INK.black) or INK.white, border = on and 0 or math.max(1, px(1.5)) },
@@ -1623,7 +1624,7 @@ W.forecast = function(ctx, w, hh)
             table.insert(cells, vstack({ w = cw, align = "center" }, {
                 rect(cw, px(8), is_end and BoardColour.ink(ctx, INK.black) or (is_today and BoardColour.mid(ctx, INK.g6) or BoardColour.track(ctx, INK.gc)), px(4)),
                 space(nil, px(3)),
-                text(BoardData.shortWeekday(t):sub(1, 1), { s = 11, b = is_end or is_today, col = (is_end or is_today) and INK.black or INK.g4, w = cw, align = "center" }),
+                text(BoardData.weekdayInitial(t), { s = 11, b = is_end or is_today, col = (is_end or is_today) and INK.black or INK.g4, w = cw, align = "center" }),
             }))
         end
         return hstack({ gap = g }, cells)

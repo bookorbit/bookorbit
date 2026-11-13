@@ -8,7 +8,7 @@ network.
 ]]
 
 local NetworkMgr = require("ui/network/manager")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local Capabilities = require("bookorbit_capabilities")
 local DashboardSections = require("bookorbit_dashboard_sections")

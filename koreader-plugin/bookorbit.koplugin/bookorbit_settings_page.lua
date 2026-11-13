@@ -12,7 +12,7 @@ local Geom = require("ui/geometry")
 local IconWidget = require("ui/widget/iconwidget")
 local UIManager = require("ui/uimanager")
 local VerticalSpan = require("ui/widget/verticalspan")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -133,7 +133,7 @@ local function settingsList(page, w, compact)
     if not page.plugin:isLoggedIn() then
         status_summary = _("Not signed in")
     elseif waiting > 0 then
-        status_summary = T(_("%1 changes waiting"), waiting)
+        status_summary = T(_.ngettext("1 change waiting", "%1 changes waiting", waiting), waiting)
     elseif last_error.event ~= "connection_test" and (tonumber(last_error.at) or 0) > (last_sync.event ~= "connection_test" and tonumber(last_sync.at) or 0) then
         status_summary = _("The last sync did not finish")
     elseif not last_sync.at or last_sync.event == "connection_test" then
