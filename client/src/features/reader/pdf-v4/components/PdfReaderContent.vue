@@ -49,6 +49,8 @@ const emit = defineEmits<{
   startReading: []
 }>()
 
+const isDark = computed(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
+
 const { state: scrollState, provides: scroll } = useScroll(() => props.documentId)
 const { provides: scrollCapability } = useScrollCapability()
 const { state: zoomState, provides: zoom } = useZoom(() => props.documentId)
@@ -537,7 +539,7 @@ onUnmounted(() => {
           :surface="viewerSurface"
           :current-page="scrollState.currentPage"
           :total-pages="scrollState.totalPages"
-          :is-dark="props.settings.theme?.includes('dark')"
+          :is-dark="isDark"
           @turn-next="handleNextPage"
           @turn-prev="handlePreviousPage"
         />

@@ -73,10 +73,10 @@ describe('usePdfPagination', () => {
     const { scope, scrollToPageMock } = createMockScrollScope()
     const onActivity = vi.fn<() => void>()
 
-    let storedCompleteCb: (() => void) | null = null
+    let storedCompleteCb: (() => void) | undefined
     const onPageTurnAnimation = vi.fn<(dir: number, navCb?: () => void, completeCb?: () => void) => void>((_dir, navCb, completeCb) => {
       navCb?.()
-      storedCompleteCb = completeCb ?? null
+      storedCompleteCb = completeCb
     })
 
     const pagination = usePdfPagination({
@@ -99,7 +99,9 @@ describe('usePdfPagination', () => {
     expect(scrollToPageMock).toHaveBeenCalledTimes(1)
 
     // Release animation
-    storedCompleteCb?.()
+    if (typeof storedCompleteCb === 'function') {
+      ;(storedCompleteCb as () => void)()
+    }
     expect(pagination.isFlipping.value).toBe(false)
   })
 
