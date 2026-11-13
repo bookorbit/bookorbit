@@ -29,7 +29,7 @@ function resetDisplaySettings() {
   settings.gridCardPrimaryLabel.value = 'hidden'
   settings.gridCardSecondaryLabel.value = 'hidden'
   settings.cardInfoMode.value = 'hover-overlay'
-  settings.thumbnailClickAction.value = 'reader'
+  settings.thumbnailClickAction.value = 'details'
   settings.openHighlightsInPeek.value = false
   settings.formatBadgeStyle.value = 'underline'
 }
@@ -53,7 +53,7 @@ describe('useDisplaySettings preferences helpers', () => {
       showJumpRails: true,
       bookSpineOverlay: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
-      thumbnailClickAction: 'reader',
+      thumbnailClickAction: 'details',
     })
   })
 
@@ -232,9 +232,9 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(snap.thumbnailClickAction).toBe('details')
   })
 
-  it('defaults thumbnailClickAction to reader', () => {
+  it('defaults thumbnailClickAction to details', () => {
     resetDisplaySettings()
-    expect(settings.thumbnailClickAction.value).toBe('reader')
+    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 
   it('sanitizes valid thumbnailClickAction values', () => {

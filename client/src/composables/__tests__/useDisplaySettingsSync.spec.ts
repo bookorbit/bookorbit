@@ -387,14 +387,14 @@ describe('useDisplaySettingsSync', () => {
     apiMock.mockResolvedValue({ ok: true })
 
     sync.initDisplaySettingsSync()
-    displaySettings.useDisplaySettings().thumbnailClickAction.value = 'details'
+    displaySettings.useDisplaySettings().thumbnailClickAction.value = 'reader'
     await vi.advanceTimersByTimeAsync(1500)
 
     expect(apiMock).toHaveBeenCalledWith(
       '/api/v1/user-preferences/display',
       expect.objectContaining({
         method: 'PUT',
-        body: expect.stringContaining('"thumbnailClickAction":"details"'),
+        body: expect.stringContaining('"thumbnailClickAction":"reader"'),
       }),
     )
   })
@@ -403,12 +403,12 @@ describe('useDisplaySettingsSync', () => {
     const { apiMock, displaySettings, sync } = await loadModules()
     apiMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ settings: validDisplayPreferences({ thumbnailClickAction: 'details' }) }),
+      json: async () => ({ settings: validDisplayPreferences({ thumbnailClickAction: 'reader' }) }),
     })
 
     await sync.loadDisplaySettingsFromServer()
 
-    expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('details')
+    expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('reader')
   })
 
   it('syncs openHighlightsInPeek changes to the server', async () => {

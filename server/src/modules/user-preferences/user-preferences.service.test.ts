@@ -466,13 +466,13 @@ describe('UserPreferencesService', () => {
     }
   });
 
-  it('upsertDisplayPreferences defaults thumbnailClickAction to reader when omitted', async () => {
+  it('upsertDisplayPreferences defaults thumbnailClickAction to details when omitted', async () => {
     const { thumbnailClickAction, ...withoutAction } = validDisplayPreferences;
     void thumbnailClickAction;
 
     await expect(service.upsertDisplayPreferences(11, withoutAction as unknown as Record<string, unknown>)).resolves.toBeUndefined();
 
-    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ thumbnailClickAction: 'reader' }));
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ thumbnailClickAction: 'details' }));
   });
 
   it('upsertDisplayPreferences defaults formatBadgeStyle to underline when omitted', async () => {
