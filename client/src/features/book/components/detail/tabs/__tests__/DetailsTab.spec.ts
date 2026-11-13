@@ -147,6 +147,7 @@ function mountDetails(book: BookDetail) {
         BookCoverArtwork: false,
         BookCoverSurface: false,
         BookReadingActivityCard: false,
+        BookTaxonomyPill: false,
         RouterLink: RouterLinkStub,
         Popover: { template: '<div><slot /><slot name="content" /></div>' },
         PopoverTrigger: { template: '<div><slot /></div>' },
@@ -410,6 +411,37 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.get('[data-test="genre-overflow-trigger"]').text()).toBe('+1')
     expect(wrapper.get('[data-test="genre-overflow-trigger"]').attributes('aria-label')).toBe('+1 more')
     expect(wrapper.get('[data-test="hidden-genres"]').text()).toContain('Mystery')
+  })
+
+  it('links genres and tags to their pages and leaves a name without an id as text', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        genres: ['Fantasy', 'Unlisted'],
+        genreRefs: [{ id: 31, name: 'Fantasy' }],
+        tags: ['favorites'],
+        tagRefs: [{ id: 4, name: 'favorites' }],
+      }),
+    )
+    await flushPromises()
+
+    const links = wrapper.findAllComponents(RouterLinkStub).filter((link) => ['Fantasy', '#favorites', 'Unlisted'].includes(link.text()))
+    expect(links.map((link) => [link.text(), link.props('to')])).toEqual([
+      ['Fantasy', { name: 'genre-detail', params: { id: 31 } }],
+      ['#favorites', { name: 'tag-detail', params: { id: 4 } }],
+    ])
+    expect(wrapper.findAll('[data-test="visible-genre"]').map((pill) => [pill.element.tagName, pill.text()])).toEqual([
+      ['A', 'Fantasy'],
+      ['SPAN', 'Unlisted'],
+    ])
+    expect(wrapper.findAll('[data-genre-pill="true"]').every((pill) => pill.element.tagName === 'SPAN')).toBe(true)
+  })
+
+  it('keeps genres and tags as text for a server that sends no ids', async () => {
+    const wrapper = mountDetails(makeBook({ genres: ['Fantasy'], tags: ['favorites'] }))
+    await flushPromises()
+
+    expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => ['Fantasy', '#favorites'].includes(link.text()))).toHaveLength(0)
+    expect(wrapper.text()).toContain('#favorites')
   })
 
   it('fully expands the synopsis without creating a nested scroll area', async () => {

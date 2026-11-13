@@ -238,7 +238,7 @@ describe('useSeriesCollapsePreference', () => {
 
       await setPreference('global', true)
 
-      expect(prefs.value).toEqual({ global: true, libraries: {}, collections: {}, smartScopes: {}, authorPages: false })
+      expect(prefs.value).toEqual({ global: true, libraries: {}, collections: {}, smartScopes: {}, authorPages: false, taxonomyPages: false })
     })
 
     it('writes the author pages flag without touching the other scopes', async () => {
@@ -270,6 +270,32 @@ describe('useSeriesCollapsePreference', () => {
       await setPreference({ authorPages: true }, false)
 
       expect(prefs.value!.authorPages).toBe(false)
+    })
+
+    it('writes the genre and tag pages flag without touching the author pages flag', async () => {
+      const userRef = ref(makeUser({ seriesCollapsePreferences: { global: false, libraries: {}, collections: {}, authorPages: true } }))
+      mockUseAuth.mockReturnValue({ user: userRef } as ReturnType<typeof useAuth>)
+
+      const { setPreference, getEffectivePreference, prefs } = useSeriesCollapsePreference()
+
+      await setPreference({ taxonomyPages: true }, true)
+
+      expect(prefs.value!.taxonomyPages).toBe(true)
+      expect(prefs.value!.authorPages).toBe(true)
+      expect(getEffectivePreference({ taxonomyPages: true })).toBe(true)
+      expect(mockApi).toHaveBeenCalledWith(
+        '/api/v1/users/me/series-collapse-preferences',
+        expect.objectContaining({ body: JSON.stringify({ taxonomyPages: true }) }),
+      )
+    })
+
+    it('does not let the global default leak into genre and tag pages', () => {
+      const userRef = ref(makeUser({ seriesCollapsePreferences: { global: true, libraries: {}, collections: {} } }))
+      mockUseAuth.mockReturnValue({ user: userRef } as ReturnType<typeof useAuth>)
+
+      const { getEffectivePreference } = useSeriesCollapsePreference()
+
+      expect(getEffectivePreference({ taxonomyPages: true })).toBe(false)
     })
 
     it('preserves existing library overrides when setting global', async () => {

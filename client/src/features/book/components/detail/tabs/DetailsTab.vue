@@ -68,6 +68,7 @@ import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/compo
 import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import BookLinkedChips from '@/features/book/components/link/BookLinkedChips.vue'
+import BookTaxonomyPill from '@/features/book/components/detail/details/BookTaxonomyPill.vue'
 import { useBookLinkActions } from '@/features/book/composables/useBookLinkActions'
 import type { LinkSeedBook } from '@/features/book/lib/book-link'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
@@ -204,7 +205,14 @@ const safeDescription = useSafeHtml(() => props.book.description)
 const filledCustomMetadata = computed(() => (props.book.customMetadata ?? []).filter((field) => field.value !== null && field.value !== ''))
 const displayedGenres = computed(() => props.book.genres.slice(0, visibleGenreCount.value))
 const hiddenGenres = computed(() => props.book.genres.slice(visibleGenreCount.value))
+const genreIds = computed(() => new Map((props.book.genreRefs ?? []).map((ref) => [ref.name, ref.id])))
+const tagIds = computed(() => new Map((props.book.tagRefs ?? []).map((ref) => [ref.name, ref.id])))
+const hiddenGenresOpen = ref(false)
 const GENRE_GAP_PX = 6
+
+function closeHiddenGenres() {
+  hiddenGenresOpen.value = false
+}
 
 function resetGenreFoldState() {
   visibleGenreCount.value = props.book.genres.length
@@ -1957,16 +1965,16 @@ watch(
       <!-- Genres + Tags -->
       <div v-if="book.genres.length || book.tags.length" class="space-y-1">
         <div v-if="book.genres.length" class="relative">
-          <div data-test="genre-row" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
-            <span
+          <div data-test="genre-row" class="-m-1 flex min-w-0 items-center gap-1.5 overflow-hidden p-1 whitespace-nowrap">
+            <BookTaxonomyPill
               v-for="(genre, index) in displayedGenres"
               :key="`${genre}-${index}`"
               data-test="visible-genre"
-              class="chip-genre shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
-            >
-              {{ genre }}
-            </span>
-            <Popover v-if="genreHiddenCount > 0">
+              kind="genre"
+              :name="genre"
+              :id="genreIds.get(genre)"
+            />
+            <Popover v-if="genreHiddenCount > 0" v-model:open="hiddenGenresOpen">
               <PopoverTrigger as-child>
                 <button
                   type="button"
@@ -1979,13 +1987,14 @@ watch(
               </PopoverTrigger>
               <PopoverContent align="start" class="w-80 max-w-[calc(100vw-2rem)] p-3">
                 <div data-test="hidden-genres" class="flex flex-wrap gap-1.5">
-                  <span
+                  <BookTaxonomyPill
                     v-for="(genre, index) in hiddenGenres"
                     :key="`hidden-${genre}-${index}`"
-                    class="chip-genre rounded-md px-2 py-0.5 text-[11px] font-medium"
-                  >
-                    {{ genre }}
-                  </span>
+                    kind="genre"
+                    :name="genre"
+                    :id="genreIds.get(genre)"
+                    @navigate="closeHiddenGenres"
+                  />
                 </div>
               </PopoverContent>
             </Popover>
@@ -1995,14 +2004,13 @@ watch(
             aria-hidden="true"
             class="pointer-events-none invisible absolute left-0 top-0 -z-10 flex w-full items-center gap-1.5 overflow-hidden whitespace-nowrap"
           >
-            <span
+            <BookTaxonomyPill
               v-for="(genre, index) in book.genres"
               :key="`measure-${genre}-${index}`"
               data-genre-pill="true"
-              class="chip-genre shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
-            >
-              {{ genre }}
-            </span>
+              kind="genre"
+              :name="genre"
+            />
             <button
               type="button"
               tabindex="-1"
@@ -2015,7 +2023,7 @@ watch(
         </div>
 
         <div v-if="book.tags.length" class="flex flex-wrap gap-1.5">
-          <span v-for="tag in book.tags" :key="tag" class="chip-tag rounded-md border px-2 py-0.5 text-[11px] font-medium"> #{{ tag }} </span>
+          <BookTaxonomyPill v-for="tag in book.tags" :key="tag" kind="tag" :name="tag" :id="tagIds.get(tag)" />
         </div>
       </div>
 

@@ -5,7 +5,7 @@ import { fileNameFromContentDisposition, triggerBlobDownload } from '@/lib/downl
 
 export type MetadataExportFormat = 'csv' | 'json'
 export type MetadataExportScope = 'selected' | 'all-matching'
-export type MetadataExportViewType = 'library' | 'collection' | 'smartScope'
+export type MetadataExportViewType = 'library' | 'collection' | 'smartScope' | 'genre' | 'tag'
 export type MetadataExportColumnsMode = 'canonical' | 'visible'
 
 export type MetadataExportQuery = {

@@ -3752,6 +3752,8 @@ export class BookService {
       authors: authorRows,
       genres: genreRows.map((g) => g.name),
       tags: tagRows.map((t) => t.name),
+      genreRefs: genreRows.map((g) => ({ id: g.id, name: g.name })),
+      tagRefs: tagRows.map((t) => ({ id: t.id, name: t.name })),
       files: orderedFileRows.map((f) => ({
         id: f.id,
         format: f.format,

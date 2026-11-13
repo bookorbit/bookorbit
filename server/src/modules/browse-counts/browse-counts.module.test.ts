@@ -3,6 +3,7 @@ import 'reflect-metadata';
 vi.mock('../annotation/annotation.module', () => ({ AnnotationModule: class AnnotationModule {} }));
 vi.mock('../authors/authors.module', () => ({ AuthorsModule: class AuthorsModule {} }));
 vi.mock('../series/series.module', () => ({ SeriesModule: class SeriesModule {} }));
+vi.mock('../taxonomy/taxonomy.module', () => ({ TaxonomyModule: class TaxonomyModule {} }));
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
 

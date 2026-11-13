@@ -75,7 +75,16 @@ describe('sidebar nav registry', () => {
   })
 
   it('shows only ungated destinations to a user with no permissions', () => {
-    expect(allowedIds(makeContext())).toEqual(['dashboard', 'statistics', 'reading-history', 'achievements', 'authors', 'series', 'annotations'])
+    expect(allowedIds(makeContext())).toEqual([
+      'dashboard',
+      'statistics',
+      'reading-history',
+      'achievements',
+      'authors',
+      'series',
+      'genres',
+      'annotations',
+    ])
   })
 
   it('places Dashboard, Book Dock, Requests, Tools and AI in the primary zone, above the entity sections', () => {
@@ -204,6 +213,14 @@ describe('sidebar nav registry', () => {
     expect(entry('authors').isActive(makeRoute('author-detail', { id: '4' }))).toBe(true)
   })
 
+  it('keeps Genres lit on the genre and tag indexes and pages, which share one row', () => {
+    for (const name of ['genres', 'genre-detail', 'tags', 'tag-detail']) {
+      expect(entry('genres').isActive(makeRoute(name, { id: '31' }))).toBe(true)
+    }
+    expect(entry('genres').isActive(makeRoute('series'))).toBe(false)
+    expect(entry('genres').zone).toBe('browse')
+  })
+
   it('exposes the Book Dock badge only when items are queued', () => {
     const context = makeContext({ permissions: ['book_dock_access'], bookDockTotal: 3 })
 
@@ -251,17 +268,20 @@ describe('sidebar nav registry', () => {
   it.each([
     ['authors', 1234],
     ['series', 312],
+    ['genres', 603],
     ['annotations', 18000],
   ])('badges %s with its browse count', (id, expected) => {
-    const context = makeContext({ browseCounts: { authors: 1234, series: 312, annotations: 18000 } })
+    const context = makeContext({ browseCounts: { authors: 1234, series: 312, genres: 603, annotations: 18000 } })
 
     expect(resolveNavEntry(entry(id), context, makeRoute('dashboard'), id).badge).toEqual({ value: expected })
   })
 
   it('leaves the browse rows unbadged before the counts load and while they are zero', () => {
-    const zeroed = makeContext({ browseCounts: { authors: 0, series: 0, annotations: 0 } })
+    const zeroed = makeContext({ browseCounts: { authors: 0, series: 0, genres: 0, annotations: 0 } })
+    const olderServer = makeContext({ browseCounts: { authors: 4, series: 2, annotations: 1 } })
 
-    for (const id of ['authors', 'series', 'annotations']) {
+    expect(resolveNavEntry(entry('genres'), olderServer, makeRoute('dashboard'), 'genres').badge).toBeNull()
+    for (const id of ['authors', 'series', 'genres', 'annotations']) {
       expect(resolveNavEntry(entry(id), makeContext(), makeRoute('dashboard'), id).badge).toBeNull()
       expect(resolveNavEntry(entry(id), zeroed, makeRoute('dashboard'), id).badge).toBeNull()
     }

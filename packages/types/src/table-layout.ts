@@ -1,4 +1,4 @@
-export type TableViewType = "library" | "smartScope" | "collection" | "series";
+export type TableViewType = "library" | "smartScope" | "collection" | "series" | "genre" | "tag";
 
 export type TableLayoutState = {
   columnOrder: string[];

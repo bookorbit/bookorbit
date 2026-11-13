@@ -346,6 +346,10 @@ export type BookDetail = {
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];
   tags: string[];
+  /** `genres` with their ids, in the same order, for linking to genre pages. Absent from older servers. */
+  genreRefs?: { id: number; name: string }[];
+  /** `tags` with their ids, in the same order. Absent from older servers. */
+  tagRefs?: { id: number; name: string }[];
   files: BookDetailFile[];
   lastWrittenAt: string | null;
   metadataScore: number | null;

@@ -1,12 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick, ref } from 'vue'
-import { flushPromises, shallowMount } from '@vue/test-utils'
+import { defineComponent, h, KeepAlive, nextTick, ref } from 'vue'
+import { flushPromises, mount, shallowMount } from '@vue/test-utils'
 import { ENTITY_CAPABILITIES, type BrowseEntityItem } from '@bookorbit/types'
 
 import EntityManagerView from './EntityManagerView.vue'
 
 const mocks = vi.hoisted(() => ({
   useEntityManager: vi.fn<() => unknown>(),
+  route: { query: {} as Record<string, unknown> },
+  replace: vi.fn<(to: unknown) => Promise<void>>(),
+}))
+
+vi.mock('vue-router', () => ({
+  useRoute: () => mocks.route,
+  useRouter: () => ({ replace: mocks.replace }),
 }))
 
 vi.mock('../../composables/useEntityManager', () => ({
@@ -91,6 +98,7 @@ function makeEntityManagerMock() {
 describe('EntityManagerView selection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.route.query = {}
   })
 
   it('loads browse mode exactly once on mount', () => {
@@ -392,5 +400,100 @@ describe('EntityManagerView selection', () => {
     expect(entityManager.clearSelection).toHaveBeenCalled()
     expect(entityManager.fetchBrowse).toHaveBeenCalled()
     expect(wrapper.findComponent({ name: 'BrowseMergeModal' }).exists()).toBe(false)
+  })
+})
+
+const CHILD_STUBS = Object.fromEntries(
+  [
+    'BrowseMergeModal',
+    'BulkDeleteModal',
+    'DeleteModal',
+    'DuplicateReviewControls',
+    'DuplicatesPanel',
+    'EntityBrowseTable',
+    'EntityBrowseToolbar',
+    'EntityTypeSelector',
+    'ModeSwitcher',
+    'RenameModal',
+    'SplitModal',
+  ].map((name) => [name, true]),
+)
+
+describe('EntityManagerView links in', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useRealTimers()
+    mocks.route.query = {}
+  })
+
+  it('opens the type and search named in the address, loads once, then clears the address', async () => {
+    vi.useFakeTimers()
+    const entityManager = makeEntityManagerMock()
+    entityManager.mode.value = 'duplicates'
+    mocks.useEntityManager.mockReturnValue(entityManager)
+    mocks.route.query = { type: 'genre', q: 'Fantasy' }
+
+    shallowMount(EntityManagerView)
+    await vi.runAllTimersAsync()
+
+    expect(entityManager.mode.value).toBe('browse')
+    expect(entityManager.entityType.value).toBe('genre')
+    expect(entityManager.browseSearch.value).toBe('Fantasy')
+    expect(entityManager.fetchBrowse).toHaveBeenCalledTimes(1)
+    expect(mocks.replace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('ignores a type it does not know and leaves the address alone', () => {
+    const entityManager = makeEntityManagerMock()
+    mocks.useEntityManager.mockReturnValue(entityManager)
+    mocks.route.query = { type: 'publisher-ish', q: 'Tor' }
+
+    shallowMount(EntityManagerView)
+
+    expect(entityManager.entityType.value).toBe('author')
+    expect(entityManager.browseSearch.value).toBe('')
+    expect(mocks.replace).not.toHaveBeenCalled()
+  })
+
+  it('applies a new link when the kept-alive page comes back, with one refresh', async () => {
+    vi.useFakeTimers()
+    const entityManager = makeEntityManagerMock()
+    entityManager.entityType.value = 'genre'
+    mocks.useEntityManager.mockReturnValue(entityManager)
+    const active = ref(true)
+    const Other = defineComponent({ name: 'OtherView', render: () => h('div') })
+    mount(
+      defineComponent({
+        render: () => h(KeepAlive, null, [active.value ? h(EntityManagerView) : h(Other)]),
+      }),
+      { global: { stubs: CHILD_STUBS } },
+    )
+    active.value = false
+    await nextTick()
+    entityManager.fetchBrowse.mockClear()
+
+    mocks.route.query = { type: 'genre', q: 'Horror' }
+    active.value = true
+    await nextTick()
+    await vi.runAllTimersAsync()
+
+    expect(entityManager.browseSearch.value).toBe('Horror')
+    expect(entityManager.browsePage.value).toBe(1)
+    expect(entityManager.fetchBrowse).toHaveBeenCalledTimes(1)
+    expect(mocks.replace).toHaveBeenCalledWith({ query: {} })
+  })
+
+  it('gives genre and tag names a page to open, and no other type', () => {
+    const entityManager = makeEntityManagerMock()
+    mocks.useEntityManager.mockReturnValue(entityManager)
+    const wrapper = shallowMount(EntityManagerView)
+    const itemRoute = () => wrapper.findComponent({ name: 'EntityBrowseTable' }).props('itemRoute') as (item: BrowseEntityItem) => unknown
+
+    expect(itemRoute()(makeItem(5))).toBeNull()
+    entityManager.entityType.value = 'genre'
+    expect(itemRoute()(makeItem(5))).toEqual({ name: 'genre-detail', params: { id: 5 } })
+    entityManager.entityType.value = 'tag'
+    expect(itemRoute()(makeItem(5))).toEqual({ name: 'tag-detail', params: { id: 5 } })
+    expect(itemRoute()(makeItem('inline-key'))).toBeNull()
   })
 })

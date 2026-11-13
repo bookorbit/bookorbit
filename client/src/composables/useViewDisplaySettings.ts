@@ -4,7 +4,7 @@ import { storage } from '@/services/storage'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { DEFAULT_COVER_ASPECT_RATIO } from '@/features/book/lib/cover-aspect-ratio'
 
-type ViewType = 'library' | 'smartScope' | 'collection' | 'series'
+type ViewType = 'library' | 'smartScope' | 'collection' | 'series' | 'genre' | 'tag'
 type CoverShapeGroup = 'portrait' | 'square'
 
 function coverSizeKey(type: ViewType, id: number, group: CoverShapeGroup) {

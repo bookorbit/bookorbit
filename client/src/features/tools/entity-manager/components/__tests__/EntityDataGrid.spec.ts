@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, RouterLinkStub } from '@vue/test-utils'
 import { ENTITY_CAPABILITIES, type BrowseEntityItem } from '@bookorbit/types'
 
 import EntityDataGrid from '../EntityDataGrid.vue'
@@ -29,6 +29,7 @@ function mountGrid(overrides: Partial<InstanceType<typeof EntityDataGrid>['$prop
         DropdownMenuContent: { template: '<div><slot /></div>' },
         DropdownMenuItem: { emits: ['click'], template: '<button class="dropdown-item" @click="$emit(\'click\')"><slot /></button>' },
         DropdownMenuSeparator: { template: '<hr />' },
+        RouterLink: RouterLinkStub,
       },
     },
   })
@@ -46,6 +47,27 @@ function headerButton(wrapper: ReturnType<typeof mountGrid>, label: string) {
 }
 
 describe('EntityDataGrid', () => {
+  it('links names to their pages where the type has one, on desktop and phone', () => {
+    const wrapper = mountGrid({
+      items: [makeItem(31, { name: 'Fantasy' }), makeItem(32, { name: 'Horror' })],
+      itemRoute: (item) => (item.id === 31 ? { name: 'genre-detail', params: { id: item.id } } : null),
+    })
+
+    const links = wrapper.findAllComponents(RouterLinkStub)
+    expect(links.map((link) => [link.text(), link.props('to')])).toEqual([
+      ['Fantasy', { name: 'genre-detail', params: { id: 31 } }],
+      ['Fantasy', { name: 'genre-detail', params: { id: 31 } }],
+    ])
+    expect(wrapper.find('table').text()).toContain('Horror')
+  })
+
+  it('keeps names as text when no route is given', () => {
+    const wrapper = mountGrid()
+
+    expect(wrapper.findAllComponents(RouterLinkStub)).toHaveLength(0)
+    expect(wrapper.find('table').text()).toContain('Entity 1')
+  })
+
   it('emits the checkbox click event so Shift-click selection can be handled by the parent', async () => {
     const wrapper = mountGrid()
 

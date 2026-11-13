@@ -43,4 +43,6 @@ export interface BrowseCounts {
   authors: number;
   series: number;
   annotations: number;
+  /** Genres with books the viewer can see. Absent from servers that predate genre pages. */
+  genres?: number;
 }

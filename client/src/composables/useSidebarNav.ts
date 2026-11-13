@@ -1,7 +1,20 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
-import { BarChart3, BookPlus, Highlighter, History, LayoutDashboard, Library, PackageOpen, Sparkles, Trophy, Users, Wrench } from '@lucide/vue'
+import {
+  BarChart3,
+  BookPlus,
+  Highlighter,
+  History,
+  LayoutDashboard,
+  Library,
+  PackageOpen,
+  Shapes,
+  Sparkles,
+  Trophy,
+  Users,
+  Wrench,
+} from '@lucide/vue'
 import { Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
@@ -85,6 +98,9 @@ const ZONE_SECTION_IDS: Record<SidebarZoneId, SidebarSectionId | null> = {
 function routeNameStartsWith(route: RouteLocationNormalizedLoaded, prefix: string): boolean {
   return typeof route.name === 'string' && route.name.startsWith(prefix)
 }
+
+/** Tags share the Genres row: the index switches between the two. */
+const GENRE_ROUTE_NAMES = new Set(['genres', 'genre-detail', 'tags', 'tag-detail'])
 
 /** Browse badges stay out of the row until the counts have loaded and there is something to count. */
 function browseBadge(key: keyof BrowseCounts): (context: NavContext) => SidebarNavBadge | null {
@@ -198,6 +214,15 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     to: { name: 'series' },
     isActive: (route) => route.name === 'series' || route.name === 'series-detail',
     badge: browseBadge('series'),
+  },
+  {
+    id: 'genres',
+    labelKey: 'components.sidebar.genres',
+    icon: Shapes,
+    zone: 'browse',
+    to: { name: 'genres' },
+    isActive: (route) => GENRE_ROUTE_NAMES.has(route.name as string),
+    badge: browseBadge('genres'),
   },
   {
     id: 'annotations',

@@ -486,6 +486,7 @@ export const E2E_SUITES = Object.freeze({
     useDedicatedDatabase: true,
     changedPaths: [
       "server/src/modules/catalog/**",
+      "server/src/modules/taxonomy/**",
       "server/src/modules/library/**",
       "server/src/common/utils/content-filter-sql.utils.ts",
       "server/test/catalog-visibility.e2e-spec.ts",

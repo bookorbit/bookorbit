@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import type { BrowseEntityItem, DuplicateCluster } from '@bookorbit/types'
+import { computed, onActivated, ref, watch } from 'vue'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
+import { FIRST_CLASS_ENTITY_TYPES, INLINE_ENTITY_TYPES, type BrowseEntityItem, type DuplicateCluster, type EntityType } from '@bookorbit/types'
 
 import { useEntityManager, type EntityManagerMode } from '../../composables/useEntityManager'
 import { useEntityRowDensity } from '../composables/useEntityRowDensity'
@@ -19,6 +20,26 @@ import BrowseMergeModal from '../components/BrowseMergeModal.vue'
 
 const em = useEntityManager()
 const { density } = useEntityRowDensity()
+const route = useRoute()
+const router = useRouter()
+
+const ENTITY_TYPES: readonly string[] = [...FIRST_CLASS_ENTITY_TYPES, ...INLINE_ENTITY_TYPES]
+
+/**
+ * Other pages link here as `?type=genre&q=Fantasy` to open one type already searched. The query
+ * is read once and dropped, so changing type or search here never fights the address bar.
+ */
+function takeRouteQuery(): boolean {
+  const type = route.query.type
+  if (typeof type !== 'string' || !ENTITY_TYPES.includes(type)) return false
+  em.mode.value = 'browse'
+  em.entityType.value = type as EntityType
+  em.browseSearch.value = typeof route.query.q === 'string' ? route.query.q.slice(0, 200) : ''
+  void router.replace({ query: {} })
+  return true
+}
+
+takeRouteQuery()
 
 const renameTarget = ref<BrowseEntityItem | null>(null)
 const deleteTarget = ref<BrowseEntityItem | null>(null)
@@ -35,6 +56,13 @@ const bulkDeleteDefaultMode = computed<'soft' | 'hard'>(() =>
 
 let searchDebounce: ReturnType<typeof setTimeout> | null = null
 let skipNextSearchWatch = false
+
+/** Genre and tag names open their own pages; other types have none here yet. */
+function browseItemRoute(item: BrowseEntityItem): RouteLocationRaw | null {
+  const type = em.entityType.value
+  if ((type !== 'genre' && type !== 'tag') || typeof item.id !== 'number') return null
+  return { name: type === 'tag' ? 'tag-detail' : 'genre-detail', params: { id: item.id } }
+}
 
 function refreshBrowseFromFirstPage(): void {
   em.browsePage.value = 1
@@ -64,6 +92,19 @@ watch(
   },
   { immediate: true },
 )
+
+let activatedOnce = false
+onActivated(() => {
+  if (!activatedOnce) {
+    activatedOnce = true
+    return
+  }
+  const before = { type: em.entityType.value, mode: em.mode.value, search: em.browseSearch.value }
+  if (!takeRouteQuery()) return
+  if (em.browseSearch.value !== before.search) skipNextSearchWatch = true
+  // A new type or mode reloads through its own watcher; the same one needs the new search applied here.
+  if (em.entityType.value === before.type && em.mode.value === before.mode) refreshBrowseFromFirstPage()
+})
 
 function handleUpdateMode(value: EntityManagerMode): void {
   em.mode.value = value
@@ -314,6 +355,7 @@ async function handleBulkDeleteConfirm(mode: 'soft' | 'hard' | 'inline', writeFi
         :selected-ids="em.selectedIds.value"
         :capabilities="em.capabilities.value"
         :is-inline="em.isInline.value"
+        :item-route="browseItemRoute"
         @update:page="handleUpdatePage"
         @update:page-size="handleUpdatePageSize"
         @sort-change="handleBrowseSortChange"

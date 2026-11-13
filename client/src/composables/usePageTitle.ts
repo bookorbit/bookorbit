@@ -10,6 +10,7 @@ function setTitle(title: string | null | undefined) {
 
 export function usePageTitle(title: MaybeRefOrGetter<string | null | undefined>) {
   const route = useRoute()
+  const ownPath = route.path
   let active = true
 
   const stop = watch(
@@ -18,6 +19,16 @@ export function usePageTitle(title: MaybeRefOrGetter<string | null | undefined>)
       if (active) setTitle(value)
     },
     { immediate: true },
+  )
+
+  // A page that rewrites its own query (a picked library, say) navigates, and the router's title
+  // hook then puts the route's generic title back. Restore this page's own once that settles.
+  const stopQuery = watch(
+    () => route.fullPath,
+    () => {
+      if (active && route.path === ownPath) setTitle(toValue(title))
+    },
+    { flush: 'post' },
   )
 
   onActivated(() => {
@@ -31,6 +42,7 @@ export function usePageTitle(title: MaybeRefOrGetter<string | null | undefined>)
 
   onBeforeUnmount(() => {
     stop()
+    stopQuery()
     if (active && typeof document !== 'undefined') {
       document.title = resolveRouteTitle(route)
     }

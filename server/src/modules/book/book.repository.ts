@@ -1634,8 +1634,12 @@ export class BookRepository {
         .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
         .where(eq(bookAuthors.bookId, id))
         .orderBy(bookAuthors.displayOrder),
-      this.db.select({ name: genres.name }).from(bookGenres).innerJoin(genres, eq(genres.id, bookGenres.genreId)).where(eq(bookGenres.bookId, id)),
-      this.db.select({ name: tags.name }).from(bookTags).innerJoin(tags, eq(tags.id, bookTags.tagId)).where(eq(bookTags.bookId, id)),
+      this.db
+        .select({ id: genres.id, name: genres.name })
+        .from(bookGenres)
+        .innerJoin(genres, eq(genres.id, bookGenres.genreId))
+        .where(eq(bookGenres.bookId, id)),
+      this.db.select({ id: tags.id, name: tags.name }).from(bookTags).innerJoin(tags, eq(tags.id, bookTags.tagId)).where(eq(bookTags.bookId, id)),
       this.db
         .select({
           id: bookFiles.id,

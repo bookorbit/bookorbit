@@ -81,6 +81,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { MigrationModule } from './modules/migration/migration.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SeriesModule } from './modules/series/series.module';
+import { TaxonomyModule } from './modules/taxonomy/taxonomy.module';
 import { EntityManagerModule } from './modules/entity-manager/entity-manager.module';
 import { FontModule } from './modules/font/font.module';
 import { ServerFontModule } from './modules/server-font/server-font.module';
@@ -209,6 +210,7 @@ import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
     MigrationModule,
     NotificationModule,
     SeriesModule,
+    TaxonomyModule,
     EntityManagerModule,
     FontModule,
     ServerFontModule,

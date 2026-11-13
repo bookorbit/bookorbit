@@ -72,6 +72,7 @@ export * from "./series";
 export * from "./series-index";
 export * from "./table-layout";
 export * from "./series-collapse";
+export * from "./taxonomy";
 export * from "./entity-manager";
 export * from "./font";
 export * from "./dictionary";
