@@ -95,6 +95,10 @@ export function storyGuidePhaseText(phase: StoryGuidePhase): string {
       return phase.chapter !== null && phase.total !== null
         ? t('book.detail.storyGuide.phases.writingChapter', { chapter: formatNumber(phase.chapter), total: formatNumber(phase.total) })
         : t('book.detail.storyGuide.phases.writing')
+    case 'summarizing':
+      return phase.chapter !== null && phase.total !== null
+        ? t('book.detail.storyGuide.phases.summarizingChapter', { chapter: formatNumber(phase.chapter), total: formatNumber(phase.total) })
+        : t('book.detail.storyGuide.phases.summarizing')
     case 'finishing':
       return t('book.detail.storyGuide.phases.finishing')
     case 'building':

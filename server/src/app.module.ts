@@ -114,6 +114,7 @@ import { PageLocatorModule } from './modules/page-locator/page-locator.module';
 import { YearReviewModule } from './modules/year-review/year-review.module';
 import { VisualMatchModule } from './modules/visual-match/visual-match.module';
 import { VisionScanModule } from './modules/vision-scan/vision-scan.module';
+import { ReadingHelpModule } from './modules/reading-help/reading-help.module';
 import { StoryEditsModule } from './modules/story-edits/story-edits.module';
 import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
 
@@ -239,6 +240,7 @@ import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
     YearReviewModule,
     VisualMatchModule,
     VisionScanModule,
+    ReadingHelpModule,
     StoryEditsModule,
     StoryGuidesModule,
   ],

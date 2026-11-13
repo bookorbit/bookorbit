@@ -78,6 +78,7 @@ describe('AiJobRunner', () => {
         step: 'names',
         connectionId: 1,
         model: 'fast-model',
+        effort: null,
         units: 3,
         lanes: 3,
         durationMs: expect.any(Number),
@@ -88,6 +89,7 @@ describe('AiJobRunner', () => {
         step: 'summary',
         connectionId: 1,
         model: 'careful-model',
+        effort: null,
         units: 1,
         lanes: 1,
         durationMs: expect.any(Number),
@@ -186,6 +188,20 @@ describe('AiJobRunner outcomes for each client answer', () => {
       step: 'names',
     });
     expect(h.client.callsFor('careful')).toHaveLength(0);
+  });
+
+  it('neither fails nor lowers coverage for units an optional step could not finish', async () => {
+    const h = createRunnerHarness();
+    const names = h.feature.steps.find((step) => step.id === 'names');
+    if (!names) throw new Error('expected a names step');
+    names.optional = true;
+    h.client.handler = (request) =>
+      /^Passage [0-4] /.test(request.user) ? { ...defaultAnswer(request), finish: 'refused', json: undefined } : defaultAnswer(request);
+    const outcome = await h.run(h.job(10));
+    expect(outcome).toMatchObject({ kind: 'completed', artifact: { coverage: 1 } });
+    expect(h.events).toContainEqual(
+      expect.objectContaining({ code: 'step_finished', step: 'names', data: expect.objectContaining({ coverage: 0.5 }) }),
+    );
   });
 
   it('stops for a cancelled request, and fails error for a bad request', async () => {

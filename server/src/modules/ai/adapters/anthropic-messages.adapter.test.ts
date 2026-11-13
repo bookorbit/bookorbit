@@ -115,6 +115,12 @@ describe('AnthropicMessagesAdapter', () => {
       const body = bodyOf(adapter.buildRequest(target, request({ effort: 'medium', omit: new Set(['output_config']) })));
       expect(body.output_config).toBeUndefined();
     });
+
+    it('still sends an effort the slot chose after output_config was rejected, in instructions mode', () => {
+      const body = bodyOf(adapter.buildRequest(target, request({ effort: 'high', effortChosen: true, omit: new Set(['output_config']) })));
+      expect(body.output_config).toEqual({ effort: 'high' });
+      expect(body.system).toContain('JSON schema');
+    });
   });
 
   describe('parseResponse', () => {

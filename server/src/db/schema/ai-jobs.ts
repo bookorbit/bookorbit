@@ -14,7 +14,7 @@ import {
   uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
-import type { AiJobEstimate, AiJobModels, AiJobSubjectRef } from '@bookorbit/types';
+import type { AiEffort, AiJobEstimate, AiJobModels, AiJobSubjectRef } from '@bookorbit/types';
 
 import { aiConnections } from './ai';
 import { users } from './auth';
@@ -189,6 +189,8 @@ export const aiStepTimings = pgTable(
       .notNull()
       .references(() => aiConnections.id, { onDelete: 'cascade' }),
     model: varchar('model', { length: 200 }).notNull(),
+    /** The slot's effort level; null for builds that left effort to the feature. */
+    effort: varchar('effort', { length: 16 }).$type<AiEffort>(),
     units: integer('units').notNull(),
     /** Units the step ran at once: 1 for a sequential step. */
     lanes: integer('lanes').notNull(),

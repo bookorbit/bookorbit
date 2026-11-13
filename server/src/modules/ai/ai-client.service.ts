@@ -3,7 +3,7 @@ import type { AiFailureCode, AiJsonSupport, AiModelPrices, AiSlot, AiUsageOutcom
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { AiAdapter, AiAdapterResult, AiAdapterUsage, AiMessage, AiProviderError } from './adapters/ai-adapter.interface';
-import { isWebPage } from './adapters/ai-adapter-common';
+import { EFFORT_PARAMETERS, isWebPage } from './adapters/ai-adapter-common';
 import { AI_ADAPTERS } from './adapters';
 import { AiBudgetService, toMicros } from './ai-budget.service';
 import { AiError, type AiErrorDetails, type AiRequest, type AiResult, type AiSlotChoice, type AiUsage } from './ai-client.types';
@@ -14,9 +14,10 @@ import { extractJson, repairMessage, validateJson } from './ai-json';
 import { AiLedgerRepository } from './ai-ledger.repository';
 import { AiLimiterAbortedError, AiLimiterService } from './ai-limiter';
 import { aiMonthKey } from './ai-month';
-import { AiHttpService, AiNetworkError, type AiHttpResponse } from './ai-network';
+import { AI_MAX_RESPONSE_BYTES, AiHttpService, AiNetworkError, classifyAiNetworkError, type AiHttpResponse } from './ai-network';
 import { scrubSecrets } from './ai-scrub';
 import { AiSettingsService, type AiSettingsSnapshot } from './ai-settings.service';
+import { readSseEvents } from './ai-sse';
 
 /** Waits before the second to fifth try after a network error, a timeout, a 5xx or a 429 without `retry-after`. */
 export const AI_RETRY_DELAYS_MS = [5_000, 20_000, 60_000, 120_000];
@@ -30,10 +31,27 @@ const MAX_ATTEMPTS = 12;
 const BYTES_PER_TOKEN = 3;
 /** A picture's tokens by its pixels, the most any supported API type charges for one. */
 const PIXELS_PER_IMAGE_TOKEN = 750;
+/** A streamed answer has someone waiting: one quick retry, and only before the first token. */
+export const AI_STREAM_RETRY_DELAYS_MS = [1_000];
+const AI_STREAM_TRIES = AI_STREAM_RETRY_DELAYS_MS.length + 1;
+/** The most one streamed event or the provider's silence between chunks may be. */
+const STREAM_MAX_EVENT_BYTES = 256 * 1024;
+const STREAM_IDLE_MS = 30_000;
 
 export interface AiCompleteOptions {
   /** For the admin's Try it, which runs before a feature is on. */
   ignoreFeatureSwitch?: boolean;
+}
+
+/** What `AiClient.stream` yields: pieces of the answer as they arrive, then the whole result once. */
+export type AiStreamEvent = { delta: string } | { done: AiResult };
+
+export interface AiStreamOptions {
+  /**
+   * Called with the text so far after each piece; true ends the answer there as finished, and the
+   * provider stops being read. Usage is then estimated, since providers count it at the end.
+   */
+  stopWhen?: (text: string) => boolean;
 }
 
 type Step = { done: AiResult } | { retry: true; delayMs?: number; transient?: AiFailureCode };
@@ -59,6 +77,11 @@ interface Run {
   lastTransient: { failure: AiFailureCode; message: string } | null;
   secrets: string[];
   host: string;
+  /** Tries for errors that may pass, and the waits between them. */
+  transientLimit: number;
+  delays: readonly number[];
+  /** Someone is waiting on screen: ahead of builds in the queue, and a connection is not marked failing over it. */
+  interactive: boolean;
 }
 
 /**
@@ -77,6 +100,7 @@ export class AiClient {
   private readonly rejectedParameters = new Map<string, Set<string>>();
   /** Overridden in tests. */
   retryDelaysMs: readonly number[] = AI_RETRY_DELAYS_MS;
+  streamRetryDelaysMs: readonly number[] = AI_STREAM_RETRY_DELAYS_MS;
 
   constructor(
     private readonly connections: AiConnectionService,
@@ -102,10 +126,38 @@ export class AiClient {
       prices: chosen.prices,
       jsonMode: chosen.jsonMode,
       maxOutputTokens: chosen.maxOutputTokens,
+      ...(chosen.effort !== 'auto' ? { effort: chosen.effort } : {}),
     };
   }
 
   async complete(request: AiRequest, options: AiCompleteOptions = {}): Promise<AiResult> {
+    const run = await this.prepare(request, options, false);
+    for (let number = 1; number <= MAX_ATTEMPTS; number++) {
+      const step = await this.attempt(run, number);
+      if ('done' in step) return step.done;
+      if (!(await this.beforeRetry(run, step))) break;
+    }
+    return this.giveUp(run);
+  }
+
+  /**
+   * A plain-text answer as it is written, for someone waiting on screen. The same checks and ledger
+   * as `complete`, but it queues ahead of builds, retries once and only before the first piece, and
+   * never retries a reply cut short. A stream the caller abandons, or that the signal aborts, is
+   * still recorded, with the usage estimated from what was sent and received.
+   */
+  async *stream(request: AiRequest, options: AiStreamOptions = {}): AsyncGenerator<AiStreamEvent, void, undefined> {
+    if (request.schema || request.images?.length) throw new Error('A streamed answer is plain text');
+    const run = await this.prepare(request, {}, true);
+    for (let number = 1; number <= MAX_ATTEMPTS; number++) {
+      const step = yield* this.streamAttempt(run, number, options);
+      if ('done' in step) return;
+      if (!(await this.beforeRetry(run, step))) break;
+    }
+    await this.giveUp(run);
+  }
+
+  private async prepare(request: AiRequest, options: AiCompleteOptions, interactive: boolean): Promise<Run> {
     throwIfCancelled(request.signal);
     const settings = await this.settings.snapshot();
     if (!options.ignoreFeatureSwitch && !isEnabled(settings, request.feature)) {
@@ -117,7 +169,7 @@ export class AiClient {
       (request.jobId ? await this.bridge.jobSlotChoice(request.jobId, request.slot) : null) ??
       (await this.resolveSlot(request.slot, settings));
     const connection = (await this.connections.resolve(choice.connectionId)) as ResolvedAiConnection & { id: number };
-    const run: Run = {
+    return {
       request,
       choice,
       connection,
@@ -132,19 +184,190 @@ export class AiClient {
       lastTransient: null,
       secrets: AiConnectionService.secretsOf(connection),
       host: hostOf(connection.baseUrl),
+      transientLimit: interactive ? AI_STREAM_TRIES : AI_MAX_TRIES,
+      delays: interactive ? this.streamRetryDelaysMs : this.retryDelaysMs,
+      interactive,
     };
+  }
 
-    for (let number = 1; number <= MAX_ATTEMPTS; number++) {
-      const step = await this.attempt(run, number);
-      if ('done' in step) return step.done;
-      if (step.transient) {
-        run.transientFailures++;
-        if (run.transientFailures >= AI_MAX_TRIES) return this.giveUp(run);
-      }
-      const delay = step.delayMs ?? 0;
-      if (delay > 0) await sleep(delay, request.signal);
+  /** Counts a failed attempt and waits before the next one; false once the request should give up. */
+  private async beforeRetry(run: Run, step: Exclude<Step, { done: AiResult }>): Promise<boolean> {
+    if (step.transient) {
+      run.transientFailures++;
+      if (run.transientFailures >= run.transientLimit) return false;
     }
-    return this.giveUp(run);
+    const delay = step.delayMs ?? 0;
+    if (delay > 0) await sleep(delay, run.request.signal);
+    return true;
+  }
+
+  private async *streamAttempt(run: Run, number: number, options: AiStreamOptions): AsyncGenerator<AiStreamEvent, Step, undefined> {
+    const { request, choice, connection, adapter } = run;
+    await this.budget.checkRequest({ feature: request.feature, jobId: request.jobId, worstCaseMicros: this.worstCase(run) });
+
+    const httpRequest = adapter.buildRequest(
+      { baseUrl: connection.baseUrl, key: connection.key, headers: connection.headers },
+      {
+        model: choice.model,
+        system: request.system,
+        messages: run.messages,
+        json: 'none',
+        maxOutputTokens: run.maxOutputTokens,
+        effort: choice.effort ?? request.effort,
+        effortChosen: choice.effort !== undefined,
+        omit: this.omitFor(run),
+        stream: true,
+      },
+    );
+
+    const release = await this.acquire(run);
+    const attempt: Attempt = { number, startedAt: new Date() };
+    const received = { text: '', recorded: false };
+    try {
+      let opened: Awaited<ReturnType<AiHttpService['open']>>;
+      try {
+        opened = await this.http.open(httpRequest, {
+          networkProfile: connection.networkProfile,
+          timeoutMs: connection.timeoutMs,
+          signal: request.signal,
+        });
+      } catch (err) {
+        if (!(err instanceof AiNetworkError)) throw err;
+        received.recorded = true;
+        return await this.onNetworkError(run, attempt, err);
+      }
+
+      if (opened.kind === 'whole') {
+        received.recorded = true;
+        if (opened.status < 200 || opened.status >= 300) return await this.onProviderError(run, attempt, adapter.parseError(opened), opened);
+        const parsed = adapter.parseResponse(opened);
+        if (!parsed) {
+          const error: AiProviderError = isWebPage(opened)
+            ? { kind: 'not-api', status: opened.status, message: 'This URL answered with a web page, not an API' }
+            : { kind: 'server', status: opened.status, message: 'The provider sent a reply that could not be read' };
+          return await this.onProviderError(run, attempt, error, opened);
+        }
+        if (parsed.finish !== 'refused' && parsed.finish !== 'filtered' && parsed.text) yield { delta: parsed.text };
+        const done = await this.streamed(run, attempt, parsed, opened.durationMs);
+        yield { done };
+        return { done };
+      }
+
+      const reply: AiAdapterResult = {
+        text: '',
+        finish: 'stop',
+        usage: { input: 0, output: 0, reasoning: 0, cached: 0 },
+        usageReported: false,
+        model: '',
+      };
+      try {
+        for await (const event of readSseEvents(opened.body, {
+          maxEventBytes: STREAM_MAX_EVENT_BYTES,
+          maxTotalBytes: AI_MAX_RESPONSE_BYTES,
+          idleMs: STREAM_IDLE_MS,
+        })) {
+          const piece = adapter.parseStreamEvent(event);
+          if (!piece) continue;
+          if (piece.error) {
+            if (received.text === '') {
+              received.recorded = true;
+              return await this.onProviderError(run, attempt, piece.error, {
+                status: piece.error.status,
+                headers: new Headers(),
+                text: '',
+                durationMs: elapsed(attempt),
+              });
+            }
+            throw new AiNetworkError('provider-error', scrubSecrets(piece.error.message, run.secrets));
+          }
+          if (piece.model) reply.model = piece.model;
+          if (piece.usage) {
+            reply.usageReported = true;
+            reply.usage = largest(reply.usage, piece.usage);
+          }
+          if (piece.finish && reply.finish !== 'refused') reply.finish = piece.finish;
+          if (piece.delta) {
+            received.text += piece.delta;
+            yield { delta: piece.delta };
+            if (options.stopWhen?.(received.text)) {
+              reply.finish = 'stop';
+              reply.usageReported = false;
+              break;
+            }
+          }
+          if (piece.end) break;
+        }
+      } catch (err) {
+        const failure = err instanceof AiNetworkError ? err : classifyAiNetworkError(err, request.signal);
+        if (received.text === '' && !failure.extra.aborted && !request.signal?.aborted) {
+          received.recorded = true;
+          return await this.onNetworkError(run, attempt, failure);
+        }
+        received.recorded = true;
+        const cancelledNow = failure.extra.aborted || request.signal?.aborted === true;
+        await this.recordEstimate(
+          run,
+          attempt,
+          cancelledNow ? 'error:cancelled' : failure.failure === 'timeout' ? 'timeout' : 'error:provider-down',
+          received.text,
+        );
+        if (cancelledNow) throw cancelled();
+        throw new AiError('provider-down', scrubSecrets(failure.message, run.secrets), { connectionId: connection.id, failure: failure.failure });
+      }
+
+      reply.text = received.text;
+      received.recorded = true;
+      const done = await this.streamed(run, attempt, reply, elapsed(attempt));
+      yield { done };
+      return { done };
+    } finally {
+      release();
+      // The caller stopped reading mid-answer: what was sent and received still cost something.
+      if (!received.recorded) await this.recordEstimate(run, attempt, 'error:cancelled', received.text);
+    }
+  }
+
+  /** Records a streamed reply and turns it into a result. A reply cut short is kept as it is. */
+  private async streamed(run: Run, attempt: Attempt, reply: AiAdapterResult, durationMs: number): Promise<AiResult> {
+    const usage = reply.usageReported ? reply.usage : this.estimatedUsage(run, reply.text);
+    const cost = costOf(usage, run.choice.prices);
+    const outcome: AiUsageOutcome = reply.finish === 'stop' ? 'ok' : reply.finish;
+    await this.record(run, attempt, outcome, usage, cost, durationMs);
+    if (reply.finish === 'stop' || reply.finish === 'length') await this.clearSlotHealth(run);
+    const refused = reply.finish === 'refused' || reply.finish === 'filtered';
+    return { text: refused ? '' : reply.text, usage: toUsage(usage, cost), finish: reply.finish, model: reply.model || run.choice.model };
+  }
+
+  private async recordEstimate(run: Run, attempt: Attempt, outcome: AiUsageOutcome, received: string): Promise<void> {
+    const usage = this.estimatedUsage(run, received);
+    await this.record(run, attempt, outcome, usage, costOf(usage, run.choice.prices), elapsed(attempt));
+  }
+
+  /** Tokens for a request the provider did not count: what was sent, and what came back, at three bytes a token. */
+  private estimatedUsage(run: Run, received: string): AiAdapterUsage {
+    const sent = Buffer.byteLength(run.request.system ?? '', 'utf8') + run.messages.reduce((total, message) => total + textBytes(message.content), 0);
+    return {
+      input: Math.ceil(sent / BYTES_PER_TOKEN),
+      output: Math.ceil(Buffer.byteLength(received, 'utf8') / BYTES_PER_TOKEN),
+      reasoning: 0,
+      cached: 0,
+    };
+  }
+
+  private async acquire(run: Run): Promise<() => void> {
+    const { connection, request } = run;
+    try {
+      return await this.limiters
+        .for(connection.id)
+        .acquire(
+          { maxParallel: connection.maxParallel, requestsPerMinute: connection.requestsPerMinute },
+          request.signal,
+          run.interactive ? 'interactive' : 'background',
+        );
+    } catch (err) {
+      if (err instanceof AiLimiterAbortedError) throw cancelled();
+      throw err;
+    }
   }
 
   private async attempt(run: Run, number: number): Promise<Step> {
@@ -160,20 +383,13 @@ export class AiClient {
         json: run.json,
         schema: request.schema,
         maxOutputTokens: run.maxOutputTokens,
-        effort: request.effort,
-        omit: this.omitted(connection.id, choice.model),
+        effort: choice.effort ?? request.effort,
+        effortChosen: choice.effort !== undefined,
+        omit: this.omitFor(run),
       },
     );
 
-    const limiter = this.limiters.for(connection.id);
-    let release: () => void;
-    try {
-      release = await limiter.acquire({ maxParallel: connection.maxParallel, requestsPerMinute: connection.requestsPerMinute }, request.signal);
-    } catch (err) {
-      if (err instanceof AiLimiterAbortedError) throw cancelled();
-      throw err;
-    }
-
+    const release = await this.acquire(run);
     const attempt: Attempt = { number, startedAt: new Date() };
     let response: AiHttpResponse;
     try {
@@ -262,6 +478,12 @@ export class AiClient {
       case 'bad-parameter': {
         const omitted = this.omitted(run.connection.id, run.choice.model);
         await record('error:bad-request');
+        if (run.choice.effort && error.parameter && EFFORT_PARAMETERS.has(error.parameter)) {
+          // Left out, the model would run at its own default, which some providers set to their highest level.
+          const reason = `The model refused the effort level ${run.choice.effort}`;
+          await this.markSlotFailing(run, 'effort-rejected', reason);
+          throw new AiError('bad-request', `${reason}: ${message}`, { ...details, failure: 'effort-rejected' });
+        }
         if (error.parameter && !omitted.has(error.parameter)) {
           omitted.add(error.parameter);
           this.logger.log(
@@ -307,7 +529,7 @@ export class AiClient {
       }
       case 'model-missing': {
         await record('error:model-missing');
-        await this.markSlotFailing(run);
+        await this.markSlotFailing(run, 'model-missing', 'Model no longer available');
         throw new AiError('model-missing', `The model ${run.choice.model} is no longer available`, { ...details, failure: 'model-missing' });
       }
       case 'context-length':
@@ -348,14 +570,25 @@ export class AiClient {
 
   private async giveUp(run: Run): Promise<never> {
     const last = run.lastTransient ?? { failure: 'unreachable' as const, message: 'The provider could not be reached' };
-    await this.markFailing(run, last.failure, last.message);
+    // Two quick tries for one reader say little about the connection; builds keep that judgement.
+    if (!run.interactive) await this.markFailing(run, last.failure, last.message);
     throw new AiError('provider-down', last.message, { connectionId: run.connection.id, failure: last.failure });
   }
 
   /** The delay before the next try after this many transient failures (counting the one just had). */
   private backoff(run: Run): number {
-    const delays = this.retryDelaysMs;
+    const delays = run.delays;
     return delays[Math.min(run.transientFailures, delays.length - 1)] ?? 0;
+  }
+
+  /**
+   * What the next attempt leaves out. A level the slot chose is always sent, even where a feature's
+   * level was refused before, so a refusal reaches the admin instead of being skipped.
+   */
+  private omitFor(run: Run): ReadonlySet<string> {
+    const omitted = this.omitted(run.connection.id, run.choice.model);
+    if (!run.choice.effort) return omitted;
+    return new Set([...omitted].filter((parameter) => !EFFORT_PARAMETERS.has(parameter)));
   }
 
   private omitted(connectionId: number, model: string): Set<string> {
@@ -414,6 +647,7 @@ export class AiClient {
         outcome,
         jobId: request.jobId ?? null,
         attempt: attempt.number,
+        userId: request.userId ?? null,
       });
     } catch (err) {
       this.logger.error(
@@ -432,19 +666,15 @@ export class AiClient {
     await this.connections.markFailing(run.connection.id, failure, reason);
   }
 
-  /** Marks the slot failing, unless the slot already moved to another model or connection. */
-  private async markSlotFailing(run: Run): Promise<void> {
+  /** Marks the slot failing, unless the slot already moved to another model, connection or effort. */
+  private async markSlotFailing(run: Run, code: AiFailureCode, reason: string): Promise<void> {
     const { choice } = run;
     const current = (await this.settings.slots())[choice.slot];
-    if (current.connectionId === choice.connectionId && current.model === choice.model) {
-      await this.settings.setSlotHealth(choice.slot, {
-        failingSince: new Date().toISOString(),
-        code: 'model-missing',
-        reason: 'Model no longer available',
-        model: choice.model,
-      });
+    const sameEffort = code !== 'effort-rejected' || current.effort === choice.effort;
+    if (current.connectionId === choice.connectionId && current.model === choice.model && sameEffort) {
+      await this.settings.setSlotHealth(choice.slot, { failingSince: new Date().toISOString(), code, reason, model: choice.model });
     }
-    this.events.emit(AI_EVENTS.SLOT_FAILING, { slot: choice.slot, model: choice.model, code: 'model-missing' } satisfies AiSlotFailingEvent);
+    this.events.emit(AI_EVENTS.SLOT_FAILING, { slot: choice.slot, model: choice.model, code } satisfies AiSlotFailingEvent);
   }
 
   private async clearSlotHealth(run: Run): Promise<void> {
@@ -488,6 +718,23 @@ function toUsage(usage: AiAdapterUsage, cost: number | null): AiUsage {
     ...(usage.cached ? { cached: usage.cached } : {}),
     ...(cost !== null ? { cost } : {}),
   };
+}
+
+/** The larger of each count, since a stream may send running totals or one figure at the end. */
+function largest(current: AiAdapterUsage, next: AiAdapterUsage): AiAdapterUsage {
+  const merged: AiAdapterUsage = {
+    input: Math.max(current.input, next.input),
+    output: Math.max(current.output, next.output),
+    reasoning: Math.max(current.reasoning, next.reasoning),
+    cached: Math.max(current.cached, next.cached),
+  };
+  const cost = next.cost ?? current.cost;
+  if (cost !== undefined) merged.cost = cost;
+  return merged;
+}
+
+function elapsed(attempt: Attempt): number {
+  return Date.now() - attempt.startedAt.getTime();
 }
 
 function cancelled(): AiError {

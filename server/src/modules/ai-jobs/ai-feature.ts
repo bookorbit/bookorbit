@@ -83,6 +83,11 @@ export interface AiStep<Subject extends AiSubject = AiSubject> {
   fingerprint(ctx: AiRunContext<Subject>, unit: AiUnit): string;
   /** Units run one at a time in order, each able to read the ones before it. */
   sequential?: boolean;
+  /**
+   * The step adds extras the result is complete without: units it could not finish never fail the
+   * job, and do not lower the coverage the result reports.
+   */
+  optional?: boolean;
   run(ctx: AiStepContext<Subject>, unit: AiUnit): Promise<unknown>;
 }
 

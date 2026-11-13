@@ -50,7 +50,7 @@ export type StoryGuideProgressTitle = 'storyGuide' | 'updating' | 'rebuilding'
 /** The step a running build is on, as the copy deck names it. */
 export type StoryGuidePhase =
   | { kind: 'reading' | 'findingNames' | 'checkingWho' | 'findingTies' | 'finishing' | 'building' }
-  | { kind: 'writing'; chapter: number | null; total: number | null }
+  | { kind: 'writing' | 'summarizing'; chapter: number | null; total: number | null }
 
 export type StoryGuideRow =
   /** No guide and no job, building allowed. */
@@ -154,6 +154,14 @@ function count(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
+/** A step that goes chapter by chapter, with the chapter it is on when the counts are known. */
+function chapterPhase(kind: 'writing' | 'summarizing', job: Pick<StoryGuideJob, 'done' | 'total'>): StoryGuidePhase {
+  const done = count(job.done)
+  const total = count(job.total)
+  if (done === null || total === null || total <= 0) return { kind, chapter: null, total: null }
+  return { kind, chapter: Math.min(Math.max(done + 1, 1), total), total }
+}
+
 export function storyGuidePhase(job: Pick<StoryGuideJob, 'phase' | 'done' | 'total'>): StoryGuidePhase {
   switch (job.phase) {
     case 'text':
@@ -166,12 +174,10 @@ export function storyGuidePhase(job: Pick<StoryGuideJob, 'phase' | 'done' | 'tot
     case 'ties':
       return { kind: 'findingTies' }
     case 'lines':
-    case 'profiles': {
-      const done = count(job.done)
-      const total = count(job.total)
-      if (done === null || total === null || total <= 0) return { kind: 'writing', chapter: null, total: null }
-      return { kind: 'writing', chapter: Math.min(Math.max(done + 1, 1), total), total }
-    }
+    case 'profiles':
+      return chapterPhase('writing', job)
+    case 'summaries':
+      return chapterPhase('summarizing', job)
     case 'assemble':
       return { kind: 'finishing' }
     default:

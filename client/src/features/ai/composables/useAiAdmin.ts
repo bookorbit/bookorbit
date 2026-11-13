@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import type { AiConnection, AiModelList, AiOverview, AiSettings } from '@bookorbit/types'
+import type { AiConnection, AiModelList, AiOverview, AiSettings, AiUsageReport } from '@bookorbit/types'
 
 import * as aiApi from '../api/ai.api'
 
@@ -18,6 +18,8 @@ export function useAiAdmin() {
   const settingsState = ref<AiLoadState>('loading')
   /** Model lists per connection, fetched once a slot needs them. */
   const modelLists = ref<Record<number, AiModelList | 'loading' | 'error'>>({})
+  /** This month's usage by feature, for each feature's spend; the tables show no monthly figure without it. */
+  const monthUsage = ref<AiUsageReport | null>(null)
 
   async function loadOverview(): Promise<void> {
     if (!overview.value) overviewState.value = 'loading'
@@ -26,6 +28,18 @@ export function useAiAdmin() {
       overviewState.value = 'ready'
     } catch {
       overviewState.value = 'error'
+      return
+    }
+    await loadMonthUsage()
+  }
+
+  async function loadMonthUsage(): Promise<void> {
+    const month = overview.value?.month.month
+    if (!month) return
+    try {
+      monthUsage.value = await aiApi.getUsage(month, month)
+    } catch {
+      // Spend by feature is extra detail; the totals above it come from the overview.
     }
   }
 
@@ -90,6 +104,7 @@ export function useAiAdmin() {
     settings,
     settingsState,
     modelLists,
+    monthUsage,
     load,
     loadOverview,
     loadConnections,

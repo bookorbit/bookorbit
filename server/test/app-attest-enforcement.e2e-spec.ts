@@ -67,12 +67,13 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['GET', '/mobile/books/files/1/story-guide/fixes'],
   ['PUT', `/mobile/books/files/1/story-guide/fixes/${ID}`],
   ['POST', '/mobile/vision-scan'],
+  ['POST', '/mobile/reading-help'],
 ];
 
 /**
  * Guarded routes that, outside production, also accept a request with no assertion at all, each
  * with a body that passes validation and the answer that shows the request got past the guard:
- * no such book file, or a photo that is not an image.
+ * no such book file, a photo that is not an image, or a recap with more passages than it reads.
  */
 const UNSIGNED_OUTSIDE_PRODUCTION: Array<[method: string, path: string, body: object | undefined, status: number]> = [
   ['GET', '/mobile/books/files/1/story-guide?format=1', undefined, 404],
@@ -84,6 +85,7 @@ const UNSIGNED_OUTSIDE_PRODUCTION: Array<[method: string, path: string, body: ob
     404,
   ],
   ['POST', '/mobile/vision-scan', { kind: 'cover', image: 'AAAA' }, 400],
+  ['POST', '/mobile/reading-help', { kind: 'recap-note', fileId: 1, language: 'en', passages: ['He came in.', 'She left.'] }, 400],
 ];
 
 const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [

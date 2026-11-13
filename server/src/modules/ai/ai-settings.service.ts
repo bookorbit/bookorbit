@@ -2,11 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import {
   AI_FAILURE_CODES,
   AI_FEATURE_DEFINITIONS,
+  AI_READER_CAP_DEFAULTS,
   AI_FEATURES,
   AI_JSON_MODES,
+  AI_SLOT_EFFORTS,
   AI_SLOTS,
   type AiBudgetSettings,
   type AiFailureCode,
+  type AiFeatureDefinition,
   type AiFeatureId,
   type AiFeatureLimits,
   type AiFeatureSettings,
@@ -14,6 +17,7 @@ import {
   type AiModelPrices,
   type AiPrivacyConfirmation,
   type AiSlot,
+  type AiSlotEffort,
   type AiSlotHealth,
   type AiSlotSettings,
   type AiSlotsSettings,
@@ -136,16 +140,17 @@ export function isAiFeature(value: string): value is AiFeatureId {
 }
 
 export function emptySlot(): AiSlotSettings {
-  return { connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null };
+  return { connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null, effort: 'auto' };
 }
 
 export function defaultFeatureSettings(feature: AiFeatureId): AiFeatureSettings {
-  const limits = AI_FEATURE_DEFINITIONS[feature].limits;
+  const definition: AiFeatureDefinition = AI_FEATURE_DEFINITIONS[feature];
   return {
     enabled: false,
-    limits: Object.fromEntries(Object.entries(limits).map(([name, range]) => [name, range.default])) as AiFeatureLimits,
+    limits: Object.fromEntries(Object.entries(definition.limits).map(([name, range]) => [name, range.default])) as AiFeatureLimits,
     monthlyBudget: null,
     buildsPerMonth: null,
+    ...(definition.perReader ? { ...AI_READER_CAP_DEFAULTS } : {}),
   };
 }
 
@@ -164,6 +169,8 @@ function decodeSlot(raw: unknown): AiSlotSettings {
     prices: decodePrices(record.prices),
     jsonMode: (AI_JSON_MODES as readonly unknown[]).includes(record.jsonMode) ? (record.jsonMode as AiJsonMode) : 'auto',
     maxOutputTokens: positiveInt(record.maxOutputTokens),
+    // A level a newer server saved that this one does not know is left to the features.
+    effort: (AI_SLOT_EFFORTS as readonly unknown[]).includes(record.effort) ? (record.effort as AiSlotEffort) : 'auto',
   };
 }
 
@@ -202,12 +209,19 @@ function decodeFeature(feature: AiFeatureId, raw: unknown): AiFeatureSettings {
       limits[name as keyof AiFeatureLimits] = value;
     }
   }
-  return {
+  const settings: AiFeatureSettings = {
     enabled: record.enabled === true,
     limits,
     monthlyBudget: nonNegative(record.monthlyBudget),
     buildsPerMonth: positiveInt(record.buildsPerMonth),
   };
+  if ((AI_FEATURE_DEFINITIONS[feature] as AiFeatureDefinition).perReader) {
+    // Absent means never saved, so the default cap; null means the admin cleared it.
+    settings.readerMonthlyBudget = 'readerMonthlyBudget' in record ? nonNegative(record.readerMonthlyBudget) : defaults.readerMonthlyBudget;
+    settings.readerRequestsPerMonth =
+      'readerRequestsPerMonth' in record ? positiveInt(record.readerRequestsPerMonth) : defaults.readerRequestsPerMonth;
+  }
+  return settings;
 }
 
 function decodeBudget(raw: unknown): AiBudgetSettings {

@@ -37,10 +37,11 @@ ChatGPT, Claude and Gemini consumer plans sign in with an account, not an API ke
 
 ## Models
 
-Features send requests to two slots:
+Features send requests to three slots:
 
 - **Fast**: many small requests, such as reading each passage. A quick, low-cost model fits.
 - **Careful**: fewer requests that need the best judgement, such as the final review.
+- **Vision**: requests that carry a picture, such as photo scans. The model must read images.
 
 Each slot names a connection and a model; both may use the same one. Prices, in dollars per million input and output tokens, are filled in when the provider's model list carries them (OpenRouter does) and can be typed otherwise. **Try it** runs a short story-guide passage on a public-domain excerpt and shows what the model found, how long it took and what it cost, which is a cheap way to judge a model before a real book.
 
@@ -51,6 +52,15 @@ Story guides were measured with GPT-6 Luna in the Fast slot and GPT-6.1 Terra in
 Each feature has a switch, its own limits and an optional share of the budget. Turning a feature on for the first time asks for a confirmation: the whole text of each book built is sent to the provider you chose; readers' accounts, reading positions and notes are not. The page records who confirmed and when.
 
 Turning a feature off stops new builds and pauses running ones. What it already built stays available, because serving it sends nothing to the provider.
+
+### Reading help
+
+Reading help writes short answers for readers while they read: who or what a selected name is, a description for a Constellations entry, and Story Recap notes. The app sends `POST /api/v1/mobile/reading-help` with passages it took from before the reader's place, and the server streams the answer back as server-sent events. Only those passages and the words asked about go to the provider; the book's title, its author and the rest of its text do not.
+
+- **Models**: answers use the Fast slot. A reader can ask again more carefully, which uses the Careful slot when it has a model. `GET /api/v1/app-info` reports `readingHelp.enabled` and `readingHelp.careful`.
+- **Each reader's share**: besides the feature budget, each reader may spend $1 a month when the slot has prices, or make 300 requests a month when it does not. Both limits can be changed or cleared on the feature. A reader over their share gets `READING_HELP_READER_CAP` until the month turns.
+- **Shared answers**: an answer is cached under everything that shapes it (the kind of answer, the passages, the words asked about, the language and the model), and the same question asked again is answered from the cache at no cost, for any reader who can open the book. Answers unused for 180 days are removed, and the cache is kept under 64 MB.
+- **Errors**: a request refused before the answer starts is a JSON error with an `errorCode`, such as `READING_HELP_OFF` or `READING_HELP_CAREFUL_OFF`. A failure once the answer has started arrives as an `error` event in the stream.
 
 ## Budget
 

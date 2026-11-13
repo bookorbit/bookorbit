@@ -2,6 +2,7 @@ import type { AiModelInfo, AiModelList } from '@bookorbit/types';
 
 import type { AiFinish } from '../ai-client.types';
 import type { AiHttpRequest, AiHttpResponse } from '../ai-network';
+import type { AiSseEvent } from '../ai-sse';
 import type {
   AiAdapter,
   AiAdapterRequest,
@@ -11,6 +12,7 @@ import type {
   AiProviderError,
   AiProviderErrorKind,
   AiSend,
+  AiStreamPiece,
 } from './ai-adapter.interface';
 import { AiProviderFailure } from './ai-adapter.interface';
 import {
@@ -21,9 +23,10 @@ import {
   normaliseUsage,
   parseJson,
   parseModelList,
-  refusesField,
+  refusesEffort,
   rejectedParameter,
   retryAfterSeconds,
+  streamedError,
   strictSchema,
 } from './ai-adapter-common';
 
@@ -52,12 +55,16 @@ export class AnthropicMessagesAdapter implements AiAdapter {
       messages: request.messages.map((message) => ({ role: message.role, content: anthropicContent(message.content) })),
     };
     if (system) body.system = system;
+    if (request.stream) body.stream = true;
     const outputConfig: Record<string, unknown> = {};
     if (enforce && request.schema) {
       // Schemas here take no numeric or length constraints; the local validator enforces those.
       outputConfig.format = { type: 'json_schema', schema: strictSchema(request.schema) };
     }
-    if (request.effort && !request.omit.has('output_config') && !request.omit.has(EFFORT_PARAMETER)) outputConfig.effort = request.effort;
+    // A chosen level outlives a refused `output_config`, so the refusal reaches the admin instead of
+    // the model quietly running at its own default.
+    const sendEffort = !request.omit.has(EFFORT_PARAMETER) && (request.effortChosen || !request.omit.has('output_config'));
+    if (request.effort && sendEffort) outputConfig.effort = request.effort;
     if (Object.keys(outputConfig).length > 0) body.output_config = outputConfig;
 
     return { method: 'POST', url: joinUrl(target.baseUrl, '/v1/messages'), headers: this.headers(target), body: JSON.stringify(body) };
@@ -78,6 +85,39 @@ export class AnthropicMessagesAdapter implements AiAdapter {
     };
   }
 
+  parseStreamEvent(event: AiSseEvent): AiStreamPiece | null {
+    const body = parseJson(event.data);
+    if (!isRecord(body)) return null;
+    switch (body.type) {
+      case 'message_start': {
+        const message = isRecord(body.message) ? body.message : {};
+        const usage = normaliseUsage(message.usage);
+        return {
+          ...(typeof message.model === 'string' && message.model ? { model: message.model } : {}),
+          ...(usage ? { usage } : {}),
+        };
+      }
+      case 'content_block_delta': {
+        const delta = isRecord(body.delta) ? body.delta : {};
+        return delta.type === 'text_delta' && typeof delta.text === 'string' && delta.text.length > 0 ? { delta: delta.text } : null;
+      }
+      case 'message_delta': {
+        const delta = isRecord(body.delta) ? body.delta : {};
+        const usage = normaliseUsage(body.usage);
+        return {
+          ...(delta.stop_reason ? { finish: finishOf(delta.stop_reason) } : {}),
+          ...(usage ? { usage } : {}),
+        };
+      }
+      case 'message_stop':
+        return { end: true };
+      case 'error':
+        return { error: streamedError(body.error) };
+      default:
+        return null;
+    }
+  }
+
   parseError(response: AiHttpResponse): AiProviderError {
     const status = response.status;
     const body = parseJson(response.text);
@@ -87,7 +127,7 @@ export class AnthropicMessagesAdapter implements AiAdapter {
     const retryAfter = retryAfterSeconds(response.headers);
     const parameter =
       status === 400
-        ? (rejectedParameter(undefined, type, message) ?? (refusesField(message, /\beffort\b/i) ? EFFORT_PARAMETER : undefined))
+        ? (rejectedParameter(undefined, type, message) ?? (refusesEffort(message, /\beffort\b/i) ? EFFORT_PARAMETER : undefined))
         : undefined;
 
     const kind = ((): AiProviderErrorKind => {

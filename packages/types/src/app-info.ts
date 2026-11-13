@@ -1,4 +1,5 @@
 import type { StoryGuidesAppInfo } from "./story-guide";
+import type { ReadingHelpAppInfo } from "./reading-help";
 import type { VisionScanAppInfo } from "./vision-scan";
 
 /**
@@ -105,6 +106,11 @@ export const SERVER_FEATURES = [
    * model and matches them to the reader's libraries. `app-info` carries `visionScan`.
    */
   "vision-scan",
+  /**
+   * `POST /mobile/reading-help` writes a short answer about passages of a book with the admin's AI
+   * model and streams it back. `app-info` carries `readingHelp`.
+   */
+  "reading-help",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
@@ -122,6 +128,8 @@ export interface AppInfoResponse {
   storyGuides?: StoryGuidesAppInfo;
   /** Whether photo scans can run now; absent on servers without them. */
   visionScan?: VisionScanAppInfo;
+  /** Whether reading help can answer now; absent on servers without it. */
+  readingHelp?: ReadingHelpAppInfo;
 }
 
 /** Public, credential-free identity check for explicitly enrolled connection aliases. */

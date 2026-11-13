@@ -507,7 +507,7 @@ export const routes: RouteRecordRaw[] = [
             name: 'settings-admin-ai',
             component: () => import('@/features/ai/AiAdminSettings.vue'),
             meta: {
-              maxWidth: 'max-w-4xl',
+              maxWidth: 'max-w-6xl',
               requiredPermission: Permission.ManageAppSettings,
               permissionFallback: 'settings-account-profile',
               title: () => t('titles.admin.ai'),

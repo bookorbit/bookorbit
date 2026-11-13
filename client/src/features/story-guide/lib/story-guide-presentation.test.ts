@@ -110,6 +110,15 @@ describe('storyGuidePresentation', () => {
     expect(present(status({ job: job({ phase, done: 1, total: 4 }) })).rows[0]).toMatchObject({ phase: expected })
   })
 
+  it('counts the chapters while summaries are written, and drops the numbers when the counts are missing', () => {
+    expect(present(status({ job: job({ phase: 'summaries', done: 1, total: 4 }) })).rows[0]).toMatchObject({
+      phase: { kind: 'summarizing', chapter: 2, total: 4 },
+    })
+    expect(present(status({ job: job({ phase: 'summaries' }) })).rows[0]).toMatchObject({
+      phase: { kind: 'summarizing', chapter: null, total: null },
+    })
+  })
+
   it('writes descriptions without chapter numbers when the counts are missing, and shows no bar', () => {
     expect(present(status({ job: job({ phase: 'lines' }) })).rows[0]).toMatchObject({
       phase: { kind: 'writing', chapter: null, total: null },

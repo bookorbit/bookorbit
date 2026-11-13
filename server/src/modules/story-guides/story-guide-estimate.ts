@@ -37,6 +37,12 @@ export const STORY_GUIDE_STEP_COSTS: Record<string, StepCost> = {
   ties: { slot: 'fast', unit: 'passage', read: 1, callIn: 700, callOut: 1_500 },
   lines: { slot: 'fast', unit: 'lines', read: 0, callIn: 2_800, callOut: 1_650 },
   profiles: { slot: 'fast', unit: 'lines', read: 1, callIn: 1_500, callOut: 3_000 },
+  /**
+   * Two chapters of Through the Looking-Glass on GPT-6 Luna: the prompt and the summary before it
+   * on top of the chapter, and 70 to 110 tokens of summary out, with room for a model that reasons.
+   * Not yet measured on the golden books.
+   */
+  summaries: { slot: 'fast', unit: 'lines', read: 1, callIn: 600, callOut: 500 },
 };
 
 /**

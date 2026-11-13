@@ -1,3 +1,5 @@
+import type { AiEffort } from "./ai";
+
 /**
  * Jobs that build an AI feature's output for one subject (for example a book's text), run in steps
  * whose results are cached so a restart resumes and an update reruns only what changed.
@@ -45,6 +47,8 @@ export type AiJobEventLevel = "info" | "warn" | "error";
 export interface AiJobSlotModel {
   connectionId: number;
   model: string;
+  /** The level the slot set; absent when it left effort to the feature. */
+  effort?: AiEffort;
 }
 
 export type AiJobModels = Partial<Record<"fast" | "careful", AiJobSlotModel>>;

@@ -102,6 +102,7 @@ export * from "./year-review";
 export * from "./visual-match";
 export * from "./shelf-match";
 export * from "./vision-scan";
+export * from "./reading-help";
 export * from "./story-edits";
 export * from "./regex-metadata";
 export * from "./delivery";

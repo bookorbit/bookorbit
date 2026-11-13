@@ -6,6 +6,7 @@ import { AppSettingsService } from '../app-settings/app-settings.service';
 import { GITHUB_RELEASES_API } from './app-info.constants';
 import { AppInfoService } from './app-info.service';
 import { ServerIdentityService } from '../server-identity/server-identity.service';
+import type { ReadingHelpService } from '../reading-help/reading-help.service';
 import type { StoryGuidesService } from '../story-guides/story-guides.service';
 import type { VisionScanService } from '../vision-scan/vision-scan.service';
 
@@ -20,6 +21,10 @@ const storyGuides = {
 const visionScan = {
   appInfo: vi.fn().mockResolvedValue({ enabled: true }),
 } as unknown as VisionScanService;
+
+const readingHelp = {
+  appInfo: vi.fn().mockResolvedValue({ enabled: true, careful: false, passageTokens: 8000 }),
+} as unknown as ReadingHelpService;
 
 function makeConfig(version = 'v1.2.3'): jest.Mocked<ConfigService> {
   return {
@@ -60,25 +65,25 @@ describe('AppInfoService', () => {
 
   describe('getAppInfo', () => {
     it('returns version from config', async () => {
-      const service = new AppInfoService(makeConfig('v2.0.0'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v2.0.0'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       expect((await service.getAppInfo()).version).toBe('v2.0.0');
     });
 
     it('defaults to "Local build" when config returns undefined', async () => {
       const config = { get: vi.fn().mockReturnValue(undefined) } as unknown as ConfigService;
-      const service = new AppInfoService(config, makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(config, makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       expect((await service.getAppInfo()).version).toBe('Local build');
     });
 
     it('returns null for updateAvailable when update check is skipped', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       const info = await service.getAppInfo();
       expect(info.updateAvailable).toBeNull();
       expect(info.latestVersion).toBeNull();
     });
 
     it('does not expose the Book Dock filesystem path', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       const info = await service.getAppInfo();
       expect(info).toMatchObject({
         version: 'Local build',
@@ -90,7 +95,7 @@ describe('AppInfoService', () => {
     });
 
     it('includes the installation identity for connection verification', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       expect((await service.getAppInfo()).instanceId).toBe('538a27ca-87ef-47bc-a195-13c8597c3529');
     });
 
@@ -98,7 +103,7 @@ describe('AppInfoService', () => {
       const unavailable = {
         getIdentity: vi.fn().mockRejectedValue(new Error('database unavailable')),
       } as unknown as ServerIdentityService;
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), unavailable, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), unavailable, storyGuides, visionScan, readingHelp);
       const info = await service.getAppInfo();
       expect(info).not.toHaveProperty('instanceId');
       expect(info.features).toEqual([...SERVER_FEATURES]);
@@ -106,14 +111,14 @@ describe('AppInfoService', () => {
     });
 
     it('reports whether story guides build and are served', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       expect((await service.getAppInfo()).storyGuides).toEqual({ building: true, served: false });
       expect((await service.getAppInfo()).features).toContain('story-guides');
     });
 
     it('omits storyGuides when it cannot be read, and still answers', async () => {
       const failing = { appInfo: vi.fn().mockRejectedValue(new Error('database unavailable')) } as unknown as StoryGuidesService;
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, failing, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, failing, visionScan, readingHelp);
       const info = await service.getAppInfo();
       expect(info).not.toHaveProperty('storyGuides');
       expect(info.features).toEqual([...SERVER_FEATURES]);
@@ -121,7 +126,7 @@ describe('AppInfoService', () => {
     });
 
     it('reports whether photo scans can run', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       const info = await service.getAppInfo();
       expect(info.visionScan).toEqual({ enabled: true });
       expect(info.features).toContain('vision-scan');
@@ -129,15 +134,31 @@ describe('AppInfoService', () => {
 
     it('omits visionScan when it cannot be read, and still answers', async () => {
       const failing = { appInfo: vi.fn().mockRejectedValue(new Error('database unavailable')) } as unknown as VisionScanService;
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, failing);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, failing, readingHelp);
       const info = await service.getAppInfo();
       expect(info).not.toHaveProperty('visionScan');
       expect(info).toHaveProperty('storyGuides');
       expect(warnSpy).toHaveBeenCalledOnce();
     });
 
+    it('reports whether reading help can answer', async () => {
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
+      const info = await service.getAppInfo();
+      expect(info.readingHelp).toEqual({ enabled: true, careful: false, passageTokens: 8000 });
+      expect(info.features).toContain('reading-help');
+    });
+
+    it('omits readingHelp when it cannot be read, and still answers', async () => {
+      const failing = { appInfo: vi.fn().mockRejectedValue(new Error('database unavailable')) } as unknown as ReadingHelpService;
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, failing);
+      const info = await service.getAppInfo();
+      expect(info).not.toHaveProperty('readingHelp');
+      expect(info).toHaveProperty('visionScan');
+      expect(warnSpy).toHaveBeenCalledOnce();
+    });
+
     it('advertises every server feature so clients can detect support', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       const info = await service.getAppInfo();
       expect(info.features).toEqual([...SERVER_FEATURES]);
       expect(info.features).toEqual(
@@ -154,7 +175,7 @@ describe('AppInfoService', () => {
     });
 
     it('returns a fresh features array per call so a caller cannot mutate the shared list', async () => {
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(), identity, storyGuides, visionScan, readingHelp);
       const first = await service.getAppInfo();
       first.features?.push('book-journal');
       expect((await service.getAppInfo()).features).toEqual([...SERVER_FEATURES]);
@@ -162,7 +183,7 @@ describe('AppInfoService', () => {
 
     it('fetches from GitHub if checked for the first time', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
 
       const info = await service.getAppInfo();
       expect(info.updateAvailable).toBe(true);
@@ -171,7 +192,7 @@ describe('AppInfoService', () => {
 
     it('returns cached result and does not fetch if less than 10 minutes have passed', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
 
       await service.getAppInfo(); // First call triggers fetch
       expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -182,7 +203,7 @@ describe('AppInfoService', () => {
 
     it('re-fetches if more than 10 minutes have elapsed', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
 
       await service.getAppInfo(); // First call
       expect(fetchSpy).toHaveBeenCalledTimes(1);
@@ -201,7 +222,7 @@ describe('AppInfoService', () => {
     it('fetches GitHub API and sets updateAvailable: true when newer version exists', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       const info = await service.getAppInfo();
@@ -213,7 +234,7 @@ describe('AppInfoService', () => {
     it('sets updateAvailable: false when already on latest', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.2.3'));
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBe(false);
@@ -222,7 +243,7 @@ describe('AppInfoService', () => {
     it('sets updateAvailable: false when running newer than latest (downgrade scenario)', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.2.2'));
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBe(false);
@@ -231,7 +252,7 @@ describe('AppInfoService', () => {
     it('correctly compares minor version bumps', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
 
-      const service = new AppInfoService(makeConfig('v1.2.9'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.9'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBe(true);
@@ -240,7 +261,7 @@ describe('AppInfoService', () => {
     it('correctly compares major version bumps', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v2.0.0'));
 
-      const service = new AppInfoService(makeConfig('v1.9.9'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.9.9'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBe(true);
@@ -249,7 +270,7 @@ describe('AppInfoService', () => {
     it('skips fetch and leaves updateAvailable: null when version is "Local build"', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch');
 
-      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('Local build'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -259,7 +280,7 @@ describe('AppInfoService', () => {
     it('skips fetch when version is a sha-prefixed string', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch');
 
-      const service = new AppInfoService(makeConfig('sha-abc1234'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('sha-abc1234'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -269,7 +290,7 @@ describe('AppInfoService', () => {
     it('skips fetch when update checks are disabled', async () => {
       const fetchSpy = vi.spyOn(global, 'fetch');
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(false), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(false), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect(fetchSpy).not.toHaveBeenCalled();
@@ -279,7 +300,7 @@ describe('AppInfoService', () => {
     it('leaves updateAvailable: null on network error (does not throw)', async () => {
       vi.spyOn(global, 'fetch').mockRejectedValue(new TypeError('fetch failed'));
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -291,7 +312,7 @@ describe('AppInfoService', () => {
       abortError.name = 'AbortError';
       vi.spyOn(global, 'fetch').mockRejectedValue(abortError);
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await expect(service.onApplicationBootstrap()).resolves.not.toThrow();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -306,7 +327,7 @@ describe('AppInfoService', () => {
       } as unknown as Response;
       vi.spyOn(global, 'fetch').mockResolvedValue(badResponse);
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -321,7 +342,7 @@ describe('AppInfoService', () => {
       } as unknown as Response;
       vi.spyOn(global, 'fetch').mockResolvedValue(response);
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -336,7 +357,7 @@ describe('AppInfoService', () => {
       } as unknown as Response;
       vi.spyOn(global, 'fetch').mockResolvedValue(response);
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -351,7 +372,7 @@ describe('AppInfoService', () => {
       } as unknown as Response;
       vi.spyOn(global, 'fetch').mockResolvedValue(response);
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -366,7 +387,7 @@ describe('AppInfoService', () => {
       } as unknown as Response;
       vi.spyOn(global, 'fetch').mockResolvedValue(response);
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect((await service.getAppInfo()).updateAvailable).toBeNull();
@@ -376,7 +397,7 @@ describe('AppInfoService', () => {
     it('logs start and end on success', async () => {
       vi.spyOn(global, 'fetch').mockResolvedValue(makeGithubResponse('v1.3.0'));
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect(logSpy).toHaveBeenCalledTimes(2);
@@ -387,7 +408,7 @@ describe('AppInfoService', () => {
     it('logs warn on failure', async () => {
       vi.spyOn(global, 'fetch').mockRejectedValue(new Error('network error'));
 
-      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan);
+      const service = new AppInfoService(makeConfig('v1.2.3'), makeAppSettings(true), identity, storyGuides, visionScan, readingHelp);
       await service.onApplicationBootstrap();
 
       expect(warnSpy).toHaveBeenCalledOnce();

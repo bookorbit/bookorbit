@@ -16,6 +16,7 @@ const SPEEDS: StoryGuideSpeeds = {
         { step: 'names', secondsPerCall: 4.2, builds: 3 },
         { step: 'ties', secondsPerCall: 2, builds: 3 },
         { step: 'lines', secondsPerCall: 6.5, builds: 2 },
+        { step: 'summaries', secondsPerCall: 3, builds: 1 },
       ],
     },
     {
@@ -34,6 +35,12 @@ function clickButton(text: string) {
   button.click()
 }
 
+function clickButtonIn(selector: string, text: string) {
+  const button = [...document.body.querySelectorAll(`${selector} button`)].find((element) => element.textContent?.trim() === text)
+  if (!button) throw new Error(`No button "${text}"`)
+  ;(button as HTMLButtonElement).click()
+}
+
 describe('AiStoryGuideSpeeds', () => {
   afterEach(() => {
     vi.restoreAllMocks()
@@ -49,8 +56,8 @@ describe('AiStoryGuideSpeeds', () => {
     expect(rows[0]!.text()).toContain('fast-model')
     expect(rows[0]!.text()).toContain('on Home server')
     expect(rows[0]!.text()).toContain('Learned from up to 3 builds')
-    expect(rows[0]!.findAll('dt').map((term) => term.text())).toEqual(['Finding names', 'Finding ties', 'Writing descriptions'])
-    expect(rows[0]!.findAll('dd').map((value) => value.text())).toEqual(['4.2 sec per call', '2 sec per call', '6.5 sec per call'])
+    expect(rows[0]!.findAll('dt').map((term) => term.text())).toEqual(['Finding names', 'Finding ties', 'Writing descriptions', 'Writing summaries'])
+    expect(rows[0]!.findAll('dd').map((value) => value.text())).toEqual(['4.2 sec per call', '2 sec per call', '6.5 sec per call', '3 sec per call'])
     expect(rows[1]!.find('p').text()).toBe('careful-model')
     expect(rows[1]!.text()).toContain('Learned from 1 build')
     expect(rows[1]!.find('[data-testid="ai-story-guide-speed-reset"]').attributes('aria-label')).toBe('Reset the speed of careful-model')
@@ -81,9 +88,26 @@ describe('AiStoryGuideSpeeds', () => {
     if (!confirm) throw new Error('No confirm button')
     ;(confirm as HTMLButtonElement).click()
     await flushPromises()
-    expect(reset).toHaveBeenCalledWith({ connectionId: 3, model: 'fast-model' })
+    expect(reset).toHaveBeenCalledWith({ connectionId: 3, model: 'fast-model', effort: 'auto' })
     expect(load).toHaveBeenCalledTimes(2)
     expect(wrapper.findAll('[data-testid="ai-story-guide-speed"]')).toHaveLength(1)
+  })
+
+  it('names the effort a speed was learned at, and resets only that level', async () => {
+    const atHigh = { ...SPEEDS.models[1]!, effort: 'high' as const }
+    vi.spyOn(aiApi, 'getStoryGuideSpeeds').mockResolvedValue({ models: [SPEEDS.models[1]!, atHigh] })
+    const reset = vi.spyOn(aiApi, 'resetStoryGuideSpeed').mockResolvedValue({ removed: 1 })
+    const wrapper = mount(AiStoryGuideSpeeds, { attachTo: document.body })
+    await flushPromises()
+    const rows = wrapper.findAll('[data-testid="ai-story-guide-speed"]')
+    expect(rows.map((row) => row.find('p').text())).toEqual(['careful-model', 'careful-model at High effort'])
+    const button = rows[1]!.find('[data-testid="ai-story-guide-speed-reset"]')
+    expect(button.attributes('aria-label')).toBe('Reset the speed of careful-model at High effort')
+    await button.trigger('click')
+    await flushPromises()
+    clickButtonIn('[role="dialog"]', 'Reset')
+    await flushPromises()
+    expect(reset).toHaveBeenCalledWith({ connectionId: 4, model: 'careful-model', effort: 'high' })
   })
 
   it('offers a retry when the list cannot be read', async () => {

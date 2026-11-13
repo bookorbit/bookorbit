@@ -62,6 +62,36 @@ const TLS_ERROR_CODES = new Set([
  */
 export async function aiHttp(request: AiHttpRequest, options: AiHttpOptions): Promise<AiHttpResponse> {
   const started = Date.now();
+  const response = await fetchProvider(request, options);
+  return readWhole(response, options, started);
+}
+
+/** A reply still arriving as server-sent events. Reading `body` past the timeout or signal fails. */
+export interface AiHttpStream {
+  kind: 'stream';
+  status: number;
+  headers: Headers;
+  body: ReadableStream<Uint8Array>;
+  /** Until the headers arrived. */
+  durationMs: number;
+}
+
+/**
+ * Like `aiHttp`, but a successful `text/event-stream` reply is handed back unread so its events can
+ * be passed on as they come. Anything else (an error, or a proxy that answered in one piece) is
+ * read whole, as `aiHttp` reads it. The timeout and signal keep applying while the body is read.
+ */
+export async function aiHttpOpen(request: AiHttpRequest, options: AiHttpOptions): Promise<AiHttpStream | ({ kind: 'whole' } & AiHttpResponse)> {
+  const started = Date.now();
+  const response = await fetchProvider(request, options);
+  const type = response.headers.get('content-type') ?? '';
+  if (response.status >= 200 && response.status < 300 && response.body && /text\/event-stream/i.test(type)) {
+    return { kind: 'stream', status: response.status, headers: response.headers, body: response.body, durationMs: Date.now() - started };
+  }
+  return { kind: 'whole', ...(await readWhole(response, options, started)) };
+}
+
+async function fetchProvider(request: AiHttpRequest, options: AiHttpOptions): Promise<Response> {
   const timeout = AbortSignal.timeout(options.timeoutMs);
   const signal = options.signal ? AbortSignal.any([timeout, options.signal]) : timeout;
 
@@ -81,7 +111,10 @@ export async function aiHttp(request: AiHttpRequest, options: AiHttpOptions): Pr
     const location = response.headers.get('location') ?? '';
     throw new AiNetworkError('redirect', location ? `The provider redirected to ${location}` : 'The provider answered with a redirect', { location });
   }
+  return response;
+}
 
+async function readWhole(response: Response, options: AiHttpOptions, started: number): Promise<AiHttpResponse> {
   try {
     const text = await readBoundedText(response, AI_MAX_RESPONSE_BYTES);
     return { status: response.status, headers: response.headers, text, durationMs: Date.now() - started };
@@ -91,6 +124,11 @@ export async function aiHttp(request: AiHttpRequest, options: AiHttpOptions): Pr
     }
     throw classify(err, options.signal);
   }
+}
+
+/** Why reading a provider's reply failed, for a body read outside this file. */
+export function classifyAiNetworkError(err: unknown, signal?: AbortSignal): AiNetworkError {
+  return classify(err, signal);
 }
 
 function classify(err: unknown, jobSignal?: AbortSignal): AiNetworkError {
@@ -137,5 +175,9 @@ function causes(err: unknown): unknown[] {
 export class AiHttpService {
   send(request: AiHttpRequest, options: AiHttpOptions): Promise<AiHttpResponse> {
     return aiHttp(request, options);
+  }
+
+  open(request: AiHttpRequest, options: AiHttpOptions): Promise<AiHttpStream | ({ kind: 'whole' } & AiHttpResponse)> {
+    return aiHttpOpen(request, options);
   }
 }

@@ -1,3 +1,4 @@
+import type { AiEffort, AiSlotEffort } from "./ai";
 import type { AiJobKind, AiJobModels } from "./ai-jobs";
 
 /** The AI feature id story guides run under. */
@@ -6,16 +7,7 @@ export const STORY_GUIDE_FEATURE = "story-guides";
 /** Payload formats this server can serve, oldest first. */
 export const STORY_GUIDE_FORMATS = [1] as const;
 
-export const STORY_GUIDE_BUILD_REASONS = [
-  "off",
-  "no-text-file",
-  "language",
-  "too-short",
-  "too-long",
-  "too-large",
-  "unreadable",
-  "checking",
-] as const;
+export const STORY_GUIDE_BUILD_REASONS = ["off", "no-text-file", "language", "too-short", "too-long", "too-large", "unreadable", "checking"] as const;
 /** Why a book cannot be built now. A client that does not know a reason shows the generic sentence. */
 export type StoryGuideBuildReason = (typeof STORY_GUIDE_BUILD_REASONS)[number];
 
@@ -192,7 +184,7 @@ export interface StoryGuideHistory {
 }
 
 /** The model steps whose speed is learned. */
-export const STORY_GUIDE_TIMED_STEPS = ["names", "review", "ties", "lines", "profiles"] as const;
+export const STORY_GUIDE_TIMED_STEPS = ["names", "review", "ties", "lines", "profiles", "summaries"] as const;
 export type StoryGuideTimedStep = (typeof STORY_GUIDE_TIMED_STEPS)[number];
 
 export interface StoryGuideStepSpeed {
@@ -209,6 +201,8 @@ export interface StoryGuideModelSpeed {
   /** Null when the connection cannot be read. */
   connectionName: string | null;
   model: string;
+  /** The slot's effort level; absent for builds that left effort to story guides. */
+  effort?: AiEffort;
   /** When the newest build it was learned from finished. */
   learnedAt: string;
   steps: StoryGuideStepSpeed[];
@@ -223,6 +217,8 @@ export interface StoryGuideSpeeds {
 export interface StoryGuideSpeedResetRequest {
   connectionId: number;
   model: string;
+  /** One effort's speeds only, `auto` for builds without one; left out, every effort's. */
+  effort?: AiSlotEffort;
 }
 
 export interface StoryGuideSpeedResetResponse {

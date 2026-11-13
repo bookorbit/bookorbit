@@ -143,13 +143,16 @@ describe('writePdfMetadataInWorker', () => {
     });
 
     it('removes the temp file left by a worker it terminated on timeout', async () => {
+      vi.useFakeTimers();
       const { createWorker, workerTempPath } = makeWorkerHarness();
 
       const promise = writePdfMetadataInWorker({ ...workerData, filePath: join(dir, 'large.pdf') }, createWorker, 20);
+      const assertion = expect(promise).rejects.toMatchObject({ name: 'TimeoutError' });
       expect(dirname(workerTempPath())).toBe(dir);
       await writeFile(workerTempPath(), 'partial');
+      await vi.advanceTimersByTimeAsync(20);
 
-      await expect(promise).rejects.toMatchObject({ name: 'TimeoutError' });
+      await assertion;
       expect(await exists(workerTempPath())).toBe(false);
     });
 

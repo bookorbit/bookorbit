@@ -100,6 +100,8 @@ describe('estimateStoryGuide', () => {
     const more = estimateStoryGuide({ sections: [...sections, { words: 3_000 }], steps: ['lines'], prices: PRICES, rates: RATES });
     expect(more.minutes).toBe(lines.minutes! + 1);
     expect(more.cost!).toBeGreaterThan(lines.cost!);
+    const summaries = estimateStoryGuide({ sections, steps: ['summaries'], prices: PRICES, rates: { summaries: MINUTE } });
+    expect(summaries.minutes).toBe(estimatedLinesUnits(sections));
   });
 
   it('leaves the time unknown when a step that runs has no learned speed, and still prices it', () => {

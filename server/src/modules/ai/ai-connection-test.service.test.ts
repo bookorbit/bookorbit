@@ -89,7 +89,11 @@ function setup(apiType: AiApiType = 'openai-chat', connectionOverrides: Partial<
       vision: { ...emptySlot(), connectionId: 1, model: 'stub-model-a' },
     },
     slotHealth: {},
-    features: { 'story-guides': defaultFeatureSettings('story-guides'), 'vision-scan': defaultFeatureSettings('vision-scan') },
+    features: {
+      'story-guides': defaultFeatureSettings('story-guides'),
+      'vision-scan': defaultFeatureSettings('vision-scan'),
+      'reading-help': defaultFeatureSettings('reading-help'),
+    },
     budget: { monthlyBudget: null, buildsPerMonth: null },
     privacy: {},
   };

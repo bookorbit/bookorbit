@@ -11,6 +11,7 @@ function row(overrides: Partial<AiStepTimingRow> = {}): AiStepTimingRow {
     step: 'names',
     connectionId: 1,
     model: 'fast',
+    effort: null,
     units: 10,
     lanes: 1,
     durationMs: 10_000,
@@ -46,6 +47,19 @@ describe('AiStepRateTable', () => {
     expect(table.msPerUnit('names', { connectionId: 1, model: 'other' })).toBeNull();
     expect(table.msPerUnit('names', undefined)).toBeNull();
     expect(table.list().find((rate) => rate.step === 'names' && rate.connectionId === 1)).toMatchObject({ runs: 3 });
+  });
+
+  it('learns each effort level apart, and the level the feature chose as its own', () => {
+    const table = new AiStepRateTable([
+      row({ durationMs: 10_000, units: 10 }),
+      row({ effort: 'high', durationMs: 60_000, units: 10 }),
+      row({ effort: 'low', durationMs: 5_000, units: 10 }),
+    ]);
+    expect(table.msPerUnit('names', { connectionId: 1, model: 'fast' })).toBe(1_000);
+    expect(table.msPerUnit('names', { connectionId: 1, model: 'fast', effort: 'high' })).toBe(6_000);
+    expect(table.msPerUnit('names', { connectionId: 1, model: 'fast', effort: 'low' })).toBe(500);
+    expect(table.msPerUnit('names', { connectionId: 1, model: 'fast', effort: 'max' })).toBeNull();
+    expect(table.list().map((rate) => rate.effort)).toEqual([null, 'high', 'low']);
   });
 
   it('dates a rate by its newest run', () => {

@@ -47,6 +47,7 @@ function learned(models: readonly string[], stepIds: readonly string[] = ['names
       step,
       connectionId: 1,
       model,
+      effort: null,
       units: 1,
       lanes: 1,
       durationMs: 60_000,
@@ -373,7 +374,7 @@ describe('StoryGuideEstimator', () => {
       { step: 'lines', model: 'm', durationMs: 12_000, units: 2, lanes: 1, createdAt: new Date('2026-11-10T00:00:00Z') },
       { step: 'names', model: 'm', durationMs: 10_000, units: 24, lanes: 12, createdAt: new Date('2026-11-09T00:00:00Z') },
       { step: 'review', model: 'c', durationMs: 40_000, units: 1, lanes: 1, createdAt: new Date('2026-11-08T00:00:00Z') },
-    ].map((row, id) => ({ id, feature: 'story-guides', connectionId: 1, jobId: null, ...row }));
+    ].map((row, id) => ({ id, feature: 'story-guides', connectionId: 1, effort: null, jobId: null, ...row }));
     const rates = { table: vi.fn().mockResolvedValue(new AiStepRateTable(rows)) } as unknown as AiStepRates;
     expect(await estimator(rates).speeds()).toEqual({
       models: [
@@ -400,10 +401,28 @@ describe('StoryGuideEstimator', () => {
     expect((await gone.speeds()).models.map((entry) => entry.connectionName)).toEqual([null, null]);
   });
 
-  it('forgets one model on one connection', async () => {
+  it('lists a model apart at each effort it was learned at', async () => {
+    const rows = [
+      { effort: null, durationMs: 10_000, createdAt: new Date('2026-11-09T00:00:00Z') },
+      { effort: 'high' as const, durationMs: 30_000, createdAt: new Date('2026-11-10T00:00:00Z') },
+    ].map((row, id) => ({ id, feature: 'story-guides', step: 'review', connectionId: 1, model: 'c', units: 1, lanes: 1, jobId: null, ...row }));
+    const rates = { table: vi.fn().mockResolvedValue(new AiStepRateTable(rows)) } as unknown as AiStepRates;
+    const { models } = await estimator(rates).speeds();
+    expect(models.map((entry) => [entry.effort, entry.steps[0]!.secondsPerCall])).toEqual([
+      ['high', 30],
+      [undefined, 10],
+    ]);
+    expect(models[1]).not.toHaveProperty('effort');
+  });
+
+  it('forgets one model on one connection, at every effort, at one level, or at the feature level', async () => {
     const forget = vi.fn().mockResolvedValue(4);
     const rates = { forget } as unknown as AiStepRates;
     expect(await estimator(rates).resetSpeed({ connectionId: 1, model: 'm' })).toEqual({ removed: 4 });
-    expect(forget).toHaveBeenCalledWith({ feature: 'story-guides', connectionId: 1, model: 'm' });
+    expect(forget).toHaveBeenLastCalledWith({ feature: 'story-guides', connectionId: 1, model: 'm' });
+    await estimator(rates).resetSpeed({ connectionId: 1, model: 'm', effort: 'high' });
+    expect(forget).toHaveBeenLastCalledWith({ feature: 'story-guides', connectionId: 1, model: 'm', effort: 'high' });
+    await estimator(rates).resetSpeed({ connectionId: 1, model: 'm', effort: 'auto' });
+    expect(forget).toHaveBeenLastCalledWith({ feature: 'story-guides', connectionId: 1, model: 'm', effort: null });
   });
 });

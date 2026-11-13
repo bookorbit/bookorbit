@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import type { AiEffort } from '@bookorbit/types';
+import { and, desc, eq, inArray, isNull, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -8,13 +9,19 @@ import { aiStepTimings, type AiStepTimingRow, type NewAiStepTimingRow } from '..
 
 type Db = NodePgDatabase<typeof schema>;
 
-/** Runs kept per step, connection and model: an estimate reads the median of these. */
+/** Runs kept per step, connection, model and effort: an estimate reads the median of these. */
 export const AI_STEP_TIMINGS_KEPT = 5;
 
 export interface AiStepTimingKey {
   feature: string;
   connectionId: number;
   model: string;
+  /** One effort's runs, null for runs without one; left out, every effort's. */
+  effort?: AiEffort | null;
+}
+
+function sameEffort(effort: AiEffort | null | undefined): SQL {
+  return effort ? eq(aiStepTimings.effort, effort) : isNull(aiStepTimings.effort);
 }
 
 @Injectable()
@@ -35,6 +42,7 @@ export class AiStepTimingRepository {
               eq(aiStepTimings.feature, row.feature),
               eq(aiStepTimings.connectionId, row.connectionId),
               eq(aiStepTimings.model, row.model),
+              sameEffort(row.effort),
               eq(aiStepTimings.step, row.step),
             ),
           )
@@ -45,7 +53,7 @@ export class AiStepTimingRepository {
     });
   }
 
-  /** Every kept run of a feature, newest first: a handful per step, connection and model. */
+  /** Every kept run of a feature, newest first: a handful per step, connection, model and effort. */
   forFeature(feature: string): Promise<AiStepTimingRow[]> {
     return this.db
       .select()
@@ -54,11 +62,18 @@ export class AiStepTimingRepository {
       .orderBy(desc(aiStepTimings.createdAt), desc(aiStepTimings.id));
   }
 
-  /** Forgets what one model on one connection managed for a feature. */
+  /** Forgets what one model on one connection managed for a feature, at one effort or at all of them. */
   async remove(key: AiStepTimingKey): Promise<number> {
     const rows = await this.db
       .delete(aiStepTimings)
-      .where(and(eq(aiStepTimings.feature, key.feature), eq(aiStepTimings.connectionId, key.connectionId), eq(aiStepTimings.model, key.model)))
+      .where(
+        and(
+          eq(aiStepTimings.feature, key.feature),
+          eq(aiStepTimings.connectionId, key.connectionId),
+          eq(aiStepTimings.model, key.model),
+          key.effort === undefined ? undefined : sameEffort(key.effort),
+        ),
+      )
       .returning({ id: aiStepTimings.id });
     return rows.length;
   }

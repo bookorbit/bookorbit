@@ -74,6 +74,8 @@ function snapshot(
         monthlyBudget: overrides.featureBudget ?? null,
         buildsPerMonth: overrides.featureBuilds ?? null,
       },
+      'vision-scan': defaultFeatureSettings('vision-scan'),
+      'reading-help': defaultFeatureSettings('reading-help'),
     },
     budget: { monthlyBudget: overrides.budget ?? null, buildsPerMonth: overrides.builds ?? null },
     privacy: {},

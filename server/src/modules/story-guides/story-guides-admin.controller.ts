@@ -77,7 +77,7 @@ export class StoryGuidesAdminController {
     return this.estimator.speeds();
   }
 
-  /** Forgets one model's speed on one connection; estimates leave out the time until a build finishes on it again. */
+  /** Forgets one model's speed on one connection, at one effort or all; estimates leave out the time until a build finishes on it again. */
   @Post('speeds/reset')
   @HttpCode(HttpStatus.OK)
   @Auditable({
@@ -86,6 +86,7 @@ export class StoryGuidesAdminController {
     getMeta: (req, res) => ({
       connectionId: (req.body as StoryGuideSpeedResetDto | undefined)?.connectionId,
       model: (req.body as StoryGuideSpeedResetDto | undefined)?.model,
+      effort: (req.body as StoryGuideSpeedResetDto | undefined)?.effort,
       removed: (res as StoryGuideSpeedResetResponse | undefined)?.removed,
     }),
     description: 'Reset the learned speed of an AI model for story guides',

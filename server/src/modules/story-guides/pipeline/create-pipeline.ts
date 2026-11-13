@@ -10,13 +10,14 @@ import { namesAiStep } from './names-step';
 import { profilesAiStep } from './profiles-step';
 import { reviewAiStep } from './review-step';
 import { mergeResult, reviewResult, textResult } from './step-context';
-import type { StoryLinesResult, StoryProfilesResult, StoryTiesResult } from './story-guide.types';
+import type { StoryLinesResult, StoryProfilesResult, StorySummaryResult, StoryTiesResult } from './story-guide.types';
 import type { StoryGuidePipeline } from './story-guide-pipeline';
 import type { StoryGuideSubject } from './story-guide-subject';
+import { summariesAiStep } from './summaries-step';
 import { textAiStep, type StoryTextSource } from './text-step';
 import { tiesAiStep } from './ties-step';
 
-const ASSEMBLE_VERSION = 1;
+const ASSEMBLE_VERSION = 2;
 
 /**
  * The pipeline name: the extraction version and every step's version, so a change to the text
@@ -29,7 +30,7 @@ export function storyGuidePipelineName(steps: readonly { id: string; version: nu
 /** The story guide's steps, in order, and its payload assembly. */
 export function createStoryGuidePipeline(source: StoryTextSource): StoryGuidePipeline {
   const logger = new Logger('StoryGuidePipeline');
-  const steps = [textAiStep(source), namesAiStep(), mergeAiStep(), reviewAiStep(), tiesAiStep(), linesAiStep(), profilesAiStep()];
+  const steps = [textAiStep(source), namesAiStep(), mergeAiStep(), reviewAiStep(), tiesAiStep(), linesAiStep(), profilesAiStep(), summariesAiStep()];
   const pipeline = storyGuidePipelineName(steps, ASSEMBLE_VERSION);
 
   async function assemble(ctx: AiAssembleContext<StoryGuideSubject>): Promise<unknown> {
@@ -59,10 +60,11 @@ export function createStoryGuidePipeline(source: StoryTextSource): StoryGuidePip
       ties: ctx.results('ties').values() as Iterable<StoryTiesResult>,
       lines: ctx.results('lines').values() as Iterable<StoryLinesResult>,
       profiles: ctx.results('profiles').values() as Iterable<StoryProfilesResult>,
+      summaries: ctx.results('summaries').values() as Iterable<StorySummaryResult>,
     });
-    const lost = dropped.names + dropped.entries + dropped.lines + dropped.profiles + dropped.quotes;
+    const lost = dropped.names + dropped.entries + dropped.lines + dropped.profiles + dropped.summaries + dropped.quotes;
     logger.log(
-      `[story_guide.assemble] [end] jobId=${ctx.job.id} entities=${payload.entities.length} ties=${payload.ties.length} unanchored=${lost} - payload assembled`,
+      `[story_guide.assemble] [end] jobId=${ctx.job.id} entities=${payload.entities.length} ties=${payload.ties.length} summaries=${payload.summaries?.length ?? 0} unanchored=${lost} - payload assembled`,
     );
     return payload;
   }

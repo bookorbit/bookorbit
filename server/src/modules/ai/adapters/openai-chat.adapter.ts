@@ -2,7 +2,17 @@ import type { AiModelList } from '@bookorbit/types';
 
 import type { AiFinish } from '../ai-client.types';
 import type { AiHttpRequest, AiHttpResponse } from '../ai-network';
-import type { AiAdapter, AiAdapterRequest, AiAdapterResult, AiAdapterTarget, AiMessage, AiProviderError, AiSend } from './ai-adapter.interface';
+import type { AiSseEvent } from '../ai-sse';
+import type {
+  AiAdapter,
+  AiAdapterRequest,
+  AiAdapterResult,
+  AiAdapterTarget,
+  AiMessage,
+  AiProviderError,
+  AiSend,
+  AiStreamPiece,
+} from './ai-adapter.interface';
 import { AiProviderFailure } from './ai-adapter.interface';
 import {
   bearerHeaders,
@@ -15,7 +25,8 @@ import {
   parseJson,
   parseModelList,
   parseOpenAiStyleError,
-  refusesField,
+  refusesEffort,
+  streamedError,
 } from './ai-adapter-common';
 
 function isOpenRouter(baseUrl: string): boolean {
@@ -46,7 +57,8 @@ export class OpenAiChatAdapter implements AiAdapter {
       ...request.messages.map((message) => ({ role: message.role, content: chatContent(message.content) })),
     ];
 
-    const body: Record<string, unknown> = { model: request.model, messages, stream: false };
+    const body: Record<string, unknown> = { model: request.model, messages, stream: request.stream === true };
+    if (request.stream && !omit.has('stream_options')) body.stream_options = { include_usage: true };
     // `max_tokens` is the form most servers take; OpenAI's reasoning models want the newer name.
     if (!omit.has('max_tokens')) body.max_tokens = request.maxOutputTokens;
     else if (!omit.has('max_completion_tokens')) body.max_completion_tokens = request.maxOutputTokens;
@@ -63,9 +75,15 @@ export class OpenAiChatAdapter implements AiAdapter {
       body.response_format = { type: 'json_object' };
     }
     // OpenRouter's `require_parameters` would also rule out every provider of a model without
-    // reasoning, and answer 404, so a schema request there leaves effort to the model's default.
+    // reasoning, and answer 404, so a schema request there leaves a feature's effort to the model's
+    // default. A level the admin chose goes in OpenRouter's own `reasoning` field, which more of its
+    // providers list than `reasoning_effort`, so it survives the filter wherever it can be honoured.
     const routerFilters = body.provider !== undefined;
-    if (request.effort && !omit.has('reasoning_effort') && !routerFilters) body.reasoning_effort = request.effort;
+    if (request.effort && openRouter && request.effortChosen) {
+      if (!omit.has('reasoning')) body.reasoning = { effort: request.effort };
+    } else if (request.effort && !omit.has('reasoning_effort') && !routerFilters) {
+      body.reasoning_effort = request.effort;
+    }
     if (openRouter && !omit.has('usage')) body.usage = { include: true };
 
     return {
@@ -95,10 +113,33 @@ export class OpenAiChatAdapter implements AiAdapter {
     };
   }
 
+  parseStreamEvent(event: AiSseEvent): AiStreamPiece | null {
+    if (event.data === '[DONE]') return { end: true };
+    const body = parseJson(event.data);
+    if (!isRecord(body)) return null;
+    if (isRecord(body.error)) return { error: streamedError(body.error) };
+
+    const piece: AiStreamPiece = {};
+    if (typeof body.model === 'string' && body.model) piece.model = body.model;
+    const usage = normaliseUsage(body.usage);
+    if (usage) piece.usage = usage;
+    const choice: unknown = Array.isArray(body.choices) ? body.choices[0] : undefined;
+    if (isRecord(choice)) {
+      const delta = isRecord(choice.delta) ? choice.delta : {};
+      if (typeof delta.refusal === 'string' && delta.refusal.length > 0) piece.finish = 'refused';
+      else if (typeof delta.content === 'string' && delta.content.length > 0) piece.delta = delta.content;
+      if (piece.finish === undefined && choice.finish_reason !== null && choice.finish_reason !== undefined)
+        piece.finish = finishOf(choice.finish_reason);
+    }
+    return piece;
+  }
+
   parseError(response: AiHttpResponse): AiProviderError {
     const error = parseOpenAiStyleError(response);
-    // Some servers name it bare, with no param: "Unrecognized request argument supplied: reasoning_effort".
-    if (error.kind === 'bad-request' && refusesField(error.message, /\breasoning_effort\b/)) {
+    // Servers name it bare, with no param ("Unrecognized request argument supplied: reasoning_effort"),
+    // refuse the level instead ("Invalid reasoning_effort: minimal"), or, like Ollama, refuse any level
+    // for a model that does not think ("does not support thinking").
+    if (error.kind === 'bad-request' && refusesEffort(error.message)) {
       return { ...error, kind: 'bad-parameter', parameter: 'reasoning_effort' };
     }
     return error;

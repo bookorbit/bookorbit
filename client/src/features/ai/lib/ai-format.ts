@@ -51,6 +51,12 @@ export function formatTokenPrice(value: number): string {
   return formatNumber(value, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 4 })
 }
 
+/** A price in a table cell: whole dollars without cents, so "$2 / $10" stays narrow. */
+export function formatTokenPriceShort(value: number): string {
+  const whole = Number.isInteger(value)
+  return formatNumber(value, { style: 'currency', currency: 'USD', minimumFractionDigits: whole ? 0 : 2, maximumFractionDigits: whole ? 0 : 4 })
+}
+
 export function formatDollars(value: number): string {
   return formatNumber(value, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
@@ -76,6 +82,12 @@ export function apiTypeLabel(apiType: string): string {
 export function usageFeatureLabel(feature: string): string {
   const key = `settings.admin.ai.featureNames.${feature}`
   return i18n.global.te(key) ? i18n.global.t(key) : feature
+}
+
+/** A feature's name in a settings table, shorter than the usage view's; an unknown id keeps its usage label. */
+export function featureShortName(feature: string): string {
+  const key = `settings.admin.ai.features.shortNames.${feature}`
+  return i18n.global.te(key) ? i18n.global.t(key) : usageFeatureLabel(feature)
 }
 
 export function slotLabel(slot: string): string {

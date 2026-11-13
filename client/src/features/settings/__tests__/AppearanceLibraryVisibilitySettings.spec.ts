@@ -12,8 +12,8 @@ const state = vi.hoisted(() => ({
   libraries: null as unknown as Ref<Partial<Library>[]>,
   api: vi.fn<(url: string, init?: RequestInit) => Promise<{ ok: boolean }>>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
-  toastSuccess: vi.fn(),
-  toastError: vi.fn(),
+  toastSuccess: vi.fn<(message: string) => void>(),
+  toastError: vi.fn<(message: string) => void>(),
 }))
 
 vi.mock('@/features/auth/composables/useAuth', () => ({ useAuth: () => ({ user: state.user }) }))

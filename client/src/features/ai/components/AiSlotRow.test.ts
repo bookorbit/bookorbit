@@ -4,7 +4,7 @@ import type { AiConnection, AiModelList, AiSlotSettings, AiTryResult } from '@bo
 
 import AiSlotRow from './AiSlotRow.vue'
 
-const EMPTY: AiSlotSettings = { connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null }
+const EMPTY: AiSlotSettings = { connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null, effort: 'auto' }
 
 function connection(overrides: Partial<AiConnection> = {}): AiConnection {
   return {
@@ -35,8 +35,17 @@ function connection(overrides: Partial<AiConnection> = {}): AiConnection {
 const LIST: AiModelList = {
   listed: true,
   models: [
-    { id: 'vendor/fast-model', name: 'Fast model', contextLength: 128_000, maxOutputTokens: 16_000, prices: { input: 0.1, output: 0.5 } },
+    {
+      id: 'vendor/fast-model',
+      name: 'Fast model',
+      contextLength: 128_000,
+      maxOutputTokens: 16_000,
+      prices: { input: 0.1, output: 0.5 },
+      efforts: ['low', 'medium', 'high'],
+      defaultEffort: 'medium',
+    },
     { id: 'vendor/plain-model' },
+    { id: 'vendor/quiet-model', efforts: [] },
   ],
 }
 
@@ -48,6 +57,8 @@ function mountRow(props: Partial<InstanceType<typeof AiSlotRow>['$props']> = {})
       value: EMPTY,
       connections: [connection()],
       modelLists: { 1: LIST },
+      usedBy: [{ id: 'story-guides', optional: false }],
+      open: true,
       saving: false,
       trying: false,
       tryResult: null,
@@ -70,12 +81,14 @@ describe('AiSlotRow', () => {
 
     expect((wrapper.find('[data-testid="ai-slot-price-input"]').element as HTMLInputElement).value).toBe('0.1')
     expect((wrapper.find('[data-testid="ai-slot-price-output"]').element as HTMLInputElement).value).toBe('0.5')
-    expect(wrapper.text()).toContain('$0.10 in, $0.50 out per million tokens · 128K context')
-    expect(wrapper.findAll('datalist option')).toHaveLength(2)
+    expect(wrapper.find('[data-testid="ai-slot-facts"]').text()).toBe(
+      "From Router's model list: 128K context, $0.10 in and $0.50 out per million tokens.",
+    )
+    expect(wrapper.findAll('datalist option')).toHaveLength(3)
 
     await wrapper.find('[data-testid="ai-slot-save"]').trigger('click')
     expect(wrapper.emitted('save')?.[0]).toEqual([
-      { connectionId: 1, model: 'vendor/fast-model', prices: { input: 0.1, output: 0.5 }, jsonMode: 'auto', maxOutputTokens: 16_000 },
+      { connectionId: 1, model: 'vendor/fast-model', prices: { input: 0.1, output: 0.5 }, jsonMode: 'auto', maxOutputTokens: 16_000, effort: 'auto' },
     ])
   })
 
@@ -85,10 +98,10 @@ describe('AiSlotRow', () => {
     expect((wrapper.find('[data-testid="ai-slot-save"]').element as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('asks for a model with the connection, and for both prices or neither', async () => {
+  it('asks for a model with the provider, and for both prices or neither', async () => {
     const wrapper = mountRow()
     await wrapper.find('[data-testid="ai-slot-connection"]').setValue('1')
-    expect(wrapper.text()).toContain('Choose a connection and a model, or neither.')
+    expect(wrapper.text()).toContain('Choose a provider and a model, or neither.')
     expect((wrapper.find('[data-testid="ai-slot-save"]').element as HTMLButtonElement).disabled).toBe(true)
 
     await wrapper.find('[data-testid="ai-slot-model"]').setValue('vendor/plain-model')
@@ -97,11 +110,47 @@ describe('AiSlotRow', () => {
     expect((wrapper.find('[data-testid="ai-slot-save"]').element as HTMLButtonElement).disabled).toBe(true)
   })
 
-  it('empties the slot when the connection is set to none', async () => {
+  it('empties the slot when the provider is set to none', async () => {
     const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/plain-model', maxOutputTokens: 4000 } })
     await wrapper.find('[data-testid="ai-slot-connection"]').setValue('')
     await wrapper.find('[data-testid="ai-slot-save"]').trigger('click')
-    expect(wrapper.emitted('save')?.[0]).toEqual([{ connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null }])
+    expect(wrapper.emitted('save')?.[0]).toEqual([
+      { connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null, effort: 'auto' },
+    ])
+  })
+
+  it('offers the levels a model lists, and every level where its provider does not say', async () => {
+    const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/fast-model' } })
+    const levels = () => wrapper.findAll('[data-testid="ai-slot-effort"] option').map((option) => option.attributes('value'))
+    expect(levels()).toEqual(['auto', 'low', 'medium', 'high'])
+    expect(wrapper.text()).toContain('It uses Medium when none is sent.')
+
+    await wrapper.find('[data-testid="ai-slot-model"]').setValue('vendor/plain-model')
+    expect(levels()).toEqual(['auto', 'none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'])
+    expect(wrapper.text()).toContain("This provider doesn't list which levels its models take")
+
+    await wrapper.find('[data-testid="ai-slot-model"]').setValue('vendor/quiet-model')
+    expect(levels()).toEqual(['auto'])
+    expect(wrapper.text()).toContain('This model takes no effort level.')
+  })
+
+  it('opens Advanced on a saved level, saves a new one, and goes back to Automatic for a model without it', async () => {
+    const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/plain-model', effort: 'xhigh' } })
+    expect(wrapper.find('details').attributes('open')).toBeDefined()
+    const effort = wrapper.find('[data-testid="ai-slot-effort"]')
+    expect((effort.element as HTMLSelectElement).value).toBe('xhigh')
+
+    await effort.setValue('max')
+    await wrapper.find('[data-testid="ai-slot-save"]').trigger('click')
+    expect(wrapper.emitted('save')?.[0]?.[0]).toMatchObject({ model: 'vendor/plain-model', effort: 'max' })
+
+    await wrapper.find('[data-testid="ai-slot-model"]').setValue('vendor/fast-model')
+    expect((effort.element as HTMLSelectElement).value).toBe('auto')
+  })
+
+  it('keeps Advanced closed on Automatic', () => {
+    const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/plain-model' } })
+    expect(wrapper.find('details').attributes('open')).toBeUndefined()
   })
 
   it('shows what Try it found, how long it took and what it cost', () => {
@@ -118,8 +167,8 @@ describe('AiSlotRow', () => {
       jsonSupport: 'schema',
     }
     const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/fast-model' }, tryResult: result })
+    expect(wrapper.find('[data-testid="ai-try-line"]').text()).toBe('vendor/fast-model found 2 names in 2.4 s, $0.0002.')
     const panel = wrapper.find('[data-testid="ai-try-result"]').text()
-    expect(panel).toContain('vendor/fast-model found 2 names in 2.4 s, $0.0002.')
     expect(panel).toContain('Elizabeth Bennet')
     expect(panel).toContain('Person')
     expect(panel).toContain('Answer format: JSON schema enforced')
@@ -142,7 +191,7 @@ describe('AiSlotRow', () => {
     const wrapper = mountRow({ slotId: 'vision', value: { ...EMPTY, connectionId: 1, model: 'vendor/vision-model' }, tryResult: result })
     expect(wrapper.text()).toContain('Vision')
     const panel = wrapper.find('[data-testid="ai-try-books"]').text()
-    expect(wrapper.find('[data-testid="ai-try-result"]').text()).toContain('vendor/vision-model read 2 books in 800 ms, cost unknown.')
+    expect(wrapper.find('[data-testid="ai-try-line"]').text()).toBe('vendor/vision-model read 2 books in 800 ms, cost unknown.')
     expect(panel).toContain('Pride and Prejudice')
     expect(panel).toContain('Jane Austen')
     expect(panel).toContain('Dracula')
@@ -155,10 +204,10 @@ describe('AiSlotRow', () => {
     })
     const error = wrapper.find('[data-testid="ai-try-error"]').text()
     expect(error).toContain('The provider account is out of credit.')
-    expect(error).toContain('The provider said: Insufficient credits')
+    expect(error).toContain('Insufficient credits')
   })
 
-  it('offers a Messages connection for Claude on a proxy, and not on Anthropic itself', async () => {
+  it('offers a Messages provider for Claude on a proxy, and not on Anthropic itself', async () => {
     const proxy = connection({ id: 2, name: 'Proxy', baseUrl: 'http://localhost:8317/v1' })
     const anthropic = connection({ id: 3, name: 'Anthropic', apiType: 'anthropic-messages', baseUrl: 'https://api.anthropic.com' })
     const wrapper = mountRow({ connections: [proxy, anthropic], modelLists: { 2: { listed: false, models: [] }, 3: { listed: false, models: [] } } })
@@ -174,12 +223,72 @@ describe('AiSlotRow', () => {
     expect(wrapper.find('[data-testid="ai-anthropic-offer"]').exists()).toBe(false)
   })
 
-  it('needs the slot saved before trying it', async () => {
+  it('saves edits before trying them, so Try it asks about what is shown', async () => {
     const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/plain-model' } })
-    const tryButton = () => wrapper.find('[data-testid="ai-slot-try"]').element as HTMLButtonElement
-    expect(tryButton().disabled).toBe(false)
+    const tryButton = () => wrapper.find('[data-testid="ai-slot-try"]')
+    expect(tryButton().text()).toBe('Try it')
+    await tryButton().trigger('click')
+    expect(wrapper.emitted('try')?.[0]).toEqual([null])
+
     await wrapper.find('[data-testid="ai-slot-model"]').setValue('vendor/fast-model')
-    expect(tryButton().disabled).toBe(true)
-    expect(wrapper.text()).toContain('Save to try the new choice.')
+    expect(tryButton().text()).toBe('Save and try')
+    await tryButton().trigger('click')
+    expect(wrapper.emitted('try')?.[1]?.[0]).toMatchObject({ connectionId: 1, model: 'vendor/fast-model' })
+  })
+
+  it('has nothing to try for an empty slot', async () => {
+    const wrapper = mountRow()
+    expect((wrapper.find('[data-testid="ai-slot-try"]').element as HTMLButtonElement).disabled).toBe(true)
+    await wrapper.find('[data-testid="ai-slot-connection"]').setValue('1')
+    expect((wrapper.find('[data-testid="ai-slot-try"]').element as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('throws away edits on Cancel and closes the editor', async () => {
+    const wrapper = mountRow({ value: { ...EMPTY, connectionId: 1, model: 'vendor/plain-model' } })
+    await wrapper.find('[data-testid="ai-slot-model"]').setValue('vendor/fast-model')
+    await wrapper.find('[data-testid="ai-slot-cancel"]').trigger('click')
+    expect(wrapper.emitted('setOpen')?.[0]).toEqual([false])
+    expect((wrapper.find('[data-testid="ai-slot-model"]').element as HTMLInputElement).value).toBe('vendor/plain-model')
+  })
+
+  it('sums up a closed slot: who uses it, its model, price and status', async () => {
+    const wrapper = mountRow({
+      open: false,
+      usedBy: [
+        { id: 'story-guides', optional: false },
+        { id: 'reading-help', optional: true },
+      ],
+      value: { ...EMPTY, connectionId: 1, model: 'vendor/fast-model', prices: { input: 0.1, output: 0.5 } },
+    })
+    expect(wrapper.find('[data-testid="ai-slot-editor"]').exists()).toBe(false)
+    const text = wrapper.text()
+    expect(text).toContain('Story guides')
+    expect(text).toContain('Reading help, optional')
+    expect(wrapper.find('[data-testid="ai-slot-summary"]').text()).toContain('vendor/fast-model')
+    expect(text).toContain('$0.10 / $0.50')
+    expect(text).toContain('Working')
+
+    const toggle = wrapper.find('[data-testid="ai-slot-toggle"]')
+    expect(toggle.attributes('aria-expanded')).toBe('false')
+    await toggle.trigger('click')
+    expect(wrapper.emitted('setOpen')?.[0]).toEqual([true])
+  })
+
+  it('says why a slot fails and offers another provider', async () => {
+    const wrapper = mountRow({
+      open: false,
+      connections: [connection({ status: 'failing', failingSince: '2026-11-01T00:00:00.000Z', failingCode: 'key-rejected' })],
+      value: { ...EMPTY, connectionId: 1, model: 'vendor/fast-model' },
+    })
+    expect(wrapper.text()).toContain('Provider failing')
+    const health = wrapper.find('[data-testid="ai-slot-health"]')
+    expect(health.text()).toContain('Router is failing')
+    await health.find('button').trigger('click')
+    expect(wrapper.emitted('setOpen')?.[0]).toEqual([true])
+  })
+
+  it('names an empty slot and asks for a model', () => {
+    const wrapper = mountRow({ open: false })
+    expect(wrapper.find('[data-testid="ai-slot-summary"]').text()).toContain('Not set')
   })
 })

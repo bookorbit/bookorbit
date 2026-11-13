@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { CronExpression } from '@nestjs/schedule';
-import { AI_FEATURE_DEFINITIONS, AI_SLOTS, type AiBudgetState, type AiFeatureId, type AiSlot } from '@bookorbit/types';
+import { AI_FEATURE_DEFINITIONS, AI_SLOTS, type AiBudgetState, type AiFeatureDefinition, type AiFeatureId, type AiSlot } from '@bookorbit/types';
 
 import { SystemCron } from '../../common/decorators/system-cron.decorator';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -176,7 +176,8 @@ export class AiBudgetService {
 
   /** Slots in use that have no prices, so their spending cannot be counted in dollars. */
   slotsWithoutPrices(settings: AiSettingsSnapshot, feature?: AiFeatureId): AiSlot[] {
-    const slots = feature ? AI_FEATURE_DEFINITIONS[feature].slots : AI_SLOTS;
+    const definition: AiFeatureDefinition | null = feature ? AI_FEATURE_DEFINITIONS[feature] : null;
+    const slots = definition ? [...definition.slots, ...(definition.optionalSlots ?? [])] : AI_SLOTS;
     return slots.filter((slot) => {
       const choice = settings.slots[slot];
       return choice.connectionId !== null && choice.model !== null && choice.prices === null;

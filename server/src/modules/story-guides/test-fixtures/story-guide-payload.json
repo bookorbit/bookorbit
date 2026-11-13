@@ -273,5 +273,21 @@
       "count": 2,
       "fixed": false
     }
+  ],
+  "summaries": [
+    {
+      "through": {
+        "s": 3,
+        "end": true
+      },
+      "text": "A masked girl takes the egg from Lord Leverance while his daughter Violetta sleeps."
+    },
+    {
+      "through": {
+        "s": 4,
+        "end": true
+      },
+      "text": "The masked girl turns out to be Violetta, who loves Tom."
+    }
   ]
 }

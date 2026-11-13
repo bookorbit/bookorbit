@@ -1,5 +1,5 @@
 import { Injectable, Logger, OnModuleInit, type Provider } from '@nestjs/common';
-import type { AiFailureCode, AiFeatureId, AiSlot } from '@bookorbit/types';
+import type { AiFailureCode, AiFeatureId, AiJobSlotModel, AiSlot } from '@bookorbit/types';
 
 import { AiBudgetService } from '../ai/ai-budget.service';
 import { AiClient } from '../ai/ai-client.service';
@@ -49,11 +49,13 @@ export function createAiJobsPorts(deps: {
 }): AiJobsPorts {
   const { client, budget, settings, connections, tests } = deps;
 
-  async function choiceFor(slot: AiSlot, use: { connectionId: number; model: string } | undefined): Promise<AiSlotChoice | undefined> {
+  /** The job's recorded choice, with the slot's current terms while it still names the same model. */
+  async function choiceFor(slot: AiSlot, use: AiJobSlotModel | undefined): Promise<AiSlotChoice | undefined> {
     if (!use) return undefined;
+    // The effort stays what the job recorded, so a level changed mid-build does not move it either.
     const current = await client.resolveSlot(slot).catch(() => null);
-    if (current && current.connectionId === use.connectionId && current.model === use.model) return current;
-    return { slot, connectionId: use.connectionId, model: use.model, prices: null, jsonMode: 'auto' };
+    if (current && current.connectionId === use.connectionId && current.model === use.model) return { ...current, effort: use.effort };
+    return { slot, connectionId: use.connectionId, model: use.model, prices: null, jsonMode: 'auto', effort: use.effort };
   }
 
   async function health(models: Parameters<AiJobsPorts['health']['check']>[1], retest: boolean): Promise<AiHealthReason | null> {
@@ -85,7 +87,7 @@ export function createAiJobsPorts(deps: {
         const missing: AiJobSlot[] = [];
         for (const slot of slots) {
           const choice = await client.resolveSlot(slot).catch(() => null);
-          if (choice) models[slot] = { connectionId: choice.connectionId, model: choice.model };
+          if (choice) models[slot] = { connectionId: choice.connectionId, model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}) };
           else missing.push(slot);
         }
         return { models, missing };

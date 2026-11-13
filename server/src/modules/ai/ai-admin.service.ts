@@ -10,6 +10,7 @@ import {
   type AiConnectionTestResult,
   type AiFeatureId,
   type AiFeatureLimits,
+  type AiFeatureDefinition,
   type AiFeatureSettings,
   type AiModelList,
   type AiOverview,
@@ -195,13 +196,14 @@ export class AiAdminService {
 
   /**
    * Slots left out stay as they are. A slot whose connection or model changes loses its health
-   * entry, and its prices and output limit unless they are sent again.
+   * entry, and its prices, output limit and effort unless they are sent again. A new effort clears
+   * the health entry too, since a refused level is one of the things it records.
    */
   async updateSlots(request: UpdateAiSlotsRequest): Promise<AiSlotsUpdateResult> {
     const current = await this.settings.slots();
     const next = { ...current };
     const changed: AiSlot[] = [];
-    const moved: AiSlot[] = [];
+    const cleared: AiSlot[] = [];
 
     for (const slot of AI_SLOTS) {
       const patch = request[slot];
@@ -221,15 +223,16 @@ export class AiAdminService {
         prices: patch.prices !== undefined ? patch.prices : sameModel ? before.prices : null,
         jsonMode: patch.jsonMode ?? before.jsonMode,
         maxOutputTokens: patch.maxOutputTokens !== undefined ? patch.maxOutputTokens : sameModel ? before.maxOutputTokens : null,
+        effort: patch.effort ?? (sameModel ? before.effort : 'auto'),
       };
       if (JSON.stringify(updated) !== JSON.stringify(before)) changed.push(slot);
-      if (!sameModel) moved.push(slot);
+      if (!sameModel || updated.effort !== before.effort) cleared.push(slot);
       next[slot] = updated;
     }
 
     if (changed.length > 0) {
       await this.settings.saveSlots(next);
-      for (const slot of moved) await this.settings.setSlotHealth(slot, null);
+      for (const slot of cleared) await this.settings.setSlotHealth(slot, null);
       this.events.emit(AI_EVENTS.SLOTS_CHANGED);
     }
     return { ...(await this.getSettings()), changed };
@@ -254,11 +257,22 @@ export class AiAdminService {
       });
     }
 
+    const perReader = (AI_FEATURE_DEFINITIONS[feature] as AiFeatureDefinition).perReader === true;
+    if (!perReader && (request.readerMonthlyBudget !== undefined || request.readerRequestsPerMonth !== undefined)) {
+      throw new BadRequestException('This feature has no per-reader caps');
+    }
     const updated: AiFeatureSettings = {
       enabled: request.enabled ?? current.enabled,
       limits: { ...current.limits, ...checkedLimits(feature, request.limits) },
       monthlyBudget: request.monthlyBudget !== undefined ? request.monthlyBudget : current.monthlyBudget,
       buildsPerMonth: request.buildsPerMonth !== undefined ? request.buildsPerMonth : current.buildsPerMonth,
+      ...(perReader
+        ? {
+            readerMonthlyBudget: request.readerMonthlyBudget !== undefined ? request.readerMonthlyBudget : (current.readerMonthlyBudget ?? null),
+            readerRequestsPerMonth:
+              request.readerRequestsPerMonth !== undefined ? request.readerRequestsPerMonth : (current.readerRequestsPerMonth ?? null),
+          }
+        : {}),
     };
     const fields = (Object.keys(updated) as Array<keyof AiFeatureSettings>).filter(
       (field) => JSON.stringify(updated[field]) !== JSON.stringify(current[field]),

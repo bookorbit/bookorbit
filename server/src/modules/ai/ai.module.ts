@@ -41,6 +41,15 @@ import { AiUsageFoldJob } from './ai-usage-fold.job';
     AiAdminService,
     AiUsageFoldJob,
   ],
-  exports: [AiClient, AiBudgetService, AiSettingsService, AiEventsService, AiJobsBridge, AiConnectionService, AiConnectionTestService],
+  exports: [
+    AiClient,
+    AiBudgetService,
+    AiSettingsService,
+    AiEventsService,
+    AiJobsBridge,
+    AiConnectionService,
+    AiConnectionTestService,
+    AiLedgerRepository,
+  ],
 })
 export class AiModule {}

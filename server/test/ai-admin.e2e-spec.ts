@@ -219,6 +219,7 @@ describe('AI admin routes (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
     expect(settings.features).toEqual([
       expect.objectContaining({ id: 'story-guides', missingSlots: ['careful'], privacy: null }),
       expect.objectContaining({ id: 'vision-scan', missingSlots: ['vision'], privacy: null }),
+      expect.objectContaining({ id: 'reading-help', missingSlots: [], privacy: null }),
     ]);
 
     const unchanged = await call(admin, 'PUT', '/admin/ai/settings/slots', { fast: { connectionId, model: 'stub-model-a' } });

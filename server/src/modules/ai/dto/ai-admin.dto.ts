@@ -26,11 +26,13 @@ import {
   AI_KEY_MAX_LENGTH,
   AI_MODEL_MAX_LENGTH,
   AI_NAME_MAX_LENGTH,
+  AI_SLOT_EFFORTS,
   AI_SLOTS,
   AI_URL_MAX_LENGTH,
   type AiApiType,
   type AiJsonMode,
   type AiSlot,
+  type AiSlotEffort,
 } from '@bookorbit/types';
 
 import { NetworkProfileDto } from '../../book-request/indexers/dto/indexer.dto';
@@ -220,6 +222,10 @@ export class UpdateAiSlotDto {
   @Min(1)
   @Max(MAX_OUTPUT_TOKENS)
   maxOutputTokens?: number | null;
+
+  @IsOptional()
+  @IsIn(AI_SLOT_EFFORTS)
+  effort?: AiSlotEffort;
 }
 
 /** Slots left out stay as they are. */
@@ -277,6 +283,20 @@ export class UpdateAiFeatureDto {
   @Min(1)
   @Max(MAX_BUILDS_PER_MONTH)
   buildsPerMonth?: number | null;
+
+  /** Dollars a month one reader may spend; only for a feature readers use directly. */
+  @IsOptional()
+  @IsNumber({ allowNaN: false, allowInfinity: false })
+  @Min(0)
+  @Max(MAX_DOLLARS)
+  readerMonthlyBudget?: number | null;
+
+  /** Requests a month one reader may make when the feature's slots have no prices. */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(MAX_BUILDS_PER_MONTH)
+  readerRequestsPerMonth?: number | null;
 }
 
 export class UpdateAiBudgetDto {

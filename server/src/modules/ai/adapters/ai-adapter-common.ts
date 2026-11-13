@@ -1,4 +1,4 @@
-import type { AiModelInfo, AiModelList } from '@bookorbit/types';
+import { AI_EFFORTS, isAiEffort, type AiEffort, type AiModelInfo, type AiModelList } from '@bookorbit/types';
 
 import type { JsonSchema } from '../ai-client.types';
 import type { AiHttpResponse } from '../ai-network';
@@ -124,6 +124,7 @@ const OPTIONAL_PARAMETERS = [
   'text',
   'reasoning_effort',
   'reasoning',
+  'stream_options',
   // Effort shares `output_config` with the schema on Messages, so it can be left out on its own.
   'output_config.effort',
   'output_config',
@@ -146,6 +147,26 @@ export function rejectedParameter(param: string | undefined, code: string, messa
 /** True when an error says a field matching `field` is not taken, however the server words it. */
 export function refusesField(message: string, field: RegExp): boolean {
   return REFUSAL_WORDS.test(message) && field.test(message);
+}
+
+/** The omit keys that carry nothing but the effort, in each API type's request. */
+export const EFFORT_PARAMETERS: ReadonlySet<string> = new Set(['reasoning_effort', 'reasoning', 'output_config.effort']);
+
+/**
+ * The ways servers name effort when they refuse it: `reasoning_effort`, xAI's `reasoningEffort`,
+ * Fireworks' "reasoning effort", Ollama's "reasoning value" and "does not support thinking", and
+ * CLIProxyAPI's "valid levels".
+ */
+const EFFORT_FIELD = /\breasoning[_ ]?effort\b|\breasoningEffort\b|\breasoning value\b|\bsupport thinking\b|\bvalid levels\b/i;
+const EFFORT_REFUSAL = new RegExp(`${REFUSAL_WORDS.source}|invalid|not enabled|valid (values|levels)|input should be`, 'i');
+
+/**
+ * True when an error refuses the effort field or the level sent in it. Servers word a refused
+ * level ("Invalid reasoning_effort: minimal. Valid values are ...") unlike a refused field, which
+ * `refusesField` alone misses.
+ */
+export function refusesEffort(message: string, field: RegExp = EFFORT_FIELD): boolean {
+  return field.test(message) && EFFORT_REFUSAL.test(message);
 }
 
 function pickMessage(error: Record<string, unknown>, body: unknown, text: string): string {
@@ -207,7 +228,39 @@ function modelInfo(item: unknown): AiModelInfo | null {
       info.prices = { input: roundPrice(input * 1_000_000), output: roundPrice(output * 1_000_000) };
     }
   }
+  const efforts = effortsOf(item);
+  if (efforts) info.efforts = efforts;
+  const defaultEffort = isRecord(item.reasoning) ? item.reasoning.default_effort : undefined;
+  if (isAiEffort(defaultEffort) && (!efforts || efforts.includes(defaultEffort))) info.defaultEffort = defaultEffort;
   return info;
+}
+
+/**
+ * The levels a model takes, lowest first, from the two lists that publish them: Anthropic's
+ * `capabilities.effort` (a flag per level) and OpenRouter's `reasoning.supported_efforts`. Null
+ * where the list does not say, which is not the same as a model that takes none.
+ */
+function effortsOf(item: Record<string, unknown>): AiEffort[] | null {
+  const capabilities = isRecord(item.capabilities) ? item.capabilities : null;
+  if (capabilities && isRecord(capabilities.effort)) {
+    const effort = capabilities.effort;
+    if (effort.supported === false) return [];
+    return AI_EFFORTS.filter((level) => isRecord(effort[level]) && effort[level].supported === true);
+  }
+
+  const reasoning = isRecord(item.reasoning) ? item.reasoning : null;
+  const listed = reasoning && Array.isArray(reasoning.supported_efforts) ? reasoning.supported_efforts.filter(isAiEffort) : [];
+  if (listed.length > 0) {
+    // A model that always reasons refuses `none`.
+    const mandatory = reasoning?.mandatory === true;
+    return AI_EFFORTS.filter((level) => listed.includes(level) && !(mandatory && level === 'none'));
+  }
+  // OpenRouter lists every parameter a model takes; one without reasoning takes no effort.
+  if (Array.isArray(item.supported_parameters)) {
+    const parameters = item.supported_parameters;
+    return parameters.includes('reasoning') || parameters.includes('reasoning_effort') ? null : [];
+  }
+  return null;
 }
 
 function roundPrice(value: number): number {
@@ -284,4 +337,20 @@ export function bearerHeaders(key: string | null, extra: Array<{ name: string; v
   for (const header of extra) headers[header.name] = header.value;
   if (key) headers.authorization = `Bearer ${key}`;
   return headers;
+}
+
+/**
+ * A failure a provider reported inside a stream, after a 200. Its status is the one the provider
+ * names, when it names a number, else 500: most such failures (an overloaded model, a dropped
+ * upstream) pass by themselves.
+ */
+export function streamedError(raw: unknown): AiProviderError {
+  const error = isRecord(raw) ? raw : {};
+  const message = typeof error.message === 'string' && error.message ? error.message : 'The provider stopped the answer with an error';
+  const code = typeof error.code === 'number' ? error.code : typeof error.status === 'number' ? error.status : 500;
+  const status = code >= 400 && code < 600 ? code : 500;
+  if (CONTEXT_WORDS.test(message)) return { kind: 'context-length', status, message };
+  if (status === 401 || status === 403) return { kind: 'auth', status, message };
+  if (status === 429) return { kind: 'rate-limited', status, message };
+  return { kind: 'server', status, message };
 }

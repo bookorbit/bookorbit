@@ -1352,6 +1352,19 @@
     "apiKey": "write"
   },
   {
+    "file": "server/src/modules/reading-help/reading-help.controller.ts",
+    "className": "ReadingHelpController",
+    "methodName": "answer",
+    "httpMethod": "POST",
+    "path": "/mobile/reading-help",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
+  },
+  {
     "file": "server/src/modules/story-edits/story-edits.controller.ts",
     "className": "StoryEditsController",
     "methodName": "list",

@@ -64,6 +64,8 @@ describe('story guide copy', () => {
     expect(storyGuidePhaseText({ kind: 'findingTies' })).toBe('Finding ties')
     expect(storyGuidePhaseText({ kind: 'writing', chapter: 12, total: 34 })).toBe('Writing descriptions, chapter 12 of 34')
     expect(storyGuidePhaseText({ kind: 'writing', chapter: null, total: null })).toBe('Writing descriptions')
+    expect(storyGuidePhaseText({ kind: 'summarizing', chapter: 3, total: 34 })).toBe('Writing summaries, chapter 3 of 34')
+    expect(storyGuidePhaseText({ kind: 'summarizing', chapter: null, total: null })).toBe('Writing summaries')
     expect(storyGuidePhaseText({ kind: 'finishing' })).toBe('Finishing up')
     expect(storyGuidePhaseText({ kind: 'building' })).toBe('Building')
   })

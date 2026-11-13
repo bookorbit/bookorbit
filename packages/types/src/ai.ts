@@ -21,8 +21,24 @@ export const AI_JSON_MODES = ["auto", "schema", "json", "instructions"] as const
 export type AiJsonMode = (typeof AI_JSON_MODES)[number];
 export type AiJsonSupport = Exclude<AiJsonMode, "auto">;
 
+/**
+ * Reasoning effort, lowest first, as most providers name the levels. Each model takes its own
+ * subset, some take none, and a few providers remap a level silently; a model list says which
+ * levels a model takes where the provider publishes it.
+ */
+export const AI_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"] as const;
+export type AiEffort = (typeof AI_EFFORTS)[number];
+
+/** A slot's effort. `auto` sends what each feature asks for, as before slots had an effort. */
+export const AI_SLOT_EFFORTS = ["auto", ...AI_EFFORTS] as const;
+export type AiSlotEffort = (typeof AI_SLOT_EFFORTS)[number];
+
+export function isAiEffort(value: unknown): value is AiEffort {
+  return typeof value === "string" && (AI_EFFORTS as readonly string[]).includes(value);
+}
+
 /** AI features the server knows. Settings, ledger rows and budgets are keyed by these ids. */
-export const AI_FEATURES = ["story-guides", "vision-scan"] as const;
+export const AI_FEATURES = ["story-guides", "vision-scan", "reading-help"] as const;
 export type AiFeatureId = (typeof AI_FEATURES)[number];
 
 export const AI_CONNECTION_LIMITS = {
@@ -97,6 +113,7 @@ export const AI_FAILURE_CODES = [
   "unsupported-api-type",
   "provider-error",
   "no-image-input",
+  "effort-rejected",
 ] as const;
 export type AiFailureCode = (typeof AI_FAILURE_CODES)[number];
 
@@ -209,6 +226,13 @@ export interface AiModelInfo {
   contextLength?: number;
   maxOutputTokens?: number;
   prices?: AiModelPrices;
+  /**
+   * The effort levels the model takes, lowest first, when the provider publishes them; empty when
+   * it takes none. Absent when the provider does not say.
+   */
+  efforts?: AiEffort[];
+  /** The level the provider uses when none is sent, when it says. */
+  defaultEffort?: AiEffort;
 }
 
 export interface AiModelList {
@@ -224,6 +248,8 @@ export interface AiSlotSettings {
   jsonMode: AiJsonMode;
   /** The model's output limit when its list gave one; caps the retry of a reply cut short. */
   maxOutputTokens: number | null;
+  /** A level chosen here is sent on every request and never dropped quietly when refused. */
+  effort: AiSlotEffort;
 }
 
 export type AiSlotsSettings = Record<AiSlot, AiSlotSettings>;
@@ -249,6 +275,13 @@ export interface AiFeatureSettings {
   monthlyBudget: number | null;
   /** Builds a month, used when its slots have no prices; null for no limit. */
   buildsPerMonth: number | null;
+  /**
+   * Dollars a month one reader may spend through this feature; null for no cap. Only features
+   * marked `perReader` use it. Absent from settings saved before the field.
+   */
+  readerMonthlyBudget?: number | null;
+  /** Requests a month one reader may make, used when its slots have no prices; null for no cap. */
+  readerRequestsPerMonth?: number | null;
 }
 
 export interface AiPrivacyConfirmation {
@@ -273,7 +306,14 @@ export interface AiFeatureDefinition {
    * at a time and is capped by money only.
    */
   runs: "jobs" | "requests";
+  /** Slots the feature uses when they have a model, without needing them to run. */
+  optionalSlots?: AiSlot[];
+  /** Readers make the requests, so the per-reader caps apply. */
+  perReader?: boolean;
 }
+
+/** Per-reader caps a `perReader` feature starts with. */
+export const AI_READER_CAP_DEFAULTS = { readerMonthlyBudget: 1, readerRequestsPerMonth: 300 } as const;
 
 export const AI_FEATURE_DEFINITIONS = {
   "story-guides": {
@@ -290,6 +330,14 @@ export const AI_FEATURE_DEFINITIONS = {
     slots: ["vision"],
     limits: {},
     runs: "requests",
+  },
+  "reading-help": {
+    id: "reading-help",
+    slots: ["fast"],
+    optionalSlots: ["careful"],
+    limits: {},
+    runs: "requests",
+    perReader: true,
   },
 } satisfies Record<AiFeatureId, AiFeatureDefinition>;
 
@@ -314,6 +362,8 @@ export interface UpdateAiSlotRequest {
   prices?: AiModelPrices | null;
   jsonMode?: AiJsonMode;
   maxOutputTokens?: number | null;
+  /** Left out: kept for the same model, `auto` for a new one. */
+  effort?: AiSlotEffort;
 }
 
 /** What saving the slots returns: the settings, and which slots the save changed. */
@@ -331,6 +381,9 @@ export interface UpdateAiFeatureRequest {
   limits?: AiFeatureLimits;
   monthlyBudget?: number | null;
   buildsPerMonth?: number | null;
+  /** Only for a feature marked `perReader`; refused for any other. */
+  readerMonthlyBudget?: number | null;
+  readerRequestsPerMonth?: number | null;
 }
 
 export type UpdateAiBudgetRequest = Partial<AiBudgetSettings>;

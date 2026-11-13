@@ -52,6 +52,8 @@ const props = defineProps<{
   /** Editing this connection; null adds one. */
   connection: AiConnection | null
   prefill?: AiConnectionPrefill | null
+  /** A preset picked before the dialog opened, which starts it on the details step. */
+  presetId?: AiPresetId | null
   /** The model a slot uses on this connection, which the test asks by default. */
   slotModel?: string | null
 }>()
@@ -144,6 +146,10 @@ function reset() {
     step.value = 2
   } else if (props.prefill) {
     draft.value = { ...(draftFromUrl(props.prefill.baseUrl) ?? draftFromPreset('other')), ...props.prefill }
+    presetChosen.value = true
+    step.value = 2
+  } else if (props.presetId) {
+    draft.value = draftFromPreset(props.presetId)
     presetChosen.value = true
     step.value = 2
   } else {

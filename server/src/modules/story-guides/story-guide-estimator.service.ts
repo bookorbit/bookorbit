@@ -75,16 +75,23 @@ export class StoryGuideEstimator {
     return rates;
   }
 
-  /** What each model has managed, newest first, for the AI settings page. */
+  /** What each model has managed at each effort, newest first, for the AI settings page. */
   async speeds(): Promise<StoryGuideSpeeds> {
     const table = await this.rates.table(STORY_GUIDE_FEATURE);
     const byModel = new Map<string, StoryGuideModelSpeed>();
     for (const rate of table.list()) {
       if (!isTimedStep(rate.step)) continue;
-      const key = JSON.stringify([rate.connectionId, rate.model]);
+      const key = JSON.stringify([rate.connectionId, rate.model, rate.effort]);
       let entry = byModel.get(key);
       if (!entry) {
-        entry = { connectionId: rate.connectionId, connectionName: null, model: rate.model, learnedAt: rate.learnedAt.toISOString(), steps: [] };
+        entry = {
+          connectionId: rate.connectionId,
+          connectionName: null,
+          model: rate.model,
+          ...(rate.effort ? { effort: rate.effort } : {}),
+          learnedAt: rate.learnedAt.toISOString(),
+          steps: [],
+        };
         byModel.set(key, entry);
       }
       if (rate.learnedAt.toISOString() > entry.learnedAt) entry.learnedAt = rate.learnedAt.toISOString();
@@ -102,7 +109,13 @@ export class StoryGuideEstimator {
   }
 
   async resetSpeed(request: StoryGuideSpeedResetRequest): Promise<StoryGuideSpeedResetResponse> {
-    const removed = await this.rates.forget({ feature: STORY_GUIDE_FEATURE, connectionId: request.connectionId, model: request.model });
+    const { connectionId, model, effort } = request;
+    const removed = await this.rates.forget({
+      feature: STORY_GUIDE_FEATURE,
+      connectionId,
+      model,
+      ...(effort === undefined ? {} : { effort: effort === 'auto' ? null : effort }),
+    });
     return { removed };
   }
 

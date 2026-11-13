@@ -91,4 +91,9 @@ export interface StoryGuidePayloadV1 {
   sections: StoryGuideSectionInfo[];
   entities: StoryGuideEntity[];
   ties: StoryGuideTie[];
+  /**
+   * What happens in each chapter, or part of a long chapter, in reading order: a few sentences on
+   * that stretch alone, holding from its end on. Absent from guides built before summaries.
+   */
+  summaries?: StoryGuideLine[];
 }

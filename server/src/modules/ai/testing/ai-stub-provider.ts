@@ -50,6 +50,10 @@ export const AI_STUB_VISION_BOOKS = [
   { title: 'Dracula', author: null, box: null },
 ];
 
+/** Three sentences, one more than a term answer keeps, so the server's sentence cap ends it. */
+export const AI_STUB_READING_HELP_ANSWER =
+  'Mr. Darcy is a proud gentleman who has come to Netherfield with Mr. Bingley. He has just refused to dance with Elizabeth at the assembly. Later he changes his mind.';
+
 /** The default reply: the answer each known prompt asks for. */
 export function defaultStubReply(request: AiStubRequest): string {
   const prompt = JSON.stringify(request.body ?? {});
@@ -58,6 +62,7 @@ export function defaultStubReply(request: AiStubRequest): string {
   if (prompt.includes('You read the books in a photo')) return JSON.stringify({ books: AI_STUB_VISION_BOOKS });
   if (prompt.includes('checking that a connection works')) return '{"ok":true,"word":"orbit"}';
   if (prompt.includes("reader's guide")) return JSON.stringify({ names: AI_STUB_TRY_NAMES });
+  if (prompt.includes('You remind a reader who or what something is')) return AI_STUB_READING_HELP_ANSWER;
   return 'Hello from the stub.';
 }
 
@@ -142,6 +147,7 @@ function handle(state: AiStubOptions, request: AiStubRequest, res: ServerRespons
 
   const text = state.reply(request);
   const usage = state.omitUsage ? undefined : { input: 120, output: 30 };
+  if (body.stream === true) return stream(res, apiType, String(body.model), text, usage);
   if (apiType === 'openai-chat') {
     return send(res, 200, {
       id: 'chatcmpl-stub',
@@ -170,6 +176,34 @@ function handle(state: AiStubOptions, request: AiStubRequest, res: ServerRespons
     output: [{ type: 'message', role: 'assistant', content: [{ type: 'output_text', text }] }],
     ...(usage ? { usage: { input_tokens: usage.input, output_tokens: usage.output, output_tokens_details: { reasoning_tokens: 0 } } } : {}),
   });
+}
+
+/** The reply as server-sent events, a few words at a time, the way each API type streams. */
+function stream(res: ServerResponse, apiType: AiApiType, model: string, text: string, usage: { input: number; output: number } | undefined): void {
+  res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache' });
+  const pieces = text.match(/\S+\s*/g) ?? [];
+  const write = (event: string | null, data: unknown) =>
+    res.write(`${event ? `event: ${event}\n` : ''}data: ${typeof data === 'string' ? data : JSON.stringify(data)}\n\n`);
+  res.write(': stub keep-alive\n\n');
+  if (apiType === 'openai-chat') {
+    for (const piece of pieces) write(null, { model, choices: [{ index: 0, delta: { content: piece } }] });
+    write(null, { model, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] });
+    if (usage) write(null, { model, choices: [], usage: { prompt_tokens: usage.input, completion_tokens: usage.output } });
+    write(null, '[DONE]');
+  } else if (apiType === 'anthropic-messages') {
+    write('message_start', { type: 'message_start', message: { model, usage: { input_tokens: usage?.input ?? 0, output_tokens: 1 } } });
+    for (const piece of pieces) write('content_block_delta', { type: 'content_block_delta', index: 0, delta: { type: 'text_delta', text: piece } });
+    write('message_delta', { type: 'message_delta', delta: { stop_reason: 'end_turn' }, usage: { output_tokens: usage?.output ?? 0 } });
+    write('message_stop', { type: 'message_stop' });
+  } else {
+    write('response.created', { type: 'response.created', response: { model, status: 'in_progress' } });
+    for (const piece of pieces) write('response.output_text.delta', { type: 'response.output_text.delta', delta: piece });
+    write('response.completed', {
+      type: 'response.completed',
+      response: { model, status: 'completed', ...(usage ? { usage: { input_tokens: usage.input, output_tokens: usage.output } } : {}) },
+    });
+  }
+  res.end();
 }
 
 function keyOf(request: AiStubRequest): string | null {

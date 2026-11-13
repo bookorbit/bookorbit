@@ -78,7 +78,7 @@ export function updateFeature(feature: AiFeatureId, request: UpdateAiFeatureRequ
 }
 
 export function updateBudget(request: UpdateAiBudgetRequest): Promise<AiSettings> {
-  return apiJson<AiSettings>(`${BASE}/settings/budget`, jsonBody('PUT', request), 'settings.admin.ai.budget.saveFailed')
+  return apiJson<AiSettings>(`${BASE}/settings/budget`, jsonBody('PUT', request), 'settings.admin.ai.spending.saveFailed')
 }
 
 export function tryModel(slot: AiSlot): Promise<AiTryResult> {

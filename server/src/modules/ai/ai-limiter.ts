@@ -13,7 +13,14 @@ export class AiLimiterAbortedError extends Error {
   }
 }
 
+/**
+ * `interactive` is someone waiting for the answer on screen; it goes ahead of `background` work
+ * such as a build, first come first served within each.
+ */
+export type AiLimiterPriority = 'interactive' | 'background';
+
 interface Waiter {
+  priority: AiLimiterPriority;
   resolve: (release: () => void) => void;
   reject: (error: Error) => void;
   detach: () => void;
@@ -23,8 +30,9 @@ const MINUTE_MS = 60_000;
 
 /**
  * One connection's gate, shared by every feature and both slots: at most `maxParallel` requests
- * in flight, at most `requestsPerMinute` started in any minute, first come first served. A 429
- * with `retry-after` holds the whole connection, not only the request that got it.
+ * in flight, at most `requestsPerMinute` started in any minute, interactive requests ahead of
+ * background ones and first come first served within each. A 429 with `retry-after` holds the
+ * whole connection, not only the request that got it.
  */
 export class AiConnectionLimiter {
   private active = 0;
@@ -43,7 +51,7 @@ export class AiConnectionLimiter {
   }
 
   /** Resolves with a release function once a request may start. Limits apply as of this call. */
-  acquire(limits: AiLimits, signal?: AbortSignal): Promise<() => void> {
+  acquire(limits: AiLimits, signal?: AbortSignal, priority: AiLimiterPriority = 'background'): Promise<() => void> {
     this.limits = { maxParallel: Math.max(1, limits.maxParallel), requestsPerMinute: limits.requestsPerMinute };
     if (signal?.aborted) return Promise.reject(new AiLimiterAbortedError());
 
@@ -53,9 +61,11 @@ export class AiConnectionLimiter {
         if (index !== -1) this.queue.splice(index, 1);
         reject(new AiLimiterAbortedError());
       };
-      const waiter: Waiter = { resolve, reject, detach: () => signal?.removeEventListener('abort', onAbort) };
+      const waiter: Waiter = { priority, resolve, reject, detach: () => signal?.removeEventListener('abort', onAbort) };
       signal?.addEventListener('abort', onAbort, { once: true });
-      this.queue.push(waiter);
+      const firstBackground = priority === 'interactive' ? this.queue.findIndex((queued) => queued.priority === 'background') : -1;
+      if (firstBackground === -1) this.queue.push(waiter);
+      else this.queue.splice(firstBackground, 0, waiter);
       this.pump();
     });
   }

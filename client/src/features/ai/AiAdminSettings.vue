@@ -1,23 +1,19 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, shallowRef } from 'vue'
 import { toast } from 'vue-sonner'
-import { Loader2, Plus } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import { AI_SLOTS, normaliseAiBaseUrl, type AiConnection, type AiSettings, type AiSlot } from '@bookorbit/types'
+import { AI_SLOTS, normaliseAiBaseUrl, type AiConnection, type AiPresetId, type AiSettings, type AiSlot } from '@bookorbit/types'
 
-import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
-import LoadErrorPanel from '@/components/LoadErrorPanel.vue'
 import { ApiError, errorMessage } from '@/lib/api-json'
-import SettingsPageHeader from '@/features/settings/SettingsPageHeader.vue'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import * as aiApi from './api/ai.api'
-import AiConnectionCard from './components/AiConnectionCard.vue'
 import AiConnectionDialog, { type AiConnectionPrefill } from './components/AiConnectionDialog.vue'
-import AiBudgetSection from './components/AiBudgetSection.vue'
 import AiFeaturesSection from './components/AiFeaturesSection.vue'
 import AiModelsSection from './components/AiModelsSection.vue'
-import AiOverviewSection from './components/AiOverviewSection.vue'
+import AiProvidersSection from './components/AiProvidersSection.vue'
+import AiSpendingSection from './components/AiSpendingSection.vue'
+import AiStatusStrip from './components/AiStatusStrip.vue'
 import AiUsageView from './components/AiUsageView.vue'
 import { useAiAdmin } from './composables/useAiAdmin'
 import { slotList } from './lib/ai-format'
@@ -32,6 +28,7 @@ const {
   settings,
   settingsState,
   modelLists,
+  monthUsage,
   load,
   loadOverview,
   loadConnections,
@@ -46,13 +43,39 @@ const { loadAppInfo } = useAppInfo()
 const dialogOpen = ref(false)
 const editing = ref<AiConnection | null>(null)
 const prefill = ref<AiConnectionPrefill | null>(null)
+const presetId = ref<AiPresetId | null>(null)
 const testingId = ref<number | null>(null)
 const pendingDelete = ref<AiConnection | null>(null)
 const deleting = ref(false)
 const inUse = ref<{ connection: AiConnection; message: string; slots: AiSlot[] } | null>(null)
 const view = ref<'settings' | 'usage'>('settings')
 
+/**
+ * The row editors open on the page, keyed `slot:<id>`, `feature:<id>` or `spend:<row>`. Several can be
+ * open at once, so an unsaved draft in one isn't lost by opening another.
+ */
+const openKeys = shallowRef<ReadonlySet<string>>(new Set())
+
 onMounted(load)
+
+function setOpen(key: string, open: boolean) {
+  if (openKeys.value.has(key) === open) return
+  const next = new Set(openKeys.value)
+  if (open) next.add(key)
+  else next.delete(key)
+  openKeys.value = next
+}
+
+async function scrollToAnchor(id: string) {
+  await nextTick()
+  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+/** A problem named elsewhere on the page opens the row that fixes it. */
+function openRow(key: string, anchorId: string) {
+  setOpen(key, true)
+  void scrollToAnchor(anchorId)
+}
 
 function slotsUsing(connectionId: number): AiSlot[] {
   const slots = settings.value?.slots
@@ -66,28 +89,34 @@ const editingSlotModel = computed(() => {
   return AI_SLOTS.map((slot) => slots[slot]).find((slot) => slot.connectionId === id)?.model ?? null
 })
 
-function openAdd(withPrefill: AiConnectionPrefill | null = null) {
+function openAdd(withPrefill: AiConnectionPrefill | null = null, withPreset: AiPresetId | null = null) {
   editing.value = null
   prefill.value = withPrefill
+  presetId.value = withPreset
   dialogOpen.value = true
 }
 
-function openEdit(connection: AiConnection) {
+function handleAdd(preset: AiPresetId | null) {
+  openAdd(null, preset)
+}
+
+function handleEdit(connection: AiConnection) {
   editing.value = connection
   prefill.value = null
+  presetId.value = null
   dialogOpen.value = true
 }
 
 async function handleSaved(connection: AiConnection, testPassed: boolean) {
   upsertConnection(connection)
   toast.success(t('settings.admin.ai.sheet.saved', { name: connection.name }))
-  // The dialog tested the unsaved form; testing the saved connection records the pass on its card.
+  // The dialog tested the unsaved form; testing the saved connection records the pass on its row.
   if (testPassed) {
     testingId.value = connection.id
     try {
       await aiApi.testSavedConnection(connection.id)
     } catch {
-      // The card says Not tested, which is true; the admin can test again from it.
+      // The row says Not tested, which is true; the admin can test again from it.
     } finally {
       testingId.value = null
     }
@@ -107,6 +136,13 @@ async function handleTest(connection: AiConnection) {
     testingId.value = null
   }
   await Promise.all([loadConnections(), loadOverview()])
+}
+
+/** The status strip names a failing provider by id; its row may still be loading. */
+function handleTestConnection(id: number) {
+  const connection = connections.value.find((entry) => entry.id === id)
+  if (connection) void handleTest(connection)
+  else void scrollToAnchor(`ai-connection-${id}`)
 }
 
 function slotsMessage(slots: AiSlot[]): string {
@@ -148,23 +184,30 @@ async function confirmDelete() {
   }
 }
 
-async function scrollToAnchor(id: string) {
-  await nextTick()
-  document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-}
-
-function showConnection(id: number) {
-  void scrollToAnchor(`ai-connection-${id}`)
+function cancelDelete() {
+  pendingDelete.value = null
 }
 
 function showSlot(slot: AiSlot) {
-  void scrollToAnchor(`ai-slot-${slot}`)
+  openRow(`slot:${slot}`, `ai-slot-${slot}`)
 }
 
 function closeInUse(goToModels: boolean) {
   const slot = inUse.value?.slots[0]
   inUse.value = null
   if (goToModels && slot) showSlot(slot)
+}
+
+function handleInUseConfirm() {
+  closeInUse(true)
+}
+
+function handleInUseCancel() {
+  closeInUse(false)
+}
+
+function handleRaiseLimit() {
+  openRow('spend:server', 'ai-spend-server')
 }
 
 async function viewUsage() {
@@ -179,7 +222,7 @@ function closeUsage() {
 }
 
 /**
- * Saving settings can change what the overview says: a budget, a slot with no prices, a feature.
+ * Saving settings can change what the status strip says: a limit, a slot with no prices, a feature.
  * A feature or slot also changes whether `app-info` says story guides can be built, which book pages
  * read before asking for a guide's status.
  */
@@ -206,84 +249,83 @@ function addAnthropicConnection(connection: AiConnection) {
 
 <template>
   <div>
-    <SettingsPageHeader :title="t('settings.admin.ai.title')" :subtitle="t('settings.admin.ai.mobileAppsSubtitle')" />
+    <p class="mb-[22px] max-w-[100ch] text-sm text-muted-foreground" data-testid="ai-intro">{{ t('settings.admin.ai.mobileAppsSubtitle') }}</p>
 
     <AiUsageView v-if="view === 'usage'" @back="closeUsage" />
 
-    <div v-else class="flex flex-col gap-8">
-      <AiOverviewSection
+    <div v-else class="flex flex-col gap-7">
+      <AiStatusStrip
         :overview="overview"
         :state="overviewState"
+        :connections="connections"
+        :connections-ready="connectionsState === 'ready'"
+        :settings="settings"
+        :testing-id="testingId"
         @retry="loadOverview"
         @view-usage="viewUsage"
-        @show-connection="showConnection"
-        @show-slot="showSlot"
+        @test-connection="handleTestConnection"
+        @open-slot="showSlot"
+        @raise-limit="handleRaiseLimit"
       />
 
-      <section aria-labelledby="ai-connections-title" class="flex flex-col gap-3" data-testid="ai-connections">
-        <div class="flex items-center justify-between gap-4">
-          <h3 id="ai-connections-title" class="settings-group-label mb-0">{{ t('settings.admin.ai.connections.title') }}</h3>
-          <Button v-if="connectionsState === 'ready' && connections.length > 0" size="sm" @click="openAdd()">
-            <Plus class="size-3.5" />
-            {{ t('settings.admin.ai.connections.add') }}
-          </Button>
-        </div>
-
-        <div v-if="connectionsState === 'loading'" class="settings-loading-state">
-          <Loader2 class="size-5 animate-spin" aria-hidden="true" />
-          <span class="sr-only">{{ t('settings.admin.ai.loading') }}</span>
-        </div>
-
-        <div v-else-if="connectionsState === 'error'" class="settings-card">
-          <LoadErrorPanel :message="t('settings.admin.ai.connections.loadFailed')" @retry="loadConnections" />
-        </div>
-
-        <div v-else-if="connections.length === 0" class="settings-empty-state" data-testid="ai-connections-empty">
-          <p class="text-sm font-medium text-foreground">{{ t('settings.admin.ai.connections.emptyTitle') }}</p>
-          <p class="mx-auto mt-1 max-w-[52ch] text-xs text-muted-foreground">{{ t('settings.admin.ai.connections.emptyBrief') }}</p>
-          <Button class="mt-4" @click="openAdd()">
-            <Plus class="size-4" />
-            {{ t('settings.admin.ai.connections.add') }}
-          </Button>
-        </div>
-
-        <div v-else class="flex flex-col gap-3">
-          <AiConnectionCard
-            v-for="connection in connections"
-            :key="connection.id"
-            :connection="connection"
-            :testing="testingId === connection.id"
-            @test="handleTest(connection)"
-            @edit="openEdit(connection)"
-            @delete="handleDelete(connection)"
-          />
-        </div>
-      </section>
+      <AiProvidersSection
+        :connections="connections"
+        :state="connectionsState"
+        :testing-id="testingId"
+        @retry="loadConnections"
+        @add="handleAdd"
+        @test="handleTest"
+        @edit="handleEdit"
+        @delete="handleDelete"
+      />
 
       <AiModelsSection
         :settings="settings"
         :state="settingsState"
         :connections="connections"
         :model-lists="modelLists"
+        :open-keys="openKeys"
         @retry="loadSettings"
         @updated="handleSettingsUpdated"
         @tried="handleTried"
         @need-models="ensureModels"
         @add-anthropic="addAnthropicConnection"
+        @set-open="setOpen"
       />
 
-      <AiFeaturesSection :settings="settings" :state="settingsState" @retry="loadSettings" @updated="handleSettingsUpdated" @show-slot="showSlot" />
-
-      <AiBudgetSection
+      <AiFeaturesSection
         :settings="settings"
         :state="settingsState"
-        :usage="overview?.budget ?? null"
+        :connections="connections"
+        :overview="overview"
+        :month-usage="monthUsage"
+        :open-keys="openKeys"
         @retry="loadSettings"
         @updated="handleSettingsUpdated"
+        @set-open="setOpen"
+        @open-slot="showSlot"
+      />
+
+      <AiSpendingSection
+        :settings="settings"
+        :state="settingsState"
+        :overview="overview"
+        :month-usage="monthUsage"
+        :open-keys="openKeys"
+        @retry="loadSettings"
+        @updated="handleSettingsUpdated"
+        @set-open="setOpen"
       />
     </div>
 
-    <AiConnectionDialog v-model:open="dialogOpen" :connection="editing" :prefill="prefill" :slot-model="editingSlotModel" @saved="handleSaved" />
+    <AiConnectionDialog
+      v-model:open="dialogOpen"
+      :connection="editing"
+      :prefill="prefill"
+      :preset-id="presetId"
+      :slot-model="editingSlotModel"
+      @saved="handleSaved"
+    />
 
     <ConfirmDialog
       v-if="pendingDelete"
@@ -293,7 +335,7 @@ function addAnthropicConnection(connection: AiConnection) {
       :confirm-label="t('settings.admin.ai.connections.delete')"
       :busy="deleting"
       @confirm="confirmDelete"
-      @cancel="pendingDelete = null"
+      @cancel="cancelDelete"
     />
 
     <ConfirmDialog
@@ -303,8 +345,8 @@ function addAnthropicConnection(connection: AiConnection) {
       :description="inUse.message"
       :confirm-label="inUse.slots.length > 0 ? t('settings.admin.ai.connections.goToModels') : t('common.close')"
       :destructive="false"
-      @confirm="closeInUse(true)"
-      @cancel="closeInUse(false)"
+      @confirm="handleInUseConfirm"
+      @cancel="handleInUseCancel"
     />
   </div>
 </template>

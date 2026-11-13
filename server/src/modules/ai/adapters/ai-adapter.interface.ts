@@ -2,6 +2,7 @@ import type { AiApiType, AiJsonSupport, AiModelList } from '@bookorbit/types';
 
 import type { AiEffort, AiFinish, AiImageMediaType, JsonSchema } from '../ai-client.types';
 import type { AiHttpRequest, AiHttpResponse } from '../ai-network';
+import type { AiSseEvent } from '../ai-sse';
 
 export type AiMessagePart = { type: 'text'; text: string } | { type: 'image'; mediaType: AiImageMediaType; data: string };
 
@@ -28,8 +29,12 @@ export interface AiAdapterRequest {
   maxOutputTokens: number;
   /** Sent in the provider's own field when set; unset sends nothing. */
   effort?: AiEffort;
+  /** The admin chose the level for the slot, so it is sent even where a feature's own would be left out. */
+  effortChosen?: boolean;
   /** Optional parameters this connection and model rejected before, left out from now on. */
   omit: ReadonlySet<string>;
+  /** Ask for the reply as server-sent events. Plain text only: no JSON, no schema. */
+  stream?: boolean;
 }
 
 export interface AiAdapterUsage {
@@ -82,6 +87,21 @@ export interface AiProviderError {
   retryAfterSeconds?: number;
 }
 
+/**
+ * What one streamed event says. Usage figures are the latest the provider sent; the client keeps
+ * the largest of each, since some providers send running totals and some send them once.
+ */
+export interface AiStreamPiece {
+  delta?: string;
+  usage?: AiAdapterUsage;
+  finish?: AiFinish;
+  model?: string;
+  /** The provider reported a failure inside the stream. */
+  error?: AiProviderError;
+  /** The provider's own end marker; nothing that matters follows. */
+  end?: boolean;
+}
+
 export type AiSend = (request: AiHttpRequest) => Promise<AiHttpResponse>;
 
 /**
@@ -94,6 +114,8 @@ export interface AiAdapter {
   /** Null when the body is not a reply this adapter can read; the caller treats that as an error. */
   parseResponse(response: AiHttpResponse): AiAdapterResult | null;
   parseError(response: AiHttpResponse): AiProviderError;
+  /** One event of a streamed reply; null for an event that says nothing the client uses. */
+  parseStreamEvent(event: AiSseEvent): AiStreamPiece | null;
   /** `listed: false` when the provider has no model list. Throws `AiProviderError` as an `AiProviderFailure`. */
   listModels(target: AiAdapterTarget, send: AiSend): Promise<AiModelList>;
   /**

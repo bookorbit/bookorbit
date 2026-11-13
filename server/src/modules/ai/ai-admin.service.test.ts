@@ -137,9 +137,36 @@ describe('AiAdminService', () => {
       expect(same.slotHealth.fast).toBeDefined();
 
       const moved = await service.updateSlots({ fast: { connectionId: 2, model: 'model-b' } });
-      expect(moved.slots.fast).toEqual({ connectionId: 2, model: 'model-b', prices: null, jsonMode: 'instructions', maxOutputTokens: null });
+      expect(moved.slots.fast).toEqual({
+        connectionId: 2,
+        model: 'model-b',
+        prices: null,
+        jsonMode: 'instructions',
+        maxOutputTokens: null,
+        effort: 'auto',
+      });
       expect(moved.slotHealth.fast).toBeUndefined();
       expect(emitted.filter((name) => name === AI_EVENTS.SLOTS_CHANGED)).toHaveLength(3);
+    });
+
+    it('keeps the effort for the same model, resets it for a new one, and clears health when it changes', async () => {
+      const { service, settings } = setup();
+      await service.updateSlots({ fast: { connectionId: 1, model: 'model-a', effort: 'high' } });
+      const kept = await service.updateSlots({ fast: { connectionId: 1, model: 'model-a', jsonMode: 'json' } });
+      expect(kept.slots.fast.effort).toBe('high');
+
+      await settings.setSlotHealth('fast', {
+        failingSince: '2026-11-01T00:00:00.000Z',
+        code: 'effort-rejected',
+        model: 'model-a',
+        reason: 'Refused',
+      });
+      const lowered = await service.updateSlots({ fast: { connectionId: 1, model: 'model-a', effort: 'low' } });
+      expect(lowered.slots.fast.effort).toBe('low');
+      expect(lowered.slotHealth.fast).toBeUndefined();
+
+      const moved = await service.updateSlots({ fast: { connectionId: 1, model: 'model-b' } });
+      expect(moved.slots.fast.effort).toBe('auto');
     });
 
     it('reports no change for the same values and leaves the other slot alone', async () => {

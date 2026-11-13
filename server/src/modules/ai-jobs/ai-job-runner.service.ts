@@ -184,7 +184,7 @@ export class AiJobRunner {
 
     const finished = run.results(step.id).size;
     const coverage = units.length === 0 ? 1 : finished / units.length;
-    run.coverage.set(step.id, coverage);
+    if (!step.optional) run.coverage.set(step.id, coverage);
     await progress.finish();
     await this.activity.record(run.row.id, 'info', step.id, 'step_finished', {
       units: units.length,
@@ -192,7 +192,7 @@ export class AiJobRunner {
       skipped: run.skipped(step.id).size,
       coverage: Math.round(coverage * 1000) / 1000,
     });
-    if (coverage < AI_JOBS_MIN_COVERAGE) {
+    if (!step.optional && coverage < AI_JOBS_MIN_COVERAGE) {
       throw new AiStepError(step.id, new AiJobFailure('low-coverage', `Step ${step.id} finished ${finished} of ${units.length} units`));
     }
     const use = step.slot ? run.models[step.slot] : undefined;
@@ -202,6 +202,7 @@ export class AiJobRunner {
         step: step.id,
         connectionId: use.connectionId,
         model: use.model,
+        effort: use.effort ?? null,
         units: ran,
         lanes,
         durationMs,

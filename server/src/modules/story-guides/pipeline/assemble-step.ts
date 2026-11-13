@@ -16,9 +16,11 @@ import type {
   StoryCastEntity,
   StoryJoin,
   StoryLinesResult,
+  StoryLinesThrough,
   StoryMergeResult,
   StoryProfilesResult,
   StoryReviewResult,
+  StorySummaryResult,
   StoryTiesResult,
 } from './story-guide.types';
 import { shipTies, type PlacedTie } from './ties-step';
@@ -73,6 +75,7 @@ export interface AssembleInput {
   ties: Iterable<StoryTiesResult>;
   lines: Iterable<StoryLinesResult>;
   profiles: Iterable<StoryProfilesResult>;
+  summaries: Iterable<StorySummaryResult>;
 }
 
 /** What assemble left out because it could not anchor it; zero unless the text and steps disagree. */
@@ -81,6 +84,7 @@ export interface AssembleDropped {
   entries: number;
   lines: number;
   profiles: number;
+  summaries: number;
   quotes: number;
 }
 
@@ -93,6 +97,11 @@ function before(a: Place, b: Place): boolean {
   return a.passage < b.passage || (a.passage === b.passage && a.offset < b.offset);
 }
 
+/** Reading order of the ends lines, profiles and summaries are stamped with. */
+function throughOrder(a: { through: StoryLinesThrough }, b: { through: StoryLinesThrough }): number {
+  return a.through.chapter - b.through.chapter || (a.through.part ?? 0) - (b.through.part ?? 0);
+}
+
 /**
  * The payload, format 1. A cast entity is shown as its `id`, the member whose name it took; every
  * other member joins it at its dated join, and before that is an entry of its own. A tie names a
@@ -100,7 +109,7 @@ function before(a: Place, b: Place): boolean {
  */
 export function assembleStoryGuide(input: AssembleInput): { payload: StoryGuidePayloadV1; dropped: AssembleDropped } {
   const { merge, review, text } = input;
-  const dropped: AssembleDropped = { names: 0, entries: 0, lines: 0, profiles: 0, quotes: 0 };
+  const dropped: AssembleDropped = { names: 0, entries: 0, lines: 0, profiles: 0, summaries: 0, quotes: 0 };
   const anchors = new StoryAnchors(text, input.raw);
   const order = passageOrder(text);
   const place = (span: PassageSpan): Place => ({ passage: order.get(span.passage) ?? Number.MAX_SAFE_INTEGER, offset: span.offset });
@@ -155,7 +164,7 @@ export function assembleStoryGuide(input: AssembleInput): { payload: StoryGuideP
   // Lines and profiles are kept under a cast entity's id, or under a member until its join.
   const byEntity = (results: Iterable<{ through: StoryLinesResult['through']; changes: StoryLinesResult['lines'] }>, kind: 'lines' | 'profiles') => {
     const lists = new Map<number, StoryGuideLine[]>();
-    const sorted = [...results].sort((a, b) => a.through.chapter - b.through.chapter || (a.through.part ?? 0) - (b.through.part ?? 0));
+    const sorted = [...results].sort(throughOrder);
     for (const result of sorted) {
       const through = anchors.through(result.through);
       for (const change of result.changes) {
@@ -246,6 +255,15 @@ export function assembleStoryGuide(input: AssembleInput): { payload: StoryGuideP
     ties.push({ key, a: tie.a, type: tie.type, b: tie.b, label: info.label, at: quotes[0], quotes, count: tie.count, fixed: false });
   }
 
+  // A unit whose summary was left out has none; nothing stands in for it.
+  const summaries: StoryGuideLine[] = [];
+  for (const result of [...input.summaries].sort(throughOrder)) {
+    if (!result.text) continue;
+    const through = anchors.through(result.through);
+    if (through) summaries.push({ through, text: result.text });
+    else dropped.summaries++;
+  }
+
   return {
     payload: {
       format: 1,
@@ -259,6 +277,7 @@ export function assembleStoryGuide(input: AssembleInput): { payload: StoryGuideP
       sections: input.sections.map(({ s, title, chars, h }) => ({ s, title, chars, h })),
       entities: entities.map((item) => item.entity),
       ties,
+      summaries,
     },
     dropped,
   };

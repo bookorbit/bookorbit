@@ -3,6 +3,7 @@ import { join } from 'path';
 
 import { FIXTURES_DIR } from '../testing/story-guide-fixtures';
 import { sectionHash } from '../text/section-text';
+import { StoryAnchors } from './anchors';
 import { labReplay } from './lab-replay.testing';
 import { assembleStoryGuide, storyGuideKey, type AssembleInput } from './assemble-step';
 import type {
@@ -11,6 +12,7 @@ import type {
   StoryMergeResult,
   StoryProfilesResult,
   StoryReviewResult,
+  StorySummaryResult,
   StoryTie,
   StoryTiesResult,
 } from './story-guide.types';
@@ -158,6 +160,16 @@ function book() {
       rewritten: 0,
     },
   ];
+  const summaries: StorySummaryResult[] = [
+    { through: { chapter: 2, part: null }, text: 'The masked girl turns out to be Violetta, who loves Tom.', dropped: null, rewritten: false },
+    { through: { chapter: 9, part: null }, text: 'Left out: the book has no chapter 9.', dropped: null, rewritten: false },
+    {
+      through: { chapter: 1, part: null },
+      text: 'A masked girl takes the egg from Lord Leverance while his daughter Violetta sleeps.',
+      dropped: null,
+      rewritten: false,
+    },
+  ];
   const input: AssembleInput = {
     textKey: text.key,
     pipeline: 'x1.te1.na1.me1.re1.ti1.li1.as1',
@@ -176,6 +188,7 @@ function book() {
     ties,
     lines,
     profiles,
+    summaries,
   };
   return { input, raw };
 }
@@ -210,7 +223,7 @@ describe('assembleStoryGuide', () => {
     expect(violetta.names).toEqual([{ text: 'Violetta', at: { s: 3, o: raw.get(3)!.indexOf('Violetta'), q: 'Violetta' } }]);
     const lord = payload.entities.find((entity) => entity.key === 'lord-leverance')!;
     expect(lord.names[0].at).toEqual({ s: 3, o: raw.get(3)!.indexOf('Lord'), q: 'Lord  Leverance' });
-    expect(dropped).toEqual({ names: 1, entries: 0, lines: 0, profiles: 1, quotes: 0 });
+    expect(dropped).toEqual({ names: 1, entries: 0, lines: 0, profiles: 1, summaries: 1, quotes: 0 });
   });
 
   it("keeps a member's lines until its join, and the group's under the shown entity after", () => {
@@ -228,6 +241,53 @@ describe('assembleStoryGuide', () => {
       { through: { s: 4, end: true }, text: 'The daughter of Lord Leverance, and the masked thief who stole his egg.' },
     ]);
     expect(payload.entities.find((entity) => entity.key === 'tom')!.profiles).toEqual([]);
+  });
+
+  it('keeps the summaries in reading order, each holding from the end of its chapter', () => {
+    expect(payload.summaries).toEqual([
+      { through: { s: 3, end: true }, text: 'A masked girl takes the egg from Lord Leverance while his daughter Violetta sleeps.' },
+      { through: { s: 4, end: true }, text: 'The masked girl turns out to be Violetta, who loves Tom.' },
+    ]);
+  });
+
+  it('stamps a part of a long chapter with its last words, and leaves out a unit whose summary failed', () => {
+    const [one, two] = input.text.chapters;
+    const cut = one.lines[2].at;
+    const text = {
+      ...input.text,
+      chapters: [
+        {
+          ...one,
+          parts: [
+            { part: 1, start: one.start, end: cut },
+            { part: 2, start: cut, end: one.end },
+          ],
+        },
+        two,
+      ],
+    };
+    const failed: StorySummaryResult = {
+      through: { chapter: 2, part: null },
+      text: null,
+      dropped: { text: 'Lady Violetta wears the mask.', reason: 'names-later-entity' },
+      rewritten: true,
+    };
+    const result = assembleStoryGuide({
+      ...input,
+      text,
+      summaries: [
+        { through: { chapter: 1, part: 2 }, text: 'Violetta sleeps while Tom keeps watch.', dropped: null, rewritten: false },
+        failed,
+        { through: { chapter: 1, part: 1 }, text: 'A masked girl takes the egg from Lord Leverance.', dropped: null, rewritten: false },
+      ],
+    });
+    const partEnd = new StoryAnchors(text, raw).through({ chapter: 1, part: 1 });
+    expect(partEnd).toMatchObject({ s: 3, q: expect.stringContaining('Leverance') });
+    expect(result.payload.summaries).toEqual([
+      { through: partEnd, text: 'A masked girl takes the egg from Lord Leverance.' },
+      { through: { s: 3, end: true }, text: 'Violetta sleeps while Tom keeps watch.' },
+    ]);
+    expect(result.dropped.summaries).toBe(0);
   });
 
   it('keys ties by their sides, orders symmetric ones, counts repeats and drops a tie inside one entity', () => {

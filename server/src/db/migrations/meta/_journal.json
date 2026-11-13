@@ -1030,6 +1030,20 @@
       "when": 1794550869584,
       "tag": "0146_sync_excluded_libraries",
       "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1794586764768,
+      "tag": "0147_add_reading_help",
+      "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1794586786626,
+      "tag": "0148_add_ai_step_timing_effort",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
-import { bigint, bigserial, check, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, char, check, index, integer, jsonb, pgTable, serial, text, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 import type { AiConnectionTest, AiFailureCode, NetworkProfile } from '@bookorbit/types';
+
+import { users } from './auth';
 
 /** A header's name and the last characters of its value, readable without the encryption key. */
 export interface AiStoredHeader {
@@ -65,9 +67,14 @@ export const aiUsage = pgTable(
     outcome: varchar('outcome', { length: 60 }).notNull(),
     jobId: varchar('job_id', { length: 64 }),
     attempt: integer('attempt').notNull().default(1),
+    /** The reader a request was made for; null for builds and the admin's own requests. */
+    userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
   },
   (t) => [
     index('ai_usage_month_feature_idx').on(t.month, t.feature),
+    index('ai_usage_month_feature_user_idx')
+      .on(t.month, t.feature, t.userId)
+      .where(sql`${t.userId} is not null`),
     index('ai_usage_at_idx').on(t.at),
     index('ai_usage_job_idx')
       .on(t.jobId)
@@ -117,6 +124,26 @@ export const aiBudgetReservations = pgTable(
 
 export type AiConnectionRow = typeof aiConnections.$inferSelect;
 export type NewAiConnectionRow = typeof aiConnections.$inferInsert;
+/**
+ * Short answers a model wrote from passages of a book, keyed by everything that shaped them: the
+ * kind, the prompt's version, the connection and model, the language and the passages. Nothing in a
+ * key or an answer says who asked, so one reader's answer serves another who sends the same text.
+ */
+export const aiAnswerCache = pgTable(
+  'ai_answer_cache',
+  {
+    id: bigserial('id', { mode: 'number' }).primaryKey(),
+    keyHash: char('key_hash', { length: 64 }).notNull(),
+    feature: varchar('feature', { length: 60 }).notNull(),
+    kind: varchar('kind', { length: 40 }).notNull(),
+    answer: text('answer').notNull(),
+    bytes: integer('bytes').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastAccessedAt: timestamp('last_accessed_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('ai_answer_cache_key_uidx').on(t.keyHash), index('ai_answer_cache_accessed_idx').on(t.lastAccessedAt)],
+);
+
 export type AiUsageRow = typeof aiUsage.$inferSelect;
 export type NewAiUsageRow = typeof aiUsage.$inferInsert;
 export type AiBudgetReservationRow = typeof aiBudgetReservations.$inferSelect;

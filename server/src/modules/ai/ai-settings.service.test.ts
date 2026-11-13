@@ -15,7 +15,7 @@ function setup(stored: Record<string, string> = {}) {
 describe('AiSettingsService', () => {
   it('has empty slots, features off with their default limits, and no budget when nothing is stored', async () => {
     const snapshot = await setup().service.snapshot();
-    expect(snapshot.slots.fast).toEqual({ connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null });
+    expect(snapshot.slots.fast).toEqual({ connectionId: null, model: null, prices: null, jsonMode: 'auto', maxOutputTokens: null, effort: 'auto' });
     expect(snapshot.features['story-guides']).toEqual({
       enabled: false,
       limits: { maxWords: 400_000, concurrentBuilds: 1 },
@@ -30,7 +30,7 @@ describe('AiSettingsService', () => {
   it('degrades values it does not understand without dropping the rest', async () => {
     const { service } = setup({
       [AI_SETTING_KEYS.SLOTS]: JSON.stringify({
-        fast: { connectionId: 3, model: 'm', jsonMode: 'telepathy', prices: { input: 'free', output: 2 } },
+        fast: { connectionId: 3, model: 'm', jsonMode: 'telepathy', effort: 'ludicrous', prices: { input: 'free', output: 2 } },
         careful: 'nonsense',
         turbo: { connectionId: 9 },
       }),
@@ -42,11 +42,16 @@ describe('AiSettingsService', () => {
       [AI_SETTING_KEYS.BUDGET]: '{not json',
     });
     const snapshot = await service.snapshot();
-    expect(snapshot.slots.fast).toEqual({ connectionId: 3, model: 'm', prices: null, jsonMode: 'auto', maxOutputTokens: null });
+    expect(snapshot.slots.fast).toEqual({ connectionId: 3, model: 'm', prices: null, jsonMode: 'auto', maxOutputTokens: null, effort: 'auto' });
     expect(snapshot.slots.careful.connectionId).toBeNull();
     expect(snapshot.features['story-guides']).toMatchObject({ enabled: true, limits: { maxWords: 400_000, concurrentBuilds: 2 } });
     expect(snapshot.slotHealth.fast).toMatchObject({ code: 'provider-error', model: 'm' });
     expect(snapshot.budget).toEqual({ monthlyBudget: null, buildsPerMonth: null });
+  });
+
+  it('reads a slot effort level it knows', async () => {
+    const { service } = setup({ [AI_SETTING_KEYS.SLOTS]: JSON.stringify({ careful: { connectionId: 3, model: 'm', effort: 'xhigh' } }) });
+    expect((await service.slots()).careful.effort).toBe('xhigh');
   });
 
   it('keeps keys a newer server wrote when it saves', async () => {

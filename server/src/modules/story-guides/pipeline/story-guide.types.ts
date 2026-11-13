@@ -200,3 +200,15 @@ export interface StoryProfilesResult {
   dropped: StoryDroppedProfile[];
   rewritten: number;
 }
+
+export type StorySummaryDropReason = 'names-later-entity' | 'too-long';
+
+/** `summaries`: one per unit of the `lines` step, in order. */
+export interface StorySummaryResult {
+  through: StoryLinesThrough;
+  /** What happens in the unit alone; null when it tells no story, or when its summary failed a check after its one rewrite. */
+  text: string | null;
+  /** The summary that failed a check after its one rewrite, which the guide leaves out. */
+  dropped: { text: string; reason: StorySummaryDropReason } | null;
+  rewritten: boolean;
+}

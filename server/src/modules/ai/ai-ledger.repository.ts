@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, gte, isNotNull, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -30,6 +30,11 @@ export interface AiUsageGroup {
   unknownCostRequests: number;
 }
 
+export interface AiReaderSpend {
+  requests: number;
+  costMicros: number;
+}
+
 export interface AiUsageJobTotal {
   jobId: string;
   feature: string;
@@ -57,6 +62,22 @@ export class AiLedgerRepository {
 
   async insert(row: NewAiUsageRow): Promise<void> {
     await this.db.insert(aiUsage).values(row);
+  }
+
+  /**
+   * What one reader spent through one feature this month: requests (first attempts only, so a
+   * retry is not a second request) and estimated cost. Folded months carry no reader, and the
+   * current month is never folded.
+   */
+  async readerSpend(month: string, feature: string, userId: number): Promise<AiReaderSpend> {
+    const [row] = await this.db
+      .select({
+        requests: sql<number>`count(*) filter (where ${aiUsage.attempt} = 1)::int`,
+        costMicros: sql<number>`coalesce(sum(${aiUsage.costMicros}), 0)::bigint`,
+      })
+      .from(aiUsage)
+      .where(and(eq(aiUsage.month, month), eq(aiUsage.feature, feature), eq(aiUsage.userId, userId)));
+    return { requests: Number(row?.requests ?? 0), costMicros: Number(row?.costMicros ?? 0) };
   }
 
   async connectionMonthTotals(month: string): Promise<Map<number, AiConnectionMonthTotals>> {

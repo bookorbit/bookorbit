@@ -3,10 +3,12 @@ import { IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, MinLen
 
 import {
   AI_JOB_KINDS,
+  AI_SLOT_EFFORTS,
   STORY_GUIDE_LIST_DIRECTIONS,
   STORY_GUIDE_LIST_MAX_LIMIT,
   STORY_GUIDE_LIST_MAX_QUERY,
   STORY_GUIDE_LIST_SORTS,
+  type AiSlotEffort,
   type StoryGuideListDirection,
   type StoryGuideListSort,
   type StoryGuideBuildKind,
@@ -79,6 +81,10 @@ export class StoryGuideSpeedResetDto implements StoryGuideSpeedResetRequest {
   @MinLength(1)
   @MaxLength(200)
   model!: string;
+
+  @IsOptional()
+  @IsIn(AI_SLOT_EFFORTS)
+  effort?: AiSlotEffort;
 }
 
 /** `GET admin/ai/features/story-guides/guides`: a page of stored guides, newest first unless asked otherwise. */

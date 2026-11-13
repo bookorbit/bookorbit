@@ -88,6 +88,7 @@ function setup(
     features: {
       'story-guides': { ...defaultFeatureSettings('story-guides'), enabled: options.enabled ?? true },
       'vision-scan': { ...defaultFeatureSettings('vision-scan'), enabled: options.enabled ?? true },
+      'reading-help': { ...defaultFeatureSettings('reading-help'), enabled: options.enabled ?? true },
     },
     budget: { monthlyBudget: null, buildsPerMonth: null },
     privacy: {},
@@ -345,6 +346,46 @@ describe('AiClient', () => {
       expect(bodyOf(sent[0]).output_config).toMatchObject({ effort: 'medium', format: { type: 'json_schema' } });
       expect(bodyOf(sent[1]).output_config.effort).toBeUndefined();
       expect(bodyOf(sent[1]).output_config.format).toMatchObject({ type: 'json_schema' });
+    });
+
+    it('sends the level the slot chose over the one the feature asked for', async () => {
+      const { client, snapshot, sent } = setup();
+      snapshot.slots.fast.effort = 'high';
+      await client.complete(request({ effort: 'medium' }));
+      await client.complete(request());
+      expect(bodyOf(sent[0]).reasoning_effort).toBe('high');
+      expect(bodyOf(sent[1]).reasoning_effort).toBe('high');
+    });
+
+    it('fails and marks the slot when a model refuses the level the slot chose, instead of dropping it', async () => {
+      const { client, snapshot, respond, sent } = setup();
+      snapshot.slots.fast.effort = 'xhigh';
+      respond(() => loadFixture('openai-chat', 'rejected-effort'));
+      await expect(errorOf(client.complete(request({ effort: 'medium' })))).resolves.toMatchObject({
+        code: 'bad-request',
+        details: { failure: 'effort-rejected' },
+      });
+      expect(sent).toHaveLength(1);
+      expect(snapshot.slotHealth.fast).toMatchObject({ code: 'effort-rejected', model: 'gpt-6-luna' });
+    });
+
+    it('sends the level the slot chose even where a feature level was dropped for that model before', async () => {
+      const { client, snapshot, respondInOrder, sent } = setup();
+      respondInOrder(loadFixture('openai-chat', 'unrecognized-argument'), reply(VALID_JSON), reply(VALID_JSON));
+      await client.complete(request({ effort: 'medium' }));
+      snapshot.slots.fast.effort = 'low';
+      await client.complete(request({ effort: 'medium' }));
+      expect(bodyOf(sent[1]).reasoning_effort).toBeUndefined();
+      expect(bodyOf(sent[2]).reasoning_effort).toBe('low');
+    });
+
+    it('keeps the slot healthy when a job refused a level the slot has since moved off', async () => {
+      const { client, snapshot, respond } = setup();
+      snapshot.slots.fast.effort = 'low';
+      respond(() => loadFixture('openai-chat', 'rejected-effort'));
+      const use = { slot: 'fast' as const, connectionId: 1, model: 'gpt-6-luna', prices: null, jsonMode: 'auto' as const, effort: 'max' as const };
+      await expect(errorOf(client.complete(request({ use })))).resolves.toMatchObject({ details: { failure: 'effort-rejected' } });
+      expect(snapshot.slotHealth.fast).toBeUndefined();
     });
   });
 

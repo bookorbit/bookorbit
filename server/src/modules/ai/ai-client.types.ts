@@ -1,4 +1,4 @@
-import type { AiErrorCode, AiFailureCode, AiJsonMode, AiModelPrices, AiSlot } from '@bookorbit/types';
+import type { AiEffort, AiErrorCode, AiFailureCode, AiJsonMode, AiModelPrices, AiSlot } from '@bookorbit/types';
 
 /** The subset of JSON Schema the adapters send and the local validator enforces. */
 export type JsonSchema = Record<string, unknown>;
@@ -12,9 +12,11 @@ export interface AiSlotChoice {
   jsonMode: AiJsonMode;
   /** The model's output limit, when known; caps the retry of a reply cut short. */
   maxOutputTokens?: number | null;
+  /** The level the slot set, which wins over the request's; absent leaves it to the request. */
+  effort?: AiEffort;
 }
 
-export type AiEffort = 'low' | 'medium' | 'high';
+export type { AiEffort };
 
 export type AiImageMediaType = 'image/jpeg' | 'image/png' | 'image/webp';
 
@@ -44,6 +46,8 @@ export interface AiRequest {
   signal?: AbortSignal;
   /** The choice a job started with, so a slot changed mid-job does not move it. */
   use?: AiSlotChoice;
+  /** The reader the request is for, recorded in the ledger for per-reader caps. */
+  userId?: number;
 }
 
 export interface AiUsage {

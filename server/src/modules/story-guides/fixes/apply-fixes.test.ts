@@ -35,6 +35,17 @@ describe('applyStoryGuideFixes', () => {
     expect(JSON.stringify(payload)).toBe(before);
   });
 
+  it('passes the chapter summaries through unchanged', () => {
+    const summaries = guide().summaries;
+    expect(summaries).toHaveLength(2);
+    const { payload } = apply(
+      fix('hide', 'violetta'),
+      fix('rename', 'tom-2', { name: 'tom' }),
+      fix('line', 'lord-leverance', { text: 'Owner of the egg' }, { from: { s: 7, o: 0 } }),
+    );
+    expect(payload.summaries).toEqual(summaries);
+  });
+
   it('hides an entity with its joins and every tie that names them', () => {
     const { payload, outcomes } = apply(fix('hide', 'violetta'));
     expect(entity(payload, 'violetta')).toBeUndefined();

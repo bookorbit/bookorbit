@@ -37,7 +37,16 @@ async function load() {
 onMounted(load)
 
 function keyOf(entry: StoryGuideModelSpeed): string {
-  return `${entry.connectionId}:${entry.model}`
+  return `${entry.connectionId}:${entry.model}:${entry.effort ?? 'auto'}`
+}
+
+/** The model, with the effort its builds ran at when the slot set one: each level learns its own speed. */
+function modelLabel(entry: StoryGuideModelSpeed): string {
+  if (!entry.effort) return entry.model
+  return t('settings.admin.ai.features.storyGuides.speeds.modelAtEffort', {
+    model: entry.model,
+    level: t(`settings.admin.ai.models.efforts.${entry.effort}`),
+  })
 }
 
 function learnedText(entry: StoryGuideModelSpeed): string {
@@ -67,8 +76,8 @@ async function handleReset() {
   if (!entry) return
   busy.value = true
   try {
-    await aiApi.resetStoryGuideSpeed({ connectionId: entry.connectionId, model: entry.model })
-    toast.success(t('settings.admin.ai.features.storyGuides.speeds.resetDone', { model: entry.model }))
+    await aiApi.resetStoryGuideSpeed({ connectionId: entry.connectionId, model: entry.model, effort: entry.effort ?? 'auto' })
+    toast.success(t('settings.admin.ai.features.storyGuides.speeds.resetDone', { model: modelLabel(entry) }))
     resetting.value = null
     await load()
   } catch (reason) {
@@ -112,7 +121,7 @@ async function handleReset() {
       >
         <div class="min-w-0 space-y-1">
           <p class="break-all text-sm text-foreground">
-            {{ entry.model }}
+            {{ modelLabel(entry) }}
             <span v-if="entry.connectionName" class="text-xs text-muted-foreground">
               {{ t('settings.admin.ai.features.storyGuides.speeds.onConnection', { connection: entry.connectionName }) }}
             </span>
@@ -128,7 +137,7 @@ async function handleReset() {
         <Button
           variant="outline"
           size="sm"
-          :aria-label="t('settings.admin.ai.features.storyGuides.speeds.resetLabel', { model: entry.model })"
+          :aria-label="t('settings.admin.ai.features.storyGuides.speeds.resetLabel', { model: modelLabel(entry) })"
           data-testid="ai-story-guide-speed-reset"
           @click="startReset(entry)"
         >
@@ -140,7 +149,7 @@ async function handleReset() {
     <ConfirmDialog
       :open="resetOpen"
       :title="t('settings.admin.ai.features.storyGuides.speeds.resetTitle')"
-      :description="t('settings.admin.ai.features.storyGuides.speeds.resetBody', { model: resetting?.model ?? '' })"
+      :description="t('settings.admin.ai.features.storyGuides.speeds.resetBody', { model: resetting ? modelLabel(resetting) : '' })"
       :confirm-label="t('settings.admin.ai.features.storyGuides.speeds.reset')"
       :busy="busy"
       @confirm="handleReset"

@@ -106,6 +106,15 @@ describe('OpenAiChatAdapter', () => {
       expect(bodyOf(adapter.buildRequest(router, unfiltered)).reasoning_effort).toBe('medium');
     });
 
+    it('sends a level the slot chose to OpenRouter as reasoning, which every provider it picks must take', () => {
+      const router = { ...target, baseUrl: 'https://openrouter.ai/api/v1' };
+      const body = bodyOf(adapter.buildRequest(router, request({ effort: 'xhigh', effortChosen: true })));
+      expect(body.reasoning).toEqual({ effort: 'xhigh' });
+      expect(body.reasoning_effort).toBeUndefined();
+      expect(body.provider).toEqual({ require_parameters: true });
+      expect(bodyOf(adapter.buildRequest(target, request({ effort: 'xhigh', effortChosen: true }))).reasoning_effort).toBe('xhigh');
+    });
+
     it('drops reasoning_effort once it was rejected', () => {
       const body = bodyOf(adapter.buildRequest(target, request({ effort: 'medium', omit: new Set(['reasoning_effort']) })));
       expect(body.reasoning_effort).toBeUndefined();
@@ -162,6 +171,16 @@ describe('OpenAiChatAdapter', () => {
       ['web-page', { kind: 'not-api' }],
     ])('%s', (name, expected) => {
       expect(adapter.parseError(fixture(name))).toMatchObject(expected);
+    });
+
+    it.each([
+      'Invalid reasoning_effort: minimal. Valid values are low, medium, high.',
+      'Model grok-5 does not support parameter reasoningEffort.',
+      '"gemma4" does not support thinking',
+    ])('reads a refused effort worded as %s', (message) => {
+      const text = JSON.stringify({ error: { message, type: 'invalid_request_error', param: null, code: null } });
+      const response = { status: 400, headers: new Headers({ 'content-type': 'application/json' }), text, durationMs: 1 };
+      expect(adapter.parseError(response)).toMatchObject({ kind: 'bad-parameter', parameter: 'reasoning_effort' });
     });
 
     it('tells a missing endpoint from a missing model', () => {

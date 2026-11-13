@@ -1,4 +1,4 @@
-import type { AiJobModels, AiJobPauseReason, AiJobSlotModel } from '@bookorbit/types';
+import type { AiEffort, AiJobModels, AiJobPauseReason, AiJobSlotModel } from '@bookorbit/types';
 
 /**
  * What the jobs engine needs from the AI connection: requests, the models each slot uses, their
@@ -20,11 +20,11 @@ export interface AiRequest {
   /** When set, the client parses and validates the reply into `json`. */
   schema?: AiJsonSchema;
   maxOutputTokens: number;
-  /** The reasoning effort asked of a model that supports it. */
-  effort?: 'low' | 'medium' | 'high';
+  /** The reasoning effort asked of a model that supports it; a level the slot sets wins. */
+  effort?: AiEffort;
   jobId?: string;
   signal?: AbortSignal;
-  /** The connection and model the job recorded for this slot, so a slot changed mid-build does not move it. */
+  /** The connection, model and effort the job recorded for this slot, so a slot changed mid-build does not move it. */
   use?: AiJobSlotModel;
 }
 

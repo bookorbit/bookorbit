@@ -2,7 +2,17 @@ import type { AiModelList } from '@bookorbit/types';
 
 import type { AiFinish } from '../ai-client.types';
 import type { AiHttpRequest, AiHttpResponse } from '../ai-network';
-import type { AiAdapter, AiAdapterRequest, AiAdapterResult, AiAdapterTarget, AiMessage, AiProviderError, AiSend } from './ai-adapter.interface';
+import type { AiSseEvent } from '../ai-sse';
+import type {
+  AiAdapter,
+  AiAdapterRequest,
+  AiAdapterResult,
+  AiAdapterTarget,
+  AiMessage,
+  AiProviderError,
+  AiSend,
+  AiStreamPiece,
+} from './ai-adapter.interface';
 import { AiProviderFailure } from './ai-adapter.interface';
 import {
   bearerHeaders,
@@ -15,7 +25,9 @@ import {
   parseJson,
   parseModelList,
   parseOpenAiStyleError,
+  refusesEffort,
   refusesField,
+  streamedError,
 } from './ai-adapter-common';
 
 /**
@@ -38,6 +50,7 @@ export class OpenAiResponsesAdapter implements AiAdapter {
       input: request.messages.map((message) => ({ role: message.role, content: responsesContent(message) })),
     };
     if (instructions) body.instructions = instructions;
+    if (request.stream) body.stream = true;
     if (!omit.has('max_output_tokens')) body.max_output_tokens = request.maxOutputTokens;
     if (!omit.has('store')) body.store = false;
     if (request.effort && !omit.has('reasoning')) body.reasoning = { effort: request.effort };
@@ -80,13 +93,42 @@ export class OpenAiResponsesAdapter implements AiAdapter {
     };
   }
 
+  parseStreamEvent(event: AiSseEvent): AiStreamPiece | null {
+    const body = parseJson(event.data);
+    if (!isRecord(body)) return null;
+    const type = typeof body.type === 'string' ? body.type : event.event;
+    const response = isRecord(body.response) ? body.response : {};
+    const model = typeof response.model === 'string' && response.model ? { model: response.model } : {};
+    switch (type) {
+      case 'response.output_text.delta':
+        return typeof body.delta === 'string' && body.delta.length > 0 ? { delta: body.delta } : null;
+      case 'response.refusal.delta':
+      case 'response.refusal.done':
+        return { finish: 'refused' };
+      case 'response.created':
+      case 'response.in_progress':
+        return model;
+      case 'response.completed':
+      case 'response.incomplete': {
+        const usage = normaliseUsage(response.usage);
+        return { ...model, ...(usage ? { usage } : {}), finish: finishOf(response.status, response.incomplete_details), end: true };
+      }
+      case 'response.failed':
+        return { error: streamedError(response.error) };
+      case 'error':
+        return { error: streamedError(body) };
+      default:
+        return null;
+    }
+  }
+
   parseError(response: AiHttpResponse): AiProviderError {
     const error = parseOpenAiStyleError(response);
     // Responses names its output limit `max_output_tokens`.
     if (error.kind === 'bad-request' && /max_output_tokens/.test(error.message) && /unsupported|unknown|not supported/i.test(error.message)) {
       return { ...error, kind: 'bad-parameter', parameter: 'max_output_tokens' };
     }
-    if (error.kind === 'bad-request' && refusesField(error.message, /\breasoning\b/i)) {
+    if (error.kind === 'bad-request' && (refusesField(error.message, /\breasoning\b/i) || refusesEffort(error.message))) {
       return { ...error, kind: 'bad-parameter', parameter: 'reasoning' };
     }
     return error;
