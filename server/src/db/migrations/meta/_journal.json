@@ -1023,6 +1023,13 @@
       "when": 1794506032213,
       "tag": "0145_add_ai",
       "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1794550869584,
+      "tag": "0146_sync_excluded_libraries",
+      "breakpoints": true
     }
   ]
 }

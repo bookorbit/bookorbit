@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { boolean, index, integer, pgTable, real, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 import { books } from './books';
@@ -16,6 +17,10 @@ export const hardcoverUserSettings = pgTable('hardcover_user_settings', {
   autoSyncOnProgressUpdate: boolean('auto_sync_on_progress_update').notNull().default(true),
   autoSyncOnRatingChange: boolean('auto_sync_on_rating_change').notNull().default(true),
   privacySettingId: integer('privacy_setting_id').notNull().default(3),
+  excludedLibraryIds: integer('excluded_library_ids')
+    .array()
+    .notNull()
+    .default(sql`'{}'::integer[]`),
   lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true })
