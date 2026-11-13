@@ -1102,13 +1102,6 @@ export class Paginator extends HTMLElement {
       }
       return
     }
-          this.#curlStage.style.opacity = '0'
-          this.#curlStage.style.visibility = 'hidden'
-          this.#curlLeaf.style.transform = 'none'
-        })
-      }
-      return
-    }
 
     this.#touchScrolled = false
     if (this.scrolled) return
