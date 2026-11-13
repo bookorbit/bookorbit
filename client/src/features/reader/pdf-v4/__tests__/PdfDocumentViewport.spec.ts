@@ -1,54 +1,93 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { defineComponent, h } from 'vue'
-import PdfDocumentViewport from '../components/PdfDocumentViewport.vue'
 
-const passthroughStub = (testId: string) =>
-  defineComponent({
+const links = vi.hoisted(() => [] as { id: string; target: { kind: string; uri?: string } }[])
+
+const layerStub = (name: string) => defineComponent({ name, setup: () => () => h('div', { 'data-testid': name }) })
+
+vi.mock('@embedpdf/vue/stage', () => ({
+  Stage: defineComponent({
     inheritAttrs: false,
     setup(_, { attrs, slots }) {
-      return () => h('div', { ...attrs, 'data-testid': testId }, slots.default?.())
+      return () =>
+        h('div', { ...attrs, 'data-testid': 'stage' }, [
+          slots.page?.({ page: { pageIndex: 0 } }),
+          h('div', { 'data-testid': 'overlay' }, slots.overlay?.()),
+        ])
     },
-  })
+  }),
+  Scrollbar: layerStub('Scrollbar'),
+}))
+vi.mock('@embedpdf/vue/render', () => ({ RenderLayer: layerStub('RenderLayer') }))
+vi.mock('@embedpdf/vue/search', () => ({ SearchLayer: layerStub('SearchLayer') }))
+vi.mock('@embedpdf/vue/selection', () => ({
+  SelectionClipboard: layerStub('SelectionClipboard'),
+  SelectionHandles: layerStub('SelectionHandles'),
+  SelectionLayer: layerStub('SelectionLayer'),
+}))
+vi.mock('@embedpdf/vue/link', () => ({
+  LinkLayer: defineComponent({
+    name: 'LinkLayer',
+    setup(_, { slots }) {
+      const native = layerStub('NativeLink')
+      return () =>
+        h(
+          'div',
+          { 'data-testid': 'LinkLayer' },
+          links.map((link) => slots.link?.({ link, native })),
+        )
+    },
+  }),
+}))
+vi.mock('../components/PdfHighlightLayer.vue', () => ({ default: layerStub('PdfHighlightLayer') }))
+vi.mock('../components/PdfExternalLink.vue', () => ({
+  default: defineComponent({
+    name: 'PdfExternalLink',
+    props: { link: { type: Object, required: true }, url: { type: URL, required: true } },
+    emits: ['open'],
+    setup:
+      (props, { emit }) =>
+      () =>
+        h('button', { 'data-testid': 'external-link', onClick: () => emit('open', props.url) }, props.url.href),
+  }),
+}))
 
-const layerStub = (testId: string) =>
-  defineComponent({
-    inheritAttrs: false,
-    setup(_, { attrs }) {
-      return () => h('div', { ...attrs, 'data-testid': testId })
-    },
-  })
+const { default: PdfDocumentViewport } = await import('../components/PdfDocumentViewport.vue')
 
 describe('PdfDocumentViewport', () => {
-  it('keeps rotation outside the sized pointer layer so page backdrops fill at every zoom', () => {
-    const wrapper = mount(PdfDocumentViewport, {
-      props: { documentId: 'doc-1' },
-      global: {
-        stubs: {
-          GlobalPointerProvider: passthroughStub('global-pointer'),
-          Viewport: passthroughStub('viewport'),
-          ZoomGestureWrapper: passthroughStub('zoom-wrapper'),
-          Scroller: defineComponent({
-            setup(_, { slots }) {
-              return () => h('div', { 'data-testid': 'scroller' }, slots.default?.({ page: { pageIndex: 3 } }))
-            },
-          }),
-          Rotate: passthroughStub('rotate'),
-          PagePointerProvider: passthroughStub('page-pointer'),
-          RenderLayer: layerStub('render'),
-          TilingLayer: layerStub('tiling'),
-          SearchLayer: layerStub('search'),
-          SelectionLayer: layerStub('selection'),
-          AnnotationLayer: layerStub('annotation'),
-        },
-      },
-    })
+  it('stacks the page layers with app highlights under search and selection', () => {
+    links.length = 0
+    const wrapper = mount(PdfDocumentViewport, { props: { annotations: [] } })
 
-    const rotate = wrapper.get('[data-testid="rotate"]')
-    const pointer = rotate.get('[data-testid="page-pointer"]')
+    const order = wrapper
+      .get('[data-testid="stage"]')
+      .findAll('[data-testid]')
+      .map((element) => element.attributes('data-testid'))
+    expect(order.slice(0, 5)).toEqual(['RenderLayer', 'PdfHighlightLayer', 'SearchLayer', 'SelectionLayer', 'LinkLayer'])
+  })
 
-    expect(pointer.get('[data-testid="render"]').attributes('scale')).toBe('0.5')
-    expect(pointer.find('[data-testid="tiling"]').exists()).toBe(true)
-    expect(pointer.get('[data-testid="search"]').attributes('highlight-color')).toContain('var(--primary)')
+  it('routes web links through the confirmation and leaves in-document links to the viewer', async () => {
+    links.splice(
+      0,
+      links.length,
+      { id: 'web', target: { kind: 'uri', uri: 'https://example.com/a' } },
+      { id: 'script', target: { kind: 'uri', uri: 'javascript:alert(1)' } },
+      { id: 'page', target: { kind: 'goto' } },
+    )
+    const wrapper = mount(PdfDocumentViewport, { props: { annotations: [] } })
+
+    expect(wrapper.findAll('[data-testid="external-link"]')).toHaveLength(1)
+    expect(wrapper.findAll('[data-testid="NativeLink"]')).toHaveLength(2)
+
+    await wrapper.get('[data-testid="external-link"]').trigger('click')
+    expect(wrapper.emitted('externalLink')?.[0]?.[0]).toBeInstanceOf(URL)
+  })
+
+  it('renders the caller overlay above the Stage', () => {
+    links.length = 0
+    const wrapper = mount(PdfDocumentViewport, { props: { annotations: [] }, slots: { overlay: '<div data-testid="caller-overlay" />' } })
+
+    expect(wrapper.get('[data-testid="overlay"]').find('[data-testid="caller-overlay"]').exists()).toBe(true)
   })
 })

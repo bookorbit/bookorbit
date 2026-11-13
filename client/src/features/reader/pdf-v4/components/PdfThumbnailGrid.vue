@@ -4,12 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { useElementSize } from '@vueuse/core'
 import { Search } from '@lucide/vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
-import { Rotation } from '@embedpdf/models'
-import { useDocumentState } from '@embedpdf/core/vue'
-import { ThumbImg } from '@embedpdf/plugin-thumbnail/vue'
+import { PageView } from '@embedpdf/vue/page-view'
+import { RenderLayer } from '@embedpdf/vue/render'
+import { usePageList } from '@embedpdf/vue/runtime'
 
 const props = defineProps<{
-  documentId: string
   currentPage: number
   totalPages: number
 }>()
@@ -26,17 +25,21 @@ const LABEL_HEIGHT = 20
 const MAX_COLUMNS = 6
 const FALLBACK_ASPECT = 1.414
 
-const documentState = useDocumentState(() => props.documentId)
+const pages = usePageList()
 const scroller = ref<{ scrollToItem: (index: number) => void } | null>(null)
 const viewport = ref<HTMLElement | null>(null)
 const { width: viewportWidth } = useElementSize(viewport)
 const jumpValue = ref('')
 
+function isQuarterTurned(pageIndex: number) {
+  const rotation = pages.value[pageIndex]?.rotation
+  return rotation === 90 || rotation === 270
+}
+
 const pageAspects = computed(() => {
-  const pages = documentState.value?.document?.pages ?? []
-  if (pages.length === 0) return Array.from({ length: props.totalPages }, () => FALLBACK_ASPECT)
-  return pages.map((page) => {
-    const quarterTurned = page.rotation === Rotation.Degree90 || page.rotation === Rotation.Degree270
+  if (pages.value.length === 0) return Array.from({ length: props.totalPages }, () => FALLBACK_ASPECT)
+  return pages.value.map((page) => {
+    const quarterTurned = page.rotation === 90 || page.rotation === 270
     const width = quarterTurned ? page.size.height : page.size.width
     const height = quarterTurned ? page.size.width : page.size.height
     return width > 0 ? height / width : FALLBACK_ASPECT
@@ -80,6 +83,11 @@ function cellStyle(pageIndex: number) {
     width: `${cellWidth.value}px`,
     height: `${Math.round(cellWidth.value * aspect)}px`,
   }
+}
+
+/** A page view takes the page's upright width, which is the height a quarter-turned page shows at. */
+function thumbnailWidth(pageIndex: number) {
+  return isQuarterTurned(pageIndex) ? cellWidth.value * (pageAspects.value[pageIndex] ?? FALLBACK_ASPECT) : cellWidth.value
 }
 
 function handleSelect(pageIndex: number) {
@@ -159,19 +167,9 @@ watch(
               "
               :style="cellStyle(pageIndex)"
             >
-              <ThumbImg
-                :document-id="props.documentId"
-                :meta="{
-                  pageIndex,
-                  width: cellWidth,
-                  height: cellWidth * (pageAspects[pageIndex] ?? 1.414),
-                  wrapperHeight: rowHeight,
-                  top: 0,
-                  labelHeight: 0,
-                }"
-                class="h-full w-full object-contain"
-                alt=""
-              />
+              <PageView :page="pageIndex" :width="thumbnailWidth(pageIndex)" class="pointer-events-none" aria-hidden="true">
+                <RenderLayer thumbnail />
+              </PageView>
             </span>
             <span class="text-xs tabular-nums" :class="props.currentPage === pageIndex + 1 ? 'font-semibold text-primary' : 'text-muted-foreground'">
               {{ pageIndex + 1 }}

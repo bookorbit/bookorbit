@@ -1,39 +1,19 @@
-import {
-  PdfAnnotationSubtype,
-  PdfBlendMode,
-  type PdfAnnotationObject,
-  type PdfHighlightAnnoObject,
-  type PdfSquigglyAnnoObject,
-  type PdfStrikeOutAnnoObject,
-  type PdfUnderlineAnnoObject,
-  type Rect,
-} from '@embedpdf/models'
 import type { AnnotationItem, AnnotationPdfPosition, AnnotationRect } from '@bookorbit/types'
 
-export const PDF_ANNOTATION_ID_PREFIX = 'bo-'
+export const HIGHLIGHT_OPACITY = 0.4
 
-const HIGHLIGHT_OPACITY = 0.4
+/**
+ * One drawn piece of a highlight, in PDF points from the page's top-left corner: the space the
+ * persisted rects, the selection and the page layer share.
+ */
+export type PdfHighlightMark =
+  | { kind: 'fill'; key: string; color: string; x: number; y: number; width: number; height: number }
+  | { kind: 'line'; key: string; color: string; x1: number; y1: number; x2: number; y2: number; thickness: number }
+  | { kind: 'wave'; key: string; color: string; path: string; thickness: number }
 
-/** Derives the EmbedPDF annotation object id for a database annotation row. */
-export function toPluginId(annotationId: number): string {
-  return `${PDF_ANNOTATION_ID_PREFIX}${annotationId}`
-}
-
-/** Extracts the database annotation id from an EmbedPDF object id, or null if it is not ours. */
-export function fromPluginId(pluginId: string): number | null {
-  if (!pluginId.startsWith(PDF_ANNOTATION_ID_PREFIX)) return null
-  const parsed = Number.parseInt(pluginId.slice(PDF_ANNOTATION_ID_PREFIX.length), 10)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-/** Converts our flat persisted rect into the EmbedPDF `Rect` shape. */
-export function toRect(rect: AnnotationRect): Rect {
-  return { origin: { x: rect.x, y: rect.y }, size: { width: rect.width, height: rect.height } }
-}
-
-/** Converts an EmbedPDF `Rect` back into our flat persisted rect shape. */
-export function fromRect(rect: Rect): AnnotationRect {
-  return { x: rect.origin.x, y: rect.origin.y, width: rect.size.width, height: rect.size.height }
+/** Copies a page-space rect into the flat persisted shape, dropping anything else it carries. */
+export function toAnnotationRect(rect: AnnotationRect): AnnotationRect {
+  return { x: rect.x, y: rect.y, width: rect.width, height: rect.height }
 }
 
 /** Bounding box that encloses every segment rect, in PDF page coordinates. */
@@ -51,51 +31,44 @@ export function boundingRect(rects: AnnotationRect[]): AnnotationRect {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY }
 }
 
-function subtypeForStyle(style: string): PdfAnnotationSubtype {
-  switch (style) {
-    case 'underline':
-      return PdfAnnotationSubtype.UNDERLINE
-    case 'strikethrough':
-      return PdfAnnotationSubtype.STRIKEOUT
-    case 'squiggly':
-      return PdfAnnotationSubtype.SQUIGGLY
-    default:
-      return PdfAnnotationSubtype.HIGHLIGHT
-  }
+function lineThickness(height: number) {
+  return Math.max(height * 0.08, 0.75)
 }
 
-/**
- * Builds the EmbedPDF text-markup object that renders a persisted highlight.
- * The annotation plugin is the render surface; our database stays the source of
- * truth, so the object id is derived from the database row id.
- */
-export function buildPdfAnnotationObject(annotation: AnnotationItem): { pageIndex: number; object: PdfAnnotationObject } | null {
-  if (!annotation.pdf) return null
-  const { page, rect, rects } = annotation.pdf
-  const shared = {
-    id: toPluginId(annotation.id),
-    pageIndex: page,
-    rect: toRect(rect),
-    segmentRects: rects.map(toRect),
-    strokeColor: annotation.color,
-    color: annotation.color,
-    contents: annotation.note ?? undefined,
+function wavePath(rect: AnnotationRect, thickness: number) {
+  const amplitude = Math.max(rect.height * 0.08, 0.75)
+  const step = Math.max(rect.height * 0.2, 2)
+  const baseline = rect.y + rect.height - amplitude - thickness / 2
+  const end = rect.x + rect.width
+  let path = `M ${rect.x} ${baseline}`
+  for (let x = rect.x, up = true; x < end; x += step, up = !up) {
+    path += ` L ${Math.min(x + step, end)} ${up ? baseline + amplitude : baseline}`
   }
-  let object: PdfHighlightAnnoObject | PdfUnderlineAnnoObject | PdfStrikeOutAnnoObject | PdfSquigglyAnnoObject
-  switch (subtypeForStyle(annotation.style)) {
-    case PdfAnnotationSubtype.UNDERLINE:
-      object = { ...shared, type: PdfAnnotationSubtype.UNDERLINE, opacity: 1 }
-      break
-    case PdfAnnotationSubtype.STRIKEOUT:
-      object = { ...shared, type: PdfAnnotationSubtype.STRIKEOUT, opacity: 1 }
-      break
-    case PdfAnnotationSubtype.SQUIGGLY:
-      object = { ...shared, type: PdfAnnotationSubtype.SQUIGGLY, opacity: 1 }
-      break
-    default:
-      object = { ...shared, type: PdfAnnotationSubtype.HIGHLIGHT, opacity: HIGHLIGHT_OPACITY, blendMode: PdfBlendMode.Multiply }
-  }
-  return { pageIndex: page, object }
+  return path
+}
+
+/** The pieces that draw a persisted highlight, one per line segment, in the reader's chosen style. */
+export function buildHighlightMarks(annotation: AnnotationItem): PdfHighlightMark[] {
+  if (!annotation.pdf) return []
+  const segments = annotation.pdf.rects.length > 0 ? annotation.pdf.rects : [annotation.pdf.rect]
+  return segments.map((rect, index): PdfHighlightMark => {
+    const key = `${annotation.id}-${index}`
+    const thickness = lineThickness(rect.height)
+    switch (annotation.style) {
+      case 'underline': {
+        const y = rect.y + rect.height - thickness / 2
+        return { kind: 'line', key, color: annotation.color, x1: rect.x, y1: y, x2: rect.x + rect.width, y2: y, thickness }
+      }
+      case 'strikethrough': {
+        const y = rect.y + rect.height / 2
+        return { kind: 'line', key, color: annotation.color, x1: rect.x, y1: y, x2: rect.x + rect.width, y2: y, thickness }
+      }
+      case 'squiggly':
+        return { kind: 'wave', key, color: annotation.color, path: wavePath(rect, thickness), thickness }
+      default:
+        return { kind: 'fill', key, color: annotation.color, ...toAnnotationRect(rect) }
+    }
+  })
 }
 
 /** True when two axis-aligned rectangles overlap in PDF page coordinates. */

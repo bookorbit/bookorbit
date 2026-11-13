@@ -50,7 +50,7 @@ const visibleRows = computed(() => {
   if (search) {
     return props.bookmarks
       .map((entry, index) => ({ entry, index }))
-      .filter(({ entry }) => (entry.bookmark.title ?? '').toLowerCase().includes(search))
+      .filter(({ entry }) => entry.title.toLowerCase().includes(search))
       .map(({ entry, index }) => ({ entry, index, expandable: false, isCollapsed: false }))
   }
 
@@ -142,8 +142,8 @@ watch([activeIndex, normalizedQuery], () => void scrollActiveIntoView(), { immed
           :aria-expanded="!row.isCollapsed"
           :aria-label="
             row.isCollapsed
-              ? t('reader.pdf.sidebar.expandSection', { title: row.entry.bookmark.title })
-              : t('reader.pdf.sidebar.collapseSection', { title: row.entry.bookmark.title })
+              ? t('reader.pdf.sidebar.expandSection', { title: row.entry.title })
+              : t('reader.pdf.sidebar.collapseSection', { title: row.entry.title })
           "
           @click="toggleBranch(row.index)"
         >
@@ -160,7 +160,7 @@ watch([activeIndex, normalizedQuery], () => void scrollActiveIntoView(), { immed
           @click="handleNavigate(row.entry)"
         >
           <span v-if="row.index === activeIndex" aria-hidden="true" class="absolute inset-y-1 start-0 w-0.5 rounded-full bg-primary" />
-          <span class="line-clamp-2 min-w-0 flex-1 break-words">{{ row.entry.bookmark.title }}</span>
+          <span class="line-clamp-2 min-w-0 flex-1 break-words">{{ row.entry.title }}</span>
           <span v-if="pageLabel(row.entry) !== null" class="shrink-0 pt-0.5 text-[11px] tabular-nums text-muted-foreground">
             {{ pageLabel(row.entry) }}
           </span>

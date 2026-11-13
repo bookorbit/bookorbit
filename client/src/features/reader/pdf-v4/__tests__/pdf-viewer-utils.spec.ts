@@ -1,19 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import { PdfActionType, PdfZoomMode, Rotation, type PdfDestinationObject } from '@embedpdf/models'
-import { ScrollStrategy } from '@embedpdf/plugin-scroll'
-import { SpreadMode } from '@embedpdf/plugin-spread'
-import { ZoomMode } from '@embedpdf/plugin-zoom'
+import type { OutlineItem } from '@embedpdf/vue/outline'
+import type { PageRef } from '@embedpdf/vue/runtime'
+import type { StageBox } from '@embedpdf/vue/stage'
 import type { PdfReaderSettings } from '@bookorbit/types'
 import {
   findActivePdfBookmarkIndex,
-  flattenPdfBookmarks,
-  fromRotation,
-  getPdfBookmarkPageIndex,
+  flattenOutline,
+  fromStageSpread,
+  fromStageZoom,
+  fromStageZoomMode,
+  pdfStageRules,
   safeExternalPdfUrl,
-  toRotation,
-  toScrollStrategy,
-  toSpreadMode,
-  toZoomLevel,
+  toStageFlow,
+  toStageSpread,
+  toStageZoom,
 } from '../pdf-viewer-utils'
 
 const settings: PdfReaderSettings = {
@@ -24,84 +24,128 @@ const settings: PdfReaderSettings = {
   rotation: 0,
 }
 
-function destination(pageIndex: number): PdfDestinationObject {
-  return { pageIndex, zoom: { mode: PdfZoomMode.FitPage }, view: [] }
+function pageRef(objectNumber: number): PageRef {
+  return { kind: 'objectNumber', objectNumber }
+}
+
+function outlineItem(objectNumber: number, title: string, options: { parent?: number; page?: number; uri?: string } = {}): OutlineItem {
+  let target: OutlineItem['target'] = null
+  if (options.page !== undefined) target = { kind: 'goto', destination: { kind: 'fit', page: pageRef(1000 + options.page) } }
+  else if (options.uri !== undefined) target = { kind: 'uri', uri: options.uri }
+  return {
+    ref: { kind: 'objectNumber', objectNumber },
+    parent: options.parent === undefined ? null : { kind: 'objectNumber', objectNumber: options.parent },
+    title,
+    target,
+    action: null,
+    open: false,
+    color: null,
+    bold: false,
+    italic: false,
+  }
+}
+
+function pageIndexOf(page: PageRef): number | null {
+  return page.objectNumber >= 1000 ? page.objectNumber - 1000 : null
+}
+
+function box(width: number, height: number): StageBox {
+  return { width, height, orientation: width > height ? 'landscape' : 'portrait' }
 }
 
 describe('PDF viewer settings mapping', () => {
-  it('maps page mode to the vertical strategy used by paginated navigation', () => {
-    expect(toScrollStrategy('page')).toBe(ScrollStrategy.Vertical)
-    expect(toScrollStrategy('horizontal')).toBe(ScrollStrategy.Horizontal)
+  it('maps page mode to the paged flow and the scroll modes to continuous layouts', () => {
+    expect(toStageFlow('page')).toEqual({ flow: 'paged', layout: 'vertical' })
+    expect(toStageFlow('vertical')).toEqual({ flow: 'continuous', layout: 'vertical' })
+    expect(toStageFlow('horizontal')).toEqual({ flow: 'continuous', layout: 'horizontal' })
   })
 
-  it('maps spread modes', () => {
-    expect(toSpreadMode('none')).toBe(SpreadMode.None)
-    expect(toSpreadMode('odd')).toBe(SpreadMode.Odd)
-    expect(toSpreadMode('even')).toBe(SpreadMode.Even)
-    expect(toSpreadMode('auto')).toBe(SpreadMode.None)
+  it('maps spread modes, leaving the automatic spread to the responsive rule', () => {
+    expect(toStageSpread('none')).toBe('none')
+    expect(toStageSpread('odd')).toBe('odd')
+    expect(toStageSpread('even')).toBe('even')
+    expect(toStageSpread('auto')).toBe('none')
+    expect(toStageSpread('auto', true)).toBe('odd')
+    expect(fromStageSpread('even')).toBe('even')
   })
 
-  it('maps fit and custom zoom levels', () => {
-    expect(toZoomLevel(settings)).toBe(ZoomMode.FitPage)
-    expect(toZoomLevel({ ...settings, zoomMode: 'fit-width' })).toBe(ZoomMode.FitWidth)
-    expect(toZoomLevel({ ...settings, zoomMode: 'automatic' })).toBe(ZoomMode.Automatic)
-    expect(toZoomLevel({ ...settings, zoomMode: 'custom', customScale: 1.75 })).toBe(1.75)
+  it('maps fit modes and saved custom levels to Stage zoom specs', () => {
+    expect(toStageZoom(settings)).toEqual({ mode: 'fit-page' })
+    expect(toStageZoom({ ...settings, zoomMode: 'fit-width' })).toEqual({ mode: 'fit-width' })
+    expect(toStageZoom({ ...settings, zoomMode: 'automatic' })).toEqual({ mode: 'automatic' })
+    expect(toStageZoom({ ...settings, zoomMode: 'custom', customScale: 1.75 })).toEqual({ level: 1.75 })
   })
 
-  it('round trips persisted rotation values', () => {
-    expect(toRotation(0)).toBe(Rotation.Degree0)
-    expect(toRotation(90)).toBe(Rotation.Degree90)
-    expect(toRotation(180)).toBe(Rotation.Degree180)
-    expect(toRotation(270)).toBe(Rotation.Degree270)
-    expect(fromRotation(Rotation.Degree270)).toBe(270)
+  it('maps Stage zoom modes back to reader settings', () => {
+    expect(fromStageZoomMode('fit-width')).toBe('fit-width')
+    expect(fromStageZoomMode('automatic')).toBe('automatic')
+    expect(fromStageZoomMode('custom')).toBe('custom')
+    expect(fromStageZoomMode('fit-all')).toBe('fit-page')
+  })
+
+  it('maps a Stage zoom setting to the reader zoom it saves', () => {
+    expect(fromStageZoom({ level: 1.25 })).toEqual({ zoomMode: 'custom', customScale: 1.25 })
+    expect(fromStageZoom({ mode: 'fit-width' })).toEqual({ zoomMode: 'fit-width' })
+    expect(fromStageZoom({ pageWidth: 400 })).toBeNull()
+  })
+
+  it('turns the automatic spread on only for wide reading surfaces', () => {
+    expect(pdfStageRules('none').map((rule) => rule.name)).toEqual(['compact'])
+
+    const autoSpread = pdfStageRules('auto').find((rule) => rule.name === 'auto-spread')
+    expect(autoSpread?.settings).toEqual({ spread: 'odd' })
+    const matches = autoSpread?.when
+    expect(typeof matches).toBe('function')
+    if (typeof matches !== 'function') return
+    expect(matches(box(1200, 800))).toBe(true)
+    expect(matches(box(800, 1200))).toBe(false)
   })
 })
 
-describe('flattenPdfBookmarks', () => {
-  it('preserves hierarchy depth in document order', () => {
-    const result = flattenPdfBookmarks([
-      {
-        title: 'Part one',
-        children: [{ title: 'Chapter one' }, { title: 'Chapter two', children: [{ title: 'Section' }] }],
-      },
-    ])
+describe('flattenOutline', () => {
+  it('derives each entry depth from its parent, in document order', () => {
+    const result = flattenOutline(
+      [
+        outlineItem(1, 'Part one'),
+        outlineItem(2, 'Chapter one', { parent: 1 }),
+        outlineItem(3, 'Chapter two', { parent: 1 }),
+        outlineItem(4, 'Section', { parent: 3 }),
+        outlineItem(5, 'Part two'),
+      ],
+      pageIndexOf,
+    )
 
-    expect(result.map(({ bookmark, depth }) => [bookmark.title, depth])).toEqual([
+    expect(result.map(({ title, depth }) => [title, depth])).toEqual([
       ['Part one', 0],
       ['Chapter one', 1],
       ['Chapter two', 1],
       ['Section', 2],
+      ['Part two', 0],
     ])
   })
 
-  it('resolves direct and local goto destinations to page indexes', () => {
-    expect(getPdfBookmarkPageIndex({ title: 'Direct', target: { type: 'destination', destination: destination(4) } })).toBe(4)
-    expect(
-      getPdfBookmarkPageIndex({
-        title: 'Action',
-        target: { type: 'action', action: { type: PdfActionType.Goto, destination: destination(7) } },
-      }),
-    ).toBe(7)
-    expect(
-      getPdfBookmarkPageIndex({ title: 'Website', target: { type: 'action', action: { type: PdfActionType.URI, uri: 'https://example.com' } } }),
-    ).toBeNull()
+  it('resolves goto targets to page indexes and leaves other targets without a page', () => {
+    const result = flattenOutline(
+      [outlineItem(1, 'Direct', { page: 4 }), outlineItem(2, 'Website', { uri: 'https://example.com' }), outlineItem(3, 'Empty')],
+      pageIndexOf,
+    )
+
+    expect(result.map((entry) => entry.pageIndex)).toEqual([4, null, null])
   })
 
   it('selects the nearest outline destination at or before the current page', () => {
-    const entries = flattenPdfBookmarks([
-      { title: 'Chapter five', target: { type: 'destination', destination: destination(50) } },
-      {
-        title: 'Chapter six',
-        target: { type: 'destination', destination: destination(73) },
-        children: [
-          { title: 'Aggregates', target: { type: 'destination', destination: destination(78) } },
-          { title: 'Factories', target: { type: 'destination', destination: destination(82) } },
-        ],
-      },
-    ])
+    const entries = flattenOutline(
+      [
+        outlineItem(1, 'Chapter five', { page: 50 }),
+        outlineItem(2, 'Chapter six', { page: 73 }),
+        outlineItem(3, 'Aggregates', { parent: 2, page: 78 }),
+        outlineItem(4, 'Factories', { parent: 2, page: 82 }),
+      ],
+      pageIndexOf,
+    )
 
-    expect(entries[findActivePdfBookmarkIndex(entries, 74) ?? -1]?.bookmark.title).toBe('Chapter six')
-    expect(entries[findActivePdfBookmarkIndex(entries, 80) ?? -1]?.bookmark.title).toBe('Aggregates')
+    expect(entries[findActivePdfBookmarkIndex(entries, 74) ?? -1]?.title).toBe('Chapter six')
+    expect(entries[findActivePdfBookmarkIndex(entries, 80) ?? -1]?.title).toBe('Aggregates')
     expect(findActivePdfBookmarkIndex(entries, 1)).toBeNull()
   })
 })

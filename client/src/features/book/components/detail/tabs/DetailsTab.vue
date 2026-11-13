@@ -1478,8 +1478,7 @@ watch(
                 <RouterLink
                   :to="{ name: 'author-detail', params: { id: author.id } }"
                   class="transition-colors hover:text-primary hover:underline underline-offset-2"
-                  >{{ author.name }}</RouterLink
-                ><span v-if="index < authorLinks.length - 1">, </span>
+                  >{{ author.name }}</RouterLink><span v-if="index < authorLinks.length - 1">, </span>
               </template>
             </span>
           </p>
@@ -1739,8 +1738,7 @@ watch(
                 <RouterLink
                   :to="{ name: 'author-detail', params: { id: author.id } }"
                   class="hover:text-primary hover:underline underline-offset-2 transition-colors"
-                  >{{ author.name }}</RouterLink
-                ><span v-if="index < authorLinks.length - 1">, </span>
+                  >{{ author.name }}</RouterLink><span v-if="index < authorLinks.length - 1">, </span>
               </template>
             </span>
           </p>

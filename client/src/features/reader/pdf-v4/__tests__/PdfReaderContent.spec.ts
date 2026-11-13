@@ -1,84 +1,81 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
-import { defineComponent, h, ref } from 'vue'
+import { computed, defineComponent, h, nextTick, reactive, ref } from 'vue'
 import type { PdfReaderSettings } from '@bookorbit/types'
 
-type LayoutReadyEvent = { documentId: string; isInitial: boolean; pageNumber: number; totalPages: number }
-type PageChangeEvent = { documentId: string; pageNumber: number; totalPages: number }
+type StageEventName = 'onPageChanged' | 'onZoomChanged' | 'onSettingsChanged'
+type ZoomEvent = { level: number; previousLevel: number; mode: string }
+type ZoomSetting = { mode: string } | { level: number }
 
 const mocks = vi.hoisted(() => ({
-  layoutReadyListener: null as ((event: LayoutReadyEvent) => void) | null,
-  pageChangeListener: null as ((event: PageChangeEvent) => void) | null,
-  totalPages: 10,
-  scrollToPage: vi.fn<(options: { pageNumber: number; behavior?: ScrollBehavior }) => void>(),
+  listeners: {} as Partial<Record<'onPageChanged' | 'onZoomChanged' | 'onSettingsChanged', (event: unknown) => void>>,
+  currentPages: [0] as number[],
+  goToPage: vi.fn<(page: number, options?: { behavior?: string }) => void>(),
+  zoomTo: vi.fn<(level: number) => void>(),
 }))
 
-vi.mock('@embedpdf/plugin-scroll/vue', async () => {
-  const { ScrollStrategy } = await import('@embedpdf/plugin-scroll')
-  return {
-    ScrollStrategy,
-    useScroll: () => ({
-      state: ref({ currentPage: 1, totalPages: mocks.totalPages }),
-      provides: ref({
-        // EmbedPDF reports the target page synchronously when a programmatic page change starts.
-        scrollToPage: (options: { pageNumber: number; behavior?: ScrollBehavior }) => {
-          mocks.scrollToPage(options)
-          mocks.pageChangeListener?.({ documentId: 'document-1', pageNumber: options.pageNumber, totalPages: mocks.totalPages })
-        },
-        getSpreadPagesWithRotatedSize: () => [],
-        getPageChangeState: () => ({ isChanging: false }),
-      }),
-    }),
-    useScrollCapability: () => ({
-      provides: ref({
-        onLayoutReady: (listener: (event: LayoutReadyEvent) => void) => {
-          mocks.layoutReadyListener = listener
-          return () => {}
-        },
-        onPageChange: (listener: (event: PageChangeEvent) => void) => {
-          mocks.pageChangeListener = listener
-          return () => {}
-        },
-      }),
-    }),
-  }
-})
+const document = reactive({ status: 'loading', pageCount: 10 })
+const stageState = {
+  zoomLevel: ref(1),
+  zoomMode: ref('fit-page'),
+  currentPageIndex: ref(0),
+  pageCount: ref(10),
+  viewRotation: ref(0),
+}
 
-vi.mock('@embedpdf/plugin-zoom/vue', async () => {
-  const { ZoomMode } = await import('@embedpdf/plugin-zoom')
-  return { ZoomMode, useZoom: () => ({ state: ref({ currentZoomLevel: 1, zoomLevel: ZoomMode.FitPage }), provides: ref(null) }) }
-})
+const stageSettings = { zoom: { mode: 'fit-page' } as ZoomSetting }
 
-vi.mock('@embedpdf/plugin-spread/vue', async () => {
-  const { SpreadMode } = await import('@embedpdf/plugin-spread')
-  return { SpreadMode, useSpread: () => ({ provides: ref(null) }) }
-})
+const stage = {
+  goToPage: mocks.goToPage,
+  zoomTo: mocks.zoomTo,
+  getSettings: () => stageSettings,
+  listCurrentPages: () => mocks.currentPages.map((index) => ({ index })),
+}
 
-vi.mock('@embedpdf/plugin-rotate/vue', () => ({ useRotate: () => ({ rotation: ref(0), provides: ref(null) }) }))
-vi.mock('@embedpdf/plugin-selection/vue', () => ({ useSelectionCapability: () => ({ provides: ref(null) }) }))
-vi.mock('@embedpdf/plugin-annotation/vue', () => ({ useAnnotationCapability: () => ({ provides: ref(null) }) }))
-vi.mock('@embedpdf/plugin-document-manager/vue', () => ({
-  DocumentContent: defineComponent({ name: 'DocumentContent', props: ['documentId'], setup: () => () => h('div') }),
+vi.mock('@embedpdf/vue/stage', () => ({
+  useStage: () => stage,
+  useStageState: () => stageState,
+  useStageEvent: (select: (capability: Record<StageEventName, StageEventName>) => StageEventName, handler: (event: unknown) => void) => {
+    const name = select({ onPageChanged: 'onPageChanged', onZoomChanged: 'onZoomChanged', onSettingsChanged: 'onSettingsChanged' })
+    mocks.listeners[name] = handler
+  },
+}))
+
+vi.mock('@embedpdf/vue/runtime', () => ({
+  DocumentGate: defineComponent({
+    name: 'DocumentGate',
+    setup:
+      (_, { slots }) =>
+      () =>
+        h('div', slots.default?.()),
+  }),
+  useDocument: (select: (value: typeof document) => unknown) => computed(() => select(document)),
+}))
+
+vi.mock('@embedpdf/vue/selection', () => ({
+  SelectionMenu: defineComponent({
+    name: 'SelectionMenu',
+    setup:
+      (_, { slots }) =>
+      () =>
+        h('div', slots.default?.()),
+  }),
 }))
 
 vi.mock('../composables/usePdfInteractionMode', () => ({
   usePdfInteractionMode: () => ({ isPanning: ref(false), togglePan: vi.fn<() => void>(), activateTextSelection: vi.fn<() => void>() }),
 }))
-vi.mock('../composables/usePdfResponsiveSpread', () => ({ usePdfResponsiveSpread: () => ({ apply: vi.fn<() => void>() }) }))
 vi.mock('../../shared/composables/useFullscreen', () => ({
   useFullscreen: () => ({ isFullscreen: ref(false), isFullscreenSupported: ref(false), toggleFullscreen: vi.fn<() => void>() }),
 }))
 vi.mock('../composables/usePdfHighlights', () => ({
   usePdfHighlights: () => ({
-    renderAll: vi.fn<() => void>(),
     annotations: ref([]),
     loadError: ref(null),
     loading: ref(false),
     loadingMore: ref(false),
     hasMore: ref(false),
     popupVisible: ref(false),
-    popupPosition: ref({ x: 0, y: 0 }),
-    popupShowBelow: ref(false),
     selectedText: ref(''),
     overlappingAnnotationId: ref(null),
     isSaving: ref(false),
@@ -91,22 +88,49 @@ const { default: PdfReaderContent } = await import('../components/PdfReaderConte
 
 const settings: PdfReaderSettings = { scrollMode: 'page', spread: 'none', zoomMode: 'fit-page', customScale: 1, rotation: 0 }
 
+const ToolbarStub = defineComponent({
+  name: 'PdfReaderToolbar',
+  setup:
+    (_, { slots }) =>
+    () =>
+      h('div', slots.settings?.()),
+})
+
 function mountContent(initialPage: number | null, initialPercentage?: number) {
   return shallowMount(PdfReaderContent, {
-    props: { documentId: 'document-1', bookId: 42, fileId: 101, initialPage, initialPercentage, settings },
+    props: { bookId: 42, fileId: 101, initialPage, initialPercentage, settings },
+    global: { stubs: { PdfReaderToolbar: ToolbarStub } },
   })
 }
 
-function layoutReady() {
-  mocks.layoutReadyListener?.({ documentId: 'document-1', isInitial: true, pageNumber: 1, totalPages: mocks.totalPages })
+function turnTo(...pageIndexes: number[]) {
+  mocks.currentPages = pageIndexes
+  stageState.currentPageIndex.value = pageIndexes[0] ?? 0
+  mocks.listeners.onPageChanged?.({ pageIndex: pageIndexes[0] ?? 0 })
+}
+
+function zoom(event: ZoomEvent) {
+  mocks.listeners.onZoomChanged?.(event)
+}
+
+// The Stage reports a settings change synchronously, from inside the call that made it.
+function changeSettings(patch: { zoom?: ZoomSetting; padding?: number }) {
+  const changedKeys = Object.keys(patch).filter((key) => key !== 'zoom' || JSON.stringify(patch.zoom) !== JSON.stringify(stageSettings.zoom))
+  if (patch.zoom) stageSettings.zoom = patch.zoom
+  if (changedKeys.length) mocks.listeners.onSettingsChanged?.({ settings: { ...stageSettings }, changedKeys })
 }
 
 describe('PdfReaderContent', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.layoutReadyListener = null
-    mocks.pageChangeListener = null
-    mocks.totalPages = 10
+    mocks.listeners = {}
+    mocks.currentPages = [0]
+    document.status = 'ready'
+    document.pageCount = 10
+    stageState.pageCount.value = 10
+    stageState.currentPageIndex.value = 0
+    stageSettings.zoom = { mode: 'fit-page' }
+    mocks.zoomTo.mockImplementation((level) => changeSettings({ zoom: { level } }))
   })
 
   it.each([
@@ -118,30 +142,72 @@ describe('PdfReaderContent', () => {
     { initialPage: 25, percentage: 10, expected: 10 },
   ])('opens $initialPage / $percentage% of 10 pages at page $expected', ({ initialPage, percentage, expected }) => {
     mountContent(initialPage, percentage)
-    layoutReady()
 
-    // Page 1 is where the document already is, so the reader only scrolls for a later page.
-    expect(mocks.scrollToPage.mock.calls[0]?.[0].pageNumber ?? 1).toBe(expected)
-    expect(mocks.scrollToPage.mock.calls.length).toBeLessThanOrEqual(1)
+    // Page 1 is where the document already opens, so the reader only navigates for a later page.
+    expect((mocks.goToPage.mock.calls[0]?.[0] ?? 0) + 1).toBe(expected)
+    expect(mocks.goToPage.mock.calls.length).toBeLessThanOrEqual(1)
   })
 
-  it('restores the opening page with an instant scroll', () => {
+  it('restores the opening page without animating once the document is ready', async () => {
+    document.status = 'loading'
     mountContent(7)
-    layoutReady()
+    expect(mocks.goToPage).not.toHaveBeenCalled()
 
-    // A smooth scroll that has not started is cancelled by the fit zoom's refit on the first
-    // viewport resize, which leaves the reader on page 1.
-    expect(mocks.scrollToPage).toHaveBeenCalledExactlyOnceWith({ pageNumber: 7, behavior: 'instant' })
+    document.status = 'ready'
+    await nextTick()
+
+    expect(mocks.goToPage).toHaveBeenCalledExactlyOnceWith(6, { behavior: 'instant' })
   })
 
   it('marks the opening page as restored and later turns as moves', () => {
     const wrapper = mountContent(null, 37.5)
-    layoutReady()
-    mocks.pageChangeListener?.({ documentId: 'document-1', pageNumber: 5, totalPages: 10 })
+    turnTo(3)
+    turnTo(4)
 
     expect(wrapper.emitted('pageChange')).toEqual([
       [4, 10, true],
       [5, 10, false],
     ])
+  })
+
+  it('reports the last page of a spread as the reading position', () => {
+    const wrapper = mountContent(1)
+    turnTo(0)
+    turnTo(1, 2)
+
+    expect(wrapper.emitted('pageChange')?.at(-1)).toEqual([3, 10, false])
+  })
+
+  it('saves a level as a custom scale and a fit mode as the mode, ignoring the saved mode and other settings', () => {
+    const wrapper = mountContent(1)
+
+    changeSettings({ zoom: { level: 1.5 } })
+    changeSettings({ zoom: { mode: 'fit-width' } })
+    changeSettings({ zoom: { mode: 'fit-page' } })
+    changeSettings({ padding: 4 })
+
+    expect(wrapper.emitted('settingsChange')).toEqual([[{ zoomMode: 'custom', customScale: 1.5 }], [{ zoomMode: 'fit-width' }]])
+  })
+
+  it('saves a step zoom out of a fit mode, which the zoom event still names as the fit mode', () => {
+    const wrapper = mountContent(1)
+
+    zoom({ level: 1.25, previousLevel: 1.08, mode: 'fit-page' })
+    expect(wrapper.emitted('settingsChange')).toBeUndefined()
+
+    changeSettings({ zoom: { level: 1.25 } })
+    expect(wrapper.emitted('settingsChange')).toEqual([[{ zoomMode: 'custom', customScale: 1.25 }]])
+  })
+
+  it('saves a slider zoom once when it is committed, not while it previews', () => {
+    const wrapper = mountContent(1)
+    const panel = wrapper.findComponent({ name: 'PdfReaderSettingsPanel' })
+
+    panel.vm.$emit('previewZoom', 1.75)
+    expect(wrapper.emitted('settingsChange')).toBeUndefined()
+
+    panel.vm.$emit('setZoom', 'custom', 1.75)
+    expect(mocks.zoomTo).toHaveBeenLastCalledWith(1.75)
+    expect(wrapper.emitted('settingsChange')).toEqual([[{ zoomMode: 'custom', customScale: 1.75 }]])
   })
 })

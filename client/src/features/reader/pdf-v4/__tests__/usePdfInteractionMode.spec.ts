@@ -1,53 +1,56 @@
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const mockUsePan = vi.hoisted(() => vi.fn<() => unknown>())
-const mockUseInteractionManager = vi.hoisted(() => vi.fn<() => unknown>())
+const activateTool = vi.hoisted(() => vi.fn<(toolId: string) => void>())
+const activeToolId = ref<string | null>('pointer')
 
-vi.mock('@embedpdf/plugin-pan/vue', () => ({ usePan: mockUsePan }))
-vi.mock('@embedpdf/plugin-interaction-manager/vue', () => ({ useInteractionManager: mockUseInteractionManager }))
+vi.mock('@embedpdf/vue/interaction', () => ({
+  useInteraction: () => ({ activateTool }),
+  useInteractionState: () => activeToolId,
+}))
 
 const { usePdfInteractionMode } = await import('../composables/usePdfInteractionMode')
 
 describe('usePdfInteractionMode', () => {
-  const togglePan = vi.fn<() => void>()
-  const disablePan = vi.fn<() => void>()
-  const activate = vi.fn<(mode: string) => void>()
-  const isPanning = ref(true)
-
   beforeEach(() => {
     vi.clearAllMocks()
-    mockUsePan.mockReturnValue({
-      isPanning,
-      provides: ref({ togglePan, disablePan }),
-    })
-    mockUseInteractionManager.mockReturnValue({
-      provides: ref({ activate }),
-    })
+    activateTool.mockImplementation(() => undefined)
+    activeToolId.value = 'pointer'
   })
 
-  it('activates pointer mode directly when selecting text on a touch device', () => {
-    const mode = usePdfInteractionMode(ref('document-1'))
+  it('reports panning from the active tool', () => {
+    const mode = usePdfInteractionMode()
+    expect(mode.isPanning.value).toBe(false)
+
+    activeToolId.value = 'pan'
+    expect(mode.isPanning.value).toBe(true)
+  })
+
+  it('toggles between the pan tool and text selection', () => {
+    const mode = usePdfInteractionMode()
+
+    mode.togglePan()
+    expect(activateTool).toHaveBeenLastCalledWith('pan')
+
+    activeToolId.value = 'pan'
+    mode.togglePan()
+    expect(activateTool).toHaveBeenLastCalledWith('pointer')
+  })
+
+  it('activates text selection directly', () => {
+    activeToolId.value = 'pan'
+    const mode = usePdfInteractionMode()
 
     mode.activateTextSelection()
 
-    expect(activate).toHaveBeenCalledExactlyOnceWith('pointerMode')
-    expect(disablePan).not.toHaveBeenCalled()
-    expect(mode.isPanning).toBe(isPanning)
+    expect(activateTool).toHaveBeenCalledExactlyOnceWith('pointer')
   })
 
-  it('toggles pan through the document-scoped pan capability', () => {
-    const mode = usePdfInteractionMode(ref('document-1'))
-
-    mode.togglePan()
-
-    expect(togglePan).toHaveBeenCalledOnce()
-  })
-
-  it('keeps tool actions safe while the document capabilities are unavailable', () => {
-    mockUsePan.mockReturnValue({ isPanning, provides: ref(null) })
-    mockUseInteractionManager.mockReturnValue({ provides: ref(null) })
-    const mode = usePdfInteractionMode(ref('document-1'))
+  it('keeps tool actions safe while no document is open', () => {
+    activateTool.mockImplementation(() => {
+      throw new Error('not-ready')
+    })
+    const mode = usePdfInteractionMode()
 
     expect(() => mode.togglePan()).not.toThrow()
     expect(() => mode.activateTextSelection()).not.toThrow()

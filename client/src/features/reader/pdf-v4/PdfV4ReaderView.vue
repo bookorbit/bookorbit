@@ -2,27 +2,14 @@
 import { computed, onBeforeUnmount, onMounted, onUnmounted, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { EmbedPDF } from '@embedpdf/core/vue'
-import { createPluginRegistration, type PluginBatchRegistrations, type PluginRegistry, type PluginRegistryConfig } from '@embedpdf/core'
-import { usePdfiumEngine } from '@embedpdf/engines/vue'
-import pdfiumWasmUrl from '@embedpdf/pdfium/pdfium.wasm?url'
-import { LockModeType } from '@embedpdf/plugin-annotation'
-import { AnnotationPluginPackage } from '@embedpdf/plugin-annotation/vue'
-import { BookmarkPluginPackage } from '@embedpdf/plugin-bookmark/vue'
-import { DocumentManagerPlugin, DocumentManagerPluginPackage } from '@embedpdf/plugin-document-manager/vue'
-import { HistoryPluginPackage } from '@embedpdf/plugin-history/vue'
-import { InteractionManagerPluginPackage } from '@embedpdf/plugin-interaction-manager/vue'
-import { PanPluginPackage } from '@embedpdf/plugin-pan/vue'
-import { RenderPluginPackage } from '@embedpdf/plugin-render/vue'
-import { RotatePluginPackage } from '@embedpdf/plugin-rotate/vue'
-import { ScrollPluginPackage } from '@embedpdf/plugin-scroll/vue'
-import { SearchPluginPackage } from '@embedpdf/plugin-search/vue'
-import { SelectionPluginPackage } from '@embedpdf/plugin-selection/vue'
-import { SpreadPluginPackage } from '@embedpdf/plugin-spread/vue'
-import { ThumbnailPluginPackage } from '@embedpdf/plugin-thumbnail/vue'
-import { TilingPluginPackage } from '@embedpdf/plugin-tiling/vue'
-import { ViewportPluginPackage } from '@embedpdf/plugin-viewport/vue'
-import { ZoomPluginPackage } from '@embedpdf/plugin-zoom/vue'
+import { interactionPlugin } from '@embedpdf/vue/interaction'
+import { linkPlugin } from '@embedpdf/vue/link'
+import { outlinePlugin } from '@embedpdf/vue/outline'
+import { renderPlugin } from '@embedpdf/vue/render'
+import { Viewer, type AnyPlugin, type InitialDocument } from '@embedpdf/vue/runtime'
+import { searchPlugin } from '@embedpdf/vue/search'
+import { selectionPlugin } from '@embedpdf/vue/selection'
+import { stagePlugin } from '@embedpdf/vue/stage'
 import { LoaderCircle } from '@lucide/vue'
 import type { PdfReaderSettings } from '@bookorbit/types'
 import { api } from '@/lib/api'
@@ -30,7 +17,8 @@ import { useReaderProgress } from '../shared/composables/useReaderProgress'
 import { useReadingSession } from '../shared/composables/useReadingSession'
 import { useReaderSettings } from '../shared/composables/useReaderSettings'
 import PdfReaderContent from './components/PdfReaderContent.vue'
-import { toRotation, toScrollStrategy, toSpreadMode, toZoomLevel } from './pdf-viewer-utils'
+import { createPdfEngine } from './pdf-engine'
+import { pdfStageRules, toStageFlow, toStageRotation, toStageSpread, toStageZoom } from './pdf-viewer-utils'
 
 const { t } = useI18n()
 
@@ -50,24 +38,10 @@ const { onActivity, elapsedMinutes } = useReadingSession(
   { trackingEnabled },
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
-const absolutePdfiumWasmUrl = new URL(pdfiumWasmUrl, window.location.href).href
-const embedPdfConfig: PluginRegistryConfig = {
-  permissions: {
-    enforceDocumentPermissions: true,
-    overrides: { modifyAnnotations: true },
-  },
-}
 
-const {
-  engine,
-  isLoading: engineLoading,
-  error: engineError,
-} = usePdfiumEngine({
-  wasmUrl: absolutePdfiumWasmUrl,
-  worker: true,
-})
-const plugins = shallowRef<PluginBatchRegistrations>([])
-const documentBuffer = shallowRef<ArrayBuffer | null>(null)
+const plugins = shallowRef<AnyPlugin[]>([])
+const initialDocuments = shallowRef<InitialDocument[]>([])
+const viewerKey = shallowRef(0)
 const readerReady = shallowRef(false)
 const documentError = shallowRef<Error | null>(null)
 const initialPage = shallowRef<number | null>(null)
@@ -86,45 +60,33 @@ function parseDeepLinkPage(): number | null {
   return Number.isFinite(parsed) && parsed >= 1 ? parsed : null
 }
 
-function buildPlugins(settings: PdfReaderSettings): PluginBatchRegistrations {
+function prefersReducedMotion() {
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+}
+
+function buildPlugins(settings: PdfReaderSettings): AnyPlugin[] {
   return [
-    createPluginRegistration(DocumentManagerPluginPackage, {
-      maxDocuments: 1,
-    }),
-    createPluginRegistration(ViewportPluginPackage, { viewportGap: 12 }),
-    createPluginRegistration(ScrollPluginPackage, {
-      defaultStrategy: toScrollStrategy(settings.scrollMode),
-      defaultPageGap: 12,
-      defaultBufferSize: 3,
-    }),
-    createPluginRegistration(InteractionManagerPluginPackage),
-    createPluginRegistration(ZoomPluginPackage, {
-      defaultZoomLevel: toZoomLevel(settings),
+    stagePlugin({
+      ...toStageFlow(settings.scrollMode),
+      spread: toStageSpread(settings.spread),
+      zoom: toStageZoom(settings),
       minZoom: 0.25,
       maxZoom: 4,
+      padding: 12,
+      gap: { px: 12 },
+      viewRotation: toStageRotation(settings.rotation),
+      // One CSS pixel per PDF point, the scale saved custom zoom levels were written in.
+      viewUnitsPerPoint: 1,
+      scrollBehavior: prefersReducedMotion() ? 'instant' : 'smooth',
+      scrollChaining: false,
+      responsive: pdfStageRules(settings.spread),
     }),
-    createPluginRegistration(PanPluginPackage, { defaultMode: 'mobile' }),
-    createPluginRegistration(SpreadPluginPackage, { defaultSpreadMode: toSpreadMode(settings.spread) }),
-    createPluginRegistration(RotatePluginPackage, { defaultRotation: toRotation(settings.rotation) }),
-    createPluginRegistration(RenderPluginPackage),
-    createPluginRegistration(TilingPluginPackage, {
-      tileSize: 768,
-      overlapPx: 2.5,
-      extraRings: 0,
-    }),
-    createPluginRegistration(SelectionPluginPackage, { marquee: { enabled: false } }),
-    createPluginRegistration(SearchPluginPackage),
-    createPluginRegistration(HistoryPluginPackage),
-    createPluginRegistration(AnnotationPluginPackage, {
-      autoOpenLinks: false,
-      autoCommit: false,
-      locked: { type: LockModeType.All },
-    }),
-    createPluginRegistration(ThumbnailPluginPackage, {
-      width: 132,
-      paddingY: 12,
-    }),
-    createPluginRegistration(BookmarkPluginPackage),
+    renderPlugin(),
+    interactionPlugin(),
+    selectionPlugin(),
+    searchPlugin(),
+    outlinePlugin(),
+    linkPlugin(),
   ]
 }
 
@@ -189,13 +151,14 @@ function handleBack() {
   router.back()
 }
 
+// Each load mounts a new viewer, which starts its own engine and opens the file once; the
+// viewer reads its engine, plugins and documents only when it mounts.
 async function loadReader() {
   const sequence = ++loadSequence
   documentAbortController?.abort()
   const abortController = new AbortController()
   documentAbortController = abortController
   documentError.value = null
-  documentBuffer.value = null
   readerReady.value = false
   try {
     const [, , response] = await Promise.all([
@@ -211,8 +174,9 @@ async function loadReader() {
     const savedPage = progress.pageNumber.value
     initialPage.value = parseDeepLinkPage() ?? (savedPage !== null && savedPage > 0 ? savedPage : null)
     initialPercentage.value = progress.percentage.value
-    documentBuffer.value = buffer
+    initialDocuments.value = [{ source: { kind: 'bytes', bytes: new Uint8Array(buffer) }, name: 'PDF' }]
     plugins.value = buildPlugins(settings)
+    viewerKey.value += 1
     readerReady.value = true
   } catch (error) {
     if (sequence !== loadSequence || abortController.signal.aborted) return
@@ -222,52 +186,11 @@ async function loadReader() {
   }
 }
 
-async function handleEmbedInitialized(registry: PluginRegistry) {
-  const sequence = loadSequence
-  const buffer = documentBuffer.value
-  if (!buffer) return
-
-  await registry.pluginsReady()
-  if (sequence !== loadSequence || registry.isDestroyed()) return
-
-  const documentManager = registry.getPlugin<DocumentManagerPlugin>(DocumentManagerPlugin.id)?.provides()
-  if (!documentManager) {
-    documentError.value = new Error(t('reader.pdf.managerError'))
-    return
-  }
-
-  let documentId: string | null = null
-  try {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const opened = await documentManager
-        .openDocumentBuffer({
-          buffer,
-          name: 'PDF',
-          rotation: toRotation(effectiveSettings.value.rotation),
-        })
-        .toPromise()
-      documentId = opened.documentId
-      const document = await opened.task.toPromise()
-      if (sequence !== loadSequence || registry.isDestroyed()) return
-      if (document.pageCount > 0) return
-
-      await documentManager.closeDocument(opened.documentId).toPromise()
-      if (sequence !== loadSequence || registry.isDestroyed()) return
-    }
-
-    documentError.value = new Error(t('reader.pdf.engineNoPages'))
-  } catch (error) {
-    if (sequence !== loadSequence || registry.isDestroyed()) return
-    if (documentId && documentManager.getDocumentState(documentId)?.status === 'error') return
-    documentError.value = error instanceof Error ? error : new Error(t('reader.pdf.engineOpenError'))
-  }
+function viewerErrorMessage(error: unknown) {
+  return error instanceof Error && error.message ? error.message : t('reader.pdf.engineOpenError')
 }
 
 function handleRetry() {
-  if (engineError.value) {
-    window.location.reload()
-    return
-  }
   void loadReader()
 }
 
@@ -286,10 +209,10 @@ onUnmounted(() => {
 
 <template>
   <div class="fixed inset-0 overflow-hidden bg-background text-foreground">
-    <div v-if="engineError || documentError" class="absolute inset-0 flex items-center justify-center p-6">
+    <div v-if="documentError" class="absolute inset-0 flex items-center justify-center p-6">
       <div class="max-w-sm text-center">
         <p class="mb-2 text-sm font-medium text-foreground">{{ t('reader.pdf.openError') }}</p>
-        <p class="text-xs text-muted-foreground">{{ (engineError || documentError)?.message }}</p>
+        <p class="text-xs text-muted-foreground">{{ documentError.message }}</p>
         <div class="mt-4 flex justify-center gap-2">
           <button
             class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
@@ -304,37 +227,54 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <div v-else-if="engineLoading || !engine || !readerReady" class="absolute inset-0 flex items-center justify-center bg-background">
+    <div v-else-if="!readerReady" class="absolute inset-0 flex items-center justify-center bg-background">
       <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
         <LoaderCircle :size="30" class="animate-spin text-primary" />
         <span class="text-sm">{{ t('reader.pdf.preparing') }}</span>
       </div>
     </div>
 
-    <EmbedPDF v-else :engine="engine" :plugins="plugins" :config="embedPdfConfig" :on-initialized="handleEmbedInitialized">
-      <template #default="{ pluginsReady, activeDocumentId, activeDocument }">
-        <div v-if="!pluginsReady || !activeDocumentId || !activeDocument" class="absolute inset-0 flex items-center justify-center bg-background">
+    <Viewer v-else :key="viewerKey" :engine="createPdfEngine" :plugins="plugins" :initial-documents="initialDocuments">
+      <template #fallback>
+        <div class="absolute inset-0 flex items-center justify-center bg-background">
           <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
             <LoaderCircle :size="30" class="animate-spin text-primary" />
-            <span class="text-sm">{{ t('reader.pdf.opening') }}</span>
+            <span class="text-sm">{{ t('reader.pdf.preparing') }}</span>
           </div>
         </div>
-        <PdfReaderContent
-          v-else
-          :document-id="activeDocumentId"
-          :book-id="props.bookId"
-          :file-id="props.fileId"
-          :initial-page="initialPage"
-          :initial-percentage="initialPercentage"
-          :settings="effectiveSettings"
-          :peek-mode="props.peekMode"
-          @back="handleBack"
-          @page-change="handlePageChange"
-          @retry="handleRetry"
-          @settings-change="handleSettingsChange"
-          @start-reading="handleStartReading"
-        />
       </template>
-    </EmbedPDF>
+      <template #error="{ error }">
+        <div class="absolute inset-0 flex items-center justify-center p-6">
+          <div class="max-w-sm text-center">
+            <p class="mb-2 text-sm font-medium text-foreground">{{ t('reader.pdf.openError') }}</p>
+            <p class="text-xs text-muted-foreground">{{ viewerErrorMessage(error) }}</p>
+            <div class="mt-4 flex justify-center gap-2">
+              <button
+                class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                @click="handleBack"
+              >
+                {{ t('reader.header.goBack') }}
+              </button>
+              <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetry">
+                {{ t('reader.retry') }}
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
+      <PdfReaderContent
+        :book-id="props.bookId"
+        :file-id="props.fileId"
+        :initial-page="initialPage"
+        :initial-percentage="initialPercentage"
+        :settings="effectiveSettings"
+        :peek-mode="props.peekMode"
+        @back="handleBack"
+        @page-change="handlePageChange"
+        @retry="handleRetry"
+        @settings-change="handleSettingsChange"
+        @start-reading="handleStartReading"
+      />
+    </Viewer>
   </div>
 </template>

@@ -212,7 +212,7 @@ describe('useReaderState', () => {
     document.head.append(publisherStyle, readerStyle)
     document.body.append(paragraph)
 
-    expect(getComputedStyle(paragraph).lineHeight).toBe('3')
+    expect(getComputedStyle(paragraph).lineHeight).toBe('48px')
 
     paragraph.remove()
     publisherStyle.remove()

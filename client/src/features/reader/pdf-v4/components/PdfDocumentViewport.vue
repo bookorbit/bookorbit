@@ -1,45 +1,52 @@
 <script setup lang="ts">
-import { AnnotationLayer } from '@embedpdf/plugin-annotation/vue'
-import { GlobalPointerProvider, PagePointerProvider } from '@embedpdf/plugin-interaction-manager/vue'
-import { RenderLayer } from '@embedpdf/plugin-render/vue'
-import { Rotate } from '@embedpdf/plugin-rotate/vue'
-import { Scroller } from '@embedpdf/plugin-scroll/vue'
-import { SearchLayer } from '@embedpdf/plugin-search/vue'
-import { SelectionLayer } from '@embedpdf/plugin-selection/vue'
-import { TilingLayer } from '@embedpdf/plugin-tiling/vue'
-import { Viewport } from '@embedpdf/plugin-viewport/vue'
-import { ZoomGestureWrapper } from '@embedpdf/plugin-zoom/vue'
+import { LinkLayer, type Link } from '@embedpdf/vue/link'
+import { RenderLayer } from '@embedpdf/vue/render'
+import { SearchLayer } from '@embedpdf/vue/search'
+import { SelectionClipboard, SelectionHandles, SelectionLayer } from '@embedpdf/vue/selection'
+import { Scrollbar, Stage } from '@embedpdf/vue/stage'
+import type { AnnotationItem } from '@bookorbit/types'
+import PdfExternalLink from './PdfExternalLink.vue'
+import PdfHighlightLayer from './PdfHighlightLayer.vue'
+import { safeExternalPdfUrl } from '../pdf-viewer-utils'
 
-defineProps<{ documentId: string }>()
+defineProps<{ annotations: AnnotationItem[] }>()
+
+const emit = defineEmits<{ externalLink: [url: URL] }>()
+
+defineSlots<{ overlay?(): unknown }>()
+
+function externalUrl(link: Link): URL | null {
+  return link.target.kind === 'uri' ? safeExternalPdfUrl(link.target.uri) : null
+}
+
+function handleExternalLink(url: URL) {
+  emit('externalLink', url)
+}
 </script>
 
 <template>
-  <GlobalPointerProvider :document-id="documentId">
-    <Viewport :document-id="documentId" class="absolute inset-0 bg-muted/40">
-      <ZoomGestureWrapper :document-id="documentId">
-        <Scroller :document-id="documentId">
-          <template #default="{ page }">
-            <Rotate :document-id="documentId" :page-index="page.pageIndex" :data-page-index="page.pageIndex" class="bg-background shadow-md">
-              <PagePointerProvider :document-id="documentId" :page-index="page.pageIndex">
-                <RenderLayer :document-id="documentId" :page-index="page.pageIndex" :scale="0.5" class="pointer-events-none" />
-                <TilingLayer :document-id="documentId" :page-index="page.pageIndex" class="pointer-events-none" />
-                <SearchLayer
-                  :document-id="documentId"
-                  :page-index="page.pageIndex"
-                  highlight-color="color-mix(in oklch, var(--primary) 30%, transparent)"
-                  active-highlight-color="color-mix(in oklch, var(--primary) 55%, transparent)"
-                />
-                <SelectionLayer
-                  :document-id="documentId"
-                  :page-index="page.pageIndex"
-                  :text-style="{ background: 'color-mix(in oklch, var(--primary) 35%, transparent)' }"
-                />
-                <AnnotationLayer :document-id="documentId" :page-index="page.pageIndex" />
-              </PagePointerProvider>
-            </Rotate>
-          </template>
-        </Scroller>
-      </ZoomGestureWrapper>
-    </Viewport>
-  </GlobalPointerProvider>
+  <SelectionClipboard />
+  <Stage
+    class="size-full bg-muted/40 [--epdf-accent:var(--primary)] [--epdf-scrollbar-thumb:var(--muted-foreground)] [--epdf-search-blend-mode:normal] [--epdf-search-highlight-active:color-mix(in_oklch,var(--primary)_55%,transparent)] [--epdf-search-highlight:color-mix(in_oklch,var(--primary)_30%,transparent)] [--epdf-text-selection:color-mix(in_oklch,var(--primary)_35%,transparent)]"
+    data-testid="pdf-stage"
+  >
+    <template #page>
+      <RenderLayer />
+      <PdfHighlightLayer :annotations="annotations" />
+      <SearchLayer />
+      <SelectionLayer />
+      <LinkLayer>
+        <template #link="{ link, native }">
+          <PdfExternalLink v-if="externalUrl(link)" :link="link" :url="externalUrl(link)!" @open="handleExternalLink" />
+          <component :is="native" v-else />
+        </template>
+      </LinkLayer>
+    </template>
+    <template #overlay>
+      <Scrollbar axis="y" class="my-1.5 rounded-full" />
+      <Scrollbar axis="x" class="mx-1.5 rounded-full" />
+      <SelectionHandles />
+      <slot name="overlay" />
+    </template>
+  </Stage>
 </template>

@@ -111,25 +111,25 @@ describe('BookCarousel', () => {
   it('uses portrait ratio for loading skeletons', () => {
     const wrapper = mountCarousel([], { loading: true })
     const skeleton = wrapper.find('.animate-shimmer')
-    expect(skeleton.attributes('style')).toContain('aspect-ratio: 2/3')
+    expect(skeleton.attributes('style')).toContain('aspect-ratio: 2 / 3')
   })
 
   it('uses portrait ratio for rendered cards', () => {
     const wrapper = mountCarousel([makeBook()])
     const cover = wrapper.find('.book-cover-surface')
-    expect(cover.attributes('style')).toContain('aspect-ratio: 2/3')
+    expect(cover.attributes('style')).toContain('aspect-ratio: 2 / 3')
   })
 
   it('keeps audiobook cards portrait when configured portrait', () => {
     const wrapper = mountCarousel([makeBook({ isAudiobook: true, coverAspectRatio: '2/3' })])
     const cover = wrapper.find('.book-cover-surface')
-    expect(cover.attributes('style')).toContain('aspect-ratio: 2/3')
+    expect(cover.attributes('style')).toContain('aspect-ratio: 2 / 3')
   })
 
   it('uses square ratio for ebook cards when configured square', () => {
     const wrapper = mountCarousel([makeBook({ isAudiobook: false, coverAspectRatio: '1/1' })])
     const cover = wrapper.find('.book-cover-surface')
-    expect(cover.attributes('style')).toContain('aspect-ratio: 1/1')
+    expect(cover.attributes('style')).toContain('aspect-ratio: 1 / 1')
   })
 
   it('renders square slots wider than portrait slots regardless of media type', () => {

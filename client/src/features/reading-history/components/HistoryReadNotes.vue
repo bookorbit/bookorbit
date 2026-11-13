@@ -72,8 +72,9 @@ function handleRetry() {
           <span class="row-span-3 rounded-full" :style="{ backgroundColor: mark.color }" aria-hidden="true" />
           <blockquote class="line-clamp-3 text-sm leading-relaxed text-foreground">{{ mark.text }}</blockquote>
           <figcaption v-if="mark.note" class="mt-1 text-xs text-foreground">
-            <span class="me-1.5 text-[9.5px] font-bold tracking-[0.12em] text-primary uppercase">{{ t('readingHistory.notes.note') }}</span
-            >{{ mark.note }}
+            <span class="me-1.5 text-[9.5px] font-bold tracking-[0.12em] text-primary uppercase">{{ t('readingHistory.notes.note') }}</span>{{
+              mark.note
+            }}
           </figcaption>
           <p class="mt-0.5 text-[10.5px] text-muted-foreground">
             <template v-if="mark.chapterTitle">{{ mark.chapterTitle }} · </template>{{ formatInstantDay(mark.createdAt) }}

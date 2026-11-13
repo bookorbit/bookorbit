@@ -1,58 +1,80 @@
-import { PdfActionType, Rotation, type PdfBookmarkObject } from '@embedpdf/models'
-import { ScrollStrategy } from '@embedpdf/plugin-scroll'
-import { SpreadMode } from '@embedpdf/plugin-spread'
-import { ZoomMode, type ZoomLevel } from '@embedpdf/plugin-zoom'
+import type { OutlineItem } from '@embedpdf/vue/outline'
+import type { PageRef } from '@embedpdf/vue/runtime'
+import type { ResponsiveRule, StageSettingsPatch, ZoomModeValue } from '@embedpdf/vue/stage'
 import type { PdfReaderSettings } from '@bookorbit/types'
+import { shouldUseResponsiveSpread } from './pdf-pagination'
 
 export interface FlatPdfBookmark {
-  bookmark: PdfBookmarkObject
+  item: OutlineItem
+  title: string
   depth: number
   pageIndex: number | null
 }
 
-export function toScrollStrategy(mode: PdfReaderSettings['scrollMode']): ScrollStrategy {
-  return mode === 'horizontal' ? ScrollStrategy.Horizontal : ScrollStrategy.Vertical
+type StageSpread = NonNullable<StageSettingsPatch['spread']>
+type StageZoom = NonNullable<StageSettingsPatch['zoom']>
+type StageRotation = NonNullable<StageSettingsPatch['viewRotation']>
+
+export function toStageFlow(mode: PdfReaderSettings['scrollMode']): Pick<StageSettingsPatch, 'flow' | 'layout'> {
+  if (mode === 'page') return { flow: 'paged', layout: 'vertical' }
+  return { flow: 'continuous', layout: mode === 'horizontal' ? 'horizontal' : 'vertical' }
 }
 
-export function toSpreadMode(mode: PdfReaderSettings['spread']): SpreadMode {
-  if (mode === 'odd') return SpreadMode.Odd
-  if (mode === 'even') return SpreadMode.Even
-  return SpreadMode.None
+export function toStageSpread(mode: PdfReaderSettings['spread'], wideSurface = false): StageSpread {
+  if (mode === 'odd' || mode === 'even' || mode === 'none') return mode
+  return wideSurface ? 'odd' : 'none'
 }
 
-export function toZoomLevel(settings: PdfReaderSettings): ZoomLevel {
-  if (settings.zoomMode === 'fit-width') return ZoomMode.FitWidth
-  if (settings.zoomMode === 'automatic') return ZoomMode.Automatic
-  if (settings.zoomMode === 'custom') return settings.customScale
-  return ZoomMode.FitPage
+/**
+ * The Stage's own compact gutter, plus, for the automatic spread, two pages side by side whenever
+ * the reading surface is wide enough. A matching rule wins over the base settings, so the base
+ * spread stays 'none' for 'auto' and the rule turns it on and off as the surface resizes.
+ */
+export function pdfStageRules(spread: PdfReaderSettings['spread']): ResponsiveRule[] {
+  const rules: ResponsiveRule[] = [{ name: 'compact', when: { maxWidth: 600 }, settings: { padding: 4 } }]
+  if (spread === 'auto') {
+    rules.push({ name: 'auto-spread', when: (box) => shouldUseResponsiveSpread(box.width, box.height), settings: { spread: 'odd' } })
+  }
+  return rules
 }
 
-export function toRotation(rotation: PdfReaderSettings['rotation']): Rotation {
-  if (rotation === 90) return Rotation.Degree90
-  if (rotation === 180) return Rotation.Degree180
-  if (rotation === 270) return Rotation.Degree270
-  return Rotation.Degree0
+export function fromStageSpread(spread: StageSpread): Exclude<PdfReaderSettings['spread'], 'auto'> {
+  return spread === 'odd' || spread === 'even' ? spread : 'none'
 }
 
-export function fromRotation(rotation: Rotation): PdfReaderSettings['rotation'] {
-  if (rotation === Rotation.Degree90) return 90
-  if (rotation === Rotation.Degree180) return 180
-  if (rotation === Rotation.Degree270) return 270
-  return 0
+export function toStageZoom(settings: Pick<PdfReaderSettings, 'zoomMode' | 'customScale'>): StageZoom {
+  if (settings.zoomMode === 'custom') return { level: settings.customScale }
+  return { mode: settings.zoomMode }
 }
 
-export function getPdfBookmarkPageIndex(bookmark: PdfBookmarkObject): number | null {
-  const target = bookmark.target
-  const destination =
-    target?.type === 'destination' ? target.destination : target?.action.type === PdfActionType.Goto ? target.action.destination : null
-  return destination && Number.isInteger(destination.pageIndex) && destination.pageIndex >= 0 ? destination.pageIndex : null
+export function fromStageZoomMode(mode: ZoomModeValue | 'custom'): PdfReaderSettings['zoomMode'] {
+  if (mode === 'fit-width' || mode === 'automatic' || mode === 'custom') return mode
+  return 'fit-page'
 }
 
-export function flattenPdfBookmarks(bookmarks: PdfBookmarkObject[], depth = 0): FlatPdfBookmark[] {
-  return bookmarks.flatMap((bookmark) => [
-    { bookmark, depth, pageIndex: getPdfBookmarkPageIndex(bookmark) },
-    ...flattenPdfBookmarks(bookmark.children ?? [], depth + 1),
-  ])
+export function fromStageZoom(zoom: StageZoom): (Pick<PdfReaderSettings, 'zoomMode'> & Partial<Pick<PdfReaderSettings, 'customScale'>>) | null {
+  if ('level' in zoom) return { zoomMode: 'custom', customScale: zoom.level }
+  if ('mode' in zoom) return { zoomMode: fromStageZoomMode(zoom.mode) }
+  return null
+}
+
+export function toStageRotation(rotation: PdfReaderSettings['rotation']): StageRotation {
+  return rotation
+}
+
+export function getOutlinePageIndex(item: OutlineItem, pageIndexOf: (page: PageRef) => number | null): number | null {
+  if (item.target?.kind !== 'goto') return null
+  return pageIndexOf(item.target.destination.page)
+}
+
+/** Outline items arrive depth first with their parent, so a parent's depth is always known before its children. */
+export function flattenOutline(items: readonly OutlineItem[], pageIndexOf: (page: PageRef) => number | null): FlatPdfBookmark[] {
+  const depths = new Map<number, number>()
+  return items.map((item) => {
+    const depth = item.parent ? (depths.get(item.parent.objectNumber) ?? -1) + 1 : 0
+    depths.set(item.ref.objectNumber, depth)
+    return { item, title: item.title, depth, pageIndex: getOutlinePageIndex(item, pageIndexOf) }
+  })
 }
 
 export function findActivePdfBookmarkIndex(bookmarks: FlatPdfBookmark[], currentPage: number): number | null {

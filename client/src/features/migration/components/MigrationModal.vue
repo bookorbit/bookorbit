@@ -1794,35 +1794,42 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           <p class="text-sm font-semibold">{{ t('migration.report.booksSection') }}</p>
                           <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.metadataOverlays') }}</span
-                              ><span class="font-medium">{{ reportData.bookMetadata?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.metadataOverlays') }}</span><span class="font-medium">{{
+                                reportData.bookMetadata?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.authorMappings') }}</span
-                              ><span class="font-medium">{{ reportData.bookAuthors?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.authorMappings') }}</span><span class="font-medium">{{
+                                reportData.bookAuthors?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.narratorMappings') }}</span
-                              ><span class="font-medium">{{ reportData.bookNarrators?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.narratorMappings') }}</span><span class="font-medium">{{
+                                reportData.bookNarrators?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.genreMappings') }}</span
-                              ><span class="font-medium">{{ reportData.bookGenres?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.genreMappings') }}</span><span class="font-medium">{{
+                                reportData.bookGenres?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.tagMappings') }}</span
-                              ><span class="font-medium">{{ reportData.bookTags?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.tagMappings') }}</span><span class="font-medium">{{
+                                reportData.bookTags?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between" :class="reportData.coversSkippedAll ? 'text-amber-600' : ''">
-                              <span>{{ t('migration.report.coversImported') }}</span
-                              ><span class="font-medium">{{ reportData.bookCovers?.imported ?? 0 }}</span>
+                              <span>{{ t('migration.report.coversImported') }}</span><span class="font-medium">{{
+                                reportData.bookCovers?.imported ?? 0
+                              }}</span>
                             </div>
                             <p v-if="reportData.coversSkippedAll" class="text-amber-600 leading-tight">
                               {{ t('migration.report.coverImportSkipped') }}
                             </p>
                             <div v-if="reportData.unresolvedBooks.length > 0" class="flex justify-between text-amber-600">
-                              <span>{{ t('migration.report.couldNotMatch') }}</span
-                              ><span class="font-medium">{{ reportData.unresolvedBooks.length }}</span>
+                              <span>{{ t('migration.report.couldNotMatch') }}</span><span class="font-medium">{{
+                                reportData.unresolvedBooks.length
+                              }}</span>
                             </div>
                           </div>
                         </div>
@@ -1830,32 +1837,41 @@ const sourceTypeCompatibility = computed<SourceTypeCompatibility | null>(() => {
                           <p class="text-sm font-semibold">{{ t('migration.report.userDataSection') }}</p>
                           <div class="space-y-1.5 text-xs">
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.readingStatuses') }}</span
-                              ><span class="font-medium">{{ reportData.userBookStatus?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.readingStatuses') }}</span><span class="font-medium">{{
+                                reportData.userBookStatus?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.readingProgressEntries') }}</span
-                              ><span class="font-medium">{{ reportData.readingProgress?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.readingProgressEntries') }}</span><span
+                                class="font-medium"
+                                >{{ reportData.readingProgress?.imported ?? 0 }}</span
+                              >
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.audiobookProgressEntries') }}</span
-                              ><span class="font-medium">{{ reportData.audiobookProgress?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.audiobookProgressEntries') }}</span><span
+                                class="font-medium"
+                                >{{ reportData.audiobookProgress?.imported ?? 0 }}</span
+                              >
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.readingSessions') }}</span
-                              ><span class="font-medium">{{ reportData.readingSessions?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.readingSessions') }}</span><span class="font-medium">{{
+                                reportData.readingSessions?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.bookmarks') }}</span
-                              ><span class="font-medium">{{ reportData.bookmarks?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.bookmarks') }}</span><span class="font-medium">{{
+                                reportData.bookmarks?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.annotations') }}</span
-                              ><span class="font-medium">{{ reportData.annotations?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.annotations') }}</span><span class="font-medium">{{
+                                reportData.annotations?.imported ?? 0
+                              }}</span>
                             </div>
                             <div class="flex justify-between">
-                              <span class="text-muted-foreground">{{ t('migration.report.collectionEntries') }}</span
-                              ><span class="font-medium">{{ reportData.collections?.imported ?? 0 }}</span>
+                              <span class="text-muted-foreground">{{ t('migration.report.collectionEntries') }}</span><span class="font-medium">{{
+                                reportData.collections?.imported ?? 0
+                              }}</span>
                             </div>
                           </div>
                         </div>

@@ -120,8 +120,9 @@ function handleNavigate(cfi: string) {
             @click="handleNavigate(result.cfi)"
           >
             <p class="text-sm leading-relaxed line-clamp-3 mb-1">
-              <span class="text-muted-foreground">{{ result.excerpt.pre }}</span
-              ><mark class="bg-yellow-300 text-yellow-900 rounded-xs px-0.5">{{ result.excerpt.match }}</mark
+              <span class="text-muted-foreground">{{ result.excerpt.pre }}</span><mark class="bg-yellow-300 text-yellow-900 rounded-xs px-0.5">{{
+                result.excerpt.match
+              }}</mark
               ><span class="text-muted-foreground">{{ result.excerpt.post }}</span>
             </p>
             <p v-if="result.sectionTitle" class="text-xs text-muted-foreground truncate">

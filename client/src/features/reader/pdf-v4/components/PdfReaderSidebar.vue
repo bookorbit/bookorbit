@@ -1,15 +1,11 @@
 <script setup lang="ts">
-import { computed, ref, useId, watch } from 'vue'
+import { computed, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BookOpen, FileText, Highlighter, Search, X } from '@lucide/vue'
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/vue'
-import { useBookmarkCapability } from '@embedpdf/plugin-bookmark/vue'
-import { useScroll } from '@embedpdf/plugin-scroll/vue'
 import type { AnnotationItem } from '@bookorbit/types'
 import ReaderBottomSheet, { type ReaderSheetSnap } from '../../shared/components/ReaderBottomSheet.vue'
 import PdfNavRail from './PdfNavRail.vue'
 import PdfSidebarPanes from './PdfSidebarPanes.vue'
-import { flattenPdfBookmarks, type FlatPdfBookmark } from '../pdf-viewer-utils'
 import {
   PDF_SIDEBAR_MAX_WIDTH,
   PDF_SIDEBAR_MIN_WIDTH,
@@ -20,11 +16,12 @@ import {
 
 const props = withDefaults(
   defineProps<{
-    documentId: string
     activeTab: PdfSidebarTab
     open?: boolean
     layout?: PdfSidebarLayout
     width?: number
+    currentPage: number
+    totalPages: number
     annotations: AnnotationItem[]
     loadError?: boolean
     loading?: boolean
@@ -38,6 +35,7 @@ const emit = defineEmits<{
   close: []
   'update:activeTab': [tab: PdfSidebarTab]
   'update:width': [width: number]
+  selectPage: [pageIndex: number]
   navigateHighlight: [annotation: AnnotationItem]
   deleteHighlight: [id: number]
   retryHighlights: []
@@ -46,15 +44,8 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-const { state: scrollState, provides: scroll } = useScroll(() => props.documentId)
-const { provides: bookmarksCapability } = useBookmarkCapability()
-const { provides: annotationCapability } = useAnnotationCapability()
-
 const sidebarId = `pdf-sidebar-${useId()}`
 const sheetSnap = ref<ReaderSheetSnap>('peek')
-const bookmarks = ref<FlatPdfBookmark[]>([])
-const bookmarksLoading = ref(false)
-const bookmarksLoaded = ref(false)
 
 const TAB_ICONS = { thumbnails: FileText, contents: BookOpen, search: Search, highlights: Highlighter } as const
 
@@ -75,7 +66,7 @@ function tabLabel(tab: PdfSidebarTab) {
 }
 
 const panelCount = computed(() => {
-  if (props.activeTab === 'thumbnails') return scrollState.value.totalPages ? String(scrollState.value.totalPages) : ''
+  if (props.activeTab === 'thumbnails') return props.totalPages ? String(props.totalPages) : ''
   if (props.activeTab === 'highlights') return props.annotations.length ? String(props.annotations.length) : ''
   return ''
 })
@@ -111,13 +102,7 @@ function handleSheetTabKeydown(event: KeyboardEvent) {
 }
 
 function handleThumbnail(pageIndex: number) {
-  scroll.value?.scrollToPage({ pageNumber: pageIndex + 1, behavior: 'smooth' })
-}
-
-function handleBookmark(entry: FlatPdfBookmark) {
-  const target = entry.bookmark.target
-  if (!target) return
-  annotationCapability.value?.forDocument(props.documentId).navigateTarget(target)
+  emit('selectPage', pageIndex)
 }
 
 function handleNavigateHighlight(annotation: AnnotationItem) {
@@ -135,33 +120,6 @@ function handleRetryHighlights() {
 function handleLoadMoreHighlights() {
   emit('loadMoreHighlights')
 }
-
-function loadBookmarks() {
-  if (bookmarksLoaded.value || bookmarksLoading.value || !bookmarksCapability.value) return
-  bookmarksLoading.value = true
-  bookmarksCapability.value
-    .forDocument(props.documentId)
-    .getBookmarks()
-    .wait(
-      ({ bookmarks: items }) => {
-        bookmarks.value = flattenPdfBookmarks(items)
-        bookmarksLoaded.value = true
-        bookmarksLoading.value = false
-      },
-      () => {
-        bookmarksLoaded.value = true
-        bookmarksLoading.value = false
-      },
-    )
-}
-
-watch(
-  () => [props.activeTab, props.open, bookmarksCapability.value] as const,
-  ([tab, open]) => {
-    if (open && tab === 'contents') loadBookmarks()
-  },
-  { immediate: true },
-)
 
 // --- resize -------------------------------------------------------------
 
@@ -233,20 +191,16 @@ function handleResizeKeydown(event: KeyboardEvent) {
 
     <div :id="panelIds[props.activeTab]" role="tabpanel" :aria-labelledby="tabIds[props.activeTab]" class="flex min-h-0 flex-1 flex-col">
       <PdfSidebarPanes
-        :document-id="props.documentId"
         :active-tab="props.activeTab"
         :active="props.open"
-        :current-page="scrollState.currentPage"
-        :total-pages="scrollState.totalPages"
-        :bookmarks="bookmarks"
-        :bookmarks-loading="bookmarksLoading"
+        :current-page="props.currentPage"
+        :total-pages="props.totalPages"
         :annotations="props.annotations"
         :load-error="props.loadError"
         :loading="props.loading"
         :loading-more="props.loadingMore"
         :has-more="props.hasMore"
         @select-page="handleThumbnail"
-        @navigate-bookmark="handleBookmark"
         @navigate-highlight="handleNavigateHighlight"
         @delete-highlight="handleDeleteHighlight"
         @retry-highlights="handleRetryHighlights"
@@ -316,20 +270,16 @@ function handleResizeKeydown(event: KeyboardEvent) {
       class="flex min-h-0 flex-1 flex-col border-t border-border"
     >
       <PdfSidebarPanes
-        :document-id="props.documentId"
         :active-tab="props.activeTab"
         :active="props.open"
-        :current-page="scrollState.currentPage"
-        :total-pages="scrollState.totalPages"
-        :bookmarks="bookmarks"
-        :bookmarks-loading="bookmarksLoading"
+        :current-page="props.currentPage"
+        :total-pages="props.totalPages"
         :annotations="props.annotations"
         :load-error="props.loadError"
         :loading="props.loading"
         :loading-more="props.loadingMore"
         :has-more="props.hasMore"
         @select-page="handleThumbnail"
-        @navigate-bookmark="handleBookmark"
         @navigate-highlight="handleNavigateHighlight"
         @delete-highlight="handleDeleteHighlight"
         @retry-highlights="handleRetryHighlights"

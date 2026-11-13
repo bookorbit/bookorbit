@@ -14308,9 +14308,17 @@
       "engineOpenError": "The PDF could not be opened by the document engine.",
       "noPages": "This PDF opened without any pages",
       "noPagesHint": "Reload the document to recover from the incomplete PDF engine response.",
+      "password": {
+        "title": "Password required",
+        "description": "Enter the document password to open this PDF.",
+        "placeholder": "Document password",
+        "incorrect": "That password did not unlock the PDF.",
+        "unlock": "Unlock"
+      },
       "externalLinkTitle": "Open external link?",
       "externalLinkDescription": "This PDF wants to open {host} in a new tab.",
       "openLink": "Open link",
+      "openExternalLink": "Open link to {url}",
       "annotationsLoadError": "Could not load highlights for this PDF.",
       "loadingAnnotations": "Loading PDF highlights",
       "loadMoreAnnotations": "Load more highlights",
