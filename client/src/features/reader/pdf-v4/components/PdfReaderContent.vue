@@ -27,6 +27,7 @@ import { usePdfResponsiveSpread } from '../composables/usePdfResponsiveSpread'
 import { usePdfSidebarLayout, type PdfSidebarTab } from '../composables/usePdfSidebarLayout'
 import NoteDialog from '../../shared/components/NoteDialog.vue'
 import PdfSelectionPopup from './PdfSelectionPopup.vue'
+import PdfCurlOverlay from './PdfCurlOverlay.vue'
 
 const props = defineProps<{
   documentId: string
@@ -85,132 +86,24 @@ const {
   togglePinned: toggleHeaderPinned,
 } = usePdfFullscreenChrome(isFullscreen, hasOpenUi)
 
-const isCurling = ref(false)
-const curlDirection = ref<1 | -1>(1)
-const curlProgress = ref(0)
-let curlAnimationRaf: number | null = null
-const curlCanvasContainerRef = ref<HTMLDivElement | null>(null)
-const curlLeafGeometry = ref({
-  left: '0px',
-  top: '0px',
-  width: '100%',
-  height: '100%',
-})
+const curlOverlayRef = ref<InstanceType<typeof PdfCurlOverlay> | null>(null)
 
-function triggerPdfCurl(dir: 1 | -1, navigateCb?: () => void) {
+function triggerPdfCurl(dir: 1 | -1, navigateCb?: () => void, onCompleteCb?: () => void) {
   if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
     navigateCb?.()
+    onCompleteCb?.()
     return
   }
-  if (curlAnimationRaf !== null) {
-    cancelAnimationFrame(curlAnimationRaf)
-    curlAnimationRaf = null
-  }
-
-  const surface = viewerSurface.value
-  if (!surface) {
+  if (curlOverlayRef.value) {
+    curlOverlayRef.value.flip(dir, navigateCb, onCompleteCb)
+  } else {
     navigateCb?.()
-    return
+    onCompleteCb?.()
   }
-
-  // 1. Locate the active page element
-  const pageElements = Array.from(surface.querySelectorAll<HTMLElement>('[data-page-index]'))
-  const surfaceRect = surface.getBoundingClientRect()
-  let targetPageEl: HTMLElement | null = null
-
-  if (pageElements.length >= 2) {
-    targetPageEl = dir > 0 ? (pageElements[1] ?? pageElements[0] ?? null) : (pageElements[0] ?? null)
-  } else if (pageElements.length === 1) {
-    targetPageEl = pageElements[0] ?? null
-  }
-
-  const pageRect = targetPageEl?.getBoundingClientRect() ?? surfaceRect
-  const leafWidth = pageRect.width
-  const leafHeight = pageRect.height
-  const leafLeft = Math.max(0, pageRect.left - surfaceRect.left)
-  const leafTop = Math.max(0, pageRect.top - surfaceRect.top)
-
-  curlLeafGeometry.value = {
-    left: `${leafLeft}px`,
-    top: `${leafTop}px`,
-    width: `${leafWidth}px`,
-    height: `${leafHeight}px`,
-  }
-
-  // 2. Snapshot the current page canvas bitmap
-  const dpr = window.devicePixelRatio || 1
-  let snapshotCanvas: HTMLCanvasElement | null = null
-  try {
-    snapshotCanvas = document.createElement('canvas')
-    snapshotCanvas.width = Math.max(1, Math.round(leafWidth * dpr))
-    snapshotCanvas.height = Math.max(1, Math.round(leafHeight * dpr))
-    snapshotCanvas.style.width = '100%'
-    snapshotCanvas.style.height = '100%'
-    snapshotCanvas.className = 'block w-full h-full'
-
-    const ctx = snapshotCanvas.getContext('2d')
-    if (ctx) {
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, snapshotCanvas.width, snapshotCanvas.height)
-
-      const sourceCanvases = Array.from((targetPageEl || surface).querySelectorAll('canvas'))
-      for (const src of sourceCanvases) {
-        if (src.width > 0 && src.height > 0) {
-          const srcRect = src.getBoundingClientRect()
-          const dx = (srcRect.left - pageRect.left) * dpr
-          const dy = (srcRect.top - pageRect.top) * dpr
-          const dw = srcRect.width * dpr
-          const dh = srcRect.height * dpr
-          try {
-            ctx.drawImage(src, dx, dy, dw, dh)
-          } catch {}
-        }
-      }
-    }
-  } catch (err) {
-    console.warn('Canvas snapshot error:', err)
-  }
-
-  // 3. Immediately render the new page underneath
-  navigateCb?.()
-
-  // 4. Mount snapshot canvas and start 3D rotation
-  isCurling.value = true
-  curlDirection.value = dir
-  curlProgress.value = 0
-
-  requestAnimationFrame(() => {
-    if (curlCanvasContainerRef.value && snapshotCanvas) {
-      curlCanvasContainerRef.value.replaceChildren(snapshotCanvas)
-    }
-  })
-
-  const startTime = performance.now()
-  const duration = 420
-
-  function frame(now: number) {
-    const elapsed = now - startTime
-    const t = Math.min(1, elapsed / duration)
-    // cubic-bezier(0.22, 1, 0.36, 1) approximation
-    curlProgress.value = 1 - Math.pow(1 - t, 3)
-    if (t < 1) {
-      curlAnimationRaf = requestAnimationFrame(frame)
-    } else {
-      isCurling.value = false
-      curlAnimationRaf = null
-      if (curlCanvasContainerRef.value) {
-        curlCanvasContainerRef.value.replaceChildren()
-      }
-    }
-  }
-  curlAnimationRaf = requestAnimationFrame(frame)
 }
 
-onUnmounted(() => {
-  if (curlAnimationRaf !== null) cancelAnimationFrame(curlAnimationRaf)
-})
-
 const {
+  isFlipping,
   pageRange,
   getPageRange,
   goToPage: handleGoToPage,
@@ -228,54 +121,6 @@ const {
   onActivity: revealHeader,
   pageTurnAnimation: computed(() => props.settings.pageTurnAnimation),
   onPageTurnAnimation: triggerPdfCurl,
-})
-
-const curlLeafStyle = computed(() => {
-  const dir = curlDirection.value
-  const p = curlProgress.value
-  const opacity = p >= 0.85 ? Math.max(0, 1 - (p - 0.85) / 0.15) : 1
-
-  if (dir > 0) {
-    const angle = -180 * p
-    const liftZ = Math.sin(p * Math.PI) * 45
-    const skew = Math.sin(p * Math.PI) * 2
-    const shadowSpread = Math.sin(p * Math.PI) * 25
-    const shadowAlpha = Math.sin(p * Math.PI) * 0.28
-
-    return {
-      position: 'absolute' as const,
-      left: curlLeafGeometry.value.left,
-      top: curlLeafGeometry.value.top,
-      width: curlLeafGeometry.value.width,
-      height: curlLeafGeometry.value.height,
-      transformOrigin: '0% 50%',
-      transform: `rotateY(${angle}deg) translateZ(${liftZ + 1}px) skewY(${skew}deg)`,
-      boxShadow: `-${shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0, 0, 0, ${shadowAlpha})`,
-      transformStyle: 'preserve-3d' as const,
-      opacity: String(opacity),
-      willChange: 'transform, opacity, box-shadow',
-    }
-  } else {
-    const angle = 180 * p
-    const liftZ = Math.sin(p * Math.PI) * 45
-    const skew = Math.sin(p * Math.PI) * -2
-    const shadowSpread = Math.sin(p * Math.PI) * 25
-    const shadowAlpha = Math.sin(p * Math.PI) * 0.28
-
-    return {
-      position: 'absolute' as const,
-      left: curlLeafGeometry.value.left,
-      top: curlLeafGeometry.value.top,
-      width: curlLeafGeometry.value.width,
-      height: curlLeafGeometry.value.height,
-      transformOrigin: '100% 50%',
-      transform: `rotateY(${angle}deg) translateZ(${liftZ + 1}px) skewY(${skew}deg)`,
-      boxShadow: `${shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0, 0, 0, ${shadowAlpha})`,
-      transformStyle: 'preserve-3d' as const,
-      opacity: String(opacity),
-      willChange: 'transform, opacity, box-shadow',
-    }
-  }
 })
 const { apply: applyResponsiveSpread } = usePdfResponsiveSpread(viewerSurface, currentSpreadPreference, spread)
 const highlights = usePdfHighlights({
@@ -474,9 +319,11 @@ function handleKeydown(event: KeyboardEvent) {
   }
   if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
     event.preventDefault()
+    if (isFlipping.value) return
     handlePreviousPage()
   } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
     event.preventDefault()
+    if (isFlipping.value) return
     handleNextPage()
   } else if (event.key === 'Home') {
     event.preventDefault()
@@ -534,7 +381,8 @@ watch(
       const restored = event.pageNumber === restoringPage
       restoringPage = null
       const range = getPageRange(event.pageNumber, event.totalPages)
-      emit('pageChange', range.end, event.totalPages, restored)
+      const pageToEmit = props.settings.scrollMode === 'page' || range.start === range.end ? event.pageNumber : range.end
+      emit('pageChange', pageToEmit, event.totalPages, restored)
     })
     onCleanup(() => {
       unsubscribeLayout()
@@ -682,52 +530,17 @@ onUnmounted(() => {
         @touchend="handleTouchEnd"
         @touchcancel="handleTouchCancel"
       >
-        <!-- 3D Paper Page Curl Transition Overlay -->
-        <div
-          v-if="isCurling"
-          class="pointer-events-none absolute inset-0 z-30 overflow-visible"
-          style="perspective: 2000px; transform-style: preserve-3d"
-          aria-hidden="true"
-        >
-          <div
-            class="pointer-events-none absolute inset-y-0 w-28 -translate-x-1/2 transition-opacity"
-            :style="{
-              left: curlDirection > 0 ? curlLeafGeometry.left : `calc(${curlLeafGeometry.left} + ${curlLeafGeometry.width})`,
-              opacity: Math.sin(curlProgress * Math.PI) * 0.65,
-              background: 'linear-gradient(to right, transparent, rgba(0, 0, 0, 0.3) 50%, transparent)',
-            }"
-          />
-          <div :style="curlLeafStyle" class="pointer-events-none overflow-hidden">
-            <div class="absolute inset-0 bg-background" :style="{ backfaceVisibility: 'hidden', transform: 'rotateY(0deg)', overflow: 'hidden' }">
-              <div ref="curlCanvasContainerRef" class="w-full h-full" />
-              <div
-                class="pointer-events-none absolute inset-0"
-                :style="{
-                  opacity: Math.sin(curlProgress * Math.PI) * 0.85,
-                  background:
-                    curlDirection > 0
-                      ? 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.18) 30%, rgba(255,255,255,0.4) 50%, rgba(0,0,0,0.25) 70%, transparent 100%)'
-                      : 'linear-gradient(to left, transparent 0%, rgba(0,0,0,0.18) 30%, rgba(255,255,255,0.4) 50%, rgba(0,0,0,0.25) 70%, transparent 100%)',
-                }"
-              />
-            </div>
-            <div
-              class="absolute inset-0 bg-background brightness-95"
-              :style="{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', boxShadow: 'inset 0 0 30px rgba(0,0,0,0.1)' }"
-            >
-              <div
-                class="pointer-events-none absolute inset-0"
-                :style="{
-                  opacity: Math.sin(curlProgress * Math.PI) * 0.7,
-                  background:
-                    curlDirection > 0
-                      ? 'linear-gradient(to left, transparent 0%, rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.25) 70%, transparent 100%)'
-                      : 'linear-gradient(to right, transparent 0%, rgba(0,0,0,0.12) 40%, rgba(0,0,0,0.25) 70%, transparent 100%)',
-                }"
-              />
-            </div>
-          </div>
-        </div>
+        <!-- 3D Conical Paper Page Curl Transition Overlay -->
+        <PdfCurlOverlay
+          ref="curlOverlayRef"
+          :active="props.settings.pageTurnAnimation === 'curl' && currentScrollMode === 'page'"
+          :surface="viewerSurface"
+          :current-page="scrollState.currentPage"
+          :total-pages="scrollState.totalPages"
+          :is-dark="props.settings.theme?.includes('dark')"
+          @turn-next="handleNextPage"
+          @turn-prev="handlePreviousPage"
+        />
 
         <DocumentContent :document-id="props.documentId">
           <template #default="{ documentState, isLoading, isError, isLoaded }">

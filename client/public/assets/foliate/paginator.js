@@ -1238,6 +1238,9 @@ export class Paginator extends HTMLElement {
     const shadowColor = isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.22)'
     const highlightColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.32)'
 
+    back.style.background = isDark ? '#27272a' : '#faf8f2'
+    back.style.boxShadow = 'inset 0 0 35px rgba(0, 0, 0, 0.08)'
+
     crease.style.background = `linear-gradient(to right, transparent 0%, ${shadowColor} 30%, ${highlightColor} 50%, ${shadowColor} 70%, transparent 100%)`
 
     leaf.style.width = `${leafWidth}px`
@@ -1268,26 +1271,39 @@ export class Paginator extends HTMLElement {
 
     element[scrollProp] = targetOffset
 
-    const duration = 420
+    const duration = 480
     const startAngle = 0
-    const targetAngle = effectiveDir > 0 ? -115 : 115
+    const targetAngle = effectiveDir > 0 ? -135 : 135
 
     return animate(0, 1, duration, cubicBezierCurl, (progress) => {
       const currentAngle = lerp(startAngle, targetAngle, progress)
-      const liftZ = Math.sin(progress * Math.PI) * 45
-      const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 2 : -2)
-      const shadowSpread = Math.sin(progress * Math.PI) * 20
-      const shadowAlpha = Math.sin(progress * Math.PI) * (isDark ? 0.35 : 0.22)
+      const liftZ = Math.sin(progress * Math.PI) * 55
+      const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 3.5 : -3.5)
+      const shadowSpread = Math.sin(progress * Math.PI) * 25
+      const shadowAlpha = Math.sin(progress * Math.PI) * (isDark ? 0.4 : 0.28)
 
-      const opacity = progress >= 0.85 ? Math.max(0, 1 - (progress - 0.85) / 0.15) : 1
+      const opacity = progress >= 0.88 ? Math.max(0, 1 - (progress - 0.88) / 0.12) : 1
       leaf.style.opacity = String(opacity)
+
+      // Dynamic diagonal fold clip-path
+      const peelReach = progress * 130
+      if (effectiveDir > 0) {
+        const xCut = Math.max(0, 100 - peelReach)
+        const yCut = Math.max(0, 100 - peelReach)
+        front.style.clipPath = `polygon(0% 0%, 100% 0%, 100% ${yCut}%, ${xCut}% 100%, 0% 100%)`
+      } else {
+        const xCut = Math.min(100, peelReach)
+        const yCut = Math.max(0, 100 - peelReach)
+        front.style.clipPath = `polygon(0% 0%, 100% 0%, 100% 100%, ${xCut}% 100%, 0% ${yCut}%)`
+      }
 
       leaf.style.transform = `rotateY(${currentAngle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`
       leaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0,0,0,${shadowAlpha})`
 
-      crease.style.opacity = String(Math.sin(progress * Math.PI) * 0.85)
-      spine.style.opacity = String(Math.sin(progress * Math.PI) * 0.7)
+      crease.style.opacity = String(Math.sin(progress * Math.PI) * 0.9)
+      spine.style.opacity = String(Math.sin(progress * Math.PI) * 0.75)
     }).then(() => {
+      front.style.clipPath = 'none'
       front.replaceChildren()
       stage.style.opacity = '0'
       stage.style.visibility = 'hidden'

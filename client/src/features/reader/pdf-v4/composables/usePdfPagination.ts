@@ -1,4 +1,4 @@
-import { computed, onUnmounted, type Ref } from 'vue'
+import { computed, onUnmounted, ref, type Ref } from 'vue'
 import type { ScrollScope } from '@embedpdf/plugin-scroll'
 import type { PdfReaderSettings } from '@bookorbit/types'
 import { canTurnFromVisiblePage, findAdjacentPage, findPageRange } from '../pdf-pagination'
@@ -12,7 +12,7 @@ export interface UsePdfPaginationOptions {
   touchPageTurningEnabled: ReadonlyRef<boolean>
   onActivity: () => void
   pageTurnAnimation?: ReadonlyRef<PdfReaderSettings['pageTurnAnimation'] | undefined>
-  onPageTurnAnimation?: (direction: -1 | 1, onReadyToNavigate?: () => void) => void
+  onPageTurnAnimation?: (direction: -1 | 1, onReadyToNavigate?: () => void, onComplete?: () => void) => void
 }
 
 export function usePdfPagination({
@@ -27,6 +27,7 @@ export function usePdfPagination({
   let wheelDelta = 0
   let wheelUnlockTimer: ReturnType<typeof setTimeout> | null = null
   let touchStart: { x: number; y: number } | null = null
+  const isFlipping = ref(false)
 
   function getScrollScope() {
     try {
@@ -70,25 +71,52 @@ export function usePdfPagination({
   function turnPage(direction: -1 | 1, { chained = false }: { chained?: boolean } = {}) {
     const scope = getScrollScope()
     if (!scope) return
+    if (isFlipping.value) return
     try {
       if (!chained && scope.getPageChangeState().isChanging) return
       const spreads = getSpreads(scope)
       if (spreads.length === 0) return
-      const target = findAdjacentPage(spreads, pageRange.value.start, direction, scrollState.value.totalPages)
+
+      let target: number
+      if (mode.value === 'page' && (pageTurnAnimation?.value === 'curl' || pageRange.value.start === pageRange.value.end)) {
+        target = Math.min(Math.max(scrollState.value.currentPage + direction, 1), scrollState.value.totalPages || 1)
+      } else {
+        target = findAdjacentPage(spreads, pageRange.value.start, direction, scrollState.value.totalPages)
+      }
+
       if (target === pageRange.value.start) return
+
       if (mode.value === 'page' && pageTurnAnimation?.value === 'curl' && onPageTurnAnimation) {
-        onPageTurnAnimation(direction, () => {
-          scope.scrollToPage({ pageNumber: target, behavior: 'instant' })
-        })
+        isFlipping.value = true
+        let completed = false
+        const finish = () => {
+          if (completed) return
+          completed = true
+          isFlipping.value = false
+        }
+        const timer = setTimeout(finish, 850)
+        onPageTurnAnimation(
+          direction,
+          () => {
+            scope.scrollToPage({ pageNumber: target, behavior: 'instant' })
+          },
+          () => {
+            clearTimeout(timer)
+            finish()
+          },
+        )
         return
       }
+
       scope.scrollToPage({ pageNumber: target, behavior: behavior.value })
     } catch {
+      isFlipping.value = false
       return
     }
   }
 
   function previousPage() {
+    if (isFlipping.value) return
     onActivity()
     if (mode.value === 'page') turnPage(-1, { chained: true })
     else {
@@ -101,6 +129,7 @@ export function usePdfPagination({
   }
 
   function nextPage() {
+    if (isFlipping.value) return
     onActivity()
     if (mode.value === 'page') turnPage(1, { chained: true })
     else {
@@ -125,6 +154,7 @@ export function usePdfPagination({
   }
 
   function handleWheel(event: WheelEvent) {
+    if (isFlipping.value) return
     onActivity()
     if (mode.value !== 'page' || event.ctrlKey || event.metaKey) return
     const axis = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? 'horizontal' : 'vertical'
@@ -142,6 +172,7 @@ export function usePdfPagination({
   }
 
   function handleTouchStart(event: TouchEvent) {
+    if (isFlipping.value) return
     onActivity()
     if (mode.value !== 'page' || !touchPageTurningEnabled.value || event.touches.length !== 1) {
       touchStart = null
@@ -151,6 +182,7 @@ export function usePdfPagination({
   }
 
   function handleTouchEnd(event: TouchEvent) {
+    if (isFlipping.value) return
     if (mode.value !== 'page' || !touchPageTurningEnabled.value || !touchStart || event.changedTouches.length !== 1) {
       touchStart = null
       return
@@ -174,5 +206,16 @@ export function usePdfPagination({
     if (wheelUnlockTimer) clearTimeout(wheelUnlockTimer)
   })
 
-  return { pageRange, getPageRange, goToPage, previousPage, nextPage, handleWheel, handleTouchStart, handleTouchEnd, handleTouchCancel }
+  return {
+    isFlipping,
+    pageRange,
+    getPageRange,
+    goToPage,
+    previousPage,
+    nextPage,
+    handleWheel,
+    handleTouchStart,
+    handleTouchEnd,
+    handleTouchCancel,
+  }
 }
