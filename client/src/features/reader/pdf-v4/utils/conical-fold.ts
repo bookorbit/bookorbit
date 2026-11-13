@@ -101,7 +101,6 @@ export function calculateFoldGeometry(width: number, height: number, corner: Cor
     }
   }
 
-  // The peeled area contains cornerPoint.
   // Corners of the page that lie on the same side of the fold as cornerPoint:
   const allCorners: Point[] = [
     { x: 0, y: 0 },
@@ -120,7 +119,6 @@ export function calculateFoldGeometry(width: number, height: number, corner: Cor
   }
 
   // Build polygon around peel area: p1 -> peelCorners -> p2
-  // Sort around center of peel area
   const peelVertices = [p1, ...peelCorners, p2]
   const cx = peelVertices.reduce((sum, p) => sum + p.x, 0) / peelVertices.length
   const cy = peelVertices.reduce((sum, p) => sum + p.y, 0) / peelVertices.length
@@ -149,20 +147,19 @@ export function renderConicalFold(
   height: number,
   sourceCanvas: HTMLCanvasElement,
   geometry: FoldGeometry,
+  revealedCanvas: HTMLCanvasElement | null = null,
   isDark = false,
-  shadowIntensity = 0.55,
+  shadowIntensity = 0.65,
 ) {
   const { midpoint, foldLine, foldAngle, normal, reflectedPolygon, foldDistance } = geometry
   const [p1, p2] = foldLine
 
   ctx.clearRect(0, 0, width, height)
 
-  // 1. Draw flat unpeeled front page portion
-  // The unpeeled part is the whole page MINUS the peeled polygon
+  // 1. Base Layer: Unpeeled front page portion (page N)
   ctx.save()
   ctx.beginPath()
   ctx.rect(0, 0, width, height)
-  // Cut out peeled polygon using evenodd or inverse clipping
   if (geometry.peelPolygon.length >= 3) {
     ctx.moveTo(geometry.peelPolygon[0]!.x, geometry.peelPolygon[0]!.y)
     for (let i = 1; i < geometry.peelPolygon.length; i++) {
@@ -174,8 +171,7 @@ export function renderConicalFold(
   ctx.drawImage(sourceCanvas, 0, 0, width, height)
   ctx.restore()
 
-  // 2. Outer Drop Shadow (cast from fold line onto the revealed page underneath)
-  // The revealed page is visible through the cutout!
+  // 2. Revealed Layer: Page N+1 underneath in peel cutout
   ctx.save()
   ctx.beginPath()
   if (geometry.peelPolygon.length >= 3) {
@@ -185,23 +181,28 @@ export function renderConicalFold(
     }
     ctx.closePath()
     ctx.clip()
+    if (revealedCanvas) {
+      ctx.drawImage(revealedCanvas, 0, 0, width, height)
+    }
   }
 
-  const shadowWidth = Math.min(80, Math.max(20, foldDistance * 0.25))
+  // Soft drop shadow cast from the fold line onto revealed page
+  const shadowWidth = Math.min(100, Math.max(25, foldDistance * 0.3))
   ctx.translate(midpoint.x, midpoint.y)
   ctx.rotate(foldAngle)
 
   const outerGrad = ctx.createLinearGradient(0, -shadowWidth, 0, shadowWidth)
-  const shadowAlpha = Math.min(0.65, shadowIntensity * (0.3 + (foldDistance / (width * 1.5)) * 0.4))
+  const shadowAlpha = Math.min(0.7, shadowIntensity * (0.35 + (foldDistance / (width * 1.5)) * 0.45))
   outerGrad.addColorStop(0, `rgba(0, 0, 0, ${shadowAlpha})`)
-  outerGrad.addColorStop(0.2, `rgba(0, 0, 0, ${shadowAlpha * 0.5})`)
+  outerGrad.addColorStop(0.2, `rgba(0, 0, 0, ${shadowAlpha * 0.6})`)
+  outerGrad.addColorStop(0.5, `rgba(0, 0, 0, ${shadowAlpha * 0.2})`)
   outerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
 
   ctx.fillStyle = outerGrad
   ctx.fillRect(-width * 2, 0, width * 4, shadowWidth)
   ctx.restore()
 
-  // 3. Reflected Turned Page Backface
+  // 3. Curled Backside Layer: Mirrored page N with warm cream texture & cylindrical lighting
   ctx.save()
   ctx.beginPath()
   if (reflectedPolygon.length >= 3) {
@@ -212,47 +213,47 @@ export function renderConicalFold(
     ctx.closePath()
     ctx.clip()
 
-    // Transform context to mirror across the fold line
-    // Reflection across line passing through midpoint at foldAngle
+    // Mirror transform across fold line
     ctx.translate(midpoint.x, midpoint.y)
     ctx.rotate(foldAngle)
     ctx.scale(1, -1)
     ctx.rotate(-foldAngle)
     ctx.translate(-midpoint.x, -midpoint.y)
 
-    // Draw the source page (mirrored)
+    // Draw source page mirrored
     ctx.drawImage(sourceCanvas, 0, 0, width, height)
 
-    // Warm-tinted paper back-side texture
-    const tintColor = isDark ? 'rgba(30, 30, 32, 0.92)' : 'rgba(250, 247, 240, 0.93)'
+    // Warm cream paper backside texture
+    const tintColor = isDark ? 'rgba(32, 32, 34, 0.94)' : 'rgba(248, 244, 236, 0.92)'
     ctx.fillStyle = tintColor
     ctx.fillRect(0, 0, width, height)
 
-    // Subtle paper gradient across the backside to simulate curled lighting
-    const backGrad = ctx.createLinearGradient(midpoint.x, midpoint.y, midpoint.x + normal.x * 200, midpoint.y + normal.y * 200)
-    backGrad.addColorStop(0, isDark ? 'rgba(255, 255, 255, 0.04)' : 'rgba(0, 0, 0, 0.08)')
-    backGrad.addColorStop(0.3, isDark ? 'rgba(0, 0, 0, 0.15)' : 'rgba(0, 0, 0, 0.02)')
-    backGrad.addColorStop(1, isDark ? 'rgba(0, 0, 0, 0.35)' : 'rgba(0, 0, 0, 0.12)')
+    // Curved cylindrical highlight / shading across backside
+    const backGrad = ctx.createLinearGradient(midpoint.x, midpoint.y, midpoint.x + normal.x * 240, midpoint.y + normal.y * 240)
+    backGrad.addColorStop(0, isDark ? 'rgba(255, 255, 255, 0.06)' : 'rgba(0, 0, 0, 0.09)')
+    backGrad.addColorStop(0.3, isDark ? 'rgba(0, 0, 0, 0.12)' : 'rgba(0, 0, 0, 0.02)')
+    backGrad.addColorStop(0.7, isDark ? 'rgba(0, 0, 0, 0.28)' : 'rgba(0, 0, 0, 0.09)')
+    backGrad.addColorStop(1, isDark ? 'rgba(0, 0, 0, 0.5)' : 'rgba(0, 0, 0, 0.2)')
     ctx.fillStyle = backGrad
     ctx.fillRect(0, 0, width, height)
   }
   ctx.restore()
 
-  // 4. Inner Crease Highlight & Shadow along the fold edge
+  // 4. Crease Highlight & Inner Shadow along the fold edge
   ctx.save()
   ctx.beginPath()
   ctx.moveTo(p1.x, p1.y)
   ctx.lineTo(p2.x, p2.y)
   ctx.lineWidth = 2.5
-  ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.65)'
+  ctx.strokeStyle = isDark ? 'rgba(255, 255, 255, 0.35)' : 'rgba(255, 255, 255, 0.75)'
   ctx.stroke()
 
   ctx.translate(midpoint.x, midpoint.y)
   ctx.rotate(foldAngle)
-  const creaseWidth = 28
+  const creaseWidth = 32
   const innerGrad = ctx.createLinearGradient(0, 0, 0, -creaseWidth)
-  innerGrad.addColorStop(0, isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.3)')
-  innerGrad.addColorStop(0.2, isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.35)')
+  innerGrad.addColorStop(0, isDark ? 'rgba(0, 0, 0, 0.55)' : 'rgba(0, 0, 0, 0.4)')
+  innerGrad.addColorStop(0.2, isDark ? 'rgba(255, 255, 255, 0.2)' : 'rgba(255, 255, 255, 0.45)')
   innerGrad.addColorStop(0.5, isDark ? 'rgba(0, 0, 0, 0.18)' : 'rgba(0, 0, 0, 0.12)')
   innerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)')
 

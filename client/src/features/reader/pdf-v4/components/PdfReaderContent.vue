@@ -137,6 +137,11 @@ function handleBack() {
   emit('back')
 }
 
+function handleCurlCommit(direction: 1 | -1) {
+  const target = Math.min(Math.max(scrollState.value.currentPage + direction, 1), scrollState.value.totalPages || 1)
+  handleGoToPage(target)
+}
+
 function handleZoomOut() {
   zoom.value?.zoomOut()
 }
@@ -532,18 +537,6 @@ onUnmounted(() => {
         @touchend="handleTouchEnd"
         @touchcancel="handleTouchCancel"
       >
-        <!-- 3D Conical Paper Page Curl Transition Overlay -->
-        <PdfCurlOverlay
-          ref="curlOverlayRef"
-          :active="props.settings.pageTurnAnimation === 'curl' && currentScrollMode === 'page'"
-          :surface="viewerSurface"
-          :current-page="scrollState.currentPage"
-          :total-pages="scrollState.totalPages"
-          :is-dark="isDark"
-          @turn-next="handleNextPage"
-          @turn-prev="handlePreviousPage"
-        />
-
         <DocumentContent :document-id="props.documentId">
           <template #default="{ documentState, isLoading, isError, isLoaded }">
             <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-background">
@@ -596,6 +589,17 @@ onUnmounted(() => {
             <PdfDocumentViewport v-else-if="isLoaded" :document-id="props.documentId" />
           </template>
         </DocumentContent>
+
+        <!-- 3D Conical Paper Page Curl Transition Overlay -->
+        <PdfCurlOverlay
+          ref="curlOverlayRef"
+          :active="props.settings.pageTurnAnimation === 'curl' && currentScrollMode === 'page'"
+          :surface="viewerSurface"
+          :current-page="scrollState.currentPage"
+          :total-pages="scrollState.totalPages"
+          :is-dark="isDark"
+          @commit-turn="handleCurlCommit"
+        />
         <PdfSelectionPopup
           ref="selectionPopup"
           :visible="highlights.popupVisible.value"

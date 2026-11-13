@@ -136,7 +136,7 @@ export function useFoliate(
 
   async function loadScript() {
     if (customElements.get('foliate-view')) return
-    const src = import.meta.env.DEV ? `/assets/foliate/view.js?v=${Date.now()}` : '/assets/foliate/view.js'
+    const src = import.meta.env.DEV ? `/assets/foliate/view.js?v=${Date.now()}` : '/assets/foliate/view.js?v=2.2.0'
     await new Promise<void>((resolve, reject) => {
       const script = document.createElement('script')
       script.type = 'module'

@@ -495,6 +495,7 @@ export class Paginator extends HTMLElement {
   #scrollBounds
   #touchState
   #touchScrolled
+  #pointerDragState
   #lastVisibleRange
 
   get pageTurnAnimation() {
@@ -699,10 +700,18 @@ export class Paginator extends HTMLElement {
     this.addEventListener('touchstart', this.#onTouchStart.bind(this), opts)
     this.addEventListener('touchmove', this.#onTouchMove.bind(this), opts)
     this.addEventListener('touchend', this.#onTouchEnd.bind(this))
+    this.addEventListener('pointerdown', this.#onPointerDown.bind(this))
+    this.addEventListener('pointermove', this.#onPointerMove.bind(this))
+    this.addEventListener('pointerup', this.#onPointerUp.bind(this))
+    this.addEventListener('pointercancel', this.#onPointerUp.bind(this))
     this.addEventListener('load', ({ detail: { doc } }) => {
       doc.addEventListener('touchstart', this.#onTouchStart.bind(this), opts)
       doc.addEventListener('touchmove', this.#onTouchMove.bind(this), opts)
       doc.addEventListener('touchend', this.#onTouchEnd.bind(this))
+      doc.addEventListener('pointerdown', this.#onPointerDown.bind(this))
+      doc.addEventListener('pointermove', this.#onPointerMove.bind(this))
+      doc.addEventListener('pointerup', this.#onPointerUp.bind(this))
+      doc.addEventListener('pointercancel', this.#onPointerUp.bind(this))
     })
 
     this.addEventListener('relocate', ({ detail }) => {
@@ -1114,6 +1123,162 @@ export class Paginator extends HTMLElement {
     requestAnimationFrame(() => {
       if (globalThis.visualViewport.scale === 1) this.snap(this.#touchState.vx, this.#touchState.vy)
     })
+  }
+  #onPointerDown(e) {
+    if (e.pointerType !== 'mouse') return
+    if (this.scrolled || this.#vertical || this.pageTurnAnimation !== 'curl') return
+    const rect = this.getBoundingClientRect()
+    const xInPage = e.clientX - rect.left
+    const marginThreshold = rect.width * 0.28
+    if (xInPage > marginThreshold && xInPage < rect.width - marginThreshold) return
+
+    this.#pointerDragState = {
+      startX: e.clientX,
+      startY: e.clientY,
+      x: e.clientX,
+      y: e.clientY,
+      t: e.timeStamp,
+      vx: 0,
+      totalDx: 0,
+      active: true,
+    }
+  }
+  #onPointerMove(e) {
+    if (e.pointerType !== 'mouse') return
+    const state = this.#pointerDragState
+    if (!state || !state.active) return
+    const dx = state.startX - e.clientX
+    const dt = Math.max(1, e.timeStamp - state.t)
+    state.vx = (state.x - e.clientX) / dt
+    state.x = e.clientX
+    state.y = e.clientY
+    state.t = e.timeStamp
+    state.totalDx = dx
+
+    const isCurl = !this.scrolled && !this.#vertical && this.pageTurnAnimation === 'curl'
+    if (isCurl && this.#curlLeaf && this.#curlStage) {
+      const style = getComputedStyle(this.#top)
+      const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread')) || 1
+      const isTwoPage = maxColumnCount > 1
+      const leafWidth = isTwoPage ? this.size / 2 : this.size
+      const progress = Math.min(1, Math.max(0, Math.abs(state.totalDx) / leafWidth))
+      const dragDir = state.totalDx > 0 ? 1 : -1
+      const effectiveDir = this.#rtl ? -dragDir : dragDir
+
+      if (progress > 0.02) {
+        const bookBg = this.#background?.style?.background || getComputedStyle(this.#background).background || '#ffffff'
+        this.#curlLeafFront.style.background = bookBg
+        this.#curlLeafBack.style.background = bookBg
+
+        if (this.#curlLeafFront.childElementCount === 0 && this.#view?.document && this.#view?.iframe) {
+          try {
+            const cloneIframe = document.createElement('iframe')
+            cloneIframe.setAttribute('part', 'filter')
+            cloneIframe.setAttribute('sandbox', 'allow-same-origin allow-scripts')
+            cloneIframe.setAttribute('scrolling', 'no')
+            Object.assign(cloneIframe.style, {
+              position: 'absolute',
+              top: '0',
+              border: '0',
+              overflow: 'hidden',
+              width: this.#view.iframe.style.width,
+              height: this.#view.iframe.style.height,
+              pointerEvents: 'none',
+            })
+            const currentOffset = this.#container[this.scrollProp] || 0
+            let shift = currentOffset
+            if (isTwoPage && effectiveDir > 0) {
+              shift = currentOffset + leafWidth
+            }
+            cloneIframe.style.left = `${-shift}px`
+            this.#curlLeafFront.replaceChildren(cloneIframe)
+
+            const cloneDoc = cloneIframe.contentDocument
+            if (cloneDoc) {
+              cloneDoc.open()
+              cloneDoc.write(this.#view.document.documentElement.outerHTML)
+              cloneDoc.close()
+            }
+          } catch {}
+        }
+
+        this.#curlLeaf.style.width = `${leafWidth}px`
+        this.#curlLeaf.style.height = `${this.#container.clientHeight}px`
+
+        if (isTwoPage) {
+          if (effectiveDir > 0) {
+            this.#curlLeaf.style.left = `${leafWidth}px`
+            this.#curlLeaf.style.transformOrigin = 'left center'
+          } else {
+            this.#curlLeaf.style.left = '0px'
+            this.#curlLeaf.style.transformOrigin = 'right center'
+          }
+        } else {
+          this.#curlLeaf.style.left = '0px'
+          this.#curlLeaf.style.transformOrigin = effectiveDir > 0 ? 'left center' : 'right center'
+        }
+
+        const startAngle = 0
+        const targetAngle = effectiveDir > 0 ? -115 : 115
+        const currentAngle = lerp(startAngle, targetAngle, progress)
+        const liftZ = Math.sin(progress * Math.PI) * 45
+        const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 2 : -2)
+        const shadowSpread = Math.sin(progress * Math.PI) * 20
+
+        this.#curlStage.style.visibility = 'visible'
+        this.#curlStage.style.opacity = '1'
+        this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`
+        this.#curlLeaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0,0,0,0.22)`
+        this.#curlCreaseShadow.style.opacity = String(Math.sin(progress * Math.PI) * 0.85)
+        this.#curlSpineShadow.style.opacity = String(Math.sin(progress * Math.PI) * 0.7)
+      }
+    }
+  }
+  #onPointerUp(e) {
+    if (e.pointerType !== 'mouse') return
+    const state = this.#pointerDragState
+    if (!state || !state.active) return
+    state.active = false
+    this.#pointerDragState = null
+
+    const isCurl = !this.scrolled && !this.#vertical && this.pageTurnAnimation === 'curl'
+    if (isCurl && this.#curlStage && this.#curlLeaf) {
+      const style = getComputedStyle(this.#top)
+      const maxColumnCount = parseInt(style.getPropertyValue('--_max-column-count-spread')) || 1
+      const leafWidth = maxColumnCount > 1 ? this.size / 2 : this.size
+      const progress = Math.min(1, Math.max(0, Math.abs(state.totalDx) / leafWidth))
+      const dragDir = state.totalDx > 0 ? 1 : -1
+      const effectiveDir = this.#rtl ? -dragDir : dragDir
+
+      if (progress > 0.25 || Math.abs(state.vx) > 0.3) {
+        animate(progress, 1, 150, easeOutQuad, (p) => {
+          const currentAngle = lerp(0, effectiveDir > 0 ? -115 : 115, p)
+          const opacity = p >= 0.85 ? Math.max(0, 1 - (p - 0.85) / 0.15) : 1
+          this.#curlLeaf.style.opacity = String(opacity)
+          this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg)`
+        }).then(() => {
+          this.#curlLeafFront.replaceChildren()
+          this.#curlStage.style.opacity = '0'
+          this.#curlStage.style.visibility = 'hidden'
+          this.#curlLeaf.style.transform = 'none'
+          this.#curlLeaf.style.opacity = '1'
+          if (dragDir > 0) this.next()
+          else this.prev()
+        })
+      } else {
+        animate(progress, 0, 180, easeOutQuad, (p) => {
+          const currentAngle = lerp(0, effectiveDir > 0 ? -115 : 115, p)
+          this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg)`
+          this.#curlCreaseShadow.style.opacity = String(Math.sin(p * Math.PI) * 0.85)
+        }).then(() => {
+          this.#curlLeafFront.replaceChildren()
+          this.#curlStage.style.opacity = '0'
+          this.#curlStage.style.visibility = 'hidden'
+          this.#curlLeaf.style.transform = 'none'
+          this.#curlLeaf.style.opacity = '1'
+        })
+      }
+    }
   }
   // allows one to process rects as if they were LTR and horizontal
   #getRectMapper() {
