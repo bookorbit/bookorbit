@@ -45,7 +45,7 @@ function handleNavigate() {
 </script>
 
 <template>
-  <li class="pt-1.5" data-testid="sidebar-primary-icons">
+  <li data-testid="sidebar-icon-row">
     <ul class="grid auto-cols-fr grid-flow-col">
       <li v-for="tile in tiles" :key="tile.entry.id" class="flex justify-center">
         <Tooltip>

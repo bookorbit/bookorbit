@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { LayoutGrid, Search, SlidersHorizontal } from '@lucide/vue'
+import { Search, SlidersHorizontal } from '@lucide/vue'
 import { VueDraggable } from 'vue-draggable-plus'
+import type { SidebarIconGroupId } from '@bookorbit/types'
 import { SidebarGroup, SidebarSeparator } from '@/components/ui/sidebar'
 import SidebarCustomizeControls from '@/components/sidebar/SidebarCustomizeControls.vue'
+import SidebarCustomizeIconToggle from '@/components/sidebar/SidebarCustomizeIconToggle.vue'
 import SidebarCustomizeRow from '@/components/sidebar/SidebarCustomizeRow.vue'
 import SidebarCustomizeRows from '@/components/sidebar/SidebarCustomizeRows.vue'
-import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import type { SidebarBlockKind } from '@/components/sidebar/sidebar-layout'
 import { formatCompactNumber, formatNumber } from '@/i18n/formatters'
 import { useListReorder } from '@/composables/useListReorder'
 import { useSidebarCustomizeMode } from '@/composables/useSidebarCustomizeMode'
-import { useSidebarLayout } from '@/composables/useSidebarLayout'
+import { isSidebarIconGroup, useSidebarLayout } from '@/composables/useSidebarLayout'
 import type { ResolvedSidebarNavEntry } from '@/composables/useSidebarNav'
 
 export interface SidebarCustomizeGroup {
@@ -30,12 +31,16 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-const { layout, isHidden, toggleHidden, moveGroups, setPrimaryStyle } = useSidebarLayout()
+const { layout, isHidden, toggleHidden, moveGroups, setPrimaryStyle, groupStyle, setGroupStyle } = useSidebarLayout()
+
+/** Each group names itself: two switches both reading "the pages above" would be ambiguous to a screen reader. */
+const GROUP_ICON_LABEL_KEYS: Record<SidebarIconGroupId, string> = {
+  reading: 'components.sidebar.customize.readingIcons',
+}
 const { stopCustomizing } = useSidebarCustomizeMode()
 
 const titleId = `sidebar-customize-${useId()}`
 const titleRef = ref<HTMLElement | null>(null)
-const primaryIconsId = `sidebar-primary-icons-${useId()}`
 const primaryIcons = computed(() => layout.primaryStyle === 'icons')
 const groupsById = computed(() => new Map(props.groups.map((group) => [group.id, group])))
 
@@ -74,6 +79,14 @@ function separatorBefore(index: number): boolean {
 
 function handlePrimaryIcons(value: boolean) {
   setPrimaryStyle(value ? 'icons' : 'list')
+}
+
+function iconToggleLabel(id: string): string | null {
+  return isSidebarIconGroup(id) ? t(GROUP_ICON_LABEL_KEYS[id]) : null
+}
+
+function handleGroupIcons(id: string, value: boolean) {
+  if (isSidebarIconGroup(id)) setGroupStyle(id, value ? 'icons' : 'list')
 }
 
 function handleToggle(id: string) {
@@ -129,15 +142,11 @@ onUnmounted(() => {
           <SidebarCustomizeRow :icon="Search" :label="t('common.search')" locked />
         </template>
       </SidebarCustomizeRows>
-      <div class="mt-1 flex min-h-8 items-center gap-2 px-2">
-        <span class="inline-flex h-5 w-5 shrink-0 items-center justify-center text-muted-foreground">
-          <LayoutGrid :size="15" aria-hidden="true" />
-        </span>
-        <label :for="primaryIconsId" class="min-w-0 flex-1 cursor-pointer text-[13px] leading-snug text-sidebar-foreground">
-          {{ t('components.sidebar.customize.primaryIcons') }}
-        </label>
-        <ToggleSwitch :id="primaryIconsId" :model-value="primaryIcons" @update:model-value="handlePrimaryIcons" />
-      </div>
+      <SidebarCustomizeIconToggle
+        :label="t('components.sidebar.customize.primaryIcons')"
+        :model-value="primaryIcons"
+        @update:model-value="handlePrimaryIcons"
+      />
     </SidebarGroup>
 
     <VueDraggable
@@ -177,7 +186,15 @@ onUnmounted(() => {
               @grip-blur="onGripBlur(id)"
             />
           </div>
-          <SidebarCustomizeRows v-if="groupOf(id).kind === 'nav' && !isHidden(id)" :zone-id="id" :entries="groupOf(id).entries" />
+          <template v-if="groupOf(id).kind === 'nav' && !isHidden(id)">
+            <SidebarCustomizeRows :zone-id="id" :entries="groupOf(id).entries" />
+            <SidebarCustomizeIconToggle
+              v-if="iconToggleLabel(id) !== null"
+              :label="iconToggleLabel(id) ?? ''"
+              :model-value="groupStyle(id) === 'icons'"
+              @update:model-value="handleGroupIcons(id, $event)"
+            />
+          </template>
         </SidebarGroup>
       </div>
     </VueDraggable>

@@ -33,10 +33,16 @@ export interface SidebarLayout {
   rowOrder: Record<string, string[]>;
   /** How the pinned top group draws in the expanded sidebar. Layouts saved before this existed read as `list`. */
   primaryStyle: SidebarPrimaryStyle;
+  /** How each movable group that offers icons draws in the expanded sidebar. A group left out draws as `list`. */
+  groupStyles: Partial<Record<SidebarIconGroupId, SidebarPrimaryStyle>>;
 }
 
 export const SIDEBAR_PRIMARY_STYLES = ["list", "icons"] as const;
 export type SidebarPrimaryStyle = (typeof SIDEBAR_PRIMARY_STYLES)[number];
+
+/** Movable nav groups that may draw as an icon row. Browse is left out: its rows are there for their counts. */
+export const SIDEBAR_ICON_GROUP_IDS = ["reading"] as const;
+export type SidebarIconGroupId = (typeof SIDEBAR_ICON_GROUP_IDS)[number];
 
 /** Totals behind the sidebar Browse badges, served as one cached payload so the shell needs a single request. */
 export interface BrowseCounts {

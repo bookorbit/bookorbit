@@ -13,7 +13,7 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: { template: '<div><slot /></div>' },
 }))
 
-const { default: SidebarPrimaryIconRow } = await import('../SidebarPrimaryIconRow.vue')
+const { default: SidebarIconRow } = await import('../SidebarIconRow.vue')
 
 const Icon = markRaw({ name: 'Icon', render: () => h('svg') })
 
@@ -26,10 +26,10 @@ function accent(value: number, label?: string): SidebarNavBadge {
 }
 
 function mountRow(entries: ResolvedSidebarNavEntry[]) {
-  return mount(SidebarPrimaryIconRow, { props: { entries }, global: { stubs: { RouterLink: RouterLinkStub } } })
+  return mount(SidebarIconRow, { props: { entries }, global: { stubs: { RouterLink: RouterLinkStub } } })
 }
 
-describe('SidebarPrimaryIconRow', () => {
+describe('SidebarIconRow', () => {
   it('draws one labelled link per page, in the order given', () => {
     const wrapper = mountRow([entry('dashboard'), entry('book-dock', { tourId: 'book-dock-btn' }), entry('tools')])
 
