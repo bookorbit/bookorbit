@@ -339,8 +339,8 @@ msgstr "Se despierta cuando lees"
 #: bookorbit_board_decor.lua:129
 msgid "%1 day in a row!"
 msgid_plural "%1 days in a row!"
-msgstr[0] "%1 día seguido!"
-msgstr[1] "%1 días seguidos!"
+msgstr[0] "¡%1 día seguido!"
+msgstr[1] "¡%1 días seguidos!"
 
 #: bookorbit_board_decor.lua:129
 msgid "A new best"
@@ -2248,11 +2248,11 @@ msgstr "Tamaño"
 
 #: bookorbit_catalog_board.lua:340
 msgid "Earlier"
-msgstr "Anterior"
+msgstr "Antes"
 
 #: bookorbit_catalog_board.lua:341 bookorbit_update_sheet.lua:54 bookorbit_update_sheet.lua:82
 msgid "Later"
-msgstr "Siguiente"
+msgstr "Después"
 
 #: bookorbit_catalog_board.lua:346
 msgid "Page"
@@ -2526,7 +2526,7 @@ msgstr "Descargas fallidas"
 #: bookorbit_catalog_dashboard.lua:145 bookorbit_catalog_dashboard.lua:161 bookorbit_catalog_dashboard.lua:190
 #: bookorbit_catalog_dashboard.lua:218
 msgid "Updating Home…"
-msgstr "Actualizando el panel..."
+msgstr "Actualizando el panel…"
 
 #: bookorbit_catalog_dashboard.lua:233
 msgid "Home needs a newer BookOrbit server. Showing the catalog instead."
@@ -3422,11 +3422,11 @@ msgstr " en %1 días"
 
 #: bookorbit_detail_view.lua:1081
 msgid " over %1 days since %2, last read %3"
-msgstr "hace más de %1 días desde %2, último leído %3"
+msgstr " en %1 días desde el %2, última lectura: %3"
 
 #: bookorbit_detail_view.lua:1081
 msgid " over %1 days since %2"
-msgstr "hace más de %1 días desde %2"
+msgstr " en %1 días desde el %2"
 
 #: bookorbit_detail_view.lua:1089
 msgid "1 highlight"
@@ -4121,7 +4121,7 @@ msgstr "Biblioteca sincronizada"
 
 #: bookorbit_main_menu.lua:607
 msgid "Turn on KOReader's Gestures plugin first: Settings, Taps and gestures."
-msgstr "Activa primero el plugin Gestures de KOReader: Ajustes, Toques y gestos."
+msgstr "Activa primero el plugin Gestos de KOReader: Configuración, Toques y gestos."
 
 #: bookorbit_main_menu.lua:634 bookorbit_signin_page.lua:211
 msgid "Server address"
@@ -4806,7 +4806,7 @@ msgstr "Iniciando sesión…"
 
 #: bookorbit_signin_page.lua:317
 msgid "That username and password were not accepted. Check your KOReader login in BookOrbit on the web: Settings, KOReader."
-msgstr "No se han aceptado ese usuario y esa contraseña. Comprueba tu inicio de sesión de KOReader en BookOrbit en la web: ajustes, KOReader."
+msgstr "No se han aceptado ese usuario y esa contraseña. Comprueba tu inicio de sesión de KOReader en BookOrbit en la web: Ajustes, KOReader."
 
 #: bookorbit_status_page.lua:58
 msgid "Rechecking books…"
@@ -5334,7 +5334,7 @@ msgstr "La sincronización automática necesita Wi-Fi para activarse por sí sol
 
 #: main.lua:1425
 msgid "Open KOReader's Network settings, set 'Action when Wi-Fi is off' to 'Turn on', then turn Auto sync on again."
-msgstr "Abre los ajustes de red de KOReader, pon 'Acción cuando el Wi-Fi esté desactivado' en 'Activar' y luego vuelve a activar la sincronización automática."
+msgstr "Abre los ajustes de red de KOReader, pon 'Acción con wifi desactivado' en 'Activar' y luego vuelve a activar la sincronización automática."
 
 #: main.lua:1445
 msgid "Auto sync on"
