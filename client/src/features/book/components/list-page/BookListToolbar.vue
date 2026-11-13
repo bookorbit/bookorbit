@@ -6,10 +6,10 @@ import BrowseSortControl from '@/components/browse-header/BrowseSortControl.vue'
 import BrowseViewControls from '@/components/browse-header/BrowseViewControls.vue'
 import { barDivider } from '@/components/browse-header/browse-header'
 import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
-import BookFilterBuilder from '@/features/book/components/BookFilterBuilder.vue'
 import BookShuffleButton from '@/features/book/components/BookShuffleButton.vue'
-import BookSortBuilder from '@/features/book/components/BookSortBuilder.vue'
 import TableColumnPanel from '@/features/book/components/TableColumnPanel.vue'
+import FilterPanel from '@/features/book/components/sort-filter/FilterPanel.vue'
+import SortPanel from '@/features/book/components/sort-filter/SortPanel.vue'
 import type { BookListPage } from '@/features/book/composables/useBookListPage'
 
 /**
@@ -38,9 +38,12 @@ const { t } = useI18n()
     :model-value="page.searchQuery"
     :placeholder="searchPlaceholder ?? t('views.bookView.searchPlaceholder')"
     :tokens="page.filterTokens"
+    :join="page.filterJoin"
     :active="page.isNarrowed"
     @update:model-value="page.setSearchQuery"
     @remove-token="page.removeFilterToken"
+    @edit-token="page.editFilterToken"
+    @set-join="page.setFilterJoin"
     @clear="page.clearAll"
     @open-filters="page.openFilterPanel"
   />
@@ -50,31 +53,32 @@ const { t } = useI18n()
     :label="page.sortLabel"
     :direction="page.sortDirection"
     :changed="!page.isDefaultSort"
+    popover-class=""
+    phone-sheet
+    :extra-levels="page.sortExtraLevels"
+    :direction-label="page.sortDirectionLabel"
+    :next-direction-label="page.sortNextDirectionLabel"
+    :hide-direction="page.sortIsRandom"
     @toggle-direction="page.toggleSortDirection"
   >
-    <BookSortBuilder :model-value="page.tableSortModel" :collection-scoped="collectionScopedSort" @update:model-value="page.setSortModel" />
-    <button
-      v-if="!page.isDefaultSort"
-      type="button"
-      class="mt-3 w-full rounded-md px-2 py-1.5 text-left text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-      @click="page.resetSort"
-    >
-      {{ t('views.bookView.resetSort') }}
-    </button>
+    <SortPanel
+      :model-value="page.tableSortModel"
+      :default-sort="page.defaultSortSpec"
+      :collection-scoped="collectionScopedSort"
+      @update:model-value="page.setSortModel"
+      @shuffle="page.reshuffle"
+    />
   </BrowseSortControl>
   <BookShuffleButton v-if="page.randomSortActive" desktop-only compact @shuffle="page.reshuffle" />
-  <BrowseFilterControl :open="page.filterOpen" :count="page.filterRuleCount" @update:open="page.setFilterOpen">
-    <BookFilterBuilder :model-value="page.filter" :max-depth="filterMaxDepth" @update:model-value="page.setFilter" />
-    <template v-if="page.filterRuleCount > 0" #footer>
-      <span class="flex-1" />
-      <button
-        type="button"
-        class="inline-flex h-8 items-center rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:text-destructive"
-        @click="page.clearFilters"
-      >
-        {{ t('views.bookView.clearAllFilters') }}
-      </button>
-    </template>
+  <BrowseFilterControl :open="page.filterOpen" :count="page.filterRuleCount" :anchor="page.filterAnchor" @update:open="page.setFilterOpen">
+    <FilterPanel
+      :model-value="page.filter"
+      :view="page.filterView"
+      :match-count="page.filterMatchCount"
+      :max-depth="filterMaxDepth"
+      @update:model-value="page.setFilter"
+      @close="page.closeFilterPanel"
+    />
   </BrowseFilterControl>
   <slot name="extras" />
   <span :class="barDivider" aria-hidden="true" />

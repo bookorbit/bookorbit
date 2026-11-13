@@ -1,11 +1,12 @@
 import { computed, type Ref } from 'vue'
 import type { GroupRule, Rule } from '@bookorbit/types'
-import { i18n } from '@/i18n'
-import { ruleToTokenParts } from '../lib/filter-labels'
+import { groupLabel, ruleToTokenParts } from '../lib/filter-labels'
 
 export interface FilterToken {
-  /** Position of the rule in the root group, which is what removing it needs. */
+  /** Position of the rule in the root group, which is what editing or removing it needs. */
   index: number
+  /** A group is edited in the builder rather than in a value panel of its own. */
+  kind: 'rule' | 'group'
   field: string
   operator: string
   value: string | null
@@ -21,15 +22,15 @@ function normalize(rules: (Rule | GroupRule)[], join: GroupRule['join']): GroupR
 
 /**
  * Splits a browse filter into what the bar shows twice over: the root-level format rule the
- * format chips own, and every other root rule as a removable token in the search field. Picking
- * a chip edits that one rule, so a format is never stated as a chip and a token at once.
+ * format chips own, and every other root rule as a token in the search field. Picking a chip
+ * edits that one rule, so a format is never stated as a chip and a token at once. How the root
+ * rules combine, all or any, is the join chip beside the tokens.
  *
- * Facet chips only own a rule under an AND root. An OR root is kept whole as a single token, and
- * picking a format then ANDs the format rule beside it rather than changing what the OR means.
+ * Facet chips only own a rule under an AND root. Under an OR root every rule is a token, and
+ * picking a format then ANDs the format rule beside the whole OR rather than changing what it means.
  * Views without format chips pass `formatFacet: false`, and every rule is then a token.
  */
 export function useFilterTokens(filter: Ref<GroupRule | undefined>, options: { formatFacet?: boolean } = {}) {
-  const t = i18n.global.t
   const formatFacet = options.formatFacet ?? true
 
   const formatRuleIndex = computed(() => {
@@ -48,35 +49,25 @@ export function useFilterTokens(filter: Ref<GroupRule | undefined>, options: { f
   const tokens = computed<FilterToken[]>(() => {
     const root = filter.value
     if (!root) return []
-    if (root.join === 'OR') {
-      return [{ index: -1, field: t('components.browseHeader.tokens.anyOf', { count: root.rules.length }), operator: '', value: null }]
-    }
-    return root.rules.flatMap((rule, index) => {
+    return root.rules.flatMap((rule, index): FilterToken[] => {
       if (index === formatRuleIndex.value) return []
-      if (rule.type === 'group') {
-        const label =
-          rule.join === 'OR'
-            ? t('components.browseHeader.tokens.anyOf', { count: rule.rules.length })
-            : t('components.browseHeader.tokens.allOf', { count: rule.rules.length })
-        return [{ index, field: label, operator: '', value: null }]
-      }
-      return [{ index, ...ruleToTokenParts(rule) }]
+      if (rule.type === 'group') return [{ index, kind: 'group', field: groupLabel(rule), operator: '', value: null }]
+      return [{ index, kind: 'rule', ...ruleToTokenParts(rule) }]
     })
   })
 
-  const ruleCount = computed(() => {
+  const ruleCount = computed(() => filter.value?.rules.length ?? 0)
+  const join = computed<GroupRule['join']>(() => filter.value?.join ?? 'AND')
+
+  function setJoin(value: GroupRule['join']) {
     const root = filter.value
-    if (!root) return 0
-    return root.join === 'OR' ? 1 : root.rules.length
-  })
+    if (!root || root.join === value) return
+    filter.value = { ...root, join: value }
+  }
 
   function removeToken(index: number) {
     const root = filter.value
     if (!root) return
-    if (index < 0) {
-      filter.value = undefined
-      return
-    }
     filter.value = normalize(
       root.rules.filter((_, i) => i !== index),
       root.join,
@@ -111,5 +102,5 @@ export function useFilterTokens(filter: Ref<GroupRule | undefined>, options: { f
     setFormats(current.includes(format) ? current.filter((f) => f !== format) : [...current, format])
   }
 
-  return { tokens, selectedFormats, ruleCount, removeToken, toggleFormat, setFormats }
+  return { tokens, selectedFormats, ruleCount, join, setJoin, removeToken, toggleFormat, setFormats }
 }

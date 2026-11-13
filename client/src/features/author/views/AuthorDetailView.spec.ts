@@ -202,6 +202,8 @@ async function mountView() {
   const wrapper = mount(AuthorDetailView, {
     global: {
       stubs: {
+        SingleSortControl: true,
+        LibraryMenuButton: true,
         AuthorHeader: {
           name: 'AuthorHeader',
           props: ['author'],

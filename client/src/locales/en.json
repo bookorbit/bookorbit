@@ -7088,7 +7088,61 @@
       "customFieldFallback": "Custom field",
       "remove": "Remove",
       "emptyState": "No sort configured. Title ascending will be used.",
-      "addLevel": "Add sort level"
+      "addLevel": "Add sort level",
+      "panelTitle": "Sort",
+      "findField": "Find a field",
+      "findFieldAria": "Find a sort field",
+      "findThenByAria": "Find a field to sort by next",
+      "sortByList": "Sort by",
+      "thenBy": "Then by",
+      "thenByEllipsis": "Then by…",
+      "then": "then",
+      "backToSort": "Back to sort",
+      "orderFor": "Order for {field}",
+      "removeLevel": "Remove {field}",
+      "switchLevelOrder": "{field}: {order}. Switch",
+      "dragToReorder": "Drag to reorder",
+      "resetTo": "Reset to {field}, {order}",
+      "resetToField": "Reset to {field}",
+      "shuffleAgain": "Shuffle again",
+      "noFieldMatch": "No field matches \"{query}\".",
+      "sentenceSortBy": "Sort by",
+      "sentenceThenBy": "then by",
+      "changeField": "Change sort field",
+      "groups": {
+        "common": "Common",
+        "reading": "Reading",
+        "details": "Book details",
+        "files": "Files",
+        "other": "Other",
+        "custom": "Custom fields"
+      },
+      "direction": {
+        "text": {
+          "asc": "A → Z",
+          "desc": "Z → A"
+        },
+        "date": {
+          "asc": "Oldest first",
+          "desc": "Newest first"
+        },
+        "number": {
+          "asc": "Low to high",
+          "desc": "High to low"
+        },
+        "index": {
+          "asc": "1 → 9",
+          "desc": "9 → 1"
+        },
+        "status": {
+          "asc": "Ascending",
+          "desc": "Descending"
+        },
+        "boolean": {
+          "asc": "No first",
+          "desc": "Yes first"
+        }
+      }
     },
     "filter": {
       "match": "Match",
@@ -7192,7 +7246,109 @@
       "group": "Group",
       "addRule": "Add rule",
       "addGroup": "Add group",
-      "typeToSearch": "Type to search..."
+      "typeToSearch": "Type to search...",
+      "panelTitle": "Filter",
+      "filterBy": "Filter by…",
+      "findFieldAria": "Find a field to filter by",
+      "fieldList": "Filter fields",
+      "active": "Active",
+      "clearAll": "Clear all",
+      "addAFilter": "Add a filter",
+      "advancedBuilder": "Advanced builder",
+      "advancedBuilderHint": "Groups, any-of",
+      "backToFields": "Back to fields",
+      "removeThisFilter": "Remove this filter",
+      "removeNamed": "Remove {label}",
+      "editNamed": "Edit {label}",
+      "done": "Done",
+      "matchCount": "{count, plural, one {# book matches} other {# books match}}",
+      "notAppliedYet": "Not applied until it has a value",
+      "operator": "Operator",
+      "valuesOf": "{field} values",
+      "nothingMatches": "Nothing matches \"{query}\".",
+      "moreValues": "{count} more. Type to narrow.",
+      "typeToFind": "Type to find more",
+      "custom": "Custom…",
+      "dateValue": "Date",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "quickPicks": "Quick picks",
+      "provider": "Provider",
+      "min": "Min",
+      "max": "Max",
+      "typeValue": "Type a value",
+      "valueLabel": "{field} value",
+      "minimumLabel": "{field} minimum",
+      "maximumLabel": "{field} maximum",
+      "stars": "{count, plural, one {# star} other {# stars}}",
+      "ratingEq": "Exactly {count}",
+      "ratingGte": "{count} and up",
+      "ratingLte": "{count} and below",
+      "ratingGt": "More than {count}",
+      "ratingLt": "Less than {count}",
+      "valueSearch": {
+        "author": "Search authors",
+        "series": "Search series",
+        "genre": "Search genres",
+        "tag": "Search tags",
+        "publisher": "Search publishers",
+        "language": "Search languages",
+        "collection": "Search collections",
+        "library": "Search libraries",
+        "readStatus": "Search statuses",
+        "format": "Search formats"
+      },
+      "emptyNote": {
+        "isEmpty": "Books where {field} is empty.",
+        "isNotEmpty": "Books where {field} has a value."
+      },
+      "datePresets": {
+        "last7": "Last 7 days",
+        "last30": "Last 30 days",
+        "last90": "Last 3 months",
+        "last365": "Last 12 months",
+        "olderThanYear": "More than a year ago"
+      },
+      "pagePreset": {
+        "under200": "Under 200",
+        "from200to400": "200 to 400",
+        "over400": "Over 400"
+      },
+      "groups": {
+        "book": "Book",
+        "reading": "Reading",
+        "library": "Library and files",
+        "metadata": "Metadata",
+        "custom": "Custom fields"
+      },
+      "builder": {
+        "matchPrefix": "Match",
+        "ofTheseFilters": "of these filters",
+        "ofThese": "of these",
+        "joinAll": "all",
+        "joinAny": "any",
+        "groupAll": "All",
+        "groupAny": "Any",
+        "addFilter": "Add filter",
+        "addGroup": "Add group",
+        "emptyTitle": "No filters yet",
+        "emptyBody": "Narrow these books by author, genre, read status, dates and more. Each filter applies as soon as it has a value.",
+        "chooseValues": "Choose values",
+        "setValue": "Set a value",
+        "editValue": "Edit value",
+        "moreForFilter": "More for this filter",
+        "moreForGroup": "More for this group",
+        "duplicate": "Duplicate",
+        "wrapInGroup": "Wrap in a group",
+        "remove": "Remove",
+        "ungroup": "Ungroup",
+        "removeGroup": "Remove group",
+        "matchAllFilters": "Match all filters",
+        "matchAnyFilter": "Match any filter",
+        "changeField": "Change field",
+        "changeOperator": "Change operator",
+        "changeJoin": "Change how filters combine"
+      }
     },
     "deleteDialog": {
       "title": "Delete book?",
@@ -11776,7 +11932,12 @@
         "removeToken": "Remove filter {label}",
         "clearAll": "Clear search and filters",
         "save": "Save",
-        "summaryToken": "{count, plural, one {# filter} other {# filters}}"
+        "summaryToken": "{count, plural, one {# filter} other {# filters}}",
+        "editToken": "{label}. Edit",
+        "joinAll": "All",
+        "joinAny": "Any",
+        "joinAllAria": "Matching all filters. Change",
+        "joinAnyAria": "Matching any filter. Change"
       },
       "tokens": {
         "anyOf": "Any of {count, plural, one {# rule} other {# rules}}",
@@ -11785,7 +11946,8 @@
       "sort": {
         "sortBy": "Sort by {field}",
         "ascending": "Ascending. Switch to descending",
-        "descending": "Descending. Switch to ascending"
+        "descending": "Descending. Switch to ascending",
+        "switchDirection": "{current}. Switch to {next}"
       },
       "facets": {
         "format": "Format",

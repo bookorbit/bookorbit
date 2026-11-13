@@ -2,20 +2,23 @@
 import { cn } from '@/lib/utils'
 import { useI18n } from 'vue-i18n'
 import { Funnel } from '@lucide/vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import type { PopoverAnchorProps } from 'reka-ui'
+import BrowsePanel from './BrowsePanel.vue'
 import { barButton, barButtonOn } from './browse-header'
 
 /**
- * The filter builder, opened over the grid from the bar. It used to open as a panel that pushed
- * the grid down; the bar is the last band the header may take.
+ * The bar's Filters button and its panel, opened over the grid. The panel sizes to what it shows,
+ * becomes a bottom sheet on a phone, and can sit under a filter token instead of the button.
  */
 withDefaults(
   defineProps<{
     open: boolean
     /** Rules in effect, shown as a badge so a filter is visible even when its tokens are folded. */
     count?: number
+    /** Where the panel opens when it is not under the button, such as the token being edited. */
+    anchor?: PopoverAnchorProps['reference'] | null
   }>(),
-  { count: 0 },
+  { count: 0, anchor: null },
 )
 
 const emit = defineEmits<{
@@ -30,9 +33,14 @@ function handleOpenChange(value: boolean) {
 </script>
 
 <template>
-  <Popover :open="open" @update:open="handleOpenChange">
-    <PopoverTrigger as-child>
-      <button type="button" :class="cn(barButton, (count > 0 || open) && barButtonOn)" :aria-label="t('views.bookView.filters')">
+  <BrowsePanel :open="open" :title="t('book.filter.panelTitle')" phone-sheet :anchor="anchor" @update:open="handleOpenChange">
+    <template #trigger>
+      <button
+        type="button"
+        :class="cn(barButton, (count > 0 || open) && barButtonOn)"
+        :aria-label="t('views.bookView.filters')"
+        aria-haspopup="dialog"
+      >
         <Funnel :size="14" :class="count > 0 || open ? 'text-primary' : 'text-muted-foreground'" aria-hidden="true" />
         <span class="hidden lg:inline">{{ t('views.bookView.filters') }}</span>
         <span
@@ -41,14 +49,7 @@ function handleOpenChange(value: boolean) {
           >{{ count }}</span
         >
       </button>
-    </PopoverTrigger>
-    <PopoverContent align="start" :side-offset="8" class="flex w-[min(720px,calc(100vw-24px))] flex-col p-0">
-      <div class="max-h-[70vh] overflow-y-auto p-3">
-        <slot />
-      </div>
-      <div v-if="$slots.footer" class="flex flex-wrap items-center gap-2 border-t border-border px-3 py-2">
-        <slot name="footer" />
-      </div>
-    </PopoverContent>
-  </Popover>
+    </template>
+    <slot />
+  </BrowsePanel>
 </template>

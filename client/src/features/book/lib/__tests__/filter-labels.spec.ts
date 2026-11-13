@@ -161,7 +161,7 @@ describe('ruleToParts', () => {
 
   it('renders withinLast rules with a days suffix', () => {
     const rule: Rule = { type: 'rule', field: 'addedAt', operator: 'withinLast', value: 7 }
-    expect(ruleToParts(rule)).toEqual({ field: 'Added Date', operator: 'within last', value: '7 days' })
+    expect(ruleToParts(rule)).toEqual({ field: 'Date Added', operator: 'within last', value: '7 days' })
   })
 
   it('renders moreThanAgo rules as a day age', () => {
@@ -181,7 +181,7 @@ describe('ruleToParts', () => {
 
   it('formats primary file size values as readable byte sizes', () => {
     const rule: Rule = { type: 'rule', field: 'fileSize', operator: 'between', value: 10_485_760, valueTo: 26_214_400 }
-    expect(ruleToParts(rule)).toEqual({ field: 'Primary File Size', operator: 'between', value: '10 MB - 25 MB' })
+    expect(ruleToParts(rule)).toEqual({ field: 'File Size', operator: 'between', value: '10 MB - 25 MB' })
   })
 
   it('renders an empty value when a valued operator has no value', () => {

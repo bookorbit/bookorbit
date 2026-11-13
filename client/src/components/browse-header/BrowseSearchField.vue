@@ -3,19 +3,30 @@ import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMoun
 import { useI18n } from 'vue-i18n'
 import { useResizeObserver } from '@vueuse/core'
 import { BookmarkCheck, BookmarkPlus, ChevronDown, Search, Telescope, X } from '@lucide/vue'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import type { AcceptableValue } from 'reka-ui'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import type { FilterToken } from '@/features/book/composables/useFilterTokens'
 
 /**
  * The view search, and the readout of the filter that applies to it: every rule that is not a
- * facet chip shows here as a token. When the tokens no longer fit beside room to type, they fold
- * into one "N filters" token that opens the filter popover.
+ * facet chip shows here as a token that opens its own value panel, with a chip saying whether
+ * they all apply or any one does. When the tokens no longer fit beside room to type, they fold
+ * into one "N filters" token that opens the filter panel.
  */
 const props = withDefaults(
   defineProps<{
     modelValue: string
     placeholder: string
     tokens?: FilterToken[]
+    /** How the root rules combine. */
+    join?: 'AND' | 'OR'
     /** Anything narrowing the view, including facet picks, which turns the clear button on. */
     active?: boolean
     canSaveAsSmartScope?: boolean
@@ -24,16 +35,18 @@ const props = withDefaults(
     /** Registers "/" to focus this field while the view is on screen. */
     shortcut?: boolean
   }>(),
-  { tokens: () => [], active: false, canSaveAsSmartScope: false, canSaveFilter: false, filterSaved: false, shortcut: true },
+  { tokens: () => [], join: 'AND', active: false, canSaveAsSmartScope: false, canSaveFilter: false, filterSaved: false, shortcut: true },
 )
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   'remove-token': [index: number]
+  'edit-token': [index: number, element: HTMLElement]
+  'set-join': [join: 'AND' | 'OR']
   clear: []
   'save-as-smart-scope': []
   'save-filter': []
-  'open-filters': []
+  'open-filters': [element: HTMLElement | null]
 }>()
 
 const { t } = useI18n()
@@ -41,11 +54,16 @@ const { t } = useI18n()
 const rootRef = ref<HTMLElement | null>(null)
 const tokensRef = ref<HTMLElement | null>(null)
 const inputRef = ref<HTMLInputElement | null>(null)
+const summaryRef = ref<HTMLButtonElement | null>(null)
 const summarize = ref(false)
 const MIN_TYPING_ROOM = 120
 
 const canSave = computed(() => props.tokens.length > 0 && (props.canSaveAsSmartScope || props.canSaveFilter))
 const placeholderText = computed(() => (props.tokens.length > 0 ? t('common.search') : props.placeholder))
+const joinLabel = computed(() => (props.join === 'OR' ? t('components.browseHeader.search.joinAny') : t('components.browseHeader.search.joinAll')))
+const joinAria = computed(() =>
+  props.join === 'OR' ? t('components.browseHeader.search.joinAnyAria') : t('components.browseHeader.search.joinAllAria'),
+)
 
 function measureTokens() {
   const root = rootRef.value
@@ -55,7 +73,12 @@ function measureTokens() {
     return
   }
   const needed = tokens.scrollWidth + MIN_TYPING_ROOM
-  summarize.value = props.tokens.length > 1 && needed > root.clientWidth - 120
+  const fold = props.tokens.length > 1 && needed > root.clientWidth - 120
+  // A token or the join chip can fold away while it has focus (results change the bar's width),
+  // and a hidden element drops focus to the page, so the summary that replaces them takes it.
+  const focusSummary = fold && !summarize.value && tokens.contains(document.activeElement)
+  summarize.value = fold
+  if (focusSummary) void nextTick(() => summaryRef.value?.focus())
 }
 
 useResizeObserver(rootRef, measureTokens)
@@ -81,6 +104,15 @@ function handleRemoveToken(index: number) {
   emit('remove-token', index)
 }
 
+function handleEditToken(index: number, event: MouseEvent) {
+  const chip = (event.currentTarget as HTMLElement).closest<HTMLElement>('[data-token]')
+  if (chip) emit('edit-token', index, chip)
+}
+
+function handleJoin(value: AcceptableValue) {
+  if (value === 'AND' || value === 'OR') emit('set-join', value)
+}
+
 function handleClear() {
   emit('clear')
   inputRef.value?.focus()
@@ -94,8 +126,8 @@ function handleSaveFilter() {
   emit('save-filter')
 }
 
-function handleOpenFilters() {
-  emit('open-filters')
+function handleOpenFilters(event: MouseEvent) {
+  emit('open-filters', event.currentTarget as HTMLElement)
 }
 
 function tokenLabel(token: FilterToken) {
@@ -148,8 +180,10 @@ defineExpose({ focus: () => inputRef.value?.focus() })
 
     <button
       v-if="summarize"
+      ref="summaryRef"
       type="button"
       class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-primary/45 bg-primary/12 px-2 text-[12.5px] font-semibold text-foreground transition-colors hover:bg-primary/18 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+      aria-haspopup="dialog"
       @click="handleOpenFilters"
     >
       {{ t('components.browseHeader.search.summaryToken', { count: tokens.length }) }}
@@ -161,14 +195,44 @@ defineExpose({ focus: () => inputRef.value?.focus() })
       :class="summarize ? 'pointer-events-none invisible absolute' : ''"
       :aria-hidden="summarize || undefined"
     >
+      <DropdownMenu v-if="tokens.length > 1">
+        <DropdownMenuTrigger as-child>
+          <button
+            type="button"
+            class="inline-flex h-6 shrink-0 items-center gap-[3px] rounded-md border border-dashed border-primary/45 ps-[7px] pe-1.5 text-[11.5px] font-semibold whitespace-nowrap text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+            :aria-label="joinAria"
+            :tabindex="summarize ? -1 : undefined"
+            data-testid="filter-join-chip"
+          >
+            {{ joinLabel }}
+            <ChevronDown :size="11" :stroke-width="2.25" class="text-muted-foreground" aria-hidden="true" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" class="w-48">
+          <DropdownMenuRadioGroup :model-value="join" @update:model-value="handleJoin">
+            <DropdownMenuRadioItem value="AND">{{ t('book.filter.builder.matchAllFilters') }}</DropdownMenuRadioItem>
+            <DropdownMenuRadioItem value="OR">{{ t('book.filter.builder.matchAnyFilter') }}</DropdownMenuRadioItem>
+          </DropdownMenuRadioGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <span
         v-for="token in tokens"
         :key="token.index"
-        class="inline-flex h-6 shrink-0 items-center gap-1 rounded-md border border-primary/45 bg-primary/12 ps-2 pe-0.5 text-[12.5px] whitespace-nowrap"
+        data-token
+        class="inline-flex h-6 shrink-0 items-center gap-0.5 rounded-md border border-primary/45 bg-primary/12 pe-0.5 text-[12.5px] whitespace-nowrap transition-colors hover:bg-primary/18"
       >
-        <span class="font-semibold text-foreground">{{ token.field }}</span>
-        <span v-if="token.operator" class="text-muted-foreground">{{ token.operator }}</span>
-        <span v-if="token.value" class="max-w-[16rem] truncate font-semibold text-primary">{{ token.value }}</span>
+        <button
+          type="button"
+          class="inline-flex h-full min-w-0 items-center gap-1 rounded-s-md ps-2 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+          :aria-label="t('components.browseHeader.search.editToken', { label: tokenLabel(token) })"
+          aria-haspopup="dialog"
+          :tabindex="summarize ? -1 : undefined"
+          @click="handleEditToken(token.index, $event)"
+        >
+          <span class="font-semibold text-foreground">{{ token.field }}</span>
+          <span v-if="token.operator" class="text-muted-foreground">{{ token.operator }}</span>
+          <span v-if="token.value" class="max-w-[16rem] truncate font-semibold text-primary">{{ token.value }}</span>
+        </button>
         <button
           type="button"
           class="grid size-5 place-items-center rounded text-muted-foreground transition-colors hover:bg-primary/15 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"

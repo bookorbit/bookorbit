@@ -1,4 +1,4 @@
-import { computed, provide, reactive, ref, watch, type ComponentPublicInstance, type MaybeRefOrGetter, type Ref } from 'vue'
+import { computed, provide, reactive, ref, toValue, watch, type ComponentPublicInstance, type MaybeRefOrGetter, type Ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import type { BookCard, BookMergedEvent, ConcreteBookMediaKind, CoverAspectRatio, GroupRule, SortSpec } from '@bookorbit/types'
@@ -19,9 +19,11 @@ import { useBookViewContext } from './useBookViewContext'
 import { useBookViewWindow } from './useBookViewWindow'
 import { useBulkEditMetadata, type BulkEditFields } from './useBulkEditMetadata'
 import { useEffectiveSeriesCollapse } from './useEffectiveSeriesCollapse'
+import { useFilterPanel } from './useFilterPanel'
 import { useFilterTokens } from './useFilterTokens'
 import { useMoveToLibraryTarget } from './useMoveToLibraryTarget'
 import { useSavedViews, type SavedView } from './useSavedViews'
+import { useSortBarLabels } from './useSortFields'
 import { useScrollRestoreOnActivate } from './useScrollRestoreOnActivate'
 import { useSeriesCollapsePreference, type CollapseScope } from './useSeriesCollapsePreference'
 import { useViewSearch } from './useViewSearch'
@@ -109,6 +111,13 @@ export function useBookListPage(options: BookListPageOptions) {
   const { sortModel: tableSortModel, isDefaultSort, resetSort, loadSort } = useViewSort(tableSort, options.viewType, scopeId, defaultSort)
   const sortLabel = computed(() => (tableSort.value[0] ? sortFieldLabel(tableSort.value[0].field) : ''))
   const sortDirection = computed<'asc' | 'desc'>(() => tableSort.value[0]?.dir ?? 'asc')
+  const defaultSortSpec = computed(() => toValue(defaultSort))
+  const {
+    extraLevels: sortExtraLevels,
+    currentDirection: sortDirectionLabel,
+    nextDirection: sortNextDirectionLabel,
+    isRandom: sortIsRandom,
+  } = useSortBarLabels(tableSort)
 
   function toggleSortDirection() {
     const [first, ...rest] = tableSort.value
@@ -116,8 +125,15 @@ export function useBookListPage(options: BookListPageOptions) {
     tableSortModel.value = [{ ...first, dir: first.dir === 'asc' ? 'desc' : 'asc' }, ...rest]
   }
 
-  const filterOpen = ref(false)
-  const { tokens: filterTokens, ruleCount: filterRuleCount, removeToken: removeFilterToken } = useFilterTokens(filter, { formatFacet: false })
+  const filterPanel = useFilterPanel()
+  const filterMatchCount = computed(() => (viewWindow.initialized.value ? bookTotal.value : null))
+  const {
+    tokens: filterTokens,
+    ruleCount: filterRuleCount,
+    join: filterJoin,
+    setJoin: setFilterJoin,
+    removeToken: removeFilterToken,
+  } = useFilterTokens(filter, { formatFacet: false })
   const isNarrowed = computed(() => filterRuleCount.value > 0 || debouncedQuery.value.trim().length > 0)
   const canExport = computed(() => hasPermission('library_download') && !isDemoRestrictedAccount.value)
 
@@ -130,8 +146,12 @@ export function useBookListPage(options: BookListPageOptions) {
     clearSearch()
   }
 
-  function openFilterPanel() {
-    filterOpen.value = true
+  function openFilterPanel(element: HTMLElement | null = null) {
+    filterPanel.openFields(element)
+  }
+
+  function editFilterToken(index: number, element: HTMLElement) {
+    filterPanel.openRule(index, element)
   }
 
   /** A different entity starts from a clean slate rather than the last one's search and filters. */
@@ -301,10 +321,6 @@ export function useBookListPage(options: BookListPageOptions) {
     filter.value = value
   }
 
-  function setFilterOpen(value: boolean) {
-    filterOpen.value = value
-  }
-
   function setSortModel(value: SortSpec[]) {
     tableSortModel.value = value
   }
@@ -400,11 +416,23 @@ export function useBookListPage(options: BookListPageOptions) {
     loadSort,
     sortLabel,
     sortDirection,
+    sortDirectionLabel,
+    sortNextDirectionLabel,
+    sortExtraLevels,
+    sortIsRandom,
+    defaultSortSpec,
     toggleSortDirection,
-    filterOpen,
+    filterOpen: filterPanel.open,
+    filterView: filterPanel.view,
+    filterAnchor: filterPanel.anchor,
+    filterMatchCount,
+    closeFilterPanel: filterPanel.close,
     filterTokens,
     filterRuleCount,
     removeFilterToken,
+    filterJoin,
+    setFilterJoin,
+    editFilterToken,
     isNarrowed,
     clearFilters,
     clearAll,
@@ -440,7 +468,7 @@ export function useBookListPage(options: BookListPageOptions) {
     handleBulkEditConfirm,
     setSearchQuery,
     setFilter,
-    setFilterOpen,
+    setFilterOpen: filterPanel.setOpen,
     setSortModel,
     setViewMode,
     setQuickViewOpen,

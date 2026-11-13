@@ -1,23 +1,45 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 import { useI18n } from 'vue-i18n'
 import { ArrowDown, ArrowUp, ArrowUpDown, ChevronDown } from '@lucide/vue'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import BrowsePanel from './BrowsePanel.vue'
 import { barButton, barButtonOn, barIconButton } from './browse-header'
 
 /**
- * Sort as two controls: the field, whose popover holds the full builder, and the direction of
- * the first tier, which flips in one click instead of opening anything.
+ * Sort as two controls: the field, whose panel holds the full sort, and the direction of the first
+ * tier, which flips in one click instead of opening anything. The direction reads as the field's
+ * own words ("Newest first") when the host passes them.
  */
-withDefaults(
+const props = withDefaults(
   defineProps<{
     label: string
     direction: 'asc' | 'desc'
     /** A sort that differs from the view's default. */
     changed?: boolean
     popoverClass?: string
+    /** Tiers after the first, shown on the button as "+1". */
+    extraLevels?: number
+    /** The current order and the one a click switches to, in the field's words. */
+    directionLabel?: string
+    nextDirectionLabel?: string
+    /** Drops the direction button, for sorts that have no order to flip such as Random. */
+    hideDirection?: boolean
+    /** Opens as a bottom sheet on a phone. */
+    phoneSheet?: boolean
+    /** Keeps the field name on the button at every width. */
+    alwaysShowLabel?: boolean
   }>(),
-  { changed: false, popoverClass: 'w-80 p-3' },
+  {
+    changed: false,
+    popoverClass: 'w-80 p-3',
+    extraLevels: 0,
+    directionLabel: undefined,
+    nextDirectionLabel: undefined,
+    hideDirection: false,
+    phoneSheet: false,
+    alwaysShowLabel: false,
+  },
 )
 
 const emit = defineEmits<{
@@ -26,6 +48,15 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+const directionTitle = computed(() => {
+  if (props.directionLabel && props.nextDirectionLabel) {
+    return t('components.browseHeader.sort.switchDirection', { current: props.directionLabel, next: props.nextDirectionLabel })
+  }
+  return props.direction === 'asc' ? t('components.browseHeader.sort.ascending') : t('components.browseHeader.sort.descending')
+})
+
+const buttonLabel = computed(() => (props.extraLevels > 0 ? `${props.label} +${props.extraLevels}` : props.label))
+
 function handleToggleDirection() {
   emit('toggle-direction')
 }
@@ -33,23 +64,27 @@ function handleToggleDirection() {
 
 <template>
   <div class="flex shrink-0 items-center">
-    <Popover>
-      <PopoverTrigger as-child>
-        <button type="button" :class="cn(barButton, changed && barButtonOn)" :aria-label="t('components.browseHeader.sort.sortBy', { field: label })">
+    <BrowsePanel :title="t('book.sort.panelTitle')" :phone-sheet="phoneSheet" :content-class="popoverClass">
+      <template #trigger>
+        <button
+          type="button"
+          :class="cn(barButton, changed && barButtonOn)"
+          :aria-label="t('components.browseHeader.sort.sortBy', { field: label })"
+          aria-haspopup="dialog"
+        >
           <ArrowUpDown :size="14" :class="changed ? 'text-primary' : 'text-muted-foreground'" aria-hidden="true" />
-          <span class="hidden max-w-[11rem] truncate lg:inline">{{ label }}</span>
-          <ChevronDown :size="13" class="-ms-0.5 hidden text-muted-foreground lg:block" aria-hidden="true" />
+          <span class="max-w-[11rem] truncate" :class="alwaysShowLabel ? 'inline' : 'hidden lg:inline'">{{ buttonLabel }}</span>
+          <ChevronDown :size="13" class="-ms-0.5 text-muted-foreground" :class="alwaysShowLabel ? 'block' : 'hidden lg:block'" aria-hidden="true" />
         </button>
-      </PopoverTrigger>
-      <PopoverContent align="start" :class="popoverClass">
-        <slot />
-      </PopoverContent>
-    </Popover>
+      </template>
+      <slot />
+    </BrowsePanel>
     <button
+      v-if="!hideDirection"
       type="button"
-      :class="cn(barIconButton, 'hidden sm:inline-grid')"
-      :aria-label="direction === 'asc' ? t('components.browseHeader.sort.ascending') : t('components.browseHeader.sort.descending')"
-      :title="direction === 'asc' ? t('components.browseHeader.sort.ascending') : t('components.browseHeader.sort.descending')"
+      :class="cn(barIconButton, alwaysShowLabel ? 'inline-grid' : 'hidden sm:inline-grid')"
+      :aria-label="directionTitle"
+      :title="directionTitle"
       @click="handleToggleDirection"
     >
       <ArrowUp v-if="direction === 'asc'" :size="15" aria-hidden="true" />

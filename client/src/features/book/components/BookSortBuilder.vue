@@ -1,169 +1,201 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { ArrowDownAZ, ArrowUpAZ, ChevronDown, ChevronUp, Plus, Trash2 } from '@lucide/vue'
-import type { SortField, SortSpec } from '@bookorbit/types'
-import { SORT_FIELDS, customSortField, isCollectionScopedSortField } from '@bookorbit/types'
-import { sortFieldLabel } from '@/features/book/lib/filter-labels'
-import { useActiveCustomFields } from '@/features/book/composables/useActiveCustomFields'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ChevronDown, Plus, X } from '@lucide/vue'
+import type { SortField, SortSpec } from '@bookorbit/types'
+import { useSortFields } from '@/features/book/composables/useSortFields'
+import { DEFAULT_SORT, copySort } from '@/features/book/lib/sort-defaults'
+import { MAX_SORT_LEVELS, withLeadField } from '@/features/book/lib/sort-fields'
+import FieldPickerPopover from './sort-filter/FieldPickerPopover.vue'
+import SortOrderSegment from './sort-filter/SortOrderSegment.vue'
+import { ghostButton, iconButton } from './sort-filter/filter-styles'
 
-const { t } = useI18n()
-
-const props = defineProps<{
-  modelValue: SortSpec[]
-  /** Set when the builder sits inside a collection view, which is the only place a sort may order by collection membership. */
-  collectionScoped?: boolean
-}>()
+/**
+ * A saved sort as one sentence: "Sort by Title, A to Z, then by Author". With no sort saved it
+ * reads as the default, and the first change makes that sort the saved one.
+ */
+const props = withDefaults(
+  defineProps<{
+    modelValue: SortSpec[]
+    /** Set when the builder sits inside a collection view, which is the only place a sort may order by collection membership. */
+    collectionScoped?: boolean
+    /** The sort an empty model stands for. */
+    defaultSort?: SortSpec[]
+  }>(),
+  { collectionScoped: false, defaultSort: () => DEFAULT_SORT },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: SortSpec[]]
 }>()
 
-const { fields: customFields } = useActiveCustomFields()
+const { t } = useI18n()
+const { groups, kindOf, iconOf, labelOf, directionLabel, naturalDirectionOf } = useSortFields({ collectionScoped: () => props.collectionScoped })
 
-const customSortFields = computed<SortField[]>(() =>
-  customFields.value
-    .filter((f) => !f.archivedAt)
-    .sort((a, b) => a.displayOrder - b.displayOrder || a.label.localeCompare(b.label))
-    .map((f) => customSortField(f.id)),
-)
+/** The field picker that is open: `lead`, `add`, or `level:<index>`. */
+const openPicker = ref<string | null>(null)
 
-// Relevance only ranks against a search query, so the browse sort builder never offers it.
-const browseSortFields = SORT_FIELDS.filter((field) => field !== 'relevance')
+const effectiveSort = computed<SortSpec[]>(() => (props.modelValue.length > 0 ? props.modelValue : copySort(props.defaultSort)))
+const lead = computed<SortSpec>(() => effectiveSort.value[0] ?? DEFAULT_SORT[0]!)
+const leadKind = computed(() => kindOf(lead.value.field))
+const levels = computed(() => effectiveSort.value.slice(1))
+const usedFields = computed(() => effectiveSort.value.map((spec) => spec.field))
+const otherFields = computed(() => usedFields.value.slice(1))
+const canAddLevel = computed(() => leadKind.value !== 'random' && effectiveSort.value.length < MAX_SORT_LEVELS)
 
-// Smart scopes and home shelves are not scoped to one collection, so the server rejects a
-// membership sort from them and offering it would hand the user a sort that fails.
-const offerableFields = computed<SortField[]>(() =>
-  props.collectionScoped ? browseSortFields : browseSortFields.filter((f) => !isCollectionScopedSortField(f)),
-)
-
-const allFields = computed<SortField[]>(() => [...offerableFields.value, ...customSortFields.value])
-
-const usedFields = computed(() => new Set(props.modelValue.map((s) => s.field)))
-
-function availableFields(currentField: SortField): SortField[] {
-  return offerableFields.value.filter((f) => f === currentField || !usedFields.value.has(f))
-}
-
-function availableCustomFields(currentField: SortField): SortField[] {
-  return customSortFields.value.filter((f) => f === currentField || !usedFields.value.has(f))
-}
-
-function updateField(index: number, field: SortField) {
-  emit(
-    'update:modelValue',
-    props.modelValue.map((s, i) => (i === index ? { ...s, field } : s)),
-  )
-}
-
-function toggleDir(index: number) {
-  emit(
-    'update:modelValue',
-    props.modelValue.map((s, i) => (i === index ? { ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' } : s)),
-  )
-}
-
-function move(index: number, dir: -1 | 1) {
-  const next = [...props.modelValue]
-  const target = index + dir
-  ;[next[index], next[target]] = [next[target]!, next[index]!]
+function update(next: SortSpec[]) {
   emit('update:modelValue', next)
 }
 
-function remove(index: number) {
-  emit(
-    'update:modelValue',
-    props.modelValue.filter((_, i) => i !== index),
-  )
+function levelKey(index: number) {
+  return `level:${index}`
 }
 
-function addTier() {
-  const nextField = allFields.value.find((f) => !usedFields.value.has(f))
-  if (!nextField) return
-  emit('update:modelValue', [...props.modelValue, { field: nextField, dir: 'asc' }])
+function setPicker(key: string, open: boolean) {
+  openPicker.value = open ? key : null
 }
 
-const canAddMore = computed(() => props.modelValue.length < allFields.value.length)
+function handleLeadOpen(open: boolean) {
+  setPicker('lead', open)
+}
+
+function handleAddOpen(open: boolean) {
+  setPicker('add', open)
+}
+
+function handleLevelOpen(index: number, open: boolean) {
+  setPicker(levelKey(index), open)
+}
+
+function handlePickLead(field: SortField) {
+  update(withLeadField(effectiveSort.value, field, kindOf(field)))
+}
+
+function handleLeadDirection(dir: SortSpec['dir']) {
+  update([{ ...lead.value, dir }, ...levels.value])
+}
+
+function handleLevelPick(index: number, field: SortField) {
+  update(effectiveSort.value.map((spec, i) => (i === index + 1 ? { field, dir: naturalDirectionOf(field) } : spec)))
+}
+
+function toggleLevel(index: number) {
+  update(effectiveSort.value.map((spec, i) => (i === index + 1 ? { ...spec, dir: spec.dir === 'asc' ? 'desc' : 'asc' } : spec)))
+}
+
+function removeLevel(index: number) {
+  update(effectiveSort.value.filter((_, i) => i !== index + 1))
+}
+
+function handleAddLevel(field: SortField) {
+  update([...effectiveSort.value, { field, dir: naturalDirectionOf(field) }])
+}
+
+function levelExclude(index: number) {
+  return usedFields.value.filter((_, i) => i !== index + 1)
+}
+
+const fieldButton = `${ghostButton} -ms-1 font-semibold`
 </script>
 
 <template>
-  <div class="flex flex-col gap-2">
-    <div v-for="(spec, index) in modelValue" :key="index" class="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-      <div class="flex flex-col shrink-0">
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              @click="move(index, -1)"
-              :disabled="index === 0"
-              class="h-5 w-5 flex items-center justify-center rounded-xs text-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronUp :size="14" stroke-width="2.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('book.sort.moveUp') }}</TooltipContent>
-        </Tooltip>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <button
-              @click="move(index, 1)"
-              :disabled="index === modelValue.length - 1"
-              class="h-5 w-5 flex items-center justify-center rounded-xs text-foreground hover:text-foreground disabled:opacity-25 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronDown :size="14" stroke-width="2.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>{{ t('book.sort.moveDown') }}</TooltipContent>
-        </Tooltip>
-      </div>
-      <select
-        :value="spec.field"
-        @change="updateField(index, ($event.target as HTMLSelectElement).value as SortField)"
-        class="flex-1 h-8 rounded-md border border-input bg-background text-foreground text-sm px-2 focus:outline-none focus:ring-2 focus:ring-primary"
+  <div class="grid gap-0.5" data-testid="sort-sentence">
+    <div class="flex min-h-9 flex-wrap items-center gap-x-2 gap-y-1.5">
+      <span class="w-[52px] shrink-0 text-[13px] text-muted-foreground">{{ t('book.sort.sentenceSortBy') }}</span>
+      <FieldPickerPopover
+        :open="openPicker === 'lead'"
+        :groups="groups"
+        :selected="lead.field"
+        :exclude="otherFields"
+        :title="t('book.sort.changeField')"
+        :placeholder="t('book.sort.findField')"
+        :search-label="t('book.sort.findFieldAria')"
+        :list-label="t('book.sort.sortByList')"
+        @update:open="handleLeadOpen"
+        @pick="handlePickLead"
       >
-        <option v-for="field in availableFields(spec.field)" :key="field" :value="field">
-          {{ sortFieldLabel(field) }}
-        </option>
-        <optgroup v-if="customSortFields.length > 0" :label="t('book.sort.customFieldsGroup')">
-          <option v-for="field in availableCustomFields(spec.field)" :key="field" :value="field">
-            {{ sortFieldLabel(field) }}
-          </option>
-        </optgroup>
-      </select>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button
-            @click="toggleDir(index)"
-            class="h-8 w-8 flex items-center justify-center rounded-md border border-input bg-background text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
-          >
-            <ArrowDownAZ v-if="spec.dir === 'asc'" :size="15" />
-            <ArrowUpAZ v-else :size="15" />
+        <template #trigger>
+          <button type="button" :class="fieldButton" aria-haspopup="dialog" :aria-label="`${t('book.sort.changeField')}: ${labelOf(lead.field)}`">
+            <component :is="iconOf(lead.field)" :size="14" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+            {{ labelOf(lead.field) }}
+            <ChevronDown :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
           </button>
-        </TooltipTrigger>
-        <TooltipContent>{{ spec.dir === 'asc' ? t('book.sort.ascending') : t('book.sort.descending') }}</TooltipContent>
-      </Tooltip>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <button
-            @click="remove(index)"
-            class="h-8 w-8 flex items-center justify-center rounded-md text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors shrink-0"
-          >
-            <Trash2 :size="13" />
-          </button>
-        </TooltipTrigger>
-        <TooltipContent>{{ t('book.sort.remove') }}</TooltipContent>
-      </Tooltip>
+        </template>
+      </FieldPickerPopover>
+      <span class="flex-1" />
+      <SortOrderSegment
+        v-if="leadKind !== 'random'"
+        class="w-[220px] max-sm:w-full"
+        :model-value="lead.dir"
+        :asc-label="directionLabel(lead.field, 'asc')"
+        :desc-label="directionLabel(lead.field, 'desc')"
+        :label="t('book.sort.orderFor', { field: labelOf(lead.field) })"
+        @update:model-value="handleLeadDirection"
+      />
     </div>
 
-    <p v-if="modelValue.length === 0" class="text-sm text-muted-foreground">{{ t('book.sort.emptyState') }}</p>
+    <div v-for="(level, index) in levels" :key="level.field" class="flex min-h-9 items-center gap-2" data-testid="sort-sentence-level">
+      <span class="w-[52px] shrink-0 text-[13px] text-muted-foreground">{{ t('book.sort.sentenceThenBy') }}</span>
+      <FieldPickerPopover
+        :open="openPicker === levelKey(index)"
+        :groups="groups"
+        :selected="level.field"
+        :exclude="levelExclude(index)"
+        :title="t('book.sort.changeField')"
+        :placeholder="t('book.sort.findField')"
+        :search-label="t('book.sort.findFieldAria')"
+        :list-label="t('book.sort.thenBy')"
+        @update:open="handleLevelOpen(index, $event)"
+        @pick="handleLevelPick(index, $event)"
+      >
+        <template #trigger>
+          <button
+            type="button"
+            :class="fieldButton"
+            class="min-w-0"
+            aria-haspopup="dialog"
+            :aria-label="`${t('book.sort.changeField')}: ${labelOf(level.field)}`"
+          >
+            <component :is="iconOf(level.field)" :size="14" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+            <span class="truncate">{{ labelOf(level.field) }}</span>
+            <ChevronDown :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
+          </button>
+        </template>
+      </FieldPickerPopover>
+      <span class="flex-1" />
+      <button
+        v-if="directionLabel(level.field, level.dir)"
+        type="button"
+        class="inline-flex h-6 shrink-0 items-center rounded-full border border-border px-2 text-[11.5px] font-semibold whitespace-nowrap text-foreground transition-colors hover:bg-surface-3 focus-visible:ring-2 focus-visible:ring-ring/60 focus-visible:outline-none"
+        :aria-label="t('book.sort.switchLevelOrder', { field: labelOf(level.field), order: directionLabel(level.field, level.dir) })"
+        @click="toggleLevel(index)"
+      >
+        {{ directionLabel(level.field, level.dir) }}
+      </button>
+      <button type="button" :class="iconButton" :aria-label="t('book.sort.removeLevel', { field: labelOf(level.field) })" @click="removeLevel(index)">
+        <X :size="14" aria-hidden="true" />
+      </button>
+    </div>
 
-    <button
-      v-if="canAddMore"
-      @click="addTier"
-      class="flex items-center gap-1.5 h-9 px-4 rounded-lg border border-dashed border-input text-sm text-muted-foreground hover:text-foreground hover:border-foreground hover:bg-muted/30 transition-colors self-start"
-    >
-      <Plus :size="13" />
-      {{ t('book.sort.addLevel') }}
-    </button>
+    <div v-if="canAddLevel" class="flex min-h-8 items-center">
+      <FieldPickerPopover
+        :open="openPicker === 'add'"
+        :groups="groups"
+        :exclude="usedFields"
+        :title="t('book.sort.thenBy')"
+        :placeholder="t('book.sort.findField')"
+        :search-label="t('book.sort.findThenByAria')"
+        :list-label="t('book.sort.thenBy')"
+        @update:open="handleAddOpen"
+        @pick="handleAddLevel"
+      >
+        <template #trigger>
+          <button type="button" :class="ghostButton" class="-ms-2 text-muted-foreground hover:text-foreground" aria-haspopup="dialog">
+            <Plus :size="13" aria-hidden="true" />
+            {{ t('book.sort.thenByEllipsis') }}
+          </button>
+        </template>
+      </FieldPickerPopover>
+    </div>
   </div>
 </template>
