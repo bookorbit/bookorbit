@@ -10,7 +10,7 @@ import { assembleBookCards } from '../book/utils/assemble-book-cards';
 import { SmartScopeService } from '../smart-scope/smart-scope.service';
 import { LibraryService } from '../library/library.service';
 import { DashboardRepository, type ScrollerSelectionOptions } from './dashboard.repository';
-import { resolveDashboardLibraryIds } from './dashboard-library-scope';
+import { resolveDashboardLibraryIds, scrollerLibraryIds } from './dashboard-library-scope';
 import { DASHBOARD_SCROLLER_MAX_LIMIT, type DashboardScrollerBatchDto, type DashboardScrollerBatchItemDto } from './dto/dashboard-scroller-batch.dto';
 import { ScrollerType } from './dto/scroller-type.enum';
 
@@ -140,7 +140,8 @@ export class DashboardService {
    * recursive CTE in full, and `random` would anti-join the whole library to size a pool it only
    * ever samples. Neither shelf is asked, and neither guesses.
    */
-  private async countScroller(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, accessibleLibraryIds: number[]): Promise<number | null> {
+  private async countScroller(type: Exclude<ScrollerType, 'smart-scope'>, user: RequestUser, dashboardLibraryIds: number[]): Promise<number | null> {
+    const accessibleLibraryIds = scrollerLibraryIds(type, dashboardLibraryIds, user);
     if (accessibleLibraryIds.length === 0) return 0;
 
     const contentFilters = user.isSuperuser ? undefined : user.contentFilters;
@@ -207,9 +208,10 @@ export class DashboardService {
     type: Exclude<ScrollerType, 'smart-scope'>,
     user: RequestUser,
     clampedLimit: number,
-    accessibleLibraryIds: number[],
+    dashboardLibraryIds: number[],
     options: ScrollerSelectionOptions = {},
   ): Promise<number[]> {
+    const accessibleLibraryIds = scrollerLibraryIds(type, dashboardLibraryIds, user);
     if (accessibleLibraryIds.length === 0) return [];
 
     const contentFilters = user.isSuperuser ? undefined : user.contentFilters;

@@ -43,6 +43,7 @@ const SETTINGS: HardcoverSettings = {
   autoSyncOnProgressUpdate: true,
   autoSyncOnRatingChange: true,
   privacySettingId: 3,
+  excludedLibraryIds: [],
   lastSyncedAt: null,
 }
 

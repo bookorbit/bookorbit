@@ -4,6 +4,7 @@ import { onMounted, reactive, ref, watch } from 'vue'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import ExcludedLibrariesPicker from '@/features/library/components/ExcludedLibrariesPicker.vue'
 import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 import { useStorygraphSettings } from '../composables/useStorygraphSettings'
 
@@ -19,6 +20,7 @@ const form = reactive({
   bookSyncMode: 'all_eligible' as 'all_eligible' | 'selected_only',
   autoSyncOnStatusChange: true,
   autoSyncOnProgressUpdate: true,
+  excludedLibraryIds: [] as number[],
 })
 
 onMounted(async () => {
@@ -28,6 +30,7 @@ onMounted(async () => {
     form.bookSyncMode = settings.value.bookSyncMode
     form.autoSyncOnStatusChange = settings.value.autoSyncOnStatusChange
     form.autoSyncOnProgressUpdate = settings.value.autoSyncOnProgressUpdate
+    form.excludedLibraryIds = [...(settings.value.excludedLibraryIds ?? [])]
   }
 })
 
@@ -57,6 +60,7 @@ async function handleSave() {
     bookSyncMode: form.bookSyncMode,
     autoSyncOnStatusChange: form.autoSyncOnStatusChange,
     autoSyncOnProgressUpdate: form.autoSyncOnProgressUpdate,
+    excludedLibraryIds: form.excludedLibraryIds,
   })
   if (ok) {
     sessionCookieInput.value = ''
@@ -221,6 +225,16 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
             <div class="mt-0.5 text-xs leading-relaxed">{{ option.description }}</div>
           </button>
         </div>
+      </div>
+
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div class="min-w-0">
+          <p class="text-sm">Excluded libraries</p>
+          <p class="text-xs text-muted-foreground mt-0.5">
+            Books in these libraries never sync to StoryGraph. A book you include on its own still syncs.
+          </p>
+        </div>
+        <ExcludedLibrariesPicker v-model="form.excludedLibraryIds" label="Excluded libraries" :disabled="!form.enabled" />
       </div>
 
       <div class="flex items-center justify-between">

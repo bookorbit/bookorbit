@@ -5,6 +5,7 @@ import { useI18n } from 'vue-i18n'
 import { Link, Save, CheckCircle2, AlertCircle, Info, Loader2, Unlink } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import ExcludedLibrariesPicker from '@/features/library/components/ExcludedLibrariesPicker.vue'
 import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 import { useHardcoverSettings } from '../composables/useHardcoverSettings'
 
@@ -23,6 +24,7 @@ const form = reactive({
   autoSyncOnProgressUpdate: true,
   autoSyncOnRatingChange: true,
   privacySettingId: 3,
+  excludedLibraryIds: [] as number[],
 })
 
 onMounted(async () => {
@@ -34,6 +36,7 @@ onMounted(async () => {
     form.autoSyncOnProgressUpdate = settings.value.autoSyncOnProgressUpdate
     form.autoSyncOnRatingChange = settings.value.autoSyncOnRatingChange
     form.privacySettingId = settings.value.privacySettingId
+    form.excludedLibraryIds = [...(settings.value.excludedLibraryIds ?? [])]
   }
 })
 
@@ -55,6 +58,7 @@ async function handleSave() {
     autoSyncOnProgressUpdate: form.autoSyncOnProgressUpdate,
     autoSyncOnRatingChange: form.autoSyncOnRatingChange,
     privacySettingId: form.privacySettingId,
+    excludedLibraryIds: form.excludedLibraryIds,
   })
   if (ok) {
     tokenInput.value = ''
@@ -182,6 +186,14 @@ function selectBookSyncMode(mode: 'all_eligible' | 'selected_only') {
             <div class="mt-0.5 text-xs leading-relaxed">{{ option.description }}</div>
           </button>
         </div>
+      </div>
+
+      <div class="flex flex-col items-stretch gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div class="min-w-0">
+          <p class="text-sm">{{ t('hardcover.connection.excludedLibraries.title') }}</p>
+          <p class="text-xs text-muted-foreground mt-0.5">{{ t('hardcover.connection.excludedLibraries.description') }}</p>
+        </div>
+        <ExcludedLibrariesPicker v-model="form.excludedLibraryIds" :label="t('hardcover.connection.excludedLibraries.title')" />
       </div>
 
       <div class="flex items-center justify-between">

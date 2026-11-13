@@ -277,6 +277,22 @@ describe('UserStatisticsService', () => {
     ]);
   });
 
+  it('leaves libraries hidden from Stats out of all-libraries answers and caches each choice apart', async () => {
+    const summary = { trackedBooks: 0, startedBooks: 0, inProgressBooks: 0, completedBooks: 0, meanProgressPercent: 0 };
+    const repo = { getSummary: vi.fn().mockResolvedValue(summary) };
+    const libraryScope = { visibleIdsOrAll: vi.fn().mockResolvedValue(null), visibleIds: vi.fn().mockResolvedValue([1, 2, 3]) };
+    const service = new UserStatisticsService(repo as any, new ReadingAttemptEventsService(), libraryScope as never);
+    const user = { id: 124, isSuperuser: true, settings: {} } as any;
+
+    await service.getSummary(user, {});
+    await service.getSummary({ ...user, settings: { libraryVisibility: { hidden: { stats: [2] } } } }, {});
+    await service.getSummary({ ...user, settings: { libraryVisibility: { hidden: { stats: [2] } } } }, { libraryIds: [2] });
+
+    expect(repo.getSummary).toHaveBeenNthCalledWith(1, 124, null, undefined);
+    expect(repo.getSummary).toHaveBeenNthCalledWith(2, 124, [1, 3], undefined);
+    expect(repo.getSummary).toHaveBeenNthCalledWith(3, 124, null, [2]);
+  });
+
   it('rounds mean progress to two decimals', async () => {
     const repo = {
       getSummary: vi.fn().mockResolvedValue({

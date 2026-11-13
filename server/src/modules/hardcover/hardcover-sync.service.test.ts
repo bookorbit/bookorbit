@@ -73,10 +73,12 @@ const defaultSettings = {
   autoSyncOnProgressUpdate: true,
   autoSyncOnRatingChange: true,
   privacySettingId: 3,
+  excludedLibraryIds: [] as number[],
 };
 
 const readingBook = {
   bookId: 1,
+  libraryId: 4,
   isbn13: '9781234567890',
   isbn10: null,
   title: 'Book One',
@@ -139,6 +141,31 @@ describe('HardcoverSyncService', () => {
 
       expect(mockMatchService.matchBook).not.toHaveBeenCalled();
       expect(mockClient.query).not.toHaveBeenCalled();
+    });
+
+    it('skips a book whose library is excluded from sync', async () => {
+      mockSettingsService.getTokenForUser.mockResolvedValue('tok');
+      mockSettingsService.getSettings.mockResolvedValue({ ...defaultSettings, excludedLibraryIds: [4] });
+      mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('skipped');
+
+      expect(mockMatchService.matchBook).not.toHaveBeenCalled();
+      expect(mockClient.query).not.toHaveBeenCalled();
+    });
+
+    it('reports the library exclusion and includes the book on its own when turned on', async () => {
+      mockSettingsService.getSettings.mockResolvedValue({ ...defaultSettings, excludedLibraryIds: [4] });
+      mockRepo.findBookSyncData.mockResolvedValue(readingBook);
+
+      await expect(makeService().getBookSyncState(1, 1)).resolves.toMatchObject({ syncEnabled: false, effectiveReason: 'library_excluded' });
+
+      mockRepo.setBookSyncOverride.mockResolvedValue({ syncOverride: 'included', syncExcluded: false });
+      await expect(makeService().updateBookSyncState(1, 1, { syncEnabled: true })).resolves.toMatchObject({
+        syncEnabled: true,
+        effectiveReason: null,
+      });
+      expect(mockRepo.setBookSyncOverride).toHaveBeenCalledWith(1, 1, 'included');
     });
 
     it('skips when selected-only mode has not included the book', async () => {

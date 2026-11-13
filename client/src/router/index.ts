@@ -63,6 +63,7 @@ const APPEARANCE_ROUTES: Record<AppearanceTab, string> = {
   icons: 'settings-appearance-icons',
   layout: 'settings-appearance-layout',
   behavior: 'settings-appearance-behavior',
+  'library-visibility': 'settings-appearance-library-visibility',
   language: 'settings-appearance-language',
 }
 
@@ -239,6 +240,12 @@ export const routes: RouteRecordRaw[] = [
             name: 'settings-appearance-behavior',
             component: () => import('@/features/settings/AppearanceBehaviorSettings.vue'),
             meta: { title: () => t('titles.appearance.behavior') },
+          },
+          {
+            path: 'appearance/library-visibility',
+            name: 'settings-appearance-library-visibility',
+            component: () => import('@/features/settings/AppearanceLibraryVisibilitySettings.vue'),
+            meta: { title: () => t('titles.appearance.library-visibility') },
           },
           {
             path: 'appearance/language',

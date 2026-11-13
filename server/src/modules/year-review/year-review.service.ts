@@ -1,4 +1,5 @@
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
+import { visibleIdsOrAllForPlace } from '../../common/library-visibility/library-visibility';
 import { principalCacheKey } from '../../common/types/request-user';
 import { BadRequestException, Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { YearReviewBook, YearReviewResponse } from '@bookorbit/types';
@@ -83,7 +84,7 @@ export class YearReviewService implements OnModuleInit, OnModuleDestroy {
     const throughDay = partial ? today : `${year}-12-31`;
     const scope: YearReviewScope = {
       userId: user.id,
-      libraryIds: await this.libraryScope.visibleIdsOrAll(user),
+      libraryIds: await visibleIdsOrAllForPlace(this.libraryScope, user, 'stats'),
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
     };
     const libraryKey = scope.libraryIds === null ? 'all' : [...scope.libraryIds].sort((a, b) => a - b).join(',');

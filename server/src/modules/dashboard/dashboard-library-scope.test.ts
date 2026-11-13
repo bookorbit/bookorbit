@@ -1,5 +1,5 @@
 import { makeUser } from '../../common/test-utils/make-user';
-import { dashboardLibraryScopeCacheKey, resolveDashboardLibraryIds } from './dashboard-library-scope';
+import { dashboardLibraryScopeCacheKey, resolveDashboardLibraryIds, scrollerLibraryIds } from './dashboard-library-scope';
 
 describe('dashboard library scope', () => {
   it('uses every accessible library when no dashboard selection is stored', () => {
@@ -31,5 +31,20 @@ describe('dashboard library scope', () => {
     expect(dashboardLibraryScopeCacheKey([7, 2])).toBe('2,7');
     expect(dashboardLibraryScopeCacheKey([2, 7])).toBe('2,7');
     expect(dashboardLibraryScopeCacheKey([])).toBe('none');
+  });
+
+  it.each(['continue-reading', 'continue-listening', 'up-next-in-series', 'random'] as const)(
+    'leaves libraries hidden from reading shelves off the %s shelf',
+    (type) => {
+      const user = makeUser({ settings: { libraryVisibility: { hidden: { shelves: [3] } } } });
+
+      expect(scrollerLibraryIds(type, [1, 3, 5], user)).toEqual([1, 5]);
+    },
+  );
+
+  it.each(['recently-added', 'want-to-read'] as const)('keeps hidden libraries on the %s shelf', (type) => {
+    const user = makeUser({ settings: { libraryVisibility: { hidden: { shelves: [3] } } } });
+
+    expect(scrollerLibraryIds(type, [1, 3, 5], user)).toEqual([1, 3, 5]);
   });
 });

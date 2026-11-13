@@ -32,6 +32,14 @@ export class UpsertHardcoverSettingsDto {
   @IsInt()
   @IsIn([1, 2, 3])
   privacySettingId?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(1000)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  excludedLibraryIds?: number[];
 }
 
 export class ValidateHardcoverTokenDto {

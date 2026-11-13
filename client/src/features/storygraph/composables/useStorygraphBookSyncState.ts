@@ -14,6 +14,8 @@ function resolveReasonLabel(reason: StorygraphBookSyncEffectiveReason | null | u
       return 'Excluded'
     case 'not_selected':
       return 'Not selected'
+    case 'library_excluded':
+      return 'Library excluded'
     case 'unread':
       return null
     case 'unsupported_status':

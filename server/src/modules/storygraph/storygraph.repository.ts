@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import { Permission } from '@bookorbit/types';
 import type { ContentFilterRules, ReadStatus, StorygraphBookSyncMode } from '@bookorbit/types';
-import { and, asc, eq, gt, inArray, isNotNull, isNull, ne, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNotNull, isNull, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
@@ -13,6 +13,7 @@ type Db = NodePgDatabase<typeof schema>;
 
 export interface BookSyncData {
   bookId: number;
+  libraryId: number;
   isbn13: string | null;
   isbn10: string | null;
   title: string | null;
@@ -29,6 +30,7 @@ export interface StorygraphBookAccessScope {
 
 export interface StorygraphBookSyncScopeSettings {
   bookSyncMode: StorygraphBookSyncMode;
+  excludedLibraryIds?: readonly number[];
 }
 
 interface BookSyncDataQueryOptions {
@@ -276,6 +278,7 @@ export class StorygraphRepository {
     const query = this.db
       .select({
         bookId: schema.books.id,
+        libraryId: schema.books.libraryId,
         isbn13: schema.bookMetadata.isbn13,
         isbn10: schema.bookMetadata.isbn10,
         title: schema.bookMetadata.title,
@@ -358,7 +361,14 @@ export class StorygraphRepository {
       return eq(schema.storygraphBookState.syncOverride, 'included');
     }
 
-    return or(isNull(schema.storygraphBookState.syncOverride), ne(schema.storygraphBookState.syncOverride, 'excluded'))!;
+    const notExcluded = or(isNull(schema.storygraphBookState.syncOverride), ne(schema.storygraphBookState.syncOverride, 'excluded'))!;
+    if (!syncScope.excludedLibraryIds?.length) return notExcluded;
+
+    // A book included on its own still syncs from an excluded library.
+    return or(
+      eq(schema.storygraphBookState.syncOverride, 'included'),
+      and(notExcluded, notInArray(schema.books.libraryId, [...syncScope.excludedLibraryIds])),
+    )!;
   }
 
   private buildWhereClause(...clauses: Array<SQL | undefined>): SQL {

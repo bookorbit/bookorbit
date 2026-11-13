@@ -44,6 +44,7 @@ function makeSettings(overrides: Partial<HardcoverSettings> = {}): HardcoverSett
     autoSyncOnProgressUpdate: true,
     autoSyncOnRatingChange: true,
     privacySettingId: 3,
+    excludedLibraryIds: [],
     lastSyncedAt: null,
     ...overrides,
   }

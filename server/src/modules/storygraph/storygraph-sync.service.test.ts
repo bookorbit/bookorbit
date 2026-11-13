@@ -93,6 +93,7 @@ describe('StorygraphSyncService', () => {
       bookSyncMode: 'all_eligible',
       autoSyncOnStatusChange: true,
       autoSyncOnProgressUpdate: true,
+      excludedLibraryIds: [],
       lastSyncedAt: null,
     });
     mockLibraryService.findAccessibleLibraryIds.mockResolvedValue([1]);
@@ -368,6 +369,7 @@ describe('StorygraphSyncService', () => {
         bookSyncMode: 'selected_only',
         autoSyncOnStatusChange: true,
         autoSyncOnProgressUpdate: true,
+        excludedLibraryIds: [],
         lastSyncedAt: null,
       });
       mockRepo.findSyncableBook.mockResolvedValue(readingBook);
@@ -386,6 +388,7 @@ describe('StorygraphSyncService', () => {
         bookSyncMode: 'selected_only',
         autoSyncOnStatusChange: true,
         autoSyncOnProgressUpdate: true,
+        excludedLibraryIds: [],
         lastSyncedAt: null,
       });
       mockRepo.findBookState.mockResolvedValue({ syncOverride: 'included' });

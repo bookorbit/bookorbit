@@ -106,7 +106,7 @@ export class StorygraphSyncService {
     const state = await this.repo.setBookSyncOverride(
       userId,
       bookId,
-      resolveStorygraphBookSyncOverrideForToggle(settings.bookSyncMode, payload.syncEnabled),
+      resolveStorygraphBookSyncOverrideForToggle(settings.bookSyncMode, payload.syncEnabled, this.isLibraryExcluded(settings, book)),
     );
     return this.toBookSyncState(bookId, settings, book, state);
   }
@@ -640,7 +640,9 @@ export class StorygraphSyncService {
       const syncOverride = normalizeStorygraphBookSyncOverride(state);
       if (!settings.effectiveEnabled) return { syncEnabled: false, effectiveReason: settings.disabledReason ?? 'global_disabled' };
       if (syncOverride === 'excluded') return { syncEnabled: false, effectiveReason: 'excluded' };
-      if (syncOverride === 'included' || settings.bookSyncMode === 'all_eligible') return { syncEnabled: true, effectiveReason: null };
+      if (syncOverride === 'included') return { syncEnabled: true, effectiveReason: null };
+      if (this.isLibraryExcluded(settings, book)) return { syncEnabled: false, effectiveReason: 'library_excluded' };
+      if (settings.bookSyncMode === 'all_eligible') return { syncEnabled: true, effectiveReason: null };
       return { syncEnabled: false, effectiveReason: 'not_selected' };
     }
 
@@ -648,7 +650,12 @@ export class StorygraphSyncService {
       settings,
       status: book.status,
       syncOverride: normalizeStorygraphBookSyncOverride(state),
+      libraryExcluded: this.isLibraryExcluded(settings, book),
     });
+  }
+
+  private isLibraryExcluded(settings: StorygraphSettings, book: BookSyncData): boolean {
+    return settings.excludedLibraryIds.includes(book.libraryId);
   }
 
   private buildAttemptSnapshot(book: BookSyncData) {

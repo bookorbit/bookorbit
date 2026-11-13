@@ -40,6 +40,7 @@ export class HardcoverSettingsService {
       autoSyncOnProgressUpdate: row?.autoSyncOnProgressUpdate ?? true,
       autoSyncOnRatingChange: row?.autoSyncOnRatingChange ?? true,
       privacySettingId: row?.privacySettingId ?? HARDCOVER_PRIVACY.PRIVATE,
+      excludedLibraryIds: row?.excludedLibraryIds ?? [],
       lastSyncedAt: row?.lastSyncedAt?.toISOString() ?? null,
     };
   }
@@ -71,6 +72,7 @@ export class HardcoverSettingsService {
     if (payload.autoSyncOnProgressUpdate !== undefined) data.autoSyncOnProgressUpdate = payload.autoSyncOnProgressUpdate;
     if (payload.autoSyncOnRatingChange !== undefined) data.autoSyncOnRatingChange = payload.autoSyncOnRatingChange;
     if (payload.privacySettingId !== undefined) data.privacySettingId = payload.privacySettingId;
+    if (payload.excludedLibraryIds !== undefined) data.excludedLibraryIds = [...new Set(payload.excludedLibraryIds)].sort((a, b) => a - b);
 
     await this.repo.upsertSettings(userId, data);
     return this.getSettings(userId);

@@ -58,4 +58,53 @@ describe('storygraph sync policy', () => {
     expect(normalizeStorygraphBookSyncOverride({ syncOverride: 'included' })).toBe('included');
     expect(normalizeStorygraphBookSyncOverride({ syncOverride: 'legacy' })).toBeNull();
   });
+  it('keeps books in an excluded library out of sync', () => {
+    expect(
+      resolveStorygraphBookSyncDecision({
+        settings: baseSettings,
+        status: 'reading',
+        syncOverride: null,
+        libraryExcluded: true,
+      }),
+    ).toEqual({ syncEnabled: false, effectiveReason: 'library_excluded' });
+  });
+
+  it('lets a book included on its own sync from an excluded library', () => {
+    expect(
+      resolveStorygraphBookSyncDecision({
+        settings: baseSettings,
+        status: 'reading',
+        syncOverride: 'included',
+        libraryExcluded: true,
+      }),
+    ).toEqual({ syncEnabled: true, effectiveReason: null });
+  });
+
+  it('reports an explicit exclusion before the library exclusion', () => {
+    expect(
+      resolveStorygraphBookSyncDecision({
+        settings: baseSettings,
+        status: 'reading',
+        syncOverride: 'excluded',
+        libraryExcluded: true,
+      }),
+    ).toEqual({ syncEnabled: false, effectiveReason: 'excluded' });
+  });
+
+  it('reports an unread book in an excluded library as excluded, not as waiting to sync', () => {
+    expect(resolveStorygraphBookSyncDecision({ settings: baseSettings, status: 'unread', syncOverride: null, libraryExcluded: true })).toEqual({
+      syncEnabled: false,
+      effectiveReason: 'library_excluded',
+    });
+    expect(resolveStorygraphBookSyncDecision({ settings: baseSettings, status: 'unread', syncOverride: 'included', libraryExcluded: true })).toEqual({
+      syncEnabled: false,
+      effectiveReason: 'unread',
+    });
+  });
+
+  it('includes a book on its own when turned on inside an excluded library', () => {
+    expect(resolveStorygraphBookSyncOverrideForToggle('all_eligible', true, true)).toBe('included');
+    expect(resolveStorygraphBookSyncOverrideForToggle('all_eligible', false, true)).toBeNull();
+    expect(resolveStorygraphBookSyncOverrideForToggle('all_eligible', true, false)).toBeNull();
+  });
 });

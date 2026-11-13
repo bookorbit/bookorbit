@@ -8,6 +8,7 @@ import {
   BrainCircuit,
   Database,
   DownloadCloud,
+  EyeOff,
   FileText,
   Filter,
   Folder,
@@ -147,6 +148,14 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
             descriptionKey: 'settings.nav.descriptions.appearanceBehavior',
             icon: SlidersHorizontal,
             keywords: 'behaviour animation sorting default view',
+          },
+          {
+            id: 'appearance-library-visibility',
+            routeName: 'settings-appearance-library-visibility',
+            labelKey: 'settings.appearance.tabs.library-visibility',
+            descriptionKey: 'settings.nav.descriptions.appearanceLibraryVisibility',
+            icon: EyeOff,
+            keywords: 'hide library hidden continue reading shelves series stats statistics year in review goal sync',
           },
           {
             id: 'appearance-language',

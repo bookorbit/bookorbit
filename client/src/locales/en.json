@@ -582,12 +582,56 @@
           "bulkDelete": "Failed to delete icons"
         }
       },
+      "libraryVisibility": {
+        "intro": "Hide a library from any of these places. It stays in the sidebar, search and its own page, and picking it in a Series or Stats library filter still shows it.",
+        "librariesLabel": "Libraries",
+        "showEverywhere": "Show everywhere",
+        "shownAgain": "Every library shown again",
+        "saveFailed": "Could not save library visibility",
+        "tableLabel": "Library Visibility",
+        "libraryColumn": "Library",
+        "noLibraries": "No libraries to show yet.",
+        "shown": "Shown",
+        "hidden": "Hidden",
+        "toggleLabel": "Hide {library} from {place}",
+        "books": "{count, plural, one {# book} other {# books}}",
+        "hiddenFrom": "hidden from {places}",
+        "hiddenInOne": "Hidden in {place}",
+        "hiddenInMany": "Hidden in {count} places",
+        "hiddenEverywhere": "Hidden everywhere",
+        "legendLabel": "{place}:",
+        "newLibraries": "Libraries added later show everywhere until hidden here.",
+        "syncLabel": "Sync",
+        "syncHint": "Each service's page has its own list of libraries that never sync.",
+        "syncHintOne": "Its settings page has its own list of libraries that never sync.",
+        "places": {
+          "shelves": {
+            "label": "Reading shelves",
+            "short": "Shelves",
+            "inSentence": "reading shelves",
+            "covers": "Continue Reading, Continue Listening, Up Next in Series, Discover Something New and the Currently Reading widget, on the dashboard, on iOS and in the KOReader catalog."
+          },
+          "series": {
+            "label": "Series",
+            "short": "Series",
+            "inSentence": "Series",
+            "covers": "The Series page and its count in the sidebar. A series split across libraries keeps the books from libraries still shown."
+          },
+          "stats": {
+            "label": "Stats",
+            "short": "Stats",
+            "inSentence": "Stats",
+            "covers": "Stats, reading history, Year in Review and the dashboard's reading widgets, such as your goal and streak. Reading is still recorded, so showing the library again brings its numbers back."
+          }
+        }
+      },
       "tabs": {
         "theme": "Theme",
         "book-covers": "Book Covers",
         "icons": "Icons",
         "layout": "Layout",
         "behavior": "Behavior",
+        "library-visibility": "Library Visibility",
         "language": "Language"
       }
     },
@@ -2213,6 +2257,12 @@
     "integrations": {
       "title": "Integrations",
       "subtitle": "Connect external services to sync your reading data and highlights.",
+      "excludedLibraries": {
+        "none": "None",
+        "menuLabel": "Never sync",
+        "noLibraries": "No libraries yet.",
+        "appliesOnSave": "Applies when you press Save."
+      },
       "noPermission": "You do not have permission to use any integrations.",
       "tabs": {
         "hardcover": "Hardcover",
@@ -4825,6 +4875,7 @@
         "appearanceIcons": "Choose the icon style used across the app.",
         "appearanceLayout": "Default library view, density, and spacing.",
         "appearanceBehavior": "How the library reacts as you browse and sort.",
+        "appearanceLibraryVisibility": "Hide libraries from reading shelves, Series and Stats.",
         "appearanceLanguage": "Interface language and regional formats.",
         "readerEbook": "Fonts, spacing, and page behaviour for eBooks.",
         "readerPdf": "Rendering, zoom, and page fit for PDFs.",
@@ -4865,6 +4916,7 @@
         "appearance-icons": "Upload your own icons to use alongside the built-in set for libraries, smart scopes and collections.",
         "appearance-layout": "Cover sizes and spacing for the library grid, the cover shown for a collapsed series, and how the author grid is laid out.",
         "appearance-behavior": "What opening a book from a grid or list does, whether series collapse into one card, and whether Book Requests appear in this account.",
+        "appearance-library-visibility": "Which libraries show up in your reading shelves, the Series page and your stats.",
         "appearance-language": "The language BookOrbit uses for menus, labels and messages, and the regional formats for dates and numbers.",
         "reader-ebook": "Defaults for the eBook reader: whether new books start with your settings, page flow and columns, theme, and typography such as font, size and spacing.",
         "reader-pdf": "How PDFs open: page by page or one continuous scroll, which page starts a two-page spread, and the default zoom fit.",
@@ -12555,6 +12607,10 @@
           "description": "Sync only books you explicitly include."
         }
       },
+      "excludedLibraries": {
+        "title": "Excluded libraries",
+        "description": "Books in these libraries never sync to Hardcover. A book you include on its own still syncs."
+      },
       "enableSync": {
         "title": "Enable sync",
         "description": "Pause all Hardcover syncing without disconnecting."
@@ -16372,6 +16428,7 @@
       "icons": "Icons",
       "layout": "Display Layout",
       "behavior": "Library Behavior",
+      "library-visibility": "Library Visibility",
       "language": "Language"
     },
     "reader": {

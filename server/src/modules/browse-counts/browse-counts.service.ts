@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 
 import type { BrowseCounts } from '@bookorbit/types';
 import { StatsCache } from '../../common/cache/stats-cache';
+import { hiddenLibrariesCacheKey } from '../../common/library-visibility/library-visibility';
 import { principalCacheKey, type RequestUser } from '../../common/types/request-user';
 import { AnnotationHubService } from '../annotation/annotation-hub.service';
 import { AuthorsService } from '../authors/authors.service';
@@ -27,7 +28,8 @@ export class BrowseCountsService {
   ) {}
 
   async getCounts(user: RequestUser): Promise<BrowseCounts> {
-    return this.cache.get(String(user.id), principalCacheKey(user, 'browse-counts'), async () => {
+    const key = `browse-counts:${hiddenLibrariesCacheKey(user, 'series')}`;
+    return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
       const [authors, series, annotations, genres] = await Promise.all([
         this.authorsService.countAll(user),
         this.seriesService.countAll(user),

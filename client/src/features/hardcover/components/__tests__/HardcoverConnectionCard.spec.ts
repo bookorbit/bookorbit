@@ -52,6 +52,7 @@ function makeSettings(overrides: Partial<HardcoverSettings> = {}): HardcoverSett
     autoSyncOnProgressUpdate: true,
     autoSyncOnRatingChange: true,
     privacySettingId: 3,
+    excludedLibraryIds: [],
     lastSyncedAt: null,
     ...overrides,
   }
@@ -123,6 +124,20 @@ describe('HardcoverConnectionCard', () => {
       }),
     )
     expect(toastSuccess).toHaveBeenCalledWith('Hardcover settings saved')
+  })
+
+  it('saves the excluded libraries it loaded', async () => {
+    settings.value = makeSettings({ excludedLibraryIds: [4, 9] })
+
+    const wrapper = mount(HardcoverConnectionCard)
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Excluded libraries')
+    const saveButton = wrapper.findAll('button').find((button) => button.text().includes('Save'))
+    await saveButton!.trigger('click')
+    await flushPromises()
+
+    expect(mocks.saveSettings).toHaveBeenCalledWith(expect.objectContaining({ excludedLibraryIds: [4, 9] }))
   })
 
   it('hides Hardcover-specific controls when the account is not configured', async () => {

@@ -24,8 +24,13 @@ export function normalizeStorygraphBookSyncOverride(input: { syncOverride?: stri
   return value === 'included' || value === 'excluded' ? value : null;
 }
 
-export function resolveStorygraphBookSyncOverrideForToggle(bookSyncMode: StorygraphBookSyncMode, syncEnabled: boolean): StorygraphBookSyncOverride {
-  if (bookSyncMode === 'selected_only') {
+/** A book in an excluded library only syncs when included on its own, so turning it on has to say so. */
+export function resolveStorygraphBookSyncOverrideForToggle(
+  bookSyncMode: StorygraphBookSyncMode,
+  syncEnabled: boolean,
+  libraryExcluded = false,
+): StorygraphBookSyncOverride {
+  if (libraryExcluded || bookSyncMode === 'selected_only') {
     return syncEnabled ? 'included' : null;
   }
   return syncEnabled ? null : 'excluded';
@@ -35,12 +40,18 @@ export function resolveStorygraphBookSyncDecision(input: {
   settings: StorygraphBookSyncPolicySettings;
   status: string | null | undefined;
   syncOverride: StorygraphBookSyncOverride;
+  libraryExcluded?: boolean;
 }): StorygraphBookSyncDecision {
   if (!input.settings.effectiveEnabled) {
     return {
       syncEnabled: false,
       effectiveReason: input.settings.disabledReason ?? 'global_disabled',
     };
+  }
+
+  // Ahead of the status, so an unread book in an excluded library does not read as waiting to sync.
+  if (input.libraryExcluded && input.syncOverride === null) {
+    return { syncEnabled: false, effectiveReason: 'library_excluded' };
   }
 
   if (!input.status || !SYNCABLE_STATUSES.has(input.status as ReadStatus)) {
