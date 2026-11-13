@@ -30,6 +30,7 @@ function validDisplayPreferences(overrides: Partial<DisplayPreferences> = {}): D
     gridCardPrimaryLabel: 'hidden',
     gridCardSecondaryLabel: 'hidden',
     thumbnailClickAction: 'reader',
+    openHighlightsInPeek: false,
     placeholderCoverStyle: 'bauhaus',
     formatBadgeStyle: 'primary',
     ...overrides,
@@ -408,5 +409,35 @@ describe('useDisplaySettingsSync', () => {
     await sync.loadDisplaySettingsFromServer()
 
     expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('details')
+  })
+
+  it('syncs openHighlightsInPeek changes to the server', async () => {
+    vi.useFakeTimers()
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValue({ ok: true })
+
+    sync.initDisplaySettingsSync()
+    displaySettings.useDisplaySettings().openHighlightsInPeek.value = true
+    await vi.advanceTimersByTimeAsync(1500)
+
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/user-preferences/display',
+      expect.objectContaining({
+        method: 'PUT',
+        body: expect.stringContaining('"openHighlightsInPeek":true'),
+      }),
+    )
+  })
+
+  it('loads openHighlightsInPeek from the server', async () => {
+    const { apiMock, displaySettings, sync } = await loadModules()
+    apiMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ settings: validDisplayPreferences({ openHighlightsInPeek: true }) }),
+    })
+
+    await sync.loadDisplaySettingsFromServer()
+
+    expect(displaySettings.useDisplaySettings().openHighlightsInPeek.value).toBe(true)
   })
 })

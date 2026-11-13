@@ -95,6 +95,7 @@ const DISPLAY_PREFERENCES_SCHEMA = z
     gridCardSecondaryLabel: z.enum(GRID_CARD_LABEL_FIELDS).default('hidden'),
     cardInfoMode: z.enum(CARD_INFO_MODES).default('hover-overlay'),
     thumbnailClickAction: z.enum(BOOK_THUMBNAIL_CLICK_ACTION).default('reader'),
+    openHighlightsInPeek: z.boolean().default(false),
     placeholderCoverStyle: z.enum(PLACEHOLDER_COVER_STYLES).default('bauhaus'),
   })
   .strict()

@@ -519,6 +519,10 @@
           "openDetails": "Open details",
           "openDetailsHint": "Go to the book details page from grid and list thumbnails"
         },
+        "highlightPeek": {
+          "label": "Open highlights in Peek mode",
+          "hint": "Jumping to a highlight leaves your reading progress and read status unchanged"
+        },
         "filterPreview": {
           "label": "Show filter preview by default",
           "hint": "Expand the active filter and sort summary when opening a smartScope"
