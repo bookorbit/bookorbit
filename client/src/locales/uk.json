@@ -882,9 +882,9 @@
         "refreshRecommendationIndex": "Оновити індекс рекомендації",
         "refreshRecommendationHint": "Оновити рекомендації з останніми змінами в бібліотеці. Цей процес працює у фоновому режимі.",
         "booksQueuedForProcessing": "{count, plural, =0 {жодної книги в черзі на обробку} one {# в черзі на обробку} few {# книг в черзі на обробку} many {# книг в черзі на обробку} other {# книг в черзі на обробку}}",
-        "run": "Ран",
+        "run": "Запустити",
         "running": "Працює...",
-        "backfillAchievements": "Досягнення зворотного заповнення",
+        "backfillAchievements": "Перерахунок досягнень",
         "backfillAchievementsHint": "Повторне виконання досягнень для всіх користувачів.",
         "backfillResult": "Оброблена кількість користувачів: {users}; видано нагород: {awards}.",
         "runBackfill": "Запустити фонове заповнення",
@@ -915,8 +915,8 @@
         "progress": "Прогрес",
         "stepSourceConnection": "Вихідне з'єднання",
         "stepUserPathMapping": "зіставлення користувача та шляху",
-        "stepDryRun": "Дри-Ран",
-        "stepDryRunTitle": "Сухий запуск",
+        "stepDryRun": "Тестовий запуск",
+        "stepDryRunTitle": "Тестовий запуск",
         "stepRunMigration": "Запустити міграцію",
         "stepReport": "Доповісти",
         "stepReportTitle": "Звіт про міграцію",
@@ -1728,7 +1728,7 @@
         "koreader": "KOReader",
         "tts": "Text-to-Speech",
         "integrations": "Інтеграції",
-        "hardcover": "Палітурка",
+        "hardcover": "Hardcover",
         "admin": "Адмін",
         "system": "Система",
         "account": "Обліковий запис"
@@ -1739,9 +1739,9 @@
       "subtitle": "Під'єднайте зовнішні сервіси, щоб синхронізувати дані читання та виділення.",
       "noPermission": "У вас немає дозволу на використання будь-яких інтеграцій.",
       "tabs": {
-        "hardcover": "Палітурка",
-        "readwise": "Легко",
-        "storygraph": "Пустельний графік"
+        "hardcover": "Hardcover",
+        "readwise": "Readwise",
+        "storygraph": "StoryGraph"
       },
       "providerSubtitles": {
         "readwise": "Надсилайте виділення для читання автоматично.",
@@ -2407,7 +2407,7 @@
           "archived": "Архівовано"
         },
         "columns": {
-          "order": "Ордер",
+          "order": "Порядок",
           "field": "Поле",
           "type": "Тип",
           "libraries": "Бібліотеки",
@@ -2805,7 +2805,7 @@
       "bookDock": {
         "title": "Книга док",
         "subtitle": "Налаштувати файли обробляються під час входу в сторінку книги.",
-        "dropFolder": "Видалити папку",
+        "dropFolder": "Папка імпорту (Drop folder)",
         "containerPath": "Шлях до контейнера",
         "containerPathHint": "Скопіюйте або перемістіть файли книг у цю папку і вони будуть автоматично підібрані та оброблені сервісом Книги. Підкаталоги підтримуються.",
         "changePathPrefix": "Щоб змінити цей шлях, встановіть",
@@ -3169,7 +3169,7 @@
             "bookDownload": "Книжку завантажено",
             "progressUpdate": "Положення читання оновлено",
             "annotationsPull": "Відмітини відправлені Кобо",
-            "annotationsPush": "Яскравість отримана від Кобо"
+            "annotationsPush": "Цитати отримані від Kobo"
           },
           "outcome": {
             "failed": "Не вдалося",
@@ -3604,9 +3604,9 @@
     "system": {
       "tabs": {
         "file-naming": "Назва файлу",
-        "book-dock": "Книга док",
+        "book-dock": "Книжковий док",
         "requests": "Запити",
-        "maintenance": "Ремонт",
+        "maintenance": "Обслуговування",
         "audit-log": "Журнал аудиту"
       },
       "requests": {
@@ -4667,8 +4667,8 @@
         "notifications": "Сповіщення",
         "restrictions": "Обмеження",
         "libraryBooks": "Бібліотека і Книги",
-        "bookRequests": "Запити на бронювання",
-        "bookDock": "Книга док",
+        "bookRequests": "Запити на книги",
+        "bookDock": "Книжковий док",
         "devices": "Пристрої",
         "readingIntegrations": "Інтеграції з читанням",
         "emailNotifications": "Ел. пошта та повідомлення",
@@ -5252,8 +5252,8 @@
       "Book": "Книжка",
       "Collection": "Колекція",
       "SmartScope": "Розумний обсяг",
-      "BookDockFile": "Книга док-файлу",
-      "BookRequest": "Запити на бронювання",
+      "BookDockFile": "Файл книжкового доку",
+      "BookRequest": "Запити на книги",
       "DownloadClient": "Завантажити клієнт",
       "RequestIndexer": "Програма індексування",
       "Author": "Автор",
@@ -5516,7 +5516,7 @@
       "format": "Форматувати",
       "size": "Розмір",
       "download": "Звантажити",
-      "dockFile": "Книга док-файлу",
+      "dockFile": "Файл книжкового доку",
       "rejected": "Відхилено",
       "failed": "Не вдалося",
       "cleaned": "Очищено",
@@ -5937,7 +5937,7 @@
       "peek": "Пік",
       "quickView": "Швидкий перегляд",
       "details": "Подробиці",
-      "bookDetails": "Деталі про бронювання",
+      "bookDetails": "Деталі запиту на книгу",
       "download": "Звантажити",
       "metadata": "Метадані",
       "editMetadata": "Редагувати метадані",
@@ -7584,7 +7584,7 @@
     "table": {
       "actions": {
         "quickView": "Швидкий перегляд",
-        "bookDetails": "Деталі про бронювання",
+        "bookDetails": "Деталі запиту на книгу",
         "editMetadata": "Редагувати метадані",
         "refreshMetadata": "Оновити метадані",
         "addToCollection": "Додати до колекції",
@@ -8356,7 +8356,7 @@
       "noClientList": "BookOrbit буде використовувати найпопулярнішого клієнта, який має найвищий пріоритет."
     },
     "attempts": {
-      "title": "Раніше спроби",
+      "title": "Попередні спроби",
       "loading": "Завантаження попередніх спроб...",
       "loadFailed": "Не вдалося завантажити попередні спроби",
       "refused": "Відмушено, нічого не завантажено",
@@ -8669,7 +8669,7 @@
       "shortcuts": "J / K, щоб рухатися, Esc схвалити"
     },
     "table": {
-      "caption": "Запити на бронювання, досягнувши кожного етапу",
+      "caption": "Запити на книги, досягнувши кожного етапу",
       "cover": "Обкладинка",
       "title": "Найменування",
       "mediaKind": "Форматувати",
@@ -8916,7 +8916,7 @@
       "uploadedToast": "Вивантажено {uploaded}",
       "uploadFailedToast": "Помилка вивантаження для {failed}",
       "uploadPartialToast": "Вивантажено {uploaded}, {failed} не вдалося",
-      "bookDock": "Книга док",
+      "bookDock": "Книжковий док",
       "statistics": "Статистика",
       "achievements": "Досягнення",
       "annotations": "Анотації",
@@ -10442,7 +10442,7 @@
           "showFewer": "Показати менше"
         },
         "source": {
-          "title": "Дані про бронювання надходять із",
+          "title": "Дані про запити на книги надходять із",
           "embeddedTitle": "Теги у файлі книги",
           "embeddedHint": "Читати з основного файлу",
           "opfTitle": "метадані файлу a.opf",
@@ -11324,7 +11324,7 @@
           "description": "При відкритті нового досягнення для читання."
         },
         "bookRequests": {
-          "label": "Запити на бронювання",
+          "label": "Запити на книги",
           "description": "Коли запит на книгу відправлено, вирішено або книга стає доступною."
         }
       }
@@ -12624,7 +12624,7 @@
       },
       "table": {
         "selectPage": "Вибрати все на цій сторінці",
-        "coverFolder": "Тека для бронювання #{bookId}",
+        "coverFolder": "Папка для запиту #{bookId}",
         "fileCount": "{count, plural, one {# файл} other {# файлів} few {# файлів} many {# файлів}}",
         "orphanMedia": {
           "ebook": "Книжкова обкладинка",
@@ -12711,7 +12711,7 @@
         "edit": "Редагувати · {base}",
         "files": "Файли · {base}",
         "readingLog": "Журнал читання · {base}",
-        "highlights": "Яскравість · {base}"
+        "highlights": "Цитати · {base}"
       }
     },
     "bookDock": {
@@ -12854,7 +12854,7 @@
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "Синхронізація KOReader",
-    "bookDock": "Книга док",
+    "bookDock": "Книжковий док",
     "whatsNew": "Що нового",
     "annotations": "Анотації",
     "achievements": "Досягнення",
@@ -12925,9 +12925,9 @@
     },
     "system": {
       "file-naming": "Назва файлу",
-      "book-dock": "Книга док",
+      "book-dock": "Книжковий док",
       "requests": "Запити",
-      "maintenance": "Ремонт",
+      "maintenance": "Обслуговування",
       "audit-log": "Журнал аудиту"
     },
     "account": {
