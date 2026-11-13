@@ -341,7 +341,7 @@ end
 
 -- ------------------------------------------------------------------ text
 -- "2 min ago", "3 h ago", "yesterday", "Oct 9". A timestamp of 0 is never.
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 function MenuUI.ago(ts, now)

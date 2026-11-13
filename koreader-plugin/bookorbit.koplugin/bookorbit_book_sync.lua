@@ -17,7 +17,7 @@ local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local ffiutil = require("ffi/util")
 local T = ffiutil.template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitApi = require("bookorbit_api")

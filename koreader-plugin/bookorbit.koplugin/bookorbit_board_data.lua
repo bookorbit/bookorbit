@@ -14,7 +14,7 @@ local NetworkMgr = require("ui/network/manager")
 local datetime = require("datetime")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitStatsReader = require("bookorbit_stats_reader")
 local CatalogUtil = require("bookorbit_catalog_util")

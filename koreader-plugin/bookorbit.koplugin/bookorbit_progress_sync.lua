@@ -16,7 +16,7 @@ local logger = require("logger")
 local time = require("ui/time")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitStateManager = require("bookorbit_state_manager")
 local DeviceNames = require("bookorbit_device_names")

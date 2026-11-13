@@ -6,7 +6,7 @@ messages consistent across open-book exchange, per-book sync and sweep.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local HighlightSummary = {}
 

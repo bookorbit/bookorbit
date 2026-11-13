@@ -27,7 +27,7 @@ local TextBoxWidget = require("ui/widget/textboxwidget")
 local TextWidget = require("ui/widget/textwidget")
 local VerticalGroup = require("ui/widget/verticalgroup")
 local VerticalSpan = require("ui/widget/verticalspan")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = require("bookorbit_catalog_util")
 local BoardMetrics = require("bookorbit_board_metrics")

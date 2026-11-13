@@ -11,7 +11,7 @@ progress, and ends on Start reading or on what went wrong.
 local UIManager = require("ui/uimanager")
 local lfs = require("libs/libkoreader-lfs")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")
