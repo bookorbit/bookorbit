@@ -11,7 +11,7 @@ when online, so opening it never waits on Wi-Fi.
 local ImageWidget = require("ui/widget/imagewidget")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local BoardMetrics = require("bookorbit_board_metrics")

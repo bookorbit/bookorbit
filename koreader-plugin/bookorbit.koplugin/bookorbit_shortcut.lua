@@ -7,7 +7,7 @@ own settings file is the one written. A gesture that already does something
 is named before it is replaced, using KOReader's titles for the action.
 ]]
 
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local Shortcut = {}

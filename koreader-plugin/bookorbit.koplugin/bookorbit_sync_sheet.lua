@@ -7,7 +7,7 @@ sheet is for the ones started anywhere else. It stays up while the sync runs,
 so a stray tap cannot drop the only way to stop it.
 ]]
 
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")

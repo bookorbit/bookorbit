@@ -15,7 +15,7 @@ local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local Geom = require("ui/geometry")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = require("bookorbit_catalog_util")
 local DetailData = require("bookorbit_detail_data")

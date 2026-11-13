@@ -9,7 +9,7 @@ screen; DetailData.build gathers their inputs from the catalog.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = require("bookorbit_catalog_util")
 

@@ -22,7 +22,7 @@ local UIManager = require("ui/uimanager")
 local VerticalSpan = require("ui/widget/verticalspan")
 local logger = require("logger")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardColour = require("bookorbit_board_colour")
 local BoardData = require("bookorbit_board_data")
