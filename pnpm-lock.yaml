@@ -6508,8 +6508,8 @@ packages:
       hono: ^4.8.0
       zod: ^4.6.7
 
-  hono@4.13.13:
-    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
+  hono@4.13.18:
+    resolution: {integrity: sha512-H9q/E1XizaWstJxUW881dmLxEj+t/TrGGnyxINkm4+sK0qUwsMtFdo2BWI9Vs3cIS19MU6b6iCijoUoEf4f3DA==}
     engines: {node: '>=16.9.0'}
 
   hook-std@4.0.0:
@@ -7511,6 +7511,7 @@ packages:
 
   node-abort-controller@3.1.1:
     resolution: {integrity: sha512-AGK2yQKIjRuqnc6VkX2Xj5d+QW8xZ87pa1UK6yA6ouUyuxfHuMP6umE5QK7UmTeOAymo+Zx1Fxiuw9rVx8taHQ==}
+    deprecated: This package is no longer needed on supported Node.js versions. Node.js 16+ includes AbortController and AbortSignal as built-in globals. All Node.js versions requiring this polyfill are end-of-life. Use the built-in globals instead.
 
   node-domexception@1.0.0:
     resolution: {integrity: sha512-/jKZoMpw0F8GRwl4/eLROPA3cfcXtLApP0QzLmUT/HuPCZWyB7IY9ZrMeKw2O/nFIqPQB3PVM9aYm0F312AXDQ==}
@@ -11636,13 +11637,13 @@ snapshots:
 
   '@formatjs/icu-skeleton-parser@2.1.12': {}
 
-  '@hono/node-server@2.1.5(hono@4.13.13)':
+  '@hono/node-server@2.1.5(hono@4.13.18)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.18
 
-  '@hono/zod-validator@0.7.6(hono@4.13.13)(zod@4.6.7)':
+  '@hono/zod-validator@0.7.6(hono@4.13.18)(zod@4.6.7)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.18
       zod: 4.6.7
 
   '@huggingface/jinja@0.5.10': {}
@@ -12882,8 +12883,8 @@ snapshots:
     dependencies:
       '@aws-sdk/client-s3': 3.1152.0
       '@aws-sdk/client-transcribe': 3.1152.0
-      '@hono/node-server': 2.1.5(hono@4.13.13)
-      '@hono/zod-validator': 0.7.6(hono@4.13.13)(zod@4.6.7)
+      '@hono/node-server': 2.1.5(hono@4.13.18)
+      '@hono/zod-validator': 0.7.6(hono@4.13.18)(zod@4.6.7)
       '@huggingface/transformers': 4.3.1(@types/node@26.6.5)
       '@robingenz/zli': 0.2.0(zod@4.6.7)
       '@storyteller-platform/fs': 0.3.1
@@ -12892,8 +12893,8 @@ snapshots:
       cli-progress: 3.12.0
       ffmpeg-stream: 1.0.1(supports-color@10.2.2)
       fs-extra: 11.3.1
-      hono: 4.13.13
-      hono-zod-openapi: 1.1.1(hono@4.13.13)(zod@4.6.7)
+      hono: 4.13.18
+      hono-zod-openapi: 1.1.1(hono@4.13.18)(zod@4.6.7)
       lodash.merge: 4.6.2
       microsoft-cognitiveservices-speech-sdk: 1.44.1(supports-color@10.2.2)
       onnxruntime-node: 1.30.0
@@ -15819,14 +15820,14 @@ snapshots:
 
   highlight.js@10.7.3: {}
 
-  hono-zod-openapi@1.1.1(hono@4.13.13)(zod@4.6.7):
+  hono-zod-openapi@1.1.1(hono@4.13.18)(zod@4.6.7):
     dependencies:
-      '@hono/zod-validator': 0.7.6(hono@4.13.13)(zod@4.6.7)
-      hono: 4.13.13
+      '@hono/zod-validator': 0.7.6(hono@4.13.18)(zod@4.6.7)
+      hono: 4.13.18
       zod: 4.6.7
       zod-openapi: 5.4.6(zod@4.6.7)
 
-  hono@4.13.13: {}
+  hono@4.13.18: {}
 
   hook-std@4.0.0: {}
 
