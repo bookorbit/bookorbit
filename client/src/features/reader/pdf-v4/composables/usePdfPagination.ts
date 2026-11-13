@@ -12,7 +12,7 @@ export interface UsePdfPaginationOptions {
   touchPageTurningEnabled: ReadonlyRef<boolean>
   onActivity: () => void
   pageTurnAnimation?: ReadonlyRef<PdfReaderSettings['pageTurnAnimation'] | undefined>
-  onPageTurnAnimation?: (direction: -1 | 1) => void
+  onPageTurnAnimation?: (direction: -1 | 1, onReadyToNavigate?: () => void) => void
 }
 
 export function usePdfPagination({
@@ -76,8 +76,11 @@ export function usePdfPagination({
       if (spreads.length === 0) return
       const target = findAdjacentPage(spreads, pageRange.value.start, direction, scrollState.value.totalPages)
       if (target === pageRange.value.start) return
-      if (mode.value === 'page' && pageTurnAnimation?.value === 'curl') {
-        onPageTurnAnimation?.(direction)
+      if (mode.value === 'page' && pageTurnAnimation?.value === 'curl' && onPageTurnAnimation) {
+        onPageTurnAnimation(direction, () => {
+          scope.scrollToPage({ pageNumber: target, behavior: 'instant' })
+        })
+        return
       }
       scope.scrollToPage({ pageNumber: target, behavior: behavior.value })
     } catch {

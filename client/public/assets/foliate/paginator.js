@@ -293,6 +293,9 @@ class View {
   get element() {
     return this.#element
   }
+  get iframe() {
+    return this.#iframe
+  }
   get document() {
     return this.#iframe.contentDocument
   }
@@ -990,6 +993,38 @@ export class Paginator extends HTMLElement {
         this.#curlLeafFront.style.background = bookBg
         this.#curlLeafBack.style.background = bookBg
 
+        if (this.#curlLeafFront.childElementCount === 0 && this.#view?.document && this.#view?.iframe) {
+          try {
+            const cloneIframe = document.createElement('iframe')
+            cloneIframe.setAttribute('part', 'filter')
+            cloneIframe.setAttribute('sandbox', 'allow-same-origin allow-scripts')
+            cloneIframe.setAttribute('scrolling', 'no')
+            Object.assign(cloneIframe.style, {
+              position: 'absolute',
+              top: '0',
+              border: '0',
+              overflow: 'hidden',
+              width: this.#view.iframe.style.width,
+              height: this.#view.iframe.style.height,
+              pointerEvents: 'none',
+            })
+            const currentOffset = this.#container[this.scrollProp] || 0
+            let shift = currentOffset
+            if (isTwoPage && effectiveDir > 0) {
+              shift = currentOffset + leafWidth
+            }
+            cloneIframe.style.left = `${-shift}px`
+            this.#curlLeafFront.replaceChildren(cloneIframe)
+
+            const cloneDoc = cloneIframe.contentDocument
+            if (cloneDoc) {
+              cloneDoc.open()
+              cloneDoc.write(this.#view.document.documentElement.outerHTML)
+              cloneDoc.close()
+            }
+          } catch {}
+        }
+
         this.#curlLeaf.style.width = `${leafWidth}px`
         this.#curlLeaf.style.height = `${this.#container.clientHeight}px`
 
@@ -1006,8 +1041,8 @@ export class Paginator extends HTMLElement {
           this.#curlLeaf.style.transformOrigin = effectiveDir > 0 ? 'left center' : 'right center'
         }
 
-        const startAngle = effectiveDir > 0 ? 0 : -180
-        const targetAngle = effectiveDir > 0 ? -180 : 0
+        const startAngle = 0
+        const targetAngle = effectiveDir > 0 ? -115 : 115
         const currentAngle = lerp(startAngle, targetAngle, progress)
         const liftZ = Math.sin(progress * Math.PI) * 45
         const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 2 : -2)
@@ -1035,19 +1070,38 @@ export class Paginator extends HTMLElement {
       const leafWidth = maxColumnCount > 1 ? this.size / 2 : this.size
       const progress = Math.min(1, Math.max(0, Math.abs(state.totalDx) / leafWidth))
       const dragDir = state.totalDx > 0 ? 1 : -1
+      const effectiveDir = this.#rtl ? -dragDir : dragDir
 
       if (progress > 0.25 || Math.abs(state.vx) > 0.3) {
-        this.#curlStage.style.opacity = '0'
-        this.#curlStage.style.visibility = 'hidden'
-        this.#curlLeaf.style.transform = 'none'
-        if (dragDir > 0) this.next()
-        else this.prev()
+        animate(progress, 1, 150, easeOutQuad, (p) => {
+          const currentAngle = lerp(0, effectiveDir > 0 ? -115 : 115, p)
+          const opacity = p >= 0.85 ? Math.max(0, 1 - (p - 0.85) / 0.15) : 1
+          this.#curlLeaf.style.opacity = String(opacity)
+          this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg)`
+        }).then(() => {
+          this.#curlLeafFront.replaceChildren()
+          this.#curlStage.style.opacity = '0'
+          this.#curlStage.style.visibility = 'hidden'
+          this.#curlLeaf.style.transform = 'none'
+          this.#curlLeaf.style.opacity = '1'
+          if (dragDir > 0) this.next()
+          else this.prev()
+        })
       } else {
-        animate(progress, 0, 200, easeOutQuad, (p) => {
-          const currentAngle = (dragDir > 0 ? 0 : -180) - (dragDir > 0 ? 180 : -180) * p
+        animate(progress, 0, 180, easeOutQuad, (p) => {
+          const currentAngle = lerp(0, effectiveDir > 0 ? -115 : 115, p)
           this.#curlLeaf.style.transform = `rotateY(${currentAngle}deg)`
           this.#curlCreaseShadow.style.opacity = String(Math.sin(p * Math.PI) * 0.85)
         }).then(() => {
+          this.#curlLeafFront.replaceChildren()
+          this.#curlStage.style.opacity = '0'
+          this.#curlStage.style.visibility = 'hidden'
+          this.#curlLeaf.style.transform = 'none'
+          this.#curlLeaf.style.opacity = '1'
+        })
+      }
+      return
+    }
           this.#curlStage.style.opacity = '0'
           this.#curlStage.style.visibility = 'hidden'
           this.#curlLeaf.style.transform = 'none'
@@ -1152,6 +1206,41 @@ export class Paginator extends HTMLElement {
     front.style.background = bookBg
     back.style.background = bookBg
 
+    // Populate front leaf with actual page content slice from this.#view
+    const doc = this.#view?.document
+    if (doc && this.#view?.iframe) {
+      try {
+        const cloneIframe = document.createElement('iframe')
+        cloneIframe.setAttribute('part', 'filter')
+        cloneIframe.setAttribute('sandbox', 'allow-same-origin allow-scripts')
+        cloneIframe.setAttribute('scrolling', 'no')
+        Object.assign(cloneIframe.style, {
+          position: 'absolute',
+          top: '0',
+          border: '0',
+          overflow: 'hidden',
+          width: this.#view.iframe.style.width,
+          height: this.#view.iframe.style.height,
+          pointerEvents: 'none',
+        })
+        let shift = startOffset
+        if (isTwoPage && effectiveDir > 0) {
+          shift = startOffset + leafWidth
+        }
+        cloneIframe.style.left = `${-shift}px`
+        front.replaceChildren(cloneIframe)
+
+        const cloneDoc = cloneIframe.contentDocument
+        if (cloneDoc) {
+          cloneDoc.open()
+          cloneDoc.write(doc.documentElement.outerHTML)
+          cloneDoc.close()
+        }
+      } catch (err) {
+        console.warn('Could not snapshot EPUB page for curl:', err)
+      }
+    }
+
     const isDark = this.#mediaQuery?.matches || this.getAttribute('theme')?.includes('dark')
     const shadowColor = isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.22)'
     const highlightColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.32)'
@@ -1160,6 +1249,7 @@ export class Paginator extends HTMLElement {
 
     leaf.style.width = `${leafWidth}px`
     leaf.style.height = `${height}px`
+    leaf.style.opacity = '1'
 
     if (isTwoPage) {
       spine.style.left = '50%'
@@ -1186,8 +1276,8 @@ export class Paginator extends HTMLElement {
     element[scrollProp] = targetOffset
 
     const duration = 420
-    const startAngle = effectiveDir > 0 ? 0 : -180
-    const targetAngle = effectiveDir > 0 ? -180 : 0
+    const startAngle = 0
+    const targetAngle = effectiveDir > 0 ? -115 : 115
 
     return animate(0, 1, duration, cubicBezierCurl, (progress) => {
       const currentAngle = lerp(startAngle, targetAngle, progress)
@@ -1196,16 +1286,21 @@ export class Paginator extends HTMLElement {
       const shadowSpread = Math.sin(progress * Math.PI) * 20
       const shadowAlpha = Math.sin(progress * Math.PI) * (isDark ? 0.35 : 0.22)
 
+      const opacity = progress >= 0.85 ? Math.max(0, 1 - (progress - 0.85) / 0.15) : 1
+      leaf.style.opacity = String(opacity)
+
       leaf.style.transform = `rotateY(${currentAngle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`
       leaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0,0,0,${shadowAlpha})`
 
       crease.style.opacity = String(Math.sin(progress * Math.PI) * 0.85)
       spine.style.opacity = String(Math.sin(progress * Math.PI) * 0.7)
     }).then(() => {
+      front.replaceChildren()
       stage.style.opacity = '0'
       stage.style.visibility = 'hidden'
       leaf.style.transform = 'none'
       leaf.style.boxShadow = 'none'
+      leaf.style.opacity = '1'
       crease.style.opacity = '0'
       spine.style.opacity = '0'
       this.#scrollBounds = [targetOffset, this.atStart ? 0 : size, this.atEnd ? 0 : size]
