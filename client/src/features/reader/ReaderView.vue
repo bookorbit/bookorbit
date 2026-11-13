@@ -52,7 +52,7 @@ import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateLocationContext, FoliateRenderer } from './epub/composables/useFoliate'
-import type { BookDetail, EpubMediaOverlayPlaylist, EpubReaderSettings } from '@bookorbit/types'
+import type { BookDetail, EpubMediaOverlayPlaylist, EpubReaderSettings, PageTurnAnimation } from '@bookorbit/types'
 import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
 import { resolveReaderResumeTarget } from '@/lib/reading-checkpoint'
@@ -122,6 +122,7 @@ const {
   setThemeName,
   setFlow,
   setFixedLayoutSpread,
+  setPageTurnAnimation,
   setFontFaceCSS,
 } = readerState
 
@@ -1052,6 +1053,7 @@ const epubSetters: Record<string, (v: unknown) => void> = {
   themeName: (v) => setThemeName(v as string),
   flow: (v) => setFlow(v as 'paginated' | 'scrolled'),
   fixedLayoutSpread: (v) => setFixedLayoutSpread(v as EpubReaderSettings['fixedLayoutSpread']),
+  pageTurnAnimation: (v) => setPageTurnAnimation((v as PageTurnAnimation) ?? 'slide'),
 }
 
 // Applies settings to reactive refs (and renderer if open) without touching the delta.

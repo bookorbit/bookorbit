@@ -273,6 +273,38 @@ describe('useReaderSettings - PDF validation', () => {
       zoomMode: 'automatic',
     })
   })
+
+  it('sanitizes pageTurnAnimation for pdf and epub settings', async () => {
+    localStorage.setItem(
+      `reader:book:${BOOK_FILE_ID}`,
+      JSON.stringify({
+        scrollMode: 'page',
+        pageTurnAnimation: 'curl',
+      }),
+    )
+
+    const pdfSettings = useReaderSettings(BOOK_FILE_ID, 'pdf')
+    await pdfSettings.load()
+    expect(pdfSettings.bookDelta.value).toMatchObject({
+      scrollMode: 'page',
+      pageTurnAnimation: 'curl',
+    })
+
+    localStorage.setItem(
+      `reader:book:${BOOK_FILE_ID}`,
+      JSON.stringify({
+        flow: 'paginated',
+        pageTurnAnimation: 'curl',
+      }),
+    )
+
+    const epubSettings = useReaderSettings(BOOK_FILE_ID, 'epub')
+    await epubSettings.load()
+    expect(epubSettings.bookDelta.value).toMatchObject({
+      flow: 'paginated',
+      pageTurnAnimation: 'curl',
+    })
+  })
 })
 
 describe('useReaderSettings - load() with valid cbx localStorage delta', () => {

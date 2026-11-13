@@ -13,6 +13,7 @@ import {
   EPUB_WORD_SPACING_MIN,
   type EpubReaderSettings,
   type FontStyle,
+  type PageTurnAnimation,
 } from '@bookorbit/types'
 import { themes } from '../constants/themes'
 import type { Theme, ThemeMode } from '../constants/themes'
@@ -41,6 +42,7 @@ export interface ReaderState {
   themeName: string
   flow: 'paginated' | 'scrolled'
   fixedLayoutSpread: EpubReaderSettings['fixedLayoutSpread']
+  pageTurnAnimation: PageTurnAnimation
 }
 
 export interface ApplyReaderStateOptions {
@@ -67,6 +69,7 @@ const defaults: ReaderState = {
   themeName: 'default',
   flow: 'paginated',
   fixedLayoutSpread: 'auto',
+  pageTurnAnimation: 'slide',
 }
 
 export function useReaderState() {
@@ -89,6 +92,7 @@ export function useReaderState() {
   const themeName = ref(defaults.themeName)
   const flow = ref<'paginated' | 'scrolled'>(defaults.flow)
   const fixedLayoutSpread = ref<EpubReaderSettings['fixedLayoutSpread']>(defaults.fixedLayoutSpread)
+  const pageTurnAnimation = ref<PageTurnAnimation>(defaults.pageTurnAnimation)
 
   const fontFaceCSS = ref('')
 
@@ -112,6 +116,7 @@ export function useReaderState() {
     themeName: themeName.value,
     flow: flow.value,
     fixedLayoutSpread: fixedLayoutSpread.value,
+    pageTurnAnimation: pageTurnAnimation.value,
   }))
 
   const currentTheme = computed<Theme>(() => themes.find((t) => t.name === themeName.value) ?? themes[0]!)
@@ -303,6 +308,7 @@ export function useReaderState() {
       renderer.removeAttribute('margin')
     }
     renderer.setAttribute('flow', rendererFlow)
+    renderer.setAttribute('page-turn-animation', s.pageTurnAnimation)
     if (typeof renderer.setStyles === 'function') {
       renderer.setStyles(generateCSS())
     }
@@ -365,6 +371,9 @@ export function useReaderState() {
   function setFixedLayoutSpread(v: EpubReaderSettings['fixedLayoutSpread']) {
     fixedLayoutSpread.value = v
   }
+  function setPageTurnAnimation(v: PageTurnAnimation) {
+    pageTurnAnimation.value = v
+  }
 
   function setFontFaceCSS(css: string) {
     fontFaceCSS.value = css
@@ -391,6 +400,7 @@ export function useReaderState() {
     themeName,
     flow,
     fixedLayoutSpread,
+    pageTurnAnimation,
     currentTheme,
     activeMode,
     themes,
@@ -415,6 +425,7 @@ export function useReaderState() {
     setThemeName,
     setFlow,
     setFixedLayoutSpread,
+    setPageTurnAnimation,
     setFontFaceCSS,
   }
 }

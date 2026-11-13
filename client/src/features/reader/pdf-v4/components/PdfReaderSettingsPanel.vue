@@ -8,6 +8,7 @@ const props = defineProps<{
   rotation: PdfReaderSettings['rotation']
   zoomMode: PdfReaderSettings['zoomMode']
   customScale: number
+  pageTurnAnimation?: PdfReaderSettings['pageTurnAnimation']
 }>()
 
 const emit = defineEmits<{
@@ -17,6 +18,7 @@ const emit = defineEmits<{
   setZoom: [mode: PdfReaderSettings['zoomMode'], scale?: number]
   rotateBackward: []
   rotateForward: []
+  setPageTurnAnimation: [animation: PdfReaderSettings['pageTurnAnimation']]
 }>()
 
 let zoomPreviewTimer: ReturnType<typeof setTimeout> | null = null
@@ -177,6 +179,45 @@ onUnmounted(() => {
           @click="selectHorizontal"
         >
           Horizontal scroll
+        </button>
+      </div>
+    </div>
+
+    <div v-if="props.scrollMode === 'page'" class="mb-5">
+      <p class="settings-group-label">Page turn effect</p>
+      <div class="grid grid-cols-3 gap-2">
+        <button
+          class="rounded-md border px-3 py-2 text-xs font-medium transition-colors"
+          :class="
+            (props.pageTurnAnimation ?? 'slide') === 'slide'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:text-foreground'
+          "
+          @click="emit('setPageTurnAnimation', 'slide')"
+        >
+          Slide
+        </button>
+        <button
+          class="rounded-md border px-3 py-2 text-xs font-medium transition-colors"
+          :class="
+            props.pageTurnAnimation === 'curl'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:text-foreground'
+          "
+          @click="emit('setPageTurnAnimation', 'curl')"
+        >
+          Paper Curl
+        </button>
+        <button
+          class="rounded-md border px-3 py-2 text-xs font-medium transition-colors"
+          :class="
+            props.pageTurnAnimation === 'none'
+              ? 'border-primary bg-primary/10 text-primary'
+              : 'border-border text-muted-foreground hover:text-foreground'
+          "
+          @click="emit('setPageTurnAnimation', 'none')"
+        >
+          Instant
         </button>
       </div>
     </div>
