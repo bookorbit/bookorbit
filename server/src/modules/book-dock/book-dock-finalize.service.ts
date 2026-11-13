@@ -1737,6 +1737,8 @@ function normalizeStringArray(value: unknown, maxLength: number): string[] {
 function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): NormalizedFinalizeMetadata {
   const normalizedMeta = normalizeBookDockMetadata(meta);
   const publishedDate = normalizePublishedDate(normalizedMeta?.publishedDate) ?? null;
+  const seriesName = normalizeText(normalizedMeta?.seriesName, 500);
+  const seriesIndex = parseSeriesIndex(normalizedMeta?.seriesIndex);
   return {
     title: normalizeText(normalizedMeta?.title, 1000),
     subtitle: normalizeText(normalizedMeta?.subtitle, 1000),
@@ -1748,8 +1750,8 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(normalizedMeta?.publishedYear),
     language: normalizeLanguage(normalizedMeta?.language),
     pageCount: normalizeInteger(normalizedMeta?.pageCount),
-    seriesName: normalizeText(normalizedMeta?.seriesName, 500),
-    seriesIndex: parseSeriesIndex(normalizedMeta?.seriesIndex),
+    seriesName,
+    seriesIndex,
     authors: normalizeStringArray(normalizedMeta?.authors, 500),
     genres: normalizeStringArray(normalizedMeta?.genres, 200),
     coverUrl: normalizeText(normalizedMeta?.coverUrl),
@@ -1767,7 +1769,7 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     ranobedbId: normalizeText(normalizedMeta?.ranobedbId, 50),
     lubimyczytacId: normalizeText(normalizedMeta?.lubimyczytacId, 512),
     aladinId: normalizeText(normalizedMeta?.aladinId, 20),
-    seriesMemberships: normalizeSeriesMemberships(normalizedMeta?.seriesMemberships),
+    seriesMemberships: withPrimarySeries(normalizeSeriesMemberships(normalizedMeta?.seriesMemberships), seriesName, seriesIndex),
     communityRatings: normalizeCommunityRatings(normalizedMeta?.communityRatings),
     externalProviderIds: normalizedMeta?.externalProviderIds ?? undefined,
     comicMetadata: normalizeComicMetadata(normalizedMeta?.comicMetadata),
@@ -1789,6 +1791,22 @@ function normalizeSeriesMemberships(value: BookDockMetadata['seriesMemberships']
     memberships.push({ seriesName, seriesIndex: parseSeriesIndex(item.seriesIndex) });
   }
   return memberships;
+}
+
+/**
+ * A provider match stores its whole series list, but the Book Dock form edits only the first entry as
+ * the series name and number. The form's values replace that entry, so a corrected series is filed
+ * instead of the provider's spelling.
+ */
+function withPrimarySeries(
+  memberships: MetadataSeriesMembership[] | undefined,
+  seriesName: string | null,
+  seriesIndex: string | null,
+): MetadataSeriesMembership[] | undefined {
+  if (memberships === undefined || !seriesName) return memberships;
+  const key = seriesName.toLowerCase();
+  const others = memberships.slice(1).filter((membership) => membership.seriesName.toLowerCase() !== key);
+  return [{ seriesName, seriesIndex }, ...others];
 }
 
 function normalizeCommunityRatings(

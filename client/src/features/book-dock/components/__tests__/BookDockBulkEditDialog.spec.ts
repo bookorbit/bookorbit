@@ -1,6 +1,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { i18n } from '@/i18n'
+import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import BookDockBulkEditDialog from '../BookDockBulkEditDialog.vue'
 
 const api = vi.fn<(...args: unknown[]) => Promise<Response>>()
@@ -63,6 +64,34 @@ describe('BookDockBulkEditDialog', () => {
       fields: { isbn13: '9783426226223', isbn10: '080442957X' },
       enabledFields: ['isbn13', 'isbn10'],
     })
+  })
+
+  // Issue #1721: picking an existing series avoids filing a new one under a misspelt name.
+  it('suggests series already in the library and applies the one picked', async () => {
+    api.mockImplementation(async (url) =>
+      String(url).startsWith('/api/v1/metadata/series?')
+        ? ({ ok: true, json: async () => [{ name: 'The Expanse' }] } as Response)
+        : ({ ok: true, json: async () => ({ total: 2, updated: 2, failed: 0 }) } as Response),
+    )
+    mountDialog()
+    const seriesInput = () => wrapper.getComponent(InputWithSuggestions)
+
+    expect(seriesInput().props('disabled')).toBe(true)
+    await fieldRow('Series').get('input[type="checkbox"]').trigger('change')
+    expect(seriesInput().props('disabled')).toBe(false)
+
+    await expect(seriesInput().props('searchFn')('expanse')).resolves.toEqual(['The Expanse'])
+    expect(api).toHaveBeenCalledWith('/api/v1/metadata/series?q=expanse')
+
+    seriesInput().vm.$emit('update:modelValue', 'The Expanse')
+    await flushPromises()
+    expect(fieldInput('Series').element.value).toBe('The Expanse')
+
+    await applyButton().trigger('click')
+    await flushPromises()
+
+    const [, init] = api.mock.calls.find(([url]) => url === '/api/v1/book-dock/files/bulk-edit') as [string, RequestInit]
+    expect(JSON.parse(init.body as string)).toMatchObject({ fields: { seriesName: 'The Expanse' }, enabledFields: ['seriesName'] })
   })
 
   it('keeps an identifier field disabled until it is enabled', async () => {

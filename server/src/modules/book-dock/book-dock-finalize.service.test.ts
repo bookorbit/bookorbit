@@ -1735,6 +1735,62 @@ describe('BookDockFinalizeService', () => {
     expect(metadataService.replaceNarrators).toHaveBeenCalledWith(19, [{ name: 'Simon Vance', sortName: null }]);
   });
 
+  it.each([
+    {
+      case: 'a corrected series name',
+      seriesName: 'The Expanse',
+      seriesIndex: '3',
+      stored: [
+        { seriesName: 'Expanse', seriesIndex: '3' },
+        { seriesName: 'Expanse Universe', seriesIndex: '5' },
+      ],
+      expected: [
+        { seriesName: 'The Expanse', seriesIndex: '3' },
+        { seriesName: 'Expanse Universe', seriesIndex: '5' },
+      ],
+    },
+    {
+      case: 'a secondary series chosen as the series',
+      seriesName: 'Dune Chronicles',
+      seriesIndex: '2',
+      stored: [
+        { seriesName: 'Dune', seriesIndex: '1' },
+        { seriesName: 'dune chronicles', seriesIndex: '1' },
+        { seriesName: 'Dune Universe', seriesIndex: '7' },
+      ],
+      expected: [
+        { seriesName: 'Dune Chronicles', seriesIndex: '2' },
+        { seriesName: 'Dune Universe', seriesIndex: '7' },
+      ],
+    },
+    {
+      case: 'the series name when the provider list was cleared',
+      seriesName: 'Dune',
+      seriesIndex: '1',
+      stored: null,
+      expected: [{ seriesName: 'Dune', seriesIndex: '1' }],
+    },
+  ])('applyMetadata files $case in place of the provider primary series', async ({ seriesName, seriesIndex, stored, expected }) => {
+    const { service, db, seriesMemberships } = makeService();
+    const updateChain = {
+      set: vi.fn(),
+      where: vi.fn().mockResolvedValue(undefined),
+    };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+
+    await (service as any).applyMetadata(
+      20,
+      makeRow({
+        coverPath: null,
+        selectedMetadata: { title: 'Leviathan Wakes', seriesName, seriesIndex, seriesMemberships: stored } as BookDockMetadata,
+      }),
+    );
+
+    expect(seriesMemberships.replaceForBook).toHaveBeenCalledWith(20, expected);
+    expect(seriesMemberships.syncPrimaryFromMetadata).not.toHaveBeenCalled();
+  });
+
   it('applyMetadata prefers selected coverUrl and skips extracted cover copy when download succeeds', async () => {
     const { service, db, metadataService } = makeService();
     metadataService.downloadAndSaveCover.mockResolvedValueOnce(true);
