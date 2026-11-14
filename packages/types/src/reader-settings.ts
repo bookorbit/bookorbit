@@ -2,6 +2,8 @@ import type { FontStyle } from "./font";
 
 export type ReaderFormatGroup = "epub" | "pdf" | "cbx" | "audio";
 
+export type PageTurnAnimation = "slide" | "none" | "curl";
+
 export const EPUB_FONT_SIZE_MIN = 6;
 export const EPUB_FONT_SIZE_MAX = 32;
 export const EPUB_PARAGRAPH_SPACING_MIN = 0;
@@ -112,6 +114,7 @@ export interface EpubReaderSettings {
   footerDisplayMode: 0 | 1 | 2;
   // Fixed-layout EPUB spread handling. auto = respect book metadata; none = force one spine item per page.
   fixedLayoutSpread: "auto" | "none";
+  pageTurnAnimation?: PageTurnAnimation;
 }
 
 export interface PdfReaderSettings {
@@ -120,6 +123,7 @@ export interface PdfReaderSettings {
   zoomMode: "fit-width" | "fit-page" | "automatic" | "custom";
   customScale: number; // 0.25-4.0, used when zoomMode is 'custom'
   rotation: 0 | 90 | 180 | 270;
+  pageTurnAnimation?: PageTurnAnimation;
 }
 
 export interface CbxReaderSettings {
@@ -178,6 +182,7 @@ export const EPUB_READER_DEFAULTS: EpubReaderSettings = {
   overrideBookFormatting: true,
   footerDisplayMode: 0,
   fixedLayoutSpread: "auto",
+  pageTurnAnimation: "slide",
 };
 
 export const PDF_READER_DEFAULTS: PdfReaderSettings = {
@@ -186,6 +191,7 @@ export const PDF_READER_DEFAULTS: PdfReaderSettings = {
   zoomMode: "fit-page",
   customScale: 1.0,
   rotation: 0,
+  pageTurnAnimation: "slide",
 };
 
 export const CBX_READER_DEFAULTS: CbxReaderSettings = {

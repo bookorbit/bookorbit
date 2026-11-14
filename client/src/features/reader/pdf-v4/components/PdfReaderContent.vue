@@ -27,6 +27,7 @@ import { usePdfResponsiveSpread } from '../composables/usePdfResponsiveSpread'
 import { usePdfSidebarLayout, type PdfSidebarTab } from '../composables/usePdfSidebarLayout'
 import NoteDialog from '../../shared/components/NoteDialog.vue'
 import PdfSelectionPopup from './PdfSelectionPopup.vue'
+import PdfCurlOverlay from './PdfCurlOverlay.vue'
 
 const props = defineProps<{
   documentId: string
@@ -47,6 +48,8 @@ const emit = defineEmits<{
   settingsChange: [patch: Partial<PdfReaderSettings>]
   startReading: []
 }>()
+
+const isDark = computed(() => typeof document !== 'undefined' && document.documentElement.classList.contains('dark'))
 
 const { state: scrollState, provides: scroll } = useScroll(() => props.documentId)
 const { provides: scrollCapability } = useScrollCapability()
@@ -84,7 +87,25 @@ const {
   reveal: revealHeader,
   togglePinned: toggleHeaderPinned,
 } = usePdfFullscreenChrome(isFullscreen, hasOpenUi)
+
+const curlOverlayRef = ref<InstanceType<typeof PdfCurlOverlay> | null>(null)
+
+function triggerPdfCurl(dir: 1 | -1, navigateCb?: () => void, onCompleteCb?: () => void) {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    navigateCb?.()
+    onCompleteCb?.()
+    return
+  }
+  if (curlOverlayRef.value) {
+    curlOverlayRef.value.flip(dir, navigateCb, onCompleteCb)
+  } else {
+    navigateCb?.()
+    onCompleteCb?.()
+  }
+}
+
 const {
+  isFlipping,
   pageRange,
   getPageRange,
   goToPage: handleGoToPage,
@@ -100,6 +121,8 @@ const {
   scroll,
   touchPageTurningEnabled: isPanning,
   onActivity: revealHeader,
+  pageTurnAnimation: computed(() => props.settings.pageTurnAnimation),
+  onPageTurnAnimation: triggerPdfCurl,
 })
 const { apply: applyResponsiveSpread } = usePdfResponsiveSpread(viewerSurface, currentSpreadPreference, spread)
 const highlights = usePdfHighlights({
@@ -112,6 +135,11 @@ const highlights = usePdfHighlights({
 
 function handleBack() {
   emit('back')
+}
+
+function handleCurlCommit(direction: 1 | -1) {
+  const target = Math.min(Math.max(scrollState.value.currentPage + direction, 1), scrollState.value.totalPages || 1)
+  handleGoToPage(target)
 }
 
 function handleZoomOut() {
@@ -185,6 +213,10 @@ function handleNavigateHighlight(annotation: AnnotationItem) {
 
 function handleDeleteHighlight(id: number) {
   void highlights.deleteAnnotation(id)
+}
+
+function handlePageTurnAnimation(animation: PdfReaderSettings['pageTurnAnimation']) {
+  emit('settingsChange', { pageTurnAnimation: animation })
 }
 
 function handleRetryHighlights() {
@@ -294,9 +326,11 @@ function handleKeydown(event: KeyboardEvent) {
   }
   if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
     event.preventDefault()
+    if (isFlipping.value) return
     handlePreviousPage()
   } else if (event.key === 'ArrowRight' || event.key === 'PageDown') {
     event.preventDefault()
+    if (isFlipping.value) return
     handleNextPage()
   } else if (event.key === 'Home') {
     event.preventDefault()
@@ -354,7 +388,8 @@ watch(
       const restored = event.pageNumber === restoringPage
       restoringPage = null
       const range = getPageRange(event.pageNumber, event.totalPages)
-      emit('pageChange', range.end, event.totalPages, restored)
+      const pageToEmit = props.settings.scrollMode === 'page' || range.start === range.end ? event.pageNumber : range.end
+      emit('pageChange', pageToEmit, event.totalPages, restored)
     })
     onCleanup(() => {
       unsubscribeLayout()
@@ -461,12 +496,14 @@ onUnmounted(() => {
           :rotation="currentRotation"
           :zoom-mode="currentZoomMode"
           :custom-scale="zoomState.currentZoomLevel"
+          :page-turn-animation="props.settings.pageTurnAnimation ?? 'slide'"
           @preview-zoom="handleZoomPreview"
           @set-scroll-mode="handleScrollMode"
           @set-spread="handleSpread"
           @set-zoom="handleZoom"
           @rotate-backward="handleRotateBackward"
           @rotate-forward="handleRotateForward"
+          @set-page-turn-animation="handlePageTurnAnimation"
         />
       </template>
     </PdfReaderToolbar>
@@ -552,6 +589,17 @@ onUnmounted(() => {
             <PdfDocumentViewport v-else-if="isLoaded" :document-id="props.documentId" />
           </template>
         </DocumentContent>
+
+        <!-- 3D Conical Paper Page Curl Transition Overlay -->
+        <PdfCurlOverlay
+          ref="curlOverlayRef"
+          :active="props.settings.pageTurnAnimation === 'curl' && currentScrollMode === 'page'"
+          :surface="viewerSurface"
+          :current-page="scrollState.currentPage"
+          :total-pages="scrollState.totalPages"
+          :is-dark="isDark"
+          @commit-turn="handleCurlCommit"
+        />
         <PdfSelectionPopup
           ref="selectionPopup"
           :visible="highlights.popupVisible.value"

@@ -28,6 +28,7 @@ function makeState(overrides: Partial<ReaderState> = {}): ReaderState {
     themeName: 'default',
     flow: 'paginated',
     fixedLayoutSpread: 'auto',
+    pageTurnAnimation: 'slide',
     ...overrides,
   }
 }
@@ -220,6 +221,18 @@ describe('ReaderSettingsPanel', () => {
     await buttonByText(wrapper, 'Scroll')?.trigger('click')
 
     expect(wrapper.emitted('update')?.[0]).toEqual([{ flow: 'scrolled' }])
+  })
+
+  it('switches page turn effect when paginated', async () => {
+    const wrapper = mountPanel({ state: makeState({ flow: 'paginated', pageTurnAnimation: 'slide' }) })
+
+    expect(wrapper.text()).toContain('Page turn effect')
+    await buttonByText(wrapper, 'Paper Curl')?.trigger('click')
+
+    expect(wrapper.emitted('update')?.[0]).toEqual([{ pageTurnAnimation: 'curl' }])
+
+    const scrolledWrapper = mountPanel({ state: makeState({ flow: 'scrolled' }) })
+    expect(scrolledWrapper.text()).not.toContain('Page turn effect')
   })
 
   it('emits advanced layout changes', async () => {

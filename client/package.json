@@ -81,6 +81,7 @@
     "echarts": "^6.1.0",
     "howler": "^2.2.4",
     "intl-messageformat": "^12.1.4",
+    "page-flip": "^2.0.7",
     "pinia": "^4.1.0",
     "reka-ui": "^2.11.0",
     "socket.io-client": "^4.8.4",

@@ -13485,6 +13485,12 @@
         "paginated": "Pages",
         "scrolled": "Scroll"
       },
+      "pageTurnEffect": "Page turn effect",
+      "pageTurnEffectOptions": {
+        "slide": "Slide",
+        "curl": "Paper Curl",
+        "none": "Instant"
+      },
       "pageSpreads": "Page spreads",
       "pageSpreadsHint": "Choose how this image-based EPUB pairs pages.",
       "spread": {
