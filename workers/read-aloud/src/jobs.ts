@@ -1,6 +1,6 @@
 import { fork, type ChildProcess } from "node:child_process";
 import { readFileSync, realpathSync, renameSync, writeFileSync } from "node:fs";
-import { mkdir, statfs } from "node:fs/promises";
+import { mkdir, rm, statfs } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -16,6 +16,7 @@ import type {
 import type { ResolvedCtcDevice } from "./accelerator.js";
 import { workerTmpDir, type WorkerConfig } from "./config.js";
 import { cleanMessage, errorClass, errorMessage, logLine } from "./log.js";
+import { toLocalPath } from "./path-map.js";
 import { ReadableRoots, RequestError, expectedWorkDir, resolveSource, type RootCheckOptions } from "./paths.js";
 import {
   MAX_EVENT_MESSAGE_LENGTH,
@@ -227,12 +228,14 @@ export class JobRegistry {
   }
 
   private async resolve(request: ReadAloudWorkerRequest): Promise<ResolvedSources> {
-    const { workRoot } = this.options.config;
-    const workDir = expectedWorkDir(request.workDir, workRoot, request.jobId);
+    const { workRoot, pathMap } = this.options.config;
+    const workDir = expectedWorkDir(toLocalPath(request.workDir, pathMap), workRoot, request.jobId);
     const libraryRoots = await this.roots.get(0);
-    const epub = await resolveSource(request.epubPath, libraryRoots, "EPUB");
+    const epub = await resolveSource(toLocalPath(request.epubPath, pathMap), libraryRoots, "EPUB");
     const audio: SourceFingerprint[] = [];
-    for (const [index, path] of request.audioPaths.entries()) audio.push(await resolveSource(path, libraryRoots, `audio file ${index + 1}`));
+    for (const [index, path] of request.audioPaths.entries()) {
+      audio.push(await resolveSource(toLocalPath(path, pathMap), libraryRoots, `audio file ${index + 1}`));
+    }
     return { workDir, epub, audio };
   }
 
@@ -302,6 +305,7 @@ export class JobRegistry {
       jobId: record.jobId,
       attempt: record.attempt,
       workDir: resolved.workDir,
+      scratchDir: this.scratchDir(record.jobId),
       epub: resolved.epub,
       audio: resolved.audio,
       language: request.language,
@@ -324,7 +328,7 @@ export class JobRegistry {
         ...process.env,
         ...this.options.runnerEnv,
         TMPDIR: workerTmpDir(config),
-        STORYTELLER_SCRATCH_DIR: join(resolved.workDir, "scratch"),
+        STORYTELLER_SCRATCH_DIR: job.scratchDir,
       },
     });
     record.child = child;
@@ -366,6 +370,11 @@ export class JobRegistry {
     }
   }
 
+  /** The job's scratch folder: local to this machine even when the job folder is a network share. */
+  private scratchDir(jobId: string): string {
+    return join(workerTmpDir(this.options.config), "scratch", jobId);
+  }
+
   private onClose(record: JobRecord, child: ChildProcess, code: number | null, signal: NodeJS.Signals | null): void {
     if (record.child !== child) return;
     record.child = null;
@@ -374,6 +383,8 @@ export class JobRegistry {
     killGroup(child);
     if (record.killTimer) clearTimeout(record.killTimer);
     record.killTimer = null;
+    // A resumed run redoes its scratch work, so nothing in it is worth keeping once the runner is gone.
+    void rm(this.scratchDir(record.jobId), { recursive: true, force: true }).catch(() => undefined);
     const result = record.result;
     if (record.cancelRequested) {
       this.finish(record, "cancelled", "cancelled", record.killed ? "The job was cancelled and its runner was killed" : "The job was cancelled");

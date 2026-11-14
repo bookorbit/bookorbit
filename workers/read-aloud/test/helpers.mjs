@@ -39,6 +39,7 @@ export async function startTestWorker(sandbox, options = {}) {
     token: TOKEN,
     libraryRoots: options.libraryRoots ?? [sandbox.library],
     workRoot: sandbox.workRoot,
+    pathMap: options.pathMap ?? [],
     tmpDir: sandbox.tmpDir,
     configuredDevice: "cpu",
     dtype: null,

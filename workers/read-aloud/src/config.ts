@@ -1,13 +1,17 @@
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { CTC_DEVICES, type ConfiguredCtcDevice } from "./accelerator.js";
+import { parsePathMap, type PathMapping } from "./path-map.js";
 
 export type WorkerConfig = {
   host: string;
   port: number;
   token: string;
+  /** Folders on this machine; with a path map they are the local spelling of what the server calls /books and so on. */
   libraryRoots: string[];
   workRoot: string;
+  /** How the server's paths translate to this machine's; empty when both see the same paths. */
+  pathMap: PathMapping[];
   tmpDir: string;
   configuredDevice: ConfiguredCtcDevice;
   dtype: "fp32" | "fp16" | null;
@@ -40,6 +44,7 @@ export function loadConfig(env: Env): WorkerConfig {
     token,
     libraryRoots: parseLibraryRoots(env),
     workRoot,
+    pathMap: parsePathMap(env),
     tmpDir: absolutePath(env.READ_ALOUD_TMP_DIR, resolve(dirname(workRoot), "tmp"), "READ_ALOUD_TMP_DIR"),
     configuredDevice: readEnum(env.READ_ALOUD_CTC_DEVICE, CTC_DEVICES, "auto", "READ_ALOUD_CTC_DEVICE"),
     dtype: readOptionalEnum(env.READ_ALOUD_CTC_DTYPE, ["fp32", "fp16"] as const, "READ_ALOUD_CTC_DTYPE"),

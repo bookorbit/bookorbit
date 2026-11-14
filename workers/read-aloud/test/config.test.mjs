@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { WORKER_TMP_SUBDIR, loadConfig, parseLibraryRoots, workerVersion } from "../dist/config.js";
+import { parsePathMap, toLocalPath, toRemotePath } from "../dist/path-map.js";
 import { prepareDataFolders } from "../dist/server.js";
 import { checkFfmpeg } from "../dist/toolchain.js";
 
@@ -25,6 +26,50 @@ test("library roots: the single-root variable is the fallback, then /books", () 
 test("library roots: relative paths are refused", () => {
   assert.throws(() => parseLibraryRoots({ READ_ALOUD_LIBRARY_ROOTS: "/books,media" }), /absolute/);
   assert.throws(() => parseLibraryRoots({ READ_ALOUD_LIBRARY_ROOTS: "," }), /at least one/);
+});
+
+test("path map: pairs are trimmed, normalised and optional", () => {
+  assert.deepEqual(parsePathMap({}), []);
+  assert.deepEqual(parsePathMap({ READ_ALOUD_PATH_MAP: "  " }), []);
+  assert.deepEqual(parsePathMap({ READ_ALOUD_PATH_MAP: " /books = /mnt/books/ ,,/data/read-aloud=/mnt/data/read-aloud" }), [
+    { remote: "/books", local: "/mnt/books" },
+    { remote: "/data/read-aloud", local: "/mnt/data/read-aloud" },
+  ]);
+  assert.deepEqual(loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN }).pathMap, []);
+  assert.deepEqual(loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_PATH_MAP: "/books=/mnt/books" }).pathMap, [
+    { remote: "/books", local: "/mnt/books" },
+  ]);
+});
+
+test("path map: malformed, root and repeated entries are refused", () => {
+  for (const value of ["/books", "/books=", "=/mnt/books", "books=/mnt/books", "/books=mnt/books"]) {
+    assert.throws(() => parsePathMap({ READ_ALOUD_PATH_MAP: value }), /entries must look like/, value);
+  }
+  assert.throws(() => parsePathMap({ READ_ALOUD_PATH_MAP: "/=/mnt/books" }), /filesystem root/);
+  assert.throws(() => parsePathMap({ READ_ALOUD_PATH_MAP: "/books=/" }), /filesystem root/);
+  assert.throws(() => parsePathMap({ READ_ALOUD_PATH_MAP: "/books=/a,/books/=/b" }), /server path \/books twice/);
+  assert.throws(() => parsePathMap({ READ_ALOUD_PATH_MAP: "/books=/a,/audio=/a/" }), /local path \/a twice/);
+});
+
+test("path map: the longest matching folder wins, in both directions", () => {
+  const map = parsePathMap({ READ_ALOUD_PATH_MAP: "/data=/mnt/data,/data/read-aloud=/mnt/ra,/books=/mnt/books" });
+  assert.equal(toLocalPath("/books/A/b.epub", map), "/mnt/books/A/b.epub");
+  assert.equal(toLocalPath("/books", map), "/mnt/books");
+  assert.equal(toLocalPath("/data/read-aloud/jobs/x", map), "/mnt/ra/jobs/x");
+  assert.equal(toLocalPath("/data/other/y", map), "/mnt/data/other/y");
+  assert.equal(toRemotePath("/mnt/ra/jobs/x", map), "/data/read-aloud/jobs/x");
+  assert.equal(toRemotePath("/mnt/books", map), "/books");
+});
+
+test("path map: unmapped, relative and escaping paths are never rewritten into a mapped folder", () => {
+  const map = parsePathMap({ READ_ALOUD_PATH_MAP: "/books=/mnt/books" });
+  assert.equal(toLocalPath("/booksmith/a.epub", map), "/booksmith/a.epub");
+  assert.equal(toLocalPath("/elsewhere/a.epub", map), "/elsewhere/a.epub");
+  assert.equal(toLocalPath("a.epub", map), "a.epub");
+  assert.equal(toLocalPath("/books/../etc/passwd", map), "/books/../etc/passwd");
+  assert.equal(toLocalPath("/etc/../books/a.epub", map), "/mnt/books/a.epub");
+  assert.equal(toRemotePath("/mnt/books-extra/a", map), "/mnt/books-extra/a");
+  assert.equal(toLocalPath("/books/a.epub", []), "/books/a.epub");
 });
 
 test("version: the image's release version, else the package version", () => {

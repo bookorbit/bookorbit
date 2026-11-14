@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, rmSync, symlinkSync, utimesSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { after, before, describe, test } from "node:test";
 import { ReadableRoots } from "../dist/paths.js";
@@ -149,6 +150,85 @@ describe("paths inside a root", () => {
   });
 });
 
+describe("path map", () => {
+  // The server calls the library /books and the data folder /data/read-aloud; this machine mounts them elsewhere.
+  const SERVER_BOOK = "/books/Author/Book";
+  const SERVER_WORK = "/data/read-aloud/jobs";
+  let sandbox;
+  let client;
+
+  before(async () => {
+    sandbox = makeSandbox();
+    client = await startTestWorker(sandbox, {
+      pathMap: [
+        { remote: "/books", local: sandbox.library },
+        { remote: "/data/read-aloud", local: dirname(sandbox.workRoot) },
+      ],
+    });
+  });
+
+  after(async () => {
+    await client.close();
+    sandbox.cleanup();
+  });
+
+  const mappedRequest = (overrides = {}) => {
+    const jobId = overrides.jobId ?? randomUUID();
+    return jobRequest(sandbox, {
+      jobId,
+      epubPath: `${SERVER_BOOK}/book.epub`,
+      audioPaths: [`${SERVER_BOOK}/01.mp3`, `${SERVER_BOOK}/02.mp3`],
+      workDir: `${SERVER_WORK}/${jobId}`,
+      ...overrides,
+    });
+  };
+
+  test("health reports the folders under the names the server uses", async () => {
+    const { body } = await client.call("GET", "/health");
+    assert.deepEqual(body.libraryRoots, ["/books"]);
+    assert.equal(body.workRoot, SERVER_WORK);
+  });
+
+  test("runs a job whose paths are the server's, working in the mapped folders", async () => {
+    const request = mappedRequest();
+    const created = await client.call("POST", "/v1/jobs", request);
+    assert.equal(created.status, 202, JSON.stringify(created.body));
+    const job = await waitForJob(client, request.jobId, (body) => TERMINAL.has(body.status));
+    assert.equal(job.status, "completed", JSON.stringify(job));
+    assert.ok(existsSync(join(sandbox.workRoot, request.jobId)), "the job folder is created on this machine");
+  });
+
+  const rejected = [
+    ["a source outside every mapped folder", () => mappedRequest({ epubPath: "/elsewhere/book.epub" }), "library_not_mounted"],
+    [
+      "a source that leaves the mapped library through `..`",
+      () => mappedRequest({ audioPaths: [`${SERVER_BOOK}/../../../data/read-aloud/jobs/x/01.mp3`] }),
+      "library_not_mounted",
+    ],
+    [
+      "a work folder that is not the mapped job folder",
+      () => mappedRequest({ workDir: `/data/read-aloud/elsewhere/${randomUUID()}` }),
+      "worker_incompatible",
+    ],
+  ];
+  for (const [name, body, code] of rejected) {
+    test(`400 for ${name}`, async () => {
+      const response = await client.call("POST", "/v1/jobs", body());
+      assert.equal(response.status, 400);
+      assert.equal(response.body.errorCode, code);
+      assert.equal((await client.call("GET", "/health")).body.activeJobId, null);
+    });
+  }
+
+  test("a source path that no mapping covers is used as written, so the roots still decide", async () => {
+    const request = mappedRequest({ epubPath: join(sandbox.book, "book.epub"), audioPaths: [join(sandbox.book, "01.mp3")] });
+    const created = await client.call("POST", "/v1/jobs", request);
+    assert.equal(created.status, 202, JSON.stringify(created.body));
+    const job = await waitForJob(client, request.jobId, (body) => TERMINAL.has(body.status));
+    assert.equal(job.status, "completed", JSON.stringify(job));
+  });
+});
+
 describe("library roots", () => {
   test("a root that is not readable at startup is picked up later without a restart", async () => {
     const sandbox = makeSandbox();
@@ -293,7 +373,12 @@ describe("job lifecycle", () => {
       ["preparing_audio", "generating_emissions", "marking_up_ebook", "aligning"],
     );
     assert.equal(runs[0].tmpdir, join(sandbox.tmpDir, "read-aloud-worker"));
-    assert.equal(runs[0].scratch, join(request.workDir, "scratch"));
+    // Scratch stays off the job folder (which may be a network share) and is gone once the runner is.
+    const scratch = join(sandbox.tmpDir, "read-aloud-worker", "scratch", request.jobId);
+    assert.equal(runs[0].scratch, scratch);
+    for (let attempt = 0; attempt < 100 && existsSync(scratch); attempt += 1) await sleep(20);
+    assert.equal(existsSync(scratch), false, "the job's scratch folder is removed after the run");
+    assert.equal(existsSync(join(request.workDir, "scratch")), false, "nothing is unpacked into the job folder");
     for (const stage of ["preparing_audio", "generating_emissions", "marking_up_ebook", "aligning"]) {
       assert.ok(existsSync(join(request.workDir, `.done-${stage}`)), `marker for ${stage}`);
     }
