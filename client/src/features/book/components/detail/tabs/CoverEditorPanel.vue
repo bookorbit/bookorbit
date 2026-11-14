@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Image, ImagePlus, Link, Loader2, Lock, LockOpen, Maximize2, RotateCcw, Search, Upload } from '@lucide/vue'
+import { Image, ImagePlus, ImageUp, Link, Loader2, Lock, LockOpen, Maximize2, RotateCcw, Search, Upload } from '@lucide/vue'
 import type { BookDetail, BookMetadataLockField, CoverMedium } from '@bookorbit/types'
 import { hideOnError } from '../../../lib/metadata-fetch'
+import { useAudioCoverEmbed } from '../../../composables/useAudioCoverEmbed'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import { useCoverVersions } from '../../../composables/useCoverVersions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookCoverAspectRatio } from '../../../composables/useBookCoverAspectRatio'
+import { canEmbedAudioCover } from '../../../lib/audio-cover-embed'
 import { coverFieldMedium, coverLockField, coverTileState, editorTiles } from '../../../lib/cover-slots'
 import { nextRovingIndex } from '@/lib/roving-index'
 import BookCoverLightbox from '@/features/book/components/BookCoverLightbox.vue'
@@ -120,7 +122,10 @@ const captionId = `cover-editor-caption-${useId()}`
 const pendingKeys = computed(() => tileKeys.value.filter((key) => Boolean(editors[key].pendingFile || editors[key].pendingUrl)))
 const hasPending = computed(() => pendingKeys.value.length > 0)
 const pendingMedia = computed(() => pendingKeys.value.map(mediumOf))
-const busy = computed(() => tileKeys.value.some((key) => editors[key].uploading || editors[key].regenerating))
+const { embedding, embed } = useAudioCoverEmbed()
+const busy = computed(() => embedding.value || tileKeys.value.some((key) => editors[key].uploading || editors[key].regenerating))
+// The stored cover is what gets written, so a tile with a pending change has to be saved first.
+const canEmbed = computed(() => selectedTile.value.medium === 'audio' && hasPermission('library_edit_metadata') && canEmbedAudioCover(props.book))
 
 const tileGroup = ref<HTMLElement | null>(null)
 
@@ -234,6 +239,11 @@ async function handleRevert() {
   const key = selectedKey.value
   const result = await editors[key].revert()
   if (result !== false) emit('coverChanged', mediumOf(key))
+}
+
+async function handleEmbed() {
+  if (props.disabled || embedding.value || hasActivePending.value) return
+  await embed(props.book.id)
 }
 
 async function handleRegenerate() {
@@ -501,6 +511,19 @@ onUnmounted(() => clearTimeout(debounceTimer))
             <Loader2 v-if="activeEditor.regenerating" class="size-3 animate-spin" aria-hidden="true" />
             <Image v-else class="size-3" aria-hidden="true" />
             {{ t('book.detail.coverEditor.regenerateCover') }}
+          </button>
+          <button
+            v-if="canEmbed"
+            type="button"
+            class="flex items-center justify-center gap-1.5 w-full min-h-8 py-1.5 px-2 rounded-lg border border-input bg-background text-xs text-center leading-tight text-muted-foreground hover:text-foreground focus-visible:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+            data-testid="embed-audio-cover"
+            :title="t('book.audioCoverEmbed.actionHint')"
+            :disabled="embedding || hasActivePending || props.disabled"
+            @click="handleEmbed"
+          >
+            <Loader2 v-if="embedding" class="size-3 animate-spin" aria-hidden="true" />
+            <ImageUp v-else class="size-3" aria-hidden="true" />
+            {{ embedding ? t('book.audioCoverEmbed.inProgress') : t('book.audioCoverEmbed.action') }}
           </button>
         </div>
       </div>

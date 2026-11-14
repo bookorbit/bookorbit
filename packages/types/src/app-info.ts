@@ -115,6 +115,12 @@ export const SERVER_FEATURES = [
    * model and streams it back. `app-info` carries `readingHelp`.
    */
   "reading-help",
+  /**
+   * `POST /books/:id/embed-audio-cover` and `POST /books/bulk-embed-audio-cover` write a book's square
+   * audiobook cover into its read-along EPUBs. The single route answers a `WriteResult` with `code`
+   * (`AudioCoverEmbedCode`), where a client that does not know a code reads `status`.
+   */
+  "audio-cover-embed",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

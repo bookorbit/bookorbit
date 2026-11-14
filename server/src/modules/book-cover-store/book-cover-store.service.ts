@@ -26,6 +26,7 @@ import {
   isExtractedBookCoverFileName,
 } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { isReadAlongBookFile } from '../../common/utils/primary-file-selection.utils';
 import { generateThumbnail, imageExt, normalizeProgressiveJpeg } from '../metadata/lib/cover';
 import { BookCoverEventsService } from './book-cover-events.service';
 import { classifyCoverShape } from './cover-shape';
@@ -425,11 +426,12 @@ export class BookCoverStore {
   /**
    * The cover a book shows when no medium is asked for, as the frame it is drawn in and its cache
    * key. The face follows the primary file's medium, so an audiobook-primary book shows square art
-   * in any library; only a book with no content file takes its library's shape. The frame follows
-   * the slot actually served, so a book whose preferred slot is empty is framed for its fallback.
+   * in any library; a book with no content file, or whose primary file is a read-along EPUB, takes
+   * its library's shape. The frame follows the slot actually served, so a book whose preferred slot
+   * is empty is framed for its fallback.
    */
   faceOf(input: BookCoverFaceInput): BookCoverFace {
-    const preferred = this.preferredFace(input.libraryCoverAspectRatio, input.primaryFormat);
+    const preferred = this.preferredFace(input.libraryCoverAspectRatio, input.primaryFormat, input.primaryReadAlong);
     return {
       coverAspectRatio: this.servedFace(preferred, input.slots, input.media) === 'audio' ? '1/1' : '2/3',
       coverVersion: this.coverVersion(preferred, input.slots, input.legacyVersion),
@@ -437,9 +439,11 @@ export class BookCoverStore {
   }
 
   faceForContext(context: BookCoverContext, legacyVersion: string): BookCoverFace {
+    const primary = this.primaryFile(context);
     return this.faceOf({
       libraryCoverAspectRatio: context.coverAspectRatio,
-      primaryFormat: this.primaryFile(context)?.format,
+      primaryFormat: primary?.format,
+      primaryReadAlong: primary !== undefined && isReadAlongBookFile(primary),
       media: context.media,
       slots: context.slots,
       legacyVersion,
@@ -460,9 +464,12 @@ export class BookCoverStore {
   async enrichCardFaces(cards: BookCard[]): Promise<void> {
     const slotsByBookId = await this.repository.slotsFor(cards.map((card) => card.id));
     for (const card of cards) {
+      const primary = card.files.find((file) => file.role === 'primary');
       const face = this.faceOf({
         libraryCoverAspectRatio: card.coverAspectRatio,
-        primaryFormat: card.files.find((file) => file.role === 'primary')?.format,
+        primaryFormat: primary?.format,
+        primaryReadAlong:
+          primary !== undefined && isReadAlongBookFile({ format: primary.format, mediaOverlayAvailable: primary.mediaOverlay?.available }),
         media: getCoverMediaFromDatabaseFiles(
           card.files.map((file) => ({ format: file.format, role: file.role, mediaOverlayAvailable: file.mediaOverlay?.available === true })),
         ),
@@ -752,11 +759,16 @@ export class BookCoverStore {
   }
 
   private faceMedium(context: BookCoverContext): CoverMedium {
-    return this.preferredFace(context.coverAspectRatio, this.primaryFile(context)?.format);
+    const primary = this.primaryFile(context);
+    return this.preferredFace(context.coverAspectRatio, primary?.format, primary !== undefined && isReadAlongBookFile(primary));
   }
 
-  private preferredFace(libraryCoverAspectRatio: string, primaryFormat: string | null | undefined): CoverMedium {
-    if (primaryFormat) return this.formatMedium(primaryFormat);
+  /**
+   * A read-along EPUB is read and listened to alike, so its medium does not say which cover suits
+   * it and the library's shape decides, the way it does for a book with no content file.
+   */
+  private preferredFace(libraryCoverAspectRatio: string, primaryFormat: string | null | undefined, primaryReadAlong: boolean): CoverMedium {
+    if (primaryFormat && !primaryReadAlong) return this.formatMedium(primaryFormat);
     return libraryCoverAspectRatio === '1/1' ? 'audio' : 'ebook';
   }
 

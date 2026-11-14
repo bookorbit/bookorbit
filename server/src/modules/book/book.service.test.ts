@@ -238,6 +238,8 @@ function makeService(
     scheduleWrite: vi.fn(),
     cancelPendingWrite: vi.fn(),
     writeToFile: vi.fn(),
+    embedAudioCover: vi.fn(),
+    findBookIdsWithReadAlongFiles: vi.fn(),
     findLibraryWriteSettingsForBook: vi.fn().mockResolvedValue({ fileWriteEnabled: false, fileRenameEnabled: false }),
     resolveBookFileWriteStatus: vi.fn().mockReturnValue({ enabled: false, reason: 'library_disabled', writableFormats: [], writableFields: [] }),
   };
@@ -6663,6 +6665,123 @@ describe('BookService', () => {
       const { service } = makeService();
 
       await expect(service.resolveSelectionToIds({}, makeUser())).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('embedAudioCover', () => {
+    it('refuses a book the user cannot edit before touching any file', async () => {
+      const { service, bookRepo, fileWriteService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(null);
+
+      await expect(service.embedAudioCover(999, makeUser())).rejects.toThrow(NotFoundException);
+
+      expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
+    });
+
+    it("embeds on the user's behalf and returns the write result as it is", async () => {
+      const { service, bookRepo, fileWriteService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      const result = { status: 'skipped', fieldsWritten: [], durationMs: 3, reason: 'no audiobook cover' };
+      fileWriteService.embedAudioCover.mockResolvedValue(result);
+
+      await expect(service.embedAudioCover(10, makeUser({ id: 7 }))).resolves.toEqual(result);
+
+      expect(fileWriteService.embedAudioCover).toHaveBeenCalledWith(10, 7);
+    });
+  });
+
+  describe('bulkEmbedAudioCover', () => {
+    const user = makeUser({ id: 7 });
+
+    function arrange(candidates: number[]) {
+      const context = makeService();
+      context.bookRepo.findLibraryIdsByBookIds.mockImplementation((ids: number[]) => Promise.resolve(ids.map((id) => ({ id, libraryId: 7 }))));
+      context.bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+      context.fileWriteService.findBookIdsWithReadAlongFiles.mockResolvedValue(candidates);
+      return context;
+    }
+
+    it('visits only the books that hold a read-along EPUB and counts the rest as skipped', async () => {
+      const { service, fileWriteService } = arrange([2, 4]);
+      fileWriteService.embedAudioCover
+        .mockResolvedValueOnce({ status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 1 })
+        .mockResolvedValueOnce({ status: 'skipped', fieldsWritten: [], durationMs: 1, reason: 'audio cover unchanged' });
+      const events: unknown[] = [];
+
+      const result = await service.bulkEmbedAudioCover([1, 2, 3, 4], user, (event) => events.push(event));
+
+      expect(result).toEqual({ processed: 4, succeeded: 1, failed: 0, skipped: 3, cancelled: false });
+      expect(fileWriteService.embedAudioCover.mock.calls).toEqual([
+        [2, 7],
+        [4, 7],
+      ]);
+      expect(events).toEqual([
+        { started: true, total: 2 },
+        { bookId: 2, status: 'success', reason: undefined },
+        { bookId: 4, status: 'skipped', reason: 'audio cover unchanged' },
+      ]);
+    });
+
+    it('records a book that fails without stopping the rest', async () => {
+      const { service, fileWriteService } = arrange([1, 2]);
+      fileWriteService.embedAudioCover
+        .mockRejectedValueOnce(new Error('db down'))
+        .mockResolvedValueOnce({ status: 'failed', fieldsWritten: [], durationMs: 1, reason: 'disk full' });
+      const events: unknown[] = [];
+
+      const result = await service.bulkEmbedAudioCover([1, 2], user, (event) => events.push(event));
+
+      expect(result).toEqual({ processed: 2, succeeded: 0, failed: 2, skipped: 0, cancelled: false });
+      expect(events).toEqual([
+        { started: true, total: 2 },
+        { bookId: 1, status: 'failed', reason: 'unexpected error' },
+        { bookId: 2, status: 'failed', reason: 'disk full' },
+      ]);
+    });
+
+    it('stops when cancelled, leaving the remaining books unvisited and uncounted', async () => {
+      const { service, fileWriteService } = arrange([1, 2]);
+      let calls = 0;
+      fileWriteService.embedAudioCover.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
+
+      const result = await service.bulkEmbedAudioCover([1, 2], user, undefined, { isCancelled: () => calls++ >= 1 });
+
+      expect(fileWriteService.embedAudioCover).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: true });
+    });
+
+    it('stops before the next book when the progress stream is gone', async () => {
+      const { service, fileWriteService } = arrange([1, 2]);
+      fileWriteService.embedAudioCover.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
+      let events = 0;
+
+      const result = await service.bulkEmbedAudioCover([1, 2], user, () => {
+        if (++events > 1) throw new Error('SSE stream closed');
+      });
+
+      expect(fileWriteService.embedAudioCover).toHaveBeenCalledTimes(1);
+      expect(result.cancelled).toBe(true);
+    });
+
+    it('writes nothing when the stream is gone before the first book', async () => {
+      const { service, fileWriteService } = arrange([1, 2]);
+
+      const result = await service.bulkEmbedAudioCover([1, 2], user, () => {
+        throw new Error('SSE stream closed');
+      });
+
+      expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
+      expect(result.cancelled).toBe(true);
+    });
+
+    it('checks the user may edit every selected book before reading any file list', async () => {
+      const { service, fileWriteService } = arrange([1]);
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockRejectedValue(new ForbiddenException('denied'));
+
+      await expect(service.bulkEmbedAudioCover([1], user)).rejects.toThrow(ForbiddenException);
+
+      expect(fileWriteService.findBookIdsWithReadAlongFiles).not.toHaveBeenCalled();
+      expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
     });
   });
 

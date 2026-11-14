@@ -58,7 +58,7 @@ describe('epub-zip-patcher', () => {
     await patch('/path/to/book.epub', patches);
     const tempPath = mockRewrite.mock.calls[0]![1];
     expect(tempPath).toMatch(/^\/path\/to\/\.epub-write-[0-9a-f-]{36}$/);
-    expect(mockRewrite).toHaveBeenCalledWith('/path/to/book.epub', tempPath, patches);
+    expect(mockRewrite).toHaveBeenCalledWith('/path/to/book.epub', tempPath, patches, new Set());
     expect(mockReplace).toHaveBeenCalledWith(tempPath, '/path/to/book.epub');
   });
 
@@ -120,6 +120,24 @@ describe('epub-zip-patcher', () => {
       expect(typeof entries[2]!.source).toBe('function');
       expect((entries[2]!.source as () => unknown)()).toBe('stream:OPS/chapter.xhtml');
       expect(entries[3]!.source).toEqual(Buffer.from('new-cover'));
+    });
+
+    it('leaves out the entries it is told to remove, never the mimetype, and keeps one it also patches', async () => {
+      let entries: ZipRewriteEntry[] = [];
+      mockWriteArchive.mockImplementation((_tmpPath, source) => {
+        entries = [...source];
+        return Promise.resolve();
+      });
+
+      await patch(
+        '/path/to/book.epub',
+        new Map([['OPS/content.opf', Buffer.from('new-opf')]]),
+        new Set(['OPS/chapter.xhtml', 'OPS/content.opf', 'mimetype']),
+      );
+
+      expect(entries.map((entry) => entry.name)).toEqual(['mimetype', 'OPS/content.opf']);
+      expect(entries[1]!.source).toEqual(Buffer.from('new-opf'));
+      expect(mockRewrite.mock.calls[0]![3]).toEqual(new Set(['OPS/chapter.xhtml', 'OPS/content.opf', 'mimetype']));
     });
 
     it('replaces the original with the rebuilt archive and logs the reason zip.js gave', async () => {

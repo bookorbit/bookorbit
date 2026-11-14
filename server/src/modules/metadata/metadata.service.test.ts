@@ -16,6 +16,7 @@ vi.mock('./lib/epub', async (importOriginal) => ({
 
 vi.mock('./lib/cover-epub', () => ({
   extractEpubCover: vi.fn().mockImplementation(() => Promise.resolve(null)),
+  extractEpubAudioCover: vi.fn().mockImplementation(() => Promise.resolve(null)),
 }));
 
 vi.mock('./lib/cover-fb2', () => ({
@@ -84,7 +85,7 @@ import { Logger } from '@nestjs/common';
 import { authors, bookAuthors, bookGenres, bookTags, genres, tags } from '../../db/schema';
 import { extractCbzMetadata, type ParsedCbzMetadata } from './lib/cbz-metadata';
 import { extractCbzCover } from './lib/cover-cbz';
-import { extractEpubCover } from './lib/cover-epub';
+import { extractEpubAudioCover, extractEpubCover } from './lib/cover-epub';
 import { extractEpubMetadata } from './lib/epub';
 import { parseBookFilename } from './lib/filename-parser';
 import { parseMobiFile } from './lib/mobi-parser';
@@ -99,6 +100,7 @@ const mockParseBookFilename = parseBookFilename as MockedFunction<typeof parseBo
 const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockParsePdfFile = parsePdfFile as MockedFunction<typeof parsePdfFile>;
 const mockExtractEpubCover = extractEpubCover as MockedFunction<typeof extractEpubCover>;
+const mockExtractEpubAudioCover = extractEpubAudioCover as MockedFunction<typeof extractEpubAudioCover>;
 const mockExtractEpubMetadata = extractEpubMetadata as MockedFunction<typeof extractEpubMetadata>;
 const mockExtractCbzMetadata = extractCbzMetadata as MockedFunction<typeof extractCbzMetadata>;
 const mockExtractCbzCover = extractCbzCover as MockedFunction<typeof extractCbzCover>;
@@ -926,6 +928,28 @@ describe('MetadataService', () => {
 
     expect(defaultCoverStore.saveExtracted).toHaveBeenCalledTimes(1);
     expect(defaultCoverStore.saveExtracted).toHaveBeenCalledWith(8, 'ebook', Buffer.from('epub-cover-2'), { origin: 'embedded', overwrite: false });
+  });
+
+  it("refreshes an EPUB's audio slot from the audiobook cover it declares, never from its book cover", async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockExtractEpubCover.mockResolvedValue(Buffer.from('portrait'));
+    mockExtractEpubAudioCover.mockResolvedValueOnce(Buffer.from('square'));
+
+    await expect(service.refreshCoverForBook(9, '/book.epub', 'epub', 'audio')).resolves.toBe(true);
+
+    expect(defaultCoverStore.saveExtracted).toHaveBeenCalledWith(9, 'audio', Buffer.from('square'), { origin: 'embedded', overwrite: false });
+    expect(mockExtractEpubCover).not.toHaveBeenCalled();
+  });
+
+  it('leaves the audio slot alone when the EPUB declares no audiobook cover', async () => {
+    const { db } = makeDb();
+    const service = makeService(db);
+    mockExtractEpubCover.mockResolvedValue(Buffer.from('portrait'));
+
+    await expect(service.refreshCoverForBook(9, '/book.epub', 'epub', 'audio')).resolves.toBe(false);
+
+    expect(defaultCoverStore.saveExtracted).not.toHaveBeenCalled();
   });
 
   it('extractAndSave propagates extractor errors', async () => {

@@ -196,7 +196,7 @@ export type BookCard = {
   id: number;
   libraryId?: number;
   status: string;
-  /** The frame of the cover the book shows by default, which follows its primary file's medium rather than its library. */
+  /** The frame of the cover the book shows by default, which follows its primary file's medium rather than its library. A read-along EPUB takes its library's shape. */
   coverAspectRatio: CoverAspectRatio;
   title: string | null;
   authors: string[];

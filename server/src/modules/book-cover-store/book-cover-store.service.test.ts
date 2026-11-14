@@ -86,6 +86,7 @@ describe('BookCoverStore', () => {
       store.faceOf({
         libraryCoverAspectRatio: '2/3',
         primaryFormat: 'epub',
+        primaryReadAlong: false,
         media: both,
         slots: [ebook, audio],
         legacyVersion: 'legacy-stamp',
@@ -120,8 +121,28 @@ describe('BookCoverStore', () => {
       expect(face({ primaryFormat: 'm4b', media: { hasEbook: false, hasAudio: true }, slots: [] }).coverAspectRatio).toBe('1/1');
     });
 
-    it('keeps a read-along EPUB on the ebook side', () => {
-      expect(face({ primaryFormat: 'epub', media: { hasEbook: true, hasAudio: true }, slots: [ebook, audio] }).coverAspectRatio).toBe('2/3');
+    it("takes the library's shape for a read-along EPUB", () => {
+      const readAlong = { primaryFormat: 'epub', primaryReadAlong: true, media: both, slots: [ebook, audio] };
+
+      expect(face({ ...readAlong, libraryCoverAspectRatio: '2/3' })).toEqual({
+        coverAspectRatio: '2/3',
+        coverVersion: 'ebook:2026-01-01T00:00:00.000Z:2026-02-01T00:00:00.000Z',
+      });
+      expect(face({ ...readAlong, libraryCoverAspectRatio: '1/1' })).toEqual({
+        coverAspectRatio: '1/1',
+        coverVersion: 'audio:2026-02-01T00:00:00.000Z:2026-01-01T00:00:00.000Z',
+      });
+    });
+
+    it('frames a read-along EPUB in a square library by its portrait cover until it has a square one', () => {
+      expect(face({ primaryFormat: 'epub', primaryReadAlong: true, libraryCoverAspectRatio: '1/1', slots: [ebook] })).toEqual({
+        coverAspectRatio: '2/3',
+        coverVersion: 'audio:-:2026-01-01T00:00:00.000Z',
+      });
+    });
+
+    it('keeps a plain EPUB on the ebook side in a square library', () => {
+      expect(face({ primaryFormat: 'epub', primaryReadAlong: false, libraryCoverAspectRatio: '1/1' }).coverAspectRatio).toBe('2/3');
     });
   });
 
@@ -145,13 +166,40 @@ describe('BookCoverStore', () => {
     expect(card).toMatchObject({ coverAspectRatio: '1/1', coverVersion: 'audio:2026-01-01T00:00:00.000Z:2026-01-01T00:00:00.000Z' });
   });
 
+  it('gives a card whose primary file is a read-along EPUB the shape of its library', async () => {
+    const { store, repository } = makeStore(join(tmpdir(), 'unused-cover-store'), context());
+    repository.slotsFor.mockResolvedValue(new Map([[7, [slot('ebook'), slot('audio')]]]));
+    const card = (coverAspectRatio: string, available: boolean) => ({
+      id: 7,
+      coverAspectRatio,
+      addedAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: null,
+      coverVersion: 'legacy:x',
+      files: [{ id: 70, format: 'epub', role: 'primary', sizeBytes: null, mediaOverlay: { available } }],
+    });
+    const square = card('1/1', true);
+    const portrait = card('2/3', true);
+    const plain = card('1/1', false);
+
+    await store.enrichCardFaces([square, portrait, plain] as never[]);
+
+    expect(square.coverAspectRatio).toBe('1/1');
+    expect(portrait.coverAspectRatio).toBe('2/3');
+    expect(plain.coverAspectRatio).toBe('2/3');
+  });
+
   it('resolves faces for rows with no files of their own from one row and one slot query', async () => {
     const { store, repository } = makeStore(join(tmpdir(), 'unused-cover-store'), context());
-    const findFaceRows = vi
-      .fn()
-      .mockResolvedValue([
-        { bookId: 7, libraryCoverAspectRatio: '2/3', primaryFormat: 'm4b', media: { hasEbook: true, hasAudio: true }, legacyVersion: 'x' },
-      ]);
+    const findFaceRows = vi.fn().mockResolvedValue([
+      {
+        bookId: 7,
+        libraryCoverAspectRatio: '2/3',
+        primaryFormat: 'm4b',
+        primaryReadAlong: false,
+        media: { hasEbook: true, hasAudio: true },
+        legacyVersion: 'x',
+      },
+    ]);
     Object.assign(repository, { findFaceRows });
     repository.slotsFor.mockResolvedValue(new Map([[7, [slot('ebook'), slot('audio')]]]));
 

@@ -2,6 +2,13 @@ import { posix } from 'path';
 
 import { XMLBuilder, XMLParser } from 'fast-xml-parser';
 
+import {
+  EPUB_AUDIO_COVER_FILE_STEM,
+  EPUB_AUDIO_COVER_ITEM_ID,
+  EPUB_AUDIO_COVER_PREFIX,
+  EPUB_AUDIO_COVER_PREFIX_IRI,
+  EPUB_AUDIO_COVER_PROPERTY,
+} from '../../../../common/epub-audio-cover';
 import type { EpubCoverImage } from './epub-cover-image';
 
 const parser = new XMLParser({
@@ -203,6 +210,10 @@ function coverGuideItem(packageContent: OrderedNode[], items: ManifestItem[], op
   return null;
 }
 
+function isAudioCoverItem(item: ManifestItem): boolean {
+  return attr(item.attrs, '@_properties').split(/\s+/).includes(EPUB_AUDIO_COVER_PROPERTY);
+}
+
 function fallbackCoverItem(items: ManifestItem[]): ManifestItem | null {
   return (
     items.find((item) => {
@@ -212,10 +223,20 @@ function fallbackCoverItem(items: ManifestItem[]): ManifestItem | null {
     items.find((item) => {
       const mediaType = attr(item.attrs, '@_media-type').toLowerCase();
       const href = attr(item.attrs, '@_href').toLowerCase();
-      return isImage(mediaType) && href.includes('cover');
+      // The audiobook cover is not the book's cover, so replacing "the cover" must not land on it,
+      // and its usual name ("audio-cover") would otherwise match here.
+      return isImage(mediaType) && href.includes('cover') && !isAudioCoverItem(item);
     }) ??
     null
   );
+}
+
+/** Declares Storyteller's vocabulary prefix on the package, which its property needs to be valid EPUB 3. */
+function ensureAudioCoverPrefix(packageAttrs: Record<string, unknown>): void {
+  const current = attr(packageAttrs, '@_prefix').trim();
+  if (new RegExp(`(^|\\s)${EPUB_AUDIO_COVER_PREFIX}:`).test(current)) return;
+  const declaration = `${EPUB_AUDIO_COVER_PREFIX}: ${EPUB_AUDIO_COVER_PREFIX_IRI}`;
+  packageAttrs['@_prefix'] = current ? `${current} ${declaration}` : declaration;
 }
 
 export interface CoverSlot {
@@ -236,6 +257,8 @@ export interface CoverWriteResult {
     entryPath: string;
     xml: string;
   };
+  /** The entry a cover that moved to a new path leaves behind, when nothing else uses it. */
+  removedEntryPath?: string;
 }
 
 export type ReadTextEntry = (entryPath: string) => Promise<string>;
@@ -424,6 +447,7 @@ function chooseCoverIdentity(
   opfDir: string,
   extension: string,
   occupiedEntryPaths: readonly string[],
+  names: { id: string; file: string } = { id: BOOKORBIT_COVER_ID, file: BOOKORBIT_COVER_FILE },
 ): { id: string; href: string; entryPath: string } {
   const usedIds = new Set(items.map((item) => attr(item.attrs, '@_id')).filter(Boolean));
   const usedPaths = new Set(
@@ -432,8 +456,8 @@ function chooseCoverIdentity(
 
   for (let suffix = 0; ; suffix += 1) {
     const suffixText = suffix === 0 ? '' : `-${suffix + 1}`;
-    const id = `${BOOKORBIT_COVER_ID}${suffixText}`;
-    const href = `images/${BOOKORBIT_COVER_FILE}${suffixText}.${extension}`;
+    const id = `${names.id}${suffixText}`;
+    const href = `images/${names.file}${suffixText}.${extension}`;
     const entryPath = resolveEntryPath(opfDir, href);
     if (entryPath && !usedIds.has(id) && !usedPaths.has(entryPath.toLowerCase())) return { id, href, entryPath };
   }
@@ -471,4 +495,71 @@ export function inject(opfXml: string, opfDir: string, image: EpubCoverImage, oc
     updatedOpfXml: String(builder.build(packageResult.parsed)),
     newEntryPath: identity.entryPath,
   };
+}
+
+/** The image a package declares as its square audiobook cover, which is separate from its book cover. */
+export function locateAudioCover(opfXml: string, opfDir: string): CoverSlot | null {
+  const packageResult = parsePackage(opfXml);
+  if (!packageResult) return null;
+
+  const items = manifestItems(packageResult.packageContent, opfDir);
+  const bookCoverPath = coverMetaItem(packageResult.packageContent, items)?.entryPath;
+  const item = items.find((candidate) => {
+    if (!isAudioCoverItem(candidate) || !candidate.entryPath) return false;
+    const mediaType = attr(candidate.attrs, '@_media-type').toLowerCase();
+    if (!isImage(mediaType) || mediaType === 'image/svg+xml') return false;
+    // A declaration on the book's own cover would make "replace the audiobook cover" overwrite it.
+    return !coverPropertyItem([candidate]) && candidate.entryPath !== bookCoverPath;
+  });
+  if (!item?.entryPath) return null;
+  return { entryPath: item.entryPath, mediaType: attr(item.attrs, '@_media-type').toLowerCase(), manifestItemId: attr(item.attrs, '@_id') };
+}
+
+/**
+ * The entry an audiobook cover leaves behind when a new image type moves it to another path. It is
+ * dropped so the file keeps one audiobook cover and later writes do not dodge a stale name, unless
+ * another manifest item points at the same entry.
+ */
+function abandonedEntryPath(opfXml: string, opfDir: string, slot: CoverSlot, newEntryPath: string): string | undefined {
+  if (newEntryPath === slot.entryPath) return undefined;
+  const packageResult = parsePackage(opfXml);
+  if (!packageResult) return undefined;
+  const sharers = manifestItems(packageResult.packageContent, opfDir).filter((item) => item.entryPath === slot.entryPath);
+  return sharers.length === 1 ? slot.entryPath : undefined;
+}
+
+/**
+ * Declares `image` as the package's audiobook cover. The image already declared is replaced where
+ * it lies; otherwise a manifest item carrying Storyteller's property is added. The book's own
+ * cover, its `cover-image` property and its `cover` meta are never touched.
+ */
+export function setAudioCover(opfXml: string, opfDir: string, image: EpubCoverImage, occupiedEntryPaths: readonly string[]): CoverWriteResult {
+  const slot = locateAudioCover(opfXml, opfDir);
+  if (slot) {
+    const replaced = replace(opfXml, opfDir, slot, image, occupiedEntryPaths);
+    if (replaced) return { ...replaced, removedEntryPath: abandonedEntryPath(opfXml, opfDir, slot, replaced.newEntryPath) };
+  }
+
+  const packageResult = parsePackage(opfXml);
+  if (!packageResult) throw new Error('Cannot find <package> element in OPF');
+
+  // Manifest properties exist from EPUB 3 on, and so does the media overlay that makes a read-along EPUB.
+  const version = attr(packageResult.packageAttrs, '@_version');
+  if (!version.startsWith('3')) throw new Error(`Unsupported EPUB version: "${version || '(missing)'}"`);
+
+  const manifest = findSection(packageResult.packageContent, ['manifest']);
+  if (!manifest) throw new Error('EPUB package must contain a manifest section');
+
+  const identity = chooseCoverIdentity(manifestItems(packageResult.packageContent, opfDir), opfDir, image.extension, occupiedEntryPaths, {
+    id: EPUB_AUDIO_COVER_ITEM_ID,
+    file: EPUB_AUDIO_COVER_FILE_STEM,
+  });
+
+  ensureAudioCoverPrefix(packageResult.packageAttrs);
+  manifest.content.push({
+    [childTag(manifest.tag, 'item')]: [],
+    ':@': { '@_id': identity.id, '@_href': identity.href, '@_media-type': image.mediaType, '@_properties': EPUB_AUDIO_COVER_PROPERTY },
+  });
+
+  return { updatedOpfXml: String(builder.build(packageResult.parsed)), newEntryPath: identity.entryPath };
 }

@@ -2,7 +2,7 @@ vi.mock('unzipper', () => ({ Open: { file: vi.fn() } }));
 
 import * as unzipper from 'unzipper';
 
-import { extractEpubCover } from './cover-epub';
+import { extractEpubAudioCover, extractEpubCover } from './cover-epub';
 
 const mockOpenFile = (unzipper as any).Open.file as vi.Mock;
 
@@ -64,5 +64,95 @@ describe('extractEpubCover', () => {
     mockOpenFile.mockResolvedValue({ files: [] });
 
     await expect(extractEpubCover('/book.epub')).resolves.toBeNull();
+  });
+});
+
+describe('audio cover property', () => {
+  const containerXml = `<container><rootfiles><rootfile full-path="OPS/content.opf" /></rootfiles></container>`;
+  const portrait = Buffer.from([1, 2, 3]);
+  const square = Buffer.from([4, 5, 6]);
+  const AUDIO_ITEM =
+    '<item id="audio-cover-image" href="images/audio-cover.jpg" media-type="image/jpeg" properties="storyteller:audio-cover-image" />';
+
+  function opf(extraItems: string): string {
+    return `
+      <package>
+        <metadata />
+        <manifest>
+          <item id="cover" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image" />
+          ${extraItems}
+        </manifest>
+      </package>
+    `;
+  }
+
+  function open(opfXml: string, extra: Array<ReturnType<typeof zipFile>> = []) {
+    mockOpenFile.mockResolvedValue({
+      files: [
+        zipFile('META-INF/container.xml', containerXml),
+        zipFile('OPS/content.opf', opfXml),
+        zipFile('OPS/images/cover.jpg', portrait),
+        zipFile('OPS/images/audio-cover.jpg', square),
+        ...extra,
+      ],
+    });
+  }
+
+  beforeEach(() => vi.resetAllMocks());
+
+  it('reads the image that carries the property, and leaves the book cover alone', async () => {
+    open(opf(AUDIO_ITEM));
+
+    await expect(extractEpubAudioCover('/book.epub')).resolves.toEqual(square);
+    await expect(extractEpubCover('/book.epub')).resolves.toEqual(portrait);
+  });
+
+  it('has no audio cover without the property, however the image is named or shaped', async () => {
+    open(opf('<item id="audio-cover-image" href="images/audio-cover.jpg" media-type="image/jpeg" />'));
+
+    await expect(extractEpubAudioCover('/book.epub')).resolves.toBeNull();
+  });
+
+  it('has no audio cover when the property is on a non-image or unsupported item', async () => {
+    open(
+      opf(
+        '<item id="doc" href="text/a.xhtml" media-type="application/xhtml+xml" properties="storyteller:audio-cover-image" />' +
+          '<item id="svg" href="images/a.svg" media-type="image/svg+xml" properties="storyteller:audio-cover-image" />',
+      ),
+    );
+
+    await expect(extractEpubAudioCover('/book.epub')).resolves.toBeNull();
+  });
+
+  it("never reads the book's own cover as the audio cover", async () => {
+    open(opf('').replace('properties="cover-image"', 'properties="cover-image storyteller:audio-cover-image"'));
+
+    await expect(extractEpubAudioCover('/book.epub')).resolves.toBeNull();
+    await expect(extractEpubCover('/book.epub')).resolves.toEqual(portrait);
+  });
+
+  it('refuses an image that inflates past the size bound', async () => {
+    mockOpenFile.mockResolvedValue({
+      files: [
+        zipFile('META-INF/container.xml', containerXml),
+        zipFile('OPS/content.opf', opf('<item id="big" href="images/big.jpg" media-type="image/jpeg" properties="storyteller:audio-cover-image" />')),
+        { path: 'OPS/images/big.jpg', uncompressedSize: 33 * 1024 * 1024, buffer: () => Promise.reject(new Error('must not inflate')) },
+      ],
+    });
+
+    await expect(extractEpubAudioCover('/book.epub')).resolves.toBeNull();
+  });
+
+  it('never takes the audio cover for the book cover when the book declares none', async () => {
+    mockOpenFile.mockResolvedValue({
+      files: [
+        zipFile('META-INF/container.xml', containerXml),
+        zipFile('OPS/content.opf', `<package><metadata /><manifest>${AUDIO_ITEM}</manifest></package>`),
+        zipFile('OPS/images/audio-cover.jpg', square),
+      ],
+    });
+
+    await expect(extractEpubCover('/book.epub')).resolves.toBeNull();
+    await expect(extractEpubAudioCover('/book.epub')).resolves.toEqual(square);
   });
 });

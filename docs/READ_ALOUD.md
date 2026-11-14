@@ -190,4 +190,6 @@ Job, stage, cancellation and startup lines carry the job id and durations; STAli
 
 Publishing copies the output into the book's folder as `<book>.readaloud.epub` (with a number added if that name is taken), staged next to its destination and renamed into place. The admin upload size limit does not apply; `READ_ALOUD_MAX_OUTPUT_BYTES` (default 20 GB) is the only cap. BookOrbit checks the library volume has room for the file first.
 
+Just before that copy, if the book has an audiobook cover, BookOrbit writes it into the generated EPUB as its square audiobook cover, the way Storyteller does (see [READ_ALOUD_AUDIO_COVER.md](READ_ALOUD_AUDIO_COVER.md)). The EPUB is rewritten in the job folder, which needs one more copy of the output there while it runs. A book with no audiobook cover, an unusable image or a full disk leaves the EPUB as the worker made it, the job still publishes, and the job's activity log says so.
+
 The source EPUB and audiobook are not modified.

@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import type { Ref } from 'vue'
 import {
   BOOK_METADATA_LOCK_FIELDS,
+  type AudioCoverEmbedProgressEvent,
   type BookSelectionPayload,
   type BookSelectionQuery,
   type BookCard,
@@ -75,6 +76,29 @@ function buildLocalReadStatus(patch: BulkReadingStatePatch, existing: UserBookSt
     finishedAt: clearsLifecycle ? null : hasFinishedAt ? (patch.finishedAt ?? null) : (existing?.finishedAt ?? null),
     updatedAt: nowIso,
   }
+}
+
+/** Reads a server-sent event stream, which may split an event across chunks. Lines that are not JSON events are ignored. */
+async function readEventStream<T>(body: ReadableStream<Uint8Array>, onEvent: (event: T) => void): Promise<void> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let pending = ''
+  const dispatch = (line: string) => {
+    if (!line.startsWith('data: ')) return
+    try {
+      onEvent(JSON.parse(line.slice(6)) as T)
+    } catch {
+      /* ignore malformed SSE line */
+    }
+  }
+  while (true) {
+    const { done, value } = await reader.read()
+    if (done) break
+    const lines = (pending + decoder.decode(value, { stream: true })).split('\n')
+    pending = lines.pop() ?? ''
+    lines.forEach(dispatch)
+  }
+  dispatch(pending + decoder.decode())
 }
 
 export function useBookBulkActions(
@@ -266,6 +290,43 @@ export function useBookBulkActions(
     toast.success(i18n.global.t('book.coverRegeneration.bulkCompleted', { updated: formatNumber(updated), processed }))
   }
 
+  async function handleBulkEmbedAudioCover() {
+    if (!hasSelection()) return
+    const label = i18n.global.t('book.audioCoverEmbed.bulkInProgress')
+    inFlight.value = { label, processed: 0, total: querySelection?.value ? querySelection.value.total : selectedIds.value.size }
+    // Assigned from the stream callback, so a plain `= null` initializer would narrow it to `null`.
+    let summary = null as Extract<AudioCoverEmbedProgressEvent, { done: true }> | null
+    try {
+      const res = await api('/api/v1/books/bulk-embed-audio-cover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(getSelectionPayload()),
+      })
+      if (!res.ok || !res.body) {
+        toast.error(i18n.global.t('book.audioCoverEmbed.bulkFailed'))
+        return
+      }
+      await readEventStream<AudioCoverEmbedProgressEvent>(res.body, (event) => {
+        if ('done' in event) summary = event
+        else if ('started' in event) inFlight.value = { label, processed: 0, total: event.total }
+        else inFlight.value = { label, processed: (inFlight.value?.processed ?? 0) + 1, total: inFlight.value?.total ?? 0 }
+      })
+    } catch {
+      toast.error(i18n.global.t('book.audioCoverEmbed.bulkFailed'))
+      return
+    } finally {
+      inFlight.value = null
+    }
+    if (!summary) {
+      toast.error(i18n.global.t('book.audioCoverEmbed.bulkFailed'))
+      return
+    }
+    const { succeeded, failed, processed } = summary
+    const values = { embedded: formatNumber(succeeded), processed, failed: formatNumber(failed) }
+    if (failed > 0) toast.warning(i18n.global.t('book.audioCoverEmbed.bulkCompletedWithFailures', values))
+    else toast.success(i18n.global.t('book.audioCoverEmbed.bulkCompleted', values))
+  }
+
   async function handleDownloadFiles(scope: ExportScope) {
     const ids = [...selectedIds.value]
     await exportBooks(ids, scope === 'all', scope === 'audio' ? 'audio' : undefined)
@@ -423,6 +484,7 @@ export function useBookBulkActions(
     inFlight,
     handleBulkRefreshMetadata,
     handleBulkReExtractCover,
+    handleBulkEmbedAudioCover,
     handleDownloadFiles,
     handleBulkSetStatus,
     handleBulkSetRating,

@@ -2,6 +2,7 @@ import { mount } from '@vue/test-utils'
 import { ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCoverSlot, BookDetail, BookMetadataLockField, CoverMedium } from '@bookorbit/types'
+import { useAudioCoverEmbed } from '../../../composables/useAudioCoverEmbed'
 import { useCoverEditor } from '../../../composables/useCoverEditor'
 import CoverEditorPanel from './CoverEditorPanel.vue'
 
@@ -11,6 +12,10 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('../../../composables/useCoverEditor', () => ({
   useCoverEditor: vi.fn<() => unknown>(),
+}))
+
+vi.mock('../../../composables/useAudioCoverEmbed', () => ({
+  useAudioCoverEmbed: vi.fn<() => unknown>(),
 }))
 
 vi.mock('../../../composables/useCoverVersions', () => ({
@@ -90,6 +95,7 @@ function fakeEditor() {
 }
 
 let editors: Record<CoverMedium | 'none', FakeEditor>
+let embedder: { embedding: ReturnType<typeof ref<boolean>>; embed: ReturnType<typeof vi.fn> }
 
 function mountPanel(options: { book?: BookDetail; disabled?: boolean; lockedFields?: BookMetadataLockField[] } = {}) {
   return mount(CoverEditorPanel, {
@@ -122,6 +128,8 @@ describe('CoverEditorPanel', () => {
     vi.useFakeTimers()
     editors = { ebook: fakeEditor(), audio: fakeEditor(), none: fakeEditor() }
     vi.mocked(useCoverEditor).mockImplementation((_bookId, medium) => editors[medium ?? 'none'] as never)
+    embedder = { embedding: ref(false), embed: vi.fn<() => Promise<null>>().mockResolvedValue(null) }
+    vi.mocked(useAudioCoverEmbed).mockReturnValue(embedder as never)
   })
 
   afterEach(() => {
@@ -344,6 +352,72 @@ describe('CoverEditorPanel', () => {
       expect(editors.audio.regenerate).toHaveBeenCalledTimes(1)
       expect(editors.ebook.regenerate).not.toHaveBeenCalled()
       expect(wrapper.emitted('coverChanged')).toEqual([['audio']])
+    })
+
+    describe('embedding the audiobook cover in a read-along EPUB', () => {
+      const readAlongBook = makeBook({
+        coverMedia: ['ebook', 'audio'],
+        covers: { ebook: slot(), audio: slot('custom') },
+        files: [{ id: 5, format: 'epub', role: 'primary', mediaOverlay: { available: true } }] as never,
+      })
+      const embedButton = (wrapper: ReturnType<typeof mountPanel>) => wrapper.find('[data-testid="embed-audio-cover"]')
+
+      it('offers the action on the audiobook tile only', async () => {
+        const wrapper = mountPanel({ book: readAlongBook })
+        expect(embedButton(wrapper).exists()).toBe(false)
+
+        await radios(wrapper)[1]!.trigger('click')
+
+        expect(embedButton(wrapper).text()).toContain('book.audioCoverEmbed.action')
+      })
+
+      it('offers nothing for a book without a read-along EPUB or without an audiobook cover', async () => {
+        const plain = mountPanel({
+          book: makeBook({ ...mixedBook, files: [{ id: 5, format: 'epub', role: 'primary', mediaOverlay: null }] as never }),
+        })
+        await radios(plain)[1]!.trigger('click')
+        expect(embedButton(plain).exists()).toBe(false)
+
+        const noCover = mountPanel({ book: makeBook({ ...readAlongBook, covers: { ebook: slot(), audio: null } }) })
+        await radios(noCover)[1]!.trigger('click')
+        expect(embedButton(noCover).exists()).toBe(false)
+      })
+
+      it('embeds the stored cover of the book', async () => {
+        const wrapper = mountPanel({ book: readAlongBook })
+        await radios(wrapper)[1]!.trigger('click')
+
+        await embedButton(wrapper).trigger('click')
+
+        expect(embedder.embed).toHaveBeenCalledWith(1)
+      })
+
+      it('waits for a pending change to be saved, because only the stored cover is written', async () => {
+        editors.audio.pendingUrl.value = 'https://example.com/square.jpg'
+        const wrapper = mountPanel({ book: readAlongBook })
+        await radios(wrapper)[1]!.trigger('click')
+
+        expect(embedButton(wrapper).attributes('disabled')).toBeDefined()
+        await embedButton(wrapper).trigger('click')
+        expect(embedder.embed).not.toHaveBeenCalled()
+      })
+
+      it('shows progress, disables itself and reports the panel as busy while writing', async () => {
+        embedder.embedding.value = true
+        const wrapper = mountPanel({ book: readAlongBook })
+        await radios(wrapper)[1]!.trigger('click')
+
+        expect(embedButton(wrapper).text()).toContain('book.audioCoverEmbed.inProgress')
+        expect(embedButton(wrapper).attributes('disabled')).toBeDefined()
+        expect((wrapper.vm as unknown as { busy: boolean }).busy).toBe(true)
+      })
+
+      it('stays available while the audiobook cover is locked, since nothing about the slot changes', async () => {
+        const wrapper = mountPanel({ book: readAlongBook, lockedFields: ['audioCover'] })
+        await radios(wrapper)[1]!.trigger('click')
+
+        expect(embedButton(wrapper).attributes('disabled')).toBeUndefined()
+      })
     })
 
     it('saves every pending tile and reports each medium', async () => {

@@ -28,10 +28,31 @@ describe('selectEmbeddedCoverSources', () => {
     expect(selectEmbeddedCoverSources(files, ['mp3']).audio?.absolutePath).toBe('/b/CD 1/01.mp3');
   });
 
-  it('gives a read-along EPUB no audio source, because its art is the book cover', () => {
-    const sources = selectEmbeddedCoverSources([file('/b/book.epub', { mediaOverlayAvailable: true })], ['epub']);
+  it('takes the audio art of a book with no audio track from its read-along EPUB', () => {
+    const sources = selectEmbeddedCoverSources(
+      [file('/b/plain.epub'), file('/b/book 2.epub', { mediaOverlayAvailable: true }), file('/b/book 10.epub', { mediaOverlayAvailable: true })],
+      ['epub'],
+    );
+
+    expect(sources.audio?.absolutePath).toBe('/b/book 2.epub');
+  });
+
+  it('gives a plain EPUB no audio source', () => {
+    const sources = selectEmbeddedCoverSources([file('/b/book.epub')], ['epub']);
 
     expect(sources.ebook?.absolutePath).toBe('/b/book.epub');
+    expect(sources.audio).toBeNull();
+  });
+
+  it('prefers a real audio track over a read-along EPUB', () => {
+    const sources = selectEmbeddedCoverSources([file('/b/book.epub', { mediaOverlayAvailable: true }), file('/b/book.m4b')], ['epub']);
+
+    expect(sources.audio?.absolutePath).toBe('/b/book.m4b');
+  });
+
+  it('does not read audio art from a read-along EPUB that is not a content file', () => {
+    const sources = selectEmbeddedCoverSources([file('/b/book.epub', { role: 'supplement', mediaOverlayAvailable: true })], ['epub']);
+
     expect(sources.audio).toBeNull();
   });
 

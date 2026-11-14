@@ -135,6 +135,8 @@ function makeController() {
     globalQuery: vi.fn(),
     bulkRefreshMetadata: vi.fn(),
     bulkReExtractCover: vi.fn(),
+    bulkEmbedAudioCover: vi.fn(),
+    embedAudioCover: vi.fn(),
     reExtractCover: vi.fn(),
     bulkSetMetadata: vi.fn(),
     bulkSetStatus: vi.fn(),
@@ -494,20 +496,23 @@ describe('BookController', () => {
     expect(bookService.bulkSetStatus).toHaveBeenCalledWith([7, 9], dto, user);
   });
 
-  it.each(['bulkRefreshMetadata', 'bulkReExtractCover'] as const)('rejects an unauthorized %s selection before starting SSE', async (method) => {
-    const { controller, bookService } = makeController();
-    const { reply, raw } = makeReply();
-    const user = makeUser();
-    const error = new ForbiddenException('Editor access required');
-    bookService.resolveSelectionToIds.mockRejectedValue(error);
+  it.each(['bulkRefreshMetadata', 'bulkReExtractCover', 'bulkEmbedAudioCover'] as const)(
+    'rejects an unauthorized %s selection before starting SSE',
+    async (method) => {
+      const { controller, bookService } = makeController();
+      const { reply, raw } = makeReply();
+      const user = makeUser();
+      const error = new ForbiddenException('Editor access required');
+      bookService.resolveSelectionToIds.mockRejectedValue(error);
 
-    await expect(controller[method]({ bookIds: [9] }, user, reply)).rejects.toBe(error);
+      await expect(controller[method]({ bookIds: [9] }, user, reply)).rejects.toBe(error);
 
-    expect(bookService.resolveSelectionToIds).toHaveBeenCalledWith({ bookIds: [9] }, user, 'editor');
-    expect(bookService[method]).not.toHaveBeenCalled();
-    expect(raw.writeHead).not.toHaveBeenCalled();
-    expect(raw.write).not.toHaveBeenCalled();
-  });
+      expect(bookService.resolveSelectionToIds).toHaveBeenCalledWith({ bookIds: [9] }, user, 'editor');
+      expect(bookService[method]).not.toHaveBeenCalled();
+      expect(raw.writeHead).not.toHaveBeenCalled();
+      expect(raw.write).not.toHaveBeenCalled();
+    },
+  );
 
   it('stops sending SSE done event when client disconnects', async () => {
     const { controller, bookService } = makeController();
@@ -547,6 +552,40 @@ describe('BookController', () => {
     expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 12 })}\n\n`);
     expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, processed: 1, updated: 1 })}\n\n`);
     expect(raw.end).toHaveBeenCalled();
+  });
+
+  it('streams server-sent events for bulk audiobook cover embedding progress', async () => {
+    const { controller, bookService } = makeController();
+    const { reply, raw } = makeReply();
+    const user = makeUser();
+    bookService.resolveSelectionToIds.mockResolvedValue([12]);
+    bookService.bulkEmbedAudioCover.mockImplementation(
+      (_bookIds: number[], _user: RequestUser, onProgress: (event: object) => void, options?: { isCancelled?: () => boolean }) => {
+        expect(options?.isCancelled?.()).toBe(false);
+        onProgress({ bookId: 12, status: 'success' });
+        return Promise.resolve({ processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: false });
+      },
+    );
+
+    await controller.bulkEmbedAudioCover({ bookIds: [12] }, user, reply);
+
+    expect(bookService.bulkEmbedAudioCover).toHaveBeenCalledWith([12], user, expect.any(Function), expect.any(Object));
+    expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 12, status: 'success' })}\n\n`);
+    expect(raw.write).toHaveBeenNthCalledWith(
+      2,
+      `data: ${JSON.stringify({ done: true, processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: false })}\n\n`,
+    );
+    expect(raw.end).toHaveBeenCalled();
+  });
+
+  it('embeds the audiobook cover of one book for the calling user', async () => {
+    const { controller, bookService } = makeController();
+    const user = makeUser();
+    bookService.embedAudioCover.mockResolvedValue({ status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 4 });
+
+    await expect(controller.embedAudioCover(42, user)).resolves.toEqual({ status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 4 });
+
+    expect(bookService.embedAudioCover).toHaveBeenCalledWith(42, user);
   });
 
   it('archives exported files into a zip stream', async () => {
@@ -1068,6 +1107,13 @@ describe('BookController', () => {
     const bulkCoverAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkReExtractCover) as {
       description: (req: { body: { bookIds?: number[] } }) => string;
     };
+    const bulkEmbedAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkEmbedAudioCover) as {
+      description: (req: { body: { bookIds?: number[] } }) => string;
+    };
+    const embedAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.embedAudioCover) as {
+      getResourceId: (req: { params: Record<string, string> }) => number;
+      description: (req: { params: Record<string, string> }) => string;
+    };
     const bulkSetMetadataAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkSetMetadata) as {
       description: (req: { body: { bookIds?: number[]; field?: string } }) => string;
     };
@@ -1102,6 +1148,9 @@ describe('BookController', () => {
     expect(deleteAudit.getMeta({}, bulkDeletion)).toEqual(bulkDeletion);
     expect(bulkRefreshAudit.description({ body: { bookIds: [1] } })).toBe('Bulk refreshed metadata for 1 book');
     expect(bulkCoverAudit.description({ body: { bookIds: [1, 2, 3] } })).toBe('Bulk re-extracted covers for 3 books');
+    expect(bulkEmbedAudit.description({ body: { bookIds: [1, 2] } })).toBe('Bulk embedded audiobook covers for 2 books');
+    expect(embedAudit.getResourceId({ params: { id: '42' } })).toBe(42);
+    expect(embedAudit.description({ params: { id: '42' } })).toBe('Embedded audiobook cover in read-along EPUB of book #42');
     expect(bulkSetMetadataAudit.description({ body: { bookIds: [1, 2], field: 'language' } })).toBe('Bulk set language for 2 books');
     expect(updateMetadataAudit.getResourceId({ params: { id: '44' } })).toBe(44);
     expect(updateMetadataAudit.description({ params: { id: '44' } })).toBe('Updated metadata for book #44');

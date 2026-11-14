@@ -58,6 +58,8 @@ import type {
   AccessLevel,
   AudiobookChapter,
   AudiobookChapterSource,
+  AudioCoverEmbedProgressEvent,
+  AudioCoverEmbedResult,
   BookCard,
   BookCommunityRating,
   BookKoboState,
@@ -3970,6 +3972,83 @@ export class BookService {
       libraryAutoWriteEnabled: settings?.fileWriteEnabled ?? false,
       libraryAutoRenameEnabled: settings?.fileRenameEnabled ?? false,
     };
+  }
+
+  async embedAudioCover(bookId: number, user: RequestUser): Promise<AudioCoverEmbedResult> {
+    await this.verifyBookAccess(bookId, user, 'editor');
+    return (
+      (await this.fileWriteService?.embedAudioCover(bookId, user.id)) ?? {
+        status: 'skipped',
+        code: 'unsupported',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: 'file write service unavailable',
+      }
+    );
+  }
+
+  /**
+   * Embeds each selected book's audiobook cover in its read-along EPUBs, one book at a time so the
+   * rewrites of files that run to hundreds of megabytes never overlap. Books with no read-along EPUB
+   * are counted as skipped without a visit, which keeps a whole-library selection cheap.
+   */
+  async bulkEmbedAudioCover(
+    bookIds: number[],
+    user: RequestUser,
+    onProgress?: (event: AudioCoverEmbedProgressEvent) => void,
+    options?: { isCancelled?: () => boolean },
+  ): Promise<{ processed: number; succeeded: number; failed: number; skipped: number; cancelled: boolean }> {
+    const event = 'book.bulk_embed_audio_cover';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - bulk audio cover embed started`);
+    try {
+      await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
+      const candidates = (await this.fileWriteService?.findBookIdsWithReadAlongFiles(bookIds)) ?? [];
+
+      let succeeded = 0;
+      let failed = 0;
+      let skipped = bookIds.length - candidates.length;
+      // A progress callback throws once its stream is gone, which stops the run like a cancellation.
+      const report = (progress: AudioCoverEmbedProgressEvent): boolean => {
+        try {
+          onProgress?.(progress);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      let cancelled = !report({ started: true, total: candidates.length });
+      for (const id of candidates) {
+        if (cancelled) break;
+        if (options?.isCancelled?.()) {
+          cancelled = true;
+          break;
+        }
+        let result: WriteResult;
+        try {
+          result = await this.embedAudioCover(id, user);
+        } catch (err) {
+          this.logger.warn(
+            `[${event}] [fail] bookId=${id} userId=${user.id} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - bulk audio cover embed item failed`,
+          );
+          result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason: 'unexpected error' };
+        }
+        if (result.status === 'success') succeeded++;
+        else if (result.status === 'failed') failed++;
+        else skipped++;
+        cancelled = !report({ bookId: id, status: result.status, reason: result.reason });
+      }
+      const processed = succeeded + failed + skipped;
+      this.logger.log(
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} succeeded=${succeeded} failed=${failed} skipped=${skipped} cancelled=${cancelled} - bulk audio cover embed completed`,
+      );
+      return { processed, succeeded, failed, skipped, cancelled };
+    } catch (err) {
+      this.logger.warn(
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(err instanceof Error ? err.message : String(err))}" - bulk audio cover embed failed`,
+      );
+      throw err;
+    }
   }
 
   async updatePersonalNote(id: number, dto: UpdatePersonalNoteDto, user: RequestUser): Promise<BookDetailDto> {

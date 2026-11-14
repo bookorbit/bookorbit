@@ -17,9 +17,17 @@ function setup(workRoot = '/data/read-aloud/jobs') {
     addFile: vi.fn().mockResolvedValue({ fileId: 900, reused: false }),
   };
   const activity = { record: vi.fn().mockResolvedValue(undefined) };
+  const fileWrite = { embedAudioCoverInDraft: vi.fn().mockResolvedValue({ status: 'success', code: 'embedded', fieldsWritten: [], durationMs: 1 }) };
   const workspace = new ReadAloudWorkspace({ workRoot } as never);
-  const publisher = new ReadAloudPublisher({ maxOutputBytes: 1e9 } as never, jobs as never, workspace, files as never, activity as never);
-  return { publisher, jobs, files, activity };
+  const publisher = new ReadAloudPublisher(
+    { maxOutputBytes: 1e9 } as never,
+    jobs as never,
+    workspace,
+    files as never,
+    activity as never,
+    fileWrite as never,
+  );
+  return { publisher, jobs, files, activity, fileWrite };
 }
 
 describe('ReadAloudPublisher.publish', () => {
@@ -49,6 +57,97 @@ describe('ReadAloudPublisher.publish', () => {
     await expect(publisher.publish(row, DELETER)).resolves.toBe(900);
     expect(files.replaceFile).not.toHaveBeenCalled();
     expect(activity.record).toHaveBeenCalledWith(JOB_ID, 'warn', 'publishing', 'replace_target_missing', expect.any(String));
+  });
+});
+
+describe('ReadAloudPublisher.publish audio cover', () => {
+  let root: string;
+  const output = () => join(root, JOB_ID, 'output.epub');
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'read-aloud-cover-'));
+    await mkdir(join(root, JOB_ID));
+    await writeFile(output(), 'generated read-along');
+  });
+
+  afterEach(async () => {
+    await rm(root, { recursive: true, force: true });
+  });
+
+  it("embeds the book's audiobook cover in the generated file before it reaches the library", async () => {
+    const { publisher, files, fileWrite, activity } = setup(root);
+    const order: string[] = [];
+    fileWrite.embedAudioCoverInDraft.mockImplementation(() => {
+      order.push('embed');
+      return Promise.resolve({ status: 'success', code: 'embedded', fieldsWritten: [], durationMs: 1 });
+    });
+    files.addFile.mockImplementation(() => {
+      order.push('add');
+      return Promise.resolve({ fileId: 900, reused: false });
+    });
+
+    await expect(publisher.publish(jobRow({ replaceFileId: null }), OWNER)).resolves.toBe(900);
+
+    expect(order).toEqual(['embed', 'add']);
+    expect(fileWrite.embedAudioCoverInDraft).toHaveBeenCalledWith(12, output());
+    expect(activity.record).toHaveBeenCalledWith(JOB_ID, 'info', 'publishing', 'audio_cover_embedded', expect.any(String));
+  });
+
+  it('embeds before replacing an existing read-along too', async () => {
+    const { publisher, files, fileWrite } = setup(root);
+
+    await publisher.publish(jobRow({ replaceFileId: 300 }), DELETER);
+
+    expect(fileWrite.embedAudioCoverInDraft).toHaveBeenCalledTimes(1);
+    expect(files.replaceFile).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['has no audiobook cover', { status: 'skipped', code: 'no_audio_cover', fieldsWritten: [], durationMs: 0 }],
+    ['already holds it', { status: 'skipped', code: 'unchanged', fieldsWritten: [], durationMs: 0 }],
+  ])('publishes quietly when the book %s', async (_label, result) => {
+    const { publisher, fileWrite, activity } = setup(root);
+    fileWrite.embedAudioCoverInDraft.mockResolvedValue(result);
+
+    await expect(publisher.publish(jobRow({ replaceFileId: null }), OWNER)).resolves.toBe(900);
+
+    expect(activity.record).not.toHaveBeenCalledWith(
+      JOB_ID,
+      expect.anything(),
+      'publishing',
+      expect.stringMatching(/^audio_cover/),
+      expect.anything(),
+    );
+  });
+
+  it('still publishes, with a warning, when the cover cannot be added', async () => {
+    const { publisher, files, fileWrite, activity } = setup(root);
+    fileWrite.embedAudioCoverInDraft.mockResolvedValue({
+      status: 'failed',
+      code: 'failed',
+      reason: 'no space left on device',
+      fieldsWritten: [],
+      durationMs: 1,
+    });
+
+    await expect(publisher.publish(jobRow({ replaceFileId: null }), OWNER)).resolves.toBe(900);
+
+    expect(files.addFile).toHaveBeenCalled();
+    expect(activity.record).toHaveBeenCalledWith(JOB_ID, 'warn', 'publishing', 'audio_cover_failed', expect.any(String), {
+      reason: 'no space left on device',
+    });
+  });
+
+  it('never writes through a link the worker left in place of the output', async () => {
+    const { publisher, fileWrite } = setup(root);
+    const elsewhere = join(root, 'another-library.epub');
+    await writeFile(elsewhere, 'someone else’s read-along');
+    await rm(output());
+    await symlink(elsewhere, output());
+
+    await publisher.publish(jobRow({ replaceFileId: null }), OWNER);
+
+    expect(fileWrite.embedAudioCoverInDraft).not.toHaveBeenCalled();
   });
 });
 

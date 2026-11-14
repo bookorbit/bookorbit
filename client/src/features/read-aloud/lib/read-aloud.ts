@@ -255,6 +255,8 @@ const EVENT_CODES = new Set([
   'file_added',
   'file_replaced',
   'file_already_attached',
+  'audio_cover_embedded',
+  'audio_cover_failed',
   'replace_target_missing',
   'replace_not_permitted',
   'job_completed',

@@ -558,6 +558,7 @@ const {
   inFlight,
   handleBulkRefreshMetadata,
   handleBulkReExtractCover,
+  handleBulkEmbedAudioCover,
   handleDownloadFiles,
   handleBulkSetStatus,
   handleBulkSetRating,
@@ -1122,6 +1123,7 @@ defineOptions({ name: 'HomeView' })
       @edit-individually="handleEditIndividually"
       @refresh-metadata="handleBulkRefreshMetadata"
       @re-extract-cover="handleBulkReExtractCover"
+      @embed-audio-cover="handleBulkEmbedAudioCover"
       @set-status="handleBulkSetStatus"
       @set-rating="handleBulkSetRating"
       @set-field="handleBulkSetField"

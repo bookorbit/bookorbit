@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   djvuCover: vi.fn(),
   audio: vi.fn(),
   cover: vi.fn(),
+  epubAudioCover: vi.fn(),
   comic: {
     cbz: vi.fn(),
     cbr: vi.fn(),
@@ -39,6 +40,10 @@ vi.mock('./lib/pdf-poppler-metadata', () => ({ extractPopplerPdfMetadata: mocks.
 
 vi.mock('./lib/cover', () => ({
   extractCover: mocks.cover,
+}));
+
+vi.mock('./lib/cover-epub', () => ({
+  extractEpubAudioCover: mocks.epubAudioCover,
 }));
 
 vi.mock('./extractors/audio-format.extractor', () => ({
@@ -171,6 +176,20 @@ describe('MetadataExtractionService', () => {
     expect(mocks.djvu).toHaveBeenCalledWith('/books/DjVuLibre_Book_(2007).djvu');
     mocks.djvuCover.mockResolvedValue(cover);
     await expect(service.extractEmbeddedCover('/books/book.djvu', 'DJVU')).resolves.toEqual(cover);
+  });
+
+  it("reads an EPUB's audio medium from its declared audiobook cover, not its book cover", async () => {
+    const service = new MetadataExtractionService({} as never);
+    const book = Buffer.from('book');
+    const audio = Buffer.from('audio');
+    mocks.cover.mockResolvedValue(book);
+    mocks.epubAudioCover.mockResolvedValue(audio);
+
+    await expect(service.extractEmbeddedCover('/books/a.epub', 'epub', 'audio')).resolves.toEqual(audio);
+    await expect(service.extractEmbeddedCover('/books/a.epub', 'epub', 'ebook')).resolves.toEqual(book);
+    await expect(service.extractEmbeddedCover('/books/a.epub', 'epub')).resolves.toEqual(book);
+    expect(mocks.cover).toHaveBeenCalledTimes(2);
+    expect(mocks.epubAudioCover).toHaveBeenCalledTimes(1);
   });
 
   it('reads DjVu details for the file view without rendering a cover', async () => {

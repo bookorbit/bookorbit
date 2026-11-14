@@ -220,6 +220,37 @@ export class BookController {
     }
   }
 
+  @Post('bulk-embed-audio-cover')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
+  @Auditable({
+    action: AuditAction.BookBulkEmbedAudioCover,
+    resource: AuditResource.Book,
+    description: (req) => {
+      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
+      return `Bulk embedded audiobook covers for ${count} book${count !== 1 ? 's' : ''}`;
+    },
+  })
+  async bulkEmbedAudioCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user, 'editor');
+    const stream = this.createSseStream(reply);
+    try {
+      const result = await this.bookService.bulkEmbedAudioCover(
+        ids,
+        user,
+        (event) => {
+          stream.send(event);
+        },
+        { isCancelled: stream.isClosed },
+      );
+      if (!stream.isClosed()) {
+        stream.send({ done: true, ...result });
+      }
+    } finally {
+      stream.close();
+    }
+  }
+
   @Post(':id/re-extract-cover')
   @RequirePermission(Permission.LibraryEditMetadata)
   reExtractCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser, @Query() query?: CoverMediumQueryDto) {
@@ -696,6 +727,18 @@ export class BookController {
   })
   writeAndRename(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
     return this.bookService.writeAndRename(id, user);
+  }
+
+  @Post(':id/embed-audio-cover')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookEmbedAudioCover,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Embedded audiobook cover in read-along EPUB of book #${req.params['id']}`,
+  })
+  embedAudioCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.embedAudioCover(id, user);
   }
 
   @Get(':id/write-log')

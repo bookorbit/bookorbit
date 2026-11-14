@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
+import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
 import { NotificationModule } from '../notification/notification.module';
 import { UploadModule } from '../upload/upload.module';
@@ -21,7 +22,7 @@ import { ReadAloudWorkerService } from './read-aloud-worker.service';
 import { ReadAloudWorkspace } from './read-aloud-workspace.service';
 
 @Module({
-  imports: [AuthModule, BookModule, LibraryModule, NotificationModule, UploadModule, UserModule],
+  imports: [AuthModule, BookModule, FileWriteModule, LibraryModule, NotificationModule, UploadModule, UserModule],
   controllers: [ReadAloudController],
   providers: [
     ReadAloudActivityService,

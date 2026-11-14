@@ -184,7 +184,7 @@ export class CoverSlotReconciler implements OnModuleDestroy {
 
     for (const medium of needed) {
       const source = embeddedSources[medium];
-      const bytes = source ? await this.extractEmbedded(context.bookId, source) : null;
+      const bytes = source ? await this.extractEmbedded(context.bookId, source, medium) : null;
       if (!bytes) {
         withoutEmbeddedArt.push(medium);
         continue;
@@ -229,9 +229,9 @@ export class CoverSlotReconciler implements OnModuleDestroy {
     }
   }
 
-  private async extractEmbedded(bookId: number, file: BookCoverSourceFile): Promise<Buffer | null> {
+  private async extractEmbedded(bookId: number, file: BookCoverSourceFile, medium: CoverMedium): Promise<Buffer | null> {
     try {
-      return await this.extraction.extractEmbeddedCover(file.absolutePath, file.format!);
+      return await this.extraction.extractEmbeddedCover(file.absolutePath, file.format!, medium);
     } catch (error) {
       this.logger.debug(
         `[cover.slot_reconcile] [fail] bookId=${bookId} format=${file.format} path="${sanitizeLogValue(file.absolutePath)}" errorClass=${error instanceof Error ? error.name : 'Error'} - embedded cover unreadable`,

@@ -91,6 +91,7 @@ describe('SelectionActionBar demo restriction', () => {
 
     expect(wrapper.find('[data-testid="action-bulk-refresh-metadata"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-re-extract-cover"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="action-bulk-embed-audio-cover"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-lock-metadata"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="action-bulk-unlock-metadata"]').exists()).toBe(true)
   })
@@ -116,6 +117,7 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.find('[data-testid="action-bulk-edit-metadata"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="action-bulk-refresh-metadata"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="action-bulk-re-extract-cover"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="action-bulk-embed-audio-cover"]').exists()).toBe(false)
   })
 
   it('hides bulk-edit controls for demo-restricted accounts', () => {
@@ -206,6 +208,41 @@ describe('SelectionActionBar demo restriction', () => {
 
     await wrapper.find('[data-testid="action-bulk-refresh-metadata"]').trigger('click')
     expect(wrapper.get<HTMLInputElement>('[data-testid="ignore-cache-checkbox"]').element.checked).toBe(false)
+  })
+
+  it('asks before embedding audiobook covers, since every read-along EPUB is rewritten, then emits once', async () => {
+    const wrapper = mountBar()
+
+    await wrapper.find('[data-testid="action-bulk-embed-audio-cover"]').trigger('click')
+
+    expect(wrapper.emitted('embed-audio-cover')).toBeUndefined()
+    expect(wrapper.get('[data-testid="bulk-embed-confirm"]').text()).toContain('3 books')
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="bulk-embed-confirm-action"]').trigger('click')
+
+    expect(wrapper.emitted('embed-audio-cover')).toHaveLength(1)
+    expect(wrapper.find('[data-testid="bulk-embed-confirm"]').exists()).toBe(false)
+  })
+
+  it('emits nothing and returns to the menu when the embed is cancelled', async () => {
+    const wrapper = mountBar()
+
+    await wrapper.find('[data-testid="action-bulk-embed-audio-cover"]').trigger('click')
+    await wrapper.get('[data-testid="bulk-embed-cancel"]').trigger('click')
+
+    expect(wrapper.emitted('embed-audio-cover')).toBeUndefined()
+    expect(wrapper.find('[data-testid="action-bulk-metadata-menu"]').exists()).toBe(true)
+  })
+
+  it('drops a pending embed confirmation when the bar goes away', async () => {
+    const wrapper = mountBar()
+    await wrapper.find('[data-testid="action-bulk-embed-audio-cover"]').trigger('click')
+
+    await wrapper.setProps({ visible: false })
+    await wrapper.setProps({ visible: true })
+
+    expect(wrapper.find('[data-testid="bulk-embed-confirm"]').exists()).toBe(false)
   })
 
   it('emits set-field from the field editor flow', async () => {

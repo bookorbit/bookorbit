@@ -11,6 +11,7 @@ import {
   FolderMinus,
   FolderPlus,
   ImageDown,
+  ImageUp,
   Lock,
   Loader2,
   Mail,
@@ -98,6 +99,7 @@ const emit = defineEmits<{
   'export-metadata': []
   'refresh-metadata': [options: IgnoreCacheOptions]
   're-extract-cover': []
+  'embed-audio-cover': []
   'set-status': [patch: BulkReadingStatePatch]
   'set-rating': [rating: number | null]
   'set-field': [field: BulkEditableField, value: BulkEditableValue]
@@ -122,6 +124,8 @@ const fieldMenuOpen = ref(false)
 const refreshConfirmOpen = ref(false)
 const refreshIgnoreCache = ref(false)
 const refreshConfirmButton = ref<HTMLButtonElement | null>(null)
+const embedConfirmOpen = ref(false)
+const embedConfirmButton = ref<HTMLButtonElement | null>(null)
 const readingStateOpen = ref(false)
 const bulkField = ref<BulkEditableField>('publisher')
 const fieldValue = ref('')
@@ -258,6 +262,22 @@ function onReExtractCover() {
   emit('re-extract-cover')
 }
 
+async function onEmbedAudioCover() {
+  if (props.count === 0) return
+  embedConfirmOpen.value = true
+  await nextTick()
+  embedConfirmButton.value?.focus()
+}
+
+function confirmEmbedAudioCover() {
+  emit('embed-audio-cover')
+  embedConfirmOpen.value = false
+}
+
+function cancelEmbedAudioCover() {
+  embedConfirmOpen.value = false
+}
+
 function onMoveToLibrary() {
   if (props.count === 0) return
   emit('move-to-library')
@@ -318,6 +338,7 @@ watch(
       exportMenuOpen.value = false
       ratingMenuOpen.value = false
       refreshConfirmOpen.value = false
+      embedConfirmOpen.value = false
       readingStateOpen.value = false
       deleteInput.value = ''
       resetFieldEditor()
@@ -353,7 +374,7 @@ watch(
             <slot name="content" :count="count" />
           </template>
 
-          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !fieldMenuOpen && !refreshConfirmOpen">
+          <template v-else-if="!confirmingDelete && !exportMenuOpen && !ratingMenuOpen && !fieldMenuOpen && !refreshConfirmOpen && !embedConfirmOpen">
             <span class="px-2.5 py-0.5 text-sm font-semibold tabular-nums whitespace-nowrap rounded-full bg-primary/10 text-primary">{{
               count
             }}</span>
@@ -511,6 +532,10 @@ watch(
                           <ImageDown :size="14" />
                           <span>{{ t('components.selectionActionBar.reExtractCover') }}</span>
                         </DropdownMenuItem>
+                        <DropdownMenuItem data-testid="action-bulk-embed-audio-cover" @click="onEmbedAudioCover">
+                          <ImageUp :size="14" />
+                          <span>{{ t('components.selectionActionBar.embedAudioCover') }}</span>
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger data-testid="action-bulk-metadata-lock">
@@ -660,6 +685,27 @@ watch(
               {{ t('components.selectionActionBar.refreshConfirmAction') }}
             </button>
             <button type="button" :class="BTN_TEXT_CANCEL" data-testid="bulk-refresh-cancel" @click="cancelRefreshMetadata">
+              {{ t('common.cancel') }}
+            </button>
+          </template>
+
+          <!-- Embed audiobook covers confirmation: every read-along EPUB is rewritten -->
+          <template v-else-if="embedConfirmOpen">
+            <span class="px-3 text-sm font-semibold text-foreground whitespace-nowrap" data-testid="bulk-embed-confirm">
+              {{ t('components.selectionActionBar.embedAudioCoverConfirm', { count }) }}
+            </span>
+            <div :class="DIVIDER" />
+            <button
+              ref="embedConfirmButton"
+              type="button"
+              :class="BTN_TEXT_PRIMARY"
+              data-testid="bulk-embed-confirm-action"
+              @click="confirmEmbedAudioCover"
+            >
+              <ImageUp :size="14" />
+              {{ t('components.selectionActionBar.embedAudioCoverConfirmAction') }}
+            </button>
+            <button type="button" :class="BTN_TEXT_CANCEL" data-testid="bulk-embed-cancel" @click="cancelEmbedAudioCover">
               {{ t('common.cancel') }}
             </button>
           </template>

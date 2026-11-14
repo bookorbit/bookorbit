@@ -1,6 +1,6 @@
 import { recordBookFileHashHistory } from '../../db/book-file-hash-history';
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, isNull, ne, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import type { WriteResult, WriteLogEntry } from '@bookorbit/types';
@@ -27,6 +27,8 @@ import {
 } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+
+const READ_ALONG_LOOKUP_BATCH_SIZE = 1000;
 
 @Injectable()
 export class FileWriteRepository {
@@ -131,6 +133,26 @@ export class FileWriteRepository {
       .innerJoin(books, eq(books.id, bookFiles.bookId))
       .where(eq(bookFiles.bookId, bookId))
       .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
+  }
+
+  /** The books among `bookIds` that hold a read-along EPUB, in the order given. Read in batches, since a selection can be a whole library. */
+  async findBookIdsWithReadAlongFiles(bookIds: readonly number[]): Promise<number[]> {
+    const withReadAlong = new Set<number>();
+    for (let offset = 0; offset < bookIds.length; offset += READ_ALONG_LOOKUP_BATCH_SIZE) {
+      const rows = await this.db
+        .selectDistinct({ bookId: bookFiles.bookId })
+        .from(bookFiles)
+        .where(
+          and(
+            inArray(bookFiles.bookId, bookIds.slice(offset, offset + READ_ALONG_LOOKUP_BATCH_SIZE)),
+            inArray(bookFiles.role, ['content', 'primary']),
+            sql`lower(${bookFiles.format}) = 'epub'`,
+            eq(bookFiles.mediaOverlayAvailable, true),
+          ),
+        );
+      for (const row of rows) withReadAlong.add(row.bookId);
+    }
+    return bookIds.filter((bookId) => withReadAlong.has(bookId));
   }
 
   async findNonMissingPrimaryFilesByLibrary(libraryId: number) {

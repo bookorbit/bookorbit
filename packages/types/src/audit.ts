@@ -57,6 +57,7 @@ export enum AuditAction {
   BookBulkMetadataRefresh = "book.bulk.metadata_refresh",
   BookBulkDelete = "book.bulk.delete",
   BookBulkCoverReextract = "book.bulk.cover_reextract",
+  BookBulkEmbedAudioCover = "book.bulk.embed_audio_cover",
   BookBulkSetStatus = "book.bulk.set_status",
   BookBulkSetRating = "book.bulk.set_rating",
   BookBulkSetMetadata = "book.bulk.set_metadata",
@@ -71,6 +72,7 @@ export enum AuditAction {
   BookReadingStateReset = "book.reading_state.reset",
 
   BookWriteAndRename = "book.write_and_rename",
+  BookEmbedAudioCover = "book.embed_audio_cover",
 
   CollectionCreate = "collection.create",
   CollectionUpdate = "collection.update",

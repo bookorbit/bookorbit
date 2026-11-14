@@ -53,6 +53,7 @@ function handleRemoveFromCollection() {
     @edit-individually="page.handleEditIndividually"
     @refresh-metadata="page.handleBulkRefreshMetadata"
     @re-extract-cover="page.handleBulkReExtractCover"
+    @embed-audio-cover="page.handleBulkEmbedAudioCover"
     @set-status="page.handleBulkSetStatus"
     @set-rating="page.handleBulkSetRating"
     @set-field="page.handleBulkSetField"
