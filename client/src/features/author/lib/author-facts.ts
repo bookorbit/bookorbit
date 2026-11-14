@@ -1,8 +1,9 @@
-import type { AuthorDetail } from '@bookorbit/types'
+import type { AuthorDetail, AuthorGender } from '@bookorbit/types'
 import { formatDate, formatNumber } from '@/i18n/formatters'
 
 /** What the edit panel holds for the facts, as typed: a life date is a year or a full date. */
 export type AuthorFactsDraft = {
+  gender: AuthorGender | ''
   website: string
   born: string
   died: string
@@ -11,6 +12,7 @@ export type AuthorFactsDraft = {
 }
 
 export type AuthorFactsPayload = {
+  gender?: AuthorGender | null
   website?: string | null
   birthDate?: string | null
   birthYear?: number | null
@@ -30,6 +32,7 @@ const URL_SCHEME = /^[a-z][a-z\d+.-]*:/i
 
 export function authorFactsDraft(author: AuthorDetail | null): AuthorFactsDraft {
   return {
+    gender: author?.gender ?? '',
     website: author?.website ?? '',
     born: lifeDateInput(author?.birthDate ?? null, author?.birthYear ?? null),
     died: lifeDateInput(author?.deathDate ?? null, author?.deathYear ?? null),
@@ -90,6 +93,8 @@ export function authorFactsPayload(draft: AuthorFactsDraft, seeded: AuthorFactsD
   const payload: AuthorFactsPayload = {}
   const invalid: AuthorFactsField[] = []
 
+  if (draft.gender !== seeded.gender) payload.gender = draft.gender || null
+
   if (draft.website.trim() !== seeded.website.trim()) {
     const website = normalizeWebsiteInput(draft.website)
     if (website === undefined) invalid.push('website')
@@ -115,7 +120,14 @@ export function authorFactsPayload(draft: AuthorFactsDraft, seeded: AuthorFactsD
 }
 
 export function sameFactsDraft(a: AuthorFactsDraft, b: AuthorFactsDraft): boolean {
-  return a.website === b.website && a.born === b.born && a.died === b.died && sameList(a.genres, b.genres) && sameList(a.influences, b.influences)
+  return (
+    a.gender === b.gender &&
+    a.website === b.website &&
+    a.born === b.born &&
+    a.died === b.died &&
+    sameList(a.genres, b.genres) &&
+    sameList(a.influences, b.influences)
+  )
 }
 
 // Goodreads supplies a full date for most authors and only a year for older

@@ -808,6 +808,7 @@ describe('AuthorsService', () => {
 
     it('update writes facts, takes the year from a full date and tidies lists', async () => {
       await service.update(reqUser(), 32, {
+        gender: 'female',
         website: '  https://johnreid.example  ',
         birthDate: '1965-03-14',
         birthYear: 1900,
@@ -817,6 +818,7 @@ describe('AuthorsService', () => {
       });
 
       expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(32, {
+        gender: 'female',
         website: 'https://johnreid.example',
         birthDate: '1965-03-14',
         birthYear: 1965,
@@ -829,9 +831,10 @@ describe('AuthorsService', () => {
     });
 
     it('update clears facts sent as null and keeps a year sent beside a cleared date', async () => {
-      await service.update(reqUser(), 32, { website: null, birthDate: null, birthYear: 1965, deathDate: null, genres: null });
+      await service.update(reqUser(), 32, { gender: null, website: null, birthDate: null, birthYear: 1965, deathDate: null, genres: null });
 
       expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(32, {
+        gender: null,
         website: null,
         birthDate: null,
         birthYear: 1965,

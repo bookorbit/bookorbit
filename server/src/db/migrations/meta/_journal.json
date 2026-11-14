@@ -1044,6 +1044,27 @@
       "when": 1794586786626,
       "tag": "0148_add_ai_step_timing_effort",
       "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1794680383126,
+      "tag": "0149_add_author_gender",
+      "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1794684402120,
+      "tag": "0150_add_book_file_path_filter_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1794699754181,
+      "tag": "0151_remove_book_file_path_filter_index",
+      "breakpoints": true
     }
   ]
 }

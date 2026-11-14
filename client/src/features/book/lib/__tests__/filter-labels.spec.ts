@@ -5,7 +5,7 @@ import { activateI18nLocale, i18n } from '@/i18n'
 import { compileIcuCatalog } from '@/i18n/icu'
 import en from '@/locales/en.json'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
-import { fieldLabel, operatorLabel, ruleToParts, sortFieldLabel } from '../filter-labels'
+import { fieldLabel, filterValueLabel, operatorLabel, ruleToParts, sortFieldLabel } from '../filter-labels'
 
 vi.mock('@/features/book/composables/useActiveCustomFields', () => ({
   activeCustomFieldLabel: vi.fn<(fieldId: number) => string | null>(() => null),
@@ -140,6 +140,18 @@ describe('community rating labels', () => {
 
   it('exposes a Community Review Count field label', () => {
     expect(fieldLabel('communityRatingCount')).toBe('Community Review Count')
+  })
+})
+
+describe('author gender labels', () => {
+  it('uses translated field and value labels', () => {
+    expect(fieldLabel('authorGender')).toBe('Author Gender')
+    expect(filterValueLabel('authorGender', 'non_binary')).toBe('Non-binary')
+  })
+
+  it('uses translated values in rule summaries', () => {
+    const rule: Rule = { type: 'rule', field: 'authorGender', operator: 'includesAny', value: ['female', 'non_binary'] }
+    expect(ruleToParts(rule)).toEqual({ field: 'Author Gender', operator: 'includes any of', value: 'Female, Non-binary' })
   })
 })
 

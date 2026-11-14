@@ -50,14 +50,16 @@ import {
 } from '@bookorbit/types';
 
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
-import { bookCustomMetadataValues, bookMetadata, books, collections } from '../../db/schema';
+import { aiArtifacts, authors, bookCustomMetadataValues, bookFileTexts, bookMetadata, books, collections } from '../../db/schema';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 
 function makeBuilder() {
   const sqWhere = vi.fn((whereClause?: unknown) => ({ type: 'subquery', whereClause }));
-  const sqInnerJoin = vi.fn().mockReturnValue({ where: sqWhere });
-  const sqFrom = vi.fn().mockReturnValue({ innerJoin: sqInnerJoin, where: sqWhere });
+  const query = { innerJoin: vi.fn(), where: sqWhere };
+  query.innerJoin.mockReturnValue(query);
+  const sqInnerJoin = query.innerJoin;
+  const sqFrom = vi.fn().mockReturnValue(query);
   const db = {
     select: vi.fn().mockReturnValue({ from: sqFrom }),
   };
@@ -193,7 +195,7 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
     case 'includesAny':
     case 'includesAll':
     case 'excludesAll':
-      return { value: ['test'] };
+      return { value: field === 'authorGender' ? ['female'] : ['test'] };
     default: {
       const _exhaustive: never = operator;
       return _exhaustive;
@@ -228,6 +230,63 @@ describe('BookQueryBuilder', () => {
     const where = builder.buildWhere(undefined, { accessibleLibraryIds: [] }) as any;
 
     expect(where).toMatchObject({ type: 'sql', text: '1 = 0' });
+  });
+
+  it('matches an allowed gender on any linked author', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'authorGender', operator: 'includesAny', value: ['female'] }) as never,
+      BASE_CTX,
+    ) as Record<string, unknown>;
+
+    const ruleSql = getRuleSql(where);
+    expect(collectColumnNames(ruleSql)).toContain(authors.gender.name);
+  });
+
+  it('treats author gender as empty when no linked author has a value', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'authorGender', operator: 'isEmpty' }) as never, BASE_CTX) as Record<
+      string,
+      unknown
+    >;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'not' });
+    expect(collectColumnNames(getRuleSql(where))).toContain(authors.gender.name);
+  });
+
+  it('matches books with a built Story Guide artifact', () => {
+    const { builder, sqInnerJoin } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'storyGuide', operator: 'isPresent' }) as never, BASE_CTX) as Record<
+      string,
+      unknown
+    >;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'sql' });
+    expect(sqInnerJoin).toHaveBeenCalledWith(bookFileTexts, expect.objectContaining({ type: 'eq' }));
+    expect(sqInnerJoin).toHaveBeenCalledWith(
+      aiArtifacts,
+      expect.objectContaining({
+        type: 'and',
+        clauses: expect.arrayContaining([
+          expect.objectContaining({ type: 'eq', left: aiArtifacts.feature, right: 'story-guides' }),
+          expect.objectContaining({ type: 'eq', left: aiArtifacts.subjectKey, right: bookFileTexts.textKey }),
+        ]),
+      }),
+    );
+  });
+
+  it('negates built Story Guide existence for the missing operator', () => {
+    const { builder } = makeBuilder();
+
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'storyGuide', operator: 'isMissing' }) as never, BASE_CTX) as Record<
+      string,
+      unknown
+    >;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
   });
 
   it('combines library scope, implicit library, and filter rules into one AND clause', () => {

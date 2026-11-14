@@ -30,6 +30,7 @@ import {
   TextQuote,
   Type,
   User,
+  VenusAndMars,
   Users,
 } from '@lucide/vue'
 import type { CustomMetadataFieldType, GroupRule, Rule, RuleField, RuleOperator, StaticRuleField } from '@bookorbit/types'
@@ -46,6 +47,7 @@ export type FilterGroupKey = 'book' | 'reading' | 'library' | 'metadata' | 'cust
 export const FILTER_FIELD_KINDS: Record<StaticRuleField, FilterKind> = {
   title: 'text',
   author: 'list',
+  authorGender: 'list',
   series: 'list',
   seriesIndex: 'number',
   genre: 'list',
@@ -63,6 +65,7 @@ export const FILTER_FIELD_KINDS: Record<StaticRuleField, FilterKind> = {
   library: 'list',
   collection: 'list',
   format: 'list',
+  storyGuide: 'choice',
   fileSize: 'number',
   pageCount: 'number',
   addedAt: 'date',
@@ -80,6 +83,7 @@ export const FILTER_FIELD_KINDS: Record<StaticRuleField, FilterKind> = {
 export const FILTER_FIELD_ICONS: Record<StaticRuleField, Component> = {
   title: Type,
   author: User,
+  authorGender: VenusAndMars,
   series: Library,
   seriesIndex: ListOrdered,
   genre: Shapes,
@@ -97,6 +101,7 @@ export const FILTER_FIELD_ICONS: Record<StaticRuleField, Component> = {
   library: LibraryBig,
   collection: Layers,
   format: FileType,
+  storyGuide: Sparkles,
   fileSize: HardDrive,
   pageCount: FileText,
   addedAt: CalendarPlus,
@@ -112,13 +117,19 @@ export const FILTER_FIELD_ICONS: Record<StaticRuleField, Component> = {
 }
 
 export const FILTER_FIELD_GROUPS: { key: Exclude<FilterGroupKey, 'custom'>; fields: StaticRuleField[] }[] = [
-  { key: 'book', fields: ['title', 'author', 'series', 'seriesIndex', 'genre', 'tag', 'publisher', 'language', 'description', 'isbn'] },
+  {
+    key: 'book',
+    fields: ['title', 'author', 'authorGender', 'series', 'seriesIndex', 'genre', 'tag', 'publisher', 'language', 'description', 'isbn'],
+  },
   { key: 'reading', fields: ['readStatus', 'readProgress', 'rating', 'startedAt', 'finishedAt', 'seriesStatus'] },
   {
     key: 'library',
     fields: ['library', 'collection', 'format', 'fileSize', 'pageCount', 'addedAt', 'fileAvailability', 'cover', 'audioCover'],
   },
-  { key: 'metadata', fields: ['publishedDate', 'publishedYear', 'communityRating', 'communityRatingCount', 'metadataScore', 'lockStatus'] },
+  {
+    key: 'metadata',
+    fields: ['publishedDate', 'publishedYear', 'communityRating', 'communityRatingCount', 'metadataScore', 'storyGuide', 'lockStatus'],
+  },
 ]
 
 export const NO_VALUE_OPERATORS: readonly RuleOperator[] = [

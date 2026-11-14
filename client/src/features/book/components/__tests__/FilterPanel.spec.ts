@@ -120,6 +120,17 @@ describe('FilterPanel', () => {
     wrapper.unmount()
   })
 
+  it('offers controlled author genders and applies a selected value', async () => {
+    const wrapper = mountPanel()
+
+    await option(wrapper, 'Author Gender').trigger('click')
+    await flushPromises()
+    await option(wrapper, 'Non-binary').trigger('click')
+
+    expect(lastFilter(wrapper)).toEqual(group({ type: 'rule', field: 'authorGender', operator: 'includesAny', value: ['non_binary'] }))
+    wrapper.unmount()
+  })
+
   it('opens the builder for a group, which has no value panel of its own', async () => {
     const nested: GroupRule = { type: 'group', join: 'OR', rules: [dune, unread] }
     const wrapper = mountPanel({ modelValue: group(nested), view: { kind: 'rule', index: 0 } })

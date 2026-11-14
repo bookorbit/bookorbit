@@ -6704,6 +6704,12 @@
     }
   },
   "author": {
+    "gender": {
+      "female": "Female",
+      "male": "Male",
+      "non_binary": "Non-binary",
+      "unknown": "Unknown"
+    },
     "card": {
       "portraitAlt": "{name} portrait",
       "viewDetails": "View Author Details",
@@ -6738,6 +6744,7 @@
       "booksLabel": "Books",
       "lastAdded": "Last Added",
       "born": "Born",
+      "gender": "Gender",
       "died": "Died",
       "website": "Website",
       "genres": "Genres",
@@ -6809,6 +6816,7 @@
         "name": "Name",
         "sortName": "Sort Name",
         "description": "Description",
+        "gender": "Gender",
         "image": "Image",
         "uploading": "Uploading...",
         "replaceImage": "Replace image",
@@ -7159,11 +7167,13 @@
         "publishedYear": "Published Year",
         "pageCount": "Page Count",
         "author": "Author",
+        "authorGender": "Author Gender",
         "genre": "Genre",
         "tag": "Tag",
         "collection": "Collection",
         "library": "Library",
         "format": "Format",
+        "storyGuide": "Story Guide",
         "fileSize": "Primary File Size",
         "addedAt": "Added Date",
         "startedAt": "Date Started",

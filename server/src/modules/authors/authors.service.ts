@@ -379,6 +379,10 @@ export class AuthorsService {
         values.description = dto.description?.trim() || null;
       }
 
+      if ('gender' in dto) {
+        values.gender = dto.gender ?? null;
+      }
+
       if ('website' in dto) {
         values.website = dto.website?.trim() || null;
       }
@@ -784,6 +788,7 @@ export class AuthorsService {
     return {
       ...this.mapAuthorSummary(row),
       description: row.description,
+      gender: row.gender,
       birthDate: row.birthDate,
       birthYear: row.birthYear,
       deathDate: row.deathDate,

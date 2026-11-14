@@ -33,6 +33,10 @@ export const SERVER_FEATURES = [
    * provider match.
    */
   "author-metadata-match",
+  /** `PATCH /authors/:id` accepts `gender`, and book filters accept the `authorGender` field. */
+  "author-gender",
+  /** Book filters accept the `storyGuide` field for built Story Guide artifacts. */
+  "story-guide-filter",
   /**
    * `GET /metadata-fetch/stream` accepts `resultsPerProvider` (up to
    * `METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER`), and Open Library and Hardcover answer a search that

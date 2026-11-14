@@ -56,6 +56,7 @@ function author(overrides: Partial<AuthorDetail> = {}): AuthorDetail {
     name: 'John Reid',
     sortName: null,
     description: 'American journalist.',
+    gender: null,
     imageUrl: null,
     bookCount: 3,
     lastAddedAt: null,

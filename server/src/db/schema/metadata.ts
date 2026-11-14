@@ -31,7 +31,7 @@ const embedding256 = customType<{ data: number[]; driverData: string }>({
   },
 });
 
-import type { AudiobookChapter, AudiobookChapterSource, ChapterLookupQueueStatus, ChapterLookupReviewSummary } from '@bookorbit/types';
+import type { AudiobookChapter, AudiobookChapterSource, AuthorGender, ChapterLookupQueueStatus, ChapterLookupReviewSummary } from '@bookorbit/types';
 
 import { users } from './auth';
 import { books } from './books';
@@ -223,6 +223,7 @@ export const authors = pgTable(
     name: varchar('name', { length: 500 }).notNull(),
     sortName: varchar('sort_name', { length: 500 }),
     description: text('description'),
+    gender: varchar('gender', { length: 32 }).$type<AuthorGender>(),
     hasPhoto: boolean('has_photo').notNull().default(false),
     birthDate: date('birth_date', { mode: 'string' }),
     birthYear: integer('birth_year'),
@@ -241,6 +242,7 @@ export const authors = pgTable(
     unique('authors_name_unique').on(t.name),
     index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
     index('authors_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+    check('authors_gender_chk', sql`${t.gender} is null or ${t.gender} in ('female', 'male', 'non_binary')`),
   ],
 );
 

@@ -1,0 +1,1 @@
+CREATE INDEX "book_files_absolute_path_unaccent_trgm_idx" ON "book_files" USING gin (public.bookorbit_unaccent("absolute_path") gin_trgm_ops);

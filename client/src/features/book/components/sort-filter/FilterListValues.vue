@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Search } from '@lucide/vue'
 import { ListboxContent, ListboxFilter, ListboxItem, ListboxRoot, type AcceptableValue } from 'reka-ui'
-import { BOOK_FORMATS, READ_STATUSES, withReadAlongFormatPriority, type RuleField } from '@bookorbit/types'
+import { AUTHOR_GENDERS, BOOK_FORMATS, READ_STATUSES, withReadAlongFormatPriority, type RuleField } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { useCollections } from '@/features/collection/composables/useCollections'
@@ -57,6 +57,8 @@ const endpoint = computed(() => ENDPOINTS[props.field] ?? null)
 
 const fixedOptions = computed<ValueOption[] | null>(() => {
   switch (props.field) {
+    case 'authorGender':
+      return AUTHOR_GENDERS.map((gender) => ({ value: gender, label: filterValueLabel('authorGender', gender) }))
     case 'readStatus':
       return READ_STATUSES.map((status) => ({ value: status, label: filterValueLabel('readStatus', status) }))
     case 'format':

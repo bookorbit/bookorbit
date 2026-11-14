@@ -1,0 +1,2 @@
+ALTER TABLE "authors" ADD COLUMN "gender" varchar(32);--> statement-breakpoint
+ALTER TABLE "authors" ADD CONSTRAINT "authors_gender_chk" CHECK ("authors"."gender" is null or "authors"."gender" in ('female', 'male', 'non_binary'));

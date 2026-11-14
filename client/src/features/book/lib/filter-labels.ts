@@ -68,12 +68,16 @@ export function ruleToParts(rule: Rule): { field: string; operator: string; valu
     const valueTo = typeof rule.valueTo === 'number' ? formatBytes(rule.valueTo) : null
     return { field, operator, value: valueTo === null ? value : `${value} - ${valueTo}` }
   }
-  const val = Array.isArray(rule.value) ? (rule.value as string[]).join(', ') : String(rule.value ?? '')
+  const values = Array.isArray(rule.value) ? (rule.value as string[]) : null
+  const val = values
+    ? values.map((value) => (rule.field === 'authorGender' ? filterValueLabel(rule.field, value) : value)).join(', ')
+    : String(rule.value ?? '')
   return { field, operator, value: rule.valueTo !== undefined ? `${val} - ${rule.valueTo}` : val }
 }
 
 /** A list value as people read it: read statuses by their translated names, formats by their codes. */
 export function filterValueLabel(field: Rule['field'], value: string): string {
+  if (field === 'authorGender') return t(`author.gender.${value}`)
   if (field === 'readStatus') {
     const key = `book.readStatus.${value.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}`
     const label = t(key)

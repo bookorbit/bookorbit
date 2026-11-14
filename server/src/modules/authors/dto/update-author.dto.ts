@@ -1,4 +1,5 @@
-import { ArrayMaxSize, IsArray, IsInt, IsOptional, IsString, IsUrl, Matches, Max, MaxLength, Min } from 'class-validator';
+import { AUTHOR_GENDERS, type AuthorGender } from '@bookorbit/types';
+import { ArrayMaxSize, IsArray, IsIn, IsInt, IsOptional, IsString, IsUrl, Matches, Max, MaxLength, Min } from 'class-validator';
 
 const MAX_AUTHOR_LIST_ITEMS = 50;
 const MIN_LIFE_YEAR = -9999;
@@ -23,6 +24,10 @@ export class UpdateAuthorDto {
   @IsString()
   @MaxLength(10_000)
   description?: string | null;
+
+  @IsOptional()
+  @IsIn(AUTHOR_GENDERS)
+  gender?: AuthorGender | null;
 
   @IsOptional()
   @IsString()
