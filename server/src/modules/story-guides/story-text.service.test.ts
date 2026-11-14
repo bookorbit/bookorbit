@@ -32,7 +32,7 @@ class MemoryRepository {
 
   staleFileIds(version: number, after: number, limit: number) {
     const ids = [...this.rows.values()]
-      .filter((row) => row.extractionVersion < version && row.fileId > after)
+      .filter((row) => (row.extractionVersion < version || row.outcome === 'too-large') && row.fileId > after)
       .map((row) => row.fileId)
       .sort((a, b) => a - b);
     return Promise.resolve(ids.slice(0, limit));
@@ -142,6 +142,26 @@ describe('StoryTextService', () => {
     expect(row?.extractionVersion).toBe(STORY_TEXT_EXTRACTION_VERSION);
     expect(row?.previousKey).toBe('a'.repeat(64));
     expect(moves.move).toHaveBeenCalledWith('a'.repeat(64), row?.textKey);
+  });
+
+  it('checks a file refused as too large again at the next start', async () => {
+    const { repository, service } = setup();
+    const file = fileFor(6, FIXTURE);
+    repository.files.set(6, file);
+    await repository.save({
+      fileId: 6,
+      sizeBytes: file.sizeBytes,
+      mtime: file.mtime,
+      extractionVersion: STORY_TEXT_EXTRACTION_VERSION,
+      outcome: 'too-large',
+      sections: [],
+    });
+
+    expect(await service.queueStale()).toBe(1);
+    await service.idle();
+
+    expect(repository.rows.get(6)).toMatchObject({ outcome: 'ready', extractionVersion: STORY_TEXT_EXTRACTION_VERSION });
+    expect(await service.queueStale()).toBe(0);
   });
 
   it('records an unreadable file and one past the size limit', async () => {

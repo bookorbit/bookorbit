@@ -4,7 +4,8 @@ import { pathToFileURL } from 'url';
 
 import { JSDOM } from 'jsdom';
 
-import type { BookText, BookTextKind, BookTextSection } from './book-text.types';
+import { BOOK_TEXT_LIMITS, type BookTextLimits } from './book-text-limits';
+import { BookTextError, type BookText, type BookTextKind, type BookTextSection } from './book-text.types';
 import { rawSectionText, sectionHash } from './section-text';
 
 /**
@@ -16,6 +17,8 @@ export const FOLIATE_DIR = join(process.cwd(), 'vendor', 'foliate');
 
 interface FoliateSection {
   linear?: string;
+  /** What the section's document unpacks to, from the zip directory. */
+  size?: number;
   createDocument?: () => Promise<Document>;
 }
 
@@ -83,12 +86,13 @@ export function cssEscape(value: unknown): string {
   return out;
 }
 
-async function openBook(blob: Blob, foliateDir: string): Promise<{ kind: BookTextKind; book: FoliateBook }> {
+async function openBook(blob: Blob, foliateDir: string, limits: BookTextLimits): Promise<{ kind: BookTextKind; book: FoliateBook }> {
   const head = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
   if (head[0] === 0x50 && head[1] === 0x4b) {
     const zip = await importFoliate<ZipModule>(foliateDir, 'vendor/zip.js');
     zip.configure({ useWebWorkers: false });
     const entries = await new zip.ZipReader(new zip.BlobReader(blob)).getEntries();
+    if (entries.length > limits.maxEntries) throw new BookTextError('too-large', `the zip has ${entries.length} entries`);
     const map = new Map(entries.map((entry) => [entry.filename, entry]));
     const load =
       <A extends unknown[], R>(read: (entry: ZipEntry, ...args: A) => R) =>
@@ -103,14 +107,28 @@ async function openBook(blob: Blob, foliateDir: string): Promise<{ kind: BookTex
       getSize: (name: string) => map.get(name)?.uncompressedSize ?? 0,
     };
     const { EPUB } = await importFoliate<{ EPUB: new (loader: unknown) => { init(): Promise<FoliateBook> } }>(foliateDir, 'epub.js');
-    return { kind: 'epub', book: await new EPUB(loader).init() };
+    const book = await new EPUB(loader).init();
+    refuseSpinePastLimits(book, limits);
+    return { kind: 'epub', book };
   }
   const mobi = await importFoliate<MobiModule>(foliateDir, 'mobi.js');
   if (await mobi.isMOBI(blob)) {
+    if (blob.size > limits.maxFileBytes) throw new BookTextError('too-large', `file is ${blob.size} bytes`);
     const fflate = await importFoliate<{ unzlibSync: unknown }>(foliateDir, 'vendor/fflate.js');
     return { kind: 'mobi', book: await new mobi.MOBI({ unzlib: fflate.unzlibSync }).open(blob) };
   }
   throw new Error('not an EPUB or MOBI file');
+}
+
+/** Checks the spine's declared sizes before any section is parsed. */
+function refuseSpinePastLimits(book: FoliateBook, limits: BookTextLimits): void {
+  let total = 0;
+  for (const section of book.sections) {
+    const size = section.size ?? 0;
+    if (size > limits.maxDocumentBytes) throw new BookTextError('too-large', `a section unpacks to ${size} bytes`);
+    total += size;
+  }
+  if (total > limits.maxTextBytes) throw new BookTextError('too-large', `the sections unpack to ${total} bytes`);
 }
 
 interface ZipEntry {
@@ -158,11 +176,18 @@ function languagesOf(book: FoliateBook): string[] {
   return list.filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0);
 }
 
-/** Opens a book with foliate-js and reads every section's text. Runs inside the text worker. */
-export async function extractBookText(filePath: string, foliateDir: string = FOLIATE_DIR): Promise<BookText> {
+/**
+ * Opens a book with foliate-js and reads every section's text. Runs inside the text worker. Throws
+ * `BookTextError` with `too-large` for a book past `limits`, before any section is parsed.
+ */
+export async function extractBookText(
+  filePath: string,
+  foliateDir: string = FOLIATE_DIR,
+  limits: BookTextLimits = BOOK_TEXT_LIMITS,
+): Promise<BookText> {
   installFoliateGlobals();
   const blob = await openAsBlob(filePath);
-  const { kind, book } = await openBook(blob, foliateDir);
+  const { kind, book } = await openBook(blob, foliateDir, limits);
   const titles = await sectionTitles(book);
   const sections: BookTextSection[] = [];
   for (const [index, section] of book.sections.entries()) {

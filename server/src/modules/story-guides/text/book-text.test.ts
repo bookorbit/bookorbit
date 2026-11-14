@@ -4,6 +4,7 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { gunzipSync } from 'zlib';
 
+import { BOOK_TEXT_LIMITS } from './book-text-limits';
 import { readBookText } from './book-text-reader';
 import { BookTextError } from './book-text.types';
 import { cssEscape, extractBookText, FOLIATE_DIR } from './foliate-book-text';
@@ -67,12 +68,32 @@ describe('book text', () => {
     expect(book.sections.map((section) => section.hash)).toEqual(expected('epub').sections.map((section) => section.hash ?? sectionHash('')));
   }, 60_000);
 
-  it('refuses a file past the size limit before opening it', async () => {
-    const createWorker = vi.fn();
-    await expect(readBookText(join(FIXTURES, 'a-study-in-scarlet.epub'), { maxFileBytes: 1000, createWorker })).rejects.toMatchObject({
-      reason: 'too-large',
+  describe('limits', () => {
+    const limits = (overrides: Partial<typeof BOOK_TEXT_LIMITS>) => ({ ...BOOK_TEXT_LIMITS, ...overrides });
+    const epub = join(FIXTURES, 'a-study-in-scarlet.epub');
+
+    it('measures a zip book by what its spine unpacks to, never by the file size', async () => {
+      const book = await extractBookText(epub, FOLIATE_DIR, limits({ maxFileBytes: 1000 }));
+      expect(book.sections).toHaveLength(19);
     });
-    expect(createWorker).not.toHaveBeenCalled();
+
+    it.each([
+      ['spine documents together', { maxTextBytes: 1000 }],
+      ['one spine document', { maxDocumentBytes: 1000 }],
+      ['zip entries', { maxEntries: 2 }],
+    ])('refuses a zip book past the limit on %s', async (_, overrides) => {
+      await expect(extractBookText(epub, FOLIATE_DIR, limits(overrides))).rejects.toMatchObject({ reason: 'too-large' });
+    });
+
+    it('refuses a MOBI past the file size limit', async () => {
+      await expect(extractBookText(join(FIXTURES, 'a-study-in-scarlet.mobi'), FOLIATE_DIR, limits({ maxFileBytes: 1000 }))).rejects.toMatchObject({
+        reason: 'too-large',
+      });
+    });
+
+    it('carries a refusal out of the worker', async () => {
+      await expect(readBookText(epub, { limits: { maxTextBytes: 1000 } })).rejects.toMatchObject({ reason: 'too-large' });
+    }, 60_000);
   });
 
   it('reports a file foliate cannot open as unreadable', async () => {

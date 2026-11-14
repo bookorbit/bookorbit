@@ -155,9 +155,10 @@ export class StoryTextService implements OnModuleInit, OnModuleDestroy {
       row.sections = sections;
     } catch (error) {
       row.outcome = error instanceof BookTextError ? error.reason : 'unreadable';
-      this.logger.warn(
-        `[story_text.key] [fail] fileId=${fileId} durationMs=${Date.now() - started} errorClass=${(error as Error)?.name ?? 'Error'} error="${sanitizeLogValue(String((error as Error)?.message ?? error)).slice(0, 200)}" - reading the book's text failed`,
-      );
+      if (row.outcome !== 'too-large')
+        this.logger.warn(
+          `[story_text.key] [fail] fileId=${fileId} durationMs=${Date.now() - started} errorClass=${(error as Error)?.name ?? 'Error'} error="${sanitizeLogValue(String((error as Error)?.message ?? error)).slice(0, 200)}" - reading the book's text failed`,
+        );
     }
     if (previous?.textKey && previous.extractionVersion < STORY_TEXT_EXTRACTION_VERSION && row.textKey && previous.textKey !== row.textKey) {
       row.previousKey = previous.textKey;
@@ -188,7 +189,7 @@ export class StoryTextService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  /** Queues every file read under an older extraction version. */
+  /** Queues every file read under an older extraction version, and every file refused as too large. */
   async queueStale(): Promise<number> {
     let after = 0;
     let total = 0;

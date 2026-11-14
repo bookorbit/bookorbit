@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, eq, gt, lt } from 'drizzle-orm';
+import { and, asc, count, eq, gt, lt, or } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
@@ -45,12 +45,21 @@ export class StoryTextRepository {
     return saved;
   }
 
-  /** Files read under an older extraction version, in file order, for the background recompute. */
+  /**
+   * Files read under an older extraction version, and files refused as too large, in file order, for
+   * the background recompute. The limits are constants a release may raise, so a refusal is checked
+   * again at every start.
+   */
   async staleFileIds(extractionVersion: number, afterFileId: number, limit: number): Promise<number[]> {
     const rows = await this.db
       .select({ fileId: bookFileTexts.fileId })
       .from(bookFileTexts)
-      .where(and(lt(bookFileTexts.extractionVersion, extractionVersion), gt(bookFileTexts.fileId, afterFileId)))
+      .where(
+        and(
+          or(lt(bookFileTexts.extractionVersion, extractionVersion), eq(bookFileTexts.outcome, 'too-large')),
+          gt(bookFileTexts.fileId, afterFileId),
+        ),
+      )
       .orderBy(asc(bookFileTexts.fileId))
       .limit(limit);
     return rows.map((row) => row.fileId);

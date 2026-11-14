@@ -3,11 +3,10 @@ import { stat } from 'fs/promises';
 import { join } from 'path';
 import { Worker } from 'worker_threads';
 
-import { BookTextError, type BookText } from './book-text.types';
+import { BOOK_TEXT_LIMITS, type BookTextLimits } from './book-text-limits';
+import { BookTextError, type BookText, type BookTextFailure } from './book-text.types';
 import { FOLIATE_DIR } from './foliate-book-text';
 
-/** Past this a file is not opened at all. */
-export const BOOK_TEXT_MAX_FILE_BYTES = 500 * 1024 * 1024;
 /** A book foliate cannot finish in this time counts as unreadable. */
 export const BOOK_TEXT_TIMEOUT_MS = 5 * 60 * 1000;
 const BOOK_TEXT_HEAP_MB = 1536;
@@ -15,9 +14,11 @@ const BOOK_TEXT_HEAP_MB = 1536;
 export interface BookTextWorkerData {
   absolutePath: string;
   foliateDir: string;
+  limits: BookTextLimits;
 }
 
-export type BookTextWorkerMessage = { type: 'result'; result: BookText } | { type: 'error'; errorClass: string; errorMessage: string };
+export type BookTextWorkerMessage =
+  { type: 'result'; result: BookText } | { type: 'error'; errorClass: string; errorMessage: string; reason?: BookTextFailure };
 
 interface BookTextWorkerProcess {
   once(event: 'message', listener: (message: unknown) => void): this;
@@ -31,7 +32,7 @@ export type BookTextWorkerFactory = (data: BookTextWorkerData) => BookTextWorker
 export interface ReadBookTextOptions {
   foliateDir?: string;
   timeoutMs?: number;
-  maxFileBytes?: number;
+  limits?: Partial<BookTextLimits>;
   createWorker?: BookTextWorkerFactory;
 }
 
@@ -46,18 +47,18 @@ export function createBookTextWorker(data: BookTextWorkerData): BookTextWorkerPr
 
 /**
  * Reads a book's sections in a worker thread, so a large or hostile file cannot stall or exhaust
- * the server's own event loop and heap. Throws `BookTextError` with `too-large` before opening a
- * file past the size limit and `unreadable` for anything foliate cannot open in time.
+ * the server's own event loop and heap. Throws `BookTextError` with `too-large` for a book past the
+ * text limits, which the worker checks before parsing any section, and `unreadable` for anything
+ * foliate cannot open in time.
  */
 export async function readBookText(absolutePath: string, options: ReadBookTextOptions = {}): Promise<BookText> {
-  const maxFileBytes = options.maxFileBytes ?? BOOK_TEXT_MAX_FILE_BYTES;
   const info = await stat(absolutePath).catch(() => null);
   if (!info?.isFile()) throw new BookTextError('unreadable', 'file is missing');
-  if (info.size > maxFileBytes) throw new BookTextError('too-large', `file is ${info.size} bytes`);
 
   const worker = (options.createWorker ?? createBookTextWorker)({
     absolutePath,
     foliateDir: options.foliateDir ?? FOLIATE_DIR,
+    limits: { ...BOOK_TEXT_LIMITS, ...options.limits },
   });
   return new Promise<BookText>((resolve, reject) => {
     let settled = false;
@@ -77,7 +78,7 @@ export async function readBookText(absolutePath: string, options: ReadBookTextOp
       settle(() => {
         const typed = message as BookTextWorkerMessage | null;
         if (typed?.type === 'result') resolve(typed.result);
-        else if (typed?.type === 'error') reject(new BookTextError('unreadable', typed.errorMessage));
+        else if (typed?.type === 'error') reject(new BookTextError(typed.reason ?? 'unreadable', typed.errorMessage));
         else reject(new BookTextError('unreadable', 'the text worker answered nothing usable'));
       });
     });
