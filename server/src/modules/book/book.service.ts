@@ -141,7 +141,9 @@ import type { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-a
 import { buildBookDetailSupplementalFields } from './utils/build-book-detail-supplemental-fields';
 import type { SetStatusDto } from '../user-book-status/dto/set-status.dto';
 import { READING_DATE_ERROR_CODES } from '../user-book-status/user-book-status.constants';
+import { readEpubAudioTimelineSeconds } from '../reader/epub/epub-audio-timeline';
 import { inspectEpubMediaOverlayFields, mediaOverlayCapabilityFromFields } from '../reader/epub/epub-media-overlay-capability';
+import { readAloudDurationsMatch } from '../reader/epub/epub-media-overlay-timeline';
 import { computeFileHash } from '../scanner/lib/hash';
 import { compareCfi } from '../position-converter/cfi.utils';
 import { PositionConverterService } from '../position-converter/position-converter.service';
@@ -174,8 +176,6 @@ const EXPLICIT_REFRESH_DIRECTIVE: CacheDirective = { policy: 'refresh', allowFal
 export type MetadataUpdateFailpoint = (typeof METADATA_UPDATE_FAILPOINTS)[number];
 export type ExportScope = 'primary' | 'all' | 'audio';
 
-const READ_ALOUD_MAX_DURATION_DIFF_RATIO = 0.05;
-const READ_ALOUD_MAX_DURATION_DIFF_SECONDS = 300;
 const NARRATION_PERCENT_TOLERANCE = 5;
 
 export type BulkEditFieldResult = { updated: number; skippedLocked: number };
@@ -3698,7 +3698,7 @@ export class BookService {
       collections: collectionRows,
     });
     const mediaOverlayByFileId = await this.resolveMediaOverlayCapabilities(fileRows);
-    const readAloudSync = this.buildReadAloudProgressSync(fileRows, mediaOverlayByFileId, book.books.primaryFileId, readAloudSyncMode);
+    const readAloudSync = await this.resolveReadAloudProgressSync(fileRows, mediaOverlayByFileId, book.books.primaryFileId, readAloudSyncMode);
 
     return {
       id: book.books.id,
@@ -3837,19 +3837,47 @@ export class BookService {
     return new Map(entries);
   }
 
-  private buildReadAloudProgressSync(
-    fileRows: Array<{ id: number; format: string | null; durationSeconds: number | null }>,
+  private selectReadAloudOverlay<T extends { id: number; format: string | null }>(
+    fileRows: T[],
+    mediaOverlayByFileId: Map<number, EpubMediaOverlayCapability | null>,
+    primaryFileId: number | null,
+  ): T | null {
+    const overlayFiles = fileRows.filter((file) => file.format?.toLowerCase() === 'epub' && mediaOverlayByFileId.get(file.id)?.available === true);
+    return overlayFiles.find((file) => file.id === primaryFileId) ?? overlayFiles[0] ?? null;
+  }
+
+  private async resolveReadAloudProgressSync(
+    fileRows: Array<{ id: number; format: string | null; absolutePath: string; durationSeconds: number | null }>,
     mediaOverlayByFileId: Map<number, EpubMediaOverlayCapability | null>,
     primaryFileId: number | null,
     mode: ReadAloudProgressSyncMode,
+  ): Promise<ReadAloudProgressSync> {
+    const overlayFile = this.selectReadAloudOverlay(fileRows, mediaOverlayByFileId, primaryFileId);
+    const hasAudio = fileRows.some((file) => file.format && isAudioFormat(file.format));
+    const timelineSeconds = overlayFile && hasAudio && mode !== 'disabled' ? await this.measureReadAloudTimeline(overlayFile) : null;
+    return this.buildReadAloudProgressSync(fileRows, overlayFile, timelineSeconds, mode);
+  }
+
+  private async measureReadAloudTimeline(overlayFile: { id: number; absolutePath: string }): Promise<number | null> {
+    try {
+      return await readEpubAudioTimelineSeconds(overlayFile.absolutePath);
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      this.logger.warn(
+        `[book.read_aloud_timeline] [fail] fileId=${overlayFile.id} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - read-aloud EPUB audio timeline could not be measured`,
+      );
+      return null;
+    }
+  }
+
+  private buildReadAloudProgressSync(
+    fileRows: Array<{ id: number; format: string | null; durationSeconds: number | null }>,
+    overlayFile: { id: number } | null,
+    overlayDurationSeconds: number | null,
+    mode: ReadAloudProgressSyncMode,
   ): ReadAloudProgressSync {
-    const overlayFiles = fileRows
-      .map((file) => ({ file, mediaOverlay: mediaOverlayByFileId.get(file.id) ?? null }))
-      .filter(({ file, mediaOverlay }) => file.format?.toLowerCase() === 'epub' && mediaOverlay?.available === true);
-    const selectedOverlay = overlayFiles.find(({ file }) => file.id === primaryFileId) ?? overlayFiles[0] ?? null;
     const audioFiles = fileRows.filter((file) => file.format && isAudioFormat(file.format));
     const audioDurationSeconds = this.sumPositiveDurations(audioFiles);
-    const overlayDurationSeconds = selectedOverlay?.mediaOverlay?.durationSeconds ?? null;
     const durationDifferenceSeconds =
       audioDurationSeconds != null && overlayDurationSeconds != null ? Math.abs(audioDurationSeconds - overlayDurationSeconds) : null;
     const durationDifferenceRatio =
@@ -3859,18 +3887,18 @@ export class BookService {
 
     const base: Omit<ReadAloudProgressSync, 'state' | 'unavailableReason'> = {
       mode,
-      overlayFileId: selectedOverlay?.file.id ?? null,
+      overlayFileId: overlayFile?.id ?? null,
       audioDurationSeconds,
       overlayDurationSeconds,
       durationDifferenceSeconds,
       durationDifferenceRatio,
-      koreaderDownloadAvailable: selectedOverlay != null,
+      koreaderDownloadAvailable: overlayFile != null,
     };
 
     if (mode === 'disabled') {
       return { ...base, state: 'disabled', unavailableReason: null };
     }
-    if (!selectedOverlay) {
+    if (!overlayFile) {
       return { ...base, state: 'unavailable', unavailableReason: 'no_media_overlay_epub' };
     }
     if (audioFiles.length === 0) {
@@ -3880,8 +3908,7 @@ export class BookService {
       return { ...base, state: 'unavailable', unavailableReason: 'missing_duration' };
     }
 
-    const tolerance = Math.min(READ_ALOUD_MAX_DURATION_DIFF_SECONDS, overlayDurationSeconds * READ_ALOUD_MAX_DURATION_DIFF_RATIO);
-    if (durationDifferenceSeconds != null && durationDifferenceSeconds > tolerance) {
+    if (!readAloudDurationsMatch(audioDurationSeconds, overlayDurationSeconds)) {
       return { ...base, state: 'unavailable', unavailableReason: 'duration_mismatch' };
     }
 
