@@ -389,6 +389,19 @@
             "label": "Sperrstatus",
             "hint": "Metadaten-Sperrsymbol oben rechts - orange bei gesperrt, grün bei entsperrt"
           }
+        },
+        "formatBadgeStyle": {
+          "title": "Formatierung des Abzeichens anpassen",
+          "hint": "Wie das Abzeichen ein Buch mit mehreren Formaten darstellt. Ein Buch mit einem Format wird immer als einfache Pille dargestellt.",
+          "options": {
+            "primary": {
+              "label": "Primäre Formatierung",
+              "hint": "Eine Pille mit der Formatierung wie sich die Karte öffnet."
+            },
+            "bubble": {
+              "label": "Zählblase"
+            }
+          }
         }
       },
       "layout": {
@@ -561,7 +574,8 @@
         "profile": "Profil",
         "privacy": "Datenschutz & Freigabe",
         "notifications": "Benachrichtigungen",
-        "restrictions": "Einschränkungen"
+        "restrictions": "Einschränkungen",
+        "apiKeys": "API-Schlüssel"
       },
       "demoRestricted": {
         "cannotEdit": "Demo-eingeschränktes Konto kann Kontoeinstellungen nicht bearbeiten",
@@ -1487,7 +1501,8 @@
         "magic-links": "Magic Links",
         "oidc": "OIDC / SSO",
         "tts": "Text-to-Speech",
-        "server-fonts": "Server-Schriftarten"
+        "server-fonts": "Server-Schriftarten",
+        "api-keys": "API-Schlüssel"
       },
       "tts": {
         "title": "Anbieter",
@@ -2034,7 +2049,10 @@
         "loadFailed": "Die Liste der vorgefertigten Anbieter konnte nicht geladen werden. Sie können aber einen Anbieter mit seiner Adresse einfügen.",
         "copy": "Compose kopieren",
         "copyLabel": "Kopiere den Compose-Dienst für {name}",
-        "copied": "{name} kopiert. Fügen Sie es unter services: in Ihre Compose-Datei ein, dann führen Sie docker compose up -d aus."
+        "copied": "{name} kopiert. Fügen Sie es unter services: in Ihre Compose-Datei ein, dann führen Sie docker compose up -d aus.",
+        "add": "Hinzufügen",
+        "addLabel": "{name} hinzufügen",
+        "alreadyAdded": "Bereits hinzugefügt: {names}"
       },
       "fieldRules": {
         "clearAllProviders": "Alle Anbieter entfernen",

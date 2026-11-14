@@ -19,7 +19,7 @@
     "hide": "Nascondi",
     "undo": "Annulla",
     "pagination": {
-      "label": "Impaginazione",
+      "label": "Navigazione pagine",
       "pageOf": "Pagina {page} di {totalPages}",
       "previousPage": "Pagina precedente",
       "nextPage": "Pagina successiva",
@@ -30,7 +30,7 @@
     "privacySharing": {
       "title": "Privacy e condivisione",
       "subtitle": "Controlla se gli amministratori possono visualizzare un riepilogo identificabile della tua attività di lettura.",
-      "levelLegend": "Livello di condivisione degli insight di lettura",
+      "levelLegend": "Livello di condivisione delle statistiche di lettura",
       "current": "Impostazione attuale",
       "levels": {
         "private": {
@@ -39,28 +39,28 @@
         },
         "summary": {
           "title": "Condividi riepilogo",
-          "description": "Condividi abitudini aggregate senza titoli di libri, autori, serie o narratori."
+          "description": "Condividi comportamenti aggregati senza titoli di libri, autori, serie o narratori."
         },
         "detailed": {
-          "title": "Condividi approfondimenti dettagliati",
-          "description": "Condividi anche libri, autori, serie, generi e narratori recenti e più importanti."
+          "title": "Condividi dati dettagliati",
+          "description": "Condividi anche i libri, gli autori, le serie, i generi e i narratori recenti più letti."
         }
       },
       "fields": {
         "frequency": "Frequenza di lettura e giorni attivi",
-        "completion": "Libri aggregati iniziati e completati",
+        "completion": "Totale aggregato di libri iniziati e completati",
         "formats": "Distribuzione dei formati",
-        "genres": "Ampia distribuzione di genere",
+        "genres": "Ripartizione generica per genere",
         "trend": "Andamento della lettura aggregata",
         "books": "Titoli di libri attuali, recenti e più letti",
-        "authors": "I migliori autori",
-        "series": "Serie più popolari",
-        "narrators": "I migliori narratori"
+        "authors": "Autori preferiti",
+        "series": "Serie preferite",
+        "narrators": "Narratori preferiti"
       },
       "confirm": {
         "shareTitle": "Abilitare {level}?",
         "shareDescription": "Gli amministratori autorizzati potranno visualizzare le seguenti informazioni.",
-        "stopTitle": "Smettere di condividere approfondimenti di lettura?",
+        "stopTitle": "Interrompere la condivisione delle statistiche di lettura?",
         "stopDescription": "L'accesso come amministratore verrà bloccato immediatamente. I record di accesso esistenti rimangono nella tua cronologia.",
         "recordedNotice": "Ogni visualizzazione del profilo amministratore viene registrata e appare nella cronologia degli accessi."
       },
@@ -72,11 +72,11 @@
         "activeDays": "Giornate attive",
         "started": "Libri iniziati",
         "completed": "Libri completati",
-        "topBooks": "I migliori libri"
+        "topBooks": "Libri più letti"
       },
       "history": {
         "title": "Cronologia degli accessi al profilo",
-        "description": "Viste recenti dell'amministratore del tuo profilo di lettura condiviso.",
+        "description": "Accessi recenti degli amministratori al tuo profilo di lettura condiviso.",
         "empty": "Nessun amministratore ha visualizzato il tuo profilo di lettura condiviso.",
         "paginationLabel": "Pagine della cronologia di accesso al profilo"
       },
@@ -149,9 +149,9 @@
         },
         "topGlow": {
           "label": "Bagliore superiore",
-          "hint": "Quanto il bagliore accento raggiunge giù la pagina. Scorri fino a sinistra per spegnerlo.",
+          "hint": "Quanto si estende verso il basso il bagliore del colore d'accento nella pagina. Sposta completamente a sinistra per disattivarlo.",
           "value": "{value}%",
-          "off": "Off"
+          "off": "Disattivo"
         },
         "accents": {
           "grey": "Grigio",
@@ -225,12 +225,12 @@
         },
         "cornerRadius": {
           "label": "Raggio dell'angolo",
-          "hint": "Rotondità delle carte e degli elementi dell'interfaccia utente",
+          "hint": "Arrotondamento di schede ed elementi dell'interfaccia",
           "options": {
-            "sharp": "Nitido",
+            "sharp": "Netto",
             "default": "Predefinito",
             "rounded": "Arrotondato",
-            "pill": "Pill"
+            "pill": "Pillola"
           }
         },
         "surfaceBrightness": {
@@ -246,9 +246,9 @@
           }
         },
         "backgroundGroups": {
-          "fundamental": "Fondamentale",
-          "structural": "Strutturale",
-          "ambient": "Ambiente",
+          "fundamental": "Essenziale",
+          "structural": "Geometrico",
+          "ambient": "Ambientale",
           "refractive": "Rifrattivo"
         },
         "syncSaveFailed": "Impossibile salvare le preferenze del tema"
@@ -259,7 +259,7 @@
         "notAvailable": "Non disponibile",
         "device": {
           "title": "Solo questo dispositivo",
-          "description": "Le preferenze rimangono nel tuo browser. Ideale se desideri un aspetto diverso su dispositivi diversi."
+          "description": "Le preferenze restano nel tuo browser. Ideale se vuoi un aspetto diverso su ogni dispositivo."
         },
         "account": {
           "title": "Il mio account",
@@ -270,7 +270,7 @@
           "local": "Le preferenze rimarranno su questo dispositivo"
         },
         "errors": {
-          "demoRestricted": "L'account con limitazioni demo non può modificare la modalità di archiviazione dei temi",
+          "demoRestricted": "Gli account demo non possono modificare la modalità di salvataggio del tema",
           "update": "Impossibile aggiornare la modalità di archiviazione",
           "generic": "Si è verificato un errore durante l'aggiornamento della modalità di archiviazione"
         }
@@ -595,7 +595,8 @@
         "profile": "Profilo",
         "privacy": "Privacy e condivisione",
         "notifications": "Notifiche",
-        "restrictions": "Restrizioni"
+        "restrictions": "Restrizioni",
+        "apiKeys": "Chiavi API"
       },
       "demoRestricted": {
         "cannotEdit": "L'account con limitazioni demo non può modificare le impostazioni dell'account",
@@ -1521,7 +1522,8 @@
         "magic-links": "Collegamenti magici",
         "oidc": "OIDC /SSO",
         "tts": "Sintesi vocale",
-        "server-fonts": "Caratteri del lettore"
+        "server-fonts": "Caratteri del lettore",
+        "api-keys": "Chiavi API"
       },
       "tts": {
         "title": "Servizi",
@@ -3711,7 +3713,18 @@
         "retireDeviceFailed": "Impossibile rimuovere il dispositivo",
         "restoreDeviceFailed": "Impossibile ripristinare il dispositivo",
         "retiredDevices": "{count, plural, one {# dispositivo rimosso} other {# dispositivi rimossi}}",
-        "retiredOnLabel": "Ritirato"
+        "retiredOnLabel": "Ritirato",
+        "renameDevice": {
+          "action": "Rinomina",
+          "actionLabel": "Rinomina {device}",
+          "title": "Rinomina dispositivo",
+          "description": "BookOrbit mostra questo nome al posto del modello segnalato dal dispositivo, sia qui che nel plugin di BookOrbit sugli altri tuoi dispositivi. Lascia il campo vuoto per mostrare nuovamente il modello.",
+          "nameLabel": "Nome",
+          "modelHint": "Modello segnalato: {model}",
+          "saved": "Dispositivo rinominato",
+          "cleared": "Nome dispositivo rimosso",
+          "failed": "Impossibile rinominare il dispositivo"
+        }
       },
       "opds": {
         "title": "OPDS",
@@ -3796,12 +3809,14 @@
         "clientsEmpty": {
           "title": "Ancora nessun client di download",
           "body": "Un download HTTP diretto non ha bisogno di alcun client. Collegane uno in modo che BookOrbit possa recuperare rilasci consegnati anche da torrent o Usenet.",
-          "note": "sono supportati qBittorrent, Trasmissione, Deluge e NZBGet."
+          "note": "sono supportati qBittorrent, Trasmissione, Deluge e NZBGet.",
+          "noteWithTorbox": "Sono supportati qBittorrent, Transmission, Deluge, rTorrent, NZBGet, SABnzbd e TorBox."
         },
         "summary": "{type} - categoria {category}, priorità {priority}",
         "disabled": "Disabilitato",
         "test": "Test di connessione",
         "testSaveFirst": "Salva le tue modifiche prima di testare",
+        "validateKey": "Valida la chiave",
         "testOk": "Connesso a {client} {version}",
         "testOkNoVersion": "Connesso a {client}",
         "lastTestOk": "Ultimo test {time}: connesso",
@@ -3814,7 +3829,8 @@
           "deluge": "Deluge",
           "rtorrent": "rTorrent",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "Colore",
@@ -3844,7 +3860,10 @@
           "allowPrivateAddressHint": "Necessario quando il client viene eseguito sulla rete locale o sulla stessa macchina.",
           "passwordBrief": "Memorizzazione cifrata.",
           "apiKeyBrief": "Trovato in SABnzbd in Config > Generale. Archiviato crittografato.",
-          "useHardlinksBrief": "Importa senza occupare due volte lo spazio su disco. Se i file system sono diversi, viene eseguita una copia."
+          "torboxApiKeyBrief": "Reperibile su https://torbox.app/settings?section=account. Archiviato in forma crittografata.",
+          "useHardlinksBrief": "Importa senza occupare due volte lo spazio su disco. Se i file system sono diversi, viene eseguita una copia.",
+          "removeCompletedDownloads": "Rimuovi download completati",
+          "removeCompletedDownloadsBrief": "Elimina il download e i suoi file dal client una volta che il libro viene importato."
         },
         "mappings": {
           "title": "Mappature dei percorsi",
@@ -3898,7 +3917,9 @@
           "nameRequired": "Dai un nome a questo client.",
           "urlRequired": "Inserisci l’indirizzo tramite il quale BookOrbit può raggiungere questo client.",
           "mappingRequired": "Aggiunge almeno una mappatura del percorso, in modo che BookOrbit sappia da quale directory può importare.",
-          "apiKeyRequired": "Inserisci la chiave API SABnzbd da Config > Generale."
+          "apiKeyRequired": "Inserisci la chiave API SABnzbd da Config > Generale.",
+          "torboxApiKeyRequired": "Inserisci la chiave API TorBox dalle impostazioni dell'account TorBox.",
+          "removeCompletedUnsupported": "Solo i client Usenet possono rimuovere i download completati. I client torrent li mantengono per il seeding."
         },
         "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY non è impostata, quindi una password client non può essere salvata. Genera una con: openssl rand -hex 32",
         "confirmDelete": {
@@ -4329,7 +4350,8 @@
           "deluge": "Il tuo Deluge. Accedi con la password dell'interfaccia web; per usare la categoria deve essere attivato il plugin Label.",
           "rtorrent": "Il tuo rTorrent tramite XML-RPC. La categoria diventa la sua etichetta; saranno le impostazioni di rTorrent a stabilire dove salvare i file.",
           "nzbget": "Il tuo NZBGet. BookOrbit invia NZB file tramite il suo JSON-RPC API.",
-          "sabnzbd": "Il tuo SABnzbd. BookOrbit invia i file NZB utilizzando la chiave API."
+          "sabnzbd": "Il tuo SABnzbd. BookOrbit invia i file NZB utilizzando la chiave API.",
+          "torbox": "Il tuo account cloud TorBox. BookOrbit vi invia i torrent e recupera i file completati per l'importazione."
         },
         "searchHealth": {
           "failingOnce": "Ultima ricerca non riuscita",
@@ -4390,7 +4412,9 @@
         "auditLog": "Chi ha cambiato cosa e quando.",
         "requests": "Fonti, download client e cosa come gestire un libro una volta scaricato.",
         "readerTts": "Predefiniti voce, velocità e narrazione ad alta voce.",
-        "adminTts": "Motori di pronuncia disponibili per ogni lettore su questo server."
+        "adminTts": "Motori di pronuncia disponibili per ogni lettore su questo server.",
+        "apiKeys": "Chiavi che consentono a script e altre applicazioni di utilizzare BookOrbit per tuo conto.",
+        "adminApiKeys": "Consente le chiavi API su questo server e ne limita la durata di validità."
       },
       "backToApp": "Ritorno alla biblioteca",
       "pageDescriptions": {
@@ -5257,6 +5281,7 @@
       "whereFrom": "Da dove provengono",
       "theShelf": "Lo scaffale",
       "devices": "Dispositivi",
+      "deviceWithSource": "{source} · {device}",
       "allBooks": "Tutti i {count} libri",
       "behindCount": "{count, plural, one {# dietro} many {# dietro} other {# dietro}}",
       "busiestWeek": "Settimana più impegnativa",
@@ -5318,6 +5343,149 @@
       "cyan": "Ciano",
       "purple": "Viola",
       "gray": "Grigio"
+    }
+  },
+  "apiKeys": {
+    "errors": {
+      "load": "Impossibile caricare le chiavi API.",
+      "create": "Impossibile creare la chiave API.",
+      "rename": "Impossibile rinominare la chiave API.",
+      "regenerate": "Impossibile rigenerare la chiave API.",
+      "revoke": "Impossibile revocare la chiave API.",
+      "revokeAll": "Impossibile revocare le chiavi API.",
+      "nameRequired": "Inserisci un nome per la chiave.",
+      "saveSettings": "Impossibile salvare le impostazioni della chiave API."
+    },
+    "expiry": {
+      "never": "Mai",
+      "days": "{count, plural, one {# giorno} other {# giorni}}"
+    },
+    "access": {
+      "read": "Sola lettura",
+      "readHint": "Può consultare, ma non può modificare nulla.",
+      "write": "Lettura e scrittura",
+      "writeHint": "Consente anche di apportare modifiche, nei limiti dei permessi indicati di seguito."
+    },
+    "state": {
+      "active": "Attiva",
+      "expiring": "In scadenza",
+      "expired": "Scaduta",
+      "revoked": "Revocata"
+    },
+    "create": {
+      "title": "Crea chiave API",
+      "description": "Una chiave consente a uno script o a un'altra applicazione di utilizzare BookOrbit per tuo conto, senza concedere più accessi di quelli selezionati qui.",
+      "issueTitle": "Emetti chiave API",
+      "issueDescription": "La chiave appartiene a questa persona e agisce per suo conto, senza concedere più accessi di quelli scelti qui.",
+      "name": "Nome",
+      "namePlaceholder": "Script di backup",
+      "nameHint": "Qualcosa che spiega dove viene usata la chiave.",
+      "expiry": "Scade dopo",
+      "expiryCapped": "Questo server consente alle chiavi una durata massima di {count, plural, one {# giorno} other {# giorni}}.",
+      "access": "Accesso",
+      "libraries": "Biblioteche",
+      "librariesAll": "Tutte le mie biblioteche, incluse quelle aggiunte successivamente",
+      "librariesAllTheirs": "Tutte le loro biblioteche, comprese quelle aggiunte in seguito",
+      "librariesSome": "Solo alcune biblioteche",
+      "librariesSelected": "{count, plural, =0 {Nessuna selezione} one {# di {total} selezionata} other {# di {total} selezionate}}",
+      "librariesRequired": "Seleziona almeno una biblioteca.",
+      "admin": "Accesso amministratore",
+      "adminHint": "La chiave dispone dei privilegi completi di un amministratore.",
+      "adminWithLibraries": "Non disponibile quando la chiave è limitata ad alcune biblioteche.",
+      "adminWarning": "Chiunque sia in possesso di questa chiave ha il controllo dell'intero server. Conservala in un luogo sicuro e impostane una breve durata.",
+      "permissions": "Permessi aggiuntivi",
+      "permissionsHint": "La consultazione delle biblioteche sopra indicate non richiede permessi. Concedi solo ciò di cui lo script ha bisogno; la chiave non ottiene mai più privilegi di quanti ne possieda il suo proprietario.",
+      "noPermissions": "Non ci sono permessi da concedere.",
+      "creating": "Creazione in corso...",
+      "submit": "Crea chiave",
+      "issueSubmit": "Emetti chiave"
+    },
+    "reveal": {
+      "title": "Copia la chiave per {name}",
+      "description": "Salvala nell'applicazione o nello script che la utilizzerà, come una password.",
+      "onceOnly": "Questa chiave viene mostrata solo ora. Se la perdi, devi rigenerarla.",
+      "tokenLabel": "Chiave API",
+      "copy": "Copia",
+      "copied": "Copiata",
+      "copyFailed": "Impossibile copiare la chiave. Selezionala e copiala manualmente.",
+      "copiedAnnouncement": "Chiave copiata negli appunti.",
+      "examplesTitle": "Utilizzo della chiave",
+      "examplesHint": "Inviala in uno dei due header. Non inserirla mai in un link.",
+      "done": "Fatto"
+    },
+    "list": {
+      "label": "Chiavi API",
+      "activeCount": "{count, plural, one {# chiave attiva} other {# chiavi attive}}, fino a un massimo di {max}",
+      "limitReached": "È stato raggiunto il limite di {max} chiavi attive. Revoca una chiave per poterne creare un'altra.",
+      "adminBadge": "Amministratore",
+      "permissions": "Permessi",
+      "permissionsAdmin": "Tutti i permessi",
+      "permissionsNone": "Nessuno oltre la lettura",
+      "permissionsCount": "{count, plural, one {# permesso} other {# permessi}}",
+      "libraries": "Biblioteche",
+      "librariesAll": "Tutte",
+      "librariesNone": "Ancora nessuna",
+      "libraryUnknown": "Biblioteca {id}",
+      "librariesCount": "{count, plural, one {# biblioteca} other {# biblioteche}}",
+      "created": "Creazione",
+      "createdBy": "{date}, emesso da {username}",
+      "lastUsed": "Ultimo utilizzo",
+      "neverUsed": "Mai",
+      "lastUsedFrom": "{time} da {ip}",
+      "expires": "Scadenza",
+      "noExpiry": "Mai",
+      "revokedOn": "Revocata {date}",
+      "renameLabel": "Nome della chiave",
+      "revokedHeading": "Revocata",
+      "revokedHint": "Le chiavi revocate rimangono elencate per 90 giorni, quindi vengono cancellate."
+    },
+    "actions": {
+      "create": "Crea chiave",
+      "issue": "Emetti chiave",
+      "rename": "Rinomina",
+      "renameAria": "Rinomina {name}",
+      "regenerate": "Rigenera",
+      "regenerateAria": "Rigenera {name}",
+      "revoke": "Revoca",
+      "revokeAria": "Revoca {name}",
+      "revokeAll": "Revoca tutto"
+    },
+    "confirm": {
+      "regenerateTitle": "Rigenerare {name}?",
+      "regenerateDescription": "Una nuova chiave con gli stessi permessi sostituirà questa. Qualsiasi cosa utilizzi ancora la vecchia chiave smetterà di funzionare immediatamente.",
+      "revokeTitle": "Revocare {name}?",
+      "revokeDescription": "Qualsiasi elemento che utilizzi questa chiave smetterà di funzionare immediatamente. Questa operazione non può essere annullata.",
+      "revokeAllTitle": "Revocare tutte le chiavi API?",
+      "revokeAllDescription": "Tutti gli script e le app che utilizzano questa chiave smetteranno di funzionare immediatamente. Questa operazione non può essere annullata.",
+      "revokeAllIssuedDescription": "Tutte le chiavi possedute da questa persona smetteranno di funzionare immediatamente, comprese quelle da lei create. Questa operazione non può essere annullata."
+    },
+    "announce": {
+      "renamed": "Chiave rinominata in {name}.",
+      "revoked": "{name} revocata.",
+      "revokedAll": "{count, plural, =0 {Nessuna chiave da revocare.} one {# chiave revocata.} other {# chiavi revocate.}}"
+    },
+    "disabledNotice": "Le chiavi API sono disabilitate su questo server. Le chiavi esistenti non funzioneranno finché un amministratore non le riabilita.",
+    "ownerNotPermitted": "Questo utente deve disporre del permesso 'Crea chiavi API' prima di poter emettere una chiave a suo nome. Senza questo permesso, le chiavi già esistenti smetteranno di funzionare.",
+    "empty": {
+      "title": "Nessuna chiave API al momento",
+      "hint": "Crea una chiave per consentire a uno script di backup, alla domotica o a un'altra applicazione di accedere alla tua libreria senza utilizzare la password.",
+      "issuedTitle": "Nessuna chiave API",
+      "issuedHint": "Le chiavi create da questo utente, o emesse per lui, verranno visualizzate qui."
+    },
+    "admin": {
+      "section": "Chiavi API",
+      "sectionSummary": "Chiavi per script e applicazioni",
+      "title": "Chiavi API",
+      "hint": "Le modifiche apportate qui hanno effetto immediato e non richiedono il salvataggio."
+    },
+    "server": {
+      "enabled": "Consenti chiavi API",
+      "enabledHint": "Quando è disattivata, non funziona nessuna chiave e non è possibile crearne di nuove. Le chiavi vengono conservate e riprenderanno a funzionare quando questa opzione verrà riattivata.",
+      "maxLifetime": "Durata massima della chiave",
+      "maxLifetimeHint": "Le nuove chiavi non possono avere una durata superiore a questa e l'opzione senza scadenza non è disponibile. Le chiavi esistenti mantengono la propria scadenza.",
+      "noLimit": "Nessun limite",
+      "saved": "Impostazioni chiave API salvate.",
+      "perUserHint": "Chi può creare le chiavi viene stabilito per ciascun utente tramite il permesso 'Crea chiavi API', nella sezione Utenti."
     }
   },
   "audit": {
@@ -5458,7 +5626,8 @@
       "Series": "Serie",
       "OidcIdentity": "OIDC identità",
       "MagicLinkToken": "Collegamento magico",
-      "ReadingInsightsProfile": "Profilo di approfondimento della lettura"
+      "ReadingInsightsProfile": "Profilo di approfondimento della lettura",
+      "ApiKey": "Chiave API"
     },
     "actionLabels": {
       "AuthRegister": "Registra l'account",
@@ -5589,7 +5758,12 @@
       "EmailRecipientGroupMemberRemove": "Rimuovi il destinatario dal gruppo",
       "MaintenanceMissingBooksClean": "Ripuliti i libri mancanti",
       "MaintenanceBrokenCoversClean": "Coperchi rotti puliti",
-      "MaintenanceOrphanedCoversClean": "Cartelle di copertina orfane pulite"
+      "MaintenanceOrphanedCoversClean": "Cartelle di copertina orfane pulite",
+      "ApiKeyCreate": "Chiave API creata",
+      "ApiKeyRename": "Chiave API rinomata",
+      "ApiKeyRegenerate": "Chiave API Rigenerata",
+      "ApiKeyRevoke": "Chiave API revocata",
+      "ApiKeyRevokeAll": "Revocate tutte le chiavi API"
     },
     "views": {
       "label": "Mostra",
@@ -5718,6 +5892,7 @@
       "skipped": "Saltato",
       "remaining": "Rimanente",
       "sharingLevel": "Livello di condivisione",
+      "viaApiKey": "Tramite chiave API",
       "sharing": {
         "private": "Non condiviso",
         "summary": "Summary",
@@ -6923,6 +7098,29 @@
         "pageCountLabel": "Numero Pagine",
         "isbn13Label": "ISBN-13",
         "isbn10Label": "ISBN-10",
+        "isbnCandidates": {
+          "trigger": "Trova nel libro",
+          "triggerLabel": "Trova gli ISBN stampati in questo libro",
+          "heading": "ISBN stampati in questo libro",
+          "description": "Leggi dalla prima e dall'ultima pagina. I libri spesso elencano ogni edizione e altri titoli, quindi scegli quella che corrisponde a questo file.",
+          "loading": "Lettura del libro…",
+          "current": "Attuale",
+          "isbn10": "ISBN-10 {isbn}",
+          "status": {
+            "failed": "Impossibile leggere il libro. Riprova.",
+            "unreadable": "Impossibile cercare ISBN nel testo di questo file.",
+            "empty": "Nessun ISBN stampato in questo libro.",
+            "currentFound": "Questo libro riporta l'ISBN attuale.",
+            "currentMissing": "Questo libro non riporta l'ISBN attuale."
+          },
+          "editions": {
+            "ebook": "eBook",
+            "hardcover": "Cartonato",
+            "paperback": "Tascabile",
+            "print": "Cartaceo",
+            "audio": "Audio"
+          }
+        },
         "durationLabel": "Durata (s)",
         "abridgedLabel": "Ridotto",
         "providerIds": "ID fornitore",
@@ -8057,7 +8255,7 @@
         "columns": {
           "chapter": "Capitolo",
           "inBook": "Nel libro",
-          "starts": "Inizia",
+          "starts": "Inizio",
           "length": "Lunghezza",
           "start": "Inizia",
           "title": "Titolo"
@@ -8297,6 +8495,7 @@
           "colReached": "Raggiunti",
           "colSource": "Fonte",
           "colFormat": "Formato",
+          "sourceWithDevice": "{source} · {device}",
           "gapDays": "{count, plural, one {# giorno senza leggere} other {# giorni senza leggere}}",
           "attemptBegan": "Ciclo {index} iniziato",
           "attemptOutsideAny": "Fuori da qualsiasi ciclo",
@@ -8914,6 +9113,14 @@
         "unknown": "Qualcosa impedisce l'unione. Ricarica la pagina e riprova."
       },
       "warnings": {
+        "CROSS_DEVICE_COPY": {
+          "message": "Alcuni file devono essere spostati su un altro disco; vengono quindi prima copiati e verificati, e infine rimossi da quello vecchio.",
+          "detailed": "{size} vengono spostato su un altro disco, quindi vengono prima copiati e verificati, e infine rimossi da quello vecchio."
+        },
+        "IDENTICAL_COPIES": {
+          "message": "Alcuni file sono copie identiche, byte per byte, dei file già presenti nel libro conservato.",
+          "detailed": "{count, plural, one {# file è una copia identica, byte per byte, del file già presente nel libro conservato.} other {# file sono copie identiche, byte per byte, dei file già presenti nel libro conservato.}}"
+        },
         "RENAMED_ON_COLLISION": {
           "message": "Alcuni file vengono rinominati perché il loro nome è già in uso nella cartella di destinazione.",
           "detailed": "{count, plural, one {# file rinominato perché già in uso nella cartella di destinazione.} other {# file rinominati perché già in uso nella cartella di destinazione.}}"
@@ -9001,10 +9208,25 @@
         "retiredFiles": "{count, plural, one {# copia identica rimossa} other {# copie identiche rimosse}}",
         "reasons": {
           "FILE_CHANGED": "Un file è stato modificato su disco durante l'esecuzione dell'unione.",
-          "PATH_CONFLICT": "Un altro file è apparso nella destinazione prevista per uno di questi file."
+          "PATH_CONFLICT": "Un altro file è apparso nella destinazione prevista per uno di questi file.",
+          "INTERRUPTED": "Il server è stato riavviato durante l'unione.",
+          "MERGE_FAILED": "L'unione si è interrotta a causa di un errore imprevisto."
+        },
+        "outcome": {
+          "pending": "Non unito",
+          "merged": "Unito",
+          "rolled_back": "Annullata, niente è cambiato",
+          "failed": "Fallita"
         }
       },
+      "toast": {
+        "success": "{count, plural, one {# libro unito in {title}} other {# libri uniti in {title}}}",
+        "partial": "{total, plural, one {{merged} di # libro unito. Apri l'unione per scoprire perché gli altri non lo sono stati.} other {{merged} di # libri uniti. Apri l'unione per scoprire perché il resto non lo è stato.}}",
+        "failed": "L'unione non è stata completata. Niente è stato cambiato.",
+        "showResult": "Mostra dettagli"
+      },
       "errors": {
+        "previewFailed": "Non è stato possibile preparare la revisione dell'unione.",
         "startFailed": "Impossibile avviare l'unione.",
         "jobFailed": "Impossibile leggere lo stato di avanzamento dell'unione."
       },
@@ -9109,7 +9331,24 @@
       "medium": {
         "ebook": "Libri",
         "audiobook": "Audiolibri",
-        "comic": "Fumetti"
+        "comic": "Fumetti",
+        "unknown": "Libro"
+      },
+      "badges": {
+        "summary": "Formati: {formats}",
+        "summaryLinked": "Formati: {formats}. Libri collegati: {linked}",
+        "linkedFormat": "{format} in {library}",
+        "more": "+{count}"
+      },
+      "toast": {
+        "linked": "{count, plural, one {# libro collegato} other {# libri collegati}}",
+        "unlinked": "Questo libro non è più collegato",
+        "madeMain": "Questo ora è il libro principale"
+      },
+      "errors": {
+        "linkFailed": "Impossibile collegare questo libro.",
+        "unlinkFailed": "Impossibile scollegare questo libro.",
+        "leadFailed": "Impossibile modificare il libro principale."
       }
     }
   },
@@ -9327,7 +9566,43 @@
       "details": "Dettagli",
       "alreadyExistsSaveAs": "Esiste già: salva come:",
       "renamePlaceholder": "es. {name} (2)",
-      "import": "Importa"
+      "import": "Importa",
+      "joiningCount": "{count, plural, one {# viene unito a un libro esistente} other {# vengono uniti a libri esistenti}}",
+      "join": {
+        "joins": "Viene unito a {title}",
+        "suggested": "Sembra un altro formato di {title}",
+        "reason": {
+          "isbn": "Stesso ISBN",
+          "workId": "Stessa opera su Hardcover o Open Library",
+          "titleAuthor": "Stesso titolo e autore"
+        },
+        "accept": "Aggiungi a questo libro",
+        "acceptLabel": "Aggiungi {file} a {title}",
+        "choose": "Aggiungi a un libro esistente",
+        "chooseAnother": "Scegli un altro libro",
+        "chooseLabel": "Scegli un libro esistente per {file}",
+        "fileAsNew": "File come nuovo libro",
+        "fileAsNewLabel": "File {file} come nuovo libro",
+        "picker": {
+          "hint": "Seleziona il libro di cui {file} è un altro formato. Il file verrà inserito nella cartella di quel libro e il libro manterrà i suoi dettagli.",
+          "searchLabel": "Cerca in questa biblioteca",
+          "searchPlaceholder": "Titolo o autore",
+          "prompt": "Digita per cercare in questa biblioteca.",
+          "empty": "Nessun libro corrisponde alla ricerca.",
+          "failed": "La ricerca non è andata a buon fine. Riprova.",
+          "pick": "Aggiungi a {title}"
+        },
+        "error": {
+          "generic": "Questo file non può essere aggiunto a {title}.",
+          "BOOK_DOCK_JOIN_BOOK_NOT_FOUND": "{title} non è stato trovato. Potrebbe essere stato rimosso o potresti non disporre dei permessi per visualizzarlo.",
+          "BOOK_DOCK_JOIN_BOOK_MISSING": "I file di {title} risultano mancanti dal disco, pertanto non esiste alcuna cartella a cui aggiungere questo file.",
+          "BOOK_DOCK_JOIN_FORBIDDEN": "Non disponi dei permessi per modificare {title}, pertanto non è possibile aggiungervi questo file.",
+          "BOOK_DOCK_JOIN_OTHER_LIBRARY": "{title} è in una biblioteca diversa da quella in cui viene archiviato il file.",
+          "BOOK_DOCK_JOIN_FILE_PER_BOOK": "Questa biblioteca conserva un solo libro per file, quindi questo file non può essere aggiunto a {title}.",
+          "BOOK_DOCK_JOIN_ROOT_LEVEL": "{title} si trova nella cartella principale della libreria e non ha una cartella propria, quindi questo file non può essere aggiunto ad essa.",
+          "BOOK_DOCK_JOIN_AUDIO_CONFLICT": "{title} ha già un audiolibro e un libro ne può contenere solo uno."
+        }
+      }
     },
     "layout": {
       "pause": "Sospendi",
@@ -10027,7 +10302,8 @@
       "confirm": {
         "title": "Rimuovere questo torrent?",
         "description": "Il torrent interrompe il seeding. I file scaricati rimangono sul disco.",
-        "descriptionWithFiles": "Il torrent interrompe il seeding e i file scaricati vengono eliminati. Il libro importato rimane nella tua biblioteca."
+        "descriptionWithFiles": "Il torrent interrompe il seeding e i file scaricati vengono eliminati. Il libro importato rimane nella tua biblioteca.",
+        "descriptionRemoteDelete": "Il torrent smette di essere in seed, quindi il client di download lo elimina definitivamente insieme ai relativi file. Il libro importato rimane nella tua biblioteca."
       }
     },
     "pipeline": {
@@ -10083,11 +10359,14 @@
     "confirm": {
       "cancelDownloadTitle": "Annullare questo download?",
       "cancelDownloadDescription": "Il trasferimento attivo si interrompe e la richiesta rimane aperta, così puoi scegliere un'altra versione. I dati gestiti dal client vengono conservati; i file temporanei di un download diretto parziale vengono eliminati.",
+      "cancelDownloadDescriptionRemoteDelete": "Il trasferimento attivo si interrompe e la richiesta rimane aperta per consentire la scelta di un'altra release. Il client di download elimina definitivamente il trasferimento e i relativi file.",
       "cancelTitle": "Interrompere questa richiesta?",
       "cancelDescription": "Passa ad annullato. Nessuno che aspetta riceverà il libro.",
       "cancelDescriptionWithDownload": "Il trasferimento attivo viene interrotto. I dati nel client di download vengono conservati; la gestione temporanea parziale del download diretto viene eliminata.",
+      "cancelDescriptionWithDownloadRemoteDelete": "Il trasferimento attivo viene interrotto e rimosso dal client di download, che lo elimina definitivamente insieme ai relativi file.",
       "deleteTitle": "Eliminare questa richiesta?",
       "deleteDescription": "La richiesta e l'indicazione di chi l'ha inviata vengono eliminate definitivamente per tutti. I torrent ancora in seeding vengono rimossi dal client di download, ma i relativi file vengono conservati. I file temporanei dei download diretti vengono eliminati automaticamente. Se invece ignori la richiesta, viene nascosta soltanto dal tuo elenco.",
+      "deleteDescriptionRemoteDelete": "La richiesta e la cronologia di chi l'ha effettuata vengono eliminate definitivamente per tutti. Qualsiasi torrent ancora in fase di seeding viene rimosso dal client di download, che provvederà a eliminare definitivamente sia il torrent che i relativi file. Ignorare la richiesta, invece, la nasconde solamente dalla tua lista personale.",
       "discardImportTitle": "Eliminare questa importazione?",
       "discardImportDescription": "I file scaricati vengono rimossi dal Book Dock e la richiesta viene contrassegnata come non riuscita. Il torrent continua il seeding; arrestalo separatamente se vuoi rimuoverlo.",
       "leaveTitle": "Lasciare questa richiesta?",
@@ -11423,7 +11702,24 @@
       "CHAPTERS_ANALYSIS_TOO_LARGE": "Audio troppo lungo da analizzare in un'unica soluzione.",
       "CHAPTERS_ANALYSIS_UNAVAILABLE": "La ricerca delle pause richiede ffmpeg sul server.",
       "CHAPTERS_WRITE_UNAVAILABLE": "Impossibile salvare i capitoli in questi file.",
-      "CHAPTERS_NOTHING_TO_WRITE": "Non ci sono capitoli salvati da scrivere."
+      "CHAPTERS_NOTHING_TO_WRITE": "Non ci sono capitoli salvati da scrivere.",
+      "BOOK_MERGED": "Questo libro è stato unito in un altro libro.",
+      "MERGE_PREVIEW_STALE": "I libri sono cambiati dopo questa revisione. La revisione è nuovamente aggiornata; controllala ed effettua di nuovo l'unione.",
+      "MERGE_BLOCKED": "Un problema impedisce questa unione. La revisione ne mostra il motivo.",
+      "MERGE_IN_PROGRESS": "Questi libri sono già stati uniti.",
+      "ACCESS_LOSS_NOT_ACKNOWLEDGED": "Conferma che gli altri lettori perderanno l'accesso a questo libro prima dell'unione.",
+      "LIBRARY_BUSY": "La biblioteca è impegnata con una scansione, uno spostamento, una rinomina o un'unione. Riprova al termine.",
+      "LINK_GROUP_NOT_EDITABLE": "Questi libri sono collegati con un libro che non puoi modificare.",
+      "LINK_GROUP_FULL": "{max, plural, one {Un collegamento contiene al massimo # libro. Scollegane prima qualcuno.} other {Un collegamento contiene al massimo # libri. Scollegane prima qualcuno.}}",
+      "RESOLUTION_IN_PROGRESS": "È già in corso la risoluzione dei duplicati. Attendi il completamento.",
+      "API_KEYS_DISABLED": "Le chiavi API sono disattivate su questo server.",
+      "API_KEY_READ_ONLY": "Questa chiave API ha permessi di sola lettura.",
+      "API_KEY_ROUTE_FORBIDDEN": "Non è possibile utilizzare le chiavi API per questa operazione.",
+      "API_KEY_LIMIT_REACHED": "È stato raggiunto il limite di {limit} chiavi API attive. Revocane prima una.",
+      "API_KEY_SCOPE_EXCEEDS_OWNER": "Una chiave non può avere permessi di cui il proprietario non dispone.",
+      "API_KEY_EXPIRY_EXCEEDS_CAP": "Le chiavi su questo server possono durare al massimo {cap} giorni.",
+      "API_KEY_ADMIN_WITH_LIBRARIES": "Una chiave con accesso amministrativo non può essere limitata solo ad alcune biblioteche.",
+      "API_KEY_OWNER_NOT_PERMITTED": "Questa persona non può avere chiavi API. Ha bisogno di un account attivo e il permesso 'Crea chiavi API'."
     }
   },
   "hardcover": {
@@ -11735,6 +12031,7 @@
         "checkAll": "Controlla di nuovo le cartelle",
         "checkAgain": "Controlla di nuovo {folder}",
         "checkHint": "Ogni cartella viene controllata non appena la aggiungi. Una cartella già letta da un'altra biblioteca viene contrassegnata perché entrambe le librerie importerebbero gli stessi file.",
+        "checkHintOneLibrary": "Ogni cartella viene controllata non appena la aggiungi. Una cartella può appartenere a una sola biblioteca, quindi non è possibile aggiungerne una che si sovrappone a una cartella di un'altra biblioteca.",
         "emptyHint": "Incolla il percorso del server qui sotto o cercane uno.",
         "pastePlaceholder": "Incolla un percorso del server, es. /libri/Fantascienza",
         "browse": "Sfoglia...",
@@ -11744,6 +12041,7 @@
           "notAccessible": "Non accessibile",
           "overlap": "Anche in {library}",
           "overlapTitle": "La biblioteca \"{library}\" legge già questa cartella.",
+          "sharedWith": "Si sovrappone a {library}",
           "sharedWithTitle": "Questa cartella si sovrappone a una cartella di {library}, e una cartella può appartenere a una sola biblioteca.",
           "files": "{count, plural, one {# file} other {# file}}"
         },
@@ -14083,11 +14381,11 @@
       "noEligibleLibraries": "Nessuna biblioteca ha la ridenominazione dei file abilitata. Abilitalo nelle Impostazioni della Biblioteca.",
       "refresh": "Aggiorna",
       "previewFailed": "Impossibile caricare l'anteprima",
-      "executionFailed": "La ridenominazione collettiva non è riuscita",
+      "executionFailed": "La rinomina massiva non è riuscita",
       "openBookDetails": "Apri i dettagli del libro",
-      "openBook": "Libro aperto",
-      "toRenameCount": "{count, plural, =0 {niente da rinominare} one {# per rinominare} many {# per rinominare} other {# per rinominare}}",
-      "applyCount": "{count, plural, one {Applica # rinomina} many {Applica # rinomina} other {Applica # rinomina}}",
+      "openBook": "Apri libro",
+      "toRenameCount": "{count, plural, =0 {nessuno da rinominare} one {# da rinominare} many {# da rinominare} other {# da rinominare}}",
+      "applyCount": "{count, plural, one {Applica # rinomina} many {Applica # rinomine} other {Applica # rinomine}}",
       "search": {
         "placeholder": "Trova un libro o un percorso",
         "label": "Trova un libro",
@@ -14097,13 +14395,13 @@
         "all": "Tutto",
         "changes": "Modifiche",
         "conflicts": "Conflitti",
-        "unchanged": "Invariato"
+        "unchanged": "Invariati"
       },
       "status": {
-        "willRename": "Rinominerà",
+        "willRename": "Da rinominare",
         "unchanged": "Invariato",
-        "collision": "Collisione",
-        "noPattern": "Nessun modello",
+        "collision": "Conflitto",
+        "noPattern": "Nessun criterio",
         "error": "Errore"
       },
       "group": {
@@ -14117,19 +14415,19 @@
         "heldBack": "Questi non possono essere rinominati"
       },
       "changeKind": {
-        "ungroup": "Raggruppamento di serie rimosso",
+        "ungroup": "Raggruppamento serie rimosso",
         "flatten": "Livello di cartella duplicato rimosso",
         "yearRemoved": "Anno di pubblicazione rimosso",
         "yearAdded": "Anno di pubblicazione aggiunto",
         "yearCorrected": "Anno di pubblicazione corretto",
         "authorSpelling": "Ortografia del nome dell'autore",
-        "capitalisation": "Maiuscole e spaziatura",
+        "capitalisation": "Uso delle maiuscole e spaziatura",
         "unsafeCharacters": "Caratteri non sicuri sostituiti",
         "filenameRebuilt": "Nome file ricostruito dai metadati",
         "folderRenamed": "Cartella rinominata",
         "rebuilt": "Cartella e nome file ricostruiti",
         "restructured": "Percorso ristrutturato",
-        "multiple": "Molteplici modifiche"
+        "multiple": "Modifiche multiple"
       },
       "select": {
         "ofSelected": "di {total} selezionato",
@@ -14219,7 +14517,7 @@
       "rescan": "Nuova scansione",
       "status": {
         "queued": "Scansione in coda",
-        "running": "Scansione di libri"
+        "running": "Scansione dei libri"
       },
       "filter": "Tipo di corrispondenza",
       "allReasons": "Tutti i tipi di corrispondenza",
@@ -14283,7 +14581,7 @@
         "label": "Pagine dei gruppi duplicate",
         "page": "Pagina {page} di {total}"
       },
-      "similarityOption": "{percent} e versioni successive",
+      "similarityOption": "{percent} o più",
       "scannedBooks": "{count} libri · controllati {when}",
       "scanProgress": "{processed} di libri {total}",
       "recommended": "Consigliato",
@@ -14306,10 +14604,10 @@
       "identicalAcross": "{count, plural, one {Identico in entrambe le copie:} many {Identico in tutte le # copie:} other {Identico in tutte le # copie:}}",
       "deleteGroup": "{count, plural, one {Elimina # copia, libera {size}} many {Elimina # copie, libera {size}} other {Elimina # copie, libera {size}}}",
       "confidence": {
-        "file_hash": "Identico",
+        "file_hash": "Identici",
         "isbn": "Stesso ISBN",
         "exact_metadata": "Corrispondenza esatta",
-        "fuzzy_metadata": "Simile",
+        "fuzzy_metadata": "Simili",
         "withSimilarity": "{label} {percent}",
         "same_work": "Stesso lavoro",
         "title_author": "Titolo e autore",
@@ -14332,9 +14630,9 @@
       },
       "keepRule": {
         "label": "Mantieni",
-        "metadata": "Migliori metadati",
+        "metadata": "Metadati migliori",
         "size": "File più grandi",
-        "formats": "La maggior parte dei formati",
+        "formats": "Più formati",
         "oldest": "Copia più vecchia",
         "newest": "Copia più recente",
         "hint": "Sceglie un portiere in ogni gruppo. Puoi sovrascrivere qualsiasi riga."
@@ -14370,7 +14668,7 @@
         "capped": "Ogni sessione elabora al massimo {max} gruppi. Riavvia la procedura successivamente per gli altri."
       },
       "keys": {
-        "move": "mossa",
+        "move": "muovi",
         "expand": "espandere",
         "keep": "continua",
         "select": "seleziona"
@@ -14414,7 +14712,66 @@
       "mergeUnavailable": {
         "TOO_MANY_BOOKS": "L'unione non è disponibile: il gruppo contiene più libri di quanti ne possa gestire una singola unione.",
         "DIFFERENT_LIBRARIES": "L'unione non è disponibile: i libri i libri appartengono a biblioteche diverse.",
-        "FILE_PER_BOOK_LIBRARY": "L'unione non è disponibile: la libreria conserva un solo libro per file."
+        "FILE_PER_BOOK_LIBRARY": "L'unione non è disponibile: la libreria conserva un solo libro per file.",
+        "TARGET_NOT_PRESENT": "L'unione non è disponibile: mancano i file del libro conservato.",
+        "BOTH_HAVE_AUDIO": "L'unione non è disponibile: più libri hanno un audiolibro associato.",
+        "linkOffered": "Collegare i libri li mantiene separati ma li mostra insieme."
+      },
+      "crossLibrary": {
+        "into": "In {library}",
+        "rowNote": "Questa unione sposta i file tra biblioteche. La destinazione prevista per il libro unito è {library}.",
+        "bulkHeading": "{count, plural, one {# unione sposta i file tra biblioteche} other {# unioni spostano i file tra biblioteche}}",
+        "bulkHint": "I file vengono spostati nella biblioteca indicata e le altre biblioteche smettono di mostrare quei libri."
+      },
+      "resolution": {
+        "success": "{count, plural, =0 {Nessun gruppo risolto} one {Un gruppo risolto} other {# gruppi risolti}}",
+        "partial": "{done} gruppi su {total} risolti. Apri la revisione per controllare gli elementi saltati o non riusciti.",
+        "failed": "La risoluzione dei gruppi duplicati si è interrotta prima del completamento.",
+        "progress": "{processed} di {total} gruppi completati",
+        "finished": "Completato: {processed} di {total} gruppi",
+        "progressLabel": "Avanzamento della risoluzione"
+      },
+      "outcomes": {
+        "pending": "In Attesa",
+        "done": "Completati",
+        "partial": "Parzialmente completati",
+        "skipped": "Saltati",
+        "failed": "Non riusciti",
+        "withReason": "{status}: {reason}"
+      },
+      "bookOutcomes": {
+        "merged": "Uniti",
+        "deleted": "Eliminati",
+        "linked": "Collegati",
+        "skipped": "Saltati",
+        "failed": "Falliti"
+      },
+      "outcomeReasons": {
+        "STALE": "modificati dalla scansione",
+        "KEEPER_MISSING": "il libro conservato non esiste più o i suoi file sono mancanti",
+        "NO_ACTION": "nessuna azione selezionata",
+        "NOT_SELECTED": "lasciato invariato",
+        "ALREADY_RESOLVED": "già risolto",
+        "DELETE_FAILED": "impossibile eliminare i file",
+        "LINK_FAILED": "impossibile collegare i libri",
+        "MERGE_FAILED": "l'unione non è andata a buon fine",
+        "MERGE_BLOCKED": "qualcosa ha interrotto questa unione",
+        "MERGE_IN_PROGRESS": "questi libri sono già stati uniti",
+        "FORBIDDEN": "non hai i permessi per modificare uno di questi libri",
+        "LINK_GROUP_FULL": "il collegamento è saturo",
+        "LINK_GROUP_NOT_EDITABLE": "collegato con un libro che non puoi modificare",
+        "LIBRARY_BUSY": "la biblioteca è occupata",
+        "BOTH_HAVE_AUDIO": "più di un libro ha un audiolibro",
+        "DIFFERENT_LIBRARIES": "i libri sono in biblioteche diverse",
+        "FILE_PER_BOOK_LIBRARY": "la libreria mantiene un libro per file",
+        "TARGET_NOT_PRESENT": "i file del libro conservato sono mancanti",
+        "INSUFFICIENT_SPACE": "spazio insufficiente sull'unità di destinazione",
+        "FORMAT_NOT_ALLOWED": "la biblioteca di destinazione non consente uno dei formati",
+        "PATH_EXCLUDED": "un file verrebbe salvato in un percorso ignorato dalla biblioteca di destinazione",
+        "LEFTOVER_CONTENT": "un file del libro rimarrebbe in un'altra biblioteca",
+        "READERS_LOSE_ACCESS": "altri lettori perderebbero l'accesso al libro",
+        "ACCESS_LOSS_NOT_ACKNOWLEDGED": "altri lettori perderebbero l'accesso al libro",
+        "other": "errore {code}"
       }
     },
     "entityManager": {
@@ -14574,7 +14931,7 @@
       "allSelected": "Tutte le {count} voci corrispondenti sono selezionate.",
       "sweep": {
         "title": "Controllo della copertina",
-        "description": "Controlla ogni libro che richiede una copertina rispetto ai file su disco e cerca le cartelle di copertina lasciate dai libri eliminati. Durante il controllo non viene rimosso nulla.",
+        "description": "Verifica ogni libro che dispone di una copertina confrontandolo con i file sul disco e cerca le cartelle di copertine rimaste dopo l'eliminazione dei libri. Durante il controllo non viene rimosso nulla.",
         "run": "Esegui il controllo",
         "running": "Controllo",
         "progress": "Controllato {processed} di {total} libri",
@@ -14583,7 +14940,7 @@
       },
       "categories": {
         "missing_books": "Libri mancanti",
-        "broken_covers": "Copertine rotte",
+        "broken_covers": "Copertine non valide",
         "orphaned_cover_dirs": "Cartelle di copertina orfane"
       },
       "found": {
@@ -14622,8 +14979,8 @@
         }
       },
       "confirm": {
-        "title": "Pulire le risorse mancanti?",
-        "action": "Pulito",
+        "title": "Eliminare le risorse mancanti?",
+        "action": "Pulisci",
         "missing_books": "{count, plural, one {Elimina il record del database per un libro i cui file sono scomparsi. Il libro, i relativi metadati, l'avanzamento della lettura e la copertina verranno rimossi. Questa operazione non può essere annullata.} many {Elimina i record del database per i libri # i cui file sono scomparsi. I libri, i relativi metadati, l'avanzamento della lettura e le copertine vengono rimossi. Questa operazione non può essere annullata.} other {Elimina i record del database per i libri # i cui file sono scomparsi. I libri, i relativi metadati, l'avanzamento della lettura e le copertine vengono rimossi. Questa operazione non può essere annullata.}}",
         "broken_covers": "{count, plural, one {Cancella il riferimento alla copertina di un libro in modo che venga visualizzato come senza copertina. I metadati non vengono altrimenti modificati.} many {Cancella i riferimenti alla copertina per i libri # in modo che vengano visualizzati come senza copertina. I metadati non vengono altrimenti modificati.} other {Cancella i riferimenti alla copertina per i libri # in modo che vengano visualizzati come senza copertina. I metadati non vengono altrimenti modificati.}}",
         "orphaned_cover_dirs": "{count, plural, one {Elimina una cartella di copertina dal disco. Il suo libro non è più nel database. Questa operazione non può essere annullata.} many {Elimina le cartelle di copertina # dal disco. I loro libri non sono più nel database. Questa operazione non può essere annullata.} other {Elimina le cartelle di copertina # dal disco. I loro libri non sono più nel database. Questa operazione non può essere annullata.}}"
@@ -14973,7 +15330,8 @@
       "magic-links": "Collegamenti magici",
       "oidc": "OIDC /SSO",
       "server-fonts": "Caratteri del lettore",
-      "tts": "Sintesi vocale"
+      "tts": "Sintesi vocale",
+      "api-keys": "Chiavi API"
     },
     "system": {
       "file-naming": "Denominazione dei file",
@@ -14986,7 +15344,8 @@
       "profile": "Account",
       "privacy": "Privacy e condivisione",
       "notifications": "Notifiche",
-      "restrictions": "Restrizioni sui contenuti"
+      "restrictions": "Restrizioni sui contenuti",
+      "apiKeys": "Chiavi API"
     },
     "smartScopes": "Filtri intelligenti",
     "collections": "Raccolte",
