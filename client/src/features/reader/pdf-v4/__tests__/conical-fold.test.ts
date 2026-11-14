@@ -19,10 +19,31 @@ describe('conical-fold math', () => {
     expect(geom.foldLine.length).toBe(2)
     expect(geom.peelPolygon.length).toBeGreaterThanOrEqual(3)
     expect(geom.reflectedPolygon.length).toBeGreaterThanOrEqual(3)
+    expect(geom.progress).toBeGreaterThan(0)
+    expect(geom.progress).toBeLessThanOrEqual(1)
   })
 
   it('returns null when touch is at corner', () => {
     const geom = calculateFoldGeometry(800, 1000, 'bottom-right', { x: 800, y: 1000 })
     expect(geom).toBeNull()
+  })
+
+  it('progress increases as touch moves further from corner', () => {
+    const geomSmall = calculateFoldGeometry(800, 1000, 'bottom-right', { x: 750, y: 950 })
+    const geomLarge = calculateFoldGeometry(800, 1000, 'bottom-right', { x: 300, y: 500 })
+    expect(geomSmall).not.toBeNull()
+    expect(geomLarge).not.toBeNull()
+    if (!geomSmall || !geomLarge) return
+    expect(geomLarge.progress).toBeGreaterThan(geomSmall.progress)
+  })
+
+  it('handles all four corners', () => {
+    for (const corner of ['bottom-right', 'top-right', 'bottom-left', 'top-left'] as const) {
+      const geom = calculateFoldGeometry(800, 1000, corner, { x: 400, y: 500 })
+      expect(geom).not.toBeNull()
+      if (!geom) return
+      expect(geom.corner).toBe(corner)
+      expect(geom.reflectedPolygon.length).toBe(geom.peelPolygon.length)
+    }
   })
 })

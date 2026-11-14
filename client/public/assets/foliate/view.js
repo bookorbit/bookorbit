@@ -381,7 +381,7 @@ export class View extends HTMLElement {
       await import('./fixed-layout.js')
       this.renderer = document.createElement('foliate-fxl')
     } else {
-      await import('./paginator.js?v=2.2.0')
+      await import('./paginator.js')
       this.renderer = document.createElement('foliate-paginator')
     }
     this.renderer.setAttribute('exportparts', 'head,foot,filter')
@@ -803,7 +803,9 @@ export class View extends HTMLElement {
   }
 }
 
-customElements.define('foliate-view', View)
+if (!customElements.get('foliate-view')) {
+  customElements.define('foliate-view', View)
+}
 
 // Export makeStreamingBook to window for use from Angular
 window.makeStreamingBook = makeStreamingBook

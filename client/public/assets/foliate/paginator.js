@@ -590,7 +590,7 @@ export class Paginator extends HTMLElement {
             height: 100%;
             pointer-events: none;
             overflow: visible;
-            perspective: 1800px;
+            perspective: 2200px;
             transform-style: preserve-3d;
             z-index: 10;
             opacity: 0;
@@ -603,18 +603,18 @@ export class Paginator extends HTMLElement {
             position: absolute;
             top: 0;
             bottom: 0;
-            width: 60px;
+            width: 50px;
             pointer-events: none;
             mix-blend-mode: multiply;
             opacity: 0;
-            transition: opacity 150ms ease;
+            transition: opacity 180ms ease;
         }
         #curl-leaf {
             position: absolute;
             top: 0;
             bottom: 0;
             transform-style: preserve-3d;
-            will-change: transform, box-shadow;
+            will-change: transform, box-shadow, opacity;
             pointer-events: none;
         }
         #curl-leaf-front, #curl-leaf-back {
@@ -631,8 +631,8 @@ export class Paginator extends HTMLElement {
         }
         #curl-leaf-back {
             transform: rotateY(180deg);
-            filter: brightness(0.96);
-            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.08);
+            filter: brightness(0.95) saturate(0.92);
+            box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.06), inset 0 0 8px rgba(0, 0, 0, 0.03);
         }
         #curl-crease-shadow {
             position: absolute;
@@ -1401,13 +1401,13 @@ export class Paginator extends HTMLElement {
 
     const isDark = this.#mediaQuery?.matches || this.getAttribute('theme')?.includes('dark')
     const isSepia = this.getAttribute('theme')?.includes('sepia') || (typeof document !== 'undefined' && document.documentElement.getAttribute('data-surface') === 'sepia')
-    const shadowColor = isDark ? 'rgba(0, 0, 0, 0.45)' : 'rgba(0, 0, 0, 0.22)'
-    const highlightColor = isDark ? 'rgba(255, 255, 255, 0.12)' : 'rgba(255, 255, 255, 0.35)'
+    const shadowColor = isDark ? 'rgba(0, 0, 0, 0.50)' : 'rgba(0, 0, 0, 0.24)'
+    const highlightColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.40)'
 
-    back.style.background = isDark ? '#242428' : isSepia ? '#ECE2CC' : '#F3EFE6'
-    back.style.boxShadow = 'inset 0 0 35px rgba(0, 0, 0, 0.09)'
+    back.style.background = isDark ? '#222226' : isSepia ? '#ede4d0' : '#f0ece4'
+    back.style.boxShadow = 'inset 0 0 40px rgba(0, 0, 0, 0.06), inset 0 0 8px rgba(0, 0, 0, 0.03)'
 
-    crease.style.background = `linear-gradient(to right, transparent 0%, ${shadowColor} 25%, ${highlightColor} 50%, ${shadowColor} 75%, transparent 100%)`
+    crease.style.background = `linear-gradient(to right, transparent 0%, ${shadowColor} 20%, ${highlightColor} 50%, ${shadowColor} 80%, transparent 100%)`
 
     leaf.style.width = `${leafWidth}px`
     leaf.style.height = `${height}px`
@@ -1437,37 +1437,41 @@ export class Paginator extends HTMLElement {
 
     element[scrollProp] = targetOffset
 
-    const duration = 480
+    const duration = 550
     const startAngle = 0
-    const targetAngle = effectiveDir > 0 ? -135 : 135
+    const targetAngle = effectiveDir > 0 ? -155 : 155
 
     return animate(0, 1, duration, cubicBezierCurl, (progress) => {
+      // Smooth sine-based lift arc
+      const lift = Math.sin(progress * Math.PI)
       const currentAngle = lerp(startAngle, targetAngle, progress)
-      const liftZ = Math.sin(progress * Math.PI) * 55
-      const skew = Math.sin(progress * Math.PI) * (effectiveDir > 0 ? 3.5 : -3.5)
-      const shadowSpread = Math.sin(progress * Math.PI) * 25
-      const shadowAlpha = Math.sin(progress * Math.PI) * (isDark ? 0.4 : 0.28)
+      const liftZ = lift * 65
+      // Progressive skew that builds and releases naturally
+      const skew = lift * (effectiveDir > 0 ? 4.5 : -4.5) * (1 - progress * 0.3)
+      const shadowSpread = lift * 30
+      const shadowAlpha = lift * (isDark ? 0.45 : 0.30)
 
-      const opacity = progress >= 0.88 ? Math.max(0, 1 - (progress - 0.88) / 0.12) : 1
+      // Fade out in the last 10% of the animation
+      const opacity = progress >= 0.90 ? Math.max(0, 1 - (progress - 0.90) / 0.10) : 1
       leaf.style.opacity = String(opacity)
 
-      // Dynamic diagonal fold clip-path
-      const peelReach = progress * 130
+      // Diagonal fold clip-path that peels from corner
+      const peelReach = progress * 140
       if (effectiveDir > 0) {
         const xCut = Math.max(0, 100 - peelReach)
-        const yCut = Math.max(0, 100 - peelReach)
+        const yCut = Math.max(0, 100 - peelReach * 0.85)
         front.style.clipPath = `polygon(0% 0%, 100% 0%, 100% ${yCut}%, ${xCut}% 100%, 0% 100%)`
       } else {
         const xCut = Math.min(100, peelReach)
-        const yCut = Math.max(0, 100 - peelReach)
+        const yCut = Math.max(0, 100 - peelReach * 0.85)
         front.style.clipPath = `polygon(0% 0%, 100% 0%, 100% 100%, ${xCut}% 100%, 0% ${yCut}%)`
       }
 
       leaf.style.transform = `rotateY(${currentAngle}deg) translateZ(${liftZ}px) skewY(${skew}deg)`
-      leaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 4px ${shadowSpread * 1.5}px rgba(0,0,0,${shadowAlpha})`
+      leaf.style.boxShadow = `${effectiveDir > 0 ? -shadowSpread : shadowSpread}px 6px ${shadowSpread * 1.8}px rgba(0,0,0,${shadowAlpha})`
 
-      crease.style.opacity = String(Math.sin(progress * Math.PI) * 0.9)
-      spine.style.opacity = String(Math.sin(progress * Math.PI) * 0.75)
+      crease.style.opacity = String(lift * 0.85)
+      spine.style.opacity = String(lift * 0.65)
     }).then(() => {
       front.style.clipPath = 'none'
       front.replaceChildren()
@@ -1701,4 +1705,6 @@ export class Paginator extends HTMLElement {
   }
 }
 
-customElements.define('foliate-paginator', Paginator)
+if (!customElements.get('foliate-paginator')) {
+  customElements.define('foliate-paginator', Paginator)
+}

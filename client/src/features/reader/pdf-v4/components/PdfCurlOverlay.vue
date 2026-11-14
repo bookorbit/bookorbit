@@ -27,7 +27,6 @@ let cachedSourceCanvas: HTMLCanvasElement | null = null
 let cachedRevealedCanvas: HTMLCanvasElement | null = null
 let pageRect: DOMRect | null = null
 
-// Tracking drag gesture
 let dragStartX = 0
 let dragStartY = 0
 let dragStartTime = 0
@@ -40,6 +39,13 @@ const pageGeometry = ref({
   width: 0,
   height: 0,
 })
+
+function getIsSepia(): boolean {
+  return (
+    typeof document !== 'undefined' &&
+    (document.documentElement.getAttribute('data-surface') === 'sepia' || document.documentElement.classList.contains('sepia'))
+  )
+}
 
 function updatePageGeometry(): DOMRect | null {
   const surface = props.surface
@@ -81,7 +87,6 @@ function capturePageCanvas(pageNumber: number): HTMLCanvasElement | null {
   const pageIndex = pageNumber - 1
   let pageEl = surface.querySelector<HTMLElement>(`[data-page-index="${pageIndex}"]`)
   if (!pageEl) {
-    // If not found by index, check if active single page is available
     const pageElements = Array.from(surface.querySelectorAll<HTMLElement>('[data-page-index]'))
     pageEl = pageElements[0] ?? null
   }
@@ -98,10 +103,8 @@ function capturePageCanvas(pageNumber: number): HTMLCanvasElement | null {
   const ctx = offscreen.getContext('2d')
   if (!ctx) return null
 
-  const isSepia =
-    typeof document !== 'undefined' &&
-    (document.documentElement.getAttribute('data-surface') === 'sepia' || document.documentElement.classList.contains('sepia'))
-  ctx.fillStyle = props.isDark ? '#1E1E22' : isSepia ? '#F4EAD5' : '#FCF9F2'
+  const isSepia = getIsSepia()
+  ctx.fillStyle = props.isDark ? '#1a1a1e' : isSepia ? '#f5ead5' : '#faf8f4'
   ctx.fillRect(0, 0, offscreen.width, offscreen.height)
 
   const canvases = Array.from(pageEl.querySelectorAll('canvas'))
@@ -143,13 +146,9 @@ function drawFold(corner: Corner, touchX: number, touchY: number) {
   ctx.save()
   ctx.scale(dpr, dpr)
 
-  const isSepia =
-    typeof document !== 'undefined' &&
-    (document.documentElement.getAttribute('data-surface') === 'sepia' || document.documentElement.classList.contains('sepia'))
-
   const geom = calculateFoldGeometry(width, height, corner, { x: touchX, y: touchY })
   if (geom) {
-    renderConicalFold(ctx, width, height, cachedSourceCanvas, geom, cachedRevealedCanvas, props.isDark, isSepia, 0.65)
+    renderConicalFold(ctx, width, height, cachedSourceCanvas, geom, cachedRevealedCanvas, props.isDark, getIsSepia())
   } else {
     ctx.clearRect(0, 0, width, height)
   }
@@ -163,23 +162,18 @@ function clearCanvas() {
   if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height)
 }
 
-function easeOutQuad(x: number): number {
-  return 1 - (1 - x) * (1 - x)
+// Ease functions for animations
+function easeOutBack(x: number): number {
+  const c1 = 1.70158
+  const c3 = c1 + 1
+  return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2)
 }
 
-function cubicBezierCurl(t: number): number {
-  let s = t
-  for (let i = 0; i < 5; i++) {
-    const currentX = 3 * (1 - s) * (1 - s) * s * 0.22 + 3 * (1 - s) * s * s * 0.36 + s * s * s
-    const currentSlope = 3 * (1 - s) * (1 - s) * 0.22 + 6 * (1 - s) * s * (0.36 - 0.22) + 3 * s * s * (1 - 0.36)
-    if (Math.abs(currentSlope) < 1e-6) break
-    s -= (currentX - t) / currentSlope
-    s = Math.max(0, Math.min(1, s))
-  }
-  return 1 - (1 - s) * (1 - s) * (1 - s)
+function easeInOutCubic(x: number): number {
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2
 }
 
-// Spring back to flat (< 35% drag)
+// Spring back to flat (< 35% drag) with a slight overshoot
 function springBack(startCorner: Corner, fromX: number, fromY: number) {
   if (animationRaf !== null) {
     cancelAnimationFrame(animationRaf)
@@ -192,13 +186,13 @@ function springBack(startCorner: Corner, fromX: number, fromY: number) {
   const targetX = startCorner.includes('right') ? width : 0
   const targetY = startCorner.includes('bottom') ? height : 0
 
-  const duration = 220
+  const duration = 300
   const startTime = performance.now()
 
   function frame(now: number) {
     const elapsed = now - startTime
     const progress = Math.min(1, elapsed / duration)
-    const eased = easeOutQuad(progress)
+    const eased = easeOutBack(progress)
 
     const curX = fromX + (targetX - fromX) * eased
     const curY = fromY + (targetY - fromY) * eased
@@ -231,16 +225,16 @@ function completeTurn(direction: 1 | -1, startCorner: Corner, fromX: number, fro
 
   const width = pageGeometry.value.width
   const height = pageGeometry.value.height
-  const targetX = direction > 0 ? -width * 0.45 : width * 1.45
-  const targetY = startCorner.includes('bottom') ? height * 0.8 : height * 0.2
+  const targetX = direction > 0 ? -width * 0.4 : width * 1.4
+  const targetY = startCorner.includes('bottom') ? height * 0.75 : height * 0.25
 
-  const duration = 260
+  const duration = 340
   const startTime = performance.now()
 
   function frame(now: number) {
     const elapsed = now - startTime
     const progress = Math.min(1, elapsed / duration)
-    const eased = cubicBezierCurl(progress)
+    const eased = easeInOutCubic(progress)
 
     const curX = fromX + (targetX - fromX) * eased
     const curY = fromY + (targetY - fromY) * eased
@@ -293,24 +287,24 @@ function flip(direction: 1 | -1, onReadyToNavigate?: () => void, onComplete?: ()
   const height = pageGeometry.value.height
   const startX = direction > 0 ? width : 0
   const startY = height
-  const targetX = direction > 0 ? -width * 0.45 : width * 1.45
-  const targetY = height * 0.82
+  const targetX = direction > 0 ? -width * 0.4 : width * 1.4
+  const targetY = height * 0.78
 
-  const duration = 480
+  const duration = 520
   const startTime = performance.now()
   let navigated = false
 
   function frame(now: number) {
     const elapsed = now - startTime
     const progress = Math.min(1, elapsed / duration)
-    const eased = cubicBezierCurl(progress)
+    const eased = easeInOutCubic(progress)
 
     const curX = startX + (targetX - startX) * eased
     const curY = startY + (targetY - startY) * eased
 
     drawFold(activeCorner, curX, curY)
 
-    if (progress >= 0.45 && !navigated) {
+    if (progress >= 0.4 && !navigated) {
       navigated = true
       onReadyToNavigate?.()
     }
@@ -347,7 +341,7 @@ function startCornerPeek(corner: Corner) {
 
   const width = pageGeometry.value.width
   const height = pageGeometry.value.height
-  const peekDepth = 28
+  const peekDepth = 42
   const targetX = corner.includes('right') ? width - peekDepth : peekDepth
   const targetY = corner.includes('bottom') ? height - peekDepth : peekDepth
 
@@ -408,26 +402,26 @@ function handleZonePointerMove(direction: 1 | -1, event: PointerEvent) {
   const height = pageGeometry.value.height
 
   if (!isDragging.value) {
-    // Hover peeking check
+    // Hover peek near corners
     const isRight = direction > 0
     if (isRight) {
-      const nearBottomRight = localX > width - 130 && localY > height - 130
-      const nearTopRight = localX > width - 130 && localY < 130
-      if (nearBottomRight && hoveredCorner.value !== 'bottom-right') {
+      const nearBR = localX > width - 120 && localY > height - 120
+      const nearTR = localX > width - 120 && localY < 120
+      if (nearBR && hoveredCorner.value !== 'bottom-right') {
         startCornerPeek('bottom-right')
-      } else if (nearTopRight && hoveredCorner.value !== 'top-right') {
+      } else if (nearTR && hoveredCorner.value !== 'top-right') {
         startCornerPeek('top-right')
-      } else if (!nearBottomRight && !nearTopRight && hoveredCorner.value) {
+      } else if (!nearBR && !nearTR && hoveredCorner.value) {
         stopCornerPeek()
       }
     } else {
-      const nearBottomLeft = localX < 130 && localY > height - 130
-      const nearTopLeft = localX < 130 && localY < 130
-      if (nearBottomLeft && hoveredCorner.value !== 'bottom-left') {
+      const nearBL = localX < 120 && localY > height - 120
+      const nearTL = localX < 120 && localY < 120
+      if (nearBL && hoveredCorner.value !== 'bottom-left') {
         startCornerPeek('bottom-left')
-      } else if (nearTopLeft && hoveredCorner.value !== 'top-left') {
+      } else if (nearTL && hoveredCorner.value !== 'top-left') {
         startCornerPeek('top-left')
-      } else if (!nearBottomLeft && !nearTopLeft && hoveredCorner.value) {
+      } else if (!nearBL && !nearTL && hoveredCorner.value) {
         stopCornerPeek()
       }
     }
@@ -473,7 +467,6 @@ function handleZonePointerUp(direction: 1 | -1, event: PointerEvent) {
   if (progress >= 0.35 || isFlick) {
     completeTurn(direction, activeCorner, currentX, currentY)
   } else {
-    // Spring back (< 35%): user was just playing with the corner
     springBack(activeCorner, currentX, currentY)
   }
 }
@@ -508,7 +501,7 @@ onUnmounted(() => {
 
 <template>
   <div v-if="props.active" ref="overlayRef" class="pointer-events-none absolute inset-0 z-40 overflow-hidden" aria-hidden="true">
-    <!-- 2D Conical Fold Hardware-Accelerated Canvas -->
+    <!-- 2D Conical Fold Canvas -->
     <canvas
       ref="canvasRef"
       class="pointer-events-none absolute"
@@ -521,7 +514,7 @@ onUnmounted(() => {
       }"
     />
 
-    <!-- Interactive Right Curl Zone (Turn Next: Corner Peeking + Full Drag) -->
+    <!-- Right Curl Zone (Turn Next) -->
     <div
       v-if="props.currentPage < props.totalPages && pageGeometry.width > 0"
       class="pointer-events-auto absolute cursor-grab select-none touch-none active:cursor-grabbing"
@@ -538,7 +531,6 @@ onUnmounted(() => {
       @pointercancel="handleZonePointerUp(1, $event)"
       @pointerleave="handleZonePointerLeave"
     >
-      <!-- Corner peek visual hint -->
       <div
         class="absolute bottom-2 right-2 h-9 w-9 rounded-tl-xl transition-all duration-200"
         :class="[
@@ -557,7 +549,7 @@ onUnmounted(() => {
       />
     </div>
 
-    <!-- Interactive Left Curl Zone (Turn Previous: Corner Peeking + Full Drag) -->
+    <!-- Left Curl Zone (Turn Previous) -->
     <div
       v-if="props.currentPage > 1 && pageGeometry.width > 0"
       class="pointer-events-auto absolute cursor-grab select-none touch-none active:cursor-grabbing"
@@ -574,7 +566,6 @@ onUnmounted(() => {
       @pointercancel="handleZonePointerUp(-1, $event)"
       @pointerleave="handleZonePointerLeave"
     >
-      <!-- Corner peek visual hint -->
       <div
         class="absolute bottom-2 left-2 h-9 w-9 rounded-tr-xl transition-all duration-200"
         :class="[
