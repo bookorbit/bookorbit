@@ -14,7 +14,7 @@ local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local md5 = require("ffi/sha2").md5
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitHighlightDiagnostics = require("bookorbit_highlight_diagnostics")

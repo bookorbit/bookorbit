@@ -11,7 +11,7 @@ from data the catalog already holds, so opening it never waits on the network.
 
 local NetworkMgr = require("ui/network/manager")
 local datetime = require("datetime")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local BoardMetrics = require("bookorbit_board_metrics")

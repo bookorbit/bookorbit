@@ -1,5 +1,5 @@
 local Capabilities = require("bookorbit_capabilities")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local Delivery = {}
 
 local errors = {

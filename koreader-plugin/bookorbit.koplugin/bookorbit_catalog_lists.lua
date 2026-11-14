@@ -17,7 +17,7 @@ local UIManager = require("ui/uimanager")
 local datetime = require("datetime")
 local logger = require("logger")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardData = require("bookorbit_board_data")
 local BoardMetrics = require("bookorbit_board_metrics")

@@ -10,7 +10,7 @@ duplicating logic.
 local DocumentRegistry = require("document/documentregistry")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = {}
 
