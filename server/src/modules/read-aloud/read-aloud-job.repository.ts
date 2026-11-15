@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type {
   ReadAloudChapterReport,
@@ -18,6 +18,7 @@ import { READ_ALOUD_ACTIVE_JOB_STATUSES, READ_ALOUD_TERMINAL_JOB_STATUSES } from
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { bookFiles, bookMetadata, books, libraries, readAloudJobReports, readAloudJobs, users, type ReadAloudJobRow } from '../../db/schema';
+import { afterPosition, keysetOrder, microseconds, type JobKey, type JobPosition, type KeysetColumns } from '../jobs/job-keyset';
 import { READ_ALOUD_LEASE_MS } from './read-aloud.constants';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -38,6 +39,88 @@ export type ReadAloudSourceFile = {
   mediaOverlayAvailable: boolean;
   sortOrder: number | null;
 };
+
+/** Whose jobs a Jobs-area read covers: one account's, plus the ownerless ones when allowed; null for everyone's. */
+export type ReadAloudOwnerFilter = { id: number; ownerless: boolean } | null;
+
+export interface ReadAloudPageQuery {
+  view: 'queue' | 'needs-you' | 'failed' | 'history';
+  owner: ReadAloudOwnerFilter;
+  cutoffAt: Date;
+  after: JobPosition | null;
+  typeIndex: number;
+  limit: number;
+}
+
+const PAGE_COLUMNS = {
+  id: readAloudJobs.id,
+  bookId: readAloudJobs.bookId,
+  requestedByUserId: readAloudJobs.requestedByUserId,
+  status: readAloudJobs.status,
+  stage: readAloudJobs.stage,
+  progress: readAloudJobs.progress,
+  stageCurrent: readAloudJobs.stageCurrent,
+  stageTotal: readAloudJobs.stageTotal,
+  errorCode: readAloudJobs.errorCode,
+  cancelRequested: readAloudJobs.cancelRequested,
+  publishApproved: readAloudJobs.publishApproved,
+  pausedAt: readAloudJobs.pausedAt,
+  createdAt: readAloudJobs.createdAt,
+  startedAt: readAloudJobs.startedAt,
+  completedAt: readAloudJobs.completedAt,
+  updatedAt: readAloudJobs.updatedAt,
+  dismissedAt: readAloudJobs.dismissedAt,
+  expiresAt: readAloudJobs.expiresAt,
+  workExpiresAt: readAloudJobs.workExpiresAt,
+};
+
+export type ReadAloudPageRow = Pick<ReadAloudJobRow, keyof typeof PAGE_COLUMNS> & {
+  requesterName: string | null;
+  /** 1-based place in the fair order for a queued job that can run; 0 otherwise. */
+  rank: number;
+  key: JobKey;
+};
+
+export interface ReadAloudJobCounts {
+  queue: number;
+  needsYou: number;
+  failed: number;
+  running: number;
+  queued: number;
+  paused: number;
+}
+
+/** When a finished job ended, never null, so no row drops out of a keyset comparison. */
+const FINISH = sql`coalesce(${readAloudJobs.completedAt}, ${readAloudJobs.updatedAt})`;
+
+/**
+ * Queued jobs that can run, in the order they will (decision 14). Each band holds every requester's
+ * next job by lane rank; inside a band, requesters served longest ago go first, so someone with 400
+ * jobs gets one turn per band. A manager's priority comes before everything. Aliased throughout:
+ * drizzle renders column references unqualified, which inside a subquery would bind to the wrong row.
+ */
+const FAIR_ORDER = sql`
+  with lane as (
+    select j.id, j.requested_by_user_id, j.user_order, j.priority, j.next_attempt_at,
+      row_number() over (partition by j.requested_by_user_id order by j.user_order) as lane_rank
+    from read_aloud_jobs j
+    where j.status = 'queued' and j.paused_at is null and j.cancel_requested = false
+  ),
+  served as (
+    select l.requested_by_user_id,
+      case when l.requested_by_user_id is null
+        then (select max(r.started_at) from read_aloud_jobs r where r.requested_by_user_id is null)
+        else (select max(r.started_at) from read_aloud_jobs r where r.requested_by_user_id = l.requested_by_user_id)
+      end as last_served
+    from (select distinct requested_by_user_id from lane) l
+  )
+  select lane.id, lane.next_attempt_at,
+    row_number() over (
+      order by lane.priority desc, lane.lane_rank, served.last_served asc nulls first,
+        lane.requested_by_user_id asc nulls last, lane.user_order
+    ) as fair_rank
+  from lane
+  left join served on served.requested_by_user_id is not distinct from lane.requested_by_user_id`;
 
 export type ReadAloudReadAlongFile = {
   fileId: number;
@@ -61,6 +144,14 @@ export class ReadAloudJobRepository {
       .onConflictDoNothing()
       .returning();
     return row ?? null;
+  }
+
+  async findByIds(ids: readonly string[]): Promise<ReadAloudJobRow[]> {
+    if (ids.length === 0) return [];
+    return await this.db
+      .select()
+      .from(readAloudJobs)
+      .where(inArray(readAloudJobs.id, [...ids]));
   }
 
   async findById(id: string) {
@@ -120,27 +211,27 @@ export class ReadAloudJobRepository {
     return row ?? null;
   }
 
-  async countQueuedAhead(job: ReadAloudJobRow): Promise<number> {
-    const [row] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(readAloudJobs)
-      .where(
-        and(
-          ne(readAloudJobs.id, job.id),
-          or(
-            eq(readAloudJobs.status, 'processing'),
-            and(
-              eq(readAloudJobs.status, 'queued'),
-              eq(readAloudJobs.cancelRequested, false),
-              or(
-                lt(readAloudJobs.nextAttemptAt, job.nextAttemptAt),
-                and(eq(readAloudJobs.nextAttemptAt, job.nextAttemptAt), lt(readAloudJobs.createdAt, job.createdAt)),
-              ),
-            ),
-          ),
-        ),
-      );
-    return row?.count ?? 0;
+  /**
+   * Jobs ahead of each queued job, counting the running one: its place in the fair order less one,
+   * plus what is processing. One query for any number of jobs; a job not in line (paused, cancel
+   * requested, no longer queued) is left out.
+   */
+  async queuePositions(ids: readonly string[]): Promise<Map<string, number>> {
+    if (ids.length === 0) return new Map();
+    const fair = this.fair();
+    const [rows, [running]] = await Promise.all([
+      this.db
+        .with(fair)
+        .select({ id: fair.fairId, rank: sql<number>`${fair.fairRank}`.mapWith(Number) })
+        .from(fair)
+        .where(inArray(fair.fairId, [...ids])),
+      this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(readAloudJobs)
+        .where(eq(readAloudJobs.status, 'processing')),
+    ]);
+    const processing = running?.count ?? 0;
+    return new Map(rows.map((row) => [row.id, row.rank - 1 + processing]));
   }
 
   async findSourceFiles(bookId: number, fileIds: number[]): Promise<ReadAloudSourceFile[]> {
@@ -185,22 +276,28 @@ export class ReadAloudJobRepository {
       .orderBy(asc(bookFiles.sortOrder), asc(bookFiles.id));
   }
 
+  /** Claims the first due job in the fair order. A job in retry backoff keeps its place; it is skipped until due. */
   async claimNext(leaseMs = READ_ALOUD_LEASE_MS) {
     for (;;) {
+      const fair = this.fair();
       const [candidate] = await this.db
-        .select({ id: readAloudJobs.id })
-        .from(readAloudJobs)
-        .where(and(eq(readAloudJobs.status, 'queued'), lte(readAloudJobs.nextAttemptAt, new Date()), eq(readAloudJobs.cancelRequested, false)))
-        .orderBy(asc(readAloudJobs.nextAttemptAt), asc(readAloudJobs.createdAt))
+        .with(fair)
+        .select({ id: fair.fairId })
+        .from(fair)
+        .where(sql`${fair.fairDueAt} <= ${new Date()}`)
+        .orderBy(fair.fairRank)
         .limit(1);
       if (!candidate) return null;
-      const claimed = await this.claimQueued(candidate.id, leaseMs);
+      const claimed = await this.claimQueued(candidate.id, { leaseMs });
       if (claimed) return claimed;
     }
   }
 
-  /** Claims one queued job whatever its schedule, for a worker that is already running it. */
-  async claimQueued(id: string, leaseMs = READ_ALOUD_LEASE_MS) {
+  /**
+   * Claims one queued job whatever its schedule. `adopt` is for a worker that is already running
+   * it: a pause is ignored and cleared, because the work is under way.
+   */
+  async claimQueued(id: string, options: { leaseMs?: number; adopt?: boolean } = {}) {
     const now = new Date();
     const [claimed] = await this.db
       .update(readAloudJobs)
@@ -211,13 +308,84 @@ export class ReadAloudJobRepository {
         stageTotal: null,
         stageUnit: null,
         attemptCount: sql`${readAloudJobs.attemptCount} + 1`,
-        leaseUntil: new Date(now.getTime() + leaseMs),
+        leaseUntil: new Date(now.getTime() + (options.leaseMs ?? READ_ALOUD_LEASE_MS)),
         startedAt: now,
+        pausedAt: null,
         updatedAt: now,
+      })
+      .where(
+        and(
+          eq(readAloudJobs.id, id),
+          eq(readAloudJobs.status, 'queued'),
+          eq(readAloudJobs.cancelRequested, false),
+          options.adopt ? undefined : isNull(readAloudJobs.pausedAt),
+        ),
+      )
+      .returning();
+    return claimed ?? null;
+  }
+
+  /** Holds a queued job off the worker. Not one approved for publishing: its file may be in the library already. */
+  async pause(id: string) {
+    const now = new Date();
+    const [row] = await this.db
+      .update(readAloudJobs)
+      .set({ pausedAt: now, updatedAt: now })
+      .where(
+        and(
+          eq(readAloudJobs.id, id),
+          eq(readAloudJobs.status, 'queued'),
+          eq(readAloudJobs.cancelRequested, false),
+          eq(readAloudJobs.publishApproved, false),
+          isNull(readAloudJobs.pausedAt),
+        ),
+      )
+      .returning();
+    return row ?? null;
+  }
+
+  /** Returns a paused job to its place in line. `next_attempt_at` is untouched, so a backoff still applies. */
+  async resume(id: string) {
+    const [row] = await this.db
+      .update(readAloudJobs)
+      .set({ pausedAt: null, updatedAt: new Date() })
+      .where(and(eq(readAloudJobs.id, id), eq(readAloudJobs.status, 'queued'), isNotNull(readAloudJobs.pausedAt)))
+      .returning();
+    return row ?? null;
+  }
+
+  /** First in its requester's own lane. Other requesters' turns do not change. */
+  async moveToTop(id: string) {
+    const [row] = await this.db
+      .update(readAloudJobs)
+      .set({
+        userOrder: sql`(select min(q.user_order) - 1 from read_aloud_jobs q where q.status = 'queued' and q.requested_by_user_id is not distinct from read_aloud_jobs.requested_by_user_id)`,
+        updatedAt: new Date(),
       })
       .where(and(eq(readAloudJobs.id, id), eq(readAloudJobs.status, 'queued'), eq(readAloudJobs.cancelRequested, false)))
       .returning();
-    return claimed ?? null;
+    return row ?? null;
+  }
+
+  /** Ahead of every queued job, as the AI queue's prioritize does. `next_attempt_at` is left alone. */
+  async prioritize(id: string) {
+    const [row] = await this.db
+      .update(readAloudJobs)
+      .set({
+        priority: sql`(select coalesce(max(q.priority), 0) + 1 from read_aloud_jobs q where q.status = 'queued')`,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(readAloudJobs.id, id),
+          eq(readAloudJobs.status, 'queued'),
+          eq(readAloudJobs.cancelRequested, false),
+          eq(readAloudJobs.publishApproved, false),
+          isNull(readAloudJobs.pausedAt),
+        ),
+      )
+      .returning();
+    return row ?? null;
   }
 
   async heartbeat(id: string, leaseMs = READ_ALOUD_LEASE_MS): Promise<void> {
@@ -512,6 +680,8 @@ export class ReadAloudJobRepository {
           completedAt: null,
           dismissedAt: null,
           workExpiresAt: null,
+          pausedAt: null,
+          priority: 0,
           updatedAt: now,
         })
         .where(
@@ -546,6 +716,8 @@ export class ReadAloudJobRepository {
         nextAttemptAt: now,
         expiresAt: null,
         remindedAt: null,
+        pausedAt: null,
+        priority: 0,
         updatedAt: now,
       })
       .where(and(eq(readAloudJobs.id, id), eq(readAloudJobs.status, 'awaiting_review'), eq(readAloudJobs.cancelRequested, false)))
@@ -607,6 +779,129 @@ export class ReadAloudJobRepository {
       .returning();
   }
 
+  /** A page of jobs for the Jobs area, in the view's keyset order. */
+  async pageForJobs(query: ReadAloudPageQuery): Promise<ReadAloudPageRow[]> {
+    return query.view === 'queue' ? await this.queuePage(query) : await this.settledPage(query);
+  }
+
+  /** How many jobs each Jobs-area view holds, failed ones measured from `cutoffAt`. */
+  async countForJobs(owner: ReadAloudOwnerFilter, cutoffAt: Date): Promise<ReadAloudJobCounts> {
+    const [row] = await this.db
+      .select({
+        queue: sql<number>`count(*) filter (where ${inArray(readAloudJobs.status, ['queued', 'processing'])})`.mapWith(Number),
+        needsYou: sql<number>`count(*) filter (where ${readAloudJobs.status} = 'awaiting_review')`.mapWith(Number),
+        failed: sql<number>`count(*) filter (where ${this.failedShown(cutoffAt)})`.mapWith(Number),
+        running: sql<number>`count(*) filter (where ${readAloudJobs.status} = 'processing')`.mapWith(Number),
+        queued: sql<number>`count(*) filter (where ${readAloudJobs.status} = 'queued' and ${readAloudJobs.pausedAt} is null)`.mapWith(Number),
+        paused: sql<number>`count(*) filter (where ${readAloudJobs.status} = 'queued' and ${readAloudJobs.pausedAt} is not null)`.mapWith(Number),
+      })
+      .from(readAloudJobs)
+      .where(and(inArray(readAloudJobs.status, ['queued', 'processing', 'awaiting_review', 'failed']), this.owned(owner)));
+    return {
+      queue: row?.queue ?? 0,
+      needsYou: row?.needsYou ?? 0,
+      failed: row?.failed ?? 0,
+      running: row?.running ?? 0,
+      queued: row?.queued ?? 0,
+      paused: row?.paused ?? 0,
+    };
+  }
+
+  /** Running first, then the fair order, then paused jobs by when they were paused. */
+  private async queuePage(query: ReadAloudPageQuery): Promise<ReadAloudPageRow[]> {
+    const fair = this.fair();
+    const group = sql<number>`case when ${readAloudJobs.status} = 'processing' then 0 when ${readAloudJobs.pausedAt} is null then 1 else 2 end`;
+    const rank = sql<number>`case when ${readAloudJobs.status} = 'queued' and ${readAloudJobs.pausedAt} is null then coalesce(${fair.fairRank}, 2147483647) else 0 end`;
+    const at = microseconds(
+      sql`case when ${readAloudJobs.status} = 'processing' then coalesce(${readAloudJobs.startedAt}, timestamptz 'epoch') when ${readAloudJobs.pausedAt} is null then ${readAloudJobs.createdAt} else ${readAloudJobs.pausedAt} end`,
+    );
+    const columns: KeysetColumns = {
+      prefix: [
+        { kind: 'number', expr: group },
+        { kind: 'number', expr: rank },
+      ],
+      suffix: [{ kind: 'number', expr: at }],
+      id: { kind: 'uuid', expr: sql`${readAloudJobs.id}` },
+    };
+    const rows = await this.db
+      .with(fair)
+      .select({
+        ...PAGE_COLUMNS,
+        group: sql<number>`${group}`.mapWith(Number),
+        rank: sql<number>`${rank}`.mapWith(Number),
+        at,
+        requesterName: users.name,
+      })
+      .from(readAloudJobs)
+      .leftJoin(fair, eq(fair.fairId, readAloudJobs.id))
+      .leftJoin(users, eq(users.id, readAloudJobs.requestedByUserId))
+      .where(
+        and(
+          inArray(readAloudJobs.status, ['queued', 'processing']),
+          this.owned(query.owner),
+          query.after ? afterPosition(columns, 'queue', query.after, query.typeIndex) : undefined,
+        ),
+      )
+      .orderBy(...keysetOrder(columns, 'queue'))
+      .limit(query.limit);
+    return rows.map(({ group: band, rank: place, at: since, ...row }) => ({
+      ...row,
+      rank: place,
+      key: { prefix: [band, place], suffix: [since], id: row.id },
+    }));
+  }
+
+  /** Needs you by when review began; Failed and History by when the job finished; newest first. */
+  private async settledPage(query: ReadAloudPageQuery): Promise<ReadAloudPageRow[]> {
+    const at = query.view === 'needs-you' ? sql`${readAloudJobs.updatedAt}` : FINISH;
+    const columns: KeysetColumns = { prefix: [{ kind: 'time', expr: at }], suffix: [], id: { kind: 'uuid', expr: sql`${readAloudJobs.id}` } };
+    const rows = await this.db
+      .select({ ...PAGE_COLUMNS, finish: microseconds(at), requesterName: users.name })
+      .from(readAloudJobs)
+      .leftJoin(users, eq(users.id, readAloudJobs.requestedByUserId))
+      .where(
+        and(
+          this.settledView(query.view, query.cutoffAt),
+          this.owned(query.owner),
+          query.after ? afterPosition(columns, query.view, query.after, query.typeIndex) : undefined,
+        ),
+      )
+      .orderBy(...keysetOrder(columns, query.view))
+      .limit(query.limit);
+    return rows.map(({ finish, ...row }) => ({ ...row, rank: 0, key: { prefix: [finish], suffix: [], id: row.id } }));
+  }
+
+  private settledView(view: ReadAloudPageQuery['view'], cutoffAt: Date): SQL {
+    if (view === 'needs-you') return eq(readAloudJobs.status, 'awaiting_review');
+    if (view === 'failed') return this.failedShown(cutoffAt);
+    return and(
+      inArray(readAloudJobs.status, TERMINAL),
+      or(ne(readAloudJobs.status, 'failed'), isNotNull(readAloudJobs.dismissedAt), sql`${FINISH} <= ${cutoffAt}`),
+    )!;
+  }
+
+  /** Failed, not dismissed, and finished after the cutoff: what the Failed view still shows. */
+  private failedShown(cutoffAt: Date): SQL {
+    return and(eq(readAloudJobs.status, 'failed'), isNull(readAloudJobs.dismissedAt), sql`${FINISH} > ${cutoffAt}`)!;
+  }
+
+  private owned(owner: ReadAloudOwnerFilter): SQL | undefined {
+    if (owner === null) return undefined;
+    return or(eq(readAloudJobs.requestedByUserId, owner.id), owner.ownerless ? isNull(readAloudJobs.requestedByUserId) : undefined);
+  }
+
+  private fair() {
+    return this.db.$with('fair').as(
+      this.db
+        .select({
+          fairId: sql<string>`fair_order.id`.as('fair_id'),
+          fairRank: sql<number>`fair_order.fair_rank`.as('fair_rank'),
+          fairDueAt: sql<Date>`fair_order.next_attempt_at`.as('fair_due_at'),
+        })
+        .from(sql`(${FAIR_ORDER}) fair_order`),
+    );
+  }
+
   /** Jobs whose work folder must survive a sweep. */
   async findJobIdsKeepingWork(now: Date): Promise<Set<string>> {
     const rows = await this.db
@@ -621,11 +916,14 @@ export class ReadAloudJobRepository {
     return new Set(rows.map((row) => row.id));
   }
 
-  async clearExpiredWorkWindows(now: Date): Promise<void> {
-    await this.db
+  /** Returns how many failed jobs lost their retry window. */
+  async clearExpiredWorkWindows(now: Date): Promise<number> {
+    const cleared = await this.db
       .update(readAloudJobs)
       .set({ workExpiresAt: null })
-      .where(and(eq(readAloudJobs.status, 'failed'), isNotNull(readAloudJobs.workExpiresAt), lte(readAloudJobs.workExpiresAt, now)));
+      .where(and(eq(readAloudJobs.status, 'failed'), isNotNull(readAloudJobs.workExpiresAt), lte(readAloudJobs.workExpiresAt, now)))
+      .returning({ id: readAloudJobs.id });
+    return cleared.length;
   }
 }
 

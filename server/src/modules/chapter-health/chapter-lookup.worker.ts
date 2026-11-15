@@ -4,6 +4,7 @@ import type { ConfigType } from '@nestjs/config';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { appConfig } from '../../config/config';
 import { ChapterEditorService } from '../chapter-editor/chapter-editor.service';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { ChapterHealthRepository } from './chapter-health.repository';
 
 const TICK_MS = 3_000;
@@ -24,15 +25,18 @@ export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private stopped = false;
+  /** Whose book was claimed last, until the queue is found empty and that is announced. */
+  private unannouncedDrain: { ownerId: number | null } | null = null;
 
   constructor(
     private readonly repo: ChapterHealthRepository,
     private readonly editor: ChapterEditorService,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
+    private readonly jobChanges: JobChangesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.repo.requeueProcessing();
+    if ((await this.repo.requeueProcessing()) > 0) this.changed(null);
     // Tests drive tick() themselves, so a suite never reaches Audible from a timer it did not start.
     if (this.app.nodeEnv === 'test') return;
     this.timer = setInterval(() => void this.tick(), TICK_MS);
@@ -48,10 +52,19 @@ export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
     if (this.running || this.stopped) return;
     this.running = true;
     try {
-      await this.repo.requeueProcessing(true);
+      if ((await this.repo.requeueProcessing(true)) > 0) this.changed(null);
       for (let done = 0; done < BOOKS_PER_TICK && !this.stopped; done += 1) {
         const job = await this.repo.claimNext();
-        if (!job) break;
+        if (!job) {
+          // The queue ran dry, possibly in an earlier tick: the last batch no longer has a running row.
+          if (this.unannouncedDrain) this.changed(this.unannouncedDrain.ownerId);
+          this.unannouncedDrain = null;
+          break;
+        }
+        this.unannouncedDrain = { ownerId: job.userId };
+        // Each claim refreshes the requester's counts. Between two books the row is briefly not
+        // running; announcing that would make it flicker, so nothing is said until the next claim.
+        this.changed(job.userId);
         await this.process(job);
         await new Promise((resolve) => setTimeout(resolve, GAP_MS));
       }
@@ -73,6 +86,8 @@ export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
     try {
       const outcome = await this.editor.bulkLookup(job.bookId, job.userId);
       await this.repo.finish(job.bookId, outcome, job.claimToken);
+      // A review adds to Needs you at once; other outcomes only shrink the queue, which the next claim reports.
+      if (outcome.status === 'review') this.changed(job.userId);
       this.logger.log(
         `[${event}] [end] bookId=${job.bookId} durationMs=${Date.now() - startedAt} status=${outcome.status} reason=${outcome.reason ?? 'none'} - bulk chapter lookup finished`,
       );
@@ -83,10 +98,15 @@ export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
         await this.repo.retryLater(job.bookId, message, RETRY_DELAYS_MS[Math.min(job.attemptCount, RETRY_DELAYS_MS.length) - 1]!, job.claimToken);
       } else {
         await this.repo.finish(job.bookId, { status: 'failed', reason: null, result: null, lastError: message }, job.claimToken);
+        this.changed(job.userId);
       }
       this.logger.warn(
         `[${event}] [fail] bookId=${job.bookId} durationMs=${Date.now() - startedAt} attempt=${job.attemptCount} errorClass=${errorClass} error="${message}" - bulk chapter lookup failed`,
       );
     }
+  }
+
+  private changed(ownerId: number | null): void {
+    this.jobChanges.notify({ type: 'chapter-lookup', ownerId, state: true });
   }
 }

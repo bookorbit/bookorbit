@@ -1,4 +1,5 @@
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, getCurrentScope, onScopeDispose, ref } from 'vue'
+import { toast } from 'vue-sonner'
 import type {
   BookMoveCollisionPolicy,
   BookMoveJobCollisionPolicy,
@@ -8,7 +9,12 @@ import type {
   BookSelectionPayload,
 } from '@bookorbit/types'
 
+import { i18n } from '@/i18n'
+import { readEventStream } from '@/lib/event-stream'
+import { bulkRunIdOf, bulkRunRefusalText, cancelBulkRun, toastWithJobsLink } from '@/features/jobs/lib/bulk-runs'
 import * as bookMoveApi from '../api/book-move'
+
+const { t } = i18n.global
 
 export type MoveStep = 'destination' | 'review' | 'progress' | 'done'
 
@@ -27,6 +33,12 @@ export function useMoveToLibrary() {
   const progress = ref<MoveProgress | null>(null)
   const summary = ref<BookMoveSummary | null>(null)
   const executeError = ref<string | null>(null)
+  /** The bulk run the move became on the server; it goes on if this page stops following it. */
+  const runId = ref<string | null>(null)
+  /** No book has landed yet: the move waits behind the account's earlier bulk actions, or works on its first book. */
+  const waiting = ref(false)
+  /** A cancel was asked for and the move has not stopped yet. */
+  const cancelling = ref(false)
 
   /** Per-book policies chosen in the review step; falls back to the job policy. */
   const overrides = ref<Map<number, BookMoveCollisionPolicy>>(new Map())
@@ -37,10 +49,12 @@ export function useMoveToLibrary() {
   let previewController: AbortController | null = null
   let executeController: AbortController | null = null
 
-  onUnmounted(() => {
-    previewController?.abort()
-    executeController?.abort()
-  })
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      previewController?.abort()
+      detach()
+    })
+  }
 
   const movableCount = computed(() => (preview.value ? preview.value.readyCount + countPlannedCollisions() : 0))
 
@@ -55,11 +69,20 @@ export function useMoveToLibrary() {
     return current.collisions.filter((collision) => effectivePolicy(collision) !== 'skip').length
   }
 
+  /** Stops following a move in progress; the move itself goes on, and Jobs shows it. */
+  function detach(): void {
+    const controller = executeController
+    if (!controller) return
+    executeController = null
+    const following = step.value === 'progress' && runId.value !== null
+    controller.abort()
+    if (following) toastWithJobsLink('info', 'jobsArea.bulk.background')
+  }
+
   function reset(): void {
     previewController?.abort()
-    executeController?.abort()
+    detach()
     previewController = null
-    executeController = null
     step.value = 'destination'
     preview.value = null
     previewLoading.value = false
@@ -67,6 +90,9 @@ export function useMoveToLibrary() {
     progress.value = null
     summary.value = null
     executeError.value = null
+    runId.value = null
+    waiting.value = false
+    cancelling.value = false
     overrides.value = new Map()
     jobPolicy.value = 'suggested'
   }
@@ -115,10 +141,14 @@ export function useMoveToLibrary() {
   }
 
   async function execute(selection: BookSelectionPayload, targetLibraryId: number, targetFolderId: number): Promise<BookMoveSummary | null> {
-    executeController = new AbortController()
+    const controller = new AbortController()
+    executeController = controller
     step.value = 'progress'
     executeError.value = null
     summary.value = null
+    runId.value = null
+    waiting.value = true
+    cancelling.value = false
     progress.value = { processed: 0, total: movableCount.value, failed: 0 }
 
     try {
@@ -130,46 +160,75 @@ export function useMoveToLibrary() {
           collisionPolicy: jobPolicy.value,
           overrides: [...overrides.value].map(([bookId, policy]) => ({ bookId, policy })),
         },
-        executeController.signal,
+        controller.signal,
       )
 
       if (!response.ok || !response.body) {
-        throw new Error(await readErrorMessage(response))
+        throw new Error(bulkRunRefusalText(response, await readErrorMessage(response)))
       }
+      runId.value = bulkRunIdOf(response)
 
-      const finalSummary = await consumeStream(response.body, (event) => {
-        if ('done' in event) {
-          summary.value = event
-          return
-        }
-        const current = progress.value ?? { processed: 0, total: 0, failed: 0 }
-        progress.value = {
-          processed: current.processed + 1,
-          total: Math.max(current.total, current.processed + 1),
-          failed: current.failed + (event.status === 'failed' ? 1 : 0),
-        }
-      })
+      let finalSummary: BookMoveSummary | null = null
+      await readEventStream<BookMoveProgressEvent>(
+        response.body,
+        (event) => {
+          if ('done' in event) {
+            finalSummary = event
+            summary.value = event
+            return
+          }
+          waiting.value = false
+          const current = progress.value ?? { processed: 0, total: 0, failed: 0 }
+          progress.value = {
+            processed: current.processed + 1,
+            total: Math.max(current.total, current.processed + 1),
+            failed: current.failed + (event.status === 'failed' ? 1 : 0),
+          }
+        },
+        controller.signal,
+      )
 
-      if (finalSummary) summary.value = finalSummary
-      if (!summary.value) throw new Error('The move ended unexpectedly')
-
+      if (controller.signal.aborted) return stopFollowing()
       step.value = 'done'
-      return summary.value
-    } catch (error) {
-      if (executeController.signal.aborted) {
-        step.value = 'done'
-        return summary.value
+      // A move that fails on the server ends its stream without a summary; Jobs says why.
+      if (!finalSummary) {
+        executeError.value = t('jobsArea.bulk.stopped')
+        return null
       }
-      executeError.value = error instanceof Error ? error.message : 'The move failed'
+      return finalSummary
+    } catch (error) {
+      if (controller.signal.aborted) return stopFollowing()
+      executeError.value = runId.value ? t('jobsArea.bulk.lost') : error instanceof Error ? error.message : t('jobsArea.bulk.stopped')
       step.value = 'done'
       return null
     } finally {
-      executeController = null
+      if (executeController === controller) executeController = null
+      waiting.value = false
+      cancelling.value = false
     }
   }
 
-  function cancel(): void {
-    executeController?.abort()
+  /** This page stopped following. A reset has already moved on; otherwise the sheet shows what it saw. */
+  function stopFollowing(): BookMoveSummary | null {
+    if (step.value === 'progress') step.value = 'done'
+    return summary.value
+  }
+
+  /** Asks the server to stop the move before its next book; the stream's summary then says it was cancelled. */
+  async function cancel(): Promise<void> {
+    const id = runId.value
+    if (!id) {
+      executeController?.abort()
+      return
+    }
+    if (cancelling.value) return
+    cancelling.value = true
+    try {
+      await cancelBulkRun(id)
+    } catch {
+      cancelling.value = false
+      toast.error(t('jobsArea.bulk.cancelFailed'))
+    }
   }
 
   return {
@@ -180,6 +239,9 @@ export function useMoveToLibrary() {
     progress,
     summary,
     executeError,
+    runId,
+    waiting,
+    cancelling,
     overrides,
     jobPolicy,
     movableCount,
@@ -191,47 +253,6 @@ export function useMoveToLibrary() {
     execute,
     cancel,
   }
-}
-
-/**
- * Reads the server-sent event stream. Lines are buffered across chunks because an
- * event can straddle a network chunk boundary; splitting each chunk on its own
- * silently drops those events.
- */
-async function consumeStream(body: ReadableStream<Uint8Array>, onEvent: (event: BookMoveProgressEvent) => void): Promise<BookMoveSummary | null> {
-  const reader = body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let finalSummary: BookMoveSummary | null = null
-
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue
-        const raw = line.slice(6).trim()
-        if (!raw) continue
-
-        try {
-          const event = JSON.parse(raw) as BookMoveProgressEvent
-          if ('done' in event) finalSummary = event
-          onEvent(event)
-        } catch {
-          // A malformed frame should not abort a job that is otherwise fine.
-        }
-      }
-    }
-  } finally {
-    await reader.cancel().catch(() => {})
-  }
-
-  return finalSummary
 }
 
 async function readErrorMessage(response: Response): Promise<string> {

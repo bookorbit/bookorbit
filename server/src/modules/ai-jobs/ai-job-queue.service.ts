@@ -37,6 +37,12 @@ export interface AiJobListQuery {
   limit: number;
 }
 
+/** What deciding a job's actions reads. */
+type ActionableJob = Pick<AiJobRow, 'feature' | 'status' | 'dismissedAt' | 'finishedAt' | 'requestedBy'>;
+
+/** What naming a job's subject reads. */
+type DescribedJob = Pick<AiJobRow, 'id' | 'feature' | 'subjectRef'>;
+
 /** Those who manage the server's settings see and act on every account's jobs. */
 export function managesAiJobs(user: Pick<RequestUser, 'isSuperuser' | 'permissions'>): boolean {
   return user.isSuperuser || user.permissions.includes(Permission.ManageAppSettings);
@@ -120,11 +126,22 @@ export class AiJobQueueService {
     };
   }
 
+  /** What this viewer may do to the job now. */
+  allowedActions(row: ActionableJob, user: RequestUser, now: number): AiJobQueueAction[] {
+    return this.actionsFor(row, { user, manages: managesAiJobs(user) }, now);
+  }
+
+  /** Names each job's subject as this viewer may see it; a job whose subject they cannot reach is left out. */
+  async describe(rows: readonly DescribedJob[], user: RequestUser): Promise<Map<string, AiSubjectLabel>> {
+    return await this.labels(rows, { user, manages: managesAiJobs(user) });
+  }
+
   /**
    * Takes one action on each job, one job at a time, and says what happened to each. A job the
-   * viewer cannot see answers `not-found`, the same as one that does not exist.
+   * viewer cannot see answers `not-found`, the same as one that does not exist, and so does a job
+   * of another feature when `feature` limits the request to one.
    */
-  async act(user: RequestUser, action: AiJobQueueAction, ids: readonly string[]): Promise<AiJobActionResponse> {
+  async act(user: RequestUser, action: AiJobQueueAction, ids: readonly string[], feature?: string): Promise<AiJobActionResponse> {
     const startedAt = Date.now();
     const viewer: Viewer = { user, manages: managesAiJobs(user) };
     const unique = [...new Set(ids)];
@@ -132,7 +149,7 @@ export class AiJobQueueService {
     const results: AiJobActionResult[] = [];
     for (const id of unique) {
       const row = rows.get(id);
-      if (!row || !(viewer.manages || row.requestedBy === user.id)) {
+      if (!row || (feature !== undefined && row.feature !== feature) || !(viewer.manages || row.requestedBy === user.id)) {
         results.push({ id, outcome: 'not-found', status: null, reason: null });
         continue;
       }
@@ -209,8 +226,12 @@ export class AiJobQueueService {
     return { user, manages };
   }
 
-  private item(row: AiJobListRow, viewer: Viewer, position: number | null, subject: AiSubjectLabel, now: number): AiJobListItem {
+  private actionsFor(row: ActionableJob, viewer: Viewer, now: number): AiJobQueueAction[] {
     const feature = this.registry.get(row.feature);
+    return AI_JOB_ACTIONS.filter((action) => statusAllows(row, action, now) && viewerMay(viewer, row, feature, action));
+  }
+
+  private item(row: AiJobListRow, viewer: Viewer, position: number | null, subject: AiSubjectLabel, now: number): AiJobListItem {
     return {
       id: row.id,
       feature: row.feature,
@@ -228,7 +249,7 @@ export class AiJobQueueService {
       startedAt: row.startedAt?.toISOString() ?? null,
       pausedAt: row.pausedAt?.toISOString() ?? null,
       finishedAt: row.finishedAt?.toISOString() ?? null,
-      actions: AI_JOB_ACTIONS.filter((action) => statusAllows(row, action, now) && viewerMay(viewer, row, feature, action)),
+      actions: this.actionsFor(row, viewer, now),
     };
   }
 
@@ -237,7 +258,7 @@ export class AiJobQueueService {
    * name only while they can still reach the subject, so losing access to a library also hides
    * what their old jobs built.
    */
-  private async labels(rows: readonly AiJobRow[], viewer: Viewer): Promise<Map<string, AiSubjectLabel>> {
+  private async labels(rows: readonly DescribedJob[], viewer: Viewer): Promise<Map<string, AiSubjectLabel>> {
     const byFeature = new Map<string, Map<string, AiJobSubjectRef>>();
     for (const row of rows) {
       const refs = byFeature.get(row.feature) ?? new Map<string, AiJobSubjectRef>();

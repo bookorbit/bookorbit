@@ -11,8 +11,17 @@ function makeNotifier(options: { bookTitle?: string | null; user?: unknown } = {
   const books = { verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
   const presenter = { present: vi.fn((row: { id: string }) => Promise.resolve({ id: row.id })) };
   const gateway = { emitJobUpdated: vi.fn() };
-  const notifier = new ReadAloudNotifier(jobs as never, presenter as never, gateway as never, notifications as never, users as never, books as never);
-  return { notifier, notifications, users, books, gateway };
+  const jobChanges = { notify: vi.fn() };
+  const notifier = new ReadAloudNotifier(
+    jobs as never,
+    presenter as never,
+    gateway as never,
+    notifications as never,
+    users as never,
+    books as never,
+    jobChanges as never,
+  );
+  return { notifier, notifications, users, books, gateway, jobChanges };
 }
 
 describe('ReadAloudNotifier.notify', () => {
@@ -106,5 +115,20 @@ describe('ReadAloudNotifier.pushUpdate', () => {
     const { notifier, gateway } = makeNotifier({ user: { ...OWNER, permissions: [] } });
     await notifier.pushUpdate(jobRow());
     expect(gateway.emitJobUpdated).not.toHaveBeenCalled();
+  });
+});
+
+describe('ReadAloudNotifier and the Jobs area', () => {
+  it('reports a state change for any pushed job, a deleted requester included', async () => {
+    const { notifier, jobChanges, gateway } = makeNotifier();
+    await notifier.pushUpdate(jobRow({ requestedByUserId: null }));
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'read-along', ownerId: null, state: true });
+    expect(gateway.emitJobUpdated).not.toHaveBeenCalled();
+  });
+
+  it('reports progress alone without moving anyone in line', async () => {
+    const { notifier, jobChanges } = makeNotifier();
+    await notifier.pushUpdate(jobRow({ status: 'processing' }), 'progress');
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'read-along', ownerId: OWNER.id, state: false });
   });
 });

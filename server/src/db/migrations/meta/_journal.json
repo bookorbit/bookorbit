@@ -1065,6 +1065,41 @@
       "when": 1794699754181,
       "tag": "0151_remove_book_file_path_filter_index",
       "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1794727686143,
+      "tag": "0152_add_ai_jobs_feature_finish_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1794730172585,
+      "tag": "0153_add_read_aloud_queue_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1794731935058,
+      "tag": "0154_add_jobs_owned_type_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1794734476052,
+      "tag": "0155_add_jobs_scan_history_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1794735529136,
+      "tag": "0156_add_bulk_runs",
+      "breakpoints": true
     }
   ]
 }

@@ -212,8 +212,10 @@ export type ReadAloudJob = {
   stage: ReadAloudJobStage;
   progress: number;
   stageDetail: ReadAloudStageDetail | null;
-  /** Jobs ahead of this one while it is queued; null otherwise. */
+  /** Jobs ahead of this one, counting the running one, while it waits in line; null otherwise, paused included. */
   queuePosition: number | null;
+  /** When a queued job was paused: it stays queued but the worker skips it until resumed. */
+  pausedAt: string | null;
   input: ReadAloudJobInput;
   decisions: ReadAloudDecisions;
   outputFileId: number | null;

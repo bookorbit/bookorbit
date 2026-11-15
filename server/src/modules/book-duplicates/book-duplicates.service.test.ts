@@ -65,7 +65,8 @@ function setup(accessibleLibraryIds = [2]) {
     findCandidatePreviews: vi.fn().mockResolvedValue([]),
   };
   const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue(accessibleLibraryIds) };
-  return { service: new BookDuplicatesService(repo as never, libraryService as never), repo, libraryService };
+  const jobChanges = { notify: vi.fn() };
+  return { service: new BookDuplicatesService(repo as never, libraryService as never, jobChanges as never), repo, libraryService, jobChanges };
 }
 
 describe('BookDuplicatesService', () => {
@@ -208,7 +209,7 @@ describe('BookDuplicatesService', () => {
   });
 
   it('cleans partial artifacts when a background scan fails', async () => {
-    const { service, repo } = setup();
+    const { service, repo, jobChanges } = setup();
     repo.countScopedBooks.mockResolvedValue(10);
     repo.insertFileHashKeys.mockRejectedValue(new Error('database unavailable'));
 
@@ -216,6 +217,7 @@ describe('BookDuplicatesService', () => {
 
     await vi.waitFor(() => expect(repo.deleteScanArtifacts).toHaveBeenCalledWith(11));
     expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'failed', errorCode: 'scan_failed' }));
+    await vi.waitFor(() => expect(jobChanges.notify).toHaveBeenLastCalledWith({ type: 'duplicate-scan', ownerId: 7, state: true }));
   });
 
   it('logs the PostgreSQL reason and SQLSTATE instead of the SQL Drizzle reports', async () => {
@@ -344,7 +346,7 @@ describe('BookDuplicatesService', () => {
   });
 
   it('runs every bounded scan stage and completes a non-empty library', async () => {
-    const { service, repo } = setup();
+    const { service, repo, jobChanges } = setup();
     repo.countScopedBooks.mockResolvedValue(2);
     repo.findIsbnBatch.mockResolvedValueOnce([{ id: 3, isbn10: '0306406152', isbn13: null, formats: ['epub', 'EPUB'] }]).mockResolvedValueOnce([]);
     repo.finalizeGroups.mockResolvedValue(1);
@@ -361,6 +363,11 @@ describe('BookDuplicatesService', () => {
     expect(repo.deleteDismissedPairs).toHaveBeenCalledWith(11, 7);
     expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed', totalExtraCopies: 0, totalReclaimableBytes: 0 }));
     expect(repo.deleteScanKeys).toHaveBeenCalledWith(11);
+    // The Jobs area hears the request, the start, every stage as progress only, and the end.
+    await vi.waitFor(() => expect(jobChanges.notify).toHaveBeenLastCalledWith({ type: 'duplicate-scan', ownerId: 7, state: true }));
+    const calls = jobChanges.notify.mock.calls.map(([change]) => (change as { state: boolean }).state);
+    expect(calls.slice(0, 2)).toEqual([true, true]);
+    expect(calls.filter((state) => !state)).toHaveLength(7);
   });
 
   it('rejects completed results when the saved library scope is no longer accessible', async () => {

@@ -386,6 +386,7 @@ export class DownloadMonitorService implements OnModuleDestroy {
         totalBytes: updated.totalBytes,
       },
       viewerUserIds,
+      row.status !== nextStatus,
     );
 
     if (status.state !== 'completed') return;

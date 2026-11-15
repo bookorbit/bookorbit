@@ -556,6 +556,8 @@ const {
   cancelDelete,
   confirmDelete,
   inFlight,
+  cancelInFlight,
+  hideInFlight,
   handleBulkRefreshMetadata,
   handleBulkReExtractCover,
   handleBulkEmbedAudioCover,
@@ -1130,6 +1132,8 @@ defineOptions({ name: 'HomeView' })
       @lock-metadata="handleBulkSetMetadataLock"
       @delete="handleDeleteSelected"
       @exit="exitSelectionMode"
+      @cancel-in-flight="cancelInFlight"
+      @hide-in-flight="hideInFlight"
     />
 
     <MetadataExportDialog

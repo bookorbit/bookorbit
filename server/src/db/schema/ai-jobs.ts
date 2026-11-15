@@ -74,6 +74,10 @@ export const aiJobs = pgTable(
       .on(t.feature, sql`${t.priority} desc`, t.nextAttemptAt, t.createdAt)
       .where(sql`${t.status} = 'queued'`),
     index('ai_jobs_finished_idx').on(sql`${t.finishedAt} desc`),
+    // The Jobs area's Failed and History views page a feature's ended jobs by when they ended.
+    index('ai_jobs_feature_finish_idx')
+      .on(t.feature, sql`coalesce(${t.finishedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('completed', 'failed', 'cancelled')`),
     check('ai_jobs_status_chk', sql`${t.status} in ('queued', 'running', 'paused', 'completed', 'failed', 'cancelled')`),
     check('ai_jobs_kind_chk', sql`${t.kind} in ('build', 'update', 'rebuild')`),
     check('ai_jobs_counts_chk', sql`${t.done} >= 0 and ${t.total} >= 0 and ${t.attempts} >= 0 and ${t.generation} >= 1`),

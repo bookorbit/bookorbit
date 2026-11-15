@@ -77,6 +77,7 @@ const envSchema = z.object({
     .optional(),
   FILE_WRITE_DEBOUNCE_MS: z.coerce.number().int().positive().optional(),
   FILE_WRITE_MAX_CONCURRENT_WRITES: z.coerce.number().int().positive().optional(),
+  BULK_RUNS_MAX_CONCURRENT: z.coerce.number().int().positive().max(20).optional(),
   DJVU_MAX_CONCURRENT: z.coerce.number().int().positive().max(8).optional(),
   DJVU_TIMEOUT_MS: z.coerce.number().int().positive().max(120_000).optional(),
   DJVU_MAX_SOURCE_BYTES: z.coerce

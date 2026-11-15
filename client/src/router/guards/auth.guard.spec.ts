@@ -107,9 +107,9 @@ describe('registerAuthGuard', () => {
   it('lets in anyone holding one of a list of permissions', async () => {
     if (!guard) throw new Error('Expected guard to be registered')
     const route = {
-      name: 'ai-activity',
-      path: '/ai/activity',
-      fullPath: '/ai/activity',
+      name: 'jobs-activity',
+      path: '/jobs/activity',
+      fullPath: '/jobs/activity',
       meta: { requiredPermission: [Permission.ManageAppSettings, Permission.LibraryGenerateStoryGuide], permissionFallback: 'home' },
     }
 

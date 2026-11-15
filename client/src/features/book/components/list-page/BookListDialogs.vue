@@ -63,6 +63,8 @@ function handleRemoveFromCollection() {
     @merge="page.openMergeForSelection"
     @link="page.openLinkForSelection"
     @exit="page.exitSelectionMode"
+    @cancel-in-flight="page.cancelInFlight"
+    @hide-in-flight="page.hideInFlight"
   />
 
   <MetadataExportDialog

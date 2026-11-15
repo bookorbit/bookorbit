@@ -37,15 +37,27 @@ const mocks = vi.hoisted(() => ({
   selectionMode: null as unknown as { value: boolean },
   selectedIds: null as unknown as { value: Set<number> },
   selectedCount: null as unknown as { value: number },
-  bulkRefresh:
-    vi.fn<
-      (ids: number[], onProgress?: unknown, options?: { ignoreCache?: boolean }) => Promise<{ processed: number; failed: number; updated: number }>
-    >(),
+  bulkRefresh: vi.fn<(ids: number[], options?: { ignoreCache?: boolean }, signal?: AbortSignal) => Promise<Response>>(),
+  actOnJobs: vi.fn<(request: unknown) => Promise<{ results: { id: string; outcome: string; status: string | null }[] }>>(),
 }))
+
+vi.mock('@/features/jobs/api/jobs.api', () => ({ actOnJobs: mocks.actOnJobs }))
+
+/** A bulk refresh response whose stream sends `events` and then ends. */
+function streamResponse(events: object[]): Response {
+  const encoder = new TextEncoder()
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      for (const event of events) controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+      controller.close()
+    },
+  })
+  return { ok: true, status: 200, body, headers: new Headers({ 'X-Bulk-Run-Id': 'run-1' }) } as unknown as Response
+}
 
 vi.mock('../api/author', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../api/author')>()),
-  bulkRefreshAuthorsMetadata: mocks.bulkRefresh,
+  startBulkAuthorsMetadataRefresh: mocks.bulkRefresh,
 }))
 
 vi.mock('vue-router', () => ({
@@ -54,7 +66,12 @@ vi.mock('vue-router', () => ({
 }))
 
 vi.mock('vue-sonner', () => ({
-  toast: { success: vi.fn<(message: string) => void>(), error: vi.fn<(message: string) => void>(), warning: vi.fn<(message: string) => void>() },
+  toast: {
+    success: vi.fn<(message: string) => void>(),
+    error: vi.fn<(message: string) => void>(),
+    warning: vi.fn<(message: string) => void>(),
+    info: vi.fn<(message: string) => void>(),
+  },
 }))
 
 vi.mock('@/composables/useDisplaySettings', () => ({
@@ -179,7 +196,7 @@ describe('AuthorsView', () => {
     mocks.selectionMode = ref(false)
     mocks.selectedIds = ref(new Set<number>())
     mocks.selectedCount = ref(0)
-    mocks.bulkRefresh.mockResolvedValue({ processed: 2, failed: 0, updated: 2 })
+    mocks.bulkRefresh.mockImplementation(async () => streamResponse([{ done: true, processed: 2, failed: 0, updated: 2 }]))
   })
 
   afterEach(() => {
@@ -271,7 +288,57 @@ describe('AuthorsView', () => {
       await wrapper.get('[data-testid="author-bulk-refresh-confirm-action"]').trigger('click')
       await flushPromises()
 
-      expect(mocks.bulkRefresh).toHaveBeenCalledWith([4, 9], expect.any(Function), { ignoreCache: false })
+      expect(mocks.bulkRefresh).toHaveBeenCalledWith([4, 9], { ignoreCache: false }, expect.any(AbortSignal))
+    })
+
+    it('follows the run in the selection bar and cancels it through Jobs', async () => {
+      mocks.actOnJobs.mockResolvedValue({ results: [{ id: 'bulk-run:run-1', outcome: 'done', status: 'running' }] })
+      const encoder = new TextEncoder()
+      let feed!: ReadableStreamDefaultController<Uint8Array>
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          feed = controller
+        },
+      })
+      mocks.bulkRefresh.mockResolvedValue({ ok: true, status: 200, body, headers: new Headers({ 'X-Bulk-Run-Id': 'run-1' }) } as unknown as Response)
+      mocks.selectionMode.value = true
+      mocks.selectedIds.value = new Set([4, 9])
+      mocks.selectedCount.value = 2
+      const wrapper = shallowMount(AuthorsView, {
+        global: {
+          stubs: {
+            SelectionActionBar: {
+              props: ['inFlight'],
+              emits: ['cancel-in-flight', 'hide-in-flight'],
+              template:
+                '<div><span data-testid="pill" v-if="inFlight">{{ inFlight.kind }} {{ inFlight.runId }} {{ inFlight.processed }}</span><button data-testid="pill-cancel" @click="$emit(\'cancel-in-flight\')" /><slot name="content" /></div>',
+            },
+            Tooltip: passthrough,
+            TooltipTrigger: passthrough,
+            TooltipContent: passthrough,
+            IgnoreCacheCheckbox: false,
+          },
+        },
+      })
+      await flushPromises()
+
+      await wrapper.get('[data-testid="author-bulk-refresh"]').trigger('click')
+      await wrapper.get('[data-testid="author-bulk-refresh-confirm-action"]').trigger('click')
+      await flushPromises()
+      feed.enqueue(encoder.encode(`data: ${JSON.stringify({ authorId: 4, updated: true })}\n\n`))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="pill"]').text()).toBe('author-refresh-metadata run-1 1')
+      await wrapper.get('[data-testid="pill-cancel"]').trigger('click')
+      await flushPromises()
+      expect(mocks.actOnJobs).toHaveBeenCalledWith({ action: 'cancel', ids: ['bulk-run:run-1'] })
+
+      feed.enqueue(encoder.encode(`data: ${JSON.stringify({ done: true, processed: 1, failed: 0, updated: 1 })}\n\n`))
+      feed.close()
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pill"]').exists()).toBe(false)
     })
 
     it('ignores cached results when the box is checked', async () => {
@@ -282,7 +349,7 @@ describe('AuthorsView', () => {
       await wrapper.get('[data-testid="author-bulk-refresh-confirm-action"]').trigger('click')
       await flushPromises()
 
-      expect(mocks.bulkRefresh).toHaveBeenCalledWith([4, 9], expect.any(Function), { ignoreCache: true })
+      expect(mocks.bulkRefresh).toHaveBeenCalledWith([4, 9], { ignoreCache: true }, expect.any(AbortSignal))
     })
   })
 })

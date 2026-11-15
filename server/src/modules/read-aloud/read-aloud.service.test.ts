@@ -29,7 +29,11 @@ function makeService(
     findById: vi.fn().mockResolvedValue(jobRow()),
     findRequesterName: vi.fn().mockResolvedValue('Owner'),
     findReportChapters: vi.fn().mockResolvedValue(null),
-    countQueuedAhead: vi.fn().mockResolvedValue(0),
+    queuePositions: vi.fn().mockImplementation((ids: string[]) => Promise.resolve(new Map(ids.map((id) => [id, 0])))),
+    pause: vi.fn(),
+    resume: vi.fn(),
+    moveToTop: vi.fn(),
+    prioritize: vi.fn(),
     create: vi
       .fn()
       .mockImplementation((values: { input: unknown; replaceFileId: number | null }) =>
@@ -48,7 +52,7 @@ function makeService(
   const users = { findByIdWithPermissions: vi.fn().mockResolvedValue(OWNER) };
   const libraries = { findOne: vi.fn().mockResolvedValue({ organizationMode: options.organizationMode ?? 'book_per_folder' }) };
   const activity = { record: vi.fn().mockResolvedValue(undefined), list: vi.fn().mockResolvedValue([]) };
-  const notifier = { pushUpdate: vi.fn().mockResolvedValue(undefined), notify: vi.fn().mockResolvedValue(undefined) };
+  const notifier = { pushUpdate: vi.fn().mockResolvedValue(undefined), notify: vi.fn().mockResolvedValue(undefined), jobsChanged: vi.fn() };
   const publisher = {
     withHeartbeat: vi.fn().mockImplementation((_id: string, fn: () => Promise<unknown>) => fn()),
     validate: vi.fn().mockResolvedValue({ report: REPORT_TOTALS, coverage: COVERAGE, warnings: [], requiresReview: false, outputBytes: 10 }),
@@ -433,6 +437,63 @@ describe('ReadAloudService job actions', () => {
 
     jobs.findById.mockResolvedValue(jobRow({ status: 'completed', report: REPORT_TOTALS }));
     await expect(service.report(JOB_ID, OWNER)).resolves.toMatchObject({ totals: REPORT_TOTALS, coverage: null, chapters: [] });
+  });
+});
+
+describe('ReadAloudService queue controls', () => {
+  it('pauses a queued job, keeping it queued with no place in line', async () => {
+    const { service, jobs, notifier, activity } = makeService();
+    jobs.pause.mockResolvedValue(jobRow({ pausedAt: new Date('2026-01-02T00:00:00Z') }));
+    const job = await service.pause(JOB_ID, OWNER);
+    expect(job).toMatchObject({ status: 'queued', queuePosition: null, pausedAt: '2026-01-02T00:00:00.000Z' });
+    expect(jobs.queuePositions).not.toHaveBeenCalled();
+    expect(activity.record).toHaveBeenCalledWith(JOB_ID, 'info', 'queued', 'paused');
+    expect(notifier.pushUpdate).toHaveBeenCalled();
+  });
+
+  it('refuses to pause a job the worker has already picked up', async () => {
+    const { service, jobs, worker } = makeService();
+    worker.healthState.mockResolvedValue(okHealth({ activeJobId: JOB_ID }));
+    await expect(service.pause(JOB_ID, OWNER)).rejects.toBeInstanceOf(ConflictException);
+    expect(jobs.pause).not.toHaveBeenCalled();
+  });
+
+  it('refuses to pause a job that left the queue, and lets only its requester pause it', async () => {
+    const { service, jobs } = makeService();
+    jobs.findById.mockResolvedValue(jobRow({ status: 'processing' }));
+    await expect(service.pause(JOB_ID, OWNER)).rejects.toBeInstanceOf(ConflictException);
+    jobs.findById.mockResolvedValue(jobRow());
+    await expect(service.pause(JOB_ID, OTHER)).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('resumes a paused job, and leaves one that is not paused as it is', async () => {
+    const { service, jobs, activity } = makeService();
+    jobs.findById.mockResolvedValue(jobRow({ pausedAt: new Date() }));
+    jobs.resume.mockResolvedValue(jobRow());
+    await expect(service.resume(JOB_ID, OWNER)).resolves.toMatchObject({ pausedAt: null, queuePosition: 0 });
+    expect(activity.record).toHaveBeenCalledWith(JOB_ID, 'info', 'queued', 'resumed');
+    jobs.resume.mockResolvedValue(null);
+    activity.record.mockClear();
+    await service.resume(JOB_ID, OWNER);
+    expect(activity.record).not.toHaveBeenCalled();
+  });
+
+  it('lets only a manager move a job ahead of everyone, without needing the book', async () => {
+    const { service, jobs, books } = makeService();
+    const manager = { ...OTHER, permissions: [Permission.ManageAppSettings] } as typeof OTHER;
+    jobs.prioritize.mockResolvedValue(jobRow({ priority: 1 }));
+    await expect(service.prioritize(JOB_ID, OWNER)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.prioritize(JOB_ID, manager)).resolves.toMatchObject({ priority: 1 });
+    expect(books.verifyBookAccess).not.toHaveBeenCalled();
+    jobs.prioritize.mockResolvedValue(null);
+    await expect(service.prioritize(JOB_ID, manager)).rejects.toBeInstanceOf(ConflictException);
+  });
+
+  it("moves a job to the front of its requester's own jobs", async () => {
+    const { service, jobs } = makeService();
+    jobs.moveToTop.mockResolvedValue(jobRow({ userOrder: 0 }));
+    await expect(service.moveToTop(JOB_ID, OWNER)).resolves.toMatchObject({ userOrder: 0 });
+    await expect(service.moveToTop(JOB_ID, OTHER)).rejects.toBeInstanceOf(ForbiddenException);
   });
 });
 

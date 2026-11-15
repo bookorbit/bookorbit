@@ -6391,7 +6391,9 @@
       "ApiKeyRename": "Renamed API key",
       "ApiKeyRegenerate": "Regenerated API key",
       "ApiKeyRevoke": "Revoked API key",
-      "ApiKeyRevokeAll": "Revoked all API keys"
+      "ApiKeyRevokeAll": "Revoked all API keys",
+      "AuthorBulkMetadataRefresh": "Refresh author metadata",
+      "BulkRunCancel": "Cancel bulk action"
     },
     "views": {
       "label": "Show",
@@ -8383,6 +8385,8 @@
             "details": "Details",
             "queuedTitle": "Waiting to start",
             "queueAhead": "{count, plural, =0 {Next in line} one {# job ahead} other {# jobs ahead}}",
+            "pausedTitle": "Paused",
+            "pausedDescription": "It won't start until it's resumed. Resuming puts it back in its place in line.",
             "elapsed": "Running for {duration}",
             "justStarted": "Just started",
             "firstRunForLanguage": "First run for this language",
@@ -8416,6 +8420,7 @@
             "openReadAlong": "Open read-aloud",
             "showFile": "Show file",
             "retry": "Retry",
+            "resume": "Resume",
             "startOver": "Start over",
             "cancel": "Cancel generation",
             "cancelPrompt": "Cancel generation?",
@@ -8561,6 +8566,7 @@
             "cancel": "The job couldn't be cancelled. Try again.",
             "publish": "The read-aloud couldn't be added to this book. Try again.",
             "retry": "The job couldn't be retried. Try again.",
+            "resume": "The job couldn't be resumed. Try again.",
             "resync": "The re-sync couldn't be started. Try again.",
             "dismiss": "The card couldn't be dismissed. Try again.",
             "job": {
@@ -9800,17 +9806,20 @@
       },
       "progress": {
         "label": "Moving books to {library}",
-        "failed": "{count} failed"
+        "failed": "{count} failed",
+        "background": "You can close this. The move keeps running, and Jobs shows how far it got."
       },
       "done": {
         "summary": "Moved {count} books to {library}",
         "merged": "{count} merged with copies already there",
         "skipped": "{count} skipped",
-        "failed": "{count} failed"
+        "failed": "{count} failed",
+        "cancelled": "The move was cancelled before it finished."
       },
       "toast": {
         "success": "Moved {count} books to {library}",
-        "partial": "Moved {moved} books, {failed} failed"
+        "partial": "Moved {moved} books, {failed} failed",
+        "cancelled": "{count, plural, one {Move cancelled after # book.} other {Move cancelled after # books.}}"
       }
     },
     "gridShape": {
@@ -10265,6 +10274,11 @@
         "unlinkFailed": "The book could not be unlinked.",
         "leadFailed": "The main book could not be changed."
       }
+    },
+    "bulkRefresh": {
+      "failed": "Failed to refresh metadata",
+      "completed": "{processed, plural, one {Refreshed metadata for # book} other {Refreshed metadata for # books}}",
+      "completedWithFailures": "{processed, plural, one {Refreshed # book, {failed} failed} other {Refreshed # books, {failed} failed}}"
     }
   },
   "bookMetadataFetch": {
@@ -16709,6 +16723,277 @@
       "deletedAccountName": "Deleted account"
     }
   },
+  "jobsArea": {
+    "title": "Jobs",
+    "subtitle": "Long-running work, and where each job stands.",
+    "sectionsLabel": "Jobs sections",
+    "unknownType": "Job",
+    "unavailable": "Something you can no longer open",
+    "loading": "Loading jobs",
+    "loadFailed": "The job list could not be loaded.",
+    "actionFailed": "Couldn't change the jobs.",
+    "cost": "Cost",
+    "costSoFar": "Cost so far",
+    "moreActions": "More actions: {name}",
+    "moreActionsShort": "More actions",
+    "whyLocked": "Why you can't change {name}",
+    "noBulkActions": "Nothing applies to these jobs.",
+    "bulkAppliesTo": "{total, plural, one {Applies to {count} of # selected job} other {Applies to {count} of # selected jobs}}",
+    "views": {
+      "needsYou": "Needs you",
+      "needsReview": "Needs review"
+    },
+    "filter": {
+      "typeLabel": "Job type",
+      "allTypes": "All types"
+    },
+    "status": {
+      "needsYou": "Needs you",
+      "unknown": "Unknown"
+    },
+    "columns": {
+      "job": "Job",
+      "type": "Type",
+      "requester": "Requested by"
+    },
+    "actions": {
+      "continue": "Continue",
+      "move-to-top": "Move to front of my jobs",
+      "prioritize": "Move ahead of everyone"
+    },
+    "actionsOn": {
+      "continue": "Continue {name}",
+      "move-to-top": "Move to front of my jobs: {name}",
+      "prioritize": "Move ahead of everyone: {name}"
+    },
+    "results": {
+      "continue": "{count, plural, one {Continued # job.} other {Continued # jobs.}}",
+      "move-to-top": "{count, plural, one {Moved # job to the front of your jobs.} other {Moved # jobs to the front of your jobs.}}",
+      "prioritize": "{count, plural, one {Moved # job ahead of everyone's.} other {Moved # jobs ahead of everyone's.}}"
+    },
+    "confirmCancel": {
+      "body": "Each job stops as soon as it safely can."
+    },
+    "empty": {
+      "queue": {
+        "title": "Nothing is running or waiting.",
+        "hint": "Work you start, such as building a story guide, waits and runs here."
+      },
+      "needs-you": {
+        "title": "Nothing needs you.",
+        "hint": "Jobs that wait on your answer show up here."
+      },
+      "failed": {
+        "title": "No failed jobs.",
+        "hint": "Jobs that stop on a problem show up here, ready to try again."
+      },
+      "history": {
+        "title": "No finished jobs yet.",
+        "hint": "Finished and cancelled jobs are kept here."
+      }
+    },
+    "bands": {
+      "running": {
+        "name": "Running",
+        "hint": "Different kinds of job run side by side."
+      },
+      "next": {
+        "name": "Next in each queue",
+        "hint": "Each starts as soon as its own queue has room."
+      },
+      "later": {
+        "name": "Later",
+        "hint": "In queue order: every #2, then every #3."
+      },
+      "paused": {
+        "name": "Paused",
+        "hint": "Held back until someone resumes them."
+      }
+    },
+    "pager": {
+      "page": "Page {page}"
+    },
+    "days": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "notes": {
+      "unknown": "You can't change this job.",
+      "read-along-requester": "Only the person who started it can change it.",
+      "demo": "Demo accounts can't change jobs.",
+      "chapter-edit-requester": "Only the person who started it can try it again.",
+      "request-download-driver": "Only the person handling this request can change it.",
+      "metadata-config": "Only people who manage metadata settings can change it.",
+      "bulk-run-continue-later": "This can continue once the server finishes checking its libraries."
+    },
+    "types": {
+      "story-guide": {
+        "label": "Story guide",
+        "next": "Next in story guides",
+        "position": "#{position} in story guides",
+        "completed": "Story guide ready."
+      },
+      "read-along": {
+        "label": "Read-aloud",
+        "next": "Next in read-alouds",
+        "position": "#{position} in read-alouds",
+        "completed": "Read-aloud added to the book.",
+        "completedWarnings": "Read-aloud added, with warnings.",
+        "review": "Ready for review on the book page.",
+        "reviewUntil": "Ready for review on the book page until {date}."
+      },
+      "book-merge": {
+        "label": "Book merge",
+        "next": "Next in merges",
+        "position": "#{position} in merges",
+        "completed": "Books merged.",
+        "phases": {
+          "moving": "Moving files",
+          "committing": "Saving the merge",
+          "committed": "Finishing up"
+        },
+        "reasons": {
+          "rolled-back": "Undone, nothing was changed."
+        }
+      },
+      "chapter-edit": {
+        "label": "Chapters",
+        "next": "Next in chapter changes",
+        "position": "#{position} in chapter changes",
+        "kinds": {
+          "write": "Writing chapters into the files",
+          "read": "Reading chapters from the files",
+          "revert": "Reverting to the files' chapters"
+        },
+        "completedKinds": {
+          "write": "Chapters written into the files.",
+          "read": "Chapters read from the files.",
+          "revert": "Chapters reverted to the files."
+        },
+        "reasons": {
+          "book_chapters_operation_failed": "The chapter change stopped on an unexpected error.",
+          "book_chapters_operation_interrupted": "The server restarted before the chapter change finished."
+        }
+      },
+      "chapter-lookup": {
+        "label": "Chapter lookup",
+        "title": "Chapter lookups",
+        "remaining": "{count, plural, one {# book left} other {# books left}}",
+        "toReview": "{count, plural, one {# book to review} other {# books to review}}",
+        "failedCount": "{count, plural, one {# book failed} other {# books failed}}"
+      },
+      "duplicate-scan": {
+        "label": "Duplicate scan",
+        "title": "Duplicate scan",
+        "next": "Next in duplicate scans",
+        "position": "#{position} in duplicate scans",
+        "running": "Looking for duplicates",
+        "completed": "Scan finished.",
+        "reasons": {
+          "scan_failed": "The scan stopped on an unexpected error.",
+          "scan_interrupted": "The server restarted during the scan."
+        }
+      },
+      "request-download": {
+        "label": "Request download",
+        "phases": {
+          "downloading": "Downloading",
+          "downloaded": "Downloaded, waiting to import",
+          "importing": "Importing"
+        },
+        "completed": "Downloaded and imported.",
+        "failedDefault": "The download did not finish.",
+        "reasons": {
+          "review": "Downloaded. Review it before it is imported.",
+          "removed": "Removed before it finished.",
+          "discarded": "Discarded at review."
+        }
+      },
+      "library-scan": {
+        "label": "Library scan",
+        "running": "Scanning files",
+        "completedKinds": {
+          "manual": "Scan finished.",
+          "watcher": "Changes picked up.",
+          "schedule": "Scheduled scan finished."
+        },
+        "reasons": {
+          "error": "The scan stopped on an error."
+        }
+      },
+      "metadata-fetch": {
+        "label": "Metadata auto-fetch",
+        "title": "Metadata auto-fetch",
+        "remaining": "{count, plural, one {# book left} other {# books left}}",
+        "failedCount": "{count, plural, one {# book failed} other {# books failed}}"
+      },
+      "author-enrichment": {
+        "label": "Author enrichment",
+        "title": "Author enrichment",
+        "remaining": "{count, plural, one {# author left} other {# authors left}}",
+        "failedCount": "{count, plural, one {# author failed} other {# authors failed}}",
+        "reasons": {
+          "rate-limited": "Waiting for the provider's rate limit to reset."
+        }
+      },
+      "bulk-run": {
+        "label": "Bulk action",
+        "title": "Bulk action",
+        "titles": {
+          "book-refresh-metadata": "Refresh book metadata",
+          "book-re-extract-cover": "Re-extract covers",
+          "book-embed-audio-cover": "Embed audiobook covers",
+          "author-refresh-metadata": "Refresh author metadata",
+          "book-move": "Move books"
+        },
+        "next": "Next in your bulk actions",
+        "position": "#{position} in your bulk actions",
+        "progress": "{done} of {total}",
+        "phases": {
+          "cancelling": "Cancelling"
+        },
+        "completed": "Finished.",
+        "completedFailed": "{count, plural, one {Finished, # item failed.} other {Finished, # items failed.}}",
+        "cancelledAt": "Cancelled after {done} of {total}.",
+        "failedDefault": "Stopped on an error.",
+        "reasons": {
+          "interrupted": "Stopped when the server restarted. Continue picks up where it left off.",
+          "credential-revoked": "Stopped: the API key that started it was revoked or has expired.",
+          "access-revoked": "Stopped: the account that started it can no longer do this.",
+          "requester-gone": "Stopped: the account that started it was removed.",
+          "error": "Stopped on an error.",
+          "unknown-kind": "This server can't run this kind of bulk action."
+        }
+      }
+    },
+    "reasons": {
+      "needsYou": "Waiting on an answer."
+    },
+    "summary": {
+      "remaining": "{count, plural, one {# left} other {# left}}",
+      "toReview": "{count, plural, one {# to review} other {# to review}}",
+      "failedCount": "{count, plural, one {# failed} other {# failed}}"
+    },
+    "bulk": {
+      "labels": {
+        "book-refresh-metadata": "Refreshing metadata",
+        "author-refresh-metadata": "Refreshing author metadata",
+        "book-move": "Moving books"
+      },
+      "count": "{processed} / {total}",
+      "waiting": "Waiting to start",
+      "cancelling": "Cancelling",
+      "cancel": "Cancel this bulk action",
+      "hide": "Keep running in the background",
+      "background": "The bulk action keeps running in the background.",
+      "stopped": "The bulk action stopped before it finished.",
+      "lost": "Lost the connection to the bulk action. It may still be running.",
+      "openJobs": "Open Jobs",
+      "cancelled": "Bulk action cancelled after {processed} of {total}.",
+      "cancelFailed": "Could not cancel the bulk action.",
+      "tooMany": "{count, plural, one {You already have # bulk action waiting or running. Wait for it to finish, or cancel it in Jobs.} other {You already have # bulk actions waiting or running. Wait for one to finish, or cancel one in Jobs.}}"
+    }
+  },
   "titles": {
     "dashboard": "Dashboard",
     "libraries": "Libraries",
@@ -16815,7 +17100,8 @@
     "chapterHealth": "Chapter Health",
     "readingHistory": "Reading History",
     "aiActivity": "AI activity",
-    "aiStoryGuides": "Story guides"
+    "aiStoryGuides": "Story guides",
+    "jobs": "Jobs"
   },
   "tts": {
     "readerControls": {

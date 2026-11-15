@@ -28,7 +28,9 @@ import { BOOK_MOVE_DETAIL_LIMIT, BOOK_MOVE_PREVIEW_SAMPLE_LIMIT, NotificationTyp
 import { LibraryOperationGate, type LibraryOperationRelease } from '../../common/services/library-operation-gate.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import type { BulkRunRow } from '../../db/schema';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import type { BulkItemOutcome, BulkRunEnd } from '../bulk-runs/bulk-run-handler';
 import { BookService } from '../book/book.service';
 import { NotificationService } from '../notification/notification.service';
 import { FileWatcherService } from '../scanner/file-watcher.service';
@@ -37,16 +39,59 @@ import { ScannerService } from '../scanner/scanner.service';
 import { BookMoveExecutorService } from './book-move-executor.service';
 import type { BookMovePlan, BookMovePlanOutcome, PlanCollision } from './book-move-planner.service';
 import { BookMovePlannerService } from './book-move-planner.service';
-import type { MoveTargetLibrary } from './book-move.repository';
+import type { MoveBookData, MoveTargetLibrary } from './book-move.repository';
 import { BookMoveRepository } from './book-move.repository';
 import type { MoveBooksDto, MovePreviewDto } from './dto/move-books.dto';
 
 const MOVE_EVENT = 'book_move.job';
 const MAX_PLAN_ROUNDS = 5;
 
-export interface BookMoveStreamOptions {
-  onProgress: (event: BookMoveProgressEvent) => void;
-  isCancelled: () => boolean;
+/** What a move run keeps to rebuild its plan when it starts, and again on Continue. */
+export type BookMoveRunOptions = {
+  targetLibraryId: number;
+  targetFolderId: number;
+  collisionPolicy: BookMoveJobCollisionPolicy;
+  /** Only the overrides for books in the run. */
+  overrides: { bookId: number; policy: BookMoveCollisionPolicy }[];
+  /** The source libraries when the run was created; the gate is taken on these before replanning. */
+  sourceLibraryIds: number[];
+};
+
+export interface BookMoveRunPlan {
+  /** The books the move will work through, in plan order. */
+  subjectIds: number[];
+  options: BookMoveRunOptions;
+}
+
+interface MoveSkip {
+  code: string;
+  reason: string;
+}
+
+interface MoveWork {
+  plan: BookMovePlan;
+  mergeDuplicateBookId: number | null;
+  /** Set when the collision policy cannot be applied to this book. */
+  skip?: MoveSkip;
+}
+
+/** A started move run: the libraries it holds, its plan for the books still to do, and its tallies. */
+export interface BookMoveRunState {
+  runId: string;
+  jobId: number;
+  userId: number;
+  target: MoveTargetLibrary;
+  work: Map<number, MoveWork>;
+  /** Books the replanned run will not move, and why. */
+  skips: Map<number, MoveSkip>;
+  releaseGate: LibraryOperationRelease;
+  stoppedWatchers: number[];
+  movedByLibrary: Map<number, number[]>;
+  /** This start's tallies for the `book_move_jobs` row; the run row keeps the totals. */
+  counts: { succeeded: number; merged: number; failed: number; skipped: number };
+  /** The libraries the acting account may edit, for the actor they were read for. */
+  editable: { actor: RequestUser; ids: Set<number> };
+  startedAt: number;
 }
 
 interface ResolvedPlan {
@@ -56,9 +101,33 @@ interface ResolvedPlan {
   sourceLibraryIds: number[];
 }
 
+/** Rebuilds the route's final event from the settled run; `succeeded` there leaves merges out. */
+export function bookMoveDoneEvent(
+  run: Pick<BulkRunRow, 'status' | 'processed' | 'succeeded' | 'failed' | 'skipped' | 'stats'>,
+): BookMoveProgressEvent {
+  const merged = Math.max(0, Math.trunc(Number(run.stats?.merged ?? 0)) || 0);
+  const summary: BookMoveSummary = {
+    processed: run.processed,
+    succeeded: Math.max(0, run.succeeded - merged),
+    merged,
+    failed: run.failed,
+    skipped: run.skipped,
+    cancelled: run.status === 'cancelled',
+  };
+  return { done: true, ...summary };
+}
+
+function isLibraryId(value: unknown): value is number {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
+}
+
 @Injectable()
 export class BookMoveService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BookMoveService.name);
+  /** Set once the boot check for moves cut short by a restart has run. */
+  private bootRecoveryDone = false;
+  /** Libraries rescanned at boot because a move was cut short in them; each leaves once its scan ends. */
+  private readonly bootRescans = new Set<number>();
 
   constructor(
     private readonly moveRepo: BookMoveRepository,
@@ -80,21 +149,46 @@ export class BookMoveService implements OnApplicationBootstrap {
    * watcher's half-hourly reconcile.
    */
   async onApplicationBootstrap(): Promise<void> {
-    const interrupted = await this.moveRepo.markInterruptedJobs().catch((error: Error) => {
-      this.logger.warn(`[${MOVE_EVENT}] [fail] error="${sanitizeLogValue(error.message)}" - could not check for interrupted move jobs`);
-      return [];
-    });
+    try {
+      const interrupted = await this.moveRepo.markInterruptedJobs().catch((error: Error) => {
+        this.logger.warn(`[${MOVE_EVENT}] [fail] error="${sanitizeLogValue(error.message)}" - could not check for interrupted move jobs`);
+        return [];
+      });
 
-    if (interrupted.length === 0) return;
+      if (interrupted.length === 0) return;
 
-    const libraryIds = [...new Set(interrupted.flatMap((job) => job.libraryIds))];
-    this.logger.warn(
-      `[${MOVE_EVENT}] [fail] jobCount=${interrupted.length} libraryIds=${libraryIds.join(',')} - move jobs interrupted by restart, rescanning affected libraries`,
-    );
+      const libraryIds = [...new Set(interrupted.flatMap((job) => job.libraryIds))];
+      this.logger.warn(
+        `[${MOVE_EVENT}] [fail] jobCount=${interrupted.length} libraryIds=${libraryIds.join(',')} - move jobs interrupted by restart, rescanning affected libraries`,
+      );
 
-    for (const libraryId of libraryIds) {
-      this.scannerService.startScanAsync(libraryId);
+      for (const libraryId of libraryIds) {
+        this.bootRescans.add(libraryId);
+        this.scannerService.startScanAsync(libraryId);
+      }
+    } finally {
+      this.bootRecoveryDone = true;
     }
+  }
+
+  /**
+   * Whether an interrupted move run may continue: not before the boot check ran, nor while one of
+   * its libraries is still being rescanned after the restart.
+   */
+  isContinuable(run: Pick<BulkRunRow, 'options'>): boolean {
+    if (!this.bootRecoveryDone) return false;
+    const options = (run.options ?? {}) as Partial<BookMoveRunOptions>;
+    const libraryIds = [options.targetLibraryId, ...(Array.isArray(options.sourceLibraryIds) ? options.sourceLibraryIds : [])].filter(isLibraryId);
+    const checked = libraryIds.length > 0 ? libraryIds : [...this.bootRescans];
+    return checked.every((libraryId) => !this.bootRescanPending(libraryId));
+  }
+
+  /** The boot scan takes the library's gate as it starts, so a free gate means it has ended. */
+  private bootRescanPending(libraryId: number): boolean {
+    if (!this.bootRescans.has(libraryId)) return false;
+    if (this.libraryGate.isHeld(libraryId) || this.scannerService.isScanRunning(libraryId)) return true;
+    this.bootRescans.delete(libraryId);
+    return false;
   }
 
   isBusy(libraryId: number): boolean {
@@ -106,110 +200,228 @@ export class BookMoveService implements OnApplicationBootstrap {
     return this.buildPreview(resolved);
   }
 
-  async execute(dto: MoveBooksDto, user: RequestUser, options: BookMoveStreamOptions): Promise<BookMoveSummary> {
-    const startedAt = Date.now();
+  /**
+   * Checks a move before it is queued, as the route always has: the target exists, the account
+   * edits every library involved, and no scan or other operation holds one of them now. Answers
+   * the books the run will work through and what it needs to plan them again when it starts.
+   */
+  async planRun(dto: MoveBooksDto, user: RequestUser): Promise<BookMoveRunPlan> {
     const resolved = await this.resolvePlan(dto, user);
-    const { target } = resolved;
-
-    const involvedLibraryIds = [...new Set([target.libraryId, ...resolved.sourceLibraryIds])];
-    const releaseGate = this.acquireLibraries(involvedLibraryIds);
+    const involvedLibraryIds = [...new Set([resolved.target.libraryId, ...resolved.sourceLibraryIds])];
+    // Only a check: the run takes the gate when it starts, and waits in line while a library is held.
+    this.acquireLibraries(involvedLibraryIds)();
 
     const overrides = new Map((dto.overrides ?? []).map((override) => [override.bookId, override.policy]));
-    const work = this.selectWork(resolved.outcomes, dto.collisionPolicy, overrides);
-
-    let jobId: number;
-    try {
-      jobId = await this.moveRepo.createJob({
-        startedBy: user.id,
-        targetLibraryId: target.libraryId,
-        targetFolderId: target.folderId,
+    const subjectIds = this.selectWork(resolved.outcomes, dto.collisionPolicy, overrides).map((item) => item.plan.bookId);
+    const inRun = new Set(subjectIds);
+    return {
+      subjectIds,
+      options: {
+        targetLibraryId: resolved.target.libraryId,
+        targetFolderId: resolved.target.folderId,
+        collisionPolicy: dto.collisionPolicy,
+        overrides: [...overrides].filter(([bookId]) => inRun.has(bookId)).map(([bookId, policy]) => ({ bookId, policy })),
         sourceLibraryIds: resolved.sourceLibraryIds,
-        totalBooks: work.length,
-      });
-    } catch (error) {
-      releaseGate();
-      throw error;
+      },
+    };
+  }
+
+  /**
+   * Starts or continues a move run: takes the gate on its libraries, plans the books still to do
+   * again (some may have moved, gone or changed since the run was queued), stops the watchers and
+   * opens the `book_move_jobs` row the boot check repairs from. Answers `busy` while a library is held.
+   */
+  async prepareRun(run: BulkRunRow, actor: RequestUser): Promise<{ state: BookMoveRunState } | 'busy'> {
+    const options = run.options as Partial<BookMoveRunOptions>;
+    if (!isLibraryId(options.targetLibraryId) || !isLibraryId(options.targetFolderId)) {
+      throw new BadRequestException('The move run has no target library folder');
     }
+    const initial = [
+      ...new Set([options.targetLibraryId, ...(Array.isArray(options.sourceLibraryIds) ? options.sourceLibraryIds : [])].filter(isLibraryId)),
+    ];
+    const releaseInitial = this.libraryGate.tryAcquireAll(initial, 'book_move');
+    if (!releaseInitial) return 'busy';
 
-    this.logger.log(
-      `[${MOVE_EVENT}] [start] jobId=${jobId} userId=${user.id} toLibraryId=${target.libraryId} toFolderId=${target.folderId} ` +
-        `sourceLibraryIds=${resolved.sourceLibraryIds.join(',')} bookCount=${work.length} - book move started`,
-    );
-
-    let succeeded = 0;
-    let merged = 0;
-    let failed = 0;
-    let skipped = 0;
-    const movedByLibrary = new Map<number, number[]>();
+    const releases: LibraryOperationRelease[] = [releaseInitial];
+    const releaseGate: LibraryOperationRelease = () => {
+      for (const release of releases) release();
+    };
     const stoppedWatchers: number[] = [];
-
+    let jobId: number | null = null;
     try {
-      // Inside the try, so a failure here still frees the libraries and restarts what it stopped.
-      await this.stopWatchers(involvedLibraryIds, stoppedWatchers);
+      const target = await this.moveRepo.findTargetLibrary(options.targetLibraryId, options.targetFolderId);
+      if (!target) throw new NotFoundException('Target library folder not found');
+      const editable = new Set(await this.libraryScope.editableIds(actor));
+      if (!editable.has(target.libraryId)) throw new ForbiddenException(`Editor access is required for library ${target.libraryId} to move books`);
 
-      for (const item of work) {
-        if (options.isCancelled()) break;
-
-        if (item.skipReason) {
-          skipped++;
-          options.onProgress({ bookId: item.plan.bookId, status: 'skipped', reason: item.skipReason });
-          continue;
-        }
-
-        try {
-          const result = await this.executor.execute({
-            plan: item.plan,
-            target,
-            mergeDuplicateBookId: item.mergeDuplicateBookId,
-            userId: user.id,
-          });
-
-          if (result.status === 'success' || result.status === 'merged') {
-            if (result.status === 'merged') merged++;
-            else succeeded++;
-
-            const list = movedByLibrary.get(item.plan.sourceLibraryId);
-            if (list) list.push(item.plan.bookId);
-            else movedByLibrary.set(item.plan.sourceLibraryId, [item.plan.bookId]);
-
-            options.onProgress({ bookId: item.plan.bookId, status: result.status });
-          } else if (result.status === 'skipped') {
-            skipped++;
-            options.onProgress({ bookId: item.plan.bookId, status: 'skipped', reason: result.reason });
-          } else {
-            failed++;
-            options.onProgress({ bookId: item.plan.bookId, status: 'failed', reason: result.reason });
-          }
-        } catch (error) {
-          failed++;
-          options.onProgress({ bookId: item.plan.bookId, status: 'failed', reason: getErrorMessage(error) });
-        }
+      const remaining = run.subjectIds.slice(run.processed);
+      const found = new Map((await this.moveRepo.findMoveBookData(remaining)).map((book) => [book.bookId, book]));
+      const skips = new Map<number, MoveSkip>();
+      const reachable: MoveBookData[] = [];
+      for (const bookId of remaining) {
+        const book = found.get(bookId);
+        if (!book) skips.set(bookId, { code: 'not-found', reason: 'book no longer exists' });
+        else if (!editable.has(book.libraryId)) skips.set(bookId, { code: 'no-access', reason: 'no editor access to the source library' });
+        else reachable.push(book);
       }
 
-      const cancelled = options.isCancelled();
-      await this.moveRepo.finishJob(jobId, 'completed', { succeeded, merged, failed, skipped });
+      // A book that changed library while the run waited brings its new library under the gate too.
+      const extra = [...new Set(reachable.map((book) => book.libraryId))].filter((libraryId) => !initial.includes(libraryId));
+      if (extra.length > 0) {
+        const releaseExtra = this.libraryGate.tryAcquireAll(extra, 'book_move');
+        if (!releaseExtra) {
+          releaseGate();
+          return 'busy';
+        }
+        releases.push(releaseExtra);
+      }
+      const held = [...new Set([...initial, ...extra])];
+
+      const outcomes = await this.planBooks(target, reachable);
+      const overrides = new Map((options.overrides ?? []).map((override) => [override.bookId, override.policy]));
+      const work = new Map<number, MoveWork>();
+      for (const item of this.selectWork(outcomes, options.collisionPolicy ?? 'suggested', overrides)) work.set(item.plan.bookId, item);
+      for (const outcome of outcomes) {
+        const bookId = outcome.kind === 'ready' || outcome.kind === 'collision' ? outcome.plan.bookId : outcome.bookId;
+        if (work.has(bookId) || skips.has(bookId)) continue;
+        if (outcome.kind === 'already_in_target') skips.set(bookId, { code: 'already-in-target', reason: 'already in the target folder' });
+        else if (outcome.kind === 'ineligible') {
+          skips.set(bookId, { code: 'ineligible', reason: outcome.detail ? `${outcome.reason}: ${outcome.detail}` : outcome.reason });
+        } else skips.set(bookId, { code: 'collision-skipped', reason: 'skipped by the collision policy' });
+      }
+
+      const sourceLibraryIds = held.filter((libraryId) => libraryId !== target.libraryId);
+      jobId = await this.moveRepo.createJob({
+        startedBy: actor.id,
+        targetLibraryId: target.libraryId,
+        targetFolderId: target.folderId,
+        sourceLibraryIds,
+        totalBooks: remaining.length,
+      });
 
       this.logger.log(
-        `[${MOVE_EVENT}] [end] jobId=${jobId} userId=${user.id} durationMs=${Date.now() - startedAt} succeeded=${succeeded} ` +
-          `merged=${merged} failed=${failed} skipped=${skipped} cancelled=${cancelled} - book move completed`,
+        `[${MOVE_EVENT}] [start] runId=${run.id} jobId=${jobId} userId=${actor.id} toLibraryId=${target.libraryId} toFolderId=${target.folderId} ` +
+          `sourceLibraryIds=${sourceLibraryIds.join(',')} bookCount=${remaining.length} resumeAt=${run.processed} - book move started`,
       );
 
-      this.emitTransfers(movedByLibrary, target.libraryId);
-      await this.notifyCompletion(user.id, target, succeeded + merged, failed);
+      await this.stopWatchers(held, stoppedWatchers);
 
-      return { processed: succeeded + merged + failed + skipped, succeeded, merged, failed, skipped, cancelled };
+      return {
+        state: {
+          runId: run.id,
+          jobId,
+          userId: actor.id,
+          target,
+          work,
+          skips,
+          releaseGate,
+          stoppedWatchers,
+          movedByLibrary: new Map(),
+          counts: { succeeded: 0, merged: 0, failed: 0, skipped: 0 },
+          editable: { actor, ids: editable },
+          startedAt: Date.now(),
+        },
+      };
     } catch (error) {
-      await this.moveRepo.finishJob(jobId, 'failed', { succeeded, merged, failed, skipped }, getErrorMessage(error));
-      this.logger.error(
-        `[${MOVE_EVENT}] [fail] jobId=${jobId} userId=${user.id} durationMs=${Date.now() - startedAt} ` +
-          `errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(getErrorMessage(error))}" - book move failed`,
-      );
-      this.emitTransfers(movedByLibrary, target.libraryId);
-      throw error;
-    } finally {
+      if (jobId !== null) {
+        await this.moveRepo
+          .finishJob(jobId, 'failed', { succeeded: 0, merged: 0, failed: 0, skipped: 0 }, getErrorMessage(error))
+          .catch(() => undefined);
+      }
       releaseGate();
       await this.restartWatchers(stoppedWatchers);
+      throw error;
     }
+  }
+
+  /** Moves one book of a started run and answers the route's per-book event for it. */
+  async moveOne(bookId: number, state: BookMoveRunState, actor: RequestUser): Promise<BulkItemOutcome> {
+    const skip = (code: string, reason: string): BulkItemOutcome => {
+      state.counts.skipped++;
+      return { outcome: 'skipped', code, event: { bookId, status: 'skipped', reason } satisfies BookMoveProgressEvent };
+    };
+
+    const planned = state.skips.get(bookId);
+    if (planned) return skip(planned.code, planned.reason);
+    const item = state.work.get(bookId);
+    if (!item) return skip('not-found', 'book no longer exists');
+
+    const editable = await this.editableFor(state, actor);
+    if (!editable.has(state.target.libraryId)) return skip('no-access', 'no editor access to the target library');
+    if (!editable.has(item.plan.sourceLibraryId)) return skip('no-access', 'no editor access to the source library');
+    if (item.skip) return skip(item.skip.code, item.skip.reason);
+
+    const fail = (reason: string): BulkItemOutcome => {
+      state.counts.failed++;
+      return { outcome: 'failed', code: 'move-failed', message: reason, event: { bookId, status: 'failed', reason } satisfies BookMoveProgressEvent };
+    };
+
+    try {
+      const result = await this.executor.execute({
+        plan: item.plan,
+        target: state.target,
+        mergeDuplicateBookId: item.mergeDuplicateBookId,
+        userId: state.userId,
+      });
+
+      if (result.status === 'success' || result.status === 'merged') {
+        if (result.status === 'merged') state.counts.merged++;
+        else state.counts.succeeded++;
+
+        const list = state.movedByLibrary.get(item.plan.sourceLibraryId);
+        if (list) list.push(bookId);
+        else state.movedByLibrary.set(item.plan.sourceLibraryId, [bookId]);
+
+        return {
+          outcome: 'succeeded',
+          ...(result.status === 'merged' ? { stats: { merged: 1 } } : {}),
+          event: { bookId, status: result.status } satisfies BookMoveProgressEvent,
+        };
+      }
+      if (result.status === 'skipped') return skip('move-skipped', result.reason);
+      return fail(result.reason);
+    } catch (error) {
+      return fail(getErrorMessage(error));
+    }
+  }
+
+  /**
+   * Ends a started run however it ended: tells the libraries which books left them, closes the
+   * `book_move_jobs` row, notifies the requester, frees the libraries and restarts the watchers.
+   * A run cancelled or stopped before it started holds nothing, so there is nothing to do.
+   */
+  async finishRun(run: BulkRunRow, state: BookMoveRunState | null, end: BulkRunEnd): Promise<void> {
+    if (!state) return;
+    const { counts } = state;
+    try {
+      this.emitTransfers(state.movedByLibrary, state.target.libraryId);
+      if (end === 'failed') {
+        const error = run.error ?? run.errorCode ?? 'Move run failed';
+        await this.moveRepo.finishJob(state.jobId, 'failed', counts, error);
+        this.logger.error(
+          `[${MOVE_EVENT}] [fail] runId=${run.id} jobId=${state.jobId} userId=${state.userId} durationMs=${Date.now() - state.startedAt} ` +
+            `errorClass=BulkRunFailed code=${run.errorCode ?? 'error'} error="${sanitizeLogValue(error)}" - book move failed`,
+        );
+        return;
+      }
+
+      await this.moveRepo.finishJob(state.jobId, 'completed', counts);
+      this.logger.log(
+        `[${MOVE_EVENT}] [end] runId=${run.id} jobId=${state.jobId} userId=${state.userId} durationMs=${Date.now() - state.startedAt} succeeded=${counts.succeeded} ` +
+          `merged=${counts.merged} failed=${counts.failed} skipped=${counts.skipped} cancelled=${end === 'cancelled'} - book move completed`,
+      );
+      // The run's totals, so a move continued after a restart reports everything it moved.
+      if (run.requestedBy !== null) await this.notifyCompletion(run.requestedBy, state.target, run.succeeded, run.failed);
+    } finally {
+      state.releaseGate();
+      await this.restartWatchers(state.stoppedWatchers);
+    }
+  }
+
+  /** The libraries the run's account may edit, read again whenever the run refreshed the account. */
+  private async editableFor(state: BookMoveRunState, actor: RequestUser): Promise<Set<number>> {
+    if (state.editable.actor !== actor) state.editable = { actor, ids: new Set(await this.libraryScope.editableIds(actor)) };
+    return state.editable.ids;
   }
 
   private acquireLibraries(libraryIds: number[]): LibraryOperationRelease {
@@ -278,6 +490,12 @@ export class BookMoveService implements OnApplicationBootstrap {
 
     await this.assertEditorAccess(user, [...new Set([...sourceLibraryIds, target.libraryId])]);
 
+    return { target, outcomes: await this.planBooks(target, books), totalSelected: bookIds.length, sourceLibraryIds };
+  }
+
+  private async planBooks(target: MoveTargetLibrary, books: MoveBookData[]): Promise<BookMovePlanOutcome[]> {
+    if (books.length === 0) return [];
+
     const pattern =
       target.fileNamingPattern ??
       (target.organizationMode === 'book_per_folder'
@@ -339,7 +557,7 @@ export class BookMoveService implements OnApplicationBootstrap {
       outcomes = this.planner.plan({ books, target, pattern, sanitizeForCrossPlatform, folderPathOwners, filePathOwners, hashOwners });
     }
 
-    return { target, outcomes, totalSelected: bookIds.length, sourceLibraryIds };
+    return outcomes;
   }
 
   private async assertEditorAccess(user: RequestUser, libraryIds: number[]): Promise<void> {
@@ -356,8 +574,8 @@ export class BookMoveService implements OnApplicationBootstrap {
     outcomes: BookMovePlanOutcome[],
     jobPolicy: BookMoveJobCollisionPolicy,
     overrides: Map<number, BookMoveCollisionPolicy>,
-  ): { plan: BookMovePlan; mergeDuplicateBookId: number | null; skipReason?: string }[] {
-    const work: { plan: BookMovePlan; mergeDuplicateBookId: number | null; skipReason?: string }[] = [];
+  ): MoveWork[] {
+    const work: MoveWork[] = [];
 
     for (const outcome of outcomes) {
       if (outcome.kind === 'ready') {
@@ -377,11 +595,7 @@ export class BookMoveService implements OnApplicationBootstrap {
     return work;
   }
 
-  private applyCollisionPolicy(
-    plan: BookMovePlan,
-    collision: PlanCollision,
-    policy: BookMoveCollisionPolicy,
-  ): { plan: BookMovePlan; mergeDuplicateBookId: number | null; skipReason?: string } | null {
+  private applyCollisionPolicy(plan: BookMovePlan, collision: PlanCollision, policy: BookMoveCollisionPolicy): MoveWork | null {
     if (policy === 'skip') return null;
 
     if (policy === 'merge') {
@@ -389,13 +603,13 @@ export class BookMoveService implements OnApplicationBootstrap {
       // meaningful when the two hold identical content; for a name-only clash it
       // would delete an unrelated book, so refuse instead of guessing.
       if (collision.kind !== 'hash_duplicate' || collision.existingBookId == null) {
-        return { plan, mergeDuplicateBookId: null, skipReason: 'merge only applies to identical copies' };
+        return { plan, mergeDuplicateBookId: null, skip: { code: 'merge-not-identical', reason: 'merge only applies to identical copies' } };
       }
       return { plan, mergeDuplicateBookId: collision.existingBookId };
     }
 
     if (collision.keepBothPlan === plan) {
-      return { plan, mergeDuplicateBookId: null, skipReason: 'no free destination name found' };
+      return { plan, mergeDuplicateBookId: null, skip: { code: 'no-free-name', reason: 'no free destination name found' } };
     }
     return { plan: collision.keepBothPlan, mergeDuplicateBookId: null };
   }

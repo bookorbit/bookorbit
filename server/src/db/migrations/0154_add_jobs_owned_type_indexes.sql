@@ -1,0 +1,4 @@
+ALTER TABLE "book_request_downloads" ADD COLUMN "failure_code" varchar(30);--> statement-breakpoint
+CREATE INDEX "book_merge_jobs_finish_idx" ON "book_merge_jobs" USING btree (coalesce("finished_at", "updated_at") desc,"id" desc) WHERE "book_merge_jobs"."status" in ('done', 'failed', 'rolled_back');--> statement-breakpoint
+CREATE INDEX "book_merge_jobs_user_finish_idx" ON "book_merge_jobs" USING btree ("requested_by_user_id",coalesce("finished_at", "updated_at") desc,"id" desc) WHERE "book_merge_jobs"."status" in ('done', 'failed', 'rolled_back');--> statement-breakpoint
+CREATE INDEX "book_requests_fulfiller_user_id_idx" ON "book_requests" USING btree ("fulfiller_user_id");

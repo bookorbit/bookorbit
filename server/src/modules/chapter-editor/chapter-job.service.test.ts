@@ -4,6 +4,7 @@ import { Permission, BOOK_CHAPTERS_ERROR_CODES } from '@bookorbit/types';
 import { appConfig } from '../../config/config';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { UserService } from '../user/user.service';
 import { ChapterEditorService } from './chapter-editor.service';
 import { ChapterJobRepository } from './chapter-job.repository';
@@ -17,13 +18,15 @@ async function setup() {
     find: vi.fn(),
     latest: vi.fn(),
     claim: vi.fn().mockResolvedValue(queued),
-    recover: vi.fn().mockResolvedValue(undefined),
+    recover: vi.fn().mockResolvedValue(0),
+    purgeFinished: vi.fn().mockResolvedValue(0),
     progress: vi.fn().mockResolvedValue(undefined),
     finish: vi.fn().mockResolvedValue(undefined),
   };
   const editor = { readEmbedded: vi.fn().mockResolvedValue({ chapters: [] }), revert: vi.fn(), writeToFiles: vi.fn() };
   const books = { verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
   const users = { findByIdWithPermissions: vi.fn().mockResolvedValue(user) };
+  const changes = { notify: vi.fn() };
   const module = await Test.createTestingModule({
     providers: [
       ChapterJobService,
@@ -31,10 +34,11 @@ async function setup() {
       { provide: ChapterEditorService, useValue: editor },
       { provide: BookService, useValue: books },
       { provide: UserService, useValue: users },
+      { provide: JobChangesService, useValue: changes },
       { provide: appConfig.KEY, useValue: { nodeEnv: 'test' } },
     ],
   }).compile();
-  return { service: module.get(ChapterJobService), repo, editor, books, users };
+  return { service: module.get(ChapterJobService), repo, editor, books, users, changes };
 }
 
 describe('ChapterJobService', () => {
@@ -88,5 +92,46 @@ describe('ChapterJobService', () => {
     await service.tick();
     expect(repo.claim).toHaveBeenCalledTimes(2);
     expect(repo.recover).toHaveBeenCalledTimes(2);
+  });
+
+  it('tells the Jobs area at enqueue, claim, progress and finish', async () => {
+    const { service, repo, editor, changes } = await setup();
+    repo.enqueue.mockResolvedValue({ id: 'job', kind: 'read', status: 'queued', filesWritten: 0, filesTotal: 0 });
+    await service.start(9, 'read', queued.baseRevision, user);
+    expect(changes.notify).toHaveBeenLastCalledWith({ type: 'chapter-edit', ownerId: 7, state: true });
+    changes.notify.mockClear();
+    editor.readEmbedded.mockImplementationOnce(async (_book, _user, progress) => {
+      await progress(1, 2);
+      return { chapters: [] };
+    });
+    await service.tick();
+    expect(changes.notify.mock.calls.map(([change]) => change)).toEqual([
+      { type: 'chapter-edit', ownerId: 7, state: true },
+      { type: 'chapter-edit', ownerId: 7, state: false },
+      { type: 'chapter-edit', ownerId: 7, state: true },
+    ]);
+  });
+
+  it('marks interrupted jobs failed at boot and says so only when there were some', async () => {
+    const { service, repo, changes } = await setup();
+    changes.notify.mockClear();
+    repo.recover.mockResolvedValueOnce(0);
+    await service.onModuleInit();
+    expect(changes.notify).not.toHaveBeenCalled();
+    repo.recover.mockResolvedValueOnce(2);
+    await service.onModuleInit();
+    expect(changes.notify).toHaveBeenCalledWith({ type: 'chapter-edit', ownerId: null, state: true });
+  });
+
+  it('purges finished jobs past the seven-day retention in housekeeping, not when a job is queued', async () => {
+    const { service, repo, changes } = await setup();
+    repo.purgeFinished.mockResolvedValueOnce(3);
+    const before = Date.now();
+    await expect(service.purge()).resolves.toBe(3);
+    const cutoff = (repo.purgeFinished.mock.calls[0]![0] as Date).getTime();
+    expect(Math.abs(before - 7 * 86_400_000 - cutoff)).toBeLessThan(5_000);
+    expect(changes.notify).toHaveBeenCalledWith({ type: 'chapter-edit', ownerId: null, state: true });
+    repo.purgeFinished.mockRejectedValueOnce(new Error('connection terminated'));
+    await expect(service.purge()).resolves.toBe(0);
   });
 });

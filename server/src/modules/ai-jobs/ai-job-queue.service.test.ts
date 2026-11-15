@@ -130,6 +130,15 @@ describe('AiJobQueueService.act', () => {
     expect((await q.queue.act(q.manager, 'cancel', [other.id])).results[0]).toMatchObject({ outcome: 'done', status: 'cancelled' });
   });
 
+  it('answers not-found for a job of another feature when the request is limited to one', async () => {
+    const q = makeQueue();
+    const job = q.row();
+    q.jobs.findByIds.mockResolvedValue([job]);
+    expect((await q.queue.act(q.manager, 'cancel', [job.id], 'another-feature')).results[0]).toMatchObject({ outcome: 'not-found' });
+    expect(q.service.cancelJob).not.toHaveBeenCalled();
+    expect((await q.queue.act(q.manager, 'cancel', [job.id], job.feature)).results[0]).toMatchObject({ outcome: 'done' });
+  });
+
   it('skips a job whose status the action does not apply to, and refuses an action the viewer may not take', async () => {
     const q = makeQueue();
     const running = q.row({ status: 'running' });

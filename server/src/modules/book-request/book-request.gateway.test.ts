@@ -6,8 +6,9 @@ import { AuthenticatorService } from '../auth/authenticator.service';
 function makeGateway() {
   const jwtService = { verify: vi.fn() };
   const authService = { validateSessionUser: vi.fn() };
-  const gateway = new BookRequestGateway(new AuthenticatorService(jwtService as never, authService as never) as any);
-  return { gateway, jwtService, authService };
+  const jobChanges = { notify: vi.fn() };
+  const gateway = new BookRequestGateway(new AuthenticatorService(jwtService as never, authService as never) as any, jobChanges as never);
+  return { gateway, jwtService, authService, jobChanges };
 }
 
 function makeClient(id = 'socket-1') {
@@ -76,5 +77,39 @@ describe('BookRequestGateway', () => {
 
     expect(emit).toHaveBeenCalledWith('book-requests:changed');
     expect(gateway.changeVersion).toBe(1);
+  });
+
+  it('tells the Jobs area that request downloads changed state', () => {
+    const { gateway, jobChanges } = makeGateway();
+
+    gateway.emitChanged();
+
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'request-download', ownerId: null, state: true });
+  });
+
+  it('hands an ordinary progress tick to the Jobs area as progress for each viewer', () => {
+    const { gateway, jobChanges } = makeGateway();
+    gateway.server = { to: vi.fn().mockReturnValue({ emit: vi.fn() }) } as any;
+
+    gateway.emitProgress({ requestId: 3, downloadId: 9, status: 'downloading', progressPercent: 40, downloadedBytes: 4, totalBytes: 10 }, [5, 8]);
+
+    expect(jobChanges.notify.mock.calls.map(([change]) => change)).toEqual([
+      { type: 'request-download', ownerId: 5, state: false },
+      { type: 'request-download', ownerId: 8, state: false },
+    ]);
+  });
+
+  it('hands a tick that changed the status to the Jobs area as one state change', () => {
+    const { gateway, jobChanges } = makeGateway();
+    gateway.server = { to: vi.fn().mockReturnValue({ emit: vi.fn() }) } as any;
+
+    gateway.emitProgress(
+      { requestId: 3, downloadId: 9, status: 'completed', progressPercent: 100, downloadedBytes: 10, totalBytes: 10 },
+      [5, 8],
+      true,
+    );
+
+    expect(jobChanges.notify).toHaveBeenCalledTimes(1);
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'request-download', ownerId: null, state: true });
   });
 });

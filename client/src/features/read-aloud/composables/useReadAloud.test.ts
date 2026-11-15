@@ -300,6 +300,21 @@ describe('useReadAloud', () => {
     expect(result.jobErrorKey.value).toBeNull()
   })
 
+  it('resumes a paused job and shows its place in line again', async () => {
+    const paused = makeJob({ status: 'queued', queuePosition: null, pausedAt: '2026-01-01T00:10:00.000Z' })
+    routeApi({
+      [`GET ${CAPABILITY_URL}`]: () => jsonResponse(makeCapability({ latestJob: paused })),
+      [`POST ${JOB_URL}/resume`]: () => jsonResponse(makeJob({ status: 'queued', queuePosition: 3, updatedAt: '2026-01-01T00:30:00.000Z' })),
+    })
+    const result = setup()
+    await flushPromises()
+
+    await expect(result.resume()).resolves.toBe(true)
+
+    expect(result.job.value).toMatchObject({ status: 'queued', pausedAt: null, queuePosition: 3 })
+    expect(result.jobErrorKey.value).toBeNull()
+  })
+
   it('rechecks availability when the book gains or loses a file', async () => {
     routeApi({ [`GET ${CAPABILITY_URL}`]: () => jsonResponse(makeCapability({ eligible: false, reason: 'no_epub', epubFiles: [] })) })
     const fileIds = ref<readonly number[]>([102, 103, 104])

@@ -1,6 +1,7 @@
 import { Module, type DynamicModule, type ModuleMetadata, type Provider } from '@nestjs/common';
 
 import { AuditModule } from '../audit/audit.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { NotificationModule } from '../notification/notification.module';
 import { UserModule } from '../user/user.module';
 import { AiArtifactRepository } from './ai-artifact.repository';
@@ -22,6 +23,7 @@ import { AiJobsGateway } from './ai-jobs.gateway';
 import { AiJobsService } from './ai-jobs.service';
 import { AiStepRates } from './ai-step-rates.service';
 import { AiStepTimingRepository } from './ai-step-timing.repository';
+import { StoryGuideJobSource } from './story-guide-job-source';
 import { AI_JOBS_PORTS, DISCONNECTED_AI_JOBS_PORTS } from './ai-jobs.ports';
 
 const PROVIDERS = [
@@ -43,6 +45,7 @@ const PROVIDERS = [
   AiJobsService,
   AiStepRates,
   AiStepTimingRepository,
+  StoryGuideJobSource,
 ];
 
 export interface AiJobsModuleOptions {
@@ -63,7 +66,7 @@ export class AiJobsModule {
     return {
       module: AiJobsModule,
       controllers: [AiJobsController],
-      imports: [AuditModule, NotificationModule, UserModule, ...(options.imports ?? [])],
+      imports: [AuditModule, JobsModule, NotificationModule, UserModule, ...(options.imports ?? [])],
       providers: [...PROVIDERS, options.ports ?? { provide: AI_JOBS_PORTS, useValue: DISCONNECTED_AI_JOBS_PORTS }],
       // The lifecycle is exported so the AI connection can resume paused jobs as soon as a cause clears,
       // the change feed so a feature's pages can hear their jobs move, and the learned rates for estimates.

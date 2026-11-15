@@ -11,6 +11,8 @@ import {
   ClipboardCheck,
   Loader2,
   LocateFixed,
+  Pause,
+  Play,
   RotateCcw,
   TriangleAlert,
   X,
@@ -51,6 +53,7 @@ const emit = defineEmits<{
   cancel: []
   publish: []
   retry: []
+  resume: []
   resync: [decisions: ReadAloudDecisions]
   dismiss: []
   startOver: []
@@ -69,6 +72,8 @@ let clock: ReturnType<typeof setInterval> | null = null
 
 const status = computed(() => props.job.status)
 const queued = computed(() => status.value === 'queued')
+/** Held off the worker from the Jobs area; still queued, so it keeps blocking a second job and can be cancelled. */
+const paused = computed(() => queued.value && props.job.pausedAt !== null)
 const processing = computed(() => status.value === 'processing')
 const running = computed(() => queued.value || processing.value)
 const stopping = computed(() => running.value && props.job.cancelRequested)
@@ -99,6 +104,7 @@ const startedBy = computed(() => {
 
 const title = computed(() => {
   if (stopping.value) return t('book.detail.files.readAloud.job.stoppingTitle')
+  if (paused.value) return t('book.detail.files.readAloud.job.pausedTitle')
   if (queued.value) return t('book.detail.files.readAloud.job.queuedTitle')
   if (processing.value) return t(stageLabelKey(props.job.stage))
   if (review.value) return t('book.detail.files.readAloud.job.reviewTitle')
@@ -131,6 +137,7 @@ const stageDetail = computed(() => {
 /** Each part renders on its own, with a decorative separator between, rather than as one joined string. */
 const descriptionParts = computed<string[]>(() => {
   if (stopping.value) return [t('book.detail.files.readAloud.job.stoppingDescription')]
+  if (paused.value) return [t('book.detail.files.readAloud.job.pausedDescription')]
   if (queued.value) {
     return props.job.queuePosition === null ? [] : [t('book.detail.files.readAloud.job.queueAhead', { count: props.job.queuePosition })]
   }
@@ -270,7 +277,7 @@ onScopeDispose(stopClock)
 // When the controls someone was using disappear with the state that held them, keep the keyboard
 // in the card rather than dropping it on the page body.
 watch(
-  () => [props.job.status, props.job.cancelRequested, props.job.stage] as const,
+  () => [props.job.status, props.job.cancelRequested, props.job.stage, props.job.pausedAt] as const,
   async () => {
     const hadFocus = root.value?.contains(document.activeElement) ?? false
     await nextTick()
@@ -298,6 +305,10 @@ function handleResync(decisions: ReadAloudDecisions): void {
 
 function handleRetry(): void {
   if (!busy.value) emit('retry')
+}
+
+function handleResume(): void {
+  if (!busy.value) emit('resume')
 }
 
 function handleStartOver(): void {
@@ -349,7 +360,8 @@ function handleReloadEvents(): void {
     <div class="flex flex-col gap-3 px-3.5 py-3.5">
       <div class="flex items-start gap-2.5">
         <span class="mt-px flex size-5 shrink-0 items-center justify-center" aria-hidden="true">
-          <Loader2 v-if="running" class="size-4 animate-spin text-primary motion-reduce:animate-none" />
+          <Pause v-if="paused" class="size-4 text-muted-foreground" />
+          <Loader2 v-else-if="running" class="size-4 animate-spin text-primary motion-reduce:animate-none" />
           <ClipboardCheck v-else-if="review" class="size-4 text-warning" />
           <CircleCheck v-else-if="complete" class="size-4 text-success" />
           <CircleAlert v-else-if="failed && !expired" class="size-4 text-destructive" />
@@ -432,6 +444,18 @@ function handleReloadEvents(): void {
       <p v-if="errorKey" role="alert" class="text-[12.5px] text-destructive">{{ t(errorKey) }}</p>
 
       <div class="flex flex-wrap items-center gap-2">
+        <button
+          v-if="paused && job.canManage && !stopping"
+          type="button"
+          class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+          :disabled="busy"
+          data-test="read-aloud-resume"
+          @click="handleResume"
+        >
+          <Loader2 v-if="action === 'resume'" class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <Play v-else class="size-3.5" aria-hidden="true" />
+          {{ t('book.detail.files.readAloud.job.resume') }}
+        </button>
         <ReadAloudInlineConfirm
           v-if="running && job.canManage && job.cancellable && !stopping && !publishing"
           :label="t('book.detail.files.readAloud.job.cancel')"

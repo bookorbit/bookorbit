@@ -23,6 +23,12 @@ export const scanJobs = pgTable(
   (t) => [
     index('scan_jobs_library_status_idx').on(t.libraryId, t.status),
     index('scan_jobs_library_started_at_idx').on(t.libraryId, sql`${t.startedAt} desc`),
+    // History and Failed in the Jobs area; a background scan that found nothing is not listed.
+    index('scan_jobs_history_idx')
+      .on(sql`coalesce(${t.completedAt}, ${t.startedAt}) desc`, sql`${t.id} desc`)
+      .where(
+        sql`${t.status} in ('completed', 'failed') and not (${t.status} = 'completed' and ${t.triggeredBy} <> 'manual' and ${t.addedCount} = 0 and ${t.updatedCount} = 0 and ${t.missingCount} = 0)`,
+      ),
     check('scan_jobs_status_chk', sql`${t.status} in ('running', 'completed', 'failed')`),
     check('scan_jobs_triggered_by_chk', sql`${t.triggeredBy} in ('manual', 'watcher', 'schedule')`),
     check('scan_jobs_added_count_nonnegative_chk', sql`${t.addedCount} >= 0`),

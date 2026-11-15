@@ -51,6 +51,7 @@ import { UpdateAuthorDto } from './dto/update-author.dto';
 import { AuthorsService } from './authors.service';
 import { AuthorEnrichmentOrchestratorService } from './author-enrichment-orchestrator.service';
 import { AuthorEnrichmentRepository } from './author-enrichment.repository';
+import { BulkRunsService } from '../bulk-runs/bulk-runs.service';
 
 @Controller('authors')
 export class AuthorsController {
@@ -60,6 +61,7 @@ export class AuthorsController {
     private readonly enrichmentConfig: AuthorEnrichmentConfigService,
     private readonly queueRepo: AuthorEnrichmentRepository,
     private readonly metadataPreferences: AuthorMetadataPreferencesService,
+    private readonly bulkRuns: BulkRunsService,
   ) {}
 
   @Get()
@@ -97,32 +99,18 @@ export class AuthorsController {
   @RequirePermission(Permission.LibraryEditMetadata)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
   async bulkRefreshMetadata(@Body() dto: BulkRefreshAuthorsMetadataDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
+    const authorIds = await this.authorsService.authorizeBulkRefresh(user, dto.authorIds);
+    await this.bulkRuns.startAndStream(reply, {
+      kind: 'author-refresh-metadata',
+      subjectIds: authorIds,
+      options: { ignoreCache: dto.ignoreCache === true },
+      actor: user,
+      audit: {
+        action: AuditAction.AuthorBulkMetadataRefresh,
+        resource: AuditResource.Author,
+        description: (count) => `Bulk refreshed metadata for ${count} author${count !== 1 ? 's' : ''}`,
+      },
     });
-    const sendEvent = (event: object) => {
-      if (reply.raw.destroyed || reply.raw.writableEnded) {
-        throw new Error('SSE stream closed');
-      }
-      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    };
-    try {
-      const result = await this.authorsService.bulkRefreshMetadata(
-        dto.authorIds,
-        user,
-        (event) => {
-          sendEvent(event);
-        },
-        { ignoreCache: dto.ignoreCache === true },
-      );
-      sendEvent({ done: true, ...result });
-    } finally {
-      if (!reply.raw.destroyed && !reply.raw.writableEnded) {
-        reply.raw.end();
-      }
-    }
   }
 
   @Get('enrichment/config')

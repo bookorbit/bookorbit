@@ -217,12 +217,14 @@ export class BookMergeExecutor {
         outcome.status = unresolved.length === 0 ? 'rolled_back' : 'failed';
         outcome.errorCode = code;
         const failedPaths = unresolved.map((move) => `${move.to} -> ${move.from}`).join('; ');
+        // Stamped here as well as in the service's finish, so a crash between the two leaves no ended row without it.
         await this.repository.updateJob(job.id, {
           status: unresolved.length === 0 ? 'rolled_back' : 'failed',
           outcomes,
           errorCode: code,
           error: unresolved.length === 0 ? sanitizeLogValue(message) : sanitizeLogValue(`${message}; not restored: ${failedPaths}`),
           moves: unresolved.length === 0 ? [] : journal,
+          finishedAt: new Date(),
         });
         return { outcomes, merged, movedFileCount, crossDevice, rolledBack: unresolved.length === 0, failed: unresolved.length > 0, errorCode: code };
       }

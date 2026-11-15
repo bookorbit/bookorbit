@@ -113,6 +113,11 @@ export const aiConfig = registerAs('ai', () => ({
   encryptionKey: process.env.AI_ENCRYPTION_KEY ?? '',
 }));
 
+/** How many bulk runs the server works through at once, across every account. */
+export const bulkRunsConfig = registerAs('bulkRuns', () => ({
+  maxConcurrent: Number(process.env.BULK_RUNS_MAX_CONCURRENT ?? 3),
+}));
+
 export const oidcRuntimeConfig = registerAs('oidcRuntime', () => ({
   stateTtlMs: parsePositiveInteger(process.env.OIDC_STATE_TTL_SECS, 300) * 1000,
   discoveryCacheTtlMs: parsePositiveInteger(process.env.OIDC_DISCOVERY_CACHE_TTL_SECS, 3600) * 1000,

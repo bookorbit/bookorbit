@@ -2777,79 +2777,103 @@ describe('BookService', () => {
       expect(bookMetadataLockService.assertFieldsUnlocked).not.toHaveBeenCalled();
     });
 
-    it('stops bulk metadata refresh when cancelled', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
-      const onProgress = vi.fn();
+    describe('bulk run items', () => {
+      it('refreshMetadataBulkItem refreshes one book live or from the cache as asked', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        const user = makeUser();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
 
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-        { id: 3, libraryId: 7 },
-      ]);
+        await expect(service.refreshMetadataBulkItem(1, user)).resolves.toEqual({ status: 'success', detail: { id: 1 } });
+        await service.refreshMetadataBulkItem(1, user, { ignoreCache: true });
 
-      const result = await service.bulkRefreshMetadata([1, 2, 3], user, onProgress, {
-        isCancelled: () => refreshSpy.mock.calls.length > 0,
+        expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(user, 7, 'editor');
+        expect(refreshSpy).toHaveBeenNthCalledWith(1, 1, false, user, { cacheDirective: { policy: 'default', allowFallback: true } });
+        expect(refreshSpy).toHaveBeenNthCalledWith(2, 1, false, user, { cacheDirective: { policy: 'refresh', allowFallback: true } });
       });
 
-      expect(result).toEqual({ processed: 1, failed: 0 });
-      expect(refreshSpy).toHaveBeenCalledTimes(1);
-      expect(onProgress).toHaveBeenCalledTimes(1);
-    });
+      it('refreshMetadataBulkItem turns a provider failure into a failed item instead of a throw', async () => {
+        const { service, bookRepo } = makeService();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        vi.spyOn(service, 'refreshMetadata').mockRejectedValue(new Error('provider timeout'));
 
-    it('stops bulk metadata refresh when progress callback throws', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
+        await expect(service.refreshMetadataBulkItem(1, makeUser())).resolves.toEqual({ status: 'failed', error: 'provider timeout' });
+      });
 
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-      ]);
+      it('passes over a book deleted or out of reach since the run was queued', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        const user = makeUser();
+        const refreshSpy = vi.spyOn(service, 'refreshMetadata');
+        bookRepo.findLibraryIdByBookId.mockResolvedValueOnce(null).mockResolvedValueOnce(7);
+        libraryService.verifyAccessLevel.mockRejectedValueOnce(new ForbiddenException('Editor access required'));
 
-      const onProgress = vi
-        .fn()
-        .mockImplementationOnce(() => {
-          throw new Error('stream closed');
-        })
-        .mockImplementation(() => undefined);
+        await expect(service.refreshMetadataBulkItem(1, user)).resolves.toEqual({ status: 'skipped', code: 'not-found' });
+        await expect(service.refreshMetadataBulkItem(2, user)).resolves.toEqual({ status: 'skipped', code: 'no-access' });
 
-      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
+        expect(refreshSpy).not.toHaveBeenCalled();
+      });
 
-      expect(result).toEqual({ processed: 1, failed: 0 });
-      expect(refreshSpy).toHaveBeenCalledTimes(1);
-      expect(onProgress).toHaveBeenCalledTimes(1);
-    });
+      it('passes over a book deleted between the access check and the refresh', async () => {
+        const { service, bookRepo } = makeService();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        vi.spyOn(service, 'refreshMetadata').mockRejectedValue(new NotFoundException('Book 1 not found'));
 
-    it('bulkRefreshMetadata delegates each item to non-preview refreshMetadata', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
-      const onProgress = vi.fn();
+        await expect(service.refreshMetadataBulkItem(1, makeUser())).resolves.toEqual({ status: 'skipped', code: 'not-found' });
+      });
 
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-      ]);
+      it('reExtractCoverBulkItem reads only that book and reports attempted, locked and sourceless books', async () => {
+        const { service, bookRepo, bookMetadataLockService, metadataService } = makeService();
+        const user = makeUser();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        bookRepo.findCoverSourceFilesByBookIds.mockImplementation((ids: number[]) =>
+          Promise.resolve(
+            ids
+              .filter((id) => id !== 3)
+              .map((id) => ({
+                id: id * 10,
+                bookId: id,
+                absolutePath: `/books/${id}.epub`,
+                format: 'epub',
+                role: 'content',
+                sizeBytes: 10,
+                mediaOverlayAvailable: false,
+                formatPriority: ['epub', 'm4b'],
+              })),
+          ),
+        );
+        bookMetadataLockService.getCoverLockedBookIds.mockImplementation((ids: number[]) => Promise.resolve(new Set(ids.filter((id) => id === 2))));
+        metadataService.refreshCoverForBook.mockResolvedValue(true);
 
-      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
+        await expect(service.reExtractCoverBulkItem(1, user)).resolves.toEqual({ status: 'attempted', updated: true });
+        await expect(service.reExtractCoverBulkItem(2, user)).resolves.toEqual({ status: 'locked' });
+        await expect(service.reExtractCoverBulkItem(3, user)).resolves.toEqual({ status: 'no-source' });
 
-      expect(result).toEqual({ processed: 2, failed: 0 });
-      expect(refreshSpy).toHaveBeenCalledWith(1, false, user, { cacheDirective: { policy: 'default', allowFallback: true } });
-      expect(refreshSpy).toHaveBeenCalledWith(2, false, user, { cacheDirective: { policy: 'default', allowFallback: true } });
-      expect(onProgress).toHaveBeenCalledTimes(2);
-    });
+        expect(bookRepo.findCoverSourceFilesByBookIds.mock.calls).toEqual([[[1]], [[2]], [[3]]]);
+        expect(metadataService.refreshCoverForBook).toHaveBeenCalledOnce();
+        expect(metadataService.refreshCoverForBook).toHaveBeenCalledWith(1, '/books/1.epub', 'epub', 'ebook');
+      });
 
-    it('bulkRefreshMetadata asks providers live when the caller ignores the cache', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+      it('reExtractCoverBulkItem passes over a book the actor can no longer edit', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        libraryService.verifyAccessLevel.mockRejectedValue(new ForbiddenException('Editor access required'));
 
-      await service.bulkRefreshMetadata([1], user, undefined, { ignoreCache: true });
+        await expect(service.reExtractCoverBulkItem(1, makeUser())).resolves.toEqual({ status: 'skipped', code: 'no-access' });
 
-      expect(refreshSpy).toHaveBeenCalledWith(1, false, user, { cacheDirective: { policy: 'refresh', allowFallback: true } });
+        expect(bookRepo.findCoverSourceFilesByBookIds).not.toHaveBeenCalled();
+      });
+
+      it('findReadAlongBookIds reads the selection in bounded chunks', async () => {
+        const { service, fileWriteService } = makeService();
+        const ids = Array.from({ length: 2500 }, (_, index) => index + 1);
+        fileWriteService.findBookIdsWithReadAlongFiles.mockImplementation((chunk: number[]) =>
+          Promise.resolve(chunk.filter((id) => id % 1000 === 0)),
+        );
+
+        await expect(service.findReadAlongBookIds(ids)).resolves.toEqual(new Set([1000, 2000]));
+
+        expect(fileWriteService.findBookIdsWithReadAlongFiles.mock.calls.map(([chunk]) => (chunk as number[]).length)).toEqual([1000, 1000, 500]);
+      });
     });
 
     it('removes every content file before deleting records, then cleans up covers', async () => {
@@ -4517,46 +4541,6 @@ describe('BookService', () => {
       pipeline.runWithSources.mockRejectedValue(new Error('provider timeout'));
 
       await expect(service.refreshMetadata(1, false, user)).rejects.toThrow('provider timeout');
-    });
-
-    it('bulkRefreshMetadata increments failed count when individual books fail', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-      ]);
-      const refreshSpy = vi
-        .spyOn(service, 'refreshMetadata')
-        .mockRejectedValueOnce(new Error('failed one'))
-        .mockResolvedValueOnce({ id: 2 } as never);
-      const onProgress = vi.fn();
-
-      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
-
-      expect(result).toEqual({ processed: 1, failed: 1 });
-      expect(refreshSpy).toHaveBeenCalledTimes(2);
-      expect(onProgress).toHaveBeenCalledTimes(2);
-    });
-
-    it('bulkRefreshMetadata returns zero counts without checking access when no books are requested', async () => {
-      const { service, bookRepo } = makeService();
-
-      await expect(service.bulkRefreshMetadata([], makeUser())).resolves.toEqual({ processed: 0, failed: 0 });
-
-      expect(bookRepo.findLibraryIdsByBookIds).not.toHaveBeenCalled();
-    });
-
-    it('bulkRefreshMetadata logs and rethrows access failures before iteration starts', async () => {
-      const { service } = makeService();
-      const warnSpy = vi.spyOn((service as unknown as { logger: { warn: (message: string) => void } }).logger, 'warn').mockImplementation();
-      const user = makeUser();
-      const accessError = new ForbiddenException('denied');
-      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockRejectedValue(accessError);
-
-      await expect(service.bulkRefreshMetadata([1], user)).rejects.toThrow(accessError);
-
-      expect(warnSpy).toHaveBeenCalled();
     });
 
     it('bulkReExtractCover aborts early when cancellation is requested', async () => {
@@ -6690,97 +6674,49 @@ describe('BookService', () => {
     });
   });
 
-  describe('bulkEmbedAudioCover', () => {
+  describe('embedAudioCoverBulkItem', () => {
     const user = makeUser({ id: 7 });
 
-    function arrange(candidates: number[]) {
+    function arrange() {
       const context = makeService();
-      context.bookRepo.findLibraryIdsByBookIds.mockImplementation((ids: number[]) => Promise.resolve(ids.map((id) => ({ id, libraryId: 7 }))));
       context.bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
-      context.fileWriteService.findBookIdsWithReadAlongFiles.mockResolvedValue(candidates);
       return context;
     }
 
-    it('visits only the books that hold a read-along EPUB and counts the rest as skipped', async () => {
-      const { service, fileWriteService } = arrange([2, 4]);
-      fileWriteService.embedAudioCover
-        .mockResolvedValueOnce({ status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 1 })
-        .mockResolvedValueOnce({ status: 'skipped', fieldsWritten: [], durationMs: 1, reason: 'audio cover unchanged' });
-      const events: unknown[] = [];
+    it('embeds one book as the actor and returns the write result', async () => {
+      const { service, fileWriteService } = arrange();
+      fileWriteService.embedAudioCover.mockResolvedValue({ status: 'success', code: 'embedded', fieldsWritten: ['audioCoverBytes'], durationMs: 1 });
 
-      const result = await service.bulkEmbedAudioCover([1, 2, 3, 4], user, (event) => events.push(event));
-
-      expect(result).toEqual({ processed: 4, succeeded: 1, failed: 0, skipped: 3, cancelled: false });
-      expect(fileWriteService.embedAudioCover.mock.calls).toEqual([
-        [2, 7],
-        [4, 7],
-      ]);
-      expect(events).toEqual([
-        { started: true, total: 2 },
-        { bookId: 2, status: 'success', reason: undefined },
-        { bookId: 4, status: 'skipped', reason: 'audio cover unchanged' },
-      ]);
-    });
-
-    it('records a book that fails without stopping the rest', async () => {
-      const { service, fileWriteService } = arrange([1, 2]);
-      fileWriteService.embedAudioCover
-        .mockRejectedValueOnce(new Error('db down'))
-        .mockResolvedValueOnce({ status: 'failed', fieldsWritten: [], durationMs: 1, reason: 'disk full' });
-      const events: unknown[] = [];
-
-      const result = await service.bulkEmbedAudioCover([1, 2], user, (event) => events.push(event));
-
-      expect(result).toEqual({ processed: 2, succeeded: 0, failed: 2, skipped: 0, cancelled: false });
-      expect(events).toEqual([
-        { started: true, total: 2 },
-        { bookId: 1, status: 'failed', reason: 'unexpected error' },
-        { bookId: 2, status: 'failed', reason: 'disk full' },
-      ]);
-    });
-
-    it('stops when cancelled, leaving the remaining books unvisited and uncounted', async () => {
-      const { service, fileWriteService } = arrange([1, 2]);
-      let calls = 0;
-      fileWriteService.embedAudioCover.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
-
-      const result = await service.bulkEmbedAudioCover([1, 2], user, undefined, { isCancelled: () => calls++ >= 1 });
-
-      expect(fileWriteService.embedAudioCover).toHaveBeenCalledTimes(1);
-      expect(result).toEqual({ processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: true });
-    });
-
-    it('stops before the next book when the progress stream is gone', async () => {
-      const { service, fileWriteService } = arrange([1, 2]);
-      fileWriteService.embedAudioCover.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 1 });
-      let events = 0;
-
-      const result = await service.bulkEmbedAudioCover([1, 2], user, () => {
-        if (++events > 1) throw new Error('SSE stream closed');
+      await expect(service.embedAudioCoverBulkItem(2, user)).resolves.toEqual({
+        status: 'success',
+        code: 'embedded',
+        fieldsWritten: ['audioCoverBytes'],
+        durationMs: 1,
       });
-
-      expect(fileWriteService.embedAudioCover).toHaveBeenCalledTimes(1);
-      expect(result.cancelled).toBe(true);
+      expect(fileWriteService.embedAudioCover).toHaveBeenCalledWith(2, 7);
     });
 
-    it('writes nothing when the stream is gone before the first book', async () => {
-      const { service, fileWriteService } = arrange([1, 2]);
+    it('records an unexpected error as a failed book instead of throwing', async () => {
+      const { service, fileWriteService } = arrange();
+      fileWriteService.embedAudioCover.mockRejectedValue(new Error('db down'));
 
-      const result = await service.bulkEmbedAudioCover([1, 2], user, () => {
-        throw new Error('SSE stream closed');
+      await expect(service.embedAudioCoverBulkItem(1, user)).resolves.toEqual({
+        status: 'failed',
+        code: 'failed',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: 'unexpected error',
       });
-
-      expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
-      expect(result.cancelled).toBe(true);
     });
 
-    it('checks the user may edit every selected book before reading any file list', async () => {
-      const { service, fileWriteService } = arrange([1]);
-      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockRejectedValue(new ForbiddenException('denied'));
+    it('passes over a book that is gone or no longer editable without touching its files', async () => {
+      const { service, bookRepo, libraryService, fileWriteService } = arrange();
+      bookRepo.findLibraryIdByBookId.mockResolvedValueOnce(null);
+      libraryService.verifyAccessLevel.mockRejectedValueOnce(new ForbiddenException('Editor access required'));
 
-      await expect(service.bulkEmbedAudioCover([1], user)).rejects.toThrow(ForbiddenException);
+      await expect(service.embedAudioCoverBulkItem(1, user)).resolves.toEqual(expect.objectContaining({ status: 'skipped', code: 'not-found' }));
+      await expect(service.embedAudioCoverBulkItem(2, user)).resolves.toEqual(expect.objectContaining({ status: 'skipped', code: 'no-access' }));
 
-      expect(fileWriteService.findBookIdsWithReadAlongFiles).not.toHaveBeenCalled();
       expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
     });
   });

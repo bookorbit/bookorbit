@@ -430,7 +430,7 @@ export class RequestVerificationService implements OnModuleInit {
     }
 
     const claimedDownload = download
-      ? await this.downloads.updateIf(download.id, ['needs_review'], { status: 'failed', errorMessage: reason })
+      ? await this.downloads.updateIf(download.id, ['needs_review'], { status: 'failed', errorMessage: reason, failureCode: 'discarded' })
       : undefined;
     if (download && !claimedDownload) {
       await this.requests.updateIf(requestId, ['failed'], {

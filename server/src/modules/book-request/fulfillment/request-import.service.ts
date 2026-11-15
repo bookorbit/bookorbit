@@ -254,6 +254,7 @@ export class RequestImportService implements OnApplicationBootstrap {
       await this.downloads.updateIf(download.id, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, {
         status: 'failed',
         errorMessage: 'The request was settled while this download was finishing, so nothing was imported',
+        failureCode: 'removed',
       });
       this.logger.log(
         `[book_request.import] [end] requestId=${request.id} downloadId=${download.id} durationMs=${Date.now() - started} - the request was settled while the download finished, so nothing was imported`,
@@ -273,6 +274,7 @@ export class RequestImportService implements OnApplicationBootstrap {
         totalBytes: download.totalBytes,
       },
       (await this.requests.findRequestViewerIds([request.id])).get(request.id) ?? [],
+      true,
     );
     this.gateway.emitChanged();
 
@@ -294,6 +296,7 @@ export class RequestImportService implements OnApplicationBootstrap {
           await this.downloads.updateIf(download.id, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, {
             status: 'failed',
             errorMessage: 'The request was settled while this download was finishing, so nothing was imported',
+            failureCode: 'removed',
           });
           this.gateway.emitChanged();
           return;

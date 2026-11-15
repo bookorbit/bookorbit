@@ -2,6 +2,7 @@ import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
 import {
+  Activity,
   BarChart3,
   BookPlus,
   Highlighter,
@@ -10,12 +11,11 @@ import {
   Library,
   PackageOpen,
   Shapes,
-  Sparkles,
   Trophy,
   Users,
   Wrench,
 } from '@lucide/vue'
-import { Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
+import { JOBS_VIEW_PERMISSIONS, Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
@@ -187,13 +187,14 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     permission: ['manage_libraries', 'library_delete_books', 'library_merge_books', 'library_edit_metadata'],
   },
   {
-    id: 'ai',
-    labelKey: 'aiArea.title',
-    icon: Sparkles,
+    id: 'jobs',
+    labelKey: 'jobsArea.title',
+    icon: Activity,
     zone: 'primary',
-    to: { name: 'ai-activity' },
-    isActive: (route) => routeNameStartsWith(route, 'ai-'),
-    permission: [Permission.ManageAppSettings, Permission.LibraryGenerateStoryGuide],
+    to: { name: 'jobs-activity' },
+    isActive: (route) => routeNameStartsWith(route, 'jobs-'),
+    permission: [...JOBS_VIEW_PERMISSIONS],
+    // Story guides are the only jobs listed so far, so the entry follows their switches until more types arrive.
     visible: (context) =>
       context.storyGuidesBuilding === true || (context.hasPermission(Permission.ManageAppSettings) && context.storyGuidesServed === true),
   },

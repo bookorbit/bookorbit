@@ -6,7 +6,7 @@ import {
   type RouteLocationNormalizedLoaded,
   type RouteRecordRaw,
 } from 'vue-router'
-import { Permission } from '@bookorbit/types'
+import { JOBS_VIEW_PERMISSIONS, Permission } from '@bookorbit/types'
 import { normalizeEmailTab } from '@/features/email/lib/email-tabs'
 import { normalizeMetadataTab, type MetadataTab } from '@/features/settings/lib/metadata-tabs'
 import { normalizeReaderTab, type ReaderTab } from '@/features/settings/lib/reader-tabs'
@@ -719,30 +719,33 @@ export const routes: RouteRecordRaw[] = [
         meta: { titleRow: true, title: (to) => fallbackById('titles.tag', numericParam(to, 'id')) },
       },
       {
-        path: '/ai',
-        component: () => import('@/features/ai/views/AiAreaView.vue'),
-        meta: { titleRow: true, requiredPermission: [Permission.ManageAppSettings, Permission.LibraryGenerateStoryGuide] },
+        path: '/jobs',
+        component: () => import('@/features/jobs/views/JobsAreaView.vue'),
+        meta: { titleRow: true, requiredPermission: [...JOBS_VIEW_PERMISSIONS] },
         children: [
-          { path: '', redirect: { name: 'ai-activity' } },
+          { path: '', redirect: { name: 'jobs-activity' } },
           {
             path: 'activity',
-            name: 'ai-activity',
-            component: () => import('@/features/ai/views/AiActivityView.vue'),
-            meta: { title: () => t('titles.aiActivity') },
+            name: 'jobs-activity',
+            component: () => import('@/features/jobs/views/JobsActivityView.vue'),
+            meta: { title: () => t('titles.jobs') },
           },
           {
             path: 'story-guides',
-            name: 'ai-story-guides',
+            name: 'jobs-story-guides',
             component: () => import('@/features/ai/views/AiStoryGuidesView.vue'),
             meta: {
               requiredPermission: Permission.ManageAppSettings,
-              permissionFallback: 'ai-activity',
+              permissionFallback: 'jobs-activity',
               title: () => t('titles.aiStoryGuides'),
             },
           },
-          { path: ':pathMatch(.*)*', redirect: { name: 'ai-activity' } },
+          { path: ':pathMatch(.*)*', redirect: '/jobs/activity' },
         ],
       },
+      // The AI area became Jobs; old links and bookmarks land on the same pages.
+      { path: '/ai/story-guides', redirect: { name: 'jobs-story-guides' } },
+      { path: '/ai/:pathMatch(.*)*', redirect: '/jobs/activity' },
       {
         path: '/tools',
         component: () => import('@/features/tools/views/ToolsView.vue'),

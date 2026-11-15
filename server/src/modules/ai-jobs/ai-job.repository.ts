@@ -34,6 +34,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { aiArtifacts, aiJobs, users, type AiJobRow, type NewAiArtifactRow, type NewAiJobRow } from '../../db/schema';
 import { AiJobChanges, type AiJobChangeKind } from './ai-job-changes.service';
+import { afterPosition, keysetOrder, microseconds, type JobKey, type JobPosition, type KeysetColumns } from '../jobs/job-keyset';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -68,6 +69,56 @@ export interface AiJobListFilter {
 }
 
 export type AiJobListRow = AiJobRow & { requesterName: string | null };
+
+/** Whose jobs a Jobs-area read covers: one account's, plus ownerless ones when the viewer may see them. Null covers every account. */
+export type AiJobOwnerFilter = { id: number; ownerless: boolean } | null;
+
+export interface AiJobPageQuery {
+  feature: string;
+  view: 'queue' | 'failed' | 'history';
+  owner: AiJobOwnerFilter;
+  /** Failed jobs that finished at or before this have aged into History. */
+  cutoffAt: Date;
+  after: JobPosition | null;
+  typeIndex: number;
+  limit: number;
+}
+
+/** What a Jobs-area row reads, with its place in the view's order. `rank` is a queued job's place in its feature's queue, else 0. */
+export type AiJobPageRow = Pick<AiJobRow, keyof typeof PAGE_COLUMNS> & { requesterName: string | null; rank: number; key: JobKey };
+
+/** The columns a Jobs-area row needs. */
+const PAGE_COLUMNS = {
+  id: aiJobs.id,
+  feature: aiJobs.feature,
+  kind: aiJobs.kind,
+  subjectRef: aiJobs.subjectRef,
+  status: aiJobs.status,
+  phase: aiJobs.phase,
+  done: aiJobs.done,
+  total: aiJobs.total,
+  reason: aiJobs.reason,
+  requestedBy: aiJobs.requestedBy,
+  costMicros: aiJobs.costMicros,
+  createdAt: aiJobs.createdAt,
+  startedAt: aiJobs.startedAt,
+  pausedAt: aiJobs.pausedAt,
+  finishedAt: aiJobs.finishedAt,
+  dismissedAt: aiJobs.dismissedAt,
+} as const;
+
+/** The same columns read back from a subquery that selected them. */
+function pick<T extends Record<keyof typeof PAGE_COLUMNS, unknown>>(source: T): Pick<T, keyof typeof PAGE_COLUMNS> {
+  return Object.fromEntries(Object.keys(PAGE_COLUMNS).map((key) => [key, source[key as keyof typeof PAGE_COLUMNS]])) as Pick<
+    T,
+    keyof typeof PAGE_COLUMNS
+  >;
+}
+
+const ENDED = ['completed', 'failed', 'cancelled'];
+
+/** When a job ended. Every terminal write sets `finished_at`; the fallback keeps a row from dropping out of a comparison on a null. */
+const FINISH = sql`coalesce(${aiJobs.finishedAt}, ${aiJobs.updatedAt})`;
 
 /**
  * Every status change is a conditional update, so the worker loop, a person's request and
@@ -441,6 +492,111 @@ export class AiJobRepository {
       .from(ranked)
       .where(inArray(ranked.id, [...ids]));
     return new Map(rows.map((row) => [row.id, row.position]));
+  }
+
+  /**
+   * One Jobs-area page of a feature's jobs, after a cursor position. The Queue ranks every queued
+   * job of the feature before the owner filter, so a person's rows carry their place among
+   * everyone's; ended views read straight off the finish-time index.
+   */
+  async pageForJobs(query: AiJobPageQuery): Promise<AiJobPageRow[]> {
+    return query.view === 'queue' ? await this.queuePage(query) : await this.endedPage(query);
+  }
+
+  /** How many of a feature's jobs each Jobs-area view holds, failed ones measured from `cutoffAt`. */
+  async countForJobs(feature: string, owner: AiJobOwnerFilter, cutoffAt: Date): Promise<AiJobListCounts> {
+    const [row] = await this.db
+      .select({
+        queue: sql<number>`count(*) filter (where ${inArray(aiJobs.status, UNFINISHED)})`.mapWith(Number),
+        failed: sql<number>`count(*) filter (where ${this.failedShown(cutoffAt)})`.mapWith(Number),
+        running: sql<number>`count(*) filter (where ${aiJobs.status} = 'running')`.mapWith(Number),
+        queued: sql<number>`count(*) filter (where ${aiJobs.status} = 'queued')`.mapWith(Number),
+        paused: sql<number>`count(*) filter (where ${aiJobs.status} = 'paused')`.mapWith(Number),
+      })
+      .from(aiJobs)
+      .where(and(eq(aiJobs.feature, feature), inArray(aiJobs.status, [...UNFINISHED, 'failed']), this.owned(owner)));
+    return {
+      queue: row?.queue ?? 0,
+      failed: row?.failed ?? 0,
+      history: 0,
+      running: row?.running ?? 0,
+      queued: row?.queued ?? 0,
+      paused: row?.paused ?? 0,
+    };
+  }
+
+  private async queuePage(query: AiJobPageQuery): Promise<AiJobPageRow[]> {
+    const ranked = this.db
+      .select({
+        ...PAGE_COLUMNS,
+        group: sql<number>`case ${aiJobs.status} when 'running' then 0 when 'queued' then 1 else 2 end`.as('job_group'),
+        rank: sql<number>`case when ${aiJobs.status} = 'queued' then row_number() over (partition by ${aiJobs.status} order by ${aiJobs.priority} desc, ${aiJobs.nextAttemptAt}, ${aiJobs.createdAt}) else 0 end`.as(
+          'job_rank',
+        ),
+        at: sql<number>`(extract(epoch from case ${aiJobs.status} when 'running' then coalesce(${aiJobs.startedAt}, timestamptz 'epoch') when 'queued' then ${aiJobs.createdAt} else coalesce(${aiJobs.pausedAt}, timestamptz 'epoch') end) * 1000000)::bigint`.as(
+          'job_at',
+        ),
+      })
+      .from(aiJobs)
+      .where(and(eq(aiJobs.feature, query.feature), inArray(aiJobs.status, UNFINISHED)))
+      .as('ranked');
+    const columns: KeysetColumns = {
+      prefix: [
+        { kind: 'number', expr: sql`${ranked.group}` },
+        { kind: 'number', expr: sql`${ranked.rank}` },
+      ],
+      suffix: [{ kind: 'number', expr: sql`${ranked.at}` }],
+      id: { kind: 'uuid', expr: sql`${ranked.id}` },
+    };
+    const owner =
+      query.owner === null ? undefined : or(eq(ranked.requestedBy, query.owner.id), query.owner.ownerless ? isNull(ranked.requestedBy) : undefined);
+    const rows = await this.db
+      .select({
+        ...pick(ranked),
+        group: sql<number>`${ranked.group}`.mapWith(Number),
+        rank: sql<number>`${ranked.rank}`.mapWith(Number),
+        at: sql<number>`${ranked.at}`.mapWith(Number),
+        requesterName: users.name,
+      })
+      .from(ranked)
+      .leftJoin(users, eq(users.id, ranked.requestedBy))
+      .where(and(owner, query.after ? afterPosition(columns, 'queue', query.after, query.typeIndex) : undefined))
+      .orderBy(...keysetOrder(columns, 'queue'))
+      .limit(query.limit);
+    return rows.map(({ group, rank, at, ...row }) => ({ ...row, rank, key: { prefix: [group, rank], suffix: [at], id: row.id } }));
+  }
+
+  private async endedPage(query: AiJobPageQuery): Promise<AiJobPageRow[]> {
+    const columns: KeysetColumns = { prefix: [{ kind: 'time', expr: FINISH }], suffix: [], id: { kind: 'uuid', expr: sql`${aiJobs.id}` } };
+    const view =
+      query.view === 'failed'
+        ? this.failedShown(query.cutoffAt)
+        : and(inArray(aiJobs.status, ENDED), or(ne(aiJobs.status, 'failed'), isNotNull(aiJobs.dismissedAt), sql`${FINISH} <= ${query.cutoffAt}`));
+    const rows = await this.db
+      .select({ ...PAGE_COLUMNS, finish: microseconds(FINISH), requesterName: users.name })
+      .from(aiJobs)
+      .leftJoin(users, eq(users.id, aiJobs.requestedBy))
+      .where(
+        and(
+          eq(aiJobs.feature, query.feature),
+          view,
+          this.owned(query.owner),
+          query.after ? afterPosition(columns, query.view, query.after, query.typeIndex) : undefined,
+        ),
+      )
+      .orderBy(...keysetOrder(columns, query.view))
+      .limit(query.limit);
+    return rows.map(({ finish, ...row }) => ({ ...row, rank: 0, key: { prefix: [finish], suffix: [], id: row.id } }));
+  }
+
+  /** Failed, not dismissed, and finished after the cutoff: what the Failed view still shows. */
+  private failedShown(cutoffAt: Date): SQL {
+    return and(eq(aiJobs.status, 'failed'), isNull(aiJobs.dismissedAt), sql`${FINISH} > ${cutoffAt}`)!;
+  }
+
+  private owned(owner: AiJobOwnerFilter): SQL | undefined {
+    if (owner === null) return undefined;
+    return or(eq(aiJobs.requestedBy, owner.id), owner.ownerless ? isNull(aiJobs.requestedBy) : undefined);
   }
 
   private scope(filter: AiJobListFilter): SQL | undefined {

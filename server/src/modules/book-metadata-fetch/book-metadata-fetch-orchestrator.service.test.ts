@@ -15,7 +15,7 @@ function baseConfig(enabled = true, triggerOnImport = true) {
   };
 }
 
-function makeService(withGateway = true) {
+function makeService(withGateway = true, withJobChanges = false) {
   const queueRepo = {
     resetAllProcessingOnBoot: vi.fn().mockResolvedValue(0),
     recoverStuckProcessing: vi.fn().mockResolvedValue(0),
@@ -76,6 +76,9 @@ function makeService(withGateway = true) {
   const gateway = {
     emitStatus: vi.fn(),
   };
+  const jobChanges = {
+    notify: vi.fn(),
+  };
   const notificationService = {
     notify: vi.fn().mockResolvedValue(undefined),
   };
@@ -98,6 +101,9 @@ function makeService(withGateway = true) {
     notificationService as never,
     coverStore as never,
     withGateway ? (gateway as never) : undefined,
+    undefined,
+    undefined,
+    withJobChanges ? (jobChanges as never) : undefined,
   );
 
   return {
@@ -114,6 +120,7 @@ function makeService(withGateway = true) {
     session,
     throttleTracker,
     gateway,
+    jobChanges,
     notificationService,
     coverStore,
   };
@@ -406,6 +413,55 @@ describe('BookMetadataFetchOrchestratorService', () => {
     queueRepo.getStatusSummary.mockResolvedValue({ queued: 1, processing: 0, failed: 0, latestFailureAt: null });
 
     await expect((service as any).emitStatus()).resolves.toBeUndefined();
+  });
+
+  it('tells the Jobs area about a status change as state and about moved numbers as progress', async () => {
+    const { service, queueRepo, jobChanges } = makeService(false, true);
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 4, processing: 1, failed: 0, latestFailureAt: null });
+
+    await (service as any).emitStatusNow();
+    await (service as any).emitStatusNow();
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 3, processing: 1, failed: 1, latestFailureAt: '2026-11-15T10:00:00.000Z' });
+    await (service as any).emitStatusNow();
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 2, processing: 1, failed: 2, latestFailureAt: '2026-11-15T10:00:01.000Z' });
+    await (service as any).emitStatusNow();
+    queueRepo.getStatusSummary.mockResolvedValue({ queued: 2, processing: 0, failed: 2, latestFailureAt: '2026-11-15T10:00:01.000Z' });
+    await (service as any).emitStatusNow();
+
+    expect(jobChanges.notify.mock.calls.map(([change]) => change)).toEqual([
+      { type: 'metadata-fetch', ownerId: null, state: true },
+      { type: 'metadata-fetch', ownerId: null, state: false },
+      { type: 'metadata-fetch', ownerId: null, state: true },
+      { type: 'metadata-fetch', ownerId: null, state: false },
+      { type: 'metadata-fetch', ownerId: null, state: true },
+    ]);
+  });
+
+  it('sends pause, resume, cancel and retry to the Jobs area as state changes through the coalesced emit', async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, queueRepo, jobChanges } = makeService(false, true);
+      vi.spyOn(service as any, 'pollOnce').mockResolvedValue(undefined);
+      queueRepo.getStatusSummary.mockResolvedValue({ queued: 0, processing: 0, failed: 3, latestFailureAt: '2026-11-15T10:00:00.000Z' });
+      queueRepo.requeueFailed.mockResolvedValue(3);
+
+      await (service as any).emitStatusNow();
+      // A pause with nothing waiting changes no row, but is still a state change.
+      await service.pause();
+      expect(jobChanges.notify).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(500);
+      expect(jobChanges.notify).toHaveBeenLastCalledWith({ type: 'metadata-fetch', ownerId: null, state: true });
+
+      await vi.advanceTimersByTimeAsync(500);
+      await service.resume();
+      await service.requeueFailed();
+      await service.cancelPending();
+      await vi.advanceTimersByTimeAsync(500);
+      expect(jobChanges.notify.mock.calls.map(([change]) => change.state)).toEqual([true, true, true, true]);
+      service.onModuleDestroy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('onApplicationBootstrap resets processing rows and schedules polling', async () => {

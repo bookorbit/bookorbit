@@ -10,6 +10,15 @@ vi.mock('../../api/book-move', () => ({
   executeMove: (...args: unknown[]) => executeMove(...args),
 }))
 
+const actOnJobs = vi.fn<(request: unknown) => Promise<{ results: { id: string; outcome: string; status: string | null }[] }>>()
+const toastInfo = vi.fn<(message: string, options?: unknown) => void>()
+const toastError = vi.fn<(message: string, options?: unknown) => void>()
+
+vi.mock('@/features/jobs/api/jobs.api', () => ({ actOnJobs: (request: unknown) => actOnJobs(request) }))
+vi.mock('vue-sonner', () => ({
+  toast: { info: (...args: [string, unknown?]) => toastInfo(...args), error: (...args: [string, unknown?]) => toastError(...args) },
+}))
+
 const { useMoveToLibrary } = await import('../useMoveToLibrary')
 
 const SELECTION = { bookIds: [1, 2] }
@@ -54,7 +63,28 @@ function sse(event: unknown): string {
 beforeEach(() => {
   fetchMovePreview.mockReset()
   executeMove.mockReset()
+  actOnJobs.mockReset()
+  toastInfo.mockReset()
+  toastError.mockReset()
 })
+
+/** A move's answer whose stream the test feeds by hand, naming its run in the header. */
+function liveResponse(runId = 'run-9') {
+  const encoder = new TextEncoder()
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  const body = new ReadableStream<Uint8Array>({
+    start(value) {
+      controller = value
+    },
+  })
+  return {
+    response: { ok: true, status: 200, body, headers: new Headers({ 'X-Bulk-Run-Id': runId }) } as unknown as Response,
+    send: (event: unknown) => controller.enqueue(encoder.encode(sse(event))),
+    close: () => controller.close(),
+  }
+}
+
+const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('preview', () => {
   it('stores the preview result', async () => {
@@ -309,7 +339,8 @@ describe('execute', () => {
     const summary = await move.execute(SELECTION, 2, 22)
 
     expect(summary).toBeNull()
-    expect(move.executeError.value).toMatch(/ended unexpectedly/i)
+    expect(move.executeError.value).toBe('The bulk action stopped before it finished.')
+    expect(move.step.value).toBe('done')
   })
 
   it('reports a pre-flight rejection from the server', async () => {
@@ -361,6 +392,106 @@ describe('execute', () => {
     await move.execute(SELECTION, 2, 22)
 
     expect(executeMove.mock.calls[0][1]).toBeInstanceOf(AbortSignal)
+  })
+})
+
+describe('bulk run', () => {
+  it('waits until the first book lands, then shows progress', async () => {
+    fetchMovePreview.mockResolvedValue(makePreview())
+    const live = liveResponse()
+    executeMove.mockResolvedValue(live.response)
+    const move = useMoveToLibrary()
+    await move.loadPreview(SELECTION, 2, 22)
+
+    const running = move.execute(SELECTION, 2, 22)
+    await flush()
+    expect(move.waiting.value).toBe(true)
+    expect(move.runId.value).toBe('run-9')
+
+    live.send({ bookId: 1, status: 'success' })
+    await flush()
+    expect(move.waiting.value).toBe(false)
+    expect(move.progress.value).toMatchObject({ processed: 1 })
+
+    live.send({ done: true, processed: 2, succeeded: 2, merged: 0, failed: 0, skipped: 0, cancelled: false })
+    live.close()
+    await running
+  })
+
+  it('cancels through Jobs and keeps following until the move says it stopped', async () => {
+    actOnJobs.mockResolvedValue({ results: [{ id: 'bulk-run:run-9', outcome: 'done', status: 'running' }] })
+    fetchMovePreview.mockResolvedValue(makePreview())
+    const live = liveResponse()
+    executeMove.mockResolvedValue(live.response)
+    const move = useMoveToLibrary()
+    await move.loadPreview(SELECTION, 2, 22)
+
+    const running = move.execute(SELECTION, 2, 22)
+    live.send({ bookId: 1, status: 'success' })
+    await flush()
+    await move.cancel()
+
+    expect(actOnJobs).toHaveBeenCalledWith({ action: 'cancel', ids: ['bulk-run:run-9'] })
+    expect(move.cancelling.value).toBe(true)
+    expect(move.step.value).toBe('progress')
+
+    live.send({ done: true, processed: 1, succeeded: 1, merged: 0, failed: 0, skipped: 0, cancelled: true })
+    live.close()
+
+    expect(await running).toMatchObject({ cancelled: true, succeeded: 1 })
+    expect(move.step.value).toBe('done')
+    expect(move.cancelling.value).toBe(false)
+  })
+
+  it('says so when the cancel is refused', async () => {
+    actOnJobs.mockResolvedValue({ results: [{ id: 'bulk-run:run-9', outcome: 'refused', status: 'running' }] })
+    fetchMovePreview.mockResolvedValue(makePreview())
+    const live = liveResponse()
+    executeMove.mockResolvedValue(live.response)
+    const move = useMoveToLibrary()
+    await move.loadPreview(SELECTION, 2, 22)
+
+    void move.execute(SELECTION, 2, 22)
+    await flush()
+    await move.cancel()
+
+    expect(move.cancelling.value).toBe(false)
+    expect(toastError).toHaveBeenCalledWith('Could not cancel the bulk action.')
+  })
+
+  it('says the account already has too many bulk actions on a 429', async () => {
+    fetchMovePreview.mockResolvedValue(makePreview())
+    executeMove.mockResolvedValue({
+      ok: false,
+      status: 429,
+      body: null,
+      json: async () => ({ message: 'Too many' }),
+    } as unknown as Response)
+    const move = useMoveToLibrary()
+    await move.loadPreview(SELECTION, 2, 22)
+
+    await move.execute(SELECTION, 2, 22)
+
+    expect(move.executeError.value).toBe('You already have 10 bulk actions waiting or running. Wait for one to finish, or cancel one in Jobs.')
+  })
+
+  it('lets a move in progress go on in the background when the dialog starts over', async () => {
+    fetchMovePreview.mockResolvedValue(makePreview())
+    const live = liveResponse()
+    executeMove.mockResolvedValue(live.response)
+    const move = useMoveToLibrary()
+    await move.loadPreview(SELECTION, 2, 22)
+
+    const running = move.execute(SELECTION, 2, 22)
+    await flush()
+    move.reset()
+    await running
+
+    expect(move.step.value).toBe('destination')
+    expect(toastInfo).toHaveBeenCalledWith(
+      'The bulk action keeps running in the background.',
+      expect.objectContaining({ action: expect.objectContaining({ label: 'Open Jobs' }) }),
+    )
   })
 })
 

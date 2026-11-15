@@ -124,7 +124,8 @@ export class ReadAloudWorkerService {
   private async adoptRunning(jobId: string): Promise<ReadAloudJobRow | null> {
     if (!JOB_ID.test(jobId)) return null;
     const row = await this.jobs.findById(jobId);
-    if (row?.status === 'queued') return await this.jobs.claimQueued(jobId);
+    // The worker is already running it, so a pause asked for since no longer holds.
+    if (row?.status === 'queued') return await this.jobs.claimQueued(jobId, { adopt: true });
     if (row && ACTIVE_STATUSES.has(row.status)) return null;
     // The cached health can predate the job ending, which is the usual case right after one finishes.
     const fresh = await this.worker.healthState(true);
@@ -200,7 +201,7 @@ export class ReadAloudWorkerService {
       const signature = `${state.stage}:${state.progress}:${state.stageDetail?.current ?? ''}`;
       if (updated && signature !== lastPushed) {
         lastPushed = signature;
-        await this.notifier.pushUpdate(updated);
+        await this.notifier.pushUpdate(updated, 'progress');
       }
       if (await this.jobs.isCancellationRequested(job.id)) return await this.cancelOnWorker(job.id, state);
 

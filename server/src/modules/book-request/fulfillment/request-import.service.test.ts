@@ -351,6 +351,7 @@ describe('RequestImportService.importDownload', () => {
         totalBytes: 4,
       },
       [3],
+      true,
     );
     expect(order.slice(0, 4)).toEqual(['request', 'download', 'progress', 'changed']);
   });

@@ -87,33 +87,34 @@ describe('sidebar nav registry', () => {
     ])
   })
 
-  it('places Dashboard, Book Dock, Requests, Tools and AI in the primary zone, above the entity sections', () => {
+  it('places Dashboard, Book Dock, Requests, Tools and Jobs in the primary zone, above the entity sections', () => {
     const primary = SIDEBAR_NAV_REGISTRY.filter((candidate) => candidate.zone === 'primary').map((candidate) => candidate.id)
 
-    expect(primary).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools', 'ai'])
+    expect(primary).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools', 'jobs'])
   })
 
-  it('hides AI from settings managers until story guides are building or exist', () => {
+  it('hides Jobs from settings managers until story guides are building or exist', () => {
     const manager = ['manage_app_settings']
 
-    expect(allowedIds(makeContext({ permissions: manager }))).not.toContain('ai')
-    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: false, storyGuidesServed: false }))).not.toContain('ai')
-    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: true }))).toContain('ai')
-    expect(allowedIds(makeContext({ permissions: manager, storyGuidesServed: true }))).toContain('ai')
+    expect(allowedIds(makeContext({ permissions: manager }))).not.toContain('jobs')
+    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: false, storyGuidesServed: false }))).not.toContain('jobs')
+    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: true }))).toContain('jobs')
+    expect(allowedIds(makeContext({ permissions: manager, storyGuidesServed: true }))).toContain('jobs')
   })
 
-  it('shows AI to builders only while the server builds story guides', () => {
+  it('shows Jobs to builders only while the server builds story guides', () => {
     const builder = ['library_generate_story_guide']
 
-    expect(allowedIds(makeContext({ permissions: builder }))).not.toContain('ai')
-    expect(allowedIds(makeContext({ permissions: builder, storyGuidesServed: true }))).not.toContain('ai')
-    expect(allowedIds(makeContext({ permissions: builder, storyGuidesBuilding: true }))).toContain('ai')
+    expect(allowedIds(makeContext({ permissions: builder }))).not.toContain('jobs')
+    expect(allowedIds(makeContext({ permissions: builder, storyGuidesServed: true }))).not.toContain('jobs')
+    expect(allowedIds(makeContext({ permissions: builder, storyGuidesBuilding: true }))).toContain('jobs')
   })
 
-  it('never shows AI without either permission, and keeps it lit on every AI route', () => {
-    expect(allowedIds(makeContext({ storyGuidesBuilding: true, storyGuidesServed: true }))).not.toContain('ai')
-    expect(entry('ai').isActive(makeRoute('ai-activity'))).toBe(true)
-    expect(entry('ai').isActive(makeRoute('ai-story-guides'))).toBe(true)
+  it('never shows Jobs without a permission that sees jobs, and keeps it lit on every Jobs route', () => {
+    expect(allowedIds(makeContext({ storyGuidesBuilding: true, storyGuidesServed: true }))).not.toContain('jobs')
+    expect(entry('jobs').isActive(makeRoute('jobs-activity'))).toBe(true)
+    expect(entry('jobs').isActive(makeRoute('jobs-story-guides'))).toBe(true)
+    expect(entry('jobs').to).toEqual({ name: 'jobs-activity' })
   })
 
   it('groups Statistics, History, Achievements and Annotations in the Reading zone', () => {

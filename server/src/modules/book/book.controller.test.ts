@@ -1,14 +1,18 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, HttpException, HttpStatus, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import { ZipArchive } from 'archiver';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
-import { Permission } from '@bookorbit/types';
+import { AuditAction, AuditResource, BULK_RUN_MAX_UNFINISHED, Permission } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
+import { BulkRunHandlerRegistry } from '../bulk-runs/bulk-run-handler.registry';
+import { BulkRunStreams } from '../bulk-runs/bulk-run-streams.service';
+import { BulkRunsService } from '../bulk-runs/bulk-runs.service';
+import { BookEmbedAudioCoverBulkHandler, BookReExtractCoverBulkHandler, BookRefreshMetadataBulkHandler } from './book-bulk-run-handlers';
 import { BookController } from './book.controller';
 import { FASTIFY_ROUTE_CONFIG_METADATA } from '@nestjs/platform-fastify/constants.js';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
@@ -133,9 +137,6 @@ function makeController() {
     deleteBooks: vi.fn(),
     searchAcrossLibraries: vi.fn(),
     globalQuery: vi.fn(),
-    bulkRefreshMetadata: vi.fn(),
-    bulkReExtractCover: vi.fn(),
-    bulkEmbedAudioCover: vi.fn(),
     embedAudioCover: vi.fn(),
     reExtractCover: vi.fn(),
     bulkSetMetadata: vi.fn(),
@@ -172,11 +173,15 @@ function makeController() {
   const fileWriteService = {
     findWriteLog: vi.fn(),
   };
+  const bulkRuns = {
+    startAndStream: vi.fn().mockResolvedValue(undefined),
+  };
 
   return {
-    controller: new BookController(bookService as never, fileWriteService as never),
+    controller: new BookController(bookService as never, fileWriteService as never, bulkRuns as never),
     bookService,
     fileWriteService,
+    bulkRuns,
   };
 }
 
@@ -456,32 +461,56 @@ describe('BookController', () => {
     });
   });
 
-  it('streams server-sent events for bulk metadata refresh progress', async () => {
-    const { controller, bookService } = makeController();
-    const { reply, raw } = makeReply();
-    bookService.bulkRefreshMetadata.mockImplementation(
-      (
-        _bookIds: number[],
-        _user: RequestUser,
-        onProgress: (event: { bookId: number; success: boolean; detail?: unknown; error?: string }) => void,
-        options?: { isCancelled?: () => boolean },
-      ) => {
-        expect(options?.isCancelled?.()).toBe(false);
-        onProgress({ bookId: 9, success: true });
-        return Promise.resolve({ processed: 1, failed: 0 });
-      },
+  it.each([
+    {
+      method: 'bulkRefreshMetadata' as const,
+      kind: 'book-refresh-metadata',
+      action: AuditAction.BookBulkMetadataRefresh,
+      one: 'Bulk refreshed metadata for 1 book',
+      many: 'Bulk refreshed metadata for 3 books',
+    },
+    {
+      method: 'bulkReExtractCover' as const,
+      kind: 'book-re-extract-cover',
+      action: AuditAction.BookBulkCoverReextract,
+      one: 'Bulk re-extracted covers for 1 book',
+      many: 'Bulk re-extracted covers for 3 books',
+    },
+    {
+      method: 'bulkEmbedAudioCover' as const,
+      kind: 'book-embed-audio-cover',
+      action: AuditAction.BookBulkEmbedAudioCover,
+      one: 'Bulk embedded audiobook covers for 1 book',
+      many: 'Bulk embedded audiobook covers for 3 books',
+    },
+  ])('starts a $kind bulk run on the resolved selection and audits the resolved count', async ({ method, kind, action, one, many }) => {
+    const { controller, bookService, bulkRuns } = makeController();
+    const { reply } = makeReply();
+    const user = makeUser();
+    const dto = { query: { libraryId: 3 } };
+    bookService.resolveSelectionToIds.mockResolvedValue([4, 5, 6]);
+
+    await controller[method](dto as never, user, reply);
+
+    expect(bookService.resolveSelectionToIds).toHaveBeenCalledWith(dto, user, 'editor');
+    expect(bulkRuns.startAndStream).toHaveBeenCalledWith(
+      reply,
+      expect.objectContaining({ kind, subjectIds: [4, 5, 6], actor: user, audit: expect.objectContaining({ action, resource: AuditResource.Book }) }),
     );
+    const { audit } = bulkRuns.startAndStream.mock.calls[0]![1] as { audit: { description: (count: number) => string } };
+    expect(audit.description(1)).toBe(one);
+    expect(audit.description(3)).toBe(many);
+  });
 
-    await controller.bulkRefreshMetadata({ bookIds: [9] }, makeUser(), reply);
+  it('passes ignoreCache to a bulk metadata refresh run only when asked', async () => {
+    const { controller, bulkRuns } = makeController();
+    const user = makeUser();
 
-    expect(raw.writeHead).toHaveBeenCalledWith(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 9, success: true })}\n\n`);
-    expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, processed: 1, failed: 0 })}\n\n`);
-    expect(raw.end).toHaveBeenCalled();
+    await controller.bulkRefreshMetadata({ bookIds: [9], ignoreCache: true }, user, makeReply().reply);
+    await controller.bulkRefreshMetadata({ bookIds: [9] }, user, makeReply().reply);
+
+    expect(bulkRuns.startAndStream.mock.calls[0]![1]).toEqual(expect.objectContaining({ options: { ignoreCache: true } }));
+    expect(bulkRuns.startAndStream.mock.calls[1]![1]).toEqual(expect.objectContaining({ options: {} }));
   });
 
   it('forwards explicit reading dates through the bulk status route', async () => {
@@ -499,7 +528,7 @@ describe('BookController', () => {
   it.each(['bulkRefreshMetadata', 'bulkReExtractCover', 'bulkEmbedAudioCover'] as const)(
     'rejects an unauthorized %s selection before starting SSE',
     async (method) => {
-      const { controller, bookService } = makeController();
+      const { controller, bookService, bulkRuns } = makeController();
       const { reply, raw } = makeReply();
       const user = makeUser();
       const error = new ForbiddenException('Editor access required');
@@ -508,74 +537,69 @@ describe('BookController', () => {
       await expect(controller[method]({ bookIds: [9] }, user, reply)).rejects.toBe(error);
 
       expect(bookService.resolveSelectionToIds).toHaveBeenCalledWith({ bookIds: [9] }, user, 'editor');
-      expect(bookService[method]).not.toHaveBeenCalled();
+      expect(bulkRuns.startAndStream).not.toHaveBeenCalled();
       expect(raw.writeHead).not.toHaveBeenCalled();
       expect(raw.write).not.toHaveBeenCalled();
     },
   );
 
-  it('stops sending SSE done event when client disconnects', async () => {
-    const { controller, bookService } = makeController();
-    const { reply, raw, emitRawEvent } = makeReply();
-    bookService.bulkRefreshMetadata.mockImplementation(
-      (
-        _bookIds: number[],
-        _user: RequestUser,
-        onProgress: (event: { bookId: number; success: boolean; detail?: unknown; error?: string }) => void,
-      ) => {
-        onProgress({ bookId: 9, success: true });
-        emitRawEvent('close');
-        return Promise.resolve({ processed: 1, failed: 0 });
+  describe('bulk run streams', () => {
+    function makeStreamingController(unfinished = 0) {
+      const { controller, bookService } = makeController();
+      const registry = new BulkRunHandlerRegistry();
+      for (const Handler of [BookRefreshMetadataBulkHandler, BookReExtractCoverBulkHandler, BookEmbedAudioCoverBulkHandler]) {
+        new Handler(registry, bookService as never).onModuleInit();
+      }
+      const repo = {
+        countUnfinished: vi.fn().mockResolvedValue(unfinished),
+        insert: vi.fn(),
+        findById: vi.fn(),
+      };
+      const service = new BulkRunsService(
+        repo as never,
+        registry,
+        new BulkRunStreams(),
+        { wake: vi.fn() } as never,
+        { notify: vi.fn() } as never,
+        { emit: vi.fn() } as never,
+      );
+      (controller as unknown as { bulkRuns: BulkRunsService }).bulkRuns = service;
+      return { controller, bookService, repo };
+    }
+
+    it.each([
+      { method: 'bulkRefreshMetadata' as const, done: { done: true, processed: 0, failed: 0 } },
+      { method: 'bulkReExtractCover' as const, done: { done: true, processed: 0, updated: 0 } },
+      { method: 'bulkEmbedAudioCover' as const, done: { done: true, processed: 0, succeeded: 0, failed: 0, skipped: 0, cancelled: false } },
+    ])('answers an empty $method selection with the empty done event and creates no run', async ({ method, done }) => {
+      const { controller, bookService, repo } = makeStreamingController();
+      const { reply, raw } = makeReply();
+      bookService.resolveSelectionToIds.mockResolvedValue([]);
+
+      await controller[method]({ query: {} } as never, makeUser(), reply);
+
+      expect(raw.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({ 'Content-Type': 'text/event-stream' }));
+      expect(raw.write).toHaveBeenCalledOnce();
+      expect(raw.write).toHaveBeenCalledWith(`data: ${JSON.stringify(done)}\n\n`);
+      expect(raw.end).toHaveBeenCalled();
+      expect(repo.insert).not.toHaveBeenCalled();
+    });
+
+    it.each(['bulkRefreshMetadata', 'bulkReExtractCover', 'bulkEmbedAudioCover'] as const)(
+      'answers %s with 429 before the stream when ten runs are unfinished',
+      async (method) => {
+        const { controller, repo } = makeStreamingController(BULK_RUN_MAX_UNFINISHED);
+        const { reply, raw } = makeReply();
+
+        const result = controller[method]({ bookIds: [9] }, makeUser(), reply);
+
+        await expect(result).rejects.toBeInstanceOf(HttpException);
+        await expect(result).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
+        expect(repo.insert).not.toHaveBeenCalled();
+        expect(raw.writeHead).not.toHaveBeenCalled();
+        expect(raw.write).not.toHaveBeenCalled();
       },
     );
-
-    await controller.bulkRefreshMetadata({ bookIds: [9] }, makeUser(), reply);
-
-    expect(raw.write).toHaveBeenCalledTimes(1);
-    expect(raw.write).toHaveBeenCalledWith(`data: ${JSON.stringify({ bookId: 9, success: true })}\n\n`);
-    expect(raw.end).not.toHaveBeenCalled();
-  });
-
-  it('streams server-sent events for bulk cover re-extraction progress', async () => {
-    const { controller, bookService } = makeController();
-    const { reply, raw } = makeReply();
-    bookService.bulkReExtractCover.mockImplementation(
-      (_bookIds: number[], _user: RequestUser, onProgress: (bookId: number) => void, options?: { isCancelled?: () => boolean }) => {
-        expect(options?.isCancelled?.()).toBe(false);
-        onProgress(12);
-        return Promise.resolve({ processed: 1, updated: 1 });
-      },
-    );
-
-    await controller.bulkReExtractCover({ bookIds: [12] }, makeUser(), reply);
-
-    expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 12 })}\n\n`);
-    expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, processed: 1, updated: 1 })}\n\n`);
-    expect(raw.end).toHaveBeenCalled();
-  });
-
-  it('streams server-sent events for bulk audiobook cover embedding progress', async () => {
-    const { controller, bookService } = makeController();
-    const { reply, raw } = makeReply();
-    const user = makeUser();
-    bookService.resolveSelectionToIds.mockResolvedValue([12]);
-    bookService.bulkEmbedAudioCover.mockImplementation(
-      (_bookIds: number[], _user: RequestUser, onProgress: (event: object) => void, options?: { isCancelled?: () => boolean }) => {
-        expect(options?.isCancelled?.()).toBe(false);
-        onProgress({ bookId: 12, status: 'success' });
-        return Promise.resolve({ processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: false });
-      },
-    );
-
-    await controller.bulkEmbedAudioCover({ bookIds: [12] }, user, reply);
-
-    expect(bookService.bulkEmbedAudioCover).toHaveBeenCalledWith([12], user, expect.any(Function), expect.any(Object));
-    expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ bookId: 12, status: 'success' })}\n\n`);
-    expect(raw.write).toHaveBeenNthCalledWith(
-      2,
-      `data: ${JSON.stringify({ done: true, processed: 1, succeeded: 1, failed: 0, skipped: 0, cancelled: false })}\n\n`,
-    );
-    expect(raw.end).toHaveBeenCalled();
   });
 
   it('embeds the audiobook cover of one book for the calling user', async () => {
@@ -1082,16 +1106,6 @@ describe('BookController', () => {
     );
   });
 
-  it('throws when writing to a closed sse stream', () => {
-    const { controller } = makeController();
-    const { reply } = makeReply();
-    const stream = (controller as any).createSseStream(reply);
-
-    stream.close();
-
-    expect(() => stream.send({ ping: true })).toThrow('SSE stream closed');
-  });
-
   it('invokes auditable descriptions for bulk and metadata actions', () => {
     const deleteAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.deleteBooks) as {
       getResourceId: (
@@ -1100,15 +1114,6 @@ describe('BookController', () => {
       ) => number | undefined;
       getMeta: (req: unknown, response: { total: number; books: { id: number; title: string | null }[]; omitted: number }) => Record<string, unknown>;
       description: (req: unknown, response: { total: number; books: { id: number; title: string | null }[]; omitted: number }) => string;
-    };
-    const bulkRefreshAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkRefreshMetadata) as {
-      description: (req: { body: { bookIds?: number[] } }) => string;
-    };
-    const bulkCoverAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkReExtractCover) as {
-      description: (req: { body: { bookIds?: number[] } }) => string;
-    };
-    const bulkEmbedAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.bulkEmbedAudioCover) as {
-      description: (req: { body: { bookIds?: number[] } }) => string;
     };
     const embedAudit = Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype.embedAudioCover) as {
       getResourceId: (req: { params: Record<string, string> }) => number;
@@ -1146,9 +1151,10 @@ describe('BookController', () => {
     expect(deleteAudit.getResourceId({}, singleDeletion)).toBe(1);
     expect(deleteAudit.getResourceId({}, bulkDeletion)).toBeUndefined();
     expect(deleteAudit.getMeta({}, bulkDeletion)).toEqual(bulkDeletion);
-    expect(bulkRefreshAudit.description({ body: { bookIds: [1] } })).toBe('Bulk refreshed metadata for 1 book');
-    expect(bulkCoverAudit.description({ body: { bookIds: [1, 2, 3] } })).toBe('Bulk re-extracted covers for 3 books');
-    expect(bulkEmbedAudit.description({ body: { bookIds: [1, 2] } })).toBe('Bulk embedded audiobook covers for 2 books');
+    // The bulk run routes audit once the selection is resolved, so a query selection logs its real count.
+    for (const method of ['bulkRefreshMetadata', 'bulkReExtractCover', 'bulkEmbedAudioCover'] as const) {
+      expect(Reflect.getMetadata(AUDITABLE_KEY, BookController.prototype[method])).toBeUndefined();
+    }
     expect(embedAudit.getResourceId({ params: { id: '42' } })).toBe(42);
     expect(embedAudit.description({ params: { id: '42' } })).toBe('Embedded audiobook cover in read-along EPUB of book #42');
     expect(bulkSetMetadataAudit.description({ body: { bookIds: [1, 2], field: 'language' } })).toBe('Bulk set language for 2 books');
@@ -1173,6 +1179,7 @@ describe('BookController', () => {
     const bulkMethods = [
       BookController.prototype.bulkRefreshMetadata,
       BookController.prototype.bulkReExtractCover,
+      BookController.prototype.bulkEmbedAudioCover,
       BookController.prototype.bulkSetStatus,
       BookController.prototype.bulkSetRating,
       BookController.prototype.bulkSetMetadata,

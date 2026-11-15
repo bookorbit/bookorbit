@@ -419,7 +419,7 @@ const icon = computed(() => FEATURE_ICONS[props.feature.id])
         <span class="flex-1" />
         <RouterLink
           v-if="feature.id === 'story-guides'"
-          :to="{ name: 'ai-story-guides' }"
+          :to="{ name: 'jobs-story-guides' }"
           class="inline-flex items-center gap-1 rounded-xs text-xs font-medium text-primary underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
           data-testid="ai-story-guides-link"
         >

@@ -1133,6 +1133,32 @@
   {
     "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
     "className": "ReadAloudController",
+    "methodName": "pause",
+    "httpMethod": "POST",
+    "path": "/read-aloud-jobs/:jobId/pause",
+    "permissions": ["Permission.LibraryGenerateReadAloud", "Permission.DemoRestricted"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
+    "className": "ReadAloudController",
+    "methodName": "resume",
+    "httpMethod": "POST",
+    "path": "/read-aloud-jobs/:jobId/resume",
+    "permissions": ["Permission.LibraryGenerateReadAloud", "Permission.DemoRestricted"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/read-aloud/read-aloud.controller.ts",
+    "className": "ReadAloudController",
     "methodName": "report",
     "httpMethod": "GET",
     "path": "/read-aloud-jobs/:jobId/report",
@@ -1599,5 +1625,55 @@
     "allowDefault": false,
     "useGuards": [],
     "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/jobs/jobs.controller.ts",
+    "className": "JobsController",
+    "methodName": "list",
+    "httpMethod": "GET",
+    "path": "/jobs",
+    "permissions": [
+      "Permission.ManageAppSettings",
+      "Permission.LibraryGenerateStoryGuide",
+      "Permission.LibraryGenerateReadAloud",
+      "Permission.LibraryMergeBooks",
+      "Permission.LibraryEditMetadata",
+      "Permission.LibraryDeleteBooks",
+      "Permission.BookRequestSelfFulfill",
+      "Permission.ManageBookRequests",
+      "Permission.ManageLibraries",
+      "Permission.ManageMetadataConfig"
+    ],
+    "permissionMode": "any",
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "interactive"
+  },
+  {
+    "file": "server/src/modules/jobs/jobs.controller.ts",
+    "className": "JobsController",
+    "methodName": "act",
+    "httpMethod": "POST",
+    "path": "/jobs/actions",
+    "permissions": [
+      "Permission.ManageAppSettings",
+      "Permission.LibraryGenerateStoryGuide",
+      "Permission.LibraryGenerateReadAloud",
+      "Permission.LibraryMergeBooks",
+      "Permission.LibraryEditMetadata",
+      "Permission.LibraryDeleteBooks",
+      "Permission.BookRequestSelfFulfill",
+      "Permission.ManageBookRequests",
+      "Permission.ManageLibraries",
+      "Permission.ManageMetadataConfig"
+    ],
+    "permissionMode": "any",
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "interactive"
   }
 ]

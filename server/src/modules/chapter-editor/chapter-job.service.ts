@@ -9,14 +9,18 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
+import { Interval } from '@nestjs/schedule';
 import { appConfig } from '../../config/config';
 import { Permission, type BookChapterJobKind } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookService } from '../book/book.service';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { UserService } from '../user/user.service';
 import { ChapterEditorService } from './chapter-editor.service';
-import { ChapterJobRepository } from './chapter-job.repository';
+import { CHAPTER_JOB_RETENTION_MS, ChapterJobRepository } from './chapter-job.repository';
+
+const PURGE_INTERVAL_MS = 60 * 60_000;
 
 @Injectable()
 export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
@@ -31,12 +35,15 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
     private readonly editor: ChapterEditorService,
     private readonly books: BookService,
     private readonly users: UserService,
+    private readonly changes: JobChangesService,
     @Inject(appConfig.KEY) private readonly app: ConfigType<typeof appConfig>,
   ) {}
 
   async start(bookId: number, kind: BookChapterJobKind, baseRevision: string, user: RequestUser, retry = false) {
     await this.books.verifyBookAccess(bookId, user, 'editor');
-    return this.repo.enqueue(bookId, user.id, kind, baseRevision, retry);
+    const job = await this.repo.enqueue(bookId, user.id, kind, baseRevision, retry);
+    this.changed(user.id);
+    return job;
   }
 
   async latest(bookId: number, user: RequestUser) {
@@ -52,8 +59,9 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
-    await this.repo.recover();
+    await this.recover();
     if (this.app.nodeEnv === 'test') return;
+    void this.purge();
     this.timer = setInterval(() => void this.tick(), 2_000);
     this.timer.unref();
   }
@@ -69,16 +77,20 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
     const startedAt = Date.now();
     try {
       if (this.needsRecovery) {
-        await this.repo.recover();
+        await this.recover();
         this.needsRecovery = false;
       }
       const job = await this.repo.claim();
       if (!job) return;
+      this.changed(job.userId);
       try {
         const user = await this.users.findByIdWithPermissions(job.userId);
         if (!user?.active || (!user.isSuperuser && !user.permissions.includes(Permission.LibraryEditMetadata))) throw new ForbiddenException();
         const dto = { baseRevision: job.baseRevision };
-        const progress = (done: number, total: number) => this.repo.progress(job.id, done, total);
+        const progress = async (done: number, total: number) => {
+          await this.repo.progress(job.id, done, total);
+          this.changed(job.userId, false);
+        };
         const result =
           job.kind === 'write'
             ? await this.editor.writeToFiles(job.bookId, dto, user, progress)
@@ -91,13 +103,14 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
         const code = typeof body === 'object' && body && 'errorCode' in body ? String(body.errorCode) : 'book_chapters_operation_failed';
         await this.repo.finish(job.id, undefined, code);
       }
+      this.changed(job.userId);
     } catch (error) {
       this.logger.warn(
         `[chapter_operation] [fail] durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - chapter operation failed`,
       );
       this.needsRecovery = true;
       try {
-        await this.repo.recover();
+        await this.recover();
         this.needsRecovery = false;
       } catch {
         // Retry recovery before claiming another operation when the database reconnects.
@@ -105,5 +118,33 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  /** Removes finished jobs older than the retention, off the request path. */
+  @Interval(PURGE_INTERVAL_MS)
+  async purge(): Promise<number> {
+    const startedAt = Date.now();
+    try {
+      const removed = await this.repo.purgeFinished(new Date(Date.now() - CHAPTER_JOB_RETENTION_MS));
+      if (removed > 0) {
+        this.changed(null);
+        this.logger.log(`[chapter_operation.purge] [end] removed=${removed} durationMs=${Date.now() - startedAt} - old chapter operations removed`);
+      }
+      return removed;
+    } catch (error) {
+      this.logger.warn(
+        `[chapter_operation.purge] [fail] durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - old chapter operations not removed`,
+      );
+      return 0;
+    }
+  }
+
+  private async recover(): Promise<void> {
+    if ((await this.repo.recover()) > 0) this.changed(null);
+  }
+
+  /** Tells the Jobs area; `state` false when only progress moved. */
+  private changed(ownerId: number | null, state = true): void {
+    this.changes.notify({ type: 'chapter-edit', ownerId, state });
   }
 }

@@ -20,6 +20,7 @@ import {
   migrationConfig,
   oidcRuntimeConfig,
   readAloudConfig,
+  bulkRunsConfig,
   storageConfig,
 } from './config/config';
 import { validateEnv } from './config/env.validation';
@@ -117,6 +118,8 @@ import { VisionScanModule } from './modules/vision-scan/vision-scan.module';
 import { ReadingHelpModule } from './modules/reading-help/reading-help.module';
 import { StoryEditsModule } from './modules/story-edits/story-edits.module';
 import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { BulkRunsModule } from './modules/bulk-runs/bulk-runs.module';
 
 @Module({
   imports: [
@@ -139,6 +142,7 @@ import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
         audiolessEpubConfig,
         djvuConfig,
         readAloudConfig,
+        bulkRunsConfig,
         audioToolsConfig,
       ],
     }),
@@ -243,6 +247,8 @@ import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
     ReadingHelpModule,
     StoryEditsModule,
     StoryGuidesModule,
+    JobsModule,
+    BulkRunsModule,
   ],
   providers: [
     // Before the audit interceptor, so an audited route records the book the request now lands on.

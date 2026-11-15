@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy, OnModuleIn
 import type { AuthorEnrichmentFailedPage } from '@bookorbit/types';
 import { NotificationType, Permission } from '@bookorbit/types';
 
+import { JobChangesService } from '../jobs/job-changes.service';
 import { NotificationService } from '../notification/notification.service';
 import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEventsService } from '../metadata/metadata-events.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -41,6 +42,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     private readonly metadataEvents: MetadataEventsService,
     private readonly session: AuthorEnrichmentSessionService,
     private readonly notificationService: NotificationService,
+    private readonly jobChanges: JobChangesService,
     @Optional() private readonly gateway?: AuthorEnrichmentGateway,
   ) {}
 
@@ -299,6 +301,9 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
       if (!nextAttemptAt) this.session.incrementDone(true);
       this.session.setCurrentItemName(null);
       await this.emitStatusSnapshot();
+    } else if (!nextAttemptAt) {
+      // The Jobs failed row counts silent failures too, as retry requeues them.
+      this.jobsChanged();
     }
     return outboundRequests;
   }
@@ -324,9 +329,15 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   }
 
   private async emitStatusSnapshot(): Promise<void> {
+    this.jobsChanged();
     if (!this.gateway) return;
     const summary = await this.queueRepo.getStatusSummary();
     this.gateway.emitStatus({ ...summary, paused: this.paused, ...this.session.getSnapshot() });
+  }
+
+  /** Every tracked transition can start, stop, pause or empty a Jobs summary row, so each one is a state change. */
+  private jobsChanged(): void {
+    this.jobChanges.notify({ type: 'author-enrichment', ownerId: null, state: true });
   }
 
   private async recoverStuckProcessingRows(): Promise<void> {

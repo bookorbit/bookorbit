@@ -51,7 +51,11 @@ function key(overrides: Partial<ApiKeyRecord> = {}): ApiKeyRecord {
 }
 
 function setup(record: ApiKeyRecord | null = key(), user: RequestUser | null = owner(), enabled = true) {
-  const repo = { findByHash: vi.fn().mockResolvedValue(record), touchLastUsed: vi.fn().mockResolvedValue(undefined) };
+  const repo = {
+    findByHash: vi.fn().mockResolvedValue(record),
+    findOwned: vi.fn().mockResolvedValue(record),
+    touchLastUsed: vi.fn().mockResolvedValue(undefined),
+  };
   const appSettings = { getApiKeySettings: vi.fn().mockResolvedValue({ enabled, maxLifetimeDays: null }) };
   const authService = { findActingUser: vi.fn().mockResolvedValue(user) };
   const limiter = new ApiKeyFailureLimiter();
@@ -151,5 +155,28 @@ describe('ApiKeyAuthenticator', () => {
     const { authenticator, repo } = setup();
     repo.touchLastUsed.mockRejectedValue(new Error('db down'));
     await expect(authenticator.authenticate(token, null)).resolves.toMatchObject({ id: 5 });
+  });
+});
+
+describe('ApiKeyAuthenticator.actorForStoredKey', () => {
+  it('acts as the narrowed owner while the key still works', async () => {
+    const { authenticator, repo } = setup();
+    const actor = await authenticator.actorForStoredKey(9, 5);
+    expect(repo.findOwned).toHaveBeenCalledWith(5, 9);
+    expect(repo.touchLastUsed).not.toHaveBeenCalled();
+    expect(actor).toMatchObject({ id: 5, permissions: [Permission.LibraryDownload], credential: { kind: 'api_key', keyId: 9 } });
+  });
+
+  it.each([
+    ['a missing key', null, owner(), true],
+    ['a revoked key', key({ revokedAt: new Date() }), owner(), true],
+    ['an expired key', key({ expiresAt: new Date(Date.now() - 1000) }), owner(), true],
+    ['a key for another audience', key({ audience: 'kobo' as never }), owner(), true],
+    ['an inactive owner', key(), null, true],
+    ['an owner who lost API keys', key(), owner({ permissions: [Permission.LibraryDownload] }), true],
+    ['API keys turned off', key(), owner(), false],
+  ])('answers null for %s', async (_label, record, user, enabled) => {
+    const { authenticator } = setup(record, user, enabled);
+    await expect(authenticator.actorForStoredKey(9, 5)).resolves.toBeNull();
   });
 });

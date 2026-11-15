@@ -7,13 +7,14 @@ import {
   type ChapterLookupQueueStatus,
   type ChapterLookupReviewSummary,
 } from '@bookorbit/types';
-import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { and, eq, inArray, isNull, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import * as schema from '../../db/schema';
-import { bookMetadata, books, chapterLookupQueue } from '../../db/schema';
+import { bookMetadata, books, chapterLookupQueue, users } from '../../db/schema';
+import { microseconds } from '../jobs/job-keyset';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -34,6 +35,34 @@ export interface ChapterHealthRow {
 }
 
 const FINISHED_STATUSES: ChapterLookupQueueStatus[] = ['applied', 'review', 'not_found', 'failed', 'skipped'];
+
+/**
+ * A review still waiting: not one whose book had its chapters changed since the lookup finished,
+ * which the page counts as skipped. Table names are written out because drizzle leaves columns
+ * unqualified in a delete, where a bare `status` inside a subquery would bind to the wrong table.
+ */
+const LIVE_REVIEW = sql.raw(
+  `chapter_lookup_queue.status = 'review' and not coalesce((select m.chapters_updated_at from book_metadata m where m.book_id = chapter_lookup_queue.book_id) > chapter_lookup_queue.finished_at, false)`,
+);
+
+/** Whose lookups a Jobs-area read covers: one account's, plus the ownerless ones when allowed; null for everyone's. */
+export type ChapterLookupOwnerFilter = { id: number; ownerless: boolean } | null;
+
+/** One requester's lookups in the states the Jobs area shows, with the moments its rows are ordered by. */
+export interface ChapterLookupSummary {
+  userId: number | null;
+  userName: string | null;
+  queued: number;
+  processing: number;
+  review: number;
+  failed: number;
+  /** When the oldest waiting or running book was queued, in epoch microseconds; null when none waits. */
+  queueSince: number | null;
+  /** When the newest review still waiting was found, in epoch microseconds. */
+  reviewAt: number | null;
+  /** When the newest failure happened, in epoch microseconds. */
+  failedAt: number | null;
+}
 
 @Injectable()
 export class ChapterHealthRepository {
@@ -306,11 +335,117 @@ export class ChapterHealthRepository {
     return removed.length > 0;
   }
 
+  // ── Jobs area ──────────────────────────────────────────────────────────────
+
+  /**
+   * Per requester, how many of their lookups wait, run, wait for review or failed, counted with the
+   * same reach and the same stale-review rule as `stateFor`, so the numbers match the page. One
+   * grouped pass; at most one row per account.
+   */
+  async summarizeForJobs(owner: ChapterLookupOwnerFilter, libraryIds: number[], filters?: ContentFilterRules): Promise<ChapterLookupSummary[]> {
+    if (libraryIds.length === 0) return [];
+    const queue = sql`${chapterLookupQueue.status} in ('queued', 'processing')`;
+    const failed = sql`${chapterLookupQueue.status} = 'failed'`;
+    const finish = sql`coalesce(${chapterLookupQueue.finishedAt}, ${chapterLookupQueue.updatedAt})`;
+    const rows = await this.db
+      .select({
+        userId: chapterLookupQueue.userId,
+        userName: users.name,
+        queued: sql<number>`count(*) filter (where ${chapterLookupQueue.status} = 'queued')`.mapWith(Number),
+        processing: sql<number>`count(*) filter (where ${chapterLookupQueue.status} = 'processing')`.mapWith(Number),
+        review: sql<number>`count(*) filter (where ${LIVE_REVIEW})`.mapWith(Number),
+        failed: sql<number>`count(*) filter (where ${failed})`.mapWith(Number),
+        queueSince: microseconds(sql`min(${chapterLookupQueue.createdAt}) filter (where ${queue})`),
+        reviewAt: microseconds(sql`max(${finish}) filter (where ${LIVE_REVIEW})`),
+        failedAt: microseconds(sql`max(${finish}) filter (where ${failed})`),
+      })
+      .from(chapterLookupQueue)
+      .leftJoin(users, eq(users.id, chapterLookupQueue.userId))
+      .where(
+        and(
+          inArray(chapterLookupQueue.status, ['queued', 'processing', 'review', 'failed']),
+          this.owned(owner),
+          sql`${chapterLookupQueue.bookId} IN (${this.visibleBooks(libraryIds, filters)})`,
+        ),
+      )
+      .groupBy(chapterLookupQueue.userId, users.name);
+    return rows.map((row) => ({
+      ...row,
+      queueSince: row.queueSince ?? null,
+      reviewAt: row.reviewAt ?? null,
+      failedAt: row.failedAt ?? null,
+    }));
+  }
+
+  /** Removes one requester's books still waiting, within reach. A book already being looked up finishes. */
+  async clearQueuedFor(userId: number | null, libraryIds: number[], filters?: ContentFilterRules): Promise<number> {
+    return await this.removeFor(userId, eq(chapterLookupQueue.status, 'queued'), libraryIds, filters);
+  }
+
+  /** Dismisses every review still waiting for one requester, within reach. */
+  async dismissReviewsFor(userId: number | null, libraryIds: number[], filters?: ContentFilterRules): Promise<number> {
+    return await this.removeFor(userId, LIVE_REVIEW, libraryIds, filters);
+  }
+
+  /** Clears one requester's failed lookups, within reach. */
+  async clearFailedFor(userId: number | null, libraryIds: number[], filters?: ContentFilterRules): Promise<number> {
+    return await this.removeFor(userId, eq(chapterLookupQueue.status, 'failed'), libraryIds, filters);
+  }
+
+  /** Queues one requester's failed lookups again, within reach, as a fresh request would: at the back, with every attempt back. */
+  async retryFailedFor(userId: number | null, libraryIds: number[], filters?: ContentFilterRules): Promise<number> {
+    if (libraryIds.length === 0) return 0;
+    const now = new Date();
+    const retried = await this.db
+      .update(chapterLookupQueue)
+      .set({
+        status: 'queued',
+        reason: null,
+        result: null,
+        attemptCount: 0,
+        lastError: null,
+        createdAt: now,
+        updatedAt: now,
+        finishedAt: null,
+        availableAt: now,
+      })
+      .where(
+        and(
+          eq(chapterLookupQueue.status, 'failed'),
+          this.requester(userId),
+          sql`${chapterLookupQueue.bookId} IN (${this.visibleBooks(libraryIds, filters)})`,
+        ),
+      )
+      .returning({ bookId: chapterLookupQueue.bookId });
+    return retried.length;
+  }
+
+  private async removeFor(userId: number | null, state: SQL, libraryIds: number[], filters?: ContentFilterRules): Promise<number> {
+    if (libraryIds.length === 0) return 0;
+    const removed = await this.db
+      .delete(chapterLookupQueue)
+      .where(and(state, this.requester(userId), sql`${chapterLookupQueue.bookId} IN (${this.visibleBooks(libraryIds, filters)})`))
+      .returning({ bookId: chapterLookupQueue.bookId });
+    return removed.length;
+  }
+
+  /** A null requester is the bucket of lookups whose account was deleted. */
+  private requester(userId: number | null): SQL {
+    return userId === null ? isNull(chapterLookupQueue.userId) : eq(chapterLookupQueue.userId, userId);
+  }
+
+  private owned(owner: ChapterLookupOwnerFilter): SQL | undefined {
+    if (owner === null) return undefined;
+    return owner.ownerless
+      ? sql`(${chapterLookupQueue.userId} = ${owner.id} or ${chapterLookupQueue.userId} is null)`
+      : eq(chapterLookupQueue.userId, owner.id);
+  }
+
   // ── Worker ──────────────────────────────────────────────────────────────────
 
   /** A restart leaves nothing half done: whatever was running goes back to waiting. */
-  async requeueProcessing(staleOnly = false): Promise<void> {
-    await this.db
+  async requeueProcessing(staleOnly = false): Promise<number> {
+    const requeued = await this.db
       .update(chapterLookupQueue)
       .set({ status: 'queued', updatedAt: new Date() })
       .where(
@@ -318,7 +453,9 @@ export class ChapterHealthRepository {
           eq(chapterLookupQueue.status, 'processing'),
           ...(staleOnly ? [sql`${chapterLookupQueue.updatedAt} < now() - interval '15 minutes'`] : []),
         ),
-      );
+      )
+      .returning({ bookId: chapterLookupQueue.bookId });
+    return requeued.length;
   }
 
   /** Takes the oldest waiting book, safe against a second worker taking the same one. */

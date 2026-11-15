@@ -24,10 +24,12 @@ export class ReadAloudPresenter {
 
   async present(row: ReadAloudJobRow, viewer: ReadAloudViewer): Promise<ReadAloudJob> {
     const input = row.input as ReadAloudJobPayload;
-    const [queuePosition, requesterName] = await Promise.all([
-      row.status === 'queued' && !row.cancelRequested ? this.jobs.countQueuedAhead(row) : Promise.resolve(null),
+    const inLine = row.status === 'queued' && !row.cancelRequested && row.pausedAt == null;
+    const [positions, requesterName] = await Promise.all([
+      inLine ? this.jobs.queuePositions([row.id]) : Promise.resolve(null),
       this.jobs.findRequesterName(row.requestedByUserId),
     ]);
+    const queuePosition = positions?.get(row.id) ?? null;
     const stageDetail =
       row.stageCurrent != null && row.stageTotal != null && row.stageUnit != null
         ? { current: row.stageCurrent, total: row.stageTotal, unit: row.stageUnit as ReadAloudStageUnit }
@@ -40,6 +42,7 @@ export class ReadAloudPresenter {
       progress: row.progress,
       stageDetail,
       queuePosition,
+      pausedAt: row.status === 'queued' ? (row.pausedAt?.toISOString() ?? null) : null,
       input: {
         epubFileId: input.epubFileId,
         audioFileIds: input.audioFileIds,

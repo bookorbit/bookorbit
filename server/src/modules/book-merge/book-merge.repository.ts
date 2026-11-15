@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sep } from 'path';
 
@@ -15,6 +15,7 @@ import type {
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import type { BookMergeJobMove } from '../../db/schema';
+import { afterPosition, keysetOrder, microseconds, type JobKey, type JobPosition, type KeysetColumns } from '../jobs/job-keyset';
 
 type Db = NodePgDatabase<typeof schema>;
 export type MergeTx = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -77,6 +78,55 @@ export interface MergeRequestLink {
 }
 
 export type MergeJobRow = typeof schema.bookMergeJobs.$inferSelect;
+
+/** Whose merges a Jobs-area read covers: one account's, plus the ownerless ones when allowed; null for everyone's. */
+export type MergeOwnerFilter = { id: number; ownerless: boolean } | null;
+
+export interface MergeJobsPageQuery {
+  view: 'queue' | 'needs-you' | 'failed' | 'history';
+  owner: MergeOwnerFilter;
+  cutoffAt: Date;
+  after: JobPosition | null;
+  typeIndex: number;
+  limit: number;
+}
+
+/** Narrow on purpose: the plan, moves and outcomes columns can be large. */
+const PAGE_COLUMNS = {
+  id: schema.bookMergeJobs.id,
+  targetBookId: schema.bookMergeJobs.targetBookId,
+  requestedByUserId: schema.bookMergeJobs.requestedByUserId,
+  status: schema.bookMergeJobs.status,
+  processed: schema.bookMergeJobs.processed,
+  total: schema.bookMergeJobs.total,
+  errorCode: schema.bookMergeJobs.errorCode,
+  createdAt: schema.bookMergeJobs.createdAt,
+  updatedAt: schema.bookMergeJobs.updatedAt,
+  finishedAt: schema.bookMergeJobs.finishedAt,
+};
+
+export type MergeJobPageRow = Pick<MergeJobRow, keyof typeof PAGE_COLUMNS> & {
+  requesterName: string | null;
+  /** 1-based place among planned merges for a planned one; 0 otherwise. */
+  rank: number;
+  key: JobKey;
+};
+
+export interface MergeJobCounts {
+  queue: number;
+  failed: number;
+  running: number;
+  queued: number;
+}
+
+const RUNNING_STATUSES: BookMergeJobStatus[] = ['moving', 'committing', 'committed'];
+const FAILED_STATUSES: BookMergeJobStatus[] = ['failed', 'rolled_back'];
+
+/** When a merge ended. Rows written before the executor stamped its own failures fall back to their last write. */
+const FINISH = sql`coalesce(${schema.bookMergeJobs.finishedAt}, ${schema.bookMergeJobs.updatedAt})`;
+
+/** Planned merges in the order they wait for a run slot. Aliased: drizzle leaves column references unqualified. */
+const LANE = sql`select q.id, row_number() over (order by q.created_at, q.id) as lane_rank from book_merge_jobs q where q.status = 'planned'`;
 
 function rowsOf<T>(result: unknown): T[] {
   return (result as { rows: T[] }).rows;
@@ -561,6 +611,121 @@ export class BookMergeRepository {
       )
       .limit(1);
     return row ?? null;
+  }
+
+  /** Status and owner only, for acting on merges by id. */
+  async findJobStatuses(jobIds: readonly number[]): Promise<Array<Pick<MergeJobRow, 'id' | 'requestedByUserId' | 'status'>>> {
+    if (jobIds.length === 0) return [];
+    return await this.db
+      .select({ id: schema.bookMergeJobs.id, requestedByUserId: schema.bookMergeJobs.requestedByUserId, status: schema.bookMergeJobs.status })
+      .from(schema.bookMergeJobs)
+      .where(inArray(schema.bookMergeJobs.id, [...jobIds]));
+  }
+
+  /** A page of merges for the Jobs area, in the view's keyset order. A merge never waits on a person, so Needs you is empty. */
+  async pageForJobs(query: MergeJobsPageQuery): Promise<MergeJobPageRow[]> {
+    if (query.view === 'needs-you') return [];
+    return query.view === 'queue' ? await this.queuePage(query) : await this.endedPage(query);
+  }
+
+  /** How many merges each Jobs-area view holds, failed ones measured from `cutoffAt`. */
+  async countForJobs(owner: MergeOwnerFilter, cutoffAt: Date): Promise<MergeJobCounts> {
+    const jobs = schema.bookMergeJobs;
+    const [row] = await this.db
+      .select({
+        queue: sql<number>`count(*) filter (where ${notInArray(jobs.status, FINISHED_STATUSES)})`.mapWith(Number),
+        failed: sql<number>`count(*) filter (where ${this.failedShown(cutoffAt)})`.mapWith(Number),
+        running: sql<number>`count(*) filter (where ${inArray(jobs.status, RUNNING_STATUSES)})`.mapWith(Number),
+        queued: sql<number>`count(*) filter (where ${jobs.status} = 'planned')`.mapWith(Number),
+      })
+      .from(jobs)
+      .where(and(or(notInArray(jobs.status, FINISHED_STATUSES), this.failedShown(cutoffAt)), this.owned(owner)));
+    return { queue: row?.queue ?? 0, failed: row?.failed ?? 0, running: row?.running ?? 0, queued: row?.queued ?? 0 };
+  }
+
+  /** Running merges first, then planned ones in the order they take a run slot. */
+  private async queuePage(query: MergeJobsPageQuery): Promise<MergeJobPageRow[]> {
+    const jobs = schema.bookMergeJobs;
+    const lane = this.db
+      .$with('merge_lane')
+      .as(
+        this.db
+          .select({ laneId: sql<number>`lane.id`.as('lane_id'), laneRank: sql<number>`lane.lane_rank`.as('lane_rank') })
+          .from(sql`(${LANE}) lane`),
+      );
+    const group = sql<number>`case when ${jobs.status} = 'planned' then 1 else 0 end`;
+    const rank = sql<number>`case when ${jobs.status} = 'planned' then coalesce(${lane.laneRank}, 2147483647) else 0 end`;
+    const at = microseconds(sql`${jobs.createdAt}`);
+    const columns: KeysetColumns = {
+      prefix: [
+        { kind: 'number', expr: group },
+        { kind: 'number', expr: rank },
+      ],
+      suffix: [{ kind: 'number', expr: at }],
+      id: { kind: 'number', expr: sql`${jobs.id}` },
+    };
+    const rows = await this.db
+      .with(lane)
+      .select({
+        ...PAGE_COLUMNS,
+        group: sql<number>`${group}`.mapWith(Number),
+        rank: sql<number>`${rank}`.mapWith(Number),
+        at,
+        requesterName: schema.users.name,
+      })
+      .from(jobs)
+      .leftJoin(lane, eq(lane.laneId, jobs.id))
+      .leftJoin(schema.users, eq(schema.users.id, jobs.requestedByUserId))
+      .where(
+        and(
+          notInArray(jobs.status, FINISHED_STATUSES),
+          this.owned(query.owner),
+          query.after ? afterPosition(columns, 'queue', query.after, query.typeIndex) : undefined,
+        ),
+      )
+      .orderBy(...keysetOrder(columns, 'queue'))
+      .limit(query.limit);
+    return rows.map(({ group: band, rank: place, at: since, ...row }) => ({
+      ...row,
+      rank: place,
+      key: { prefix: [band, place], suffix: [since], id: row.id },
+    }));
+  }
+
+  /** Failed and History, newest finish first. */
+  private async endedPage(query: MergeJobsPageQuery): Promise<MergeJobPageRow[]> {
+    const jobs = schema.bookMergeJobs;
+    const columns: KeysetColumns = { prefix: [{ kind: 'time', expr: FINISH }], suffix: [], id: { kind: 'number', expr: sql`${jobs.id}` } };
+    const rows = await this.db
+      .select({ ...PAGE_COLUMNS, finish: microseconds(FINISH), requesterName: schema.users.name })
+      .from(jobs)
+      .leftJoin(schema.users, eq(schema.users.id, jobs.requestedByUserId))
+      .where(
+        and(
+          query.view === 'failed' ? this.failedShown(query.cutoffAt) : this.historyShown(query.cutoffAt),
+          this.owned(query.owner),
+          query.after ? afterPosition(columns, query.view, query.after, query.typeIndex) : undefined,
+        ),
+      )
+      .orderBy(...keysetOrder(columns, query.view))
+      .limit(query.limit);
+    return rows.map(({ finish, ...row }) => ({ ...row, rank: 0, key: { prefix: [finish], suffix: [], id: row.id } }));
+  }
+
+  /** Failed or rolled back, and ended after the cutoff: what the Failed view still shows. */
+  private failedShown(cutoffAt: Date): SQL {
+    return and(inArray(schema.bookMergeJobs.status, FAILED_STATUSES), sql`${FINISH} > ${cutoffAt}`)!;
+  }
+
+  private historyShown(cutoffAt: Date): SQL {
+    const jobs = schema.bookMergeJobs;
+    return and(inArray(jobs.status, FINISHED_STATUSES), or(eq(jobs.status, 'done'), sql`${FINISH} <= ${cutoffAt}`))!;
+  }
+
+  private owned(owner: MergeOwnerFilter): SQL | undefined {
+    if (owner === null) return undefined;
+    const jobs = schema.bookMergeJobs;
+    return or(eq(jobs.requestedByUserId, owner.id), owner.ownerless ? isNull(jobs.requestedByUserId) : undefined);
   }
 
   async updateJob(

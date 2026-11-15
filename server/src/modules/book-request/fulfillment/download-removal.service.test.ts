@@ -61,6 +61,21 @@ async function makeService(
   return { service, downloads, clients, adapter, registry, direct, appDataPath };
 }
 
+describe('DownloadRemovalService.removeAttempt', () => {
+  /** A person stopped it, so the Jobs area reads it as cancelled; the English message stays for the request page. */
+  it('fails the attempt with the removed code beside the message', async () => {
+    const { service, downloads } = await makeService();
+
+    await expect(service.removeAttempt(7, 11, false, 'ann')).resolves.toBe(true);
+
+    expect(downloads.updateIf).toHaveBeenCalledWith(11, expect.arrayContaining(['downloading']), {
+      status: 'failed',
+      errorMessage: 'Removed from the download client by ann',
+      failureCode: 'removed',
+    });
+  });
+});
+
 describe('DownloadRemovalService.removeLatestForRequest', () => {
   it('hands the torrent to the client and fails the attempt behind it', async () => {
     const { service, downloads, adapter } = await makeService();
@@ -71,6 +86,7 @@ describe('DownloadRemovalService.removeLatestForRequest', () => {
     expect(downloads.updateIf).toHaveBeenCalledWith(11, expect.arrayContaining(['downloading']), {
       status: 'failed',
       errorMessage: expect.stringContaining('ann'),
+      failureCode: 'removed',
     });
   });
 
@@ -115,6 +131,7 @@ describe('DownloadRemovalService.removeLatestForRequest', () => {
     expect(downloads.updateIf).toHaveBeenCalledWith(11, expect.arrayContaining(['completed']), {
       status: 'failed',
       errorMessage: expect.stringContaining('left seeding'),
+      failureCode: 'removed',
     });
   });
 
@@ -190,6 +207,7 @@ describe('DownloadRemovalService.removeLatestForRequest', () => {
     expect(downloads.updateIf).toHaveBeenCalledWith(11, expect.arrayContaining(['downloading']), {
       status: 'failed',
       errorMessage: expect.stringContaining('connection refused'),
+      failureCode: 'removed',
     });
   });
 });

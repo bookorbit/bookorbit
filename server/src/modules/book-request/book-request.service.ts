@@ -1005,7 +1005,7 @@ export class BookRequestService {
    * started, or correct the language the picker is matching against, has taken on work they can
    * only run forwards.
    */
-  private canDrive(request: BookRequestRow, user: RequestUser): boolean {
+  canDrive(request: Pick<BookRequestRow, 'userId' | 'fulfillerUserId'>, user: RequestUser): boolean {
     if (request.userId === user.id || this.canManageAll(user)) return true;
     return this.canSelfFulfil(user) && isBookRequestFulfiller(request, user.id);
   }

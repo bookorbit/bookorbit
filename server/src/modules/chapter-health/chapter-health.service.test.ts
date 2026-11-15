@@ -47,9 +47,15 @@ function setup(editableLibraryIds = [2, 3]) {
     removeQueued: vi.fn().mockResolvedValue(0),
     removeFinished: vi.fn().mockResolvedValue(0),
     dismissReview: vi.fn().mockResolvedValue(true),
+    summarizeForJobs: vi.fn().mockResolvedValue([]),
+    clearQueuedFor: vi.fn().mockResolvedValue(0),
+    dismissReviewsFor: vi.fn().mockResolvedValue(0),
+    clearFailedFor: vi.fn().mockResolvedValue(0),
+    retryFailedFor: vi.fn().mockResolvedValue(0),
   };
   const libraryService = { findEditableLibraryIds: vi.fn().mockResolvedValue(editableLibraryIds) };
-  return { service: new ChapterHealthService(repo as never, libraryService as never), repo, libraryService };
+  const jobChanges = { notify: vi.fn() };
+  return { service: new ChapterHealthService(repo as never, libraryService as never, jobChanges as never), repo, libraryService, jobChanges };
 }
 
 describe('ChapterHealthService.summary', () => {
@@ -237,5 +243,73 @@ describe('ChapterHealthService.dismissReview', () => {
     repo.dismissReview.mockResolvedValue(false);
 
     await expect(service.dismissReview(USER, 41)).rejects.toThrow(NotFoundException);
+  });
+});
+
+describe('ChapterHealthService Jobs area', () => {
+  const SUPERUSER = { id: 1, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as RequestUser;
+  const CHANGE = (ownerId: number | null) => ({ type: 'chapter-lookup', ownerId, state: true });
+
+  it("counts each requester's lookups within the viewer's reach", async () => {
+    const { service, repo } = setup();
+
+    await service.jobSummaries(USER, { id: 7, ownerless: false });
+    await service.jobSummaries(SUPERUSER, null);
+
+    expect(repo.summarizeForJobs.mock.calls).toEqual([
+      [{ id: 7, ownerless: false }, [2, 3], USER.contentFilters],
+      [null, [2, 3], undefined],
+    ]);
+  });
+
+  it.each([
+    ['clearQueuedFor', 'clearQueuedFor'],
+    ['dismissReviewsFor', 'dismissReviewsFor'],
+    ['clearFailedFor', 'clearFailedFor'],
+    ['retryFailedFor', 'retryFailedFor'],
+  ] as const)("%s acts on one requester's books within the viewer's reach and tells the Jobs area", async (method, repoMethod) => {
+    const { service, repo, jobChanges } = setup();
+    repo[repoMethod].mockResolvedValue(4);
+
+    await expect(service[method](USER, 9)).resolves.toBe(4);
+    await expect(service[method](SUPERUSER, null)).resolves.toBe(4);
+
+    expect(repo[repoMethod].mock.calls).toEqual([
+      [9, [2, 3], USER.contentFilters],
+      [null, [2, 3], undefined],
+    ]);
+    expect(jobChanges.notify.mock.calls).toEqual([[CHANGE(9)], [CHANGE(null)]]);
+  });
+
+  it('stays quiet when a bulk action found nothing to change', async () => {
+    const { service, jobChanges } = setup();
+
+    await expect(service.retryFailedFor(USER, 7)).resolves.toBe(0);
+
+    expect(jobChanges.notify).not.toHaveBeenCalled();
+  });
+
+  it("tells the Jobs area when the page queues, cancels, clears or dismisses the user's lookups", async () => {
+    const { service, repo, jobChanges } = setup();
+    repo.filterLookupCandidates.mockResolvedValue([41]);
+    repo.removeQueued.mockResolvedValue(2);
+    repo.removeFinished.mockResolvedValue(3);
+
+    await service.enqueue(USER, { bookIds: [41] });
+    await service.cancel(USER);
+    await service.clearFinished(USER);
+    await service.dismissReview(USER, 41);
+
+    expect(jobChanges.notify.mock.calls).toEqual([[CHANGE(7)], [CHANGE(7)], [CHANGE(7)], [CHANGE(7)]]);
+  });
+
+  it('says nothing when the page changed nothing', async () => {
+    const { service, jobChanges } = setup();
+
+    await service.cancel(USER);
+    await service.clearFinished(USER);
+    await service.enqueue(USER, { bookIds: [41] });
+
+    expect(jobChanges.notify).not.toHaveBeenCalled();
   });
 });

@@ -75,6 +75,22 @@ describe('ReadAloudJobCard', () => {
     expect(card.find('button[aria-label="' + DISMISS() + '"]').exists()).toBe(false)
   })
 
+  it('shows a paused job as held, with Resume and Cancel but no place in line', async () => {
+    const card = mountCard(makeJob({ status: 'queued', queuePosition: null, pausedAt: '2026-11-15T10:00:00.000Z' }))
+
+    expect(card.text()).toContain(t('book.detail.files.readAloud.job.pausedTitle'))
+    expect(card.text()).toContain(t('book.detail.files.readAloud.job.pausedDescription'))
+    expect(card.text()).not.toContain(t('book.detail.files.readAloud.job.queuedTitle'))
+    expect(buttonTexts(card)).toEqual(expect.arrayContaining([t('book.detail.files.readAloud.job.resume'), CANCEL()]))
+    await findButton(card, t('book.detail.files.readAloud.job.resume'))!.trigger('click')
+    expect(card.emitted('resume')).toHaveLength(1)
+  })
+
+  it('offers Resume only to someone who can manage the job', () => {
+    const card = mountCard(makeJob({ status: 'queued', queuePosition: null, pausedAt: '2026-11-15T10:00:00.000Z', canManage: false }))
+    expect(findButton(card, t('book.detail.files.readAloud.job.resume'))).toBeUndefined()
+  })
+
   it('shows a running stage with its detail, a stepper and a localized percentage', () => {
     const card = mountCard(makeJob({ stage: 'generating_emissions', progress: 37, stageDetail: { current: 7, total: 24, unit: 'track' } }))
 

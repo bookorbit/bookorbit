@@ -18,7 +18,7 @@ import { isActiveJob, isCompletedJob } from '../lib/read-aloud'
  */
 export const READ_ALOUD_POLL_INTERVAL_MS = 30_000
 
-export type ReadAloudAction = 'create' | 'cancel' | 'publish' | 'retry' | 'resync' | 'dismiss'
+export type ReadAloudAction = 'create' | 'cancel' | 'publish' | 'retry' | 'resume' | 'resync' | 'dismiss'
 
 export type ReadAloudCreateResult = { ok: true } | { ok: false; errorKey: string }
 
@@ -319,6 +319,11 @@ export function useReadAloud(options: UseReadAloudOptions) {
     return mutate('dismiss', '/dismiss', { method: 'POST' })
   }
 
+  /** A job paused from the Jobs area goes back to its place in line. */
+  function resume(): Promise<boolean> {
+    return mutate('resume', '/resume', { method: 'POST' })
+  }
+
   function resync(decisions: ReadAloudDecisions): Promise<boolean> {
     return mutate('resync', '/resync', {
       method: 'POST',
@@ -400,6 +405,7 @@ export function useReadAloud(options: UseReadAloudOptions) {
     cancel,
     publish,
     retry,
+    resume,
     resync,
     dismiss,
     clearJobError,

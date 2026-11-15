@@ -47,6 +47,12 @@ export const readAloudJobs = pgTable(
     /** Someone chose to add this output despite the review warnings; survives a server restart mid-publish. */
     publishApproved: boolean('publish_approved').notNull().default(false),
     workerEventSeq: integer('worker_event_seq').notNull().default(0),
+    /** A manager's boost: higher runs before every requester's turn. */
+    priority: integer('priority').notNull().default(0),
+    /** The job's place in its requester's own lane; Move to top gives it one below their lowest. */
+    userOrder: bigserial('user_order', { mode: 'number' }).notNull(),
+    /** Held off the worker while queued. Not a status, so the active-job index, merge blocking and cancel keep working. */
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -68,6 +74,16 @@ export const readAloudJobs = pgTable(
     index('read_aloud_jobs_user_updated_idx').on(t.requestedByUserId, sql`${t.updatedAt} desc`),
     index('read_aloud_jobs_output_file_idx').on(t.outputFileId),
     index('read_aloud_jobs_replace_file_idx').on(t.replaceFileId),
+    index('read_aloud_jobs_user_started_idx').on(t.requestedByUserId, sql`${t.startedAt} desc`),
+    index('read_aloud_jobs_user_lane_idx')
+      .on(t.requestedByUserId, t.userOrder)
+      .where(sql`${t.status} = 'queued'`),
+    index('read_aloud_jobs_finish_idx')
+      .on(sql`coalesce(${t.completedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('completed', 'completed_with_warnings', 'failed', 'cancelled')`),
+    index('read_aloud_jobs_user_finish_idx')
+      .on(t.requestedByUserId, sql`coalesce(${t.completedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('completed', 'completed_with_warnings', 'failed', 'cancelled')`),
     check(
       'read_aloud_jobs_status_chk',
       sql`${t.status} in ('queued', 'processing', 'awaiting_review', 'completed', 'completed_with_warnings', 'failed', 'cancelled')`,

@@ -5,11 +5,13 @@ import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { BookConsolidationModule } from '../book-consolidation/book-consolidation.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { BookModule } from '../book/book.module';
+import { BulkRunsModule } from '../bulk-runs/bulk-runs.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { NotificationModule } from '../notification/notification.module';
 import { ScannerModule } from '../scanner/scanner.module';
 import { BookMoveController } from './book-move.controller';
 import { BookMoveExecutorService } from './book-move-executor.service';
+import { BookMoveRunHandler } from './book-move-run.handler';
 import { BookMovePlannerService } from './book-move-planner.service';
 import { BookMoveRepository } from './book-move.repository';
 import { BookMoveService } from './book-move.service';
@@ -17,6 +19,7 @@ import { BookMoveService } from './book-move.service';
 @Module({
   imports: [
     BookModule,
+    BulkRunsModule,
     BookCoverStoreModule,
     BookConsolidationModule,
     ScannerModule,
@@ -26,7 +29,7 @@ import { BookMoveService } from './book-move.service';
     forwardRef(() => NotificationModule),
   ],
   controllers: [BookMoveController],
-  providers: [BookMoveService, BookMovePlannerService, BookMoveExecutorService, BookMoveRepository],
+  providers: [BookMoveService, BookMovePlannerService, BookMoveExecutorService, BookMoveRepository, BookMoveRunHandler],
   exports: [BookMoveService],
 })
 export class BookMoveModule {}

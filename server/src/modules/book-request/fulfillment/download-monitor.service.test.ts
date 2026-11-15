@@ -191,7 +191,7 @@ describe('DownloadMonitorService.tick', () => {
       ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
       expect.objectContaining({ status: 'downloading', progressPercent: 50, downloadedBytes: 500, contentPath: '/downloads/dune.epub' }),
     );
-    expect(gateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ requestId: 7, downloadId: 11, progressPercent: 50 }), [700]);
+    expect(gateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ requestId: 7, downloadId: 11, progressPercent: 50 }), [700], false);
   });
 
   it('stamps lastProgressAt only when bytes actually moved, which is what the watchdog reads', async () => {
@@ -525,7 +525,16 @@ describe('DownloadMonitorService.tick', () => {
     await polled(service);
 
     expect(downloads.updateIf).toHaveBeenCalledWith(11, ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES, expect.objectContaining({ status: 'queued' }));
-    expect(gateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ status: 'queued' }), [700]);
+    expect(gateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ status: 'queued' }), [700], false);
+  });
+
+  /** The Jobs area moves a row from queued to running on a status change, and only refreshes the bar on progress. */
+  it('marks the tick that moves a queued torrent to downloading as a status change', async () => {
+    const { service, gateway } = makeService({ active: [row({ status: 'queued', downloadedBytes: 0, progressPercent: 0 })] });
+
+    await polled(service);
+
+    expect(gateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ status: 'downloading' }), [700], true);
   });
 
   /** A state this adapter has no mapping for is in-flight, not idle. */
@@ -580,7 +589,11 @@ describe('DownloadMonitorService.tick', () => {
       now.mockReturnValue(66_000);
       await polled(context.service);
 
-      expect(context.gateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ downloadId: 12, progressPercent: 40 }), expect.any(Array));
+      expect(context.gateway.emitProgress).toHaveBeenCalledWith(
+        expect.objectContaining({ downloadId: 12, progressPercent: 40 }),
+        expect.any(Array),
+        false,
+      );
       finishImport();
       await importQueue(context.service).waitForIdle();
       now.mockRestore();

@@ -6,6 +6,7 @@ import { BOOK_LINK_MAX_MEMBERS, BOOK_MERGE_MAX_BOOKS } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import type { MergeSelectionState } from '@/features/book/lib/book-merge'
 import type { LinkSelectionState } from '@/features/book/lib/book-link'
+import type { BulkRunInFlight } from '@/features/jobs/composables/useBulkRunTracker'
 
 const permissionState = {
   allowed: new Set<string>(),
@@ -466,5 +467,81 @@ describe('SelectionActionBar link action', () => {
     await wrapper.get('[data-testid="action-delete"]').trigger('click')
     expect(wrapper.text()).toContain('Delete 2 books?')
     expect(wrapper.find('[data-testid="delete-linked-note"]').exists()).toBe(false)
+  })
+})
+
+describe('SelectionActionBar bulk run pill', () => {
+  beforeEach(() => {
+    i18n.global.locale.value = 'en'
+    permissionState.allowed = new Set(['library_edit_metadata'])
+    permissionState.demoRestricted = false
+  })
+
+  function mountPill(inFlight: Partial<BulkRunInFlight> = {}) {
+    return mount(SelectionActionBar, {
+      props: {
+        visible: true,
+        count: 40,
+        inFlight: {
+          kind: 'book-refresh-metadata',
+          runId: 'run-1',
+          waiting: false,
+          processed: 12,
+          total: 40,
+          failed: 0,
+          cancelling: false,
+          ...inFlight,
+        },
+      },
+      global: globalStubs,
+    })
+  }
+
+  it('names the run by its kind and shows how far it got in place of the actions', () => {
+    const wrapper = mountPill()
+
+    expect(wrapper.get('[data-testid="bulk-run-label"]').text()).toBe('Refreshing metadata')
+    expect(wrapper.get('[data-testid="bulk-run-status"]').text()).toBe('12 / 40')
+    expect(wrapper.find('[data-testid="action-bulk-set-rating"]').exists()).toBe(false)
+  })
+
+  it('shows a run that has not started yet as waiting', () => {
+    const wrapper = mountPill({ kind: 'book-re-extract-cover', waiting: true, processed: 0 })
+
+    expect(wrapper.get('[data-testid="bulk-run-label"]').text()).toBe('Re-extracting covers')
+    expect(wrapper.get('[data-testid="bulk-run-status"]').text()).toBe('Waiting to start')
+    expect(wrapper.get('[role="status"]').text()).toBe('Waiting to start')
+  })
+
+  it('asks the run to stop, and holds Cancel while it stops', async () => {
+    const wrapper = mountPill()
+
+    const cancel = wrapper.get('[data-testid="bulk-run-cancel"]')
+    expect(cancel.attributes('aria-label')).toBe('Cancel this bulk action')
+    await cancel.trigger('click')
+    expect(wrapper.emitted('cancel-in-flight')).toHaveLength(1)
+
+    await wrapper.setProps({
+      inFlight: { kind: 'book-refresh-metadata', runId: 'run-1', waiting: false, processed: 12, total: 40, failed: 0, cancelling: true },
+    })
+    expect(wrapper.get('[data-testid="bulk-run-cancel"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-testid="bulk-run-status"]').text()).toBe('Cancelling')
+  })
+
+  it('lets the run go on in the background', async () => {
+    const wrapper = mountPill()
+
+    const hide = wrapper.get('[data-testid="bulk-run-hide"]')
+    expect(hide.attributes('aria-label')).toBe('Keep running in the background')
+    await hide.trigger('click')
+
+    expect(wrapper.emitted('hide-in-flight')).toHaveLength(1)
+  })
+
+  it('offers neither Cancel nor hide before the server names the run', () => {
+    const wrapper = mountPill({ runId: null, waiting: true })
+
+    expect(wrapper.find('[data-testid="bulk-run-cancel"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="bulk-run-hide"]').exists()).toBe(false)
   })
 })

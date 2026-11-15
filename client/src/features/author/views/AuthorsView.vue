@@ -22,7 +22,13 @@ import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrol
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import JumpRail from '@/features/book/components/JumpRail.vue'
-import { bulkRefreshAuthorsMetadata, deleteAuthors, refreshAuthorMetadata } from '../api/author'
+import {
+  deleteAuthors,
+  refreshAuthorMetadata,
+  startBulkAuthorsMetadataRefresh,
+  type BulkAuthorMetadataRefreshResult,
+  type BulkAuthorMetadataRefreshStreamEvent,
+} from '../api/author'
 import AuthorConfirmDialog from '../components/AuthorConfirmDialog.vue'
 import AuthorIndexRow from '../components/AuthorIndexRow.vue'
 import AuthorTile from '../components/AuthorTile.vue'
@@ -38,6 +44,8 @@ import { splitMetadataCacheUsage, usageFallbackProviders, type IgnoreCacheOption
 import { metadataProviderLabel } from '@/features/book/lib/metadata-refresh-feedback'
 import type { BookViewMode } from '@/composables/useDisplaySettings'
 import type { TableDensity } from '@bookorbit/types'
+import { useBulkRunTracker, type BulkRunFollowResult } from '@/features/jobs/composables/useBulkRunTracker'
+import { bulkRunRefusalText } from '@/features/jobs/lib/bulk-runs'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -63,7 +71,8 @@ const sentinel = ref<HTMLElement | null>(null)
 let observer: IntersectionObserver | null = null
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const bulkRefreshing = ref(false)
+const { inFlight: bulkRefreshInFlight, begin: beginBulkRefresh, cancel: cancelBulkRefresh, detach: hideBulkRefresh } = useBulkRunTracker()
+const bulkRefreshing = computed(() => bulkRefreshInFlight.value !== null)
 const bulkDeleting = ref(false)
 const deletingAuthorId = ref<number | null>(null)
 const confirmingBulkDelete = ref(false)
@@ -361,38 +370,54 @@ async function refreshSelectedAuthorsMetadata(options: IgnoreCacheOptions = {}) 
   const ids = [...selectedIds.value]
   if (ids.length === 0 || bulkRefreshing.value || !canRefreshMetadata.value) return
 
-  bulkRefreshing.value = true
   markRefreshing(ids)
+  const run = beginBulkRefresh('author-refresh-metadata', ids.length)
+  // Assigned from the stream callback, so a plain `= null` initializer would narrow it to `null`.
+  let summary = null as BulkAuthorMetadataRefreshResult | null
+  let outcome: BulkRunFollowResult | null = null
   try {
-    const result = await bulkRefreshAuthorsMetadata(
-      ids,
-      (event) => {
-        if (event.imageUpdated) {
-          const index = items.value.findIndex((item) => item.id === event.authorId)
-          if (index !== -1) {
-            const next = [...items.value]
-            const current = next[index]
-            if (!current) return
-            next[index] = { ...current, imageUrl: event.imageUrl ?? null }
-            items.value = next
-          }
-        }
-        clearRefreshing([event.authorId])
-      },
-      { ignoreCache: options.ignoreCache === true },
-    )
-
-    if (result.failed > 0) {
-      toast.warning(t('author.list.toast.bulkRefreshPartial', { updated: result.updated, failed: result.failed }))
-    } else {
-      toast.success(t('author.list.toast.bulkRefreshSuccess', { updated: result.updated }))
+    const res = await startBulkAuthorsMetadataRefresh(ids, { ignoreCache: options.ignoreCache === true }, run.signal)
+    if (!res.ok || !res.body) {
+      toast.error(bulkRunRefusalText(res, t('author.list.toast.bulkRefreshFailed')))
+      return
     }
-  } catch (actionError) {
-    toast.error(actionError instanceof Error ? actionError.message : t('author.list.toast.bulkRefreshFailed'))
+    outcome = await run.follow<BulkAuthorMetadataRefreshStreamEvent>(res, (event) => {
+      if (event.done) {
+        summary = { processed: event.processed, failed: event.failed, updated: event.updated }
+        return true
+      }
+      applyAuthorRefreshEvent(event.authorId, event.imageUpdated === true, event.imageUrl ?? null)
+      run.advance(Boolean(event.error))
+      return false
+    })
+  } catch {
+    if (!run.signal.aborted) toast.error(t('author.list.toast.bulkRefreshFailed'))
   } finally {
     clearRefreshing(ids)
-    bulkRefreshing.value = false
+    run.end()
   }
+
+  if (outcome?.end !== 'done' || !summary) return
+  if (outcome.cancelled) {
+    toast.info(t('jobsArea.bulk.cancelled', { processed: formatNumber(outcome.processed), total: formatNumber(outcome.total) }))
+  } else if (summary.failed > 0) {
+    toast.warning(t('author.list.toast.bulkRefreshPartial', { updated: summary.updated, failed: summary.failed }))
+  } else {
+    toast.success(t('author.list.toast.bulkRefreshSuccess', { updated: summary.updated }))
+  }
+}
+
+function applyAuthorRefreshEvent(authorId: number, imageUpdated: boolean, imageUrl: string | null) {
+  if (imageUpdated) {
+    const index = items.value.findIndex((item) => item.id === authorId)
+    const current = index === -1 ? undefined : items.value[index]
+    if (current) {
+      const next = [...items.value]
+      next[index] = { ...current, imageUrl }
+      items.value = next
+    }
+  }
+  clearRefreshing([authorId])
 }
 
 async function refreshSingleAuthorMetadata(authorId: number) {
@@ -793,7 +818,14 @@ defineOptions({ name: 'AuthorsView' })
       @after-leave="rail.releaseGutter"
     />
 
-    <SelectionActionBar :visible="selectionMode" :count="selectedCount" @exit="exitSelectionMode">
+    <SelectionActionBar
+      :visible="selectionMode"
+      :count="selectedCount"
+      :in-flight="bulkRefreshInFlight"
+      @exit="exitSelectionMode"
+      @cancel-in-flight="cancelBulkRefresh"
+      @hide-in-flight="hideBulkRefresh"
+    >
       <template #content>
         <template v-if="confirmingBulkRefresh">
           <span class="whitespace-nowrap px-3 text-sm font-semibold text-foreground" data-testid="author-bulk-refresh-confirm">

@@ -79,13 +79,15 @@ function createRecovery() {
   const executor = { rollback: vi.fn().mockResolvedValue([]) };
   const effects = { apply: vi.fn().mockResolvedValue(0) };
   const libraryGate = new LibraryOperationGate();
+  const jobChanges = { notify: vi.fn() };
   const recovery = new BookMergeRecoveryService(
     repository as unknown as BookMergeRepository,
     executor as unknown as BookMergeExecutor,
     effects as unknown as BookMergeEffectsService,
     libraryGate,
+    jobChanges as never,
   );
-  return { recovery, repository, executor, effects, libraryGate };
+  return { recovery, repository, executor, effects, libraryGate, jobChanges };
 }
 
 beforeEach(() => {
@@ -100,11 +102,12 @@ afterEach(() => {
 
 describe('BookMergeRecoveryService', () => {
   it('fails a planned job as INTERRUPTED without touching files or effects', async () => {
-    const { recovery, repository, executor, effects, libraryGate } = createRecovery();
+    const { recovery, repository, executor, effects, libraryGate, jobChanges } = createRecovery();
 
     await recovery.recover(jobRow({ status: 'planned' }));
 
     expect(repository.updateJob).toHaveBeenCalledWith(40, { status: 'failed', errorCode: 'INTERRUPTED', finishedAt: expect.any(Date) });
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'book-merge', ownerId: jobRow({ status: 'planned' }).requestedByUserId, state: true });
     expect(executor.rollback).not.toHaveBeenCalled();
     expect(effects.apply).not.toHaveBeenCalled();
     expect(libraryGate.isHeld(1)).toBe(false);

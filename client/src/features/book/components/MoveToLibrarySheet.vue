@@ -12,6 +12,8 @@ import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useVirtualKeyboard } from '@/composables/useVirtualKeyboard'
 import type { BookMoveJobCollisionPolicy, BookSelectionPayload, Library } from '@bookorbit/types'
 
+import { formatNumber } from '@/i18n/formatters'
+import { openJobs } from '@/features/jobs/lib/bulk-runs'
 import { useMoveToLibrary } from '../composables/useMoveToLibrary'
 
 const props = defineProps<{
@@ -45,6 +47,13 @@ const filteredLibraries = computed(() => {
 })
 
 const selectedLibrary = computed(() => libraries.value.find((library) => library.id === selectedLibraryId.value) ?? null)
+
+const progressStatus = computed(() => {
+  if (move.cancelling.value) return t('jobsArea.bulk.cancelling')
+  if (move.waiting.value) return t('jobsArea.bulk.waiting')
+  const current = move.progress.value
+  return t('jobsArea.bulk.count', { processed: formatNumber(current?.processed ?? 0), total: formatNumber(current?.total ?? 0) })
+})
 
 const canSubmit = computed(
   () => selectedLibraryId.value !== null && selectedFolderId.value !== null && !move.previewLoading.value && move.step.value !== 'progress',
@@ -121,7 +130,9 @@ async function runMove(): Promise<void> {
     emit('moved')
   }
 
-  if (summary.failed > 0) {
+  if (summary.cancelled) {
+    toast.info(t('book.move.toast.cancelled', { count: movedCount }))
+  } else if (summary.failed > 0) {
     toast.warning(t('book.move.toast.partial', { moved: movedCount, failed: summary.failed }))
   } else if (movedCount > 0) {
     toast.success(t('book.move.toast.success', { count: movedCount, library: selectedLibrary.value?.name ?? '' }))
@@ -137,7 +148,12 @@ function handleClose(): void {
 }
 
 function handleCancel(): void {
-  move.cancel()
+  void move.cancel()
+}
+
+function handleOpenJobs(): void {
+  emit('update:open', false)
+  openJobs()
 }
 
 function handlePolicyAll(policy: BookMoveJobCollisionPolicy): void {
@@ -377,9 +393,7 @@ function collisionLabel(kind: string): string {
           <div class="space-y-2" role="status" aria-live="polite">
             <div class="flex items-baseline justify-between gap-2">
               <span class="text-sm font-medium text-foreground">{{ t('book.move.progress.label', { library: selectedLibrary?.name ?? '' }) }}</span>
-              <span class="text-xs tabular-nums text-muted-foreground"
-                >{{ move.progress.value?.processed ?? 0 }} / {{ move.progress.value?.total ?? 0 }}</span
-              >
+              <span class="shrink-0 text-xs tabular-nums text-muted-foreground" data-testid="move-progress-status">{{ progressStatus }}</span>
             </div>
             <div class="h-1.5 overflow-hidden rounded-full bg-muted">
               <div
@@ -394,8 +408,11 @@ function collisionLabel(kind: string): string {
                 {{ t('book.move.progress.failed', { count: move.progress.value.failed }) }}
               </span>
               <span v-else />
-              <Button size="sm" variant="ghost" @click="handleCancel">{{ t('common.cancel') }}</Button>
+              <Button size="sm" variant="ghost" :disabled="move.cancelling.value" data-testid="move-cancel" @click="handleCancel">{{
+                t('common.cancel')
+              }}</Button>
             </div>
+            <p class="text-xs text-muted-foreground">{{ t('book.move.progress.background') }}</p>
           </div>
         </template>
 
@@ -419,9 +436,15 @@ function collisionLabel(kind: string): string {
             <p v-if="move.summary.value.failed > 0" class="text-xs text-destructive">
               {{ t('book.move.done.failed', { count: move.summary.value.failed }) }}
             </p>
+            <p v-if="move.summary.value.cancelled" class="text-xs text-muted-foreground">
+              {{ t('book.move.done.cancelled') }}
+            </p>
           </div>
 
-          <div class="flex justify-end border-t border-border pt-3">
+          <div class="flex justify-end gap-2 border-t border-border pt-3">
+            <Button v-if="move.executeError.value && move.runId.value" variant="outline" data-testid="move-open-jobs" @click="handleOpenJobs">{{
+              t('jobsArea.bulk.openJobs')
+            }}</Button>
             <Button @click="handleClose">{{ t('common.close') }}</Button>
           </div>
         </template>

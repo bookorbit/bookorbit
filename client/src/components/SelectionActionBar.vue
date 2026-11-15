@@ -15,6 +15,7 @@ import {
   Lock,
   Loader2,
   Mail,
+  Minimize2,
   MoreHorizontal,
   Pencil,
   RefreshCw,
@@ -48,8 +49,10 @@ import {
   BULK_EDITABLE_FIELD_OPTIONS,
   type BulkEditableField,
   type BulkEditableValue,
-  type InFlightOp,
 } from '@/features/book/composables/useBookBulkActions'
+import type { BulkRunInFlight } from '@/features/jobs/composables/useBulkRunTracker'
+import { bulkRunLabel } from '@/features/jobs/lib/bulk-runs'
+import { formatNumber } from '@/i18n/formatters'
 import type { MergeSelectionState } from '@/features/book/lib/book-merge'
 import type { LinkSelectionState } from '@/features/book/lib/book-link'
 import { BOOK_LINK_MAX_MEMBERS, BOOK_MERGE_MAX_BOOKS } from '@bookorbit/types'
@@ -69,13 +72,14 @@ const BTN_TEXT_CANCEL = 'h-8 px-3 rounded-full text-sm font-medium text-muted-fo
 const BTN_TEXT_DESTRUCTIVE =
   'h-8 px-3 rounded-full text-sm font-medium text-destructive hover:bg-destructive hover:text-destructive-foreground transition-colors'
 const DIVIDER = 'w-px h-5 bg-border mx-1 shrink-0'
+const FOCUS_RING = 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
 
 const props = withDefaults(
   defineProps<{
     count: number
     visible: boolean
     inCollection?: boolean
-    inFlight?: InFlightOp | null
+    inFlight?: BulkRunInFlight | null
     // Selection is query-scoped (all matching across pages), so individual ids aren't enumerable.
     queryScoped?: boolean
     metadataEditable?: boolean
@@ -109,6 +113,10 @@ const emit = defineEmits<{
   link: []
   delete: []
   exit: []
+  /** Ask the bulk run in progress to stop. */
+  'cancel-in-flight': []
+  /** Stop following the bulk run in progress; it goes on in the background. */
+  'hide-in-flight': []
 }>()
 
 const { t } = useI18n()
@@ -179,6 +187,30 @@ const typeaheadSearchFn = computed<((q: string) => Promise<string[]>) | null>(()
   if (bulkField.value === 'language') return searchLanguage
   return null
 })
+
+const inFlightLabel = computed(() => (props.inFlight ? bulkRunLabel(props.inFlight.kind) : ''))
+const inFlightStatus = computed(() => {
+  const run = props.inFlight
+  if (!run) return ''
+  if (run.cancelling) return t('jobsArea.bulk.cancelling')
+  if (run.waiting) return t('jobsArea.bulk.waiting')
+  return t('jobsArea.bulk.count', { processed: formatNumber(run.processed), total: formatNumber(run.total) })
+})
+/** Announced when the run changes state, not on every item, which would talk over everything else. */
+const inFlightAnnouncement = computed(() => {
+  const run = props.inFlight
+  if (!run) return ''
+  if (run.cancelling) return t('jobsArea.bulk.cancelling')
+  return run.waiting ? t('jobsArea.bulk.waiting') : inFlightLabel.value
+})
+
+function handleCancelInFlight() {
+  emit('cancel-in-flight')
+}
+
+function handleHideInFlight() {
+  emit('hide-in-flight')
+}
 
 const canConfirmDelete = computed(() => props.count <= 50 || deleteInput.value === 'DELETE')
 const canApplyFieldValue = computed(() => {
@@ -364,10 +396,42 @@ watch(
         <TooltipProvider :delay-duration="0">
           <!-- In-flight SSE progress -->
           <template v-if="inFlight">
-            <Loader2 :size="15" class="animate-spin text-primary shrink-0" />
-            <span class="px-2 text-sm font-medium text-foreground whitespace-nowrap">
-              {{ inFlight.label }} {{ inFlight.processed }} / {{ inFlight.total }}
-            </span>
+            <Loader2 :size="15" class="animate-spin motion-reduce:animate-none text-primary shrink-0" aria-hidden="true" />
+            <span class="ps-2 text-sm font-medium text-foreground whitespace-nowrap" data-testid="bulk-run-label">{{ inFlightLabel }}</span>
+            <span
+              class="ps-1.5 pe-2 text-sm tabular-nums whitespace-nowrap"
+              :class="inFlight.waiting || inFlight.cancelling ? 'text-muted-foreground' : 'text-foreground'"
+              data-testid="bulk-run-status"
+              >{{ inFlightStatus }}</span
+            >
+            <span class="sr-only" role="status" aria-live="polite">{{ inFlightAnnouncement }}</span>
+            <template v-if="inFlight.runId">
+              <div :class="DIVIDER" />
+              <button
+                type="button"
+                data-testid="bulk-run-cancel"
+                :disabled="inFlight.cancelling"
+                :aria-label="t('jobsArea.bulk.cancel')"
+                :class="[BTN_TEXT_CANCEL, FOCUS_RING, 'shrink-0 whitespace-nowrap disabled:cursor-not-allowed disabled:hover:bg-transparent']"
+                @click="handleCancelInFlight"
+              >
+                {{ t('common.cancel') }}
+              </button>
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <button
+                    type="button"
+                    data-testid="bulk-run-hide"
+                    :aria-label="t('jobsArea.bulk.hide')"
+                    :class="[BTN_ICON, BTN_MUTED, FOCUS_RING]"
+                    @click="handleHideInFlight"
+                  >
+                    <Minimize2 :size="ICON_SIZE" aria-hidden="true" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="top">{{ t('jobsArea.bulk.hide') }}</TooltipContent>
+              </Tooltip>
+            </template>
           </template>
 
           <template v-else-if="hasCustomContent">

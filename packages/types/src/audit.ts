@@ -65,6 +65,7 @@ export enum AuditAction {
   BookBulkSetMetadataLock = "book.bulk.set_metadata_lock",
   BookBulkEditMetadata = "book.bulk.edit_metadata",
   BookBulkMoveLibrary = "book.bulk.move_library",
+  BulkRunCancel = "book.bulk.run_cancel",
   BookMerge = "book.merge",
   BookLink = "book.link",
   BookUnlink = "book.unlink",
@@ -138,6 +139,7 @@ export enum AuditAction {
   AuthorEnrichmentPause = "author.enrichment.pause",
   AuthorEnrichmentResume = "author.enrichment.resume",
   AuthorEnrichmentCancel = "author.enrichment.cancel",
+  AuthorBulkMetadataRefresh = "author.bulk.metadata_refresh",
 
   EntityManagerMerge = "entity_manager.merge",
   EntityManagerRename = "entity_manager.rename",
