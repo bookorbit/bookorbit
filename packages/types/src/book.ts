@@ -15,8 +15,14 @@ import { READ_ALONG_FORMAT_PRIORITY } from "./format-priority";
 export const BOOK_FORMATS = DEFAULT_FORMAT_PRIORITY;
 export type BookFormat = (typeof BOOK_FORMATS)[number];
 
-/** Values accepted by the format filter. Read-along is an edition key, not a physical file format. */
-export const BOOK_FILTER_FORMATS = [...BOOK_FORMATS, READ_ALONG_FORMAT_PRIORITY] as const;
+/**
+ * Format filter value for EPUBs without media overlays. Only the filter knows it: no file is keyed,
+ * ranked or labelled by it, so a book whose only EPUB reads along never matches it.
+ */
+export const PLAIN_EPUB_FILTER_FORMAT = "epub:plain";
+
+/** Values accepted by the format filter. Read-along and plain EPUB are edition keys, not physical file formats. */
+export const BOOK_FILTER_FORMATS = [...BOOK_FORMATS, READ_ALONG_FORMAT_PRIORITY, PLAIN_EPUB_FILTER_FORMAT] as const;
 export type BookFilterFormat = (typeof BOOK_FILTER_FORMATS)[number];
 
 /** Exported as an ordered list too, so a form offering these cannot drift from what matches them. */

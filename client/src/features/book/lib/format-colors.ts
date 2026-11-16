@@ -1,4 +1,4 @@
-import { isReadAlongFormatKey } from '@bookorbit/types'
+import { isReadAlongFormatKey, PLAIN_EPUB_FILTER_FORMAT } from '@bookorbit/types'
 
 const DEFAULT_FORMAT_COLOR = '#6b7280'
 
@@ -30,7 +30,8 @@ const FORMAT_COLORS: Record<string, string> = {
 }
 
 function paletteKey(formatOrKey: string): string {
-  return isReadAlongFormatKey(formatOrKey) ? 'readalong' : formatOrKey.toLowerCase()
+  if (isReadAlongFormatKey(formatOrKey)) return 'readalong'
+  return formatOrKey === PLAIN_EPUB_FILTER_FORMAT ? 'epub' : formatOrKey.toLowerCase()
 }
 
 /**

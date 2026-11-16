@@ -15,7 +15,14 @@ import type {
   TemporalJumpBucketUnit,
 } from '@bookorbit/types';
 import type { BookCardLinkInfo, UnscopedBookRecommendation } from '@bookorbit/types';
-import { READ_ALONG_FORMAT_PRIORITY, getBookMediaKind, isAudioFormat, isComicFormat, normalizeCoverAspectRatio } from '@bookorbit/types';
+import {
+  PLAIN_EPUB_FILTER_FORMAT,
+  READ_ALONG_FORMAT_PRIORITY,
+  getBookMediaKind,
+  isAudioFormat,
+  isComicFormat,
+  normalizeCoverAspectRatio,
+} from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { rankFileRowsByBook } from '../../common/utils/primary-file-selection.utils';
 import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-search.utils';
@@ -2135,6 +2142,9 @@ export class BookRepository {
         UNION ALL
         SELECT ${READ_ALONG_FORMAT_PRIORITY}
         WHERE facet_file.format = 'epub' AND facet_file.media_overlay_available = true
+        UNION ALL
+        SELECT ${PLAIN_EPUB_FILTER_FORMAT}
+        WHERE facet_file.format = 'epub' AND facet_file.media_overlay_available = false
       ) AS facet_key
       WHERE ${this.visibleWhere(where)}
         AND facet_key.format IN (${sql.join(

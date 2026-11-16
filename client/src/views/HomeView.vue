@@ -22,7 +22,7 @@ import FormatFacetChips from '@/components/browse-header/FormatFacetChips.vue'
 import BrowseViewControls from '@/components/browse-header/BrowseViewControls.vue'
 import BrowsePageMenu from '@/components/browse-header/BrowsePageMenu.vue'
 import BrowseScanButton from '@/components/browse-header/BrowseScanButton.vue'
-import { barDivider, outlineButton } from '@/components/browse-header/browse-header'
+import { barDivider, formatChipFacets, outlineButton } from '@/components/browse-header/browse-header'
 import { cn } from '@/lib/utils'
 import ViewHeaderDisplayControls from '@/components/view-header/ViewHeaderDisplayControls.vue'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
@@ -359,7 +359,8 @@ const { facets, refresh: refreshFacets } = useLibraryFacets(libraryId, filter, d
 const formatFacets = computed(() => facets.value?.formats ?? [])
 const filterMatchCount = computed(() => facets.value?.total ?? null)
 const filterValueCounts = computed(() => ({ format: Object.fromEntries(formatFacets.value.map((facet) => [facet.format, facet.count])) }))
-const showFormatFacets = computed(() => formatFacets.value.length > 1 || selectedFormats.value.length > 0)
+const chipFormatFacets = computed(() => formatChipFacets(formatFacets.value, selectedFormats.value))
+const showFormatFacets = computed(() => chipFormatFacets.value.length > 1 || selectedFormats.value.length > 0)
 const selectedFormatsLabel = computed(() => (selectedFormats.value.length > 0 ? selectedFormats.value.map(formatFilterValueLabel).join(', ') : null))
 const isNarrowed = computed(() => filterRuleCount.value > 0 || debouncedQuery.value.trim().length > 0)
 
@@ -898,7 +899,7 @@ defineOptions({ name: 'HomeView' })
               :active="selectedFormats.length > 0"
               hide-on-phone
             >
-              <FormatFacetChips :facets="formatFacets" :selected="selectedFormats" @toggle="toggleFormat" />
+              <FormatFacetChips :facets="chipFormatFacets" :selected="selectedFormats" @toggle="toggleFormat" />
             </BrowseInlineGroup>
           </template>
           <span :class="barDivider" aria-hidden="true" />

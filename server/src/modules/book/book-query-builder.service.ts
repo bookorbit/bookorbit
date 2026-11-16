@@ -2,7 +2,14 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { AnyColumn, SQL, and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { READ_ALONG_FORMAT_PRIORITY, STORY_GUIDE_FEATURE, parseCustomRuleFieldId, parseCustomSortFieldId, parseSeriesIndex } from '@bookorbit/types';
+import {
+  PLAIN_EPUB_FILTER_FORMAT,
+  READ_ALONG_FORMAT_PRIORITY,
+  STORY_GUIDE_FEATURE,
+  parseCustomRuleFieldId,
+  parseCustomSortFieldId,
+  parseSeriesIndex,
+} from '@bookorbit/types';
 import type {
   AuthorGender,
   CommunityRatingProvider,
@@ -717,11 +724,14 @@ export class BookQueryBuilder {
 
     const matchesFormats = (): SQL | undefined => {
       if (!values?.length) return undefined;
-      const physicalFormats = values.filter((value) => value !== READ_ALONG_FORMAT_PRIORITY);
+      const physicalFormats = values.filter((value) => value !== READ_ALONG_FORMAT_PRIORITY && value !== PLAIN_EPUB_FILTER_FORMAT);
       const clauses: SQL[] = [];
       if (physicalFormats.length > 0) clauses.push(inArray(bookFiles.format, physicalFormats));
       if (values.includes(READ_ALONG_FORMAT_PRIORITY)) {
         clauses.push(and(eq(bookFiles.format, 'epub'), eq(bookFiles.mediaOverlayAvailable, true))!);
+      }
+      if (values.includes(PLAIN_EPUB_FILTER_FORMAT)) {
+        clauses.push(and(eq(bookFiles.format, 'epub'), eq(bookFiles.mediaOverlayAvailable, false))!);
       }
       return or(...clauses);
     };

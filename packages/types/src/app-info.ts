@@ -47,6 +47,8 @@ export const SERVER_FEATURES = [
   "relative-date-ranges",
   /** The `format` book filter accepts `epub:readalong` for EPUBs with media overlays. */
   "read-along-filter",
+  /** The `format` book filter accepts `epub:plain` for EPUBs without media overlays. */
+  "plain-epub-filter",
   /**
    * `GET /reading-history` (offset pages, the first carrying every month's size), `/summary`,
    * `/:attemptId/marks` and `PATCH /:attemptId/rating`.

@@ -170,6 +170,7 @@ describe('AppInfoService', () => {
           'bookmark-edit',
           'author-metadata-match',
           'read-along-filter',
+          'plain-epub-filter',
         ]),
       );
     });

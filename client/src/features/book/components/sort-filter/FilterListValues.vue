@@ -3,7 +3,15 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Search } from '@lucide/vue'
 import { ListboxContent, ListboxFilter, ListboxItem, ListboxRoot, type AcceptableValue } from 'reka-ui'
-import { AUTHOR_GENDERS, BOOK_FORMATS, READ_STATUSES, withReadAlongFormatPriority, type RuleField } from '@bookorbit/types'
+import {
+  AUTHOR_GENDERS,
+  BOOK_FORMATS,
+  PLAIN_EPUB_FILTER_FORMAT,
+  READ_ALONG_FORMAT_PRIORITY,
+  READ_STATUSES,
+  withReadAlongFormatPriority,
+  type RuleField,
+} from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { useCollections } from '@/features/collection/composables/useCollections'
@@ -50,6 +58,10 @@ const { t } = useI18n()
 const { libraries, fetchLibraries } = useLibraries()
 const { collections, fetchCollections } = useCollections()
 
+const FILTER_FORMATS = withReadAlongFormatPriority(BOOK_FORMATS).flatMap((format) =>
+  format === READ_ALONG_FORMAT_PRIORITY ? [format, PLAIN_EPUB_FILTER_FORMAT] : [format],
+)
+
 const query = ref('')
 const pinned = ref<string[]>([...props.modelValue])
 const results = ref<string[]>([])
@@ -62,7 +74,7 @@ const fixedOptions = computed<ValueOption[] | null>(() => {
     case 'readStatus':
       return READ_STATUSES.map((status) => ({ value: status, label: filterValueLabel('readStatus', status) }))
     case 'format':
-      return withReadAlongFormatPriority(BOOK_FORMATS).map((format) => ({
+      return FILTER_FORMATS.map((format) => ({
         value: format,
         label: filterValueLabel('format', format),
         count: props.counts?.[format],

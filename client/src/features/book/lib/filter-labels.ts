@@ -1,5 +1,5 @@
 import type { GroupRule, Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
-import { isReadAlongFormatKey, parseCustomRuleFieldId, parseCustomSortFieldId } from '@bookorbit/types'
+import { isReadAlongFormatKey, parseCustomRuleFieldId, parseCustomSortFieldId, PLAIN_EPUB_FILTER_FORMAT } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
 import { providerShortLabel } from '@/lib/provider-colors'
@@ -88,7 +88,7 @@ export function filterValueLabel(field: Rule['field'], value: string): string {
 }
 
 export function formatFilterValueLabel(value: string): string {
-  return isReadAlongFormatKey(value) ? formatKeyName(value) : value.toUpperCase()
+  return isReadAlongFormatKey(value) || value === PLAIN_EPUB_FILTER_FORMAT ? formatKeyName(value) : value.toUpperCase()
 }
 
 /**

@@ -1,10 +1,19 @@
 import type { InjectionKey, Ref } from 'vue'
+import { PLAIN_EPUB_FILTER_FORMAT, type BookFormatFacet } from '@bookorbit/types'
 
 export type BrowsePlaceKind = 'library' | 'smartScope' | 'collection'
 
 export interface BrowsePlace {
   kind: BrowsePlaceKind
   id: number
+}
+
+/**
+ * The format facets the bar shows as chips. Plain EPUB is a filter-panel value: as a chip it would
+ * mostly repeat EPUB, so it only appears once picked.
+ */
+export function formatChipFacets(facets: readonly BookFormatFacet[], selected: readonly string[]): BookFormatFacet[] {
+  return facets.filter((facet) => facet.format !== PLAIN_EPUB_FILTER_FORMAT || selected.includes(facet.format))
 }
 
 /** The command bar element, so a facet group can measure the room it has left. */

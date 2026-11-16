@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomMetadataFieldSummary, Rule } from '@bookorbit/types'
-import { RULE_FIELDS, RULE_OPERATORS, SORT_FIELDS } from '@bookorbit/types'
+import { PLAIN_EPUB_FILTER_FORMAT, READ_ALONG_FORMAT_PRIORITY, RULE_FIELDS, RULE_OPERATORS, SORT_FIELDS } from '@bookorbit/types'
 import { activateI18nLocale, i18n } from '@/i18n'
 import { compileIcuCatalog } from '@/i18n/icu'
 import en from '@/locales/en.json'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
-import { fieldLabel, filterValueLabel, operatorLabel, ruleToParts, sortFieldLabel } from '../filter-labels'
+import { fieldLabel, filterValueLabel, operatorLabel, ruleToParts, ruleToTokenParts, sortFieldLabel } from '../filter-labels'
 
 vi.mock('@/features/book/composables/useActiveCustomFields', () => ({
   activeCustomFieldLabel: vi.fn<(fieldId: number) => string | null>(() => null),
@@ -152,6 +152,19 @@ describe('author gender labels', () => {
   it('uses translated values in rule summaries', () => {
     const rule: Rule = { type: 'rule', field: 'authorGender', operator: 'includesAny', value: ['female', 'non_binary'] }
     expect(ruleToParts(rule)).toEqual({ field: 'Author Gender', operator: 'includes any of', value: 'Female, Non-binary' })
+  })
+})
+
+describe('format labels', () => {
+  it('names the EPUB edition keys and shows other formats as codes', () => {
+    expect(filterValueLabel('format', READ_ALONG_FORMAT_PRIORITY)).toBe('Read-aloud EPUB')
+    expect(filterValueLabel('format', PLAIN_EPUB_FILTER_FORMAT)).toBe('EPUB without read-aloud')
+    expect(filterValueLabel('format', 'm4b')).toBe('M4B')
+  })
+
+  it('names the plain EPUB key in a filter token', () => {
+    const rule: Rule = { type: 'rule', field: 'format', operator: 'includesAny', value: [PLAIN_EPUB_FILTER_FORMAT, 'm4b'] }
+    expect(ruleToTokenParts(rule).value).toBe('EPUB without read-aloud, M4B')
   })
 })
 

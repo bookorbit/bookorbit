@@ -41,6 +41,7 @@ import {
   CUSTOM_FIELD_TYPE_OPERATORS,
   EMPTY_CONTENT_FILTER_RULES,
   FIELD_OPERATORS,
+  PLAIN_EPUB_FILTER_FORMAT,
   READ_ALONG_FORMAT_PRIORITY,
   SORT_FIELDS,
   customRuleField,
@@ -1402,6 +1403,74 @@ describe('formatRuleToSql', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(
       wrapRule({ type: 'rule', field: 'format', operator: 'excludesAll', value: [READ_ALONG_FORMAT_PRIORITY] }) as never,
+      USER_CTX,
+    ) as any;
+
+    expect(getRuleSql(where)).toMatchObject({ type: 'not', value: { type: 'sql' } });
+  });
+
+  it('matches the plain EPUB key only on EPUBs without media overlays', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'format', operator: 'includesAny', value: [PLAIN_EPUB_FILTER_FORMAT] }) as never,
+      USER_CTX,
+    ) as any;
+    const predicate = (getRuleSql(where) as any).values[0].whereClause.clauses[1];
+
+    expect(predicate).toMatchObject({
+      type: 'or',
+      clauses: [
+        {
+          type: 'and',
+          clauses: [
+            { type: 'eq', right: 'epub' },
+            { type: 'eq', right: false },
+          ],
+        },
+      ],
+    });
+    expect(predicate.clauses).toHaveLength(1);
+  });
+
+  it('keeps both EPUB edition keys apart from the physical formats', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({
+        type: 'rule',
+        field: 'format',
+        operator: 'includesAny',
+        value: ['m4b', PLAIN_EPUB_FILTER_FORMAT, READ_ALONG_FORMAT_PRIORITY],
+      }) as never,
+      USER_CTX,
+    ) as any;
+    const predicate = (getRuleSql(where) as any).values[0].whereClause.clauses[1];
+
+    expect(predicate).toMatchObject({
+      type: 'or',
+      clauses: [
+        { type: 'inArray', right: ['m4b'] },
+        {
+          type: 'and',
+          clauses: [
+            { type: 'eq', right: 'epub' },
+            { type: 'eq', right: true },
+          ],
+        },
+        {
+          type: 'and',
+          clauses: [
+            { type: 'eq', right: 'epub' },
+            { type: 'eq', right: false },
+          ],
+        },
+      ],
+    });
+  });
+
+  it('excludes books holding any plain EPUB', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(
+      wrapRule({ type: 'rule', field: 'format', operator: 'excludesAll', value: [PLAIN_EPUB_FILTER_FORMAT] }) as never,
       USER_CTX,
     ) as any;
 

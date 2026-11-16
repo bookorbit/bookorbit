@@ -7002,6 +7002,7 @@
       "ogg": "OGG audio",
       "flac": "FLAC audio",
       "readAlong": "Read-aloud EPUB",
+      "plainEpub": "EPUB without read-aloud",
       "primary": "Primary format"
     },
     "actions": {
