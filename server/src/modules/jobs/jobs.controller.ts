@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
-import { JOB_LIST_DEFAULT_LIMIT, JOBS_VIEW_PERMISSIONS, type JobActionResponse, type JobList } from '@bookorbit/types';
+import { JOB_LIST_DEFAULT_LIMIT, JOBS_VIEW_PERMISSIONS, type JobActionResponse, type JobList, type JobsSummary } from '@bookorbit/types';
 
 import { InteractiveOnly } from '../../common/decorators/api-key-policy.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -29,6 +29,13 @@ export class JobsController {
       limit: query.limit ?? JOB_LIST_DEFAULT_LIMIT,
       counts: query.counts === true,
     });
+  }
+
+  /** The viewer's own running, waiting, needs-you and failed counts, and which ownerless work is running. */
+  @Get('summary')
+  @RequireAnyPermission(...JOBS_VIEW_PERMISSIONS)
+  summary(@CurrentUser() user: RequestUser): Promise<JobsSummary> {
+    return this.jobs.summary(user);
   }
 
   /** One action on up to 100 jobs of any types, with what happened to each. */

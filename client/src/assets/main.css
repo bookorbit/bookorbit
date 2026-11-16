@@ -710,6 +710,58 @@ html[data-glow='off'] .shell-glow {
   }
 }
 
+/* ── Sidebar job signal ──────────────────────────────────────
+   The Jobs entry's icon while the viewer's own jobs run (a breathing
+   glow) or only wait (a still tint). Unlayered, so the tint wins over
+   the icon's colour utility. Reduced motion keeps the glow still.
+──────────────────────────────────────────────────────────────── */
+.nav-signal-glyph[data-signal] {
+  color: var(--primary);
+}
+.nav-signal-glyph[data-signal='waiting'] {
+  filter: drop-shadow(0 0 2.5px color-mix(in oklch, var(--primary) 38%, transparent));
+}
+.nav-signal-glyph[data-signal='running'] {
+  filter: drop-shadow(0 0 3.5px color-mix(in oklch, var(--primary) 72%, transparent));
+}
+.nav-signal-tile[data-signal='running'] {
+  border-color: color-mix(in oklch, var(--primary) 58%, var(--shell-accent-line));
+}
+.nav-signal-tile[data-signal='waiting'] {
+  border-color: color-mix(in oklch, var(--primary) 34%, var(--shell-accent-line));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .nav-signal-glyph[data-signal='running'] {
+    animation: nav-signal-breathe 2.4s ease-in-out infinite;
+  }
+
+  .nav-signal-tile[data-signal='running'] {
+    animation: nav-signal-tile 2.4s ease-in-out infinite;
+  }
+
+  @keyframes nav-signal-breathe {
+    0%,
+    100% {
+      filter: drop-shadow(0 0 0.5px color-mix(in oklch, var(--primary) 38%, transparent));
+    }
+    50% {
+      filter: drop-shadow(0 0 4.5px color-mix(in oklch, var(--primary) 72%, transparent))
+        drop-shadow(0 0 1.5px color-mix(in oklch, var(--primary) 72%, transparent));
+    }
+  }
+
+  @keyframes nav-signal-tile {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 transparent;
+    }
+    50% {
+      box-shadow: 0 0 10px -1px color-mix(in oklch, var(--primary) 38%, transparent);
+    }
+  }
+}
+
 /* Page route transitions */
 .page-enter-active {
   transition: opacity 0.2s ease-out;

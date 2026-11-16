@@ -30,11 +30,15 @@ function chipOf(badge: SidebarNavBadge | null): string | null {
 const tiles = computed(() =>
   props.entries.map((entry) => {
     const chip = chipOf(entry.badge)
+    const signal = entry.signal
+    const described = chip !== null || signal !== null
     return {
       entry,
       chip,
-      badgeId: chip === null ? undefined : `${uid}-${entry.id}-badge`,
-      badgeText: entry.badge?.label ?? formatNumber(entry.badge?.value ?? 0),
+      signal,
+      badgeId: described ? `${uid}-${entry.id}-badge` : undefined,
+      badgeText: signal?.description ?? entry.badge?.label ?? formatNumber(entry.badge?.value ?? 0),
+      tipLines: signal ? signal.details : entry.badge?.label ? [entry.badge.label] : [],
     }
   }),
 )
@@ -52,15 +56,27 @@ function handleNavigate() {
           <TooltipTrigger as-child>
             <RouterLink
               :to="tile.entry.to"
-              :class="tileClass"
+              :class="[tileClass, 'nav-signal-tile']"
               :data-active="tile.entry.isActive"
+              :data-signal="tile.signal?.activity ?? undefined"
               :data-tour="tile.entry.tourId"
               :aria-label="tile.entry.label"
               :aria-current="tile.entry.isActive ? 'page' : undefined"
               :aria-describedby="tile.badgeId"
               @click="handleNavigate"
             >
-              <component :is="tile.entry.icon" :size="ICON_SIZE" aria-hidden="true" />
+              <component
+                :is="tile.entry.icon"
+                :size="ICON_SIZE"
+                class="nav-signal-glyph"
+                :data-signal="tile.signal?.activity ?? undefined"
+                aria-hidden="true"
+              />
+              <span
+                v-if="tile.signal?.failed"
+                class="pointer-events-none absolute end-[5px] bottom-[5px] size-[7px] rounded-full bg-destructive ring-2 ring-(--shell-surface)"
+                aria-hidden="true"
+              />
               <span
                 v-if="tile.chip !== null"
                 class="pointer-events-none absolute -end-1.5 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] leading-none font-bold tabular-nums text-primary-foreground ring-2 ring-sidebar"
@@ -71,7 +87,7 @@ function handleNavigate() {
           </TooltipTrigger>
           <TooltipContent side="bottom">
             <span class="block">{{ tile.entry.label }}</span>
-            <span v-if="tile.entry.badge?.label" class="block text-[11px]">{{ tile.entry.badge.label }}</span>
+            <span v-for="line in tile.tipLines" :key="line" class="block text-[11px]">{{ line }}</span>
           </TooltipContent>
         </Tooltip>
         <span v-if="tile.badgeId" :id="tile.badgeId" class="sr-only">{{ tile.badgeText }}</span>

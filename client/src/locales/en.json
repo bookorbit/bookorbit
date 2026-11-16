@@ -11818,6 +11818,13 @@
         "allActive": "{count, plural, one {# active request across all users} other {# active requests across all users}}",
         "mineActive": "{count, plural, one {# active request of yours} other {# active requests of yours}}"
       },
+      "jobs": {
+        "running": "{count, plural, one {# running} other {# running}}",
+        "waiting": "{count, plural, one {# waiting} other {# waiting}}",
+        "needsYou": "{count, plural, one {# job needs you} other {# jobs need you}}",
+        "failed": "{count, plural, one {# failed} other {# failed}}",
+        "background": "Also running: {types}"
+      },
       "iconBadgeOverflow": "{count}+",
       "support": "Support BookOrbit",
       "supportAria": "Support BookOrbit on Ko-fi",
@@ -14398,6 +14405,14 @@
       "reviewExpiringMessage": "The generated read-aloud will be discarded in a few days unless you review it.",
       "untitledBook": "Untitled book"
     },
+    "bulkRuns": {
+      "completedTitle": "Finished: {action}",
+      "completedMessage": "{count, plural, one {# item done.} other {# items done.}}",
+      "completedWithErrorsTitle": "Finished with errors: {action}",
+      "completedWithErrorsMessage": "{total, plural, one {{failed} of # item failed.} other {{failed} of # items failed.}}",
+      "failedTitle": "Couldn't finish: {action}",
+      "interruptedTitle": "Interrupted: {action}"
+    },
     "preferences": {
       "title": "Notifications",
       "subtitle": "Choose which notification categories you want to receive.",
@@ -14442,6 +14457,10 @@
         "authorEnrichment": {
           "label": "Author enrichment",
           "description": "When author biographies and photos finish being fetched."
+        },
+        "bulkActions": {
+          "label": "Bulk actions",
+          "description": "When a bulk action you started finishes after you left it, stops, or is cut short by a restart."
         },
         "fileWriteBack": {
           "label": "File write-back",

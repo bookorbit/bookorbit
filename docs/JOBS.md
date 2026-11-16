@@ -1,6 +1,19 @@
 # Jobs
 
-The Jobs page lists long-running work from across BookOrbit in one place: what is running, what is waiting and in what order, what needs an answer, what failed, and what finished. Open it from **Jobs** in the sidebar, or at `/jobs/activity`. The sidebar entry shows how many of the viewer's own jobs are running or waiting.
+The Jobs page lists long-running work from across BookOrbit in one place: what is running, what is waiting and in what order, what needs an answer, what failed, and what finished. Open it from **Jobs** in the sidebar, or at `/jobs/activity`.
+
+## Sidebar entry
+
+The **Jobs** entry in the sidebar reflects the viewer's own jobs, so it is quiet unless something of theirs is going on:
+
+- **Running:** the icon glows softly. With reduced motion turned on, it holds a steady tint instead.
+- **Waiting or paused only:** the icon holds a steady tint, without the glow.
+- **Needs you:** a count shows how many jobs wait on the viewer. In the collapsed sidebar, where there is no room for the count, a dot stands in for it.
+- **Failed:** a small red mark shows while the viewer has failed jobs that are still listed under **Failed**. Dismissing them, or their moving to History, clears it; opening the page does not.
+
+Hovering the entry lists what is behind the signal, such as "2 running" or "1 job needs you". Work that belongs to no one, such as a library scan or the metadata auto-fetch queue, never lights the entry; for someone who can see it in Jobs, the tooltip names it as "Also running". On a phone, a dot on the menu button shows when a job needs the viewer; failures alone do not light it.
+
+The entry stays lit on the Jobs page itself. It updates when a job starts, ends or changes state, never on progress alone.
 
 ## Views
 
@@ -55,6 +68,7 @@ The toolbar shows the progress of a run started in the current tab, with **Cance
 - **Server restarts.** A run that was going when the server stopped is marked interrupted and offers **Continue**, which picks up where it stopped. A book move can continue once the server has finished rescanning the libraries it involves after the restart. Interrupted runs are dismissed after 30 days.
 - **Permissions are checked as it runs**, at least every 30 seconds. A run stops if the account that started it loses the permission, becomes a demo account or is removed, or, for a run started with an API key, if the key is revoked or expires.
 - **History.** Finished runs are deleted after 90 days.
+- **Notifications.** A run that finishes after its tab was closed, or after **Keep running in the background**, sends a notification, with a warning when some items failed. A run the tab watched to the end sends none, since the tab already showed the result. A run that stops on its own, or that a restart cuts short, always sends one; a cancelled run never does. A finished book move keeps its existing notification under **Bulk rename**. These can be turned off under **Bulk actions** in the notification settings.
 
 ### Starting a bulk action from a script
 

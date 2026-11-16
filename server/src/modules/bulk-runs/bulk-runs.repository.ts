@@ -27,6 +27,12 @@ export interface BulkRunItemRecord {
   failure?: BulkRunFailure;
 }
 
+/** What telling a requester how their run ended needs. */
+export type EndedBulkRun = Pick<
+  BulkRunRow,
+  'id' | 'kind' | 'requestedBy' | 'status' | 'errorCode' | 'total' | 'processed' | 'succeeded' | 'failed' | 'skipped'
+>;
+
 export type BulkRunPageRow = Omit<BulkRunRow, 'subjectIds'> & { requesterName: string | null; rank: number; key: JobKey };
 
 export interface BulkRunPageQuery {
@@ -240,12 +246,19 @@ export class BulkRunsRepository {
   }
 
   /** At boot nothing runs, so every run still marked running was cut short. Its ids and place stay for Continue. */
-  async interruptRunning(): Promise<Pick<BulkRunRow, 'id' | 'requestedBy'>[]> {
-    return await this.db
-      .update(bulkRuns)
-      .set({ status: 'interrupted', finishedAt: new Date() })
-      .where(eq(bulkRuns.status, 'running'))
-      .returning({ id: bulkRuns.id, requestedBy: bulkRuns.requestedBy });
+  async interruptRunning(): Promise<EndedBulkRun[]> {
+    return await this.db.update(bulkRuns).set({ status: 'interrupted', finishedAt: new Date() }).where(eq(bulkRuns.status, 'running')).returning({
+      id: bulkRuns.id,
+      kind: bulkRuns.kind,
+      requestedBy: bulkRuns.requestedBy,
+      status: bulkRuns.status,
+      errorCode: bulkRuns.errorCode,
+      total: bulkRuns.total,
+      processed: bulkRuns.processed,
+      succeeded: bulkRuns.succeeded,
+      failed: bulkRuns.failed,
+      skipped: bulkRuns.skipped,
+    });
   }
 
   /** Returns an interrupted run to the line unless its account already has `max` unfinished. */

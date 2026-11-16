@@ -10,6 +10,7 @@ import { JobChangesService } from '../jobs/job-changes.service';
 import { BulkRunActorService, BulkRunStopped } from './bulk-run-actor.service';
 import type { BulkItemOutcome, BulkRunEnd, BulkRunHandler } from './bulk-run-handler';
 import { BulkRunHandlerRegistry } from './bulk-run-handler.registry';
+import { BulkRunNotifier } from './bulk-run-notifier.service';
 import { BulkRunStreams } from './bulk-run-streams.service';
 import { BulkRunsRepository } from './bulk-runs.repository';
 
@@ -65,6 +66,7 @@ export class BulkRunDispatcher implements OnApplicationBootstrap, OnModuleDestro
     private readonly streams: BulkRunStreams,
     private readonly actors: BulkRunActorService,
     private readonly jobChanges: JobChangesService,
+    private readonly notifier: BulkRunNotifier,
     @Inject(bulkRunsConfig.KEY) private readonly config: ConfigType<typeof bulkRunsConfig>,
   ) {}
 
@@ -77,6 +79,7 @@ export class BulkRunDispatcher implements OnApplicationBootstrap, OnModuleDestro
         for (const owner of new Set(interrupted.map((run) => run.requestedBy))) {
           this.jobChanges.notify({ type: 'bulk-run', ownerId: owner, state: true });
         }
+        void this.notifier.interrupted(interrupted);
       }
     } catch (error) {
       this.logger.error(
@@ -339,17 +342,24 @@ export class BulkRunDispatcher implements OnApplicationBootstrap, OnModuleDestro
       );
     }
     if (handler) await this.finishQuietly(handler, settled ?? run, state, end);
+    const watched = this.streams.following(run.id);
     this.streams.close(run.id, handler && settled && end !== 'failed' ? handler.doneEvent(settled) : null);
     this.jobChanges.notify({ type: 'bulk-run', ownerId: run.requestedBy, state: true });
+    if (settled) void this.notifier.ended(settled, { watched, completionHandled: handler?.notifiesCompletion === true });
     return settled;
   }
 
   private async retryUnsettled(): Promise<void> {
     for (const [id, pending] of this.unsettled) {
       try {
-        await this.repo.settle(id, pending.end, pending.failure);
+        const settled = await this.repo.settle(id, pending.end, pending.failure);
         this.unsettled.delete(id);
         this.jobChanges.notify({ type: 'bulk-run', ownerId: pending.run.requestedBy, state: true });
+        // Its streams closed when it first tried to settle, so nobody watched it end.
+        if (settled) {
+          const completionHandled = this.handlers.get(settled.kind)?.notifiesCompletion === true;
+          void this.notifier.ended(settled, { watched: false, completionHandled });
+        }
         this.logger.log(`[bulk_run.settle] [end] runId=${id} kind=${pending.run.kind} outcome=${pending.end} - bulk run settled on retry`);
       } catch {
         // Still failing; the next tick tries again, and a restart marks it interrupted.

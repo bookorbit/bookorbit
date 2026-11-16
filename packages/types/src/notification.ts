@@ -33,6 +33,10 @@ export const NotificationType = {
   ReadAloudReviewExpiring: "read_aloud_review_expiring",
   StoryGuideReady: "story_guide_ready",
   StoryGuideFailed: "story_guide_failed",
+  BulkRunCompleted: "bulk_run_completed",
+  BulkRunCompletedWithErrors: "bulk_run_completed_with_errors",
+  BulkRunFailed: "bulk_run_failed",
+  BulkRunInterrupted: "bulk_run_interrupted",
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -64,6 +68,7 @@ export const NOTIFICATION_CATEGORY_IDS = [
   "achievements",
   "readAloud",
   "storyGuides",
+  "bulkActions",
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORY_IDS)[number];
@@ -113,6 +118,10 @@ export const NOTIFICATION_TYPE_META: Record<NotificationType, NotificationTypeMe
   [NotificationType.ReadAloudReviewExpiring]: { category: "readAloud", severity: "warning" },
   [NotificationType.StoryGuideReady]: { category: "storyGuides", severity: "success" },
   [NotificationType.StoryGuideFailed]: { category: "storyGuides", severity: "error" },
+  [NotificationType.BulkRunCompleted]: { category: "bulkActions", severity: "success" },
+  [NotificationType.BulkRunCompletedWithErrors]: { category: "bulkActions", severity: "warning" },
+  [NotificationType.BulkRunFailed]: { category: "bulkActions", severity: "error" },
+  [NotificationType.BulkRunInterrupted]: { category: "bulkActions", severity: "warning" },
 };
 
 export const NOTIFICATION_CATEGORIES: Record<NotificationCategory, readonly NotificationType[]> = NOTIFICATION_CATEGORY_IDS.reduce(

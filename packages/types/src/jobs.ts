@@ -150,6 +150,21 @@ export interface JobList {
   scopes?: JobScope[];
 }
 
+/**
+ * The viewer's own jobs at a glance, for the sidebar. Ownerless work (library scans and the
+ * metadata and author queues) never counts here; it is only named in `background`.
+ */
+export interface JobsSummary {
+  running: number;
+  /** Queued or paused. */
+  waiting: number;
+  needsYou: number;
+  /** Failed inside their type's failed window and not dismissed. */
+  failed: number;
+  /** Ownerless types the viewer may see that are running now, in `JOB_TYPES` order. */
+  background: JobType[];
+}
+
 export interface JobActionRequest {
   action: JobActionKind;
   ids: string[];

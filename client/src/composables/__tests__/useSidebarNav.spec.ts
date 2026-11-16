@@ -1,20 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { Permission, type BrowseCounts } from '@bookorbit/types'
+import { Permission, type BrowseCounts, type JobsSummary } from '@bookorbit/types'
 import type { RouteLocationNormalizedLoaded } from 'vue-router'
 import { SIDEBAR_NAV_REGISTRY, isNavEntryAllowed, resolveNavEntry, useSidebarNav } from '../useSidebarNav'
 
-const mocks = vi.hoisted(() => ({ permissions: new Set<string>() }))
+const mocks = vi.hoisted(() => ({ permissions: new Set<string>(), jobsSummary: { value: null as JobsSummary | null } }))
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({
-    t: (key: string, params?: { count?: number }) => {
+    t: (key: string, params?: { count?: number; types?: string }) => {
       const count = params?.count ?? 0
       if (key === 'components.sidebar.requestBadge.allActive') return `${count} active requests across all users`
       if (key === 'components.sidebar.requestBadge.mineActive') return `${count} active requests of yours`
+      if (key === 'components.sidebar.jobs.running') return `${count} running`
+      if (key === 'components.sidebar.jobs.waiting') return `${count} waiting`
+      if (key === 'components.sidebar.jobs.needsYou') return `${count} need you`
+      if (key === 'components.sidebar.jobs.failed') return `${count} failed`
+      if (key === 'components.sidebar.jobs.background') return `Also running: ${params?.types}`
+      if (key === 'jobsArea.types.library-scan.label') return 'Library scan'
       return key
     },
+    te: (key: string) => key === 'jobsArea.types.library-scan.label',
   }),
 }))
+
+vi.mock('@/features/jobs/composables/useJobsSummary', () => ({ useJobsSummary: () => ({ summary: mocks.jobsSummary }) }))
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
@@ -38,7 +47,6 @@ function makeContext(
     outstandingRequestLabel: string
     browseCounts: BrowseCounts | null
     storyGuidesBuilding: boolean
-    storyGuidesServed: boolean
   }> = {},
 ) {
   const permissions = overrides.permissions ?? []
@@ -51,7 +59,6 @@ function makeContext(
     outstandingRequestLabel: overrides.outstandingRequestLabel ?? '',
     browseCounts: overrides.browseCounts ?? null,
     storyGuidesBuilding: overrides.storyGuidesBuilding,
-    storyGuidesServed: overrides.storyGuidesServed,
   }
 }
 
@@ -72,6 +79,7 @@ function allowedIds(context: ReturnType<typeof makeContext>) {
 describe('sidebar nav registry', () => {
   beforeEach(() => {
     mocks.permissions.clear()
+    mocks.jobsSummary.value = null
   })
 
   it('shows only ungated destinations to a user with no permissions', () => {
@@ -93,25 +101,28 @@ describe('sidebar nav registry', () => {
     expect(primary).toEqual(['dashboard', 'book-dock', 'book-requests', 'tools', 'jobs'])
   })
 
-  it('hides Jobs from settings managers until story guides are building or exist', () => {
-    const manager = ['manage_app_settings']
-
-    expect(allowedIds(makeContext({ permissions: manager }))).not.toContain('jobs')
-    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: false, storyGuidesServed: false }))).not.toContain('jobs')
-    expect(allowedIds(makeContext({ permissions: manager, storyGuidesBuilding: true }))).toContain('jobs')
-    expect(allowedIds(makeContext({ permissions: manager, storyGuidesServed: true }))).toContain('jobs')
+  it('shows Jobs to anyone holding a permission that sees jobs, whatever the story-guide switches', () => {
+    for (const permission of [
+      'manage_app_settings',
+      'library_generate_read_aloud',
+      'library_merge_books',
+      'library_edit_metadata',
+      'manage_libraries',
+    ]) {
+      expect(allowedIds(makeContext({ permissions: [permission] }))).toContain('jobs')
+      expect(allowedIds(makeContext({ permissions: [permission], storyGuidesBuilding: false }))).toContain('jobs')
+    }
   })
 
   it('shows Jobs to builders only while the server builds story guides', () => {
     const builder = ['library_generate_story_guide']
 
     expect(allowedIds(makeContext({ permissions: builder }))).not.toContain('jobs')
-    expect(allowedIds(makeContext({ permissions: builder, storyGuidesServed: true }))).not.toContain('jobs')
     expect(allowedIds(makeContext({ permissions: builder, storyGuidesBuilding: true }))).toContain('jobs')
   })
 
   it('never shows Jobs without a permission that sees jobs, and keeps it lit on every Jobs route', () => {
-    expect(allowedIds(makeContext({ storyGuidesBuilding: true, storyGuidesServed: true }))).not.toContain('jobs')
+    expect(allowedIds(makeContext({ storyGuidesBuilding: true }))).not.toContain('jobs')
     expect(entry('jobs').isActive(makeRoute('jobs-activity'))).toBe(true)
     expect(entry('jobs').isActive(makeRoute('jobs-story-guides'))).toBe(true)
     expect(entry('jobs').to).toEqual({ name: 'jobs-activity' })
@@ -233,6 +244,7 @@ describe('sidebar nav registry', () => {
     expect(SIDEBAR_NAV_REGISTRY.filter((candidate) => candidate.returnsWithWork).map((candidate) => candidate.id)).toEqual([
       'book-dock',
       'book-requests',
+      'jobs',
     ])
     expect(resolveNavEntry(entry('book-dock'), makeContext(), makeRoute('dashboard'), 'Book Dock').returnsWithWork).toBe(true)
     expect(resolveNavEntry(entry('series'), makeContext(), makeRoute('dashboard'), 'Series').returnsWithWork).toBe(false)
@@ -286,6 +298,52 @@ describe('sidebar nav registry', () => {
       expect(resolveNavEntry(entry(id), makeContext(), makeRoute('dashboard'), id).badge).toBeNull()
       expect(resolveNavEntry(entry(id), zeroed, makeRoute('dashboard'), id).badge).toBeNull()
     }
+  })
+
+  function jobsEntry() {
+    const { zones, jobsAllowed } = useSidebarNav()
+    return { jobs: zones.value.flatMap((zone) => zone.entries).find((candidate) => candidate.id === 'jobs'), jobsAllowed: jobsAllowed.value }
+  }
+
+  it("lights the Jobs entry from the viewer's own jobs and counts what needs them", () => {
+    mocks.permissions.add(Permission.LibraryEditMetadata)
+    mocks.jobsSummary.value = { running: 2, waiting: 3, needsYou: 1, failed: 2, background: ['library-scan'] }
+
+    const { jobs, jobsAllowed } = jobsEntry()
+
+    expect(jobsAllowed).toBe(true)
+    expect(jobs?.badge).toEqual({ value: 1, label: '1 need you', tone: 'accent' })
+    expect(jobs?.returnsWithWork).toBe(true)
+    expect(jobs?.signal).toMatchObject({
+      activity: 'running',
+      failed: true,
+      attention: true,
+      details: ['2 running', '3 waiting', '1 need you', '2 failed', 'Also running: Library scan'],
+    })
+    expect(jobs?.signal?.description).toContain('2 running')
+  })
+
+  it('holds a still tint while jobs only wait, and names background work without lighting the icon', () => {
+    mocks.permissions.add(Permission.ManageAppSettings)
+    mocks.jobsSummary.value = { running: 0, waiting: 1, needsYou: 0, failed: 0, background: [] }
+    expect(jobsEntry().jobs?.signal).toMatchObject({ activity: 'waiting', failed: false, attention: false })
+
+    mocks.jobsSummary.value = { running: 0, waiting: 0, needsYou: 0, failed: 0, background: ['library-scan'] }
+    const { jobs } = jobsEntry()
+    expect(jobs?.signal).toMatchObject({ activity: null, failed: false, details: ['Also running: Library scan'] })
+    expect(jobs?.badge).toBeNull()
+  })
+
+  it('leaves the Jobs entry plain while nothing is going on or the summary has not loaded', () => {
+    mocks.permissions.add(Permission.ManageAppSettings)
+    expect(jobsEntry().jobs).toMatchObject({ signal: null, badge: null })
+
+    mocks.jobsSummary.value = { running: 0, waiting: 0, needsYou: 0, failed: 0, background: [] }
+    expect(jobsEntry().jobs).toMatchObject({ signal: null, badge: null })
+  })
+
+  it('follows no jobs for a viewer without the Jobs entry', () => {
+    expect(jobsEntry()).toEqual({ jobs: undefined, jobsAllowed: false })
   })
 
   it('gives every entry a zone and a unique id', () => {

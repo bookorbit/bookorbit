@@ -14,18 +14,21 @@ const props = withDefaults(
   defineProps<
     SidebarMenuButtonProps & {
       tooltip?: string | Component
+      /** Shows the tooltip in the expanded sidebar too, for rows whose details do not fit in them. */
+      tooltipWhenExpanded?: boolean
     }
   >(),
   {
     as: 'button',
     variant: 'default',
     size: 'default',
+    tooltipWhenExpanded: false,
   },
 )
 
 const { isMobile, state } = useSidebar()
 
-const delegatedProps = reactiveOmit(props, 'tooltip')
+const delegatedProps = reactiveOmit(props, 'tooltip', 'tooltipWhenExpanded')
 </script>
 
 <template>
@@ -39,7 +42,7 @@ const delegatedProps = reactiveOmit(props, 'tooltip')
         <slot />
       </SidebarMenuButtonChild>
     </TooltipTrigger>
-    <TooltipContent side="right" align="center" :hidden="state !== 'collapsed' || isMobile">
+    <TooltipContent side="right" align="center" :hidden="isMobile || (state !== 'collapsed' && !tooltipWhenExpanded)">
       <template v-if="typeof tooltip === 'string'">
         {{ tooltip }}
       </template>

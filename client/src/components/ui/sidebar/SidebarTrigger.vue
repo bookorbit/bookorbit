@@ -9,6 +9,8 @@ import { useSidebar } from './utils'
 
 const props = defineProps<{
   class?: HTMLAttributes['class']
+  /** Ids of elements that say more about the button, such as a waiting-work dot beside it. */
+  describedBy?: string
 }>()
 
 const { isMobile, openMobile, state, toggleSidebar } = useSidebar()
@@ -32,6 +34,7 @@ const actionLabel = computed(() => {
         size="icon"
         :class="cn('h-7 w-7', props.class)"
         :aria-label="actionLabel"
+        :aria-describedby="props.describedBy"
         @click="toggleSidebar"
       >
         <PanelLeft aria-hidden="true" />

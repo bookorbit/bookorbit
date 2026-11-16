@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { mount, RouterLinkStub } from '@vue/test-utils'
 import { h, markRaw } from 'vue'
-import type { ResolvedSidebarNavEntry, SidebarNavBadge } from '@/composables/useSidebarNav'
+import type { ResolvedSidebarNavEntry, SidebarNavBadge, SidebarNavSignal } from '@/composables/useSidebarNav'
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string, params?: { count?: string }) => (params?.count ? `${key}:${params.count}` : key) }),
@@ -18,7 +18,7 @@ const { default: SidebarIconRow } = await import('../SidebarIconRow.vue')
 const Icon = markRaw({ name: 'Icon', render: () => h('svg') })
 
 function entry(id: string, overrides: Partial<ResolvedSidebarNavEntry> = {}): ResolvedSidebarNavEntry {
-  return { id, label: `${id} label`, icon: Icon, to: { name: id }, isActive: false, badge: null, returnsWithWork: false, ...overrides }
+  return { id, label: `${id} label`, icon: Icon, to: { name: id }, isActive: false, badge: null, signal: null, returnsWithWork: false, ...overrides }
 }
 
 function accent(value: number, label?: string): SidebarNavBadge {
@@ -58,6 +58,42 @@ describe('SidebarIconRow', () => {
     expect(describedBy).toBeTruthy()
     expect(wrapper.find(`[id="${describedBy}"]`).text()).toBe('3 active requests of yours')
     expect(wrapper.find('[data-testid="tooltip-content"]').text()).toContain('3 active requests of yours')
+  })
+
+  function signal(overrides: Partial<SidebarNavSignal> = {}): SidebarNavSignal {
+    return { activity: null, failed: false, attention: false, details: [], description: '', ...overrides }
+  }
+
+  it('glows while work runs and holds a still tint while it only waits', () => {
+    const wrapper = mountRow([
+      entry('jobs', { signal: signal({ activity: 'running', details: ['2 running'], description: '2 running' }) }),
+      entry('book-dock', { signal: signal({ activity: 'waiting', details: ['3 waiting'], description: '3 waiting' }) }),
+      entry('tools'),
+    ])
+
+    const [jobs, dock, tools] = wrapper.findAllComponents(RouterLinkStub)
+    expect(jobs?.attributes('data-signal')).toBe('running')
+    expect(jobs?.find('svg').attributes('data-signal')).toBe('running')
+    expect(dock?.attributes('data-signal')).toBe('waiting')
+    expect(tools?.attributes('data-signal')).toBeUndefined()
+  })
+
+  it('marks failures, keeps the count for work waiting, and spells every detail out', () => {
+    const details = ['2 running', '1 job needs you', '2 failed']
+    const wrapper = mountRow([
+      entry('jobs', {
+        badge: accent(1, '1 job needs you'),
+        signal: signal({ activity: 'running', failed: true, attention: true, details, description: '2 running, 1 job needs you, 2 failed' }),
+      }),
+    ])
+
+    const link = wrapper.findComponent(RouterLinkStub)
+    expect(link.find('.bg-destructive').exists()).toBe(true)
+    expect(link.find('.bg-primary').text()).toBe('1')
+    const describedBy = link.attributes('aria-describedby')
+    expect(wrapper.find(`[id="${describedBy}"]`).text()).toBe('2 running, 1 job needs you, 2 failed')
+    const tooltipLines = wrapper.findAll('[data-testid="tooltip-content"] span').map((line) => line.text())
+    expect(tooltipLines).toEqual(['jobs label', ...details])
   })
 
   it('caps the chip so a large count still fits on the tile', () => {

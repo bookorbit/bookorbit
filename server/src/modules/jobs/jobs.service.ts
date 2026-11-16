@@ -10,6 +10,7 @@ import type {
   JobSubject,
   JobType,
   JobView,
+  JobsSummary,
 } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
@@ -173,6 +174,36 @@ export class JobsService {
       `[jobs.action] [end] userId=${user.id} action=${action} jobs=${unique.length} done=${done} durationMs=${Date.now() - startedAt} - job action taken`,
     );
     return { results: answered };
+  }
+
+  /**
+   * The sidebar's glance: the viewer's own jobs only, never the ownerless rows `mine` lists beside
+   * them. Types no one owns (`access.own` is never true for them) are asked only whether they run.
+   */
+  async summary(user: RequestUser): Promise<JobsSummary> {
+    const now = Date.now();
+    const visible = this.registry
+      .list()
+      .map((source) => ({ source, viewer: { user, access: source.access(user) } }))
+      .filter(({ viewer }) => sees(viewer.access));
+    const ask = (source: JobSource, viewer: JobViewer, owner: JobOwnerFilter) =>
+      source.counts({ owner, cutoffAt: new Date(now - source.failedWindowMs) }, viewer);
+    const owned = visible.filter(({ viewer }) => viewer.access.own);
+    const ownerless = visible.filter(({ viewer }) => !viewer.access.own && viewer.access.all);
+    const [own, background] = await Promise.all([
+      Promise.all(owned.map(({ source, viewer }) => ask(source, viewer, { id: user.id, ownerless: false }))),
+      Promise.all(ownerless.map(({ source, viewer }) => ask(source, viewer, { id: user.id, ownerless: true }))),
+    ]);
+    return {
+      running: own.reduce((sum, counts) => sum + counts.running, 0),
+      waiting: own.reduce((sum, counts) => sum + counts.queued + counts.paused, 0),
+      needsYou: own.reduce((sum, counts) => sum + counts.needsYou, 0),
+      failed: own.reduce((sum, counts) => sum + counts.failed, 0),
+      background: ownerless
+        .filter((_, index) => background[index]!.running > 0)
+        .map(({ source }) => source.type)
+        .sort((a, b) => jobTypeIndex(a) - jobTypeIndex(b)),
+    };
   }
 
   private async counts(entries: readonly Entry[], asOf: number): Promise<JobCounts> {

@@ -35,6 +35,9 @@ export type BulkRunEnd = 'completed' | 'failed' | 'cancelled';
 export interface BulkRunHandler<S = unknown> {
   readonly kind: BulkRunKind;
 
+  /** The kind tells its requester itself when a run completes; the runner still reports one that stops. */
+  readonly notifiesCompletion?: boolean;
+
   /**
    * Setup before the first item still to do (`run.processed` onward), on every start, Continue
    * included. Answer `busy` to leave the run queued and let the dispatcher try another, as a move

@@ -1,8 +1,9 @@
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
-import { JOB_TYPES, type JobType, type JobView } from '@bookorbit/types';
+import { JOB_TYPES, type JobCounts, type JobType, type JobView } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { decodeJobCursor, encodeJobCursor } from './job-cursor';
+import type { JobOwnerFilter, SourceCountQuery } from './job-source';
 import { JobSourceRegistry } from './job-source.registry';
 import { JobsService, type JobListQuery } from './jobs.service';
 import { createFakeJobSource, type FakeJob } from './testing/fake-job-source';
@@ -272,5 +273,51 @@ describe('job cursors', () => {
   it('refuses text that is not a cursor at all', () => {
     expect(() => decodeJobCursor('%%%')).toThrow(BadRequestException);
     expect(() => decodeJobCursor(Buffer.from('[1,2]').toString('base64url'))).toThrow(BadRequestException);
+  });
+});
+
+describe('JobsService summary', () => {
+  const ZERO = { queue: 0, needsYou: 0, failed: 0, running: 0, queued: 0, paused: 0 };
+
+  function counting(type: JobType, access: { own: boolean; all: boolean }, answer: (owner: JobOwnerFilter) => Partial<JobCounts>) {
+    const source = createFakeJobSource(type, [], access);
+    const counts = vi.fn((query: SourceCountQuery) => Promise.resolve({ ...ZERO, ...answer(query.owner) }));
+    source.counts = counts;
+    return { source, counts };
+  }
+
+  it("sums only the viewer's own jobs, never the ownerless rows the mine scope lists", async () => {
+    const guides = counting('story-guide', { own: true, all: true }, (owner) =>
+      owner?.ownerless ? { running: 50 } : { running: 1, queued: 2, failed: 1 },
+    );
+    const aloud = counting('read-along', { own: true, all: false }, () => ({ running: 1, paused: 1, needsYou: 2 }));
+    const summary = await makeService(guides.source, aloud.source).summary(viewer);
+    expect(summary).toEqual({ running: 2, waiting: 3, needsYou: 2, failed: 1, background: [] });
+    expect(guides.counts).toHaveBeenCalledWith(expect.objectContaining({ owner: { id: viewer.id, ownerless: false } }), expect.anything());
+  });
+
+  it('names running ownerless types in JOB_TYPES order and leaves them out of every count', async () => {
+    const enrichment = counting('author-enrichment', { own: false, all: true }, () => ({ running: 1, failed: 4 }));
+    const scans = counting('library-scan', { own: false, all: true }, () => ({ running: 2 }));
+    const fetches = counting('metadata-fetch', { own: false, all: true }, () => ({ queued: 1 }));
+    const summary = await makeService(enrichment.source, scans.source, fetches.source).summary(viewer);
+    expect(summary).toEqual({ running: 0, waiting: 0, needsYou: 0, failed: 0, background: ['library-scan', 'author-enrichment'] });
+    expect(scans.counts).toHaveBeenCalledWith(expect.objectContaining({ owner: { id: viewer.id, ownerless: true } }), expect.anything());
+  });
+
+  it('asks no type the viewer cannot see', async () => {
+    const hidden = counting('book-merge', { own: false, all: false }, () => ({ running: 9 }));
+    const summary = await makeService(hidden.source).summary(viewer);
+    expect(summary).toEqual({ running: 0, waiting: 0, needsYou: 0, failed: 0, background: [] });
+    expect(hidden.counts).not.toHaveBeenCalled();
+  });
+
+  it("measures each type's failures against its own failed window", async () => {
+    const guides = counting('story-guide', { own: true, all: false }, () => ({}));
+    const before = Date.now();
+    await makeService(guides.source).summary(viewer);
+    const cutoff = guides.counts.mock.calls[0]![0].cutoffAt.getTime();
+    expect(cutoff).toBeGreaterThanOrEqual(before - guides.source.failedWindowMs);
+    expect(cutoff).toBeLessThanOrEqual(Date.now() - guides.source.failedWindowMs);
   });
 });

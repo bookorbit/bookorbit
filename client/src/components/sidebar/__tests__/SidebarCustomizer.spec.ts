@@ -48,7 +48,7 @@ const { useSidebarCustomizeMode } = await import('@/composables/useSidebarCustom
 const Icon = markRaw({ name: 'Icon', render: () => h('svg') })
 
 function entry(id: string, returnsWithWork = false): ResolvedSidebarNavEntry {
-  return { id, label: id, icon: Icon, to: { name: id }, isActive: false, badge: null, returnsWithWork }
+  return { id, label: id, icon: Icon, to: { name: id }, isActive: false, badge: null, signal: null, returnsWithWork }
 }
 
 const primaryEntries = [entry('dashboard'), entry('book-dock', true), entry('tools')]

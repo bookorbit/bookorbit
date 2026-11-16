@@ -27,6 +27,11 @@ export class BulkRunStreams {
     if (set.size === 0) this.sinks.delete(runId);
   }
 
+  /** Whether an open response follows the run now. */
+  following(runId: string): boolean {
+    return (this.sinks.get(runId)?.size ?? 0) > 0;
+  }
+
   emit(runId: string, event: object): void {
     for (const sink of [...(this.sinks.get(runId) ?? [])]) {
       if (!this.safeWrite(sink, event)) this.detach(runId, sink);

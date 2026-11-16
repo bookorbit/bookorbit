@@ -69,6 +69,17 @@ describe('NotificationPreferences', () => {
     expect(categoryLabels(superuser)).toContain(t('notifications.preferences.categories.readAloud.label'))
   })
 
+  it('offers bulk action notifications only to someone who can start a bulk action', () => {
+    const label = t('notifications.preferences.categories.bulkActions.label')
+    expect(categoryLabels(shallowMount(NotificationPreferences, { props: { embedded: true } }))).not.toContain(label)
+
+    account.value = { ...account.value, permissions: [Permission.LibraryEditMetadata] }
+    expect(categoryLabels(shallowMount(NotificationPreferences, { props: { embedded: true } }))).toContain(label)
+
+    account.value = { ...account.value, permissions: [Permission.LibraryEditMetadata, Permission.DemoRestricted] }
+    expect(categoryLabels(shallowMount(NotificationPreferences, { props: { embedded: true } }))).not.toContain(label)
+  })
+
   it('hides read-aloud notifications from a demo-restricted account even with the permission', () => {
     account.value = { ...account.value, permissions: [Permission.LibraryGenerateReadAloud, Permission.DemoRestricted] }
     const wrapper = shallowMount(NotificationPreferences, { props: { embedded: true } })

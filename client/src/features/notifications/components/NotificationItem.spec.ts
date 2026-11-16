@@ -4,6 +4,7 @@ import { createI18n } from 'vue-i18n'
 import { createMemoryHistory, createRouter } from 'vue-router'
 
 import { NotificationType, type NotificationItem } from '@bookorbit/types'
+import { compileIcuCatalog } from '@/i18n/icu'
 import en from '@/locales/en.json'
 import NotificationItemVue from './NotificationItem.vue'
 
@@ -38,7 +39,7 @@ async function mountItem(item: NotificationItem, options: { locale?: string; mes
     legacy: false,
     locale,
     fallbackLocale: 'en',
-    messages: { en, ...(options.messages ? { [locale]: options.messages } : {}) },
+    messages: { en: compileIcuCatalog(en, 'en'), ...(options.messages ? { [locale]: options.messages } : {}) },
   })
 
   const wrapper = mount(NotificationItemVue, {
@@ -140,6 +141,42 @@ describe('NotificationItem', () => {
 
       expect(wrapper.text()).toContain('Server fallback title')
       expect(wrapper.text()).toContain('Server fallback message')
+    })
+
+    const bulkRun = (overrides: Partial<NotificationItem> = {}) =>
+      notification({
+        type: NotificationType.BulkRunCompletedWithErrors,
+        title: 'Server fallback title',
+        message: 'Server fallback message',
+        actionUrl: '/jobs/activity?view=history&type=bulk-run',
+        meta: { runId: 'run-1', kind: 'book-refresh-metadata', total: 40, processed: 40, succeeded: 37, failed: 3, skipped: 0, code: null },
+        ...overrides,
+      })
+
+    it('words a bulk run in the reader’s locale with the Jobs area’s name for its kind', async () => {
+      const { wrapper } = await mountItem(bulkRun())
+
+      expect(wrapper.text()).toContain('Finished with errors: Refresh book metadata')
+      expect(wrapper.text()).toContain('3 of 40 items failed.')
+      expect(wrapper.text()).not.toContain('Server fallback')
+    })
+
+    it('explains a stopped bulk run with the Jobs area’s reason for its code', async () => {
+      const { wrapper } = await mountItem(
+        bulkRun({ type: NotificationType.BulkRunFailed, meta: { runId: 'run-1', kind: 'book-move', total: 5, failed: 0, code: 'access-revoked' } }),
+      )
+
+      expect(wrapper.text()).toContain("Couldn't finish: Move books")
+      expect(wrapper.text()).toContain(String(en.jobsArea.types['bulk-run'].reasons['access-revoked']))
+    })
+
+    it('names a bulk run kind this client does not know generically', async () => {
+      const { wrapper } = await mountItem(
+        bulkRun({ type: NotificationType.BulkRunInterrupted, meta: { runId: 'run-1', kind: 'future-kind', total: 2 } }),
+      )
+
+      expect(wrapper.text()).toContain('Interrupted: Bulk action')
+      expect(wrapper.text()).toContain(String(en.jobsArea.types['bulk-run'].reasons.interrupted))
     })
 
     it('leaves every other type to the server copy', async () => {

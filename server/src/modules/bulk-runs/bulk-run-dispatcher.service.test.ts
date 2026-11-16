@@ -7,6 +7,7 @@ import { BULK_RUN_FINISHED_KEPT_MS, BULK_RUN_INTERRUPTED_KEPT_MS, BulkRunDispatc
 import type { BulkItemOutcome, BulkRunHandler } from './bulk-run-handler';
 import { BulkRunHandlerRegistry } from './bulk-run-handler.registry';
 import { BulkRunStreams } from './bulk-run-streams.service';
+import type { EndedBulkRun } from './bulk-runs.repository';
 
 const editor = { id: 7, active: true, isSuperuser: false, permissions: [Permission.LibraryEditMetadata] } as unknown as RequestUser;
 const AT = new Date('2026-11-15T10:00:00.000Z');
@@ -58,7 +59,7 @@ function setup(options: { maxConcurrent?: number } = {}) {
   const streams = new BulkRunStreams();
   const settled = new Map<string, BulkRunRow>();
   const repo = {
-    interruptRunning: vi.fn(() => Promise.resolve([] as Pick<BulkRunRow, 'id' | 'requestedBy'>[])),
+    interruptRunning: vi.fn(() => Promise.resolve([] as EndedBulkRun[])),
     claimNext: vi.fn((): Promise<{ run: BulkRunRow; firstStart: boolean } | null> => Promise.resolve(null)),
     releaseClaim: vi.fn((): Promise<BulkRunRow | null> => Promise.resolve(run({ status: 'queued' }))),
     recordItem: vi.fn(() => Promise.resolve(false)),
@@ -79,10 +80,11 @@ function setup(options: { maxConcurrent?: number } = {}) {
     as: vi.fn(<T>(_actor: RequestUser, work: () => Promise<T>) => work()),
   };
   const jobChanges = { notify: vi.fn() };
-  const dispatcher = new BulkRunDispatcher(repo as never, registry, streams, actors as never, jobChanges as never, {
+  const notifier = { ended: vi.fn(() => Promise.resolve()), interrupted: vi.fn(() => Promise.resolve()) };
+  const dispatcher = new BulkRunDispatcher(repo as never, registry, streams, actors as never, jobChanges as never, notifier as never, {
     maxConcurrent: options.maxConcurrent ?? 3,
   });
-  return { dispatcher, registry, streams, repo, actors, jobChanges, settled };
+  return { dispatcher, registry, streams, repo, actors, jobChanges, notifier, settled };
 }
 
 function follow(streams: BulkRunStreams, runId: string) {
@@ -105,16 +107,53 @@ describe('BulkRunDispatcher', () => {
   });
 
   it('marks runs left running as interrupted at boot and tells their owners', async () => {
-    const { dispatcher, repo, jobChanges } = setup();
-    repo.interruptRunning.mockResolvedValue([
-      { id: 'a', requestedBy: 7 },
-      { id: 'b', requestedBy: 7 },
-      { id: 'c', requestedBy: null },
-    ]);
+    const { dispatcher, repo, jobChanges, notifier } = setup();
+    const interrupted = [
+      run({ id: 'a', status: 'interrupted' }),
+      run({ id: 'b', status: 'interrupted' }),
+      run({ id: 'c', requestedBy: null, status: 'interrupted' }),
+    ];
+    repo.interruptRunning.mockResolvedValue(interrupted);
     await boot(dispatcher);
     expect(jobChanges.notify).toHaveBeenCalledTimes(2);
     expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'bulk-run', ownerId: 7, state: true });
     expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'bulk-run', ownerId: null, state: true });
+    expect(notifier.interrupted).toHaveBeenCalledWith(interrupted);
+  });
+
+  it('tells the notifier whether a tab watched the run end', async () => {
+    const { dispatcher, registry, streams, repo, notifier } = setup();
+    registry.register(handler());
+    const watched = run({ id: 'watched' });
+    const unwatched = run({ id: 'unwatched' });
+    repo.claimNext
+      .mockResolvedValueOnce({ run: watched, firstStart: true })
+      .mockResolvedValueOnce({ run: unwatched, firstStart: true })
+      .mockResolvedValue(null);
+    follow(streams, watched.id);
+    await boot(dispatcher);
+    await dispatcher.tick();
+    await dispatcher.idle();
+
+    expect(notifier.ended).toHaveBeenCalledWith(expect.objectContaining({ id: 'watched', status: 'completed' }), {
+      watched: true,
+      completionHandled: false,
+    });
+    expect(notifier.ended).toHaveBeenCalledWith(expect.objectContaining({ id: 'unwatched', status: 'completed' }), {
+      watched: false,
+      completionHandled: false,
+    });
+  });
+
+  it('leaves a completed run to a kind that reports its own completion', async () => {
+    const { dispatcher, registry, repo, notifier } = setup();
+    registry.register({ ...handler(), notifiesCompletion: true });
+    repo.claimNext.mockResolvedValueOnce({ run: run(), firstStart: true }).mockResolvedValue(null);
+    await boot(dispatcher);
+    await dispatcher.tick();
+    await dispatcher.idle();
+
+    expect(notifier.ended).toHaveBeenCalledWith(expect.objectContaining({ status: 'completed' }), { watched: false, completionHandled: true });
   });
 
   it('works every item from where the run stopped, streams each event and ends with done', async () => {

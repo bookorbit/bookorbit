@@ -1654,6 +1654,31 @@
   {
     "file": "server/src/modules/jobs/jobs.controller.ts",
     "className": "JobsController",
+    "methodName": "summary",
+    "httpMethod": "GET",
+    "path": "/jobs/summary",
+    "permissions": [
+      "Permission.ManageAppSettings",
+      "Permission.LibraryGenerateStoryGuide",
+      "Permission.LibraryGenerateReadAloud",
+      "Permission.LibraryMergeBooks",
+      "Permission.LibraryEditMetadata",
+      "Permission.LibraryDeleteBooks",
+      "Permission.BookRequestSelfFulfill",
+      "Permission.ManageBookRequests",
+      "Permission.ManageLibraries",
+      "Permission.ManageMetadataConfig"
+    ],
+    "permissionMode": "any",
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "interactive"
+  },
+  {
+    "file": "server/src/modules/jobs/jobs.controller.ts",
+    "className": "JobsController",
     "methodName": "act",
     "httpMethod": "POST",
     "path": "/jobs/actions",

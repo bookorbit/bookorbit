@@ -38,6 +38,7 @@ function entry(id: string, options: { badge?: SidebarNavBadge | null; returnsWit
     to: { name: id },
     isActive: false,
     badge: options.badge ?? null,
+    signal: null,
     returnsWithWork: options.returnsWithWork ?? false,
   }
 }

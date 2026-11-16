@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, onScopeDispose, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Orbit } from '@lucide/vue'
@@ -20,6 +20,7 @@ import SidebarCustomizeBar from '@/components/sidebar/SidebarCustomizeBar.vue'
 import { groupRuns } from '@/components/sidebar/sidebar-layout'
 import { useSidebarDataSync } from '@/composables/useSidebarDataSync'
 import { useSidebarNav, type SidebarNavZone } from '@/composables/useSidebarNav'
+import { followJobsSummary } from '@/features/jobs/composables/useJobsSummary'
 import { useSidebarLayout } from '@/composables/useSidebarLayout'
 import { useSidebarCustomizeMode } from '@/composables/useSidebarCustomizeMode'
 import { useSidebarSections, type SidebarListKind, type SidebarSection } from '@/composables/useSidebarSections'
@@ -34,7 +35,22 @@ const { t } = useI18n()
 const route = useRoute()
 const { state, isMobile, openMobile, setOpen, setOpenMobile } = useSidebar()
 const { outstandingRequestTotal } = useSidebarDataSync()
-const { zones } = useSidebarNav(() => outstandingRequestTotal.value)
+const { zones, jobsAllowed } = useSidebarNav(() => outstandingRequestTotal.value)
+
+// Followed while the viewer may see jobs at all, even with the Jobs row hidden: it comes back with work waiting.
+let stopJobsSummary: (() => void) | null = null
+watch(
+  jobsAllowed,
+  (allowed) => {
+    if (allowed && !stopJobsSummary) stopJobsSummary = followJobsSummary()
+    if (!allowed && stopJobsSummary) {
+      stopJobsSummary()
+      stopJobsSummary = null
+    }
+  },
+  { immediate: true },
+)
+onScopeDispose(() => stopJobsSummary?.())
 const { sections } = useSidebarSections()
 const { subscribe: subscribeLibraryActivity } = useSidebarLibraryActivity()
 const { handleLibraryCreated } = useLibraryCreationRedirect()
@@ -184,6 +200,7 @@ async function onLibrarySaved(library: Library) {
               :key="entry.id"
               :is-active="entry.isActive"
               :tooltip="entry.badge?.label ?? entry.label"
+              :signal="entry.signal"
               :to="entry.to"
               :icon="entry.icon"
               :label="entry.label"
@@ -219,6 +236,7 @@ async function onLibrarySaved(library: Library) {
                     :key="entry.id"
                     :is-active="entry.isActive"
                     :tooltip="entry.badge?.label ?? entry.label"
+                    :signal="entry.signal"
                     :to="entry.to"
                     :icon="entry.icon"
                     :label="entry.label"

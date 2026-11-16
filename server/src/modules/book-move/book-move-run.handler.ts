@@ -14,6 +14,8 @@ import { BookMoveService, bookMoveDoneEvent, type BookMoveRunState } from './boo
 @Injectable()
 export class BookMoveRunHandler implements BulkRunHandler<BookMoveRunState>, OnModuleInit {
   readonly kind = 'book-move' as const;
+  /** `BookMoveService` reports a finished move under Bulk rename, with the library it moved to. */
+  readonly notifiesCompletion = true;
 
   constructor(
     private readonly registry: BulkRunHandlerRegistry,

@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Search } from '@lucide/vue'
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar'
 import { useCommandPalette } from '@/features/command-palette/composables/useCommandPalette'
+import JobsNeedsYouDot from '@/features/jobs/components/JobsNeedsYouDot.vue'
+import { useJobsNeedsYou } from '@/features/jobs/composables/useJobsSummary'
 
 /**
  * Phones have no global header. Pages that open with a title row carry the menu and search buttons
@@ -16,6 +18,8 @@ const { isMobile } = useSidebar()
 const { openPalette } = useCommandPalette()
 
 const visible = computed(() => isMobile.value && route.meta.titleRow !== true)
+const needsYou = useJobsNeedsYou()
+const descriptionId = useId()
 
 function handleSearch() {
   openPalette()
@@ -28,7 +32,13 @@ function handleSearch() {
     class="relative z-30 mx-(--shell-gap) mt-(--shell-gap) flex h-12 flex-none shrink-0 items-center gap-2 rounded-(--shell-radius) border border-(--shell-border) bg-(--shell-surface) px-2 shadow-(--shell-shadow) shell-backdrop"
     data-testid="mobile-shell-bar"
   >
-    <SidebarTrigger class="size-9 rounded-md text-foreground hover:bg-(--shell-accent-wash)" />
+    <span class="relative flex">
+      <SidebarTrigger
+        class="size-9 rounded-md text-foreground hover:bg-(--shell-accent-wash)"
+        :described-by="needsYou > 0 ? descriptionId : undefined"
+      />
+      <JobsNeedsYouDot :description-id="descriptionId" ring="shell" />
+    </span>
     <span class="flex-1" aria-hidden="true" />
     <button
       type="button"
