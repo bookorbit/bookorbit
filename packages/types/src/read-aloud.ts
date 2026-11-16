@@ -176,8 +176,9 @@ export type ReadAloudNarrationCoverage = {
   /** Sentences from where the narration starts to where it ends. */
   storySentences: number;
   storyUnmatchedSentences: number;
-  /** Unmatched sentences outside the narration. */
+  /** Unmatched sentences outside the narration, including the unread lines of a chapter that is otherwise read. */
   outsideSentences: number;
+  /** Chapters outside the narration with no audio at all. */
   outsideChapterCount: number;
   /** Titles of those chapters in book order, at most READ_ALOUD_OUTSIDE_TITLES_SHOWN of them. */
   outsideTitles: string[];
@@ -307,7 +308,7 @@ export type ReadAloudChapterReport = {
   preview: string | null;
   firstMatch: string | null;
   lastMatch: string | null;
-  /** Unmatched text before the narration starts or after it ends; see ReadAloudNarrationCoverage. */
+  /** Before the narration starts or after it ends, with no audio at all; see ReadAloudNarrationCoverage. */
   outsideNarration: boolean;
 };
 

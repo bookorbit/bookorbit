@@ -54,7 +54,7 @@ export class ReadAloudPublisher {
     if (raw == null) throw new ReadAloudJobError('invalid_output', 'The alignment report is missing');
     const parsed = parseAlignmentReport(raw);
     const { coverage, chapters } = assessCoverage(parsed.totals, parsed.chapters);
-    const { warnings, requiresReview } = reportWarnings(parsed.totals, coverage);
+    const { warnings, requiresReview } = reportWarnings(parsed.totals, coverage, parsed.tracks);
     await this.jobs.saveReportChapters(row.id, chapters);
     return { report: parsed.totals, coverage, warnings, requiresReview, outputBytes: output.size };
   }

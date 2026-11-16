@@ -1,6 +1,6 @@
 import type { ReadAloudChapterReport, ReadAloudReportSummary } from '@bookorbit/types';
 
-import { assessCoverage, InvalidReportError, parseAlignmentReport, reportWarnings } from './read-aloud-report';
+import { assessCoverage, InvalidReportError, parseAlignmentReport, type ReadAloudTrackReport, reportWarnings } from './read-aloud-report';
 import { classifyReadAloudError, ReadAloudJobError } from './read-aloud-errors';
 import { WorkerJobNotFoundError, WorkerRejectedError, WorkerUnreachableError } from './read-aloud-worker-client.service';
 import { GeneratedFileError } from '../upload/generated-book-file.service';
@@ -85,7 +85,63 @@ describe('parseAlignmentReport', () => {
     const parsed = parseAlignmentReport(report({ spine: [{ href: 'a.xhtml', status: 'aligned', preview: long }] }));
     expect(parsed.chapters[0]!.preview!.length).toBeLessThanOrEqual(280);
   });
+
+  it('reads the track list whole, or not at all', () => {
+    const track = { index: 0, name: '0001.mp4', duration: 38, offset: 0, matchedSeconds: 0, interpolatedSeconds: 0, looseSeconds: 38, excluded: [] };
+    expect(parseAlignmentReport(report({ tracks: [track] })).tracks).toEqual([{ duration: 38, matchedSeconds: 0, interpolatedSeconds: 0 }]);
+    expect(parseAlignmentReport(report()).tracks).toBeNull();
+    expect(parseAlignmentReport(report({ tracks: [track, { ...track, duration: -1 }] })).tracks).toBeNull();
+    expect(parseAlignmentReport(report({ tracks: [track, 'not a track'] })).tracks).toBeNull();
+  });
 });
+
+/** The Briar Club as aligned: duration and placed seconds per track, in playback order. */
+const BRIAR_CLUB_TRACKS: [number, number][] = [
+  [38, 0], // opening credits
+  [16, 15.8],
+  [291, 291],
+  [8, 0], // "Four and a Half Years Earlier. June 1950."
+  [4375, 4375],
+  [262, 258.7],
+  [7, 0],
+  [4329.1, 4329.1],
+  [4323.3, 4323.3],
+  [238.6, 237.4],
+  [7.2, 0],
+  [2934.8, 2934.7],
+  [2897.1, 2893.7],
+  [285, 285],
+  [7.1, 2],
+  [3185.9, 3185.9],
+  [3272, 3272],
+  [265.4, 261.7],
+  [8.7, 2.6],
+  [3036.3, 3036.3],
+  [2930.7, 2930.7],
+  [146, 142.3],
+  [8.4, 3.1],
+  [3518.7, 3518.7],
+  [3492, 3492],
+  [190, 185.8],
+  [8, 0],
+  [3628.2, 3628.2],
+  [3645.1, 3645.1],
+  [2092.8, 2092.8],
+  [1423.4, 1423.4],
+  [443.7, 435.6],
+  [1286, 1286],
+  [1539, 93.8],
+  [76.8, 39.2],
+];
+
+function tracksOf(entries: [number, number][]): ReadAloudTrackReport[] {
+  return entries.map(([duration, placed]) => ({ duration, matchedSeconds: placed, interpolatedSeconds: 0 }));
+}
+
+function withTracks(tracks: ReadAloudTrackReport[]): ReadAloudReportSummary {
+  const unaligned = tracks.filter((track) => track.matchedSeconds === 0 && track.interpolatedSeconds === 0).length;
+  return { ...REPORT_TOTALS, tracks: tracks.length, unalignedTracks: unaligned };
+}
 
 describe('reportWarnings', () => {
   it('flags review only past the thresholds', () => {
@@ -94,6 +150,65 @@ describe('reportWarnings', () => {
     expect(reportWarnings({ ...REPORT_TOTALS, unmatchedSentences: 11 }, null).requiresReview).toBe(true);
     expect(reportWarnings({ ...REPORT_TOTALS, unalignedTracks: 1 }, null)).toEqual({ warnings: ['unaligned_tracks'], requiresReview: true });
     expect(reportWarnings({ ...REPORT_TOTALS, matchedSentences: 0 }, null).requiresReview).toBe(true);
+  });
+
+  it('publishes past credits and spoken part headings, keeping the warning', () => {
+    const tracks = tracksOf(BRIAR_CLUB_TRACKS);
+    expect(reportWarnings(withTracks(tracks), null, tracks)).toEqual({ warnings: ['unaligned_tracks'], requiresReview: false });
+  });
+
+  it('counts a track as placed when only estimated timing landed in it', () => {
+    const tracks = tracksOf([
+      [600, 590],
+      [300, 0],
+      [600, 590],
+    ]);
+    tracks[1] = { ...tracks[1]!, interpolatedSeconds: 4 };
+    expect(reportWarnings(withTracks(tracks), null, tracks)).toEqual({ warnings: [], requiresReview: false });
+  });
+
+  it('keeps the review for unaligned audio long enough to be a chapter', () => {
+    const inside = tracksOf(BRIAR_CLUB_TRACKS);
+    inside[7] = { duration: 4329.1, matchedSeconds: 0, interpolatedSeconds: 0 };
+    expect(reportWarnings(withTracks(inside), null, inside).requiresReview).toBe(true);
+
+    const shortChapter = tracksOf([
+      [600, 590],
+      [21, 0],
+      [600, 590],
+    ]);
+    expect(reportWarnings(withTracks(shortChapter), null, shortChapter).requiresReview).toBe(true);
+
+    const longOpening = tracksOf([
+      [121, 0],
+      [600, 590],
+    ]);
+    expect(reportWarnings(withTracks(longOpening), null, longOpening).requiresReview).toBe(true);
+
+    const bonusInterview = tracksOf([
+      [600, 590],
+      [1539, 0],
+      [76.8, 0],
+    ]);
+    expect(reportWarnings(withTracks(bonusInterview), null, bonusInterview).requiresReview).toBe(true);
+  });
+
+  it('keeps the review when short unaligned tracks add up', () => {
+    const tracks = tracksOf([[100, 0], [100, 0], [600, 590], ...Array.from({ length: 5 }, (): [number, number] => [10, 0]), [600, 590]]);
+    expect(reportWarnings(withTracks(tracks), null, tracks).requiresReview).toBe(true);
+  });
+
+  it('keeps the review when the track list is missing or disagrees with the totals', () => {
+    const tracks = tracksOf(BRIAR_CLUB_TRACKS);
+    const totals = withTracks(tracks);
+    expect(reportWarnings(totals, null, null).requiresReview).toBe(true);
+    expect(reportWarnings({ ...totals, unalignedTracks: 4 }, null, tracks).requiresReview).toBe(true);
+    expect(reportWarnings({ ...totals, tracks: 34 }, null, tracks).requiresReview).toBe(true);
+    const silent = tracksOf([
+      [10, 0],
+      [10, 0],
+    ]);
+    expect(reportWarnings({ ...withTracks(silent), matchedSentences: 1 }, null, silent).requiresReview).toBe(true);
   });
 });
 
@@ -157,11 +272,40 @@ describe('assessCoverage', () => {
       storySentences: totals.sentences - 662,
       storyUnmatchedSentences: 0,
       outsideSentences: 662,
-      outsideChapterCount: 6,
-      outsideTitles: ['Copyright', 'Table of Contents', 'Dedication', 'Acknowledgments', 'Contact the Author', 'All Your Perfects'],
+      outsideChapterCount: 5,
+      outsideTitles: ['Copyright', 'Table of Contents', 'Dedication', 'Acknowledgments', 'All Your Perfects'],
     });
-    expect(marked.filter((entry) => entry.outsideNarration).map((entry) => entry.index)).toEqual([0, 1, 2, 35, 36, 37]);
+    expect(marked.filter((entry) => entry.outsideNarration).map((entry) => entry.index)).toEqual([0, 1, 2, 35, 37]);
     expect(reportWarnings(totals, coverage)).toEqual({ warnings: [], requiresReview: false });
+  });
+
+  it('never calls a chapter with audio "not in the narration", but sets aside its unread lines', () => {
+    const chapters = [
+      chapter(0, 'Dedication', 'front', 4, 3),
+      chapter(1, 'Prologue', 'front', 59, 59),
+      ...Array.from({ length: 10 }, (_, offset) => chapter(2 + offset, `Chapter ${offset + 1}`, 'body', 200, 200)),
+      chapter(12, 'Acknowledgments', 'back', 11, 6),
+      chapter(13, 'About the Author', 'back', 5, 0),
+    ];
+    const totals = totalsOf(chapters);
+    const { coverage, chapters: marked } = assessCoverage(totals, chapters);
+
+    expect(marked.filter((entry) => entry.outsideNarration).map((entry) => entry.title)).toEqual(['About the Author']);
+    expect(coverage).toEqual({
+      storySentences: totals.sentences - 11,
+      storyUnmatchedSentences: 0,
+      outsideSentences: 11,
+      outsideChapterCount: 1,
+      outsideTitles: ['About the Author'],
+    });
+  });
+
+  it('counts estimated timing as audio when deciding a chapter has none', () => {
+    const chapters = [chapter(0, 'Dedication', 'front', 2, 0), chapter(1, 'Chapter 1', 'body', 200, 200)];
+    chapters[0] = { ...chapters[0]!, interpolatedSentenceCount: 1 };
+    const { coverage, chapters: marked } = assessCoverage(totalsOf(chapters), chapters);
+    expect(marked[0]!.outsideNarration).toBe(false);
+    expect(coverage).toMatchObject({ outsideSentences: 1, outsideChapterCount: 0, outsideTitles: [] });
   });
 
   it('counts a gap inside the story, and sets aside only what lies beyond the last matched chapter', () => {
