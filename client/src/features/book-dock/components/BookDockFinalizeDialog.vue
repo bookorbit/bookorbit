@@ -17,30 +17,16 @@ import BookDestinationFields from '@/features/library/components/BookDestination
 import { useBookDockFinalize } from '../composables/useBookDockFinalize'
 import { joinErrorMessageKey, useBookDockJoinChoices, type BookDockJoinChoice } from '../composables/useBookDockJoinChoices'
 import BookDockFinalizePreviewRow from './BookDockFinalizePreviewRow.vue'
+import type { BookDockSelectionPayload } from '../composables/useBookDockFiles'
 
 const { t } = useI18n()
 
 const props = defineProps<{
-  selectionPayload: {
-    fileIds?: number[]
-    selectAll?: boolean
-    excludedIds?: number[]
-    status?: string
-    needsReview?: boolean
-    readyToFile?: boolean
-    search?: string
-  }
+  selectionPayload: BookDockSelectionPayload
   selectionCount: number
 }>()
 
-type FinalizePayload = {
-  fileIds?: number[]
-  selectAll?: boolean
-  excludedIds?: number[]
-  status?: string
-  needsReview?: boolean
-  readyToFile?: boolean
-  search?: string
+type FinalizePayload = BookDockSelectionPayload & {
   defaultLibraryId?: number
   defaultFolderId?: number
   overrides?: BookDockFinalizeOverride[]
@@ -110,13 +96,7 @@ function withJoinOverrides<T extends FinalizePayload>(payload: T, fileIds?: numb
   return overrides.length > 0 ? { ...payload, overrides } : payload
 }
 
-function effectiveSelectionPayload(): {
-  fileIds?: number[]
-  selectAll?: boolean
-  excludedIds?: number[]
-  status?: string
-  search?: string
-} {
+function effectiveSelectionPayload(): BookDockSelectionPayload {
   if (props.selectionPayload.selectAll) {
     return {
       ...props.selectionPayload,

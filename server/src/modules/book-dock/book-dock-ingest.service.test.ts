@@ -2,6 +2,7 @@ import { BadRequestException, Logger } from '@nestjs/common';
 import { Readable } from 'stream';
 import { mkdir, realpath, stat } from 'fs/promises';
 
+import { UploadValidatorService } from '../upload/upload-validator.service';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { buildSingleBookCandidate } from '../scanner/lib/walk';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
@@ -47,10 +48,13 @@ function makeService(bookDockPath = '/books/book-dock') {
     findSelectionBatch: vi.fn(),
     update: vi.fn(),
     countsByStatus: vi.fn().mockResolvedValue({}),
+    findLibraryFormats: vi.fn().mockResolvedValue({ name: 'Fiction', allowedFormats: [] }),
   };
 
+  const realValidator = new UploadValidatorService();
   const validator = {
     sanitizeFilename: vi.fn(),
+    isAllowedByLibrary: vi.fn((fileName: string, formats: string[]) => realValidator.isAllowedByLibrary(fileName, formats)),
   };
 
   const storage = {
@@ -83,6 +87,14 @@ function makeService(bookDockPath = '/books/book-dock') {
     emitChanged: vi.fn(),
   };
 
+  const dockRegistry = {
+    findById: vi.fn().mockResolvedValue(undefined),
+  };
+
+  const keptFiles = {
+    unchangedKept: vi.fn().mockResolvedValue(new Set<string>()),
+  };
+
   const service = new BookDockIngestService(
     config as never,
     repo as never,
@@ -94,9 +106,24 @@ function makeService(bookDockPath = '/books/book-dock') {
     metadataFetchPipeline as never,
     processingState as never,
     gateway as never,
+    dockRegistry as never,
+    keptFiles as never,
   );
 
-  return { service, repo, validator, storage, metadataService, events, appSettings, metadataFetchPipeline, processingState, gateway };
+  return {
+    service,
+    repo,
+    validator,
+    storage,
+    metadataService,
+    events,
+    appSettings,
+    metadataFetchPipeline,
+    processingState,
+    gateway,
+    dockRegistry,
+    keptFiles,
+  };
 }
 
 describe('BookDockIngestService', () => {
@@ -223,6 +250,56 @@ describe('BookDockIngestService', () => {
     });
   });
 
+  describe('ingestUpload into a library dock', () => {
+    const fiction = { dockId: 3, libraryId: 10, folderId: 100, folderName: 'Fiction' };
+
+    function prepare() {
+      const made = makeService();
+      made.validator.sanitizeFilename.mockReturnValue('book.epub');
+      mockedStat.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+      made.storage.streamToTemp.mockResolvedValue({ tempPath: '/tmp/upload.bin', sizeBytes: 1024 });
+      made.storage.moveToPath.mockResolvedValue(undefined);
+      made.repo.create.mockResolvedValue({ id: 43 });
+      return made;
+    }
+
+    it("lands in the dock's folder, made again if it is gone, headed for its library and folder", async () => {
+      const { service, storage, repo } = prepare();
+
+      await expect(service.ingestUpload('raw.epub', new Readable({ read() {} }), 5, fiction)).resolves.toBe(43);
+
+      expect(vi.mocked(mkdir)).toHaveBeenCalledWith('/books/book-dock/_libraries/Fiction', { recursive: true });
+      expect(storage.moveToPath).toHaveBeenCalledWith('/tmp/upload.bin', '/books/book-dock/_libraries/Fiction/book.epub');
+      expect(repo.create).toHaveBeenCalledWith({
+        fileName: 'book.epub',
+        absolutePath: '/books/book-dock/_libraries/Fiction/book.epub',
+        fileSize: 1024,
+        format: 'epub',
+        status: 'pending',
+        uploadedBy: 5,
+        dockId: 3,
+        targetLibraryId: 10,
+        targetFolderId: 100,
+      });
+    });
+
+    it('waits for a folder when the dock has lost its own', async () => {
+      const { service, repo } = prepare();
+
+      await service.ingestUpload('raw.epub', new Readable({ read() {} }), 5, { ...fiction, folderId: null });
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dockId: 3,
+          targetLibraryId: 10,
+          targetFolderId: null,
+          holdReason: 'no_folder',
+          holdDetail: { libraryId: 10, libraryName: 'Fiction' },
+        }),
+      );
+    });
+  });
+
   describe('ingestFromWatchedFolder', () => {
     it('skips if file already exists in repo', async () => {
       const { service, repo } = makeService();
@@ -247,6 +324,18 @@ describe('BookDockIngestService', () => {
 
       const result = await service.ingestFromWatchedFolder('/watched/book.epub');
       expect(result).toBeNull();
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('leaves a file a keep-original dock already filed or discarded, while it is unchanged', async () => {
+      const { service, repo, keptFiles } = makeService();
+      mockedStat.mockResolvedValue({ size: 2048 } as never);
+      keptFiles.unchangedKept.mockResolvedValue(new Set(['/watched/seeding.epub']));
+
+      const result = await service.ingestFromWatchedFolder('/watched/seeding.epub');
+
+      expect(result).toBeNull();
+      expect(keptFiles.unchangedKept).toHaveBeenCalledWith(['/watched/seeding.epub']);
       expect(repo.create).not.toHaveBeenCalled();
     });
 
@@ -294,7 +383,73 @@ describe('BookDockIngestService', () => {
       await (service as any).metadataQueue.waitForIdle();
 
       expect(result).toBeNull();
-      expect(metadataService.extractAndSave).toHaveBeenCalledWith(6, '/watched/book.epub', 'epub', '/books/book-dock/covers');
+      expect(metadataService.extractAndSave).toHaveBeenCalledWith(6, '/watched/book.epub', 'epub', '/data/book-dock-covers');
+    });
+
+    it('gives a file dropped in a library dock that dock, its library and its folder', async () => {
+      const { service, repo } = makeService();
+      mockedStat.mockResolvedValue({ size: 2048 } as never);
+      repo.create.mockResolvedValue({ id: 10 });
+
+      await service.ingestFromWatchedFolder('/watched/_libraries/Fiction/novel.epub', { dockId: 3, libraryId: 14, folderId: 22 });
+
+      expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ dockId: 3, targetLibraryId: 14, targetFolderId: 22 }));
+      expect(repo.create.mock.calls[0][0]).not.toHaveProperty('holdReason');
+    });
+
+    it('holds a file the dock library does not accept, naming the library', async () => {
+      const { service, repo } = makeService();
+      repo.findLibraryFormats.mockResolvedValue({ name: 'Fiction', allowedFormats: ['epub'] });
+      mockedStat.mockResolvedValue({ size: 2048 } as never);
+      repo.create.mockResolvedValue({ id: 10 });
+
+      await service.ingestFromWatchedFolder('/watched/_libraries/Fiction/Saga.cbz', { dockId: 3, libraryId: 14, folderId: 22 });
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dockId: 3,
+          targetLibraryId: 14,
+          holdReason: 'not_allowed_in_library',
+          holdDetail: { libraryId: 14, libraryName: 'Fiction' },
+        }),
+      );
+    });
+
+    it('holds a file whose dock has no library folder to file into', async () => {
+      const { service, repo } = makeService();
+      mockedStat.mockResolvedValue({ size: 2048 } as never);
+      repo.create.mockResolvedValue({ id: 10 });
+
+      await service.ingestFromWatchedFolder('/watched/_libraries/Fiction/novel.epub', { dockId: 3, libraryId: 14, folderId: null });
+
+      expect(repo.create).toHaveBeenCalledWith(
+        expect.objectContaining({ dockId: 3, targetLibraryId: 14, targetFolderId: null, holdReason: 'no_folder' }),
+      );
+    });
+
+    it('leaves a file in Unsorted when the dock library is gone', async () => {
+      const { service, repo } = makeService();
+      repo.findLibraryFormats.mockResolvedValue(undefined);
+      mockedStat.mockResolvedValue({ size: 2048 } as never);
+      repo.create.mockResolvedValue({ id: 10 });
+
+      await service.ingestFromWatchedFolder('/watched/_libraries/Fiction/novel.epub', { dockId: 3, libraryId: 14, folderId: 22 });
+
+      expect(repo.create.mock.calls[0][0]).not.toHaveProperty('dockId');
+      expect(repo.create.mock.calls[0][0]).not.toHaveProperty('targetLibraryId');
+    });
+
+    it('never changes the destination of a row found again on a rescan', async () => {
+      const { service, repo } = makeService();
+      const row = { id: 6, status: 'ready', format: 'epub', absolutePath: '/watched/_libraries/Fiction/book.epub', targetLibraryId: 40 };
+      repo.findByAbsolutePath.mockResolvedValue(row);
+
+      await expect(service.ingestFromWatchedFolder(row.absolutePath, { dockId: 3, libraryId: 14, folderId: 22 })).resolves.toBeNull();
+      await (service as any).metadataQueue.waitForIdle();
+
+      expect(repo.findLibraryFormats).not.toHaveBeenCalled();
+      expect(repo.create).not.toHaveBeenCalled();
+      expect(repo.update).not.toHaveBeenCalled();
     });
 
     it('does not requeue existing ready rows during a watched-folder rescan', async () => {
@@ -357,6 +512,27 @@ describe('BookDockIngestService', () => {
       // None of them owns the folder: claiming it would hide the others from the watcher, and
       // deleting one would take the whole folder with it.
       for (const [anchor] of repo.createUnit.mock.calls) expect(anchor.unitDirectory).toBeNull();
+    });
+
+    it('gives every unit of a folder dropped in a library dock that dock and holds the ones it cannot take', async () => {
+      const { service, repo } = makeService();
+      repo.findLibraryFormats.mockResolvedValue({ name: 'Comics', allowedFormats: ['cbz'] });
+      vi.mocked(buildSingleBookCandidate).mockResolvedValue({
+        folderPath: '/books/book-dock/_libraries/Comics/Saga',
+        files: [
+          candidateFile('/books/book-dock/_libraries/Comics/Saga/Saga 001.cbz', 'cbz'),
+          candidateFile('/books/book-dock/_libraries/Comics/Saga/Saga 002.cbr', 'cbr'),
+        ],
+      } as never);
+
+      await service.ingestUnitDirectory('/books/book-dock/_libraries/Comics/Saga', { dockId: 5, libraryId: 9, folderId: 30 });
+
+      const anchors = repo.createUnit.mock.calls.map(([anchor]) => anchor);
+      expect(anchors).toHaveLength(2);
+      for (const anchor of anchors) expect(anchor).toMatchObject({ dockId: 5, targetLibraryId: 9, targetFolderId: 30 });
+      expect(anchors.find((anchor) => anchor.format === 'cbz')).not.toHaveProperty('holdReason');
+      expect(anchors.find((anchor) => anchor.format === 'cbr')).toMatchObject({ holdReason: 'not_allowed_in_library' });
+      expect(repo.findLibraryFormats).toHaveBeenCalledTimes(1);
     });
 
     it('ignores a folder with no supported book file', async () => {
@@ -469,11 +645,29 @@ describe('BookDockIngestService', () => {
     it('returns early when auto-fetch is disabled', async () => {
       const { service, appSettings, repo } = makeService();
       appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(false);
+      repo.findById.mockResolvedValue({ id: 8, fileName: 'dune.epub', status: 'ready', dockId: null, embeddedMetadata: { title: 'Dune' } });
 
       await (service as any).autoFetchMetadataAsync(8);
 
-      expect(repo.findById).not.toHaveBeenCalled();
       expect(repo.update).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { global: true, dock: false, fetches: false },
+      { global: false, dock: true, fetches: true },
+      { global: true, dock: null, fetches: true },
+      { global: false, dock: null, fetches: false },
+    ])('follows the dock choice $dock over the global $global', async ({ global, dock, fetches }) => {
+      const { service, appSettings, repo, metadataFetchPipeline, dockRegistry } = makeService();
+      appSettings.isBookDockAutoFetchEnabled.mockResolvedValue(global);
+      dockRegistry.findById.mockResolvedValue({ id: 3, autoFetchMetadata: dock });
+      repo.findById.mockResolvedValue({ id: 8, fileName: 'dune.epub', status: 'ready', dockId: 3, embeddedMetadata: { title: 'Dune' } });
+      (metadataFetchPipeline as any).runWithSources = vi.fn().mockResolvedValue({ resolved: {}, sources: {} });
+
+      await (service as any).autoFetchMetadataAsync(8);
+
+      expect(dockRegistry.findById).toHaveBeenCalledWith(3);
+      expect((metadataFetchPipeline as any).runWithSources).toHaveBeenCalledTimes(fetches ? 1 : 0);
     });
 
     it('forces an explicit refetch when automatic fetching is disabled', async () => {
@@ -1088,9 +1282,9 @@ describe('BookDockIngestService', () => {
     (service as any).extractMetadataAsync(12, 'epub');
     await (service as any).metadataQueue.waitForIdle();
 
-    expect(metadataService.extractAndSave).toHaveBeenCalledWith(12, '/bucket/12.epub', 'epub', '/books/book-dock/covers');
+    expect(metadataService.extractAndSave).toHaveBeenCalledWith(12, '/bucket/12.epub', 'epub', '/data/book-dock-covers');
     expect(autoFetchSpy).toHaveBeenCalledWith(12, false);
-    expect(repo.update).toHaveBeenCalledWith(12, { status: 'extracting' });
+    expect(repo.update).toHaveBeenCalledWith(12, { status: 'extracting', holdReason: null });
     expect(emitSummarySpy).toHaveBeenCalledTimes(2);
     expect(events.emit).toHaveBeenCalledWith('book-dock.file.ingested', 12);
   });
@@ -1186,7 +1380,7 @@ describe('BookDockIngestService', () => {
       await vi.advanceTimersByTimeAsync(250);
       await newestStarted;
       expect(metadataService.extractAndSave).toHaveBeenCalledTimes(1);
-      expect(metadataService.extractAndSave).toHaveBeenCalledWith(2, '/bucket/2.epub', 'epub', '/books/book-dock/covers');
+      expect(metadataService.extractAndSave).toHaveBeenCalledWith(2, '/bucket/2.epub', 'epub', '/data/book-dock-covers');
 
       resolveNewest();
       await Promise.resolve();

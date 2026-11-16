@@ -1100,6 +1100,20 @@
       "when": 1794735529136,
       "tag": "0156_add_bulk_runs",
       "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1794852216322,
+      "tag": "0157_add_library_docks",
+      "breakpoints": true
+    },
+    {
+      "idx": 158,
+      "version": "7",
+      "when": 1794856038964,
+      "tag": "0158_add_book_metadata_edition_id_indexes",
+      "breakpoints": true
     }
   ]
 }

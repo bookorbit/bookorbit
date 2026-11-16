@@ -1,5 +1,5 @@
 import { Injectable, Logger, RequestTimeoutException } from '@nestjs/common';
-import { mkdir, open, rename, stat, unlink } from 'fs/promises';
+import { link, mkdir, open, rename, stat, unlink } from 'fs/promises';
 import { createReadStream, createWriteStream } from 'fs';
 import { tmpdir } from 'os';
 import { dirname, join } from 'path';
@@ -16,6 +16,12 @@ import { uploadError } from './upload-errors';
 export const MAX_UPLOAD_BYTES = HARD_MAX_UPLOAD_BYTES;
 
 export class UploadDestinationExistsError extends Error {}
+
+/** How `linkToPath` placed a file: sharing the source's bytes, or as a copy of them. */
+export type LinkedPlacement = 'linked' | 'copied';
+
+/** Errors that mean this filesystem pair cannot hard link, so a copy is the way to place the file. */
+const LINK_UNAVAILABLE_CODES = new Set(['EXDEV', 'EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'ENOSYS', 'EMLINK']);
 
 @Injectable()
 export class UploadStorageService {
@@ -103,7 +109,33 @@ export class UploadStorageService {
     }
   }
 
+  /**
+   * Places a file at an already-resolved destination and leaves the source where it is: a hard link
+   * when the filesystem allows one, so a seeding torrent and the library share the same bytes, and
+   * otherwise a copy staged on the destination filesystem, as the *arr apps do. Never replaces an
+   * existing destination.
+   */
+  async linkToPath(sourcePath: string, absolutePath: string): Promise<LinkedPlacement> {
+    await mkdir(dirname(absolutePath), { recursive: true });
+    try {
+      await link(sourcePath, absolutePath);
+      return 'linked';
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code === 'EEXIST') throw new UploadDestinationExistsError('Upload destination already exists');
+      if (code === 'ENOSPC') throw uploadError.storageFull('The server does not have enough storage for this upload');
+      if (!code || !LINK_UNAVAILABLE_CODES.has(code)) throw err;
+    }
+    await this.stageCopy(sourcePath, absolutePath);
+    return 'copied';
+  }
+
   private async copyAcrossDevices(sourcePath: string, destinationPath: string): Promise<void> {
+    await this.stageCopy(sourcePath, destinationPath);
+    await this.cleanup(sourcePath);
+  }
+
+  private async stageCopy(sourcePath: string, destinationPath: string): Promise<void> {
     const stagingPath = join(dirname(destinationPath), `.bookorbit-upload-${randomUUID()}.tmp`);
     const stagingFile = await open(stagingPath, 'wx');
 
@@ -117,8 +149,6 @@ export class UploadStorageService {
       await this.cleanup(stagingPath);
       throw err;
     }
-
-    await this.cleanup(sourcePath);
   }
 
   async cleanup(tempPath: string): Promise<void> {

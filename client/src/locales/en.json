@@ -2710,7 +2710,7 @@
       },
       "externalProviders": {
         "title": "External providers",
-        "description": "Metadata services that run outside BookOrbit, such as a container beside it or a hosted service. Add one by its address; once enabled it appears in search, Book Dock and field rules like any other source.",
+        "description": "Metadata services that run outside BookOrbit, such as a container beside it or a hosted service. Add one by its address; once enabled it appears in search, Library Dock and field rules like any other source.",
         "yourProviders": "Your providers",
         "emptyWithDirectory": "Nothing added yet. Pick a ready-made provider below, or add one by its address.",
         "add": "Add provider",
@@ -3556,17 +3556,17 @@
         }
       },
       "bookDock": {
-        "title": "Book Dock",
-        "subtitle": "Configure how files are processed when they enter Book Dock.",
+        "title": "Library Dock",
+        "subtitle": "Configure how files are processed when they enter Library Dock.",
         "dropFolder": "Drop folder",
         "containerPath": "Container path",
-        "containerPathHint": "Copy or move book files into this folder and they will be automatically picked up and processed by Book Dock. Subdirectories are supported.",
+        "containerPathHint": "Copy or move book files into this folder and they will be automatically picked up and processed by Library Dock. Subdirectories are supported.",
         "changePathPrefix": "To change this path, set",
         "changePathMiddle": "in your",
         "changePathSuffix": "file.",
         "metadata": "Metadata",
         "autoFetch": "Auto-fetch metadata from providers",
-        "autoFetchHint": "Automatically fetch metadata from configured providers (Google Books, iTunes, Open Library, etc.) after a file is added to Book Dock.",
+        "autoFetchHint": "Automatically fetch metadata from configured providers (Google Books, iTunes, Open Library, etc.) after a file is added to Library Dock.",
         "autoFinalize": "Auto-finalize",
         "enableAutoFinalize": "Enable auto-finalize",
         "enableAutoFinalizeHint": "Files with a metadata confidence score at or above the threshold will be finalized automatically.",
@@ -3574,10 +3574,17 @@
         "thresholdIgnored": "(ignored in Embedded only mode)",
         "destinationLibrary": "Destination library",
         "selectLibrary": "Select a library...",
+        "noDefaultLibrary": "None: only files with a destination",
+        "defaultLibraryHint": "Files with a destination of their own are filed there. This library takes the rest; with none, they wait for review.",
         "metadataMode": "Metadata mode",
         "metadataModeSafeMerge": "Safe merge (recommended)",
         "metadataModeFetchedOnly": "Fetched only",
         "metadataModeEmbeddedOnly": "Embedded only",
+        "metadataModeHint": {
+          "safe_merge": "Uses what providers found where they have it, and the file's own details everywhere else. Your edits always win.",
+          "fetched_only": "Uses only what providers found and ignores the file's own details. Your edits always win.",
+          "embedded_only": "Uses only the file's own details, and files every ready file whatever its match. Your edits always win."
+        },
         "destinationFolder": "Destination folder",
         "selectFolder": "Select a folder...",
         "saveSettingFailed": "Failed to save setting",
@@ -3589,7 +3596,82 @@
         "destinationLibraryUpdated": "Destination library updated",
         "destinationFolderUpdated": "Destination folder updated",
         "confidenceThresholdUpdated": "Confidence threshold updated",
-        "metadataModeUpdated": "Metadata mode updated"
+        "metadataModeUpdated": "Metadata mode updated",
+        "docks": {
+          "subtitle": "Drop folders and filing per library.",
+          "containerPathHint": "Files dropped here go to Unsorted. Each library's dock is a folder inside _libraries, created when its dock is turned on. Subdirectories are supported.",
+          "defaults": "Defaults",
+          "autoFetchDefaultHint": "Every dock fetches metadata after a file arrives, unless its own settings say otherwise.",
+          "autoFile": "Auto-file",
+          "autoFileDefaultHint": "Files at or above the match below are filed without review, unless a dock says otherwise.",
+          "title": "Docks",
+          "defaultExplained": "\"Default\" follows the settings above.",
+          "columnLibrary": "Library",
+          "columnAutoFile": "Auto-file",
+          "columnFiling": "Filing",
+          "columnExtras": "Extras",
+          "columnOn": "On",
+          "unsortedHint": "The dock root. Always on.",
+          "unsortedAlwaysOn": "Unsorted is always on",
+          "unsortedDescription": "The dock root. Always on, and uses the defaults.",
+          "unsortedLibrary": "Library for files without one",
+          "unsortedOnly": "Unsorted only",
+          "unsortedSaved": "Unsorted settings saved",
+          "noDock": "No dock",
+          "oldName": "Old name",
+          "oldNameHint": "The library was renamed; the folder kept its name",
+          "noFolder": "No folder",
+          "default": "Default",
+          "defaultValue": "Default ({value})",
+          "ownValue": "Own value",
+          "on": "On",
+          "off": "Off",
+          "none": "None",
+          "joinsBooks": "Joins books",
+          "filingMove": "Move",
+          "filingCopy": "Copy",
+          "filingHardlink": "Hardlink",
+          "dockOn": "{library} dock",
+          "dockOnLabel": "Dock on",
+          "editDock": "Edit the {dock} dock",
+          "editTitle": "{library} dock",
+          "editDescription": "Files dropped here are fetched and filed into {library}.",
+          "renamedCallout": "This library is now called {library}. Its dock folder kept the name {folder}.",
+          "renameToMatch": "Rename folder to {folder}",
+          "folder": "Folder",
+          "folderHint": "Renaming moves the folder and everything in it. Scripts, download clients or sync tools that use the old path stop working.",
+          "folderCaseHint": "Folder names ignore case.",
+          "filesInto": "Files into",
+          "fetchAndFile": "Fetch and file",
+          "autoFetch": "Auto-fetch metadata",
+          "matchNeeded": "Match needed",
+          "thisDockOnly": "This dock only",
+          "autoJoin": "Join matching books",
+          "autoJoinHint": "Adds a file to an existing book only when they share an ISBN, ASIN or provider id. Title and author alone never join.",
+          "keepOriginal": "Keep originals",
+          "keepOriginalHint": "Hardlinks into the library and leaves the file here for a download client. Copies when a hardlink is not possible.",
+          "turnOnTitle": "Turn on the {library} dock",
+          "turnOnDescription": "Files dropped into its folder are fetched, named and filed into {library} with the default settings.",
+          "turnOnExisting": "A folder named {folder} is already in _libraries. The dock uses it, and its files are picked up.",
+          "unownedFolders": "Folders no dock owns",
+          "error": {
+            "generic": "The dock could not be changed. Try again.",
+            "LIBRARY_DOCK_NOT_FOUND": "This library has no dock.",
+            "LIBRARY_DOCK_NOT_ENABLED": "This dock is turned off.",
+            "LIBRARY_DOCK_EXISTS": "This library already has a dock.",
+            "LIBRARY_DOCK_BUSY": "Files in this dock are still being worked on. Try again once they settle.",
+            "LIBRARY_DOCK_TARGET_FOLDER_INVALID": "That folder does not belong to this library.",
+            "LIBRARY_DOCK_FOLDER_NAME_INVALID": "That folder name cannot be used.",
+            "LIBRARY_DOCK_FOLDER_NAME_TAKEN": "Another dock already uses that folder name.",
+            "LIBRARY_DOCK_FOLDER_EXISTS": "A folder with that name is already in _libraries.",
+            "LIBRARY_DOCK_FOLDER_NOT_FOUND": "That folder is no longer in _libraries.",
+            "LIBRARY_DOCK_FOLDER_OWNED": "A dock already owns that folder.",
+            "LIBRARY_DOCK_FOLDER_NOT_EMPTY": "The folder still has files in it.",
+            "LIBRARY_DOCK_FOLDER_UNWRITABLE": "BookOrbit cannot write to the dock folder.",
+            "LIBRARY_DOCK_OTHER_FILESYSTEM": "The folder is on a different disk from the dock.",
+            "LIBRARY_DOCKS_FOLDER_IS_BOOK": "_libraries is a book in a library, so library docks cannot start until it is moved."
+          }
+        }
       },
       "fileNaming": {
         "title": "File Naming",
@@ -4391,7 +4473,7 @@
     "system": {
       "tabs": {
         "file-naming": "File Naming",
-        "book-dock": "Book Dock",
+        "book-dock": "Library Dock",
         "requests": "Requests",
         "maintenance": "Maintenance",
         "audit-log": "Audit Log"
@@ -4486,7 +4568,7 @@
           "link_refused": "This filesystem refused the link ({code}): imports will copy, using the space twice.",
           "download_dir_unwritable": "BookOrbit cannot write to the download directory ({code}), so hardlinking could not be tested.",
           "localMissing": "BookOrbit cannot see that path.",
-          "dockMissing": "The Book Dock folder is not readable."
+          "dockMissing": "The Library Dock folder is not readable."
         },
         "reconciliation": {
           "action": "Reconcile",
@@ -4821,7 +4903,7 @@
         },
         "automation": {
           "title": "Automation",
-          "pipeline": "When a download finishes it passes through the Book Dock, where its title and author are read so the file can be named and filed correctly, and then it moves into the request's destination library on its own. It only stops for you if import checking is on and the file does not match what was requested.",
+          "pipeline": "When a download finishes it passes through the Library Dock, where its title and author are read so the file can be named and filed correctly, and then it moves into the request's destination library on its own. It only stops for you if import checking is on and the file does not match what was requested.",
           "groupDownloads": "Automatic downloads",
           "groupImports": "Import checks",
           "stateOn": "On",
@@ -4834,7 +4916,7 @@
           "minScoreShort": "Nothing below this is downloaded unattended.",
           "autoRetryShort": "A failed download falls through to the runner-up.",
           "maxAttemptsShort": "The first attempt and every retry count towards this.",
-          "verificationShort": "Below this, the file waits in the Book Dock for review.",
+          "verificationShort": "Below this, the file waits in the Library Dock for review.",
           "loading": "Loading the automation settings...",
           "loadFailed": "Could not load the automation settings",
           "saveFailed": "Could not save that setting",
@@ -4866,12 +4948,12 @@
           "autoSearchMaxAgeHint": "A request older than this is left alone. It stays approved and can still have a release picked by hand at any time; nothing looks for it automatically any more.",
           "autoSearchMaxAgeUnit": "days",
           "verify": "Check imports against the request",
-          "verifyOnHint": "Every downloaded file is compared with the book that was requested before it is filed. Anything that does not match closely enough waits in the Book Dock for someone to look at.",
+          "verifyOnHint": "Every downloaded file is compared with the book that was requested before it is filed. Anything that does not match closely enough waits in the Library Dock for someone to look at.",
           "verifyOffHint": "Nothing is held for review. Every download is filed as soon as its title and author have been read, so a mislabelled release lands in your library without warning.",
           "verificationEnabled": "Import checking is on",
           "verificationDisabled": "Import checking is off. Downloads will be filed without review",
           "verification": "Verification threshold",
-          "verificationHint": "How closely a downloaded file has to match the request before it is filed on its own. Anything below this waits in the Book Dock for review instead. This applies to every request, including releases someone picked by hand.",
+          "verificationHint": "How closely a downloaded file has to match the request before it is filed on its own. Anything below this waits in the Library Dock for review instead. This applies to every request, including releases someone picked by hand.",
           "destinations": "Default destinations",
           "destinationsHint": "Where a book is filed when nobody chose a library for it. There is one default per medium, because the medium is picked before anything is searched and is the only thing known about the file that early. A destination the requester pinned, or one chosen at approval, is used ahead of these.",
           "destinationUnset": "No default",
@@ -5013,6 +5095,7 @@
         "oidc": "Single sign-on provider, claims, and provisioning.",
         "serverFonts": "Fonts installed for every reader on this server.",
         "bookDock": "Quick actions shown on book pages.",
+        "bookDockIntake": "Drop folder, metadata fetch and auto-filing for incoming books.",
         "auditLog": "Who changed what, and when.",
         "requests": "Sources, download clients, and what happens to a book once it downloads.",
         "readerTts": "Read-aloud voice, speed, and narration defaults.",
@@ -5038,7 +5121,7 @@
         "reader-fonts": "Upload your own fonts for the reader, and choose which fonts shared by your server administrator appear in it.",
         "reader-general": "Where your reader preferences are saved, and the defaults shared by every reading mode.",
         "tts": "Your default voice and speed when BookOrbit reads a book aloud.",
-        "notifications": "Choose which events notify you, from finished scans and metadata fetches to file renames, imports and Book Dock results.",
+        "notifications": "Choose which events notify you, from finished scans and metadata fetches to file renames, imports and Library Dock results.",
         "privacy": "Decide how much of your reading activity administrators can see, preview your shared profile, and check who has viewed it.",
         "restrictions": "Content limits set on this account, such as age ratings and hidden content, and what they keep out of your libraries.",
         "libraries": "Every library at a glance: its folders, what it holds, how it is scanned and when it last ran. Add, edit or rescan libraries here.",
@@ -5066,7 +5149,7 @@
         "oidc": "Connect a single sign-on provider such as Keycloak, map its claims, and decide how new accounts are created.",
         "requests": "Where BookOrbit searches for requested books, which download clients fetch them, and what happens once a download finishes.",
         "admin-tts": "The text-to-speech engines readers can use for read-aloud, the voices offered from each, and the order they appear in.",
-        "book-dock": "The Book Dock drop folder, automatic metadata fetching for new files, and the score at which files are finalized on their own.",
+        "book-dock": "The Library Dock drop folder, automatic metadata fetching for new files, and the score at which files are finalized on their own.",
         "server-fonts": "Upload fonts once for every reader on this server. Each reader can still hide any of them.",
         "audit-log": "A searchable record of who changed what and when, filterable by event, person, affected item and date."
       }
@@ -5472,7 +5555,7 @@
         "restrictions": "Restrictions",
         "libraryBooks": "Library & Books",
         "bookRequests": "Book Requests",
-        "bookDock": "Book Dock",
+        "bookDock": "Library Dock",
         "devices": "Devices",
         "readingIntegrations": "Reading Integrations",
         "emailNotifications": "Email & Notifications",
@@ -6212,7 +6295,8 @@
       "Book": "Book",
       "Collection": "Collection",
       "SmartScope": "Smart scope",
-      "BookDockFile": "Book Dock file",
+      "BookDockFile": "Library Dock file",
+      "LibraryDock": "Library dock",
       "BookRequest": "Book request",
       "DownloadClient": "Download client",
       "RequestIndexer": "Indexer",
@@ -6309,7 +6393,12 @@
       "SmartScopeCreate": "Create smart scope",
       "SmartScopeUpdate": "Update smart scope",
       "SmartScopeDelete": "Delete smart scope",
-      "BookDockFinalize": "Finalize Book Dock file",
+      "BookDockFinalize": "Finalize Library Dock file",
+      "LibraryDockUpdate": "Update library dock",
+      "LibraryDockFolderRename": "Rename library dock folder",
+      "LibraryDockFolderAdopt": "Adopt folder as library dock",
+      "LibraryDockFolderMove": "Move library docks folder to Unsorted",
+      "LibraryDockFolderRemove": "Remove library docks folder",
       "AiJobBuild": "Start AI build",
       "AiJobUpdate": "Update AI build",
       "AiJobRebuild": "Rebuild AI output",
@@ -6515,7 +6604,7 @@
       "format": "Format",
       "size": "Size",
       "download": "Download",
-      "dockFile": "Book Dock file",
+      "dockFile": "Library Dock file",
       "rejected": "Rejected",
       "failed": "Failed",
       "cleaned": "Cleaned",
@@ -10431,12 +10520,15 @@
         "tooLargeProxy": "Rejected as too large before it reached BookOrbit, likely by a reverse proxy",
         "storageFull": "The server is out of storage space",
         "network": "Could not reach the server",
-        "status": "Upload failed (HTTP {status})"
+        "status": "Upload failed (HTTP {status})",
+        "notAllowed": "{library} does not take .{extension} files",
+        "notAllowedServer": "The library does not take this file type",
+        "dockOff": "This library has no Library Dock turned on"
       }
     },
     "fileList": {
-      "emptyTitle": "No files in Book Dock",
-      "emptyMessageDefault": "Upload files or drop them in the Book Dock folder",
+      "emptyTitle": "No files in Library Dock",
+      "emptyMessageDefault": "Upload files or drop them in the Library Dock folder",
       "colCurrent": "Current",
       "colNew": "New",
       "colFile": "File",
@@ -10552,7 +10644,9 @@
         "needsReview": "Needs review",
         "pending": "Pending",
         "ready": "Ready",
-        "error": "Error"
+        "error": "Error",
+        "onHold": "On hold",
+        "working": "Working"
       },
       "working": {
         "label": "{count} working"
@@ -10571,7 +10665,9 @@
         "refetch": "Re-fetch metadata",
         "clickToZoom": "Click a cover to enlarge",
         "changedFields": "{count, plural, one {# field} other {# fields}}",
-        "needMore": "Need to search providers or edit other fields?"
+        "needMore": "Need to search providers or edit other fields?",
+        "alsoIn": "Also in {libraries}",
+        "fromDeletedLibrary": "From deleted library {library}"
       },
       "selection": {
         "fileToLibrary": "{count, plural, =0 {File to library} one {File # to library} other {File # to library}}",
@@ -10581,7 +10677,12 @@
       "empty": {
         "nothingToReview": "Nothing needs review. Every ready file has a destination and a confident match.",
         "nothingReadyToFile": "No files are ready to file.",
-        "dropHint": "Or drop files anywhere on this page."
+        "dropHint": "Or drop files anywhere on this page.",
+        "nothingOnHold": "Nothing is on hold.",
+        "nothingWorking": "Nothing is being read or matched right now.",
+        "nothingFailed": "No files failed.",
+        "dockTitle": "Nothing in the {dock} dock",
+        "dockPrompt": "Drop files into {folder} or upload them here, and they are matched and filed into {library}."
       },
       "selectAllOnPage": "Select all files on this page",
       "showingOf": "{shown} of {total}",
@@ -10616,6 +10717,89 @@
           "supplement": "Extra"
         }
       }
+    },
+    "uploadTo": "Upload to {dock}",
+    "switcher": {
+      "label": "Docks",
+      "all": "All",
+      "unsorted": "Unsorted",
+      "otherDock": "Other dock",
+      "off": "Off",
+      "addDock": "Add a dock",
+      "tabSummary": "{total, plural, one {# file} other {# files}}, {onHold, plural, one {# on hold} other {# on hold}}, {error, plural, one {# failed} other {# failed}}"
+    },
+    "hold": {
+      "rowLabel": "Why files wait",
+      "why": "Why",
+      "anyReason": "Any reason",
+      "managerHint": "The uploader cannot add books to this library, so a dock manager files this one",
+      "reason": {
+        "low_confidence": "Low match",
+        "duplicate": "Already in library",
+        "destination_conflict": "Path taken",
+        "not_allowed_in_library": "Doesn't fit",
+        "unsupported_layout": "Layout doesn't fit",
+        "no_destination": "No destination",
+        "no_folder": "Folder removed",
+        "waiting_for_manager": "Waiting for a manager",
+        "unknown": "Waiting for review"
+      },
+      "chip": {
+        "lowConfidence": "{confidence}% match, needs {threshold}%",
+        "duplicate": "Already in {library}",
+        "doesNotFit": "Doesn't fit {library}"
+      },
+      "action": {
+        "resolve": "Resolve",
+        "chooseFolder": "Choose a folder",
+        "moveTo": "Move to…"
+      },
+      "duplicate": {
+        "openExisting": "Open the book",
+        "addAsFormat": "Add as format",
+        "keepBoth": "Keep both",
+        "keepBothFailed": "Could not keep both. Try again.",
+        "hint": "Add as format puts this file in the existing book. Keep both files it as a second book.",
+        "hintMember": "Add as format puts this file in the existing book. A dock manager can also keep both."
+      }
+    },
+    "facts": {
+      "defaultSettings": "Default settings",
+      "dropHint": "Drop files here to file them into {library}",
+      "filesInto": "Files into",
+      "autoFileAt": "Auto-file at {threshold}%",
+      "autoFileOff": "Auto-file off",
+      "moves": "Moves files",
+      "copies": "Copies files",
+      "copiesHint": "The dock and the library are on different disks, so filing copies each file",
+      "hardlinks": "Hardlinks",
+      "keepsOriginals": "Keeps originals",
+      "joinsBooks": "Joins matching books",
+      "keptForSeeding": "{count, plural, one {{formatted} kept for seeding} other {{formatted} kept for seeding}}",
+      "dockSettings": "Dock settings"
+    },
+    "strip": {
+      "offTitle": "The {library} dock is off.",
+      "offBody": "New files in {folder} are not picked up. Files already here can still be filed.",
+      "turnOn": "Turn on",
+      "turnOnFailed": "Could not turn it on.",
+      "folderTitle": "{library} no longer has the folder this dock filed into.",
+      "folderBody": "Its files wait until one is chosen.",
+      "chooseFolder": "Choose a folder"
+    },
+    "attention": {
+      "title": "Folders that need you",
+      "matches": "Matches {library}, which has no dock.",
+      "unowned": "No library dock owns this folder, so its files are not picked up.",
+      "turnOn": "Turn on {library} dock",
+      "moveToUnsorted": "Move to Unsorted",
+      "remove": "Remove folder",
+      "removeHint": "Only an empty folder can be removed",
+      "files": "{count, plural, one {# file} other {# files}}",
+      "manyFiles": "{count, plural, one {#+ files} other {#+ files}}",
+      "loose": "Loose files, outside any library dock.",
+      "notEmpty": "{folder} still has files in it, so it was not removed.",
+      "failed": "That did not work. Try again."
     }
   },
   "bookRequests": {
@@ -10803,10 +10987,10 @@
       "languageAny": "Any language",
       "destinationRequired": "Approving files the book into a library, so pick one before you approve.",
       "fulfilTitle": "Close this request",
-      "fulfilHint": "Point the request at the book you added, or at the Book Dock file waiting to be filed.",
+      "fulfilHint": "Point the request at the book you added, or at the Library Dock file waiting to be filed.",
       "bookIdLabel": "Book ID",
       "bookIdPlaceholder": "e.g. 128",
-      "dockFileIdLabel": "Book Dock file ID",
+      "dockFileIdLabel": "Library Dock file ID",
       "dockFileIdPlaceholder": "e.g. 42",
       "backToList": "All requests",
       "loading": "Loading request...",
@@ -10815,10 +10999,10 @@
       "decideTitle": "Approve or reject",
       "fulfilSourceLabel": "What closes this request",
       "fulfilFromLibrary": "A book in the library",
-      "fulfilFromDock": "A Book Dock file",
+      "fulfilFromDock": "A Library Dock file",
       "fulfilSearchLabel": "Search for the file that closes this request",
       "fulfilSearchBooks": "Search your library by title or author",
-      "fulfilSearchDock": "Search the Book Dock by file name",
+      "fulfilSearchDock": "Search the Library Dock by file name",
       "fulfilSearching": "Searching...",
       "fulfilNoResults": "Nothing matched. Try a different search.",
       "errors": {
@@ -10999,7 +11183,7 @@
         "downloading": "Downloading",
         "completed": "Download finished",
         "importing": "Importing into your library",
-        "needs_review": "Waiting for review in the Book Dock",
+        "needs_review": "Waiting for review in the Library Dock",
         "imported": "Added to your library",
         "failed": "Download failed"
       }
@@ -11394,7 +11578,7 @@
       "deleteDescription": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client with its files kept. Direct-download staging is cleaned automatically. Dismissing the request instead only hides it from your own list.",
       "deleteDescriptionRemoteDelete": "The request and the record of who asked for it go for good, for everyone. Any torrent still seeding is removed from the download client, which deletes it and its files there for good. Dismissing the request instead only hides it from your own list.",
       "discardImportTitle": "Discard this import?",
-      "discardImportDescription": "The downloaded files are removed from the Book Dock and the request is marked failed. The torrent keeps seeding; stop it separately if you want it gone.",
+      "discardImportDescription": "The downloaded files are removed from the Library Dock and the request is marked failed. The torrent keeps seeding; stop it separately if you want it gone.",
       "leaveTitle": "Leave this request?",
       "leaveDescription": "You stop following it and stop being notified about it. Whoever asked for it keeps their request.",
       "rejectDescription": "Everyone waiting on these requests is told they were turned down. Nothing is downloaded.",
@@ -11543,13 +11727,13 @@
       "fileIt": "File it",
       "fileItHint": "Files this into the destination library and marks the request available.",
       "noDestination": "This request has no destination library with a folder in it, so there is nowhere to file the book yet.",
-      "openDock": "Open the Book Dock",
-      "missingEntry": "The file this request was held over is no longer in the Book Dock. It was filed or discarded by hand, so there is nothing left here to review.",
+      "openDock": "Open the Library Dock",
+      "missingEntry": "The file this request was held over is no longer in the Library Dock. It was filed or discarded by hand, so there is nothing left here to review.",
       "missingEntryNext": "If the book is already in your library, close this request against it below. If it is not, cancel the request and search for another release.",
       "filed": "Filed into your library.",
       "fileFailed": "Could not file this import",
       "discard": "Discard this import",
-      "discardHint": "Use this when the release turned out to be the wrong book. The files are removed from the Book Dock and the request is marked failed.",
+      "discardHint": "Use this when the release turned out to be the wrong book. The files are removed from the Library Dock and the request is marked failed.",
       "checkTitle": "Check the match",
       "fieldColumn": "Field"
     },
@@ -11856,7 +12040,7 @@
       "uploadedToast": "Uploaded {uploaded}",
       "uploadFailedToast": "Upload failed for {failed}",
       "uploadPartialToast": "Uploaded {uploaded}, {failed} failed",
-      "bookDock": "Book Dock",
+      "bookDock": "Library Dock",
       "statistics": "Statistics",
       "achievements": "Achievements",
       "annotations": "Annotations",
@@ -13811,6 +13995,7 @@
         "folderRequired": "Add at least one folder.",
         "folderOverlap": "{folder} overlaps a folder of {library}. A folder can belong to only one library.",
         "folderNested": "{folder} overlaps {other}. A library cannot read the same folder twice, so keep only one of them.",
+        "folderInDock": "{folder} overlaps the Library Dock folder {dock}. Choose a folder outside the dock.",
         "cronInvalid": "Enter a valid 5-field cron expression.",
         "readingStartRange": "Reading start must be between 0.05% and 5%.",
         "fileSizeRange": "File-size limits must be whole numbers from 1 to 10,000 MB.",
@@ -14051,6 +14236,20 @@
       "dropzone": {
         "title": "Drop files here or click to browse",
         "hint": "{formats} - up to {size} MB each"
+      },
+      "dock": {
+        "howToAdd": "How to add them",
+        "remembered": "Remembered for {library}",
+        "review": "Review in dock first",
+        "reviewHint": "Fetches metadata in the {library} dock. You check and file them there.",
+        "fileNow": "File now",
+        "fileNowHint": "Adds them to {library} straight away, with the details inside the files.",
+        "send": "{count, plural, one {Send # to {library} dock} other {Send # to {library} dock}}",
+        "sent": "{count, plural, one {# file sent to the dock} other {# files sent to the dock}}",
+        "openDock": "Open the dock",
+        "sendEmpty": "Send to {library} dock",
+        "notAllowed": "{library} does not take {format}",
+        "refusedCount": "{count, plural, one {# file cannot be added to {library}} other {# files cannot be added to {library}}}"
       }
     }
   },
@@ -14497,6 +14696,14 @@
       "reviewExpiringMessage": "The generated read-aloud will be discarded in a few days unless you review it.",
       "untitledBook": "Untitled book"
     },
+    "bookDock": {
+      "digestTitle": "Library Dock: {library}",
+      "digestTitleUnsorted": "Library Dock: Unsorted",
+      "digestTitleUnknown": "Library Dock",
+      "digestFiled": "{filed, plural, one {# book filed.} other {# books filed.}}",
+      "digestHeld": "{held, plural, one {# book needs review.} other {# books need review.}}",
+      "digestFiledAndHeld": "{filed, plural, one {# book filed} other {# books filed}}, {held, plural, one {# needs review.} other {# need review.}}"
+    },
     "bulkRuns": {
       "completedTitle": "Finished: {action}",
       "completedMessage": "{count, plural, one {# item done.} other {# items done.}}",
@@ -14579,8 +14786,8 @@
           "description": "When an import from another library tool completes or fails."
         },
         "bookDock": {
-          "label": "Book Dock",
-          "description": "When Book Dock finalization completes or encounters problems."
+          "label": "Library Dock",
+          "description": "When Library Dock finalization completes or encounters problems."
         },
         "koboSync": {
           "label": "Kobo sync",
@@ -16503,17 +16710,17 @@
       }
     },
     "bookDock": {
-      "title": "Book Dock",
+      "title": "Library Dock",
       "newFilesDetected": "New files detected",
       "reconnecting": "Reconnecting",
       "rescanFailed": "Rescan failed",
-      "totalInDock": "{size} in Book Dock",
-      "dropFiles": "Drop files into Book Dock",
+      "totalInDock": "{size} in Library Dock",
+      "dropFiles": "Drop files into Library Dock",
       "supportedFormats": "Supported: {formats}",
       "empty": {
         "noSearchMatch": "No files match \"{query}\"",
         "noStatusFiles": "No {status} files",
-        "uploadPrompt": "Upload files or drop them in the Book Dock folder"
+        "uploadPrompt": "Upload files or drop them in the Library Dock folder"
       },
       "retry": {
         "noneToRetry": "No error files to retry",
@@ -17111,7 +17318,7 @@
     "opds": "OPDS",
     "koboSync": "Kobo Sync",
     "koreaderSync": "KOReader Sync",
-    "bookDock": "Book Dock",
+    "bookDock": "Library Dock",
     "whatsNew": "What's New",
     "annotations": "Annotations",
     "achievements": "Achievements",
@@ -17189,7 +17396,7 @@
     },
     "system": {
       "file-naming": "File Naming",
-      "book-dock": "Book Dock",
+      "book-dock": "Library Dock",
       "requests": "Requests",
       "maintenance": "Maintenance",
       "audit-log": "Audit Log"

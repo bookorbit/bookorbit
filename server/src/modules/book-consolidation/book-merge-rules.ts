@@ -73,6 +73,7 @@ export const BOOK_MERGE_RULES: Readonly<Record<string, BookMergeRuleKind>> = {
   'book_requests.target_book_id': 'repoint',
   'upload_sessions.target_book_id': 'repoint',
   'upload_sessions.result_book_id': 'repoint',
+  'book_dock_kept_files.book_id': 'repoint',
   'book_duplicate_dismissals.book_id_a': 'repoint',
   'book_duplicate_dismissals.book_id_b': 'repoint',
   'book_duplicate_groups.root_book_id': 'drop',
@@ -93,6 +94,7 @@ export const BOOK_MERGE_SET_NULL_COLUMNS = [
   'email_send_log.book_id',
   'upload_sessions.target_book_id',
   'upload_sessions.result_book_id',
+  'book_dock_kept_files.book_id',
   'reading_attempts.book_id',
   'book_link_groups.lead_book_id',
 ] as const;

@@ -7,20 +7,13 @@ import { api } from '@/lib/api'
 import IdentifierInput from '@/components/ui/IdentifierInput.vue'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import { useSeriesNameSearch } from '@/features/book/composables/useMetadataFieldSearch'
+import type { BookDockSelectionPayload } from '../composables/useBookDockFiles'
 
 const { t } = useI18n()
 const { search: searchSeries } = useSeriesNameSearch()
 
 const props = defineProps<{
-  selectionPayload: {
-    fileIds?: number[]
-    selectAll?: boolean
-    excludedIds?: number[]
-    status?: string
-    needsReview?: boolean
-    readyToFile?: boolean
-    search?: string
-  }
+  selectionPayload: BookDockSelectionPayload
   selectionCount: number
 }>()
 

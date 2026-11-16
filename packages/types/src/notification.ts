@@ -7,6 +7,10 @@ export const NotificationType = {
   MetadataFetchFailed: "metadata_fetch_failed",
   BookDockFinalized: "book_dock_finalized",
   BookDockFinalizedWithErrors: "book_dock_finalized_with_errors",
+  /** What auto-file did in one dock once it went quiet; `meta` holds `{ dockId, libraryId, libraryName, filed, held }`. */
+  BookDockDigest: "book_dock_digest",
+  /** The same, when some files are left waiting for a person. */
+  BookDockDigestNeedsReview: "book_dock_digest_needs_review",
   BookRequestSubmitted: "book_request_submitted",
   BookRequestApproved: "book_request_approved",
   BookRequestRejected: "book_request_rejected",
@@ -92,6 +96,8 @@ export const NOTIFICATION_TYPE_META: Record<NotificationType, NotificationTypeMe
   [NotificationType.MetadataFetchFailed]: { category: "metadata", severity: "warning" },
   [NotificationType.BookDockFinalized]: { category: "bookDock", severity: "success" },
   [NotificationType.BookDockFinalizedWithErrors]: { category: "bookDock", severity: "warning" },
+  [NotificationType.BookDockDigest]: { category: "bookDock", severity: "success" },
+  [NotificationType.BookDockDigestNeedsReview]: { category: "bookDock", severity: "warning" },
   [NotificationType.BookRequestSubmitted]: { category: "bookRequests", severity: "success" },
   [NotificationType.BookRequestApproved]: { category: "bookRequests", severity: "success" },
   [NotificationType.BookRequestRejected]: { category: "bookRequests", severity: "warning" },

@@ -2,12 +2,16 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Upload, RotateCw, Loader2, Pause, Play } from '@lucide/vue'
-import { Permission } from '@bookorbit/types'
+import { Permission, type BookDockUploadTarget } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { SUPPORTED_FORMATS_ACCEPT, useBookDockUpload } from '../composables/useBookDockUpload'
 
-const props = defineProps<{ paused: boolean }>()
+const props = defineProps<{
+  paused: boolean
+  /** The dock being viewed takes the upload; null sends it to Unsorted. */
+  uploadTarget: BookDockUploadTarget | null
+}>()
 
 const emit = defineEmits<{
   pause: []
@@ -28,6 +32,16 @@ const processingStateChanging = ref(false)
 
 const canManageBookDock = computed(() => hasPermission(Permission.ManageBookDock))
 
+const uploadLabel = computed(() =>
+  props.uploadTarget
+    ? t('bookDock.uploadTo', { dock: props.uploadTarget.libraryName })
+    : t('bookDock.uploadTo', { dock: t('bookDock.switcher.unsorted') }),
+)
+
+const accept = computed(() =>
+  props.uploadTarget?.allowedFormats.length ? props.uploadTarget.allowedFormats.map((format) => `.${format}`).join(',') : SUPPORTED_FORMATS_ACCEPT,
+)
+
 function openFilePicker() {
   fileInput.value?.click()
 }
@@ -35,7 +49,7 @@ function openFilePicker() {
 function onFilesSelected(event: Event) {
   const input = event.target as HTMLInputElement
   if (input.files?.length) {
-    addFiles(input.files)
+    addFiles(input.files, props.uploadTarget)
     input.value = ''
   }
 }
@@ -79,7 +93,7 @@ async function toggleProcessingState() {
 
 <template>
   <div class="flex items-center gap-2">
-    <input ref="fileInput" type="file" :accept="SUPPORTED_FORMATS_ACCEPT" multiple class="hidden" @change="onFilesSelected" />
+    <input ref="fileInput" type="file" :accept="accept" multiple class="hidden" @change="onFilesSelected" />
 
     <button
       v-if="canManageBookDock"
@@ -110,6 +124,8 @@ async function toggleProcessingState() {
     <button
       type="button"
       data-testid="book-dock-upload"
+      :aria-label="uploadLabel"
+      :title="uploadLabel"
       class="flex items-center gap-1.5 h-8 px-3 rounded-lg text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       @click="openFilePicker"
     >

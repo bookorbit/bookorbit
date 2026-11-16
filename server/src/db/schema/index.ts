@@ -7,6 +7,7 @@ export * from './custom-metadata';
 export * from './custom-icons';
 export * from './migration';
 export * from './libraries';
+export * from './library-docks';
 export * from './books';
 export * from './book-covers';
 export * from './book-duplicates';

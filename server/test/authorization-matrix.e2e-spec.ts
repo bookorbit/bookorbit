@@ -1723,7 +1723,7 @@ describe('Authorization matrix (e2e)', () => {
           headers: authHeader(personas.bookDockUser.accessToken),
           payload: request.payload,
         });
-        expectError(response, 403, 'You do not have access to this Book Dock file');
+        expectError(response, 403, 'You do not have access to this Library Dock file');
       }
     });
 

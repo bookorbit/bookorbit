@@ -1482,7 +1482,7 @@ export class BookRequestService {
       throw new BadRequestException(`A ${joined.request.status} request cannot be fulfilled`);
     }
     if (dto.matchedBookId == null && dto.bookDockFileId == null) {
-      throw new BadRequestException('Provide either a book or a Book Dock file to close the request');
+      throw new BadRequestException('Provide either a book or a Library Dock file to close the request');
     }
 
     // Scoped to what this actor can reach, not merely to what exists. `ManageBookRequests` says
@@ -1493,7 +1493,7 @@ export class BookRequestService {
       throw new BadRequestException('That book no longer exists');
     }
     if (dto.bookDockFileId != null && !(await this.repo.bookDockFileExists(dto.bookDockFileId, this.dockUploaderScope(user)))) {
-      throw new BadRequestException('That Book Dock file no longer exists');
+      throw new BadRequestException('That Library Dock file no longer exists');
     }
 
     // Before the transition, like cancel and delete: the person has the book already, so a transfer

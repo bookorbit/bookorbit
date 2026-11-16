@@ -1546,5 +1546,18 @@
     "allowDefault": false,
     "useGuards": [],
     "apiKey": "write"
+  },
+  {
+    "file": "server/src/modules/book-dock/book-dock.controller.ts",
+    "className": "BookDockController",
+    "methodName": "keepBoth",
+    "httpMethod": "POST",
+    "path": "/book-dock/files/:id/keep-both",
+    "permissions": ["Permission.BookDockAccess"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "write"
   }
 ]

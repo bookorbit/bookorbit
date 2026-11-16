@@ -153,6 +153,19 @@ export const bookMetadata = pgTable(
     index('bm_open_library_id_idx')
       .on(t.openLibraryId)
       .where(sql`${t.openLibraryId} is not null`),
+    // Edition ids, matched exactly when a docked file is checked against the books a library holds.
+    index('bm_amazon_id_idx')
+      .on(t.amazonId)
+      .where(sql`${t.amazonId} is not null`),
+    index('bm_audible_id_idx')
+      .on(t.audibleId)
+      .where(sql`${t.audibleId} is not null`),
+    index('bm_google_books_id_idx')
+      .on(t.googleBooksId)
+      .where(sql`${t.googleBooksId} is not null`),
+    index('bm_goodreads_id_idx')
+      .on(t.goodreadsId)
+      .where(sql`${t.goodreadsId} is not null`),
     index('bm_embedding_hnsw_cosine_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
     check('book_metadata_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 10)`),
     check(

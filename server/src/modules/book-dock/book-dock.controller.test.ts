@@ -41,8 +41,15 @@ function makeController() {
     resumeProcessing: vi.fn(),
   };
   const ingestService = { ingestUpload: vi.fn() };
-  const finalizeService = { previewNames: vi.fn(), previewFinalize: vi.fn(), discardDuplicateCandidates: vi.fn(), finalize: vi.fn() };
+  const finalizeService = {
+    previewNames: vi.fn(),
+    previewFinalize: vi.fn(),
+    discardDuplicateCandidates: vi.fn(),
+    finalize: vi.fn(),
+    recheckAfterSettingsChange: vi.fn(),
+  };
   const watcherService = { rescan: vi.fn() };
+  const libraryDocks = { resolveUploadDock: vi.fn() };
   const appSettings = {
     getMaxUploadSizeMb: vi.fn().mockResolvedValue(500),
     getBookDockSettings: vi.fn(),
@@ -55,9 +62,10 @@ function makeController() {
     finalizeService as never,
     watcherService as never,
     appSettings as never,
+    libraryDocks as never,
   );
 
-  return { controller, service, ingestService, finalizeService, watcherService, appSettings };
+  return { controller, service, ingestService, finalizeService, watcherService, appSettings, libraryDocks };
 }
 
 const MOCK_USER = { id: 1, isSuperuser: false, permissions: [Permission.BookDockAccess] } as any;
@@ -71,20 +79,24 @@ describe('BookDockController', () => {
     const { controller, service } = makeController();
     service.listFiles.mockResolvedValue({ items: [], total: 0, page: 1, size: 20 });
 
-    await controller.listFiles(MOCK_USER, { readyToFile: true });
+    await controller.listFiles(MOCK_USER, { readyToFile: true, dock: '12', hold: 'held' });
 
-    expect(service.listFiles).toHaveBeenCalledWith({
-      status: undefined,
-      needsReview: undefined,
-      readyToFile: true,
-      page: 1,
-      limit: 20,
-      sort: 'createdAt',
-      order: 'desc',
-      search: undefined,
-      userId: MOCK_USER.id,
-      canManageAll: false,
-    });
+    expect(service.listFiles).toHaveBeenCalledWith(
+      {
+        status: undefined,
+        needsReview: undefined,
+        readyToFile: true,
+        page: 1,
+        limit: 20,
+        sort: 'createdAt',
+        order: 'desc',
+        search: undefined,
+        filter: { dock: 12, hold: 'held' },
+        userId: MOCK_USER.id,
+        canManageAll: false,
+      },
+      MOCK_USER,
+    );
   });
 
   it('getCover throws when file has no cover path or cover file does not exist', async () => {
@@ -138,8 +150,31 @@ describe('BookDockController', () => {
     service.getFile.mockResolvedValue({ id: 44, fileName: 'book.epub' });
 
     await expect(controller.upload(MOCK_USER, req)).resolves.toEqual({ id: 44, fileName: 'book.epub' });
-    expect(ingestService.ingestUpload).toHaveBeenCalledWith('book.epub', expect.any(Readable), MOCK_USER.id);
+    expect(ingestService.ingestUpload).toHaveBeenCalledWith('book.epub', expect.any(Readable), MOCK_USER.id, undefined);
     expect(service.getFile).toHaveBeenCalledWith(44, MOCK_USER.id, false);
+  });
+
+  it("checks an upload into a library's dock from the part's name, then lands it there", async () => {
+    const { controller, ingestService, service, libraryDocks } = makeController();
+    const dock = { dockId: 3, libraryId: 10, folderId: 100, folderName: 'Fiction' };
+    const req = { file: vi.fn().mockResolvedValue({ filename: 'book.epub', file: Readable.from('book') }) } as any;
+    libraryDocks.resolveUploadDock.mockResolvedValue(dock);
+    ingestService.ingestUpload.mockResolvedValue(45);
+    service.getFile.mockResolvedValue({ id: 45 });
+
+    await controller.upload(MOCK_USER, req, 10);
+
+    expect(libraryDocks.resolveUploadDock).toHaveBeenCalledWith(MOCK_USER, 10, 'book.epub');
+    expect(ingestService.ingestUpload).toHaveBeenCalledWith('book.epub', expect.any(Readable), MOCK_USER.id, dock);
+  });
+
+  it('takes in nothing when the dock refuses the upload', async () => {
+    const { controller, ingestService, libraryDocks } = makeController();
+    const req = { file: vi.fn().mockResolvedValue({ filename: 'book.pdf', file: Readable.from('book') }) } as any;
+    libraryDocks.resolveUploadDock.mockRejectedValue(new BadRequestException('format not allowed'));
+
+    await expect(controller.upload(MOCK_USER, req, 10)).rejects.toBeInstanceOf(BadRequestException);
+    expect(ingestService.ingestUpload).not.toHaveBeenCalled();
   });
 
   it('opens a file to check for narration only when the read asks for it', async () => {
@@ -156,8 +191,24 @@ describe('BookDockController', () => {
   it('bulk and finalize endpoints delegate payload fields as expected', async () => {
     const { controller, service, finalizeService, watcherService } = makeController();
 
-    await controller.bulkDiscard(MOCK_USER, { fileIds: [1], selectAll: false, excludedIds: [2], status: 'error', search: 'x', readyToFile: true });
-    await controller.applyFetched(MOCK_USER, { fileIds: [1], selectAll: true, excludedIds: [2], status: 'ready', search: 'x', readyToFile: true });
+    await controller.bulkDiscard(MOCK_USER, {
+      fileIds: [1],
+      selectAll: false,
+      excludedIds: [2],
+      status: 'error',
+      search: 'x',
+      readyToFile: true,
+      dock: 'unsorted',
+    });
+    await controller.applyFetched(MOCK_USER, {
+      fileIds: [1],
+      selectAll: true,
+      excludedIds: [2],
+      status: 'ready',
+      search: 'x',
+      readyToFile: true,
+      dock: '7',
+    });
     await controller.retryFetch(MOCK_USER, { fileIds: [3], selectAll: false, excludedIds: [4], status: 'error', search: 'y', readyToFile: true });
     await controller.refetchMetadata(MOCK_USER, 11);
     await controller.setTarget(MOCK_USER, {
@@ -187,6 +238,7 @@ describe('BookDockController', () => {
       defaultFolderId: 3,
       overrides: [],
       readyToFile: true,
+      dock: '7',
     } as any);
     await controller.discardFinalizeDuplicates(MOCK_USER, {
       fileIds: [10],
@@ -199,17 +251,39 @@ describe('BookDockController', () => {
     } as any);
     await controller.finalize(
       { id: 99, isSuperuser: true, permissions: [] } as any,
-      { fileIds: [1], defaultLibraryId: 2, defaultFolderId: 3, selectAll: false, excludedIds: [], overrides: [], readyToFile: true } as any,
+      {
+        fileIds: [1],
+        defaultLibraryId: 2,
+        defaultFolderId: 3,
+        selectAll: false,
+        excludedIds: [],
+        overrides: [],
+        readyToFile: true,
+        dock: 'unsorted',
+      } as any,
     );
     await controller.rescan();
     await controller.pause();
     await controller.resume();
 
-    expect(service.bulkDiscard).toHaveBeenCalledWith([1], false, [2], 'error', 'x', MOCK_USER.id, false, undefined, true);
-    expect(service.bulkApplyFetched).toHaveBeenCalledWith([1], true, [2], 'ready', 'x', MOCK_USER.id, false, undefined, true);
-    expect(service.bulkRetryFetch).toHaveBeenCalledWith([3], false, [4], 'error', 'y', MOCK_USER.id, false, undefined, true);
-    expect(service.bulkSetTarget).toHaveBeenCalledWith([5], false, [6], null, null, undefined, undefined, MOCK_USER.id, false, undefined, true);
-    expect(service.selectionSummary).toHaveBeenCalledWith([7], false, [8], undefined, undefined, MOCK_USER.id, false, undefined, true);
+    expect(service.bulkDiscard).toHaveBeenCalledWith([1], false, [2], 'error', 'x', MOCK_USER.id, false, undefined, true, { dock: 'unsorted' });
+    expect(service.bulkApplyFetched).toHaveBeenCalledWith([1], true, [2], 'ready', 'x', MOCK_USER.id, false, undefined, true, { dock: 7 });
+    expect(service.bulkRetryFetch).toHaveBeenCalledWith([3], false, [4], 'error', 'y', MOCK_USER.id, false, undefined, true, undefined);
+    expect(service.bulkSetTarget).toHaveBeenCalledWith(
+      [5],
+      false,
+      [6],
+      null,
+      null,
+      undefined,
+      undefined,
+      MOCK_USER.id,
+      false,
+      undefined,
+      true,
+      undefined,
+    );
+    expect(service.selectionSummary).toHaveBeenCalledWith([7], false, [8], undefined, undefined, MOCK_USER.id, false, undefined, true, undefined);
     expect(service.bulkEdit).toHaveBeenCalledWith(
       [9],
       false,
@@ -223,9 +297,22 @@ describe('BookDockController', () => {
       false,
       undefined,
       true,
+      undefined,
     );
     expect(service.refetchMetadata).toHaveBeenCalledWith(11, MOCK_USER.id, false);
-    expect(finalizeService.previewNames).toHaveBeenCalledWith([10], false, [], 2, MOCK_USER.id, false, undefined, undefined, undefined, true);
+    expect(finalizeService.previewNames).toHaveBeenCalledWith(
+      [10],
+      false,
+      [],
+      2,
+      MOCK_USER.id,
+      false,
+      undefined,
+      undefined,
+      undefined,
+      true,
+      undefined,
+    );
     expect(finalizeService.previewFinalize).toHaveBeenCalledWith(
       1,
       false,
@@ -241,6 +328,7 @@ describe('BookDockController', () => {
       undefined,
       true,
       MOCK_USER,
+      { dock: 7 },
     );
     expect(finalizeService.discardDuplicateCandidates).toHaveBeenCalledWith(
       1,
@@ -257,19 +345,32 @@ describe('BookDockController', () => {
       undefined,
       true,
       MOCK_USER,
+      undefined,
     );
-    expect(finalizeService.finalize).toHaveBeenCalledWith(99, true, true, [1], false, [], 2, 3, [], undefined, undefined, undefined, true, {
-      id: 99,
-      isSuperuser: true,
-      permissions: [],
-    });
+    expect(finalizeService.finalize).toHaveBeenCalledWith(
+      99,
+      true,
+      true,
+      [1],
+      false,
+      [],
+      2,
+      3,
+      [],
+      undefined,
+      undefined,
+      undefined,
+      true,
+      { id: 99, isSuperuser: true, permissions: [] },
+      { dock: 'unsorted' },
+    );
     expect(watcherService.rescan).toHaveBeenCalled();
     expect(service.pauseProcessing).toHaveBeenCalledTimes(1);
     expect(service.resumeProcessing).toHaveBeenCalledTimes(1);
   });
 
   it('reads and updates Book Dock settings through the scoped service methods', async () => {
-    const { controller, appSettings } = makeController();
+    const { controller, appSettings, finalizeService } = makeController();
     const settings = {
       bookDockPath: '/data/book-dock',
       autoFetchMetadata: true,
@@ -289,6 +390,8 @@ describe('BookDockController', () => {
 
     expect(appSettings.getBookDockSettings).toHaveBeenCalledOnce();
     expect(appSettings.updateBookDockSettings).toHaveBeenCalledWith(update);
+    // Files already in the dock are checked against what was just saved.
+    expect(finalizeService.recheckAfterSettingsChange).toHaveBeenCalledWith();
   });
 
   it('marks bulk edit endpoint as demo-restricted', () => {

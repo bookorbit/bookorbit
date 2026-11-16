@@ -21,6 +21,7 @@ const domainByResource: Record<AuditResource, AuditResourceDomain> = {
   [AuditResource.Collection]: 'content',
   [AuditResource.SmartScope]: 'content',
   [AuditResource.BookDockFile]: 'content',
+  [AuditResource.LibraryDock]: 'settings',
   [AuditResource.BookRequest]: 'content',
   [AuditResource.DownloadClient]: 'integrations',
   [AuditResource.RequestIndexer]: 'integrations',

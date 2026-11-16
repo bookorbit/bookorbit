@@ -329,9 +329,17 @@ export function useLibraryCreator() {
 async function responseError(response: Response, fallback: string): Promise<string> {
   const body = await response.json().catch(() => null)
   if (body?.errorCode === 'LIBRARY_FOLDER_OVERLAP') return folderOverlapMessage(body.errorMeta ?? {})
+  if (body?.errorCode === 'LIBRARY_FOLDER_OVERLAPS_BOOK_DOCK') return folderInDockMessage(body.errorMeta ?? {})
   const message = body?.message
   if (Array.isArray(message)) return message.find((entry): entry is string => typeof entry === 'string') ?? fallback
   return typeof message === 'string' && message.trim() ? message : fallback
+}
+
+function folderInDockMessage(meta: { path?: unknown; overlapPath?: unknown }): string {
+  return i18n.global.t('library.creator.errors.folderInDock', {
+    folder: typeof meta.path === 'string' ? meta.path : '',
+    dock: typeof meta.overlapPath === 'string' ? meta.overlapPath : '',
+  })
 }
 
 function folderOverlapMessage(meta: { path?: unknown; overlapPath?: unknown; overlapLibrary?: unknown }): string {

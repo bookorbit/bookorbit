@@ -1,11 +1,11 @@
 {
-  "totalRoutes": 749,
+  "totalRoutes": 758,
   "byPermission": {
     "(none)": 284,
     "Permission.ManageMetadataConfig": 50,
     "Permission.EmailSend": 34,
     "Permission.LibraryEditMetadata": 65,
-    "Permission.BookDockAccess": 17,
+    "Permission.BookDockAccess": 19,
     "Permission.ManageAppSettings": 91,
     "Permission.ManageLibraries": 36,
     "Permission.ManageUsers": 18,
@@ -20,7 +20,7 @@
     "Permission.LibraryDeleteBooks": 23,
     "Permission.LibraryDownload": 4,
     "Permission.LibraryUpload": 2,
-    "Permission.ManageBookDock": 3,
+    "Permission.ManageBookDock": 10,
     "Permission.ManageIcons": 1,
     "Permission.HardcoverSync": 1,
     "Permission.ReadwiseSync": 1,

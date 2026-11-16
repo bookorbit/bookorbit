@@ -24,6 +24,7 @@ import { SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type MetadataProviderKey
 import { IsExternalProviderMap } from '../../../common/decorators/is-external-provider-map.decorator';
 import { IsMetadataProviderKey } from '../../../common/decorators/is-metadata-provider-key.decorator';
 import { NormalizeIdentifier } from '../../../common/decorators/normalize-identifier.decorator';
+import { IsBookDockFilter, IsBookDockHoldFilter } from './book-dock-filter';
 
 @ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
 class HasCompleteDefaultDestinationConstraint implements ValidatorConstraintInterface {
@@ -210,6 +211,12 @@ export class FinalizeBookDockDto {
   @IsBoolean()
   readyToFile?: boolean;
 
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
+
   @IsOptional()
   @ValidateIf((_, value) => value !== undefined)
   @IsInt()
@@ -257,6 +264,12 @@ export class BulkDiscardDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class PreviewNamesDto {
@@ -289,6 +302,12 @@ export class PreviewNamesDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== undefined)
@@ -326,6 +345,12 @@ export class BulkRetryFetchDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class BulkApplyFetchedDto {
@@ -358,6 +383,12 @@ export class BulkApplyFetchedDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class BulkSetTargetDto {
@@ -390,6 +421,12 @@ export class BulkSetTargetDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
@@ -432,6 +469,12 @@ export class SelectionSummaryDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class BulkEditBookDockDto {
@@ -464,6 +507,12 @@ export class BulkEditBookDockDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @ValidateNested()
   @IsObject()

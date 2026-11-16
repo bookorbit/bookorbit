@@ -47,8 +47,23 @@ function makeService(bookDockPath = '/data/book-dock') {
   const processingState = {
     isPaused: vi.fn().mockResolvedValue(false),
   };
-  const service = new BookDockWatcherService(config as never, ingestService as never, repo as never, gateway as never, processingState as never);
-  return { service, ingestService, repo, gateway, processingState };
+  const dockRegistry = {
+    findEnabledByFolderName: vi.fn().mockResolvedValue(undefined),
+  };
+  const keptFiles = {
+    forget: vi.fn().mockResolvedValue(undefined),
+    prune: vi.fn().mockResolvedValue(0),
+  };
+  const service = new BookDockWatcherService(
+    config as never,
+    ingestService as never,
+    repo as never,
+    gateway as never,
+    processingState as never,
+    dockRegistry as never,
+    keptFiles as never,
+  );
+  return { service, ingestService, repo, gateway, processingState, dockRegistry, keptFiles };
 }
 
 function makeReadyWatcher(overrides: { close?: ReturnType<typeof vi.fn> } = {}) {
@@ -70,14 +85,16 @@ describe('BookDockWatcherService', () => {
     vi.mocked(readdir).mockResolvedValue([]);
   });
 
-  it('rescan walks files and emits summary', async () => {
-    const { service } = makeService();
+  it('rescan walks files, forgets kept files that are gone, and emits summary', async () => {
+    const { service, keptFiles } = makeService();
     const walkSpy = vi.spyOn(service as any, 'walkAndIngest').mockResolvedValue(undefined);
     const emitSpy = vi.spyOn(service as any, 'emitChange').mockReturnValue(undefined);
 
     await service.rescan();
 
     expect(walkSpy).toHaveBeenCalledWith('/data/book-dock');
+    expect(keptFiles.prune).toHaveBeenCalledTimes(1);
+    expect(walkSpy.mock.invocationCallOrder[0]).toBeLessThan(keptFiles.prune.mock.invocationCallOrder[0]!);
     expect(emitSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -100,7 +117,49 @@ describe('BookDockWatcherService', () => {
 
     expect(mkdir).toHaveBeenCalledWith('/data/book-dock', { recursive: true });
     expect(realpath).toHaveBeenCalledWith('/data/book-dock');
-    expect(watch).toHaveBeenCalledWith('/data/book-dock', { ignoreInitial: true, followSymlinks: false });
+    expect(watch).toHaveBeenCalledWith('/data/book-dock', { ignoreInitial: true, followSymlinks: false, ignored: expect.any(Function) });
+    const { ignored } = vi.mocked(watch).mock.calls[0]![1] as { ignored: (path: string) => boolean };
+    expect(ignored('/data/book-dock')).toBe(false);
+    expect(ignored('/data/book-dock/Dune.epub')).toBe(false);
+    expect(ignored('/data/book-dock/._Dune.epub')).toBe(true);
+    expect(ignored('/data/book-dock/#recycle/Dune.epub')).toBe(true);
+  });
+
+  it('process(create) ignores operating-system and NAS leftovers', async () => {
+    const { service, ingestService } = makeService();
+    vi.mocked(isPrimaryFormat).mockReturnValue(true);
+    const scanSpy = vi.spyOn(service as any, 'scan');
+
+    await (service as any).process('create', '/data/book-dock/._Dune.epub');
+    await (service as any).process('create', '/data/book-dock/@eaDir/Dune.epub/SYNOFILE_THUMB_M.jpg');
+    await (service as any).process('create', '/data/book-dock/.stversions/Dune~20261116.epub');
+
+    expect(waitForStability).not.toHaveBeenCalled();
+    expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
+    expect(scanSpy).not.toHaveBeenCalled();
+  });
+
+  it('walkAndIngest never enters recycle bins or picks up AppleDouble files', async () => {
+    const { service, ingestService } = makeService();
+    vi.mocked(isPrimaryFormat).mockImplementation((path: string) => path.endsWith('.epub'));
+    vi.mocked(readdir).mockImplementation((dir: string) => {
+      if (dir === '/data/book-dock') {
+        return Promise.resolve([
+          { name: '#recycle', isDirectory: () => true, isFile: () => false },
+          { name: '@eaDir', isDirectory: () => true, isFile: () => false },
+          { name: '.Trash-1000', isDirectory: () => true, isFile: () => false },
+          { name: '._Dune.epub', isDirectory: () => false, isFile: () => true },
+          { name: 'Dune.epub', isDirectory: () => false, isFile: () => true },
+        ] as any);
+      }
+      return Promise.resolve([] as any);
+    });
+
+    await (service as any).walkAndIngest('/data/book-dock');
+
+    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledTimes(1);
+    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/Dune.epub', undefined);
+    expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalled();
   });
 
   it('startWatcher swallows watcher boot errors', async () => {
@@ -121,7 +180,7 @@ describe('BookDockWatcherService', () => {
     await (service as any).process('create', '/data/book-dock/book.epub');
 
     expect(waitForStability).toHaveBeenCalledWith('/data/book-dock/book.epub');
-    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/book.epub');
+    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/book.epub', undefined);
     expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
   });
 
@@ -147,6 +206,16 @@ describe('BookDockWatcherService', () => {
     expect(unlink).toHaveBeenCalledWith('/data/book-dock/covers/12_thumb.jpg');
     expect(repo.deleteById).toHaveBeenCalledWith(12);
     expect(gateway.emitChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('process(delete) forgets a kept file or folder that was removed, with or without a row', async () => {
+    const { service, repo, keptFiles } = makeService();
+    repo.findByAbsolutePath.mockResolvedValue(undefined);
+
+    await (service as any).process('delete', '/data/book-dock/_libraries/Fiction/Dune');
+
+    expect(keptFiles.forget).toHaveBeenCalledWith('/data/book-dock/_libraries/Fiction/Dune');
+    expect(repo.deleteById).not.toHaveBeenCalled();
   });
 
   it('process(create) skips stability and ingest while paused', async () => {
@@ -186,9 +255,9 @@ describe('BookDockWatcherService', () => {
 
     await (service as any).walkAndIngest('/data/book-dock');
 
-    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/root.epub');
+    expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/root.epub', undefined);
     expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalledWith('/data/book-dock/nested/inner.pdf');
-    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/nested');
+    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/nested', undefined);
     expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalledWith('/data/book-dock/covers');
   });
 
@@ -207,7 +276,7 @@ describe('BookDockWatcherService', () => {
 
     await (service as any).process('create', '/data/book-dock/Neuromancer/Chapter 3.mp3');
 
-    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
+    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer', undefined);
     expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
   });
 
@@ -222,8 +291,80 @@ describe('BookDockWatcherService', () => {
     await (service as any).process('create', '/data/book-dock/Neuromancer');
 
     expect(stat).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
-    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer');
+    expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/Neuromancer', undefined);
     expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
+  });
+
+  describe('library docks', () => {
+    const fiction = { id: 3, libraryId: 14, targetFolderId: 22, enabled: true };
+
+    it('files an event inside a dock folder under that dock', async () => {
+      const { service, ingestService, dockRegistry } = makeService();
+      dockRegistry.findEnabledByFolderName.mockResolvedValue(fiction);
+      vi.mocked(isPrimaryFormat).mockReturnValue(true);
+      ingestService.ingestFromWatchedFolder.mockResolvedValue(42);
+
+      await (service as any).process('create', '/data/book-dock/_libraries/Fiction/Dune.epub');
+      await (service as any).process('create', '/data/book-dock/_libraries/Fiction/Hyperion/CD 1/01.mp3');
+
+      const arrival = { dockId: 3, libraryId: 14, folderId: 22 };
+      expect(dockRegistry.findEnabledByFolderName).toHaveBeenCalledWith('Fiction');
+      expect(ingestService.ingestFromWatchedFolder).toHaveBeenCalledWith('/data/book-dock/_libraries/Fiction/Dune.epub', arrival);
+      expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/_libraries/Fiction/Hyperion', arrival);
+    });
+
+    it('debounces a dropped folder inside a dock on that folder, not on the dock', () => {
+      const { service } = makeService();
+      expect((service as any).unitDirectoryFor('/data/book-dock/_libraries/Fiction/Hyperion/CD 1/01.mp3')).toBe(
+        '/data/book-dock/_libraries/Fiction/Hyperion',
+      );
+      expect((service as any).unitDirectoryFor('/data/book-dock/_libraries/Fiction/Dune.epub')).toBeNull();
+    });
+
+    it('creates nothing for a folder no dock owns or a dock that is off, but tells clients', async () => {
+      const { service, ingestService, gateway } = makeService();
+      vi.mocked(isPrimaryFormat).mockReturnValue(true);
+
+      await (service as any).process('create', '/data/book-dock/_libraries/Unknown/Dune.epub');
+      await (service as any).process('create', '/data/book-dock/_libraries/stray.epub');
+
+      expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
+      expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalled();
+      expect(gateway.emitChanged).toHaveBeenCalledTimes(2);
+    });
+
+    it('never treats _libraries as a book of Unsorted', async () => {
+      const { service, ingestService } = makeService();
+      vi.mocked(readdir).mockImplementation((dir: string) => {
+        if (dir === '/data/book-dock') return Promise.resolve([{ name: '_libraries', isDirectory: () => true, isFile: () => false }] as any);
+        if (dir === '/data/book-dock/_libraries') {
+          return Promise.resolve([
+            { name: 'Unknown', isDirectory: () => true, isFile: () => false },
+            { name: 'stray.epub', isDirectory: () => false, isFile: () => true },
+          ] as any);
+        }
+        return Promise.resolve([] as any);
+      });
+
+      await (service as any).walkAndIngest('/data/book-dock');
+
+      expect(ingestService.ingestUnitDirectory).not.toHaveBeenCalled();
+      expect(ingestService.ingestFromWatchedFolder).not.toHaveBeenCalled();
+    });
+
+    it('keeps a _libraries folder an older version took in as a book in Unsorted, and warns once', async () => {
+      const { service, ingestService, repo, dockRegistry } = makeService();
+      const warn = vi.spyOn((service as any).logger, 'warn').mockImplementation(() => undefined);
+      repo.findByUnitDirectory.mockImplementation((dir: string) => Promise.resolve(dir === '/data/book-dock/_libraries' ? { id: 1 } : undefined));
+      dockRegistry.findEnabledByFolderName.mockResolvedValue(fiction);
+
+      await (service as any).process('create', '/data/book-dock/_libraries/Fiction/Dune.epub');
+      await (service as any).process('create', '/data/book-dock/_libraries/Fiction/Dune.epub');
+
+      expect(ingestService.ingestUnitDirectory).toHaveBeenCalledWith('/data/book-dock/_libraries', undefined);
+      expect(dockRegistry.findEnabledByFolderName).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('onModuleDestroy clears timers and unsubscribes active watcher', async () => {

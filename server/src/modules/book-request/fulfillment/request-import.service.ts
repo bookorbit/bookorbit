@@ -666,7 +666,7 @@ export class RequestImportService implements OnApplicationBootstrap {
       if (!onDisk && !claimed) return candidate;
     }
 
-    throw new Error('Could not find a free destination filename in the Book Dock');
+    throw new Error('Could not find a free destination filename in the Library Dock');
   }
 
   /**

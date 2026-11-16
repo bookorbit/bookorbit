@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { getValidToken } from '@/lib/api'
-import { UPLOAD_SUPPORTED_FORMATS, type BookDockFile } from '@bookorbit/types'
+import { UPLOAD_SUPPORTED_FORMATS, type BookDockFile, type BookDockUploadTarget } from '@bookorbit/types'
 
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 import { isRetryableUploadFailure, type BookDockUploadFailure } from '../lib/upload-failure'
@@ -17,6 +17,8 @@ export interface UploadItem {
   progress: number
   failure?: BookDockUploadFailure
   bookDockFile?: BookDockFile
+  /** The library dock it goes into; absent for Unsorted. */
+  libraryId?: number
 }
 
 const CONCURRENCY = 3
@@ -26,9 +28,12 @@ function fileExtension(name: string): string {
   return dot === -1 ? '' : name.slice(dot + 1).toLowerCase()
 }
 
-function validateFile(file: File): BookDockUploadFailure | null {
+function validateFile(file: File, target: BookDockUploadTarget | null): BookDockUploadFailure | null {
   const extension = fileExtension(file.name)
   if (!SUPPORTED_FORMATS.includes(extension)) return { kind: 'unsupported', extension }
+  if (target?.allowedFormats.length && !target.allowedFormats.includes(extension)) {
+    return { kind: 'notAllowed', extension, library: target.libraryName }
+  }
   const { maxUploadSizeMb } = useAppInfo()
   const limitBytes = maxUploadSizeMb.value * 1024 * 1024
   if (file.size > limitBytes) return { kind: 'tooLarge', limitBytes }
@@ -75,7 +80,7 @@ async function uploadSingle(item: UploadItem): Promise<void> {
   await new Promise<void>((resolve) => {
     try {
       const xhr = new XMLHttpRequest()
-      xhr.open('POST', '/api/v1/book-dock/upload')
+      xhr.open('POST', item.libraryId === undefined ? '/api/v1/book-dock/upload' : `/api/v1/book-dock/upload?libraryId=${item.libraryId}`)
       if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
 
       xhr.upload.onprogress = (e) => {
@@ -114,15 +119,17 @@ const isUploading = ref(false)
 const failures = computed(() => files.value.filter((f) => f.status === 'error'))
 
 export function useBookDockUpload() {
-  function addFiles(fileList: FileList | File[]) {
+  /** Queues files for Unsorted, or for one library's dock when `target` is given. */
+  function addFiles(fileList: FileList | File[], target: BookDockUploadTarget | null = null) {
     for (const file of fileList) {
-      const failure = validateFile(file)
+      const failure = validateFile(file, target)
       const item: UploadItem = {
         id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
         file,
         status: failure ? 'error' : 'pending',
         progress: 0,
         failure: failure ?? undefined,
+        ...(target ? { libraryId: target.libraryId } : {}),
       }
       files.value.push(item)
     }

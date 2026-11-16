@@ -5,19 +5,12 @@ import { X, Loader2, FolderPlus } from '@lucide/vue'
 import { api } from '@/lib/api'
 import { useBookDestination } from '@/features/library/composables/useBookDestination'
 import BookDestinationFields from '@/features/library/components/BookDestinationFields.vue'
+import type { BookDockSelectionPayload } from '../composables/useBookDockFiles'
 
 const { t } = useI18n()
 
 const props = defineProps<{
-  selectionPayload: {
-    fileIds?: number[]
-    selectAll?: boolean
-    excludedIds?: number[]
-    status?: string
-    needsReview?: boolean
-    readyToFile?: boolean
-    search?: string
-  }
+  selectionPayload: BookDockSelectionPayload
   selectionCount: number
 }>()
 

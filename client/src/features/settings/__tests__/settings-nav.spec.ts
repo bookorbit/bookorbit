@@ -3,7 +3,14 @@ import type { RouteRecordRaw } from 'vue-router'
 import { BookMarked, Highlighter, LibraryBig } from '@lucide/vue'
 import { Permission } from '@bookorbit/types'
 import { routes } from '@/router'
-import { SETTINGS_NAV, findSettingsNavItem, firstVisibleSettingsRoute, visibleSettingsNav, type SettingsNavContext } from '../lib/settings-nav'
+import {
+  SETTINGS_NAV,
+  findSettingsNavItem,
+  firstVisibleSettingsRoute,
+  searchSettingsNav,
+  visibleSettingsNav,
+  type SettingsNavContext,
+} from '../lib/settings-nav'
 
 const NOBODY: SettingsNavContext = { isSuperuser: false, permissions: [], isDemoRestricted: false }
 const SUPERUSER: SettingsNavContext = { isSuperuser: true, permissions: [], isDemoRestricted: false }
@@ -137,5 +144,19 @@ describe('findSettingsNavItem', () => {
 describe('firstVisibleSettingsRoute', () => {
   it('returns a destination the user can actually open', () => {
     expect(firstVisibleSettingsRoute(NOBODY)).toBe('settings-account-profile')
+  })
+})
+
+describe('searchSettingsNav', () => {
+  const identity = (key: string) => key
+
+  it.each(['upload', 'import', 'incoming', 'drop folder'])('finds the Book Dock settings for "%s"', (query) => {
+    const ids = searchSettingsNav(SETTINGS_NAV, query, identity).map((hit) => hit.item.id)
+    expect(ids).toContain('book-dock')
+  })
+
+  it('no longer offers the Book Dock settings for book page toolbar searches', () => {
+    const ids = searchSettingsNav(SETTINGS_NAV, 'toolbar', identity).map((hit) => hit.item.id)
+    expect(ids).not.toContain('book-dock')
   })
 })

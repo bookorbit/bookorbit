@@ -97,6 +97,37 @@ describe('NotificationItem', () => {
     expect(wrapper.findAll('button')[0].element.tagName).toBe('BUTTON')
   })
 
+  describe('Library Dock digests', () => {
+    const digest = (meta: Record<string, unknown>, type: NotificationItem['type'] = NotificationType.BookDockDigestNeedsReview) =>
+      notification({ type, title: 'Server fallback title', message: 'Server fallback message', actionUrl: '/book-dock', meta })
+
+    it('names the dock and both counts in the reader’s locale, as needing review', async () => {
+      const { wrapper } = await mountItem(digest({ dockId: 11, libraryId: 4, libraryName: 'Fiction', filed: 482, held: 18 }))
+
+      expect(wrapper.text()).toContain('Library Dock: Fiction')
+      expect(wrapper.text()).toContain('482 books filed, 18 need review.')
+      expect(wrapper.text()).not.toContain('Server fallback')
+      expect(wrapper.find('.lucide-package-open').classes()).toContain('text-warning')
+    })
+
+    it.each([
+      [{ dockId: null, libraryId: null, libraryName: null, filed: 1, held: 0 }, 'Library Dock: Unsorted', '1 book filed.'],
+      [{ dockId: 11, libraryId: 4, libraryName: 'Fiction', filed: 0, held: 1 }, 'Library Dock: Fiction', '1 book needs review.'],
+      [{ dockId: 11, libraryId: null, libraryName: null, filed: 2, held: 0 }, 'Library Dock', '2 books filed.'],
+    ])('words %o', async (meta, title, message) => {
+      const { wrapper } = await mountItem(digest(meta, NotificationType.BookDockDigest))
+
+      expect(wrapper.text()).toContain(title)
+      expect(wrapper.text()).toContain(message)
+    })
+
+    it('keeps the server copy for a digest stored without its counts', async () => {
+      const { wrapper } = await mountItem(digest({ dockId: 11, filed: 'many' }))
+
+      expect(wrapper.text()).toContain('Server fallback title')
+    })
+  })
+
   describe('read-aloud notifications', () => {
     const readAloud = (overrides: Partial<NotificationItem> = {}) =>
       notification({

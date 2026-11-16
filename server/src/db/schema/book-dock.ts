@@ -1,8 +1,10 @@
 import { sql } from 'drizzle-orm';
 import { bigint, boolean, check, index, integer, jsonb, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core';
-import type { BookDockMetadata } from '@bookorbit/types';
+import type { BookDockHoldDetail, BookDockHoldReason, BookDockMetadata } from '@bookorbit/types';
 
+import { books } from './books';
 import { libraries, libraryFolders } from './libraries';
+import { libraryDocks } from './library-docks';
 import { users } from './auth';
 
 export const bookDockFiles = pgTable(
@@ -41,6 +43,12 @@ export const bookDockFiles = pgTable(
      * The dock deliberately does not learn which module, only that it is not its call to make.
      */
     autoFinalizeSuppressed: boolean('auto_finalize_suppressed').notNull().default(false),
+    /** The library dock the file arrived in. Null for Unsorted, request imports and Unsorted uploads. */
+    dockId: integer('dock_id').references(() => libraryDocks.id, { onDelete: 'set null' }),
+    /** The name of the library this file was headed for, kept when that library is deleted. */
+    formerLibraryName: varchar('former_library_name', { length: 255 }),
+    holdReason: varchar('hold_reason', { length: 40 }).$type<BookDockHoldReason>(),
+    holdDetail: jsonb('hold_detail').$type<BookDockHoldDetail>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -51,7 +59,12 @@ export const bookDockFiles = pgTable(
     index('book_dock_files_status_idx').on(t.status),
     index('book_dock_files_target_library_id_idx').on(t.targetLibraryId),
     index('book_dock_files_uploaded_by_idx').on(t.uploadedBy),
+    index('book_dock_files_dock_id_idx').on(t.dockId),
     check('book_dock_files_status_chk', sql`${t.status} in ('pending', 'extracting', 'fetching', 'ready', 'error')`),
+    check(
+      'book_dock_files_hold_reason_chk',
+      sql`${t.holdReason} is null or ${t.holdReason} in ('low_confidence', 'no_destination', 'no_folder', 'not_allowed_in_library', 'duplicate', 'destination_conflict', 'unsupported_layout', 'waiting_for_manager')`,
+    ),
     check('book_dock_files_confidence_range_chk', sql`${t.confidence} is null or (${t.confidence} >= 0 and ${t.confidence} <= 100)`),
   ],
 );
@@ -89,3 +102,28 @@ export const bookDockUnitFiles = pgTable(
 
 export type BookDockUnitFileRow = typeof bookDockUnitFiles.$inferSelect;
 export type NewBookDockUnitFileRow = typeof bookDockUnitFiles.$inferInsert;
+
+/**
+ * Source files a keep-original dock filed by hardlink or copy and left in place for a download
+ * client to keep seeding. The dock row is gone once filed; this remembers the file so a rescan does
+ * not offer it again. A file whose size or modification time changed is a new arrival.
+ *
+ * `ignored` marks a file a manager discarded: it stays on disk and is never offered again.
+ */
+export const bookDockKeptFiles = pgTable(
+  'book_dock_kept_files',
+  {
+    id: serial('id').primaryKey(),
+    absolutePath: text('absolute_path').notNull().unique(),
+    fileSize: bigint('file_size', { mode: 'number' }).notNull(),
+    mtimeMs: bigint('mtime_ms', { mode: 'number' }).notNull(),
+    dockId: integer('dock_id').references(() => libraryDocks.id, { onDelete: 'set null' }),
+    bookId: integer('book_id').references(() => books.id, { onDelete: 'set null' }),
+    ignored: boolean('ignored').notNull().default(false),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('book_dock_kept_files_dock_id_idx').on(t.dockId), index('book_dock_kept_files_book_id_idx').on(t.bookId)],
+);
+
+export type BookDockKeptFileRow = typeof bookDockKeptFiles.$inferSelect;
+export type NewBookDockKeptFileRow = typeof bookDockKeptFiles.$inferInsert;

@@ -16,8 +16,18 @@ const props = withDefaults(
     conflicts?: Record<number, BookDockConflict>
     namePreviewByFileId?: Record<number, string>
     emptyMessage?: string
+    emptyTitle?: string
+    uploadLabel?: string
+    canManage?: boolean
   }>(),
-  { conflicts: () => ({}), namePreviewByFileId: () => ({}), emptyMessage: undefined },
+  {
+    conflicts: () => ({}),
+    namePreviewByFileId: () => ({}),
+    emptyMessage: undefined,
+    emptyTitle: undefined,
+    uploadLabel: undefined,
+    canManage: false,
+  },
 )
 
 const emit = defineEmits<{
@@ -30,6 +40,7 @@ const emit = defineEmits<{
   retry: [BookDockFile]
   upload: []
   keyboardActive: [boolean]
+  changed: []
 }>()
 
 const { t } = useI18n()
@@ -156,6 +167,9 @@ function onRetry(file: BookDockFile) {
 function onUpload() {
   emit('upload')
 }
+function onChanged() {
+  emit('changed')
+}
 </script>
 
 <template>
@@ -177,7 +191,7 @@ function onUpload() {
       <div class="flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
         <PackageOpen class="size-6" aria-hidden="true" />
       </div>
-      <p class="text-sm font-medium text-foreground">{{ t('bookDock.fileList.emptyTitle') }}</p>
+      <p class="text-sm font-medium text-foreground">{{ props.emptyTitle ?? t('bookDock.fileList.emptyTitle') }}</p>
       <p class="max-w-md text-xs text-muted-foreground">{{ props.emptyMessage ?? t('bookDock.fileList.emptyMessageDefault') }}</p>
       <button
         type="button"
@@ -186,7 +200,7 @@ function onUpload() {
         @click="onUpload"
       >
         <Upload class="size-3.5" aria-hidden="true" />
-        {{ t('bookDock.uploadAction') }}
+        {{ props.uploadLabel ?? t('bookDock.uploadAction') }}
       </button>
       <p class="text-[11px] text-muted-foreground">{{ t('bookDock.layout.empty.dropHint') }}</p>
     </div>
@@ -202,6 +216,7 @@ function onUpload() {
         :library-name="libraryNameFor(file)"
         :target-label="targetLabelFor(file)"
         :conflict="props.conflicts[file.id]"
+        :can-manage="props.canManage"
         @select="onSelect"
         @toggle-expand="toggleExpand"
         @set-destination="onSetDestination"
@@ -210,6 +225,7 @@ function onUpload() {
         @open="onOpen"
         @discard="onDiscard"
         @retry="onRetry"
+        @changed="onChanged"
       />
     </template>
   </div>

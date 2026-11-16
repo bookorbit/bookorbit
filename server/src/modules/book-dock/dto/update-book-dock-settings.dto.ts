@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsInt, Max, Min, ValidateIf } from 'class-validator';
+import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min, ValidateIf } from 'class-validator';
 
 import type { BookDockAutoFinalizeMetadataMode, UpdateBookDockSettingsRequest } from '@bookorbit/types';
 
@@ -28,4 +28,12 @@ export class UpdateBookDockSettingsDto implements UpdateBookDockSettingsRequest 
 
   @IsIn(AUTO_FINALIZE_METADATA_MODES)
   autoFinalizeMetadataMode!: BookDockAutoFinalizeMetadataMode;
+
+  @IsOptional()
+  @IsBoolean()
+  unsortedAutoJoin?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  unsortedKeepOriginal?: boolean;
 }

@@ -86,6 +86,11 @@ export enum AuditAction {
   SmartScopeDelete = "smart_scope.delete",
 
   BookDockFinalize = "book_dock.finalize",
+  LibraryDockUpdate = "library_dock.update",
+  LibraryDockFolderRename = "library_dock.folder.rename",
+  LibraryDockFolderAdopt = "library_dock.folder.adopt",
+  LibraryDockFolderMove = "library_dock.folder.move_to_unsorted",
+  LibraryDockFolderRemove = "library_dock.folder.remove",
 
   AiJobBuild = "ai_job.build",
   AiJobUpdate = "ai_job.update",
@@ -188,6 +193,7 @@ export enum AuditResource {
   Collection = "collection",
   SmartScope = "smart_scope",
   BookDockFile = "book_dock_file",
+  LibraryDock = "library_dock",
   BookRequest = "book_request",
   DownloadClient = "download_client",
   RequestIndexer = "request_indexer",
@@ -271,7 +277,7 @@ export const AUDIT_CATEGORY_PREFIXES: Record<Exclude<AuditCategory, "other">, re
   requests: ["book_request.", "download_client.", "request_indexer."],
   collections: ["collection.", "smart_scope."],
   devices: ["kobo.", "email."],
-  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider.", "ai."],
+  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider.", "ai.", "library_dock."],
 };
 
 export function getAuditCategory(action: string): AuditCategory {

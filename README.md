@@ -113,7 +113,7 @@ Take your library anywhere with the official native BookOrbit app. Read ebooks, 
 - **Multi-User & SSO**: Granular per-user permissions and isolated reading data, with native support for Authentik, Keycloak, and Authelia via OIDC.
 - **Multilingual Interface**: Community translations are managed on [Crowdin](https://crowdin.com/project/bookorbit). See the [localization guide](docs/LOCALIZATION.md) for current language support and contributor instructions.
 - **Content Delivery**: OPDS support for compatible apps, Send-to-Kindle via email, and browser drag-and-drop uploads.
-- **Automated Ingestion**: Configure a Book Dock drop folder for hands-free importing.
+- **Automated Ingestion**: Drop files into the Library Dock folder to review them before they reach a library. Each library can have its own dock, where incoming files get metadata and, with auto-file on, are named and filed into that library.
 
 <a id="quick-start-docker"></a>
 

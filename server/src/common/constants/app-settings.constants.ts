@@ -10,6 +10,8 @@ export const APP_SETTING_KEYS = {
   BOOK_DOCK_AUTO_FINALIZE_LIBRARY_ID: 'book_dock_auto_finalize_library_id',
   BOOK_DOCK_AUTO_FINALIZE_FOLDER_ID: 'book_dock_auto_finalize_folder_id',
   BOOK_DOCK_AUTO_FINALIZE_METADATA_MODE: 'book_dock_auto_finalize_metadata_mode',
+  BOOK_DOCK_UNSORTED_AUTO_JOIN: 'book_dock_unsorted_auto_join',
+  BOOK_DOCK_UNSORTED_KEEP_ORIGINAL: 'book_dock_unsorted_keep_original',
   AUTHORS_AUTO_ENRICHMENT_ENABLED: 'authors_auto_enrichment_enabled',
   AUTHORS_AUTO_ENRICHMENT_WRITE_MODE: 'authors_auto_enrichment_write_mode',
   AUTHORS_AUTO_ENRICHMENT_CONFIG: 'authors_auto_enrichment_config',
@@ -61,6 +63,8 @@ export const BOOK_DOCK_MANAGED_SETTING_KEYS: readonly string[] = [
   APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_LIBRARY_ID,
   APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_FOLDER_ID,
   APP_SETTING_KEYS.BOOK_DOCK_AUTO_FINALIZE_METADATA_MODE,
+  APP_SETTING_KEYS.BOOK_DOCK_UNSORTED_AUTO_JOIN,
+  APP_SETTING_KEYS.BOOK_DOCK_UNSORTED_KEEP_ORIGINAL,
 ];
 
 export const DEFAULT_AUDIT_RETENTION_DAYS = 90;

@@ -13,9 +13,241 @@ export interface BookDockSettings {
   autoFinalizeLibraryId: number | null;
   autoFinalizeFolderId: number | null;
   autoFinalizeMetadataMode: BookDockAutoFinalizeMetadataMode;
+  /** Unsorted's own toggles; library docks carry theirs on the dock. Absent on older servers. */
+  unsortedAutoJoin?: boolean;
+  unsortedKeepOriginal?: boolean;
 }
 
 export type UpdateBookDockSettingsRequest = Omit<BookDockSettings, "bookDockPath">;
+
+/** A dock's own values for the global Book Dock settings. `null` inherits the global value. */
+export interface LibraryDockOverrides {
+  autoFetchMetadata: boolean | null;
+  autoFinalizeEnabled: boolean | null;
+  autoFinalizeThreshold: number | null;
+  autoFinalizeMetadataMode: BookDockAutoFinalizeMetadataMode | null;
+}
+
+/** What a dock actually does once its overrides are applied over the global settings. */
+export interface BookDockEffectiveSettings {
+  autoFetchMetadata: boolean;
+  autoFinalizeEnabled: boolean;
+  autoFinalizeThreshold: number;
+  autoFinalizeMetadataMode: BookDockAutoFinalizeMetadataMode;
+  autoJoin: boolean;
+  keepOriginal: boolean;
+}
+
+/** A library's own drop folder, `_libraries/<folderName>` inside the Book Dock. */
+export interface LibraryDock {
+  id: number;
+  libraryId: number;
+  libraryName: string;
+  folderName: string;
+  enabled: boolean;
+  /** Null when the folder it filed into was removed from the library; arrivals wait until one is chosen. */
+  targetFolderId: number | null;
+  overrides: LibraryDockOverrides;
+  autoJoin: boolean;
+  keepOriginal: boolean;
+}
+
+/**
+ * Why a ready file waits instead of filing itself. Stable, so clients can show their own copy; new
+ * codes may be added, so an unknown one must read as a plain "waiting for review".
+ */
+export const BOOK_DOCK_HOLD_REASONS = [
+  /** The best match scored below the dock's threshold. */
+  "low_confidence",
+  /** No library to file into. */
+  "no_destination",
+  /** The library is known but the folder it filed into was removed. */
+  "no_folder",
+  /** The target library does not accept this format or layout. */
+  "not_allowed_in_library",
+  /** The target library already holds this book. */
+  "duplicate",
+  /** Something already sits at the path this file would be written to. */
+  "destination_conflict",
+  /** A multi-file unit the target library's organization mode cannot represent. */
+  "unsupported_layout",
+  /** The uploader may not add books to the target library, so a dock manager files it. */
+  "waiting_for_manager",
+] as const;
+
+export type BookDockHoldReason = (typeof BOOK_DOCK_HOLD_REASONS)[number];
+
+export function isBookDockHoldReason(value: unknown): value is BookDockHoldReason {
+  return typeof value === "string" && (BOOK_DOCK_HOLD_REASONS as readonly string[]).includes(value);
+}
+
+/** The facts behind a hold reason. Which fields are set depends on the reason. */
+export interface BookDockHoldDetail {
+  confidence?: number;
+  threshold?: number;
+  libraryId?: number;
+  libraryName?: string;
+  /** The existing book a `duplicate` hold matched. */
+  bookId?: number;
+  /** A manager chose "Keep both" for a duplicate, so the duplicate check no longer holds the file. */
+  keepBoth?: boolean;
+}
+
+/** A library folder a dock can file into. */
+export interface LibraryDockFolderOption {
+  id: number;
+  path: string;
+}
+
+/** A library as the dock settings list it, with its dock when it has one. */
+export interface LibraryDockAdminEntry {
+  libraryId: number;
+  libraryName: string;
+  folders: LibraryDockFolderOption[];
+  dock: LibraryDock | null;
+  /** What the dock does with its overrides applied. For a library without a dock, the defaults it would start with. */
+  effective: BookDockEffectiveSettings;
+  /**
+   * The folder name the library's current name gives. For a dock whose folder no longer matches,
+   * what "Rename folder to match" would use; null when it already matches.
+   */
+  suggestedFolderName: string | null;
+  /** Whether the dock's folder exists on disk. False for a library without a dock. */
+  folderPresent: boolean;
+}
+
+/** A folder in `_libraries` that no dock owns. Its files are not taken in. */
+export interface LibraryDockUnrecognisedFolder {
+  name: string;
+  /** A library without a dock whose name gives this folder name, so the folder can be adopted in one step. */
+  matchesLibraryId: number | null;
+}
+
+/** Everything the dock settings page manages, read by dock managers. */
+export interface LibraryDocksAdmin {
+  /** The `_libraries` folder inside the Book Dock folder. */
+  librariesPath: string;
+  libraries: LibraryDockAdminEntry[];
+  unrecognisedFolders: LibraryDockUnrecognisedFolder[];
+  /** Files sitting directly in `_libraries`, which no dock takes in. At most 100 names. */
+  strayFiles: string[];
+  /** More stray files exist than `strayFiles` lists. */
+  strayFilesTruncated: boolean;
+  /** `_libraries` is a book an earlier version took in, so library docks cannot start until it is moved. */
+  librariesFolderIsBook: boolean;
+}
+
+/**
+ * Changes to a library's dock. Absent fields stay as they are; a `null` override goes back to
+ * inheriting the global setting. A library without a dock gets one only with `enabled: true`.
+ */
+export interface UpdateLibraryDockRequest {
+  enabled?: boolean;
+  /** Renames the folder on disk. */
+  folderName?: string;
+  targetFolderId?: number;
+  autoFetchMetadata?: boolean | null;
+  autoFinalizeEnabled?: boolean | null;
+  autoFinalizeThreshold?: number | null;
+  autoFinalizeMetadataMode?: BookDockAutoFinalizeMetadataMode | null;
+  autoJoin?: boolean;
+  keepOriginal?: boolean;
+}
+
+export interface MoveLibraryDockFolderResult {
+  /** Top-level entries moved into the Book Dock root. */
+  moved: number;
+  /** The folder was empty afterwards and was removed. */
+  folderRemoved: boolean;
+}
+
+/** A library dock the caller may upload into: turned on, in a library the caller can see. */
+export interface BookDockUploadTarget {
+  dockId: number;
+  libraryId: number;
+  libraryName: string;
+  /** The library's own format list; empty allows every supported format. */
+  allowedFormats: string[];
+}
+
+/**
+ * `GET /book-dock/docks`. A server without library docks answers 404, and a client then offers
+ * Unsorted only: an older server would silently drop `libraryId` from a `book_dock` upload.
+ */
+export interface BookDockUploadTargets {
+  docks: BookDockUploadTarget[];
+}
+
+/**
+ * How filing from a dock reaches its library. `move` is instant: a rename, or a hardlink in a
+ * keep-original dock. `copy` means the two sit on different filesystems or mounts. `unknown` means
+ * a folder is missing or cannot be written, so nothing could be tried.
+ */
+export type LibraryDockFiling = "move" | "copy" | "unknown";
+
+export interface LibraryDockFilingCheck {
+  libraryId: number;
+  filing: LibraryDockFiling;
+  /** The OS error behind `copy` or `unknown`, EXDEV say. Shown verbatim; not translated. */
+  errorCode?: string;
+}
+
+export interface LibraryDockFilingChecks {
+  checks: LibraryDockFilingCheck[];
+}
+
+/**
+ * The `dock` filter on the file list, bulk actions and finalize: `unsorted`, or a dock id as a
+ * string. A request download counts under the dock of the library it is headed for.
+ */
+export const BOOK_DOCK_UNSORTED_FILTER = "unsorted";
+
+/**
+ * The `hold` filter on the file list, bulk actions and finalize: ready files that wait (`held`),
+ * ready files that do not (`clear`), or ready files held for one reason.
+ */
+export type BookDockHoldFilter = "held" | "clear" | BookDockHoldReason;
+
+export const BOOK_DOCK_HOLD_FILTERS: readonly BookDockHoldFilter[] = ["held", "clear", ...BOOK_DOCK_HOLD_REASONS];
+
+/** Why a dock management request was refused. Stable, so clients can show their own copy. */
+export const LIBRARY_DOCK_ERROR_CODES = [
+  "LIBRARY_DOCK_NOT_FOUND",
+  "LIBRARY_DOCK_NOT_ENABLED",
+  "LIBRARY_DOCK_EXISTS",
+  "LIBRARY_DOCK_BUSY",
+  "LIBRARY_DOCK_TARGET_FOLDER_INVALID",
+  "LIBRARY_DOCK_FOLDER_NAME_INVALID",
+  "LIBRARY_DOCK_FOLDER_NAME_TAKEN",
+  "LIBRARY_DOCK_FOLDER_EXISTS",
+  "LIBRARY_DOCK_FOLDER_NOT_FOUND",
+  "LIBRARY_DOCK_FOLDER_OWNED",
+  "LIBRARY_DOCK_FOLDER_NOT_EMPTY",
+  "LIBRARY_DOCK_FOLDER_UNWRITABLE",
+  "LIBRARY_DOCK_OTHER_FILESYSTEM",
+  "LIBRARY_DOCKS_FOLDER_IS_BOOK",
+] as const;
+
+export type LibraryDockErrorCode = (typeof LIBRARY_DOCK_ERROR_CODES)[number];
+
+export function isLibraryDockErrorCode(value: unknown): value is LibraryDockErrorCode {
+  return typeof value === "string" && (LIBRARY_DOCK_ERROR_CODES as readonly string[]).includes(value);
+}
+
+/** Per-dock counts on the summary. `dockId` null is Unsorted. */
+export interface BookDockDockCounts {
+  dockId: number | null;
+  total: number;
+  /** Not yet settled: pending, extracting or fetching. */
+  working: number;
+  /** Ready but held, with a `holdReason`. */
+  onHold: number;
+  ready: number;
+  error: number;
+  keptForSeeding: number;
+  /** `onHold` split by reason. Reasons with no files are left out. Absent on older servers. */
+  onHoldByReason?: Partial<Record<BookDockHoldReason, number>>;
+}
 
 export function resolveBookDockSearchTitle(fileName: string, metadataTitle?: string | null): string | undefined {
   const normalizedMetadataTitle = metadataTitle?.trim();
@@ -106,6 +338,14 @@ export interface BookDockFile {
    * `readAlong=true` answers it, since it means opening the file; every other response leaves it out.
    */
   readAlong?: boolean;
+  /** The library dock it arrived in; null for Unsorted. Absent on older servers. */
+  dockId?: number | null;
+  holdReason?: BookDockHoldReason | null;
+  holdDetail?: BookDockHoldDetail | null;
+  /** Set when the library this file was headed for was deleted. */
+  formerLibraryName?: string | null;
+  /** Other libraries that already hold this book, at most three. Never holds the file. */
+  alsoIn?: string[];
 }
 
 export interface BookDockFilesPage {
@@ -128,6 +368,10 @@ export interface BookDockSummary {
   readyToFile: number;
   total: number;
   paused: boolean;
+  /** Counts per dock, Unsorted included. Absent on older servers. */
+  docks?: BookDockDockCounts[];
+  /** Files filed from keep-original docks and left in place for seeding. Absent on older servers. */
+  keptForSeeding?: number;
 }
 
 /**

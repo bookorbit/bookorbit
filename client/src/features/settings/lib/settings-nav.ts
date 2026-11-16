@@ -560,9 +560,9 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
         id: 'book-dock',
         routeName: 'settings-admin-book-dock',
         labelKey: 'settings.system.tabs.book-dock',
-        descriptionKey: 'settings.nav.descriptions.bookDock',
+        descriptionKey: 'settings.nav.descriptions.bookDockIntake',
         icon: PanelBottom,
-        keywords: 'dock quick action book page toolbar',
+        keywords: 'dock drop folder upload import incoming inbox metadata fetch auto finalize file',
         isVisible: anyPermission(Permission.ManageBookDock),
       },
       {

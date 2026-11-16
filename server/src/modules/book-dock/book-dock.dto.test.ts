@@ -5,6 +5,7 @@ import { validate } from 'class-validator';
 import { ValidationPipe } from '@nestjs/common';
 
 import { BulkEditBookDockDto, BulkSetTargetDto, FinalizeBookDockDto, UpdateBookDockFileDto } from './dto';
+import { toBookDockFilter } from './dto/book-dock-filter';
 import { ListBookDockFilesDto } from './dto/list-book-dock-files.dto';
 import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 
@@ -30,6 +31,33 @@ describe('BookDock DTO validation', () => {
     expect((await validate(dto)).length).toBe(0);
     expect((await errorsFor(ListBookDockFilesDto, { status: 'unknown' })).length).toBeGreaterThan(0);
     expect((await errorsFor(ListBookDockFilesDto, { limit: 200 })).length).toBeGreaterThan(0);
+  });
+
+  it('takes a dock filter of unsorted or a dock id, on the list and on bulk actions', async () => {
+    for (const dock of ['unsorted', '7', '999999999']) {
+      expect(await errorsFor(ListBookDockFilesDto, { dock })).toEqual([]);
+      expect(await errorsFor(BulkSetTargetDto, { dock, selectAll: true })).toEqual([]);
+    }
+    for (const dock of ['Unsorted', '0', '07', '-1', '1234567890', 'all', 7]) {
+      expect((await errorsFor(ListBookDockFilesDto, { dock })).length).toBeGreaterThan(0);
+      expect((await errorsFor(FinalizeBookDockDto, { dock })).length).toBeGreaterThan(0);
+    }
+    expect(toBookDockFilter({ dock: 'unsorted' })).toEqual({ dock: 'unsorted' });
+    expect(toBookDockFilter({ dock: '7' })).toEqual({ dock: 7 });
+    expect(toBookDockFilter({})).toBeUndefined();
+  });
+
+  it('takes a hold filter of held, clear or one hold reason, on the list and on bulk actions', async () => {
+    for (const hold of ['held', 'clear', 'duplicate', 'waiting_for_manager']) {
+      expect(await errorsFor(ListBookDockFilesDto, { hold })).toEqual([]);
+      expect(await errorsFor(FinalizeBookDockDto, { hold, selectAll: true })).toEqual([]);
+    }
+    for (const hold of ['Held', 'any', 'unknown_reason', 1]) {
+      expect((await errorsFor(ListBookDockFilesDto, { hold })).length).toBeGreaterThan(0);
+      expect((await errorsFor(BulkSetTargetDto, { hold })).length).toBeGreaterThan(0);
+    }
+    expect(toBookDockFilter({ hold: 'held' })).toEqual({ hold: 'held' });
+    expect(toBookDockFilter({ dock: '7', hold: 'duplicate' })).toEqual({ dock: 7, hold: 'duplicate' });
   });
 
   it('FinalizeBookDockDto requires default destination values to be complete pair', async () => {

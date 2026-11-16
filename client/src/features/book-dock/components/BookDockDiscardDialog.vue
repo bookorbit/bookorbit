@@ -3,17 +3,10 @@ import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import { api } from '@/lib/api'
+import type { BookDockSelectionPayload } from '../composables/useBookDockFiles'
 
 const props = defineProps<{
-  selectionPayload: {
-    fileIds?: number[]
-    selectAll?: boolean
-    excludedIds?: number[]
-    status?: string
-    needsReview?: boolean
-    readyToFile?: boolean
-    search?: string
-  }
+  selectionPayload: BookDockSelectionPayload
   selectionCount: number
 }>()
 

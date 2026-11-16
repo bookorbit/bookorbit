@@ -436,3 +436,44 @@ describe('useBookDockUpload retry and dismiss', () => {
     expect(upload.failures.value).toHaveLength(0)
   })
 })
+
+describe('useBookDockUpload into a library dock', () => {
+  const fiction = { dockId: 7, libraryId: 3, libraryName: 'Fiction', allowedFormats: ['epub'] }
+
+  it("sends the file to the viewed dock's library", async () => {
+    const { upload } = await loadComposable()
+
+    upload.addFiles([book('Dune.epub')], fiction)
+    await flushPromises()
+
+    expect(FakeXhr.sent.map((xhr) => xhr.url)).toEqual(['/api/v1/book-dock/upload?libraryId=3'])
+  })
+
+  it('refuses a format the library does not take, without sending it', async () => {
+    const { upload } = await loadComposable()
+
+    upload.addFiles([book('Saga.cbz')], fiction)
+    await flushPromises()
+
+    expect(FakeXhr.sent).toHaveLength(0)
+    expect(upload.failures.value[0]?.failure).toEqual({ kind: 'notAllowed', extension: 'cbz', library: 'Fiction' })
+  })
+
+  it('takes every supported format into a library that names none', async () => {
+    const { upload } = await loadComposable()
+
+    upload.addFiles([book('Saga.cbz')], { ...fiction, allowedFormats: [] })
+    await flushPromises()
+
+    expect(FakeXhr.sent).toHaveLength(1)
+  })
+
+  it('sends to Unsorted without a target', async () => {
+    const { upload } = await loadComposable()
+
+    upload.addFiles([book('Dune.epub')])
+    await flushPromises()
+
+    expect(FakeXhr.sent[0]?.url).toBe('/api/v1/book-dock/upload')
+  })
+})

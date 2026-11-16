@@ -40,6 +40,8 @@ describe('UpdateBookDockSettingsDto', () => {
     ['autoFinalizeLibraryId', 0],
     ['autoFinalizeFolderId', -1],
     ['autoFinalizeMetadataMode', 'replace_all'],
+    ['unsortedAutoJoin', 'yes'],
+    ['unsortedKeepOriginal', 1],
   ])('rejects invalid %s values', async (field, value) => {
     const errors = await errorsFor({ [field]: value });
     expect(errors.map((error) => error.property)).toContain(field);
@@ -50,5 +52,10 @@ describe('UpdateBookDockSettingsDto', () => {
     delete input[field];
     const errors = await validate(plainToInstance(UpdateBookDockSettingsDto, input));
     expect(errors.map((error) => error.property)).toContain(field);
+  });
+
+  it("accepts Unsorted's toggles and leaves them optional for older clients", async () => {
+    await expect(errorsFor({ unsortedAutoJoin: true, unsortedKeepOriginal: false })).resolves.toHaveLength(0);
+    await expect(errorsFor()).resolves.toHaveLength(0);
   });
 });
