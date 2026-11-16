@@ -416,6 +416,38 @@ watch([coverColumnEl, coverActionsEl], ([column, actions]) => {
   measureCoverLayout()
 })
 
+/**
+ * From 46rem of pane width, Story Guide sits under the cover's actions instead of in the rail. The
+ * width is measured rather than left to a container query because the card must mount in one
+ * place only: it loads the guide's status when it mounts and polls while a build runs.
+ */
+const WIDE_DETAIL_LAYOUT_REM = 46
+const detailsLayoutEl = ref<HTMLElement | null>(null)
+const detailsLayoutWidth = ref<number | null>(null)
+let detailsLayoutObserver: ResizeObserver | null = null
+
+function measureDetailsLayout() {
+  detailsLayoutWidth.value = detailsLayoutEl.value?.getBoundingClientRect().width ?? 0
+}
+
+const storyGuideBesideCover = computed<boolean | null>(() => {
+  const width = detailsLayoutWidth.value
+  if (width === null) return null
+  const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  return width >= WIDE_DETAIL_LAYOUT_REM * rootFontSize
+})
+
+onMounted(() => {
+  measureDetailsLayout()
+  detailsLayoutObserver = new ResizeObserver(measureDetailsLayout)
+  if (detailsLayoutEl.value) detailsLayoutObserver.observe(detailsLayoutEl.value)
+})
+
+onBeforeUnmount(() => {
+  detailsLayoutObserver?.disconnect()
+  detailsLayoutObserver = null
+})
+
 const coverAspectRatio = useBookCoverAspectRatio(() => props.book)
 const { bookCoverDisplayMode } = useDisplaySettings()
 const detailCoverAspectRatio = computed(() => {
@@ -1388,6 +1420,7 @@ watch(
   <!-- Below 46rem of pane width the page is a single column. Above it, the shelf follows the
        natural height of the three-column content instead of being pinned to the viewport bottom. -->
   <div
+    ref="detailsLayoutEl"
     data-test="details-layout"
     class="flex flex-col gap-5 @min-[46rem]/book-detail:grid @min-[46rem]/book-detail:content-start @min-[46rem]/book-detail:grid-cols-[clamp(12rem,23cqi,17rem)_minmax(16rem,1fr)_clamp(15rem,26cqi,19.25rem)] @min-[46rem]/book-detail:gap-x-6 @min-[46rem]/book-detail:gap-y-5"
   >
@@ -1395,7 +1428,7 @@ watch(
     <div
       ref="coverColumnEl"
       data-test="cover-column"
-      class="flex min-w-0 flex-col gap-4 @min-[46rem]/book-detail:col-start-1 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0"
+      class="flex min-w-0 flex-col gap-4 @min-[46rem]/book-detail:col-start-1 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:self-start"
     >
       <div class="flex items-start gap-4 sm:gap-5 @min-[46rem]/book-detail:block @min-[46rem]/book-detail:min-h-0">
         <div
@@ -1707,11 +1740,13 @@ watch(
           <TooltipContent>{{ koboAnomaly.tooltip }}</TooltipContent>
         </Tooltip>
       </div>
+
+      <StoryGuideCard v-if="storyGuideBesideCover === true" :book-id="book.id" />
     </div>
 
     <!-- Main column -->
     <div
-      class="flex min-w-0 flex-col gap-2.5 @min-[46rem]/book-detail:col-start-2 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:overflow-y-auto"
+      class="flex min-w-0 flex-col gap-2.5 @min-[46rem]/book-detail:col-start-2 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:self-start @min-[46rem]/book-detail:overflow-y-auto"
     >
       <div class="hidden @min-[46rem]/book-detail:block">
         <!-- Identity block -->
@@ -2162,20 +2197,15 @@ watch(
         </div>
       </section>
 
-      <BookReadingActivityCard
-        class="@min-[46rem]/book-detail:flex-1"
-        :stats="readingStats"
-        :sessions="readingSessions"
-        :loading="readingLogLoading"
-      />
+      <BookReadingActivityCard :stats="readingStats" :sessions="readingSessions" :loading="readingLogLoading" />
     </div>
 
     <!-- Detail rail -->
     <div
-      class="flex min-w-0 flex-col gap-3 @min-[46rem]/book-detail:col-start-3 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:overflow-y-auto"
+      class="flex min-w-0 flex-col gap-3 @min-[46rem]/book-detail:col-start-3 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:self-start @min-[46rem]/book-detail:overflow-y-auto"
     >
       <section
-        class="flex min-h-0 flex-col rounded-xl border border-border bg-card px-4 pt-3 pb-2 @min-[46rem]/book-detail:flex-1"
+        class="flex min-h-0 flex-col rounded-xl border border-border bg-card px-4 pt-3 pb-2"
         :aria-label="t('book.detail.details.detailsHeading')"
       >
         <h3 class="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2395,7 +2425,7 @@ watch(
         </template>
       </BookEditionsCard>
 
-      <StoryGuideCard :book-id="book.id" />
+      <StoryGuideCard v-if="storyGuideBesideCover === false" :book-id="book.id" />
 
       <div v-if="filledCustomMetadata.length > 0" class="mt-6 pt-5 border-t border-border">
         <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.customMetadata') }}</p>

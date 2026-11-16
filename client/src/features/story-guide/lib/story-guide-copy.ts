@@ -1,7 +1,7 @@
 import type { StoryGuideEstimate } from '@bookorbit/types'
 
 import { i18n } from '@/i18n'
-import { formatDate, formatListParts, formatNumber } from '@/i18n/formatters'
+import { formatDate, formatListParts, formatNumber, formatPercent } from '@/i18n/formatters'
 import type { StoryGuideAction, StoryGuideBuiltNote, StoryGuideNotice, StoryGuidePhase, StoryGuideProgressTitle } from './story-guide-presentation'
 
 const t = i18n.global.t
@@ -152,16 +152,29 @@ function sameYear(date: Date, now: Date): boolean {
   return date.getFullYear() === now.getFullYear()
 }
 
+function builtDate(builtAt: Date, now: Date): string {
+  return formatDate(builtAt, sameYear(builtAt, now) ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+/** A guide covering this share of the book or more is described as the whole book. */
+const WHOLE_BOOK_COVERAGE = 0.995
+
 /** "Built Nov 9 with gpt-6-luna and gpt-6.1-terra"; null without a date. */
 export function storyGuideBuiltText(note: StoryGuideBuiltNote, now: Date = new Date()): string | null {
   if (!note.builtAt) return null
-  const date = formatDate(
-    note.builtAt,
-    sameYear(note.builtAt, now) ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' },
-  )
+  const date = builtDate(note.builtAt, now)
   if (note.models.length === 0) return t('book.detail.storyGuide.builtOn', { date })
   const models = formatListParts(note.models)
     .map((part) => part.value)
     .join('')
   return t('book.detail.storyGuide.builtWith', { date, models })
+}
+
+/** "Built Nov 9 · whole book" or "Built Nov 9 · 92% of the book"; null without a date. */
+export function storyGuideBuiltLine(note: StoryGuideBuiltNote, now: Date = new Date()): string | null {
+  if (!note.builtAt) return null
+  const date = builtDate(note.builtAt, now)
+  if (note.coverage === null) return t('book.detail.storyGuide.builtOn', { date })
+  if (note.coverage >= WHOLE_BOOK_COVERAGE) return t('book.detail.storyGuide.builtWholeBook', { date })
+  return t('book.detail.storyGuide.builtPartOfBook', { date, percent: formatPercent(note.coverage) })
 }

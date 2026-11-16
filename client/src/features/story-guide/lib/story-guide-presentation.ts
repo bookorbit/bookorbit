@@ -72,10 +72,11 @@ export type StoryGuideRow =
   /** An outdated guide, or one built with models the slots no longer use. */
   | { kind: 'update' }
 
-/** When the guide in use was built, and with which models. */
+/** When the guide in use was built, with which models, and how much of the book it covers (0 to 1). */
 export interface StoryGuideBuiltNote {
   builtAt: Date | null
   models: string[]
+  coverage: number | null
 }
 
 /** Everything the book page shows from a status, derived in one place. */
@@ -305,7 +306,13 @@ export function storyGuidePresentation({
     menu.push('rebuild')
   }
 
-  const builtNote = guide ? { builtAt: parseDate(guide.builtAt), models: modelNames(guide.models) } : null
+  const builtNote = guide
+    ? {
+        builtAt: parseDate(guide.builtAt),
+        models: modelNames(guide.models),
+        coverage: Number.isFinite(guide.coverage) ? guide.coverage : null,
+      }
+    : null
   if (guide) menu.push('delete')
   return { rows, menu, builtNote }
 }

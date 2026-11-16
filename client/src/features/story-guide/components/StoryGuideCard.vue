@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, useId, watch } from 'vue'
-import { ArrowUpCircle, Ellipsis, Loader2, Play, RefreshCw, RotateCcw, Sparkles, Trash2, X, XCircle } from '@lucide/vue'
+import { ArrowUpCircle, Ellipsis, Galaxy, Loader2, Play, RefreshCw, RotateCcw, Sparkles, Trash2, X, XCircle } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,7 @@ import { useStoryGuideStatus } from '../composables/useStoryGuideStatus'
 import { storyGuideConfirmation, type StoryGuideConfirmation, type StoryGuideConfirmationChoice } from '../lib/story-guide-confirmation'
 import {
   storyGuideActionLabel,
+  storyGuideBuiltLine,
   storyGuideBuiltText,
   storyGuideEstimateLine,
   storyGuideNoticeSentence,
@@ -41,6 +42,11 @@ watch(
 )
 
 const builtText = computed(() => (presentation.value.builtNote ? storyGuideBuiltText(presentation.value.builtNote) : null))
+/** A built guide with nothing else to show gets a status row; beside other rows it stays a footnote. */
+const builtLine = computed(() =>
+  presentation.value.rows.length === 0 && presentation.value.builtNote ? storyGuideBuiltLine(presentation.value.builtNote) : null,
+)
+const builtModels = computed(() => presentation.value.builtNote?.models ?? [])
 const shown = computed(() => presentation.value.rows.length > 0 || presentation.value.menu.length > 0 || builtText.value !== null)
 const busy = computed(() => pending.value !== null)
 
@@ -163,7 +169,7 @@ function handleCloseConfirmation() {
     <div v-if="presentation.rows.length > 0" class="mt-2 flex flex-col gap-3">
       <template v-for="row in presentation.rows" :key="row.kind">
         <div v-if="row.kind === 'buildCard'" data-testid="story-guide-build-card">
-          <p class="text-[13px] leading-snug text-muted-foreground">{{ t('book.detail.storyGuide.cardBody') }}</p>
+          <p class="text-[13px] leading-snug text-muted-foreground">{{ t('book.detail.storyGuide.cardSummary') }}</p>
           <div class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1.5">
             <Button size="sm" :disabled="busy" data-testid="story-guide-build" @click="handleBuild">
               <Loader2 v-if="pending === 'build'" class="animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -260,8 +266,36 @@ function handleCloseConfirmation() {
       </template>
     </div>
 
+    <template v-if="builtLine">
+      <div class="mt-2.5 flex items-center gap-2.5" data-testid="story-guide-built">
+        <span
+          class="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-primary/14 text-primary ring-1 ring-inset ring-primary/30"
+          aria-hidden="true"
+        >
+          <Galaxy class="size-[17px]" />
+        </span>
+        <div class="min-w-0">
+          <p class="text-[13px] font-semibold leading-tight text-foreground">{{ t('book.detail.storyGuide.readyInApps') }}</p>
+          <p class="mt-px text-[11.5px] leading-snug tabular-nums text-muted-foreground">{{ builtLine }}</p>
+        </div>
+      </div>
+      <ul
+        v-if="builtModels.length > 0"
+        class="mt-2.5 flex flex-wrap gap-1.5 border-t border-border pt-2.5"
+        :aria-label="t('book.detail.storyGuide.models')"
+        data-testid="story-guide-models"
+      >
+        <li
+          v-for="model in builtModels"
+          :key="model"
+          class="rounded-md bg-muted px-[7px] py-1 font-mono text-[10.5px] leading-none text-muted-foreground"
+        >
+          {{ model }}
+        </li>
+      </ul>
+    </template>
     <p
-      v-if="builtText"
+      v-else-if="builtText"
       class="text-muted-foreground"
       :class="presentation.rows.length > 0 ? 'mt-3 border-t border-border pt-2 text-[11px]' : 'mt-1.5 text-[13px] leading-snug'"
       data-testid="story-guide-built"

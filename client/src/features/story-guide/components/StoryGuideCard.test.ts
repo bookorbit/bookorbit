@@ -162,9 +162,7 @@ describe('StoryGuideCard', () => {
     it('not built: the web card body, Build and its estimate, and Build in the menu', async () => {
       const wrapper = await mountCard(status())
       expect(wrapper.find('h3').text()).toBe('Story guide')
-      expect(wrapper.find('[data-testid="story-guide-build-card"]').text()).toContain(
-        'Builds the story guide that Constellations uses in the BookOrbit apps.',
-      )
+      expect(wrapper.find('[data-testid="story-guide-build-card"]').text()).toContain('Powers Constellations in the BookOrbit apps.')
       expect(wrapper.find('[data-testid="story-guide-build"]').text()).toBe('Build')
       expect(menuItems(wrapper)).toEqual(['Build story guide'])
       expect(wrapper.find('[data-testid="story-guide-built"]').exists()).toBe(false)
@@ -201,10 +199,20 @@ describe('StoryGuideCard', () => {
       expect(wrapper.find('[data-testid="story-guide-built"]').text()).toBe('Built Nov 9 with gpt-6-luna and gpt-6.1-terra')
     })
 
-    it('built: when and with which models, and Rebuild and Delete in the menu', async () => {
+    it('built: a status row with when and how much, the models as a list, and Rebuild and Delete in the menu', async () => {
       const wrapper = await mountCard(status({ guide: GUIDE }))
-      expect(wrapper.find('[data-testid="story-guide-built"]').text()).toBe('Built Nov 9 with gpt-6-luna and gpt-6.1-terra')
+      const built = wrapper.get('[data-testid="story-guide-built"]')
+      expect(built.text()).toContain('Ready in the BookOrbit apps')
+      expect(built.text()).toContain('Built Nov 9 · whole book')
+      const models = wrapper.get('[data-testid="story-guide-models"]')
+      expect(models.attributes('aria-label')).toBe('Models')
+      expect(models.findAll('li').map((item) => item.text())).toEqual(['gpt-6-luna', 'gpt-6.1-terra'])
       expect(menuItems(wrapper)).toEqual(['Rebuild from scratch', 'Delete story guide'])
+    })
+
+    it('built over part of the book: the share it covers', async () => {
+      const wrapper = await mountCard(status({ guide: { ...GUIDE, coverage: 0.92 } }))
+      expect(wrapper.get('[data-testid="story-guide-built"]').text()).toContain('Built Nov 9 · 92% of the book')
     })
 
     it('outdated: the update row, and Update first in the menu', async () => {

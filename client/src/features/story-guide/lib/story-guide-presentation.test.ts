@@ -208,7 +208,7 @@ describe('storyGuidePresentation', () => {
     const result = present(status({ guide: GUIDE }))
     expect(result.rows).toEqual([])
     expect(result.menu).toEqual(['rebuild', 'delete'])
-    expect(result.builtNote).toEqual({ builtAt: new Date('2026-11-09T18:20:00.000Z'), models: ['gpt-6-luna', 'gpt-6.1-terra'] })
+    expect(result.builtNote).toEqual({ builtAt: new Date('2026-11-09T18:20:00.000Z'), models: ['gpt-6-luna', 'gpt-6.1-terra'], coverage: 1 })
   })
 
   it('names a model once when both slots used it', () => {

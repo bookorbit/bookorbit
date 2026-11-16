@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import {
   storyGuideActionLabel,
+  storyGuideBuiltLine,
   storyGuideBuiltText,
   storyGuideEstimateLine,
   storyGuideEstimateSentence,
@@ -97,10 +98,22 @@ describe('story guide copy', () => {
   it('notes when and with which models a guide was built, adding the year for another year', () => {
     const now = new Date('2026-11-10T12:00:00Z')
     const builtAt = new Date('2026-11-09T12:00:00Z')
-    expect(storyGuideBuiltText({ builtAt, models: ['gpt-6-luna', 'gpt-6.1-terra'] }, now)).toBe('Built Nov 9 with gpt-6-luna and gpt-6.1-terra')
-    expect(storyGuideBuiltText({ builtAt, models: ['gpt-6-luna'] }, now)).toBe('Built Nov 9 with gpt-6-luna')
-    expect(storyGuideBuiltText({ builtAt, models: [] }, now)).toBe('Built Nov 9')
-    expect(storyGuideBuiltText({ builtAt: new Date('2025-03-02T12:00:00Z'), models: [] }, now)).toBe('Built Mar 2, 2025')
-    expect(storyGuideBuiltText({ builtAt: null, models: ['gpt-6-luna'] }, now)).toBeNull()
+    const note = { builtAt, models: ['gpt-6-luna', 'gpt-6.1-terra'], coverage: 1 }
+    expect(storyGuideBuiltText(note, now)).toBe('Built Nov 9 with gpt-6-luna and gpt-6.1-terra')
+    expect(storyGuideBuiltText({ ...note, models: ['gpt-6-luna'] }, now)).toBe('Built Nov 9 with gpt-6-luna')
+    expect(storyGuideBuiltText({ ...note, models: [] }, now)).toBe('Built Nov 9')
+    expect(storyGuideBuiltText({ ...note, builtAt: new Date('2025-03-02T12:00:00Z'), models: [] }, now)).toBe('Built Mar 2, 2025')
+    expect(storyGuideBuiltText({ ...note, builtAt: null }, now)).toBeNull()
+  })
+
+  it('states when a guide was built and how much of the book it covers', () => {
+    const now = new Date('2026-11-10T12:00:00Z')
+    const note = { builtAt: new Date('2026-11-09T12:00:00Z'), models: ['gpt-6-luna'], coverage: 1 }
+    expect(storyGuideBuiltLine(note, now)).toBe('Built Nov 9 · whole book')
+    expect(storyGuideBuiltLine({ ...note, coverage: 0.996 }, now)).toBe('Built Nov 9 · whole book')
+    expect(storyGuideBuiltLine({ ...note, coverage: 0.92 }, now)).toBe('Built Nov 9 · 92% of the book')
+    expect(storyGuideBuiltLine({ ...note, coverage: null }, now)).toBe('Built Nov 9')
+    expect(storyGuideBuiltLine({ ...note, builtAt: new Date('2025-03-02T12:00:00Z') }, now)).toBe('Built Mar 2, 2025 · whole book')
+    expect(storyGuideBuiltLine({ ...note, builtAt: null }, now)).toBeNull()
   })
 })

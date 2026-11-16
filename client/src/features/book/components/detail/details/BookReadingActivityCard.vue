@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { BookOpen } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import { formatNumber, formatPercent, formatRelativeFromNow } from '@/i18n/formatters'
 import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
@@ -83,59 +84,103 @@ function relative(iso: string | null | undefined): string {
 function dayLabel(day: string, minutes: number): string {
   return t('book.detail.details.activityDayTooltip', { day, minutes: Math.round(minutes) })
 }
+
+function reachedFraction(session: BookReadingSession): number {
+  return Math.min(1, Math.max(0, (session.endProgress ?? 0) / 100))
+}
+
+function reachedPercent(session: BookReadingSession): string {
+  return formatPercent(reachedFraction(session))
+}
+
+function reachedWidth(session: BookReadingSession): string {
+  return `${Math.round(reachedFraction(session) * 100)}%`
+}
+
+function reachedLabel(session: BookReadingSession): string {
+  return t('book.detail.details.activityReached', { percent: reachedPercent(session) })
+}
 </script>
 
 <template>
-  <section class="flex flex-col rounded-xl border border-border bg-card px-3.5 py-3" :aria-label="t('book.detail.details.yourReading')">
+  <section
+    class="@container/reading flex flex-col rounded-xl border border-border bg-card px-3.5 py-3"
+    :aria-label="t('book.detail.details.yourReading')"
+  >
     <div class="flex items-baseline gap-2">
       <h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {{ t('book.detail.details.yourReading') }}
       </h3>
-      <p class="ml-auto text-[11px] text-muted-foreground">
-        <template v-if="hasActivity">{{ t('book.detail.details.lastRead', { when: relative(stats!.lastSessionAt) }) }}</template>
-        <template v-else>{{ t('book.detail.details.notStarted') }}</template>
+      <p v-if="hasActivity" class="ms-auto text-[11px] text-muted-foreground">
+        {{ t('book.detail.details.lastRead', { when: relative(stats!.lastSessionAt) }) }}
       </p>
     </div>
 
     <p v-if="loading" class="mt-3 text-[13px] text-muted-foreground">{{ t('common.loading') }}</p>
 
-    <p v-else-if="!hasActivity" class="mt-3 text-[13px] leading-relaxed text-muted-foreground">
-      {{ t('book.detail.details.noSessionsYet') }}
-    </p>
+    <div v-else-if="!hasActivity" class="mt-2.5 flex items-center gap-2.5" data-test="reading-not-started">
+      <span class="flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-muted text-muted-foreground" aria-hidden="true">
+        <BookOpen class="size-[17px]" />
+      </span>
+      <div class="min-w-0">
+        <p class="text-[13px] font-semibold leading-tight text-foreground">{{ t('book.detail.details.readingNotStarted') }}</p>
+        <p class="mt-px text-[11.5px] leading-snug text-muted-foreground">{{ t('book.detail.details.readingNotStartedHint') }}</p>
+      </div>
+    </div>
 
     <template v-else>
-      <div class="mt-3 flex flex-wrap items-end gap-x-6 gap-y-2">
-        <dl class="flex shrink-0 gap-6">
-          <div v-for="stat in summaryStats" :key="stat.key">
+      <!-- The stats and the daily bars share the width as equal columns; below 27.5rem the bars take their own row. -->
+      <div class="mt-3 grid grid-cols-4 @min-[27.5rem]/reading:grid-cols-[repeat(4,minmax(0,1fr))_minmax(0,1.6fr)]" data-test="reading-summary">
+        <dl class="col-span-4 grid grid-cols-subgrid">
+          <div v-for="stat in summaryStats" :key="stat.key" class="min-w-0 border-s border-border px-3 first:border-s-0 first:ps-0">
             <dt class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{{ stat.label }}</dt>
-            <dd class="mt-0.5 text-sm font-semibold tabular-nums">{{ stat.value }}</dd>
+            <dd class="mt-[3px] whitespace-nowrap text-base font-semibold leading-tight tabular-nums">{{ stat.value }}</dd>
           </div>
         </dl>
 
-        <div class="ml-auto flex h-7 shrink-0 items-stretch gap-[3px]" aria-hidden="true">
-          <span
-            v-for="day in days"
-            :key="day.day"
-            :title="dayLabel(day.day, day.minutes)"
-            class="flex w-2.5 items-end overflow-hidden rounded-[2px] bg-muted"
-          >
-            <span class="w-full rounded-[2px] bg-primary" :style="{ height: barHeight(day.minutes) }" />
-          </span>
+        <div
+          v-if="days.length > 0"
+          class="col-span-full mt-2.5 min-w-0 @min-[27.5rem]/reading:col-span-1 @min-[27.5rem]/reading:mt-0 @min-[27.5rem]/reading:border-s @min-[27.5rem]/reading:border-border @min-[27.5rem]/reading:ps-3"
+          aria-hidden="true"
+          data-test="reading-daily"
+        >
+          <p class="text-[9px] font-semibold uppercase tracking-wider text-muted-foreground">{{ t('book.detail.details.activityDaily') }}</p>
+          <div class="mt-[3px] flex h-[18px] items-stretch gap-0.5">
+            <span
+              v-for="day in days"
+              :key="day.day"
+              :title="dayLabel(day.day, day.minutes)"
+              class="flex min-w-0.5 max-w-[9px] flex-1 basis-0 items-end overflow-hidden rounded-[2px] bg-muted"
+            >
+              <span class="w-full rounded-[2px] bg-primary" :style="{ height: barHeight(day.minutes) }" />
+            </span>
+          </div>
         </div>
       </div>
 
-      <ul v-if="recentSessions.length > 0" class="mt-2.5 min-h-0 flex-1 overflow-y-auto">
-        <li v-for="session in recentSessions" :key="session.id" class="flex items-center gap-2.5 border-t border-border py-1.5 first:border-t-0">
-          <span class="w-24 shrink-0 truncate text-[11px] text-muted-foreground">{{ relative(session.startedAt) }}</span>
-          <span class="w-12 shrink-0 text-[11px] font-semibold tabular-nums">{{ formatDuration(session.durationSeconds) }}</span>
-          <span class="min-w-0 flex-1 truncate text-[11px] tabular-nums text-muted-foreground">
-            {{ t('book.detail.details.activityReached', { percent: formatPercent((session.endProgress ?? 0) / 100) }) }}
+      <!-- One fixed-height row per session; the columns are shared so chips, times and bars line up. -->
+      <ul v-if="recentSessions.length > 0" class="mt-2.5 grid grid-cols-[auto_auto_auto_minmax(0,1fr)] gap-x-3">
+        <li
+          v-for="session in recentSessions"
+          :key="session.id"
+          class="col-span-full grid h-[29px] grid-cols-subgrid items-center border-t border-border text-[11.5px]"
+        >
+          <span class="flex">
+            <BookFormatChip
+              v-if="session.format"
+              :format-key="session.format"
+              class="h-4.5 shrink-0 rounded-xs px-1.5 text-[9px] leading-none tracking-wider"
+            />
           </span>
-          <BookFormatChip
-            v-if="session.format"
-            :format-key="session.format"
-            class="h-4.5 shrink-0 rounded-xs px-1.5 text-[9px] leading-none tracking-wider"
-          />
+          <span class="whitespace-nowrap text-muted-foreground">{{ relative(session.startedAt) }}</span>
+          <span class="whitespace-nowrap text-end font-semibold tabular-nums">{{ formatDuration(session.durationSeconds) }}</span>
+          <span class="flex min-w-0 items-center gap-2" :title="reachedLabel(session)">
+            <span class="h-1 min-w-6 flex-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
+              <span class="block h-full rounded-full bg-primary/75" :style="{ width: reachedWidth(session) }" />
+            </span>
+            <span class="min-w-[30px] text-end tabular-nums text-muted-foreground" aria-hidden="true">{{ reachedPercent(session) }}</span>
+            <span class="sr-only">{{ reachedLabel(session) }}</span>
+          </span>
         </li>
       </ul>
     </template>
