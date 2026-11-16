@@ -52,6 +52,7 @@ export function mapBookRequestRow(
     targetFolderId: r.targetFolderId,
     decidedByUserId: r.decidedByUserId,
     decidedByUsername: row.decidedByUsername,
+    decidedByName: row.decidedByName,
     decidedAt: r.decidedAt?.toISOString() ?? null,
     decisionNote: r.decisionNote,
     matchedBookId: r.matchedBookId,

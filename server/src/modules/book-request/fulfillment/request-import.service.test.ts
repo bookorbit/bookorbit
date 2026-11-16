@@ -805,6 +805,26 @@ describe('RequestImportService.importDownload', () => {
     await expect(harness.service.importDownload(download('', { contentPath: null }))).resolves.toBe(false);
     expect(harness.fulfillment.failDownload).toHaveBeenCalledWith(expect.anything(), expect.stringContaining('did not report'));
   });
+
+  it('records an unreadable download with a code and the path it tried, keeping the same reason', async () => {
+    const harness = await makeHarness();
+    const missing = join(harness.downloadsPath, 'Frank Herbert - Dune ');
+
+    await expect(harness.service.importDownload(download(missing))).resolves.toBe(false);
+
+    expect(harness.fulfillment.failDownload).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 11 }),
+      `The downloaded content is not readable at ${missing}`,
+      { code: 'DOWNLOAD_UNREADABLE', meta: { path: missing } },
+    );
+  });
+
+  it('leaves a failure it has no code for unclassified', async () => {
+    const harness = await makeHarness();
+    await harness.service.importDownload(download('', { contentPath: null }));
+    expect(harness.fulfillment.failDownload).toHaveBeenCalledTimes(1);
+    expect(harness.fulfillment.failDownload.mock.calls[0]).toHaveLength(2);
+  });
 });
 
 /**

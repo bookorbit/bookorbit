@@ -10829,7 +10829,10 @@
       "entityName": "Request",
       "pairSwitchLabel": "Formats in this request",
       "joinsBook": "Joins a book you have",
-      "joinsBookHint": "When this arrives it is added to the book already in your library"
+      "joinsBookHint": "When this arrives it is added to the book already in your library",
+      "releaseSection": "Release",
+      "language": "Language",
+      "noteFrom": "Note from {name}"
     },
     "actions": {
       "approve": "Approve",
@@ -10869,7 +10872,8 @@
       },
       "hide": "Hide",
       "unhide": "Unhide",
-      "pickRelease": "Pick release"
+      "pickRelease": "Pick release",
+      "closeRequest": "Close this request..."
     },
     "filters": {
       "status": "Status",
@@ -10978,7 +10982,8 @@
       "loading": "Loading earlier attempts...",
       "loadFailed": "Could not load the earlier attempts",
       "refused": "Refused, nothing downloaded",
-      "handPicked": "Sent by hand"
+      "handPicked": "Sent by hand",
+      "summary": "{count, plural, one {# earlier attempt} other {# earlier attempts}}"
     },
     "download": {
       "source": {
@@ -11016,13 +11021,20 @@
       },
       "subtitle": "Ranked across every enabled indexer.",
       "summaryCount": "{count, plural, one {# release} other {# releases}}",
+      "summaryFiltered": "{shown} of {count, plural, one {# release} other {# releases}}",
       "allFreeleech": "all freeleech",
       "allLanguage": "all {language}",
       "allFormat": "all {format}",
       "allIndexer": "all from {name}",
+      "allProtocol": {
+        "torrent": "all torrents",
+        "usenet": "all Usenet",
+        "file": "all direct downloads"
+      },
       "criteria": {
         "label": "Active search",
         "searched": "Searched",
+        "searchedIsbn": "Searched ISBN {isbn}",
         "searchedTitleAuthor": "Searched title and author",
         "nothingFound": "Nothing found for {key}",
         "changeSearch": "Change search",
@@ -11030,6 +11042,7 @@
         "sources": "Sources",
         "sourceSearchedIsbn": "searched the ISBN",
         "sourceSearchedTitleAuthor": "searched the title and author",
+        "byTitleAuthor": "by title and author",
         "sourceNoAdapter": "no matching adapter",
         "sourceReleases": "{count, plural, one {# release} other {# releases}}",
         "sourceNone": "no matches",
@@ -11106,12 +11119,18 @@
       },
       "freeleechOnly": "Freeleech only ({count})",
       "clearFilters": "Clear filters",
+      "clearFilter": "Clear the {filter} filter",
+      "filtersLabel": "Sort and filter releases",
       "filteredEmpty": "No release matches these filters.",
       "grab": "Download release",
       "viewFiles": "View files",
       "hideFiles": "Hide files",
       "viewDetails": "About contents",
       "hideDetails": "Hide details",
+      "viewFilesOf": "View files of {title}",
+      "hideFilesOf": "Hide files of {title}",
+      "viewDetailsOf": "View details of {title}",
+      "hideDetailsOf": "Hide details of {title}",
       "inspectingFiles": "Reading the release file list...",
       "inspectingNzb": "Fetching and validating the NZB...",
       "inspectingShort": "Checking files...",
@@ -11169,6 +11188,7 @@
         "summary": "{count, plural, one {# release was found, but automatic download will skip it because it does not match any {medium} profile tier.} other {# releases were found, but automatic download will skip them because none matches a {medium} profile tier.}} Match score and profile rules are separate checks. You can still click Send.",
         "review": "Review {medium} profile",
         "row": "Automatic download will skip this. Closest tier: {tier}. {reasons}",
+        "closest": "Closest tier: {tier}. {reasons}",
         "failures": {
           "formatUnknown": "{source} did not state a format; this tier requires {expected}.",
           "format": "Format is {actual}; this tier requires {expected}.",
@@ -11184,6 +11204,26 @@
           "size": "Size is {actual}; this tier allows up to {expected}.",
           "freeleech": "This tier requires freeleech.",
           "vipOnly": "This tier excludes VIP-only releases."
+        },
+        "short": {
+          "formatUnknown": "No format stated, tier needs {expected}",
+          "format": "{actual}, tier needs {expected}",
+          "fileLayoutUnknownSingle": "No file count, tier needs one",
+          "fileLayoutUnknownMulti": "No file count, tier needs several",
+          "fileLayoutSingle": "Several files, tier needs one",
+          "fileLayoutMulti": "One file, tier needs several",
+          "bitrate": "{actual} kbps, tier needs {expected}+",
+          "channelsMono": "Stereo, tier needs mono",
+          "channelsStereo": "Mono, tier needs stereo",
+          "languageUnknown": "No language stated, tier needs {expected}",
+          "language": "{actual}, tier needs {expected}",
+          "source": "Source not in this tier",
+          "seeders": "{actual, plural, one {# seeder} other {# seeders}}, tier needs {expected}",
+          "sizeUnknown": "No size stated, tier allows {expected}",
+          "size": "{actual}, tier allows {expected}",
+          "freeleech": "Tier needs freeleech",
+          "vipOnly": "Tier excludes VIP only",
+          "more": "{reason} (+{count} more)"
         }
       },
       "alreadyGrabbed": "Already snatched",
@@ -11191,6 +11231,7 @@
       "published": "Published",
       "scoreLabel": "Match score {score} out of 100",
       "scoreBreakdown": "How this release scored",
+      "addedOn": "Added {date}",
       "whyThisScore": "Why this score",
       "failures": {
         "unauthorized": "sign-in expired",
@@ -11223,6 +11264,12 @@
       "release": "Release",
       "send": "Send",
       "tableCaption": "Releases, ranked",
+      "moreOptions": "More options",
+      "group": {
+        "outside": "Outside every tier",
+        "inTierHint": "Automatic download can take these",
+        "outsideHint": "Automatic download skips these; Send still works."
+      },
       "onlyBestMatch": "That is the only release that matched.",
       "tiedWithBest": "{count, plural, one {# other release scored the same} other {# other releases scored the same}}",
       "inspectionFailedHint": "It was not sent to a download client. Try again, or use Paste a link instead.",
@@ -11266,7 +11313,9 @@
         "description": "The torrent stops seeding. The downloaded files stay on disk.",
         "descriptionWithFiles": "The torrent stops seeding and its downloaded files are deleted. The imported book stays in your library.",
         "descriptionRemoteDelete": "The torrent stops seeding and the download client deletes it and its files there for good. The imported book stays in your library."
-      }
+      },
+      "keepSeeding": "Keep seeding",
+      "removeEllipsis": "Remove from client..."
     },
     "pipeline": {
       "label": "Progress",
@@ -11296,7 +11345,14 @@
       "previous": "Previous request",
       "next": "Next request",
       "position": "{position} of {total}",
-      "shortcuts": "J / K to move, A to approve, Esc to close"
+      "shortcuts": "J / K to move, A to approve, Esc to close",
+      "shortcutsNoApprove": "J / K to move, Esc to close",
+      "keys": {
+        "move": "move",
+        "approve": "approve",
+        "close": "close",
+        "esc": "Esc"
+      }
     },
     "table": {
       "caption": "Book requests, with the stage each one has reached",
@@ -11385,7 +11441,8 @@
       "ALL_TRIED": "Every release good enough to grab has already been tried, so this one needs a release picked by hand",
       "BELOW_SCORE_FLOOR": "No release scored {floor} or better, so this one needs a release picked by hand",
       "ALL_BLOCKED": "Every release good enough to grab was ruled out by an earlier failure, so this one needs a release picked by hand",
-      "ABANDONED": "No release was picked, so this download was not started"
+      "ABANDONED": "No release was picked, so this download was not started",
+      "DOWNLOAD_UNREADABLE": "The download finished, but BookOrbit could not read it at {path}"
     },
     "submitError": {
       "SUBMIT_TITLE_REQUIRED": "Give the book a title before requesting it",
@@ -11492,7 +11549,9 @@
       "filed": "Filed into your library.",
       "fileFailed": "Could not file this import",
       "discard": "Discard this import",
-      "discardHint": "Use this when the release turned out to be the wrong book. The files are removed from the Book Dock and the request is marked failed."
+      "discardHint": "Use this when the release turned out to be the wrong book. The files are removed from the Book Dock and the request is marked failed.",
+      "checkTitle": "Check the match",
+      "fieldColumn": "Field"
     },
     "sources": {
       "noneConfigured": "No search sources are set up.",
@@ -11704,6 +11763,30 @@
       "skip": "Skip",
       "done": "{count, plural, one {Picked a release for # request} other {Picked releases for # requests}}",
       "nothing": "Nothing in the selection is waiting on a release."
+    },
+    "statusCard": {
+      "label": "Where this request is",
+      "pendingDecide": {
+        "ebook": "{requester} asked for this e-book. Choose where it files, then approve or reject.",
+        "audiobook": "{requester} asked for this audiobook. Choose where it files, then approve or reject.",
+        "comic": "{requester} asked for this comic. Choose where it files, then approve or reject.",
+        "other": "{requester} asked for this book. Choose where it files, then approve or reject."
+      },
+      "transferredIn": "{done} of {total} in {client}",
+      "unreadableTitle": "Could not file the download",
+      "unreadableSeeding": "{client} finished the download and is still seeding it, but BookOrbit could not read the files at this path:",
+      "unreadableClient": "{client} finished the download, but BookOrbit could not read the files at this path:",
+      "unreadable": "The download finished, but BookOrbit could not read the files at this path:",
+      "filesAt": "{threshold} files it",
+      "copyPath": "Copy the path",
+      "pathCopied": "Path copied",
+      "copyFailed": "Could not copy the path",
+      "stepState": {
+        "done": "{step}: done",
+        "current": "{step}: current step",
+        "failed": "{step}: failed here",
+        "upcoming": "{step}: not yet"
+      }
     }
   },
   "collection": {

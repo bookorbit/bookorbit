@@ -31,17 +31,30 @@ function review(overrides: Partial<BookRequestReview> = {}): BookRequestReview {
   }
 }
 
-function render(overrides: Partial<BookRequestReview> = {}, props: { canManage?: boolean; busy?: boolean; coverUrl?: string | null } = {}) {
+function render(overrides: Partial<BookRequestReview> = {}, props: { canManage?: boolean; coverUrl?: string | null } = {}) {
   return mount(RequestReviewPanel, {
-    props: { review: review(overrides), canManage: props.canManage ?? true, busy: props.busy ?? false, coverUrl: props.coverUrl ?? null },
+    props: { review: review(overrides), canManage: props.canManage ?? true, coverUrl: props.coverUrl ?? null },
     global: { stubs: { RouterLink: RouterLinkStub } },
   })
 }
 
 describe('RequestReviewPanel', () => {
-  it('states the score against the threshold that held it', () => {
-    expect(render().text()).toContain('scored 65')
-    expect(render().text()).toContain('below the 70')
+  /** The score itself is the status card's sentence; this section says what to do about it. */
+  it('leads with what the score means for the person checking it', () => {
+    const wrapper = render()
+
+    expect(wrapper.text()).toContain('Check the match')
+    expect(wrapper.text()).toContain('Check the fields below and decide whether it is the right book.')
+    expect(wrapper.text()).not.toContain('scored 65')
+  })
+
+  it('compares the request and the file in a table, field by field', () => {
+    const rows = render().findAll('tbody tr')
+
+    expect(rows).toHaveLength(3)
+    expect(rows[0]!.get('th').text()).toContain('Title')
+    expect(rows[0]!.get('th').text()).toContain('Does not match')
+    expect(rows[1]!.get('th').text()).toContain('Matches')
   })
 
   /** The question the panel exists to answer: which field cost the points. */
@@ -78,26 +91,16 @@ describe('RequestReviewPanel', () => {
     expect(text).toContain('Cover')
   })
 
-  it('files the import on request', async () => {
-    const wrapper = render()
-
-    await wrapper.get('button').trigger('click')
-
-    expect(wrapper.emitted('file')).toHaveLength(1)
-  })
-
-  it('cannot be filed when the request has nowhere to file it into', () => {
-    const wrapper = render({ canFile: false })
-
-    expect(wrapper.get('button').attributes('disabled')).toBeDefined()
-    expect(wrapper.text()).toContain('no destination library')
+  it('says when the request has nowhere to file it into', () => {
+    expect(render({ canFile: false }).text()).toContain('no destination library')
   })
 
   /** Backend-gated too, but an approve button a requester cannot use should not be there at all. */
   it('offers no action to somebody who cannot moderate the queue', () => {
-    const wrapper = render({}, { canManage: false })
+    const wrapper = render({ canFile: false }, { canManage: false })
 
     expect(wrapper.find('button').exists()).toBe(false)
+    expect(wrapper.text()).not.toContain('no destination library')
     expect(wrapper.text()).toContain('fablehaven-01.m4b')
   })
 
@@ -108,43 +111,18 @@ describe('RequestReviewPanel', () => {
   it('says so when the entry it was held over has left the Book Dock', () => {
     const wrapper = render({ bookDockFileId: null, verification: null, files: [], totalSizeBytes: null, canFile: false })
 
-    expect(wrapper.text()).toContain('no longer in the Book Dock')
-    expect(wrapper.find('dl').exists()).toBe(false)
+    expect(wrapper.text()).toContain('If the book is already in your library')
+    expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.find('button').exists()).toBe(false)
     expect(wrapper.text()).not.toContain('What landed')
   })
 
-  it('explains a hold that no score produced, and compares nothing', () => {
+  it('compares nothing for a hold that no score produced, and still lists what landed', () => {
     const wrapper = render({ verification: null })
 
-    expect(wrapper.text()).toContain('Import checking is off')
-    expect(wrapper.find('dl').exists()).toBe(false)
+    expect(wrapper.find('table').exists()).toBe(false)
     expect(wrapper.text()).toContain('fablehaven-01.m4b')
   })
-  describe('a review the sender asked for', () => {
-    const passed = {
-      score: 96,
-      threshold: 70,
-      passed: true,
-      reason: 'above_threshold' as const,
-      rows: [{ field: 'title' as const, requested: 'Fablehaven', imported: 'Fablehaven', verdict: 'match' as const }],
-    }
-
-    it('says why it is waiting and offers to file it without calling that an override', () => {
-      const wrapper = render({ heldOnRequest: true, verification: passed })
-
-      expect(wrapper.text()).toContain('sent to be checked before filing')
-      expect(wrapper.text()).toContain('scored 96')
-      const file = wrapper.findAll('button').find((button) => button.text() === 'File it')
-      expect(file).toBeDefined()
-      expect(wrapper.text()).not.toContain('File it anyway')
-    })
-
-    it('still calls filing an override when the import also failed its check', () => {
-      expect(render({ heldOnRequest: true }).text()).toContain('File it anyway')
-    })
-  })
-
   it('links the page of the release the import came from', () => {
     const link = render({ releaseInfoUrl: 'https://tracker.example.com/t/42' }).get('a[href="https://tracker.example.com/t/42"]')
 
@@ -170,7 +148,7 @@ describe('RequestReviewPanel', () => {
       },
       { coverUrl: '/api/v1/admin/book-requests/7/review/cover?entry=100' },
     )
-    const facts = wrapper.get('dl.grid-cols-\\[auto_minmax\\(0\\,1fr\\)\\]')
+    const facts = wrapper.get('dl')
 
     expect(facts.text()).toContain('PublisherBrilliance Audio')
     expect(facts.text()).toContain('Narrated byE.B. Stevens')

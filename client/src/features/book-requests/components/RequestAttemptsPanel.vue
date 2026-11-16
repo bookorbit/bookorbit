@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Globe, Loader2, Magnet, Newspaper } from '@lucide/vue'
-import { DELIVERY_BY_DOWNLOAD_SOURCE, type BookRequestDownloadItem, type BookRequestItem } from '@bookorbit/types'
+import { ChevronDown, CircleMinus, CircleX, History, Loader2 } from '@lucide/vue'
+import type { BookRequestDownloadItem, BookRequestItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import { useRequestAttempts } from '../composables/useRequestAttempts'
@@ -52,7 +52,7 @@ function isRefusal(attempt: BookRequestDownloadItem): boolean {
 }
 
 function facts(attempt: BookRequestDownloadItem): string[] {
-  const parts = [attempt.indexerName ?? t('bookRequests.attempts.handPicked')]
+  const parts = [outcomeText(attempt), attempt.indexerName ?? t('bookRequests.attempts.handPicked')]
   if (attempt.releaseSizeBytes !== null) parts.push(formatBytes(attempt.releaseSizeBytes))
   parts.push(formatDate(new Date(attempt.createdAt), { dateStyle: 'medium', timeStyle: 'short' }))
   return parts
@@ -60,47 +60,37 @@ function facts(attempt: BookRequestDownloadItem): string[] {
 </script>
 
 <template>
-  <details v-if="show" :key="request.id" class="group rounded-lg border border-border bg-card">
+  <details v-if="show" :key="request.id" class="group mt-3">
     <summary
-      class="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-4 py-3 text-xs font-semibold tracking-wide text-foreground uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&::-webkit-details-marker]:hidden"
+      class="inline-flex cursor-pointer list-none items-center gap-1.5 rounded-sm text-xs text-foreground hover:underline hover:underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
     >
-      {{ t('bookRequests.attempts.title') }}
-      <ChevronDown class="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" />
+      <History :size="13" aria-hidden="true" />
+      <span>{{ failed ? t('bookRequests.attempts.title') : t('bookRequests.attempts.summary', { count: earlier.length }) }}</span>
+      <ChevronDown :size="13" class="transition-transform group-open:rotate-180 motion-reduce:transition-none" aria-hidden="true" />
     </summary>
 
-    <div class="px-4 pb-4">
-      <div v-if="loading" class="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 class="size-4 animate-spin" aria-hidden="true" />
-        {{ t('bookRequests.attempts.loading') }}
-      </div>
+    <div v-if="loading" class="mt-2 flex items-center gap-2 text-xs text-muted-foreground">
+      <Loader2 class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+      {{ t('bookRequests.attempts.loading') }}
+    </div>
 
-      <p v-else-if="failed" role="alert" class="text-sm text-destructive">{{ t('bookRequests.attempts.loadFailed') }}</p>
+    <p v-else-if="failed" role="alert" class="mt-2 text-xs text-destructive">{{ t('bookRequests.attempts.loadFailed') }}</p>
 
-      <ul v-else class="space-y-2.5">
-        <li v-for="attempt in earlier" :key="attempt.id" class="text-sm">
-          <p class="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span
-              class="inline-flex items-center gap-1 rounded-full border px-1.5 py-px text-xs font-medium"
-              :class="isRefusal(attempt) ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-border text-muted-foreground'"
-            >
-              <Magnet v-if="DELIVERY_BY_DOWNLOAD_SOURCE[attempt.source] === 'torrent'" :size="11" aria-hidden="true" />
-              <Newspaper v-else-if="DELIVERY_BY_DOWNLOAD_SOURCE[attempt.source] === 'usenet'" :size="11" aria-hidden="true" />
-              <Globe v-else :size="11" aria-hidden="true" />
-              {{ outcomeText(attempt) }}
-            </span>
-            <span class="min-w-0 flex-1 truncate text-foreground">{{ attempt.releaseTitle }}</span>
-          </p>
-
+    <ul v-else>
+      <li v-for="attempt in earlier" :key="attempt.id" class="mt-2 flex gap-2 ps-0.5">
+        <CircleX v-if="isRefusal(attempt)" :size="14" class="mt-0.5 flex-none text-destructive" aria-hidden="true" />
+        <CircleMinus v-else :size="14" class="mt-0.5 flex-none text-muted-foreground" aria-hidden="true" />
+        <div class="min-w-0">
+          <p class="text-[13px] [overflow-wrap:anywhere] text-foreground">{{ attempt.releaseTitle }}</p>
           <p class="mt-0.5 text-xs text-muted-foreground">
-            <template v-for="(fact, index) in facts(attempt)" :key="fact">
+            <template v-for="(fact, index) in facts(attempt)" :key="index">
               <span v-if="index > 0" aria-hidden="true"> · </span>
               <span>{{ fact }}</span>
             </template>
           </p>
-
-          <p v-if="attempt.errorMessage" class="mt-0.5 text-xs text-destructive">{{ attempt.errorMessage }}</p>
-        </li>
-      </ul>
-    </div>
+          <p v-if="attempt.errorMessage" class="mt-0.5 text-xs [overflow-wrap:anywhere] text-muted-foreground">{{ attempt.errorMessage }}</p>
+        </div>
+      </li>
+    </ul>
   </details>
 </template>

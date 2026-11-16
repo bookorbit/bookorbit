@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { BOOK_REQUEST_STATUSES } from '@bookorbit/types'
 import type { BookRequestDownloadItem, BookRequestItem, BookRequestProgressEvent } from '@bookorbit/types'
-import { REQUEST_PIPELINE_STEPS, requestPipelineState, requestPresentationStatus, requestStepState } from '../requestPipeline'
+import { REQUEST_PIPELINE_STEPS, requestPipelineState, requestPresentationStatus, requestStepState, requestStepTime } from '../requestPipeline'
 
 type PipelineInput = Pick<BookRequestItem, 'status' | 'download'>
 
@@ -43,6 +43,13 @@ describe('requestPipelineState', () => {
     expect(REQUEST_PIPELINE_STEPS[neverFound.currentIndex]).toBe('release')
     expect(inTransfer.tone).toBe('failed')
     expect(inTransfer.halted).toBe(true)
+  })
+
+  it('places a failure after the client finished at filing, where it actually died', () => {
+    const state = requestPipelineState(at('failed', { ...DOWNLOAD, completedAt: '2026-11-16T09:00:00.000Z' }))
+
+    expect(REQUEST_PIPELINE_STEPS[state.currentIndex]).toBe('filed')
+    expect(state.tone).toBe('failed')
   })
 
   it('places a cancellation where the request had actually reached', () => {
@@ -95,5 +102,58 @@ describe('requestStepState', () => {
   it('lights the step a failure died on rather than the end of the line', () => {
     const state = requestPipelineState(at('failed'))
     expect(REQUEST_PIPELINE_STEPS.map((_, index) => requestStepState(state, index))).toEqual(['done', 'done', 'current', 'upcoming', 'upcoming'])
+  })
+})
+
+describe('requestStepTime', () => {
+  const STAMPS = {
+    createdAt: '2026-11-10T08:00:00.000Z',
+    decidedAt: '2026-11-10T09:00:00.000Z',
+    updatedAt: '2026-11-12T10:00:00.000Z',
+  }
+  const FINISHED = {
+    ...DOWNLOAD,
+    createdAt: '2026-11-11T07:00:00.000Z',
+    grabbedAt: '2026-11-11T07:05:00.000Z',
+    completedAt: '2026-11-11T08:00:00.000Z',
+    importedAt: null,
+  } as BookRequestDownloadItem
+
+  function times(request: Parameters<typeof requestStepTime>[0]) {
+    const state = requestPipelineState(request)
+    return REQUEST_PIPELINE_STEPS.map((_, index) => requestStepTime(request, state, index))
+  }
+
+  it('dates each finished step from the timestamp the row already carries', () => {
+    expect(times({ ...STAMPS, status: 'downloading', download: { ...FINISHED, completedAt: null } })).toEqual([
+      STAMPS.createdAt,
+      STAMPS.decidedAt,
+      FINISHED.grabbedAt,
+      null,
+      null,
+    ])
+  })
+
+  it('dates the step a request stopped on by its last change, and nothing after it', () => {
+    expect(times({ ...STAMPS, status: 'failed', download: FINISHED })).toEqual([
+      STAMPS.createdAt,
+      STAMPS.decidedAt,
+      FINISHED.grabbedAt,
+      FINISHED.completedAt,
+      STAMPS.updatedAt,
+    ])
+  })
+
+  it('falls back to when the grab row was made for an attempt with no grab time', () => {
+    const request = { ...STAMPS, status: 'downloading' as const, download: { ...FINISHED, grabbedAt: null, completedAt: null } }
+    expect(times(request)[2]).toBe(FINISHED.createdAt)
+  })
+
+  it('dates a filed request without an import time by its last change', () => {
+    expect(times({ ...STAMPS, status: 'available', download: null })[4]).toBe(STAMPS.updatedAt)
+  })
+
+  it('leaves the step a request is still waiting at undated', () => {
+    expect(times({ ...STAMPS, decidedAt: null, status: 'pending', download: null })).toEqual([STAMPS.createdAt, null, null, null, null])
   })
 })

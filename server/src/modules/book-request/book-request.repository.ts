@@ -195,6 +195,7 @@ export interface BookRequestJoinedRow {
   requesterUsername: string;
   requesterName: string;
   decidedByUsername: string | null;
+  decidedByName: string | null;
   targetLibraryName: string | null;
 }
 
@@ -482,12 +483,14 @@ export class BookRequestRepository {
     return this.withDecidedBy(rows);
   }
 
-  private async withDecidedBy<T extends { request: BookRequestRow }>(rows: T[]): Promise<Array<T & { decidedByUsername: string | null }>> {
-    const decidedByNames = await this.findUsernames(rows.map((r) => r.request.decidedByUserId));
-    return rows.map((row) => ({
-      ...row,
-      decidedByUsername: row.request.decidedByUserId != null ? (decidedByNames.get(row.request.decidedByUserId) ?? null) : null,
-    }));
+  private async withDecidedBy<T extends { request: BookRequestRow }>(
+    rows: T[],
+  ): Promise<Array<T & { decidedByUsername: string | null; decidedByName: string | null }>> {
+    const deciders = await this.findDeciders(rows.map((r) => r.request.decidedByUserId));
+    return rows.map((row) => {
+      const decider = row.request.decidedByUserId != null ? deciders.get(row.request.decidedByUserId) : undefined;
+      return { ...row, decidedByUsername: decider?.username ?? null, decidedByName: decider?.name ?? null };
+    });
   }
 
   /**
@@ -526,18 +529,15 @@ export class BookRequestRepository {
 
     if (!row) return undefined;
 
-    const names = await this.findUsernames([row.request.decidedByUserId]);
-    return {
-      ...row,
-      decidedByUsername: row.request.decidedByUserId != null ? (names.get(row.request.decidedByUserId) ?? null) : null,
-    };
+    const [withDecider] = await this.withDecidedBy([row]);
+    return withDecider;
   }
 
-  private async findUsernames(ids: Array<number | null>): Promise<Map<number, string>> {
+  private async findDeciders(ids: Array<number | null>): Promise<Map<number, { username: string; name: string }>> {
     const unique = [...new Set(ids.filter((id): id is number => id != null))];
     if (unique.length === 0) return new Map();
-    const rows = await this.db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, unique));
-    return new Map(rows.map((r) => [r.id, r.username]));
+    const rows = await this.db.select({ id: users.id, username: users.username, name: users.name }).from(users).where(inArray(users.id, unique));
+    return new Map(rows.map((r) => [r.id, { username: r.username, name: r.name }]));
   }
 
   /**

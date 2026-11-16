@@ -18,6 +18,9 @@ const CHIP_CLASSES: Record<IndexerColor, string> = {
   teal: 'border-[var(--pill-source-teal)]/40 bg-[var(--pill-source-teal)]/10 text-[var(--pill-source-teal)]',
 }
 
+/** What a source with no assigned colour wears: the name still says which source it is. */
+const NEUTRAL_CHIP = 'border-border bg-muted text-foreground'
+
 const DOT_CLASSES: Record<IndexerColor, string> = {
   blue: 'bg-[var(--pill-source-blue)]',
   indigo: 'bg-[var(--pill-source-indigo)]',
@@ -40,9 +43,6 @@ const PROTOCOL_CLASSES = {
   usenet: 'border-[var(--pill-usenet)]/40 bg-[var(--pill-usenet)]/10 text-[var(--pill-usenet)]',
   direct: 'border-[var(--pill-direct)]/40 bg-[var(--pill-direct)]/10 text-[var(--pill-direct)]',
 } as const
-
-/** What an uncoloured source wears, which is what every source wore before colours existed. */
-const NEUTRAL_CHIP = 'border-border text-muted-foreground'
 
 /** A value straight off the wire: a row written by a newer build can name a hue this one lacks. */
 export function isIndexerColor(value: unknown): value is IndexerColor {

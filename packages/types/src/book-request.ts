@@ -271,6 +271,11 @@ export const BOOK_REQUEST_HANDBACK_CODES = [
    * so it stops holding the dedupe claim on a work nobody is actually fetching.
    */
   "ABANDONED",
+  /**
+   * Not automation either: the download finished, but BookOrbit could not read what it left on
+   * disk, so nothing was imported. Carries `path`, the location BookOrbit tried to read.
+   */
+  "DOWNLOAD_UNREADABLE",
 ] as const;
 
 export type BookRequestHandbackCode = (typeof BOOK_REQUEST_HANDBACK_CODES)[number];
@@ -437,6 +442,8 @@ export interface BookRequestItem extends BookRequestWorkSnapshot {
   targetFolderId: number | null;
   decidedByUserId: number | null;
   decidedByUsername: string | null;
+  /** The decider's display name. Null when nobody has decided, or when that account is gone. */
+  decidedByName: string | null;
   decidedAt: string | null;
   decisionNote: string | null;
   matchedBookId: number | null;
@@ -455,7 +462,8 @@ export interface BookRequestItem extends BookRequestWorkSnapshot {
   statusReason: string | null;
   /**
    * Set only where a failure has been classified, which today means automation handing a request
-   * back. Null elsewhere, and the UI falls back to `statusReason` when it is.
+   * back or a finished download that could not be read. Null elsewhere, and the UI falls back to
+   * `statusReason` when it is.
    */
   failureCode: BookRequestHandbackCode | null;
   failureMeta: BookRequestFailureMeta | null;

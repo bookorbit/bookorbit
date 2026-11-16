@@ -5,6 +5,7 @@ import { AudioLines, BookOpen, Images, Loader2 } from '@lucide/vue'
 import type { ReleaseUnitChoice } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { formatBytes } from '@/lib/formatting'
+import RequestDrawerSection from './RequestDrawerSection.vue'
 
 const props = defineProps<{
   units: ReleaseUnitChoice[]
@@ -36,9 +37,8 @@ function handleImport() {
 </script>
 
 <template>
-  <section class="rounded-lg border border-border bg-card p-4" :aria-label="t('bookRequests.chooser.title')">
-    <h3 class="text-sm font-semibold text-foreground">{{ t('bookRequests.chooser.title') }}</h3>
-    <p class="mt-1 text-xs text-muted-foreground">{{ t('bookRequests.chooser.hint', { count: props.units.length }) }}</p>
+  <RequestDrawerSection :title="t('bookRequests.chooser.title')">
+    <p class="text-[13px] text-muted-foreground">{{ t('bookRequests.chooser.hint', { count: props.units.length }) }}</p>
 
     <fieldset class="mt-3" :disabled="props.busy">
       <legend class="sr-only">{{ t('bookRequests.chooser.title') }}</legend>
@@ -47,13 +47,13 @@ function handleImport() {
         <label
           v-for="unit in props.units"
           :key="unit.index"
-          class="flex items-start gap-2.5 rounded-md border border-border p-2.5 transition-colors hover:border-primary/50"
-          :class="selected === unit.index ? 'border-primary bg-primary/5' : ''"
+          class="flex cursor-pointer items-start gap-2.5 rounded-sm border p-2.5 transition-colors motion-reduce:transition-none"
+          :class="selected === unit.index ? 'border-primary bg-primary/5' : 'border-border hover:border-ring/50'"
         >
           <input v-model="selected" type="radio" name="release-unit" class="mt-1 accent-primary" :value="unit.index" />
           <component :is="UNIT_ICONS[unit.mediaKind]" class="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span class="min-w-0 flex-1">
-            <span class="block break-words text-sm text-foreground">{{ unitLabel(unit) }}</span>
+            <span class="block text-sm [overflow-wrap:anywhere] text-foreground">{{ unitLabel(unit) }}</span>
             <span class="block text-xs text-muted-foreground">{{ unitDetail(unit) }}</span>
           </span>
         </label>
@@ -61,8 +61,8 @@ function handleImport() {
     </fieldset>
 
     <Button class="mt-3" :disabled="selected === null || props.busy" @click="handleImport">
-      <Loader2 v-if="props.busy" class="size-4 animate-spin" aria-hidden="true" />
+      <Loader2 v-if="props.busy" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
       {{ t('bookRequests.chooser.import') }}
     </Button>
-  </section>
+  </RequestDrawerSection>
 </template>

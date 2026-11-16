@@ -83,6 +83,7 @@ function joined(overrides: Record<string, unknown> = {}) {
     requesterUsername: 'reader',
     requesterName: 'Reader',
     decidedByUsername: null,
+    decidedByName: null,
     targetLibraryName: null,
   };
 }
@@ -1747,6 +1748,23 @@ describe('BookRequestService.getOne', () => {
   it('refuses a stranger', async () => {
     const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ userId: 2 })) } });
     await expect(service.getOne(10, user())).rejects.toThrow(ForbiddenException);
+  });
+
+  /** The username stays for clients that read it; the display name is beside it, not instead of it. */
+  it('names the decider by username and by display name', async () => {
+    const decided = { ...joined({ status: 'approved', decidedByUserId: 4 }), decidedByUsername: 'mod', decidedByName: 'Sam Whitfield' };
+    const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue(decided) } });
+
+    await expect(service.getOne(10, user())).resolves.toMatchObject({
+      decidedByUserId: 4,
+      decidedByUsername: 'mod',
+      decidedByName: 'Sam Whitfield',
+    });
+  });
+
+  it('names no decider on an undecided request', async () => {
+    const { service } = makeService();
+    await expect(service.getOne(10, user())).resolves.toMatchObject({ decidedByUsername: null, decidedByName: null });
   });
 });
 

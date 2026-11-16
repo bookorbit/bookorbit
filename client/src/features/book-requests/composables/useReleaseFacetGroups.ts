@@ -2,7 +2,7 @@ import { computed, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { IndexerColor } from '@bookorbit/types'
 
-import { sourceChipClass } from '../sourceColors'
+import { sourceDotClass } from '../sourceColors'
 import type { ReleaseFilters } from './useReleaseFilters'
 
 export interface FacetOption {
@@ -10,7 +10,8 @@ export interface FacetOption {
   label: string
   count: number | null
   active: boolean
-  className?: string
+  /** The colour the operator gave a source, as a dot beside its name. */
+  dotClass?: string
   select: () => void
 }
 
@@ -147,7 +148,7 @@ export function useReleaseFacetGroups(filters: ReleaseFilters, colorByIndexer: R
           label: facet.name,
           count: facet.count,
           active: filters.source.value === facet.indexerId,
-          className: sourceChipClass(colorByIndexer.value.get(facet.indexerId)),
+          dotClass: sourceDotClass(colorByIndexer.value.get(facet.indexerId)),
           select: () => filters.selectSource(facet.indexerId),
         })),
       })
