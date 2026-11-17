@@ -1128,6 +1128,13 @@
       "when": 1794942724960,
       "tag": "0160_add_normalized_name_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 161,
+      "version": "7",
+      "when": 1794947035400,
+      "tag": "0161_index_koreader_page_stats_page_start",
+      "breakpoints": true
     }
   ]
 }

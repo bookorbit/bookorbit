@@ -1,6 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, desc, eq, gt, gte, inArray, like, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, exists, gt, gte, inArray, like, lt, lte, not, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { alias } from 'drizzle-orm/pg-core';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -12,6 +13,7 @@ import {
   getReadingSessionDayKeys,
   type ReadingDailyStatsSegment,
 } from '../../common/utils/reading-daily-stats.utils';
+import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import {
   KOREADER_MAX_EVENT_DURATION_SECONDS,
   KOREADER_SESSION_GAP_SECONDS,
@@ -33,12 +35,57 @@ function toSeconds(value: string | number | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Matches a stored page event that another device reported first: same book file, same page, same
+ * start second, lower row id. Copying statistics between devices (a tool that merges
+ * statistics.sqlite3, or a restored copy of it) hands one device another device's page events, and
+ * the plugin uploads them under its own device id, where the per-device dedup key cannot see them.
+ *
+ * One page event is one reading act whichever device reports it, so the earliest row owns it and
+ * the copies stay out of derivation. Without that the same minutes become one session per device
+ * and every total, streak and achievement counts them once per device.
+ *
+ * Insert order decides the owner, under the per-book advisory lock ingest already holds, and row
+ * ids never change: ownership cannot flip later, so uploading a copy never invalidates sessions
+ * another device has already stored. Deleting the owner's rows promotes the next copy, which is
+ * derived again the next time that device uploads into the window.
+ */
+function copiedFromAnotherDevice(tx: Tx, userId: number, bookFileId: number) {
+  const owner = alias(schema.koreaderPageStats, 'owner_page_stat');
+  return exists(
+    tx
+      .select({ one: sql`1` })
+      .from(owner)
+      .where(
+        and(
+          eq(owner.userId, userId),
+          eq(owner.bookFileId, bookFileId),
+          eq(owner.page, schema.koreaderPageStats.page),
+          eq(owner.startTime, schema.koreaderPageStats.startTime),
+          lt(owner.id, schema.koreaderPageStats.id),
+        ),
+      ),
+  );
+}
+
 export interface IngestPageStatsResult {
   accepted: number;
   duplicates: number;
   insertedSessions: DerivedKoreaderSession[];
   updatedSessions: DerivedKoreaderSession[];
   deletedSessions: number;
+}
+
+/** Where a copied-event repair pass stopped, so the next batch resumes at the following book file. */
+export interface CopiedStatsRepairCursor {
+  userId: number;
+  bookFileId: number;
+}
+
+export interface CopiedStatsRepairBatch {
+  bookFiles: number;
+  removedSessions: number;
+  nextCursor: CopiedStatsRepairCursor | null;
 }
 
 @Injectable()
@@ -103,6 +150,123 @@ export class KoreaderPluginRepository {
     });
   }
 
+  /**
+   * Repairs history stored before a copied event was recognised as one: both devices derived a
+   * session over the same minutes, so every total counted them twice. Re-deriving each window that
+   * holds a copy leaves only the owning device's session and rewrites the affected days. Derivation
+   * reads nothing but the stored events, so the pass is idempotent, and a book file whose events
+   * reached a single device is never visited.
+   *
+   * Paged over the duplicate `(page, start time)` groups in book-file order: the group scan is
+   * resumable, every group of one book file is contiguous, and repairing a book file covers all of
+   * its windows, so the cursor skips straight to the next book file. Sessions still stored under
+   * the legacy eight-character device key are upgraded by the ingest path's own migration, which
+   * re-derives the same way, and are left to it.
+   */
+  async repairCopiedStatsBatch(cursor: CopiedStatsRepairCursor | null, limit: number): Promise<CopiedStatsRepairBatch> {
+    const duplicateGroups = await this.db
+      .select({ userId: schema.koreaderPageStats.userId, bookFileId: schema.koreaderPageStats.bookFileId })
+      .from(schema.koreaderPageStats)
+      .where(
+        cursor
+          ? sql`(${schema.koreaderPageStats.userId}, ${schema.koreaderPageStats.bookFileId}) > (${cursor.userId}, ${cursor.bookFileId})`
+          : undefined,
+      )
+      .groupBy(
+        schema.koreaderPageStats.userId,
+        schema.koreaderPageStats.bookFileId,
+        schema.koreaderPageStats.page,
+        schema.koreaderPageStats.startTime,
+      )
+      // Only a second device can hold the same page at the same start second: the dedup key makes
+      // one device's rows unique across page and start time.
+      .having(sql`count(*) > 1`)
+      .orderBy(schema.koreaderPageStats.userId, schema.koreaderPageStats.bookFileId)
+      .limit(limit);
+
+    if (duplicateGroups.length === 0) return { bookFiles: 0, removedSessions: 0, nextCursor: null };
+
+    const bookFiles = [...new Map(duplicateGroups.map((group) => [`${group.userId}:${group.bookFileId}`, group])).values()];
+    let removedSessions = 0;
+    for (const bookFile of bookFiles) {
+      removedSessions += await this.repairCopiedStatsForBookFile(bookFile.userId, bookFile.bookFileId);
+    }
+
+    const last = duplicateGroups.at(-1)!;
+    return {
+      bookFiles: bookFiles.length,
+      removedSessions,
+      nextCursor: duplicateGroups.length < limit ? null : { userId: last.userId, bookFileId: last.bookFileId },
+    };
+  }
+
+  private async repairCopiedStatsForBookFile(userId: number, bookFileId: number): Promise<number> {
+    const [target] = await this.db
+      .select({ bookId: schema.bookFiles.bookId, libraryId: schema.books.libraryId, userSettings: schema.users.settings })
+      .from(schema.bookFiles)
+      .innerJoin(schema.books, eq(schema.books.id, schema.bookFiles.bookId))
+      .innerJoin(schema.users, eq(schema.users.id, userId))
+      .where(eq(schema.bookFiles.id, bookFileId))
+      .limit(1);
+    if (!target) return 0;
+
+    const timeZone = resolveTimeZone((target.userSettings as { timezone?: unknown } | null)?.timezone, 'UTC');
+
+    return this.db.transaction(async (tx) => {
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`koreader-stats:${userId}:${bookFileId}`}, 0))`);
+
+      const devices = await tx
+        .selectDistinct({ deviceId: schema.koreaderPageStats.deviceId })
+        .from(schema.koreaderPageStats)
+        .where(
+          and(
+            eq(schema.koreaderPageStats.userId, userId),
+            eq(schema.koreaderPageStats.bookFileId, bookFileId),
+            copiedFromAnotherDevice(tx, userId, bookFileId),
+          ),
+        )
+        .orderBy(schema.koreaderPageStats.deviceId);
+
+      let removedSessions = 0;
+      for (const { deviceId } of devices) {
+        let repairedThrough = 0;
+        for (;;) {
+          const [earliestCopy] = await tx
+            .select({ startTime: sql<string | number | null>`min(${schema.koreaderPageStats.startTime})` })
+            .from(schema.koreaderPageStats)
+            .where(
+              and(
+                eq(schema.koreaderPageStats.userId, userId),
+                eq(schema.koreaderPageStats.bookFileId, bookFileId),
+                eq(schema.koreaderPageStats.deviceId, deviceId),
+                gt(schema.koreaderPageStats.startTime, repairedThrough),
+                copiedFromAnotherDevice(tx, userId, bookFileId),
+              ),
+            );
+          const startTime = toSeconds(earliestCopy?.startTime);
+          if (startTime == null) break;
+
+          const window = await this.findAffectedWindow(tx, {
+            userId,
+            bookFileId,
+            deviceId,
+            firstInsertedStart: startTime,
+            lastInsertedStart: startTime,
+          });
+          const derived = await this.deriveStoredWindow(
+            tx,
+            { userId, bookFileId, bookId: target.bookId, libraryId: target.libraryId, deviceId, timeZone },
+            window,
+          );
+          removedSessions += derived.deletedSessions;
+          repairedThrough = Math.max(window.lastStart, startTime);
+        }
+      }
+
+      return removedSessions;
+    });
+  }
+
   private async deriveStoredWindow(
     tx: Tx,
     params: {
@@ -132,12 +296,14 @@ export class KoreaderPluginRepository {
           eq(schema.koreaderPageStats.deviceId, deviceId),
           gte(schema.koreaderPageStats.startTime, window.firstStart),
           lte(schema.koreaderPageStats.startTime, window.lastStart),
+          not(copiedFromAnotherDevice(tx, userId, bookFileId)),
         ),
       )
       .orderBy(schema.koreaderPageStats.startTime, schema.koreaderPageStats.page);
 
-    // The window still grows over suppressed events: dropping events only widens the gaps
-    // between the rest, so its edges stay true cluster boundaries.
+    // The window still grows over suppressed events, tombstoned or copied from another device:
+    // dropping events only widens the gaps between the rest, so its edges stay true cluster
+    // boundaries, and a window over a copy still covers the stale session that copy once derived.
     const tombstones = await tx
       .select({ startTime: schema.koreaderSessionTombstones.startTime, endTime: schema.koreaderSessionTombstones.endTime })
       .from(schema.koreaderSessionTombstones)

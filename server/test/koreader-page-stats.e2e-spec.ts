@@ -1,12 +1,13 @@
 import { copyFile } from 'fs/promises';
 import { randomUUID } from 'crypto';
 import { join } from 'path';
-import { and, asc, eq, gte, like } from 'drizzle-orm';
+import { and, asc, eq, gte, like, lte } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
 import { Permission } from '@bookorbit/types';
 import { buildSessionId, buildSessionIdPrefix, koreaderSessionDeviceKey } from '../src/common/utils/koreader-session-id.utils';
 import { KOREADER_SESSION_GAP_SECONDS, deriveKoreaderSessions, type KoreaderPageEvent } from '../src/modules/koreader/koreader-stats.util';
+import { KoreaderPluginRepository } from '../src/modules/koreader/koreader-plugin.repository';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
@@ -121,6 +122,41 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     }
   }
 
+  /** Every KOReader session stored for this book in a window, whichever device derived it. */
+  async function sessionsFromEveryDeviceBetween(fromEpoch: number, toEpoch: number) {
+    return ctx.db
+      .select({ sessionId: schema.readingSessions.sessionId, durationSeconds: schema.readingSessions.durationSeconds })
+      .from(schema.readingSessions)
+      .where(
+        and(
+          eq(schema.readingSessions.bookFileId, epub.bookFileId),
+          gte(schema.readingSessions.startedAt, new Date(fromEpoch * 1000)),
+          lte(schema.readingSessions.startedAt, new Date(toEpoch * 1000)),
+        ),
+      )
+      .orderBy(asc(schema.readingSessions.sessionId));
+  }
+
+  function dayKey(epoch: number): string {
+    return new Date(epoch * 1000).toISOString().slice(0, 10);
+  }
+
+  /** The owner's rolled-up reading seconds around an epoch, the number every total is summed from. */
+  async function readingSecondsAround(epoch: number): Promise<number> {
+    const rows = await ctx.db
+      .select({ readingSeconds: schema.userReadingDailyStats.readingSeconds })
+      .from(schema.userReadingDailyStats)
+      .where(
+        and(
+          eq(schema.userReadingDailyStats.userId, ownerId),
+          eq(schema.userReadingDailyStats.libraryId, library.libraryId),
+          gte(schema.userReadingDailyStats.day, dayKey(epoch - 86_400)),
+          lte(schema.userReadingDailyStats.day, dayKey(epoch + 86_400)),
+        ),
+      );
+    return rows.reduce((total, row) => total + row.readingSeconds, 0);
+  }
+
   function pagesFor(progressDelta: number | null): number {
     return ((progressDelta ?? 0) / 100) * TOTAL_PAGES;
   }
@@ -210,12 +246,14 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
   it('upgrades a conflated legacy session from complete raw device clusters without double counting', async () => {
     const base = BASE_EPOCH + 2_000_000;
     const devices = ['legacy-prefix-A', 'legacy-prefix-B'];
+    // Separate pages: two devices reporting one page at one start second is a copied event, which
+    // derivation counts once, and this is about upgrading the conflated legacy session instead.
     await ctx.db.insert(schema.koreaderPageStats).values(
       devices.map((deviceId, index) => ({
         userId: ownerId,
         bookFileId: epub.bookFileId,
         deviceId,
-        page: 1,
+        page: 1 + index,
         startTime: base,
         durationSeconds: 40 + index * 30,
         totalPages: TOTAL_PAGES,
@@ -238,6 +276,97 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
       .where(and(eq(schema.readingSessions.bookFileId, epub.bookFileId), eq(schema.readingSessions.startedAt, new Date(base * 1000))));
     expect(rows.map((row) => row.sessionId).sort()).toEqual(devices.map((device) => buildSessionId(device, epub.bookFileId, base)).sort());
     expect(rows.map((row) => row.durationSeconds).sort((a, b) => a - b)).toEqual([70, 80]);
+  });
+
+  it('counts one sitting once when statistics copied to a second device upload it again', async () => {
+    const base = BASE_EPOCH + 2_500_000;
+    const sitting = cluster(base, 10, 1);
+    const sourceDevice = 'copied-stats-source-01';
+    const copyDevice = 'copied-stats-target-02';
+    const expected = deriveKoreaderSessions(sitting, sourceDevice, epub.bookFileId);
+    expect(expected).toHaveLength(1);
+
+    expect((await uploadPageStats(sitting, epub.bookFileId, sourceDevice)).results[0]!.accepted).toBe(sitting.length);
+    // A device that received the copy reports it under its own id, where the dedup key cannot see
+    // it, so the rows are stored a second time and only derivation can tell they are one sitting.
+    expect((await uploadPageStats(sitting, epub.bookFileId, copyDevice)).results[0]!.accepted).toBe(sitting.length);
+
+    expect(await sessionsFromEveryDeviceBetween(base, base + 600)).toEqual([
+      { sessionId: expected[0]!.sessionId, durationSeconds: expected[0]!.durationSeconds },
+    ]);
+    expect(await readingSecondsAround(base)).toBe(expected[0]!.durationSeconds);
+  });
+
+  it('collapses a sitting a copy had already derived a session for before copies were recognised', async () => {
+    const base = BASE_EPOCH + 2_700_000;
+    const sitting = cluster(base, 8, 20);
+    const sourceDevice = 'copied-stats-repair-01';
+    const copyDevice = 'copied-stats-repair-02';
+    const kept = deriveKoreaderSessions(sitting, sourceDevice, epub.bookFileId);
+    const copied = deriveKoreaderSessions(sitting, copyDevice, epub.bookFileId);
+    expect(kept).toHaveLength(1);
+    expect(copied).toHaveLength(1);
+
+    expect((await uploadPageStats(sitting, epub.bookFileId, sourceDevice)).results[0]!.accepted).toBe(sitting.length);
+
+    // The state an older server left behind: the copy's own rows, its own session over the same
+    // minutes, and a day that counted them twice.
+    await ctx.db.insert(schema.koreaderPageStats).values(
+      sitting.map((event) => ({
+        userId: ownerId,
+        bookFileId: epub.bookFileId,
+        deviceId: copyDevice,
+        page: event.page,
+        startTime: event.startTime,
+        durationSeconds: event.durationSeconds,
+        totalPages: event.totalPages,
+      })),
+    );
+    await ctx.db.insert(schema.readingSessions).values({
+      userId: ownerId,
+      bookFileId: epub.bookFileId,
+      bookId: epub.bookId,
+      source: 'koreader',
+      sessionId: copied[0]!.sessionId,
+      startedAt: copied[0]!.startedAt,
+      endedAt: copied[0]!.endedAt,
+      durationSeconds: copied[0]!.durationSeconds,
+      progressDelta: copied[0]!.progressDelta,
+      endProgress: copied[0]!.endProgress,
+    });
+    await ctx.db
+      .insert(schema.userReadingDailyStats)
+      .values({
+        userId: ownerId,
+        libraryId: library.libraryId,
+        day: dayKey(base),
+        readingSeconds: kept[0]!.durationSeconds + copied[0]!.durationSeconds,
+        sessionsCount: 2,
+      })
+      .onConflictDoUpdate({
+        target: [schema.userReadingDailyStats.userId, schema.userReadingDailyStats.libraryId, schema.userReadingDailyStats.day],
+        set: { readingSeconds: kept[0]!.durationSeconds + copied[0]!.durationSeconds, sessionsCount: 2 },
+      });
+    expect(await sessionsFromEveryDeviceBetween(base, base + 600)).toHaveLength(2);
+    expect(await readingSecondsAround(base)).toBe(kept[0]!.durationSeconds * 2);
+
+    const repo = ctx.app.get(KoreaderPluginRepository);
+    const repaired = await repo.repairCopiedStatsBatch(null, 200);
+    expect(repaired.removedSessions).toBeGreaterThanOrEqual(1);
+    expect(repaired.bookFiles).toBeGreaterThanOrEqual(1);
+    expect(repaired.nextCursor).toBeNull();
+    expect(await sessionsFromEveryDeviceBetween(base, base + 600)).toEqual([
+      { sessionId: kept[0]!.sessionId, durationSeconds: kept[0]!.durationSeconds },
+    ]);
+    expect(await readingSecondsAround(base)).toBe(kept[0]!.durationSeconds);
+
+    // Derivation reads only the stored events, so a second pass finds the same sessions.
+    const again = await repo.repairCopiedStatsBatch(null, 200);
+    expect(again.removedSessions).toBe(0);
+    expect(await sessionsFromEveryDeviceBetween(base, base + 600)).toEqual([
+      { sessionId: kept[0]!.sessionId, durationSeconds: kept[0]!.durationSeconds },
+    ]);
+    expect(await readingSecondsAround(base)).toBe(kept[0]!.durationSeconds);
   });
 
   it('scopes canonical status and page-time uploads to the authenticated reader', async () => {
