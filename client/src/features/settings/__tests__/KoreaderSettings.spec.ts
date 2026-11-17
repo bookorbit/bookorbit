@@ -669,6 +669,26 @@ describe('KoreaderSettings', () => {
     expect(koreaderMock.linkUnmatchedBook).toHaveBeenCalledWith('a'.repeat(32), { bookId: 55 })
   })
 
+  it('keeps the book link dialog within the viewport and makes overflow scrollable', async () => {
+    const status = makeSyncStatus({ pluginTotals: { ...makeSyncStatus().pluginTotals, unmatchedBooks: 1 } })
+    koreaderMock.credentials.value = status.credentials
+    koreaderMock.syncStatus.value = status
+    koreaderMock.unmatchedBooks.value = [makeUnmatchedBook()]
+
+    const wrapper = mountComponent()
+    await flushPromises()
+
+    await buttonByText(wrapper, 'Link')!.trigger('click')
+
+    const dialog = wrapper.get('[data-testid="koreader-link-dialog"]')
+    expect(dialog.attributes('role')).toBe('dialog')
+    expect(dialog.attributes('aria-modal')).toBe('true')
+    expect(dialog.attributes('aria-labelledby')).toBe('koreader-link-dialog-title')
+    expect(dialog.classes()).toContain('max-h-[calc(100svh-1rem)]')
+    expect(dialog.classes()).toContain('overflow-y-auto')
+    expect(dialog.get('button[aria-label="Close"]')).toBeTruthy()
+  })
+
   it('says what a link syncs before it is confirmed', async () => {
     const status = makeSyncStatus({ pluginTotals: { ...makeSyncStatus().pluginTotals, unmatchedBooks: 1 } })
     koreaderMock.credentials.value = status.credentials
