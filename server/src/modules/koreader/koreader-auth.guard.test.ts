@@ -163,9 +163,10 @@ describe('KoreaderAuthGuard', () => {
     expect(mockUserService.findByIdWithPermissions).not.toHaveBeenCalled();
   });
 
-  it('passes bcrypt authentication and sets koreaderUserId', async () => {
+  it('passes bcrypt authentication for plaintext clients when no md5 is stored', async () => {
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = 'secret';
+    mockRepo.findKoreaderUserByUsername.mockResolvedValueOnce(makeKoreaderUser({ passwordMd5: null }));
     mockCompare.mockResolvedValueOnce(true);
 
     await expect(guard.canActivate(mockContext as ExecutionContext)).resolves.toBe(true);
@@ -176,10 +177,9 @@ describe('KoreaderAuthGuard', () => {
     expect(mockCreateHash).not.toHaveBeenCalled();
   });
 
-  it('passes MD5 authentication when bcrypt comparison fails', async () => {
+  it('passes MD5 authentication for a plaintext key without running bcrypt', async () => {
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = 'secret';
-    mockCompare.mockResolvedValueOnce(false);
 
     const mockHash = {
       update: vi.fn().mockReturnThis(),
@@ -191,6 +191,7 @@ describe('KoreaderAuthGuard', () => {
 
     expect(mockCreateHash).toHaveBeenCalledWith('md5');
     expect(mockHash.update).toHaveBeenCalledWith('secret');
+    expect(mockCompare).not.toHaveBeenCalled();
     expect(mockRequest.koreaderUserId).toBe(42);
   });
 
@@ -205,6 +206,7 @@ describe('KoreaderAuthGuard', () => {
     mockCreateHash.mockReturnValueOnce(mockHash as unknown as ReturnType<typeof createHash>);
 
     await expectGuardToReject(UnauthorizedException, 401, 'Invalid credentials');
+    expect(mockCompare).toHaveBeenCalledWith('wrong-secret', 'bcrypt-hash');
     expect(mockUserService.findByIdWithPermissions).not.toHaveBeenCalled();
   });
 
@@ -213,7 +215,6 @@ describe('KoreaderAuthGuard', () => {
     mockRequest.headers['x-auth-key'] = 'secret';
     mockRepo.findKoreaderUserByUsername.mockResolvedValueOnce(makeKoreaderUser({ userId: 99 }));
     mockUserService.findByIdWithPermissions.mockResolvedValueOnce(makeUser({ id: 99, username: 'alice' }));
-    mockCompare.mockResolvedValueOnce(true);
 
     await guard.canActivate(mockContext as ExecutionContext);
 
@@ -224,7 +225,6 @@ describe('KoreaderAuthGuard', () => {
   it('returns 401 when user account is not found after credential validation', async () => {
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = 'secret';
-    mockCompare.mockResolvedValueOnce(true);
     mockUserService.findByIdWithPermissions.mockResolvedValueOnce(null);
 
     await expectGuardToReject(UnauthorizedException, 401, 'Account not found or disabled');
@@ -233,7 +233,6 @@ describe('KoreaderAuthGuard', () => {
   it('returns 401 when user account is disabled', async () => {
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = 'secret';
-    mockCompare.mockResolvedValueOnce(true);
     mockUserService.findByIdWithPermissions.mockResolvedValueOnce(makeUser({ active: false }));
 
     await expectGuardToReject(UnauthorizedException, 401, 'Account not found or disabled');
@@ -242,7 +241,6 @@ describe('KoreaderAuthGuard', () => {
   it('returns 401 when user lacks koreader_sync permission', async () => {
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = 'secret';
-    mockCompare.mockResolvedValueOnce(true);
     mockPermissionService.userHas.mockReturnValueOnce(false);
 
     await expectGuardToReject(UnauthorizedException, 401, 'KOReader sync permission revoked');
@@ -251,7 +249,6 @@ describe('KoreaderAuthGuard', () => {
   it('passes when user is superuser (bypasses permission check)', async () => {
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = 'secret';
-    mockCompare.mockResolvedValueOnce(true);
     mockUserService.findByIdWithPermissions.mockResolvedValueOnce(makeUser({ isSuperuser: true, permissions: [] }));
     mockPermissionService.userHas.mockReturnValueOnce(true);
 
@@ -259,15 +256,43 @@ describe('KoreaderAuthGuard', () => {
     expect(mockPermissionService.userHas).toHaveBeenCalledWith(expect.objectContaining({ isSuperuser: true }), Permission.KoreaderSync);
   });
 
-  it('passes when incoming key is exactly 32 hex chars matching md5 hash (pre-hashed key)', async () => {
+  it('passes when incoming key is exactly 32 hex chars matching md5 hash (pre-hashed key) without running bcrypt', async () => {
     const md5Key = 'abcdef0123456789abcdef0123456789';
     mockRequest.headers['x-auth-user'] = 'alice';
     mockRequest.headers['x-auth-key'] = md5Key;
-    mockCompare.mockResolvedValueOnce(false);
     mockRepo.findKoreaderUserByUsername.mockResolvedValueOnce(makeKoreaderUser({ passwordMd5: md5Key }));
 
     await expect(guard.canActivate(mockContext as ExecutionContext)).resolves.toBe(true);
     expect(mockCreateHash).not.toHaveBeenCalled();
+    expect(mockCompare).not.toHaveBeenCalled();
+  });
+
+  it('matches a pre-hashed key regardless of hex case', async () => {
+    mockRequest.headers['x-auth-user'] = 'alice';
+    mockRequest.headers['x-auth-key'] = 'ABCDEF0123456789ABCDEF0123456789';
+    mockRepo.findKoreaderUserByUsername.mockResolvedValueOnce(makeKoreaderUser({ passwordMd5: 'abcdef0123456789abcdef0123456789' }));
+
+    await expect(guard.canActivate(mockContext as ExecutionContext)).resolves.toBe(true);
+    expect(mockCompare).not.toHaveBeenCalled();
+  });
+
+  it('falls back to bcrypt when a 32-hex key is the plaintext password itself', async () => {
+    const hexPassword = '0123456789abcdef0123456789abcdef';
+    mockRequest.headers['x-auth-user'] = 'alice';
+    mockRequest.headers['x-auth-key'] = hexPassword;
+    mockCompare.mockResolvedValueOnce(true);
+
+    await expect(guard.canActivate(mockContext as ExecutionContext)).resolves.toBe(true);
+    expect(mockCompare).toHaveBeenCalledWith(hexPassword, 'bcrypt-hash');
+    expect(mockCreateHash).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when a pre-hashed key does not match and bcrypt rejects it', async () => {
+    mockRequest.headers['x-auth-user'] = 'alice';
+    mockRequest.headers['x-auth-key'] = '00000000000000000000000000000000';
+
+    await expectGuardToReject(UnauthorizedException, 401, 'Invalid credentials');
+    expect(mockUserService.findByIdWithPermissions).not.toHaveBeenCalled();
   });
 
   it('returns 401 when md5 hash matches no password and no md5 stored', async () => {

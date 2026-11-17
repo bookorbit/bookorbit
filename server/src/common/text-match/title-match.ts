@@ -81,6 +81,12 @@ export function tokenizeTitleText(value: string): string[] {
   return value.split(' ').filter((token) => token.length > 1 || /^\p{N}$/u.test(token));
 }
 
+// A lone digit tells volumes apart (symmetricTitleSimilarity), but in a fuzzy relevance match it dilutes the
+// overlap ratio of a candidate that does not spell the volume number, pushing a right book under the floor.
+function relevanceTokens(value: string): string[] {
+  return tokenizeTitleText(value).filter((token) => token.length > 1);
+}
+
 /**
  * Tokens worth matching on. Falls back to the raw tokens when a title is nothing but stopwords,
  * so a book genuinely titled "It" or "Them" still has something to match.
@@ -134,8 +140,8 @@ export function scoreTitleMatch(query: string, candidate: string): number {
     return TITLE_MATCH_SCORES.substring;
   }
 
-  const queryTokens = significantTokens(tokenizeTitleText(normalizedQuery));
-  const candidateTokens = new Set(tokenizeTitleText(normalizedCandidate));
+  const queryTokens = significantTokens(relevanceTokens(normalizedQuery));
+  const candidateTokens = new Set(relevanceTokens(normalizedCandidate));
   const overlapRatio = queryTokens.length > 0 ? queryTokens.filter((token) => candidateTokens.has(token)).length / queryTokens.length : 0;
   // A minority of the query's meaningful words in common is not evidence of the same book;
   // "The Way of Kings" and "The Way We Were" share exactly one.

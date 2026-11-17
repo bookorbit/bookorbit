@@ -33,6 +33,7 @@ RUN case "${TARGETARCH}" in \
     go version -m "/out/${name}"
 
 FROM ${NODE_IMAGE} AS base
+
 # Install exactly the pnpm version the repo declares in "packageManager".
 # If the installed pnpm differs from it, pnpm 11 tries to switch versions and
 # must verify that version's native binary against pnpm-lock.yaml, which fails
