@@ -1,6 +1,8 @@
 import { sql } from 'drizzle-orm';
 import { index, integer, pgTable, primaryKey, serial, timestamp, varchar } from 'drizzle-orm/pg-core';
 
+import { normalizeMetadataTextKeySql } from '../../common/utils/metadata-text-normalize.utils';
+
 import { books } from './books';
 
 export const narrators = pgTable(
@@ -14,6 +16,7 @@ export const narrators = pgTable(
   (t) => [
     index('narrators_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
     index('narrators_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+    index('narrators_name_normalized_key_idx').on(normalizeMetadataTextKeySql(t.name)),
   ],
 );
 

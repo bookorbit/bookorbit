@@ -19,6 +19,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { normalizeMetadataTextKeySql } from '../../common/utils/metadata-text-normalize.utils';
+
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
   toDriver: (v) => `[${v.join(',')}]`,
@@ -255,6 +257,7 @@ export const authors = pgTable(
     unique('authors_name_unique').on(t.name),
     index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
     index('authors_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+    index('authors_name_normalized_key_idx').on(normalizeMetadataTextKeySql(t.name)),
     check('authors_gender_chk', sql`${t.gender} is null or ${t.gender} in ('female', 'male', 'non_binary')`),
   ],
 );

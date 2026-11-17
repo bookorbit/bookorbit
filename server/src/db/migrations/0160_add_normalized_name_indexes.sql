@@ -1,0 +1,2 @@
+CREATE INDEX "authors_name_normalized_key_idx" ON "authors" USING btree (lower(btrim(regexp_replace(replace("name", chr(160), ' '), '[[:space:]]+', ' ', 'g'))));--> statement-breakpoint
+CREATE INDEX "narrators_name_normalized_key_idx" ON "narrators" USING btree (lower(btrim(regexp_replace(replace("name", chr(160), ' '), '[[:space:]]+', ' ', 'g'))));

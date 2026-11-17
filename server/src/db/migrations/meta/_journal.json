@@ -1121,6 +1121,13 @@
       "when": 1794899962043,
       "tag": "0159_add_book_file_audio_timelines",
       "breakpoints": true
+    },
+    {
+      "idx": 160,
+      "version": "7",
+      "when": 1794942724960,
+      "tag": "0160_add_normalized_name_indexes",
+      "breakpoints": true
     }
   ]
 }
