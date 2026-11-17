@@ -66,6 +66,17 @@ describe('BookDock DTO validation', () => {
     expect((await errorsFor(FinalizeBookDockDto, { defaultLibraryId: 1, defaultFolderId: 2, fileIds: [1, 2] })).length).toBe(0);
   });
 
+  it('FinalizeBookDockDto rejects a request that selects nothing to finalize', async () => {
+    for (const body of [{}, { fileIds: [] }, { selectAll: false, fileIds: [] }, { readyToFile: true }, { status: 'ready' }]) {
+      expect((await errorsFor(FinalizeBookDockDto, body)).length).toBeGreaterThan(0);
+    }
+    const [error] = await errorsFor(FinalizeBookDockDto, {});
+    expect(error?.constraints?.hasFinalizeSelection).toContain('selectAll');
+
+    expect(await errorsFor(FinalizeBookDockDto, { fileIds: [996, 997] })).toEqual([]);
+    expect(await errorsFor(FinalizeBookDockDto, { selectAll: true, readyToFile: true })).toEqual([]);
+  });
+
   it('FinalizeBookDockDto accepts an optional existing book to join per override and nothing else in it', async () => {
     const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
     const check = (overrides: unknown[]) => pipe.transform({ fileIds: [1], overrides }, { type: 'body', metatype: FinalizeBookDockDto });

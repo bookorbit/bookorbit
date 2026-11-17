@@ -52,6 +52,36 @@ function HasCompleteDefaultDestination(options?: ValidationOptions) {
   };
 }
 
+@ValidatorConstraint({ name: 'hasFinalizeSelection', async: false })
+class HasFinalizeSelectionConstraint implements ValidatorConstraintInterface {
+  validate(_: unknown, args?: ValidationArguments): boolean {
+    const dto = args?.object as FinalizeBookDockDto | undefined;
+    if (!dto) return false;
+    return dto.selectAll === true || (dto.fileIds?.length ?? 0) > 0;
+  }
+
+  defaultMessage(): string {
+    return 'fileIds must contain at least one id, or selectAll must be true';
+  }
+}
+
+/**
+ * A finalize request naming no files used to answer 200 with an empty result, which reads as
+ * "nothing was ready to file" rather than "nothing was asked for". Rejecting it keeps the two apart.
+ */
+function HasFinalizeSelection(options?: ValidationOptions) {
+  return function (constructor: new (...args: unknown[]) => unknown) {
+    registerDecorator({
+      name: 'hasFinalizeSelection',
+      target: constructor,
+      propertyName: '',
+      options,
+      constraints: [],
+      validator: HasFinalizeSelectionConstraint,
+    });
+  };
+}
+
 class BookDockAudiobookChapterDto {
   @IsString() title!: string;
   @IsInt() @Min(0) startMs!: number;
@@ -180,6 +210,7 @@ class FinalizeOverrideDto {
 }
 
 @HasCompleteDefaultDestination()
+@HasFinalizeSelection()
 export class FinalizeBookDockDto {
   @IsOptional()
   @IsArray()
