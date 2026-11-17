@@ -12,6 +12,8 @@ import { isStoryTextFormat, STORY_TEXT_KEY_MOVES, type StoryTextFile, type Story
 
 export const STORY_TEXT_READER = Symbol('STORY_TEXT_READER');
 export type StoryTextReader = (absolutePath: string) => Promise<BookText>;
+/** Told the book a file belongs to once that file's text row is saved, so its page can ask again. */
+export type StoryTextComputedListener = (bookId: number) => void;
 
 /** How many stale files the background recompute queues per database read. */
 const RECOMPUTE_BATCH = 500;
@@ -48,7 +50,8 @@ export function storyTextRefusal(row: BookFileTextRow, maxWords: number): StoryT
 
 /**
  * Text keys for book files. Status only reads the cache: a file with no fresh row is queued for
- * the key job and reported as `checking`. The key job reads one file at a time, in a worker, and a
+ * the key job and reported as `checking`, and every saved row is announced to `onComputed`
+ * listeners so the page hears when checking is over. The key job reads one file at a time, in a worker, and a
  * change of extraction version recomputes every key in the background, moving each guide to its
  * file's new key.
  */
@@ -58,6 +61,7 @@ export class StoryTextService implements OnModuleInit, OnModuleDestroy {
   private readonly queue: number[] = [];
   private readonly queued = new Set<number>();
   private draining: Promise<void> | null = null;
+  private readonly computedListeners = new Set<StoryTextComputedListener>();
   private recomputeTimer: NodeJS.Timeout | null = null;
   private stopped = false;
 
@@ -113,6 +117,12 @@ export class StoryTextService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
+  /** Hears every saved text row, from the key job and from a build. Returns the unsubscribe. */
+  onComputed(listener: StoryTextComputedListener): () => void {
+    this.computedListeners.add(listener);
+    return () => this.computedListeners.delete(listener);
+  }
+
   /** Resolves when the key job has nothing left to do. */
   async idle(): Promise<void> {
     while (this.draining) await this.draining;
@@ -166,6 +176,15 @@ export class StoryTextService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`[story_text.key_move] [end] fileId=${fileId} moved=${moved} - text key changed with the extraction rules`);
     }
     const saved = await this.repository.save(row);
+    for (const listener of this.computedListeners) {
+      try {
+        listener(file.bookId);
+      } catch (error) {
+        this.logger.warn(
+          `[story_text.key_notify] [fail] fileId=${fileId} bookId=${file.bookId} errorClass=${(error as Error)?.name ?? 'Error'} error="${sanitizeLogValue(String((error as Error)?.message ?? error)).slice(0, 200)}" - telling the book page failed`,
+        );
+      }
+    }
     this.logger.debug(
       `[story_text.key] [end] fileId=${fileId} durationMs=${Date.now() - started} outcome=${saved.outcome} words=${saved.words} sections=${saved.sections.length} - text key computed`,
     );

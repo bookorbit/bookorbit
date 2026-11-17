@@ -46,8 +46,10 @@ function failureKey(action: StoryGuideAction): string {
  * and otherwise starting at 5 seconds and doubling while nothing changes, up to a minute. Each ask
  * sends the last ETag, so an unchanged status is a `304`. A change heard while the page is hidden
  * is asked for when it is visible again, as is a build in progress. A status that says the server
- * is still reading the file is asked once more after 3 seconds. Answers for a book the page has
- * since left, and answers older than one already shown, are dropped.
+ * is still reading the file is asked once more after 3 seconds; after that the socket says when the
+ * reading is done, and without the socket it is asked again, waiting twice as long each time up to
+ * a minute. Answers for a book the page has since left, and answers older than one already shown,
+ * are dropped.
  */
 export function useStoryGuideStatus(bookId: MaybeRefOrGetter<number>) {
   const { hasPermission } = usePermissions()
@@ -84,8 +86,9 @@ export function useStoryGuideStatus(bookId: MaybeRefOrGetter<number>) {
   let pollTimer: ReturnType<typeof setTimeout> | null = null
   let checkingTimer: ReturnType<typeof setTimeout> | null = null
   let stillTheCaseTimer: ReturnType<typeof setTimeout> | null = null
-  /** "Checking this book" is asked about once more, not on a loop. */
+  /** "Checking this book" is asked about once more; after that only while the socket is not pushing. */
   let askedAgain = false
+  let checkingWait = STORY_GUIDE_CHECKING_AGAIN_MS
   /** Bumped when an action's answer is shown, so a poll that left before it cannot undo it. */
   let revision = 0
 
@@ -117,6 +120,7 @@ export function useStoryGuideStatus(bookId: MaybeRefOrGetter<number>) {
       checkingTimer = null
       // It never asked, so the page may ask once more when it is next visible.
       askedAgain = false
+      checkingWait = STORY_GUIDE_CHECKING_AGAIN_MS
     }
   }
 
@@ -239,14 +243,17 @@ export function useStoryGuideStatus(bookId: MaybeRefOrGetter<number>) {
     const current = generation
     if (isStoryGuideBuilding(status.value)) startPolling(current)
     else stopPolling()
-    if (isStoryGuideChecking(status.value) && !askedAgain && !checkingTimer) {
+    if (!isStoryGuideChecking(status.value)) checkingWait = STORY_GUIDE_CHECKING_AGAIN_MS
+    else if (!checkingTimer && (!askedAgain || !live)) {
+      const wait = checkingWait
       askedAgain = true
+      checkingWait = Math.min(wait * 2, STORY_GUIDE_LONGEST_POLL_MS)
       checkingTimer = setTimeout(async () => {
         checkingTimer = null
         if (current !== generation || !pageVisible()) return
         await fetchStatus(current)
         if (current === generation) schedule()
-      }, STORY_GUIDE_CHECKING_AGAIN_MS)
+      }, wait)
     }
   }
 
@@ -259,6 +266,7 @@ export function useStoryGuideStatus(bookId: MaybeRefOrGetter<number>) {
     status.value = null
     etag = null
     askedAgain = false
+    checkingWait = STORY_GUIDE_CHECKING_AGAIN_MS
     pending.value = null
     stillTheCase.value = false
     if (!mayBuild.value) return

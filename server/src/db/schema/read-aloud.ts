@@ -1,5 +1,20 @@
 import { sql } from 'drizzle-orm';
-import { bigserial, boolean, check, index, integer, jsonb, pgTable, smallint, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  bigserial,
+  boolean,
+  check,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  smallint,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import type {
   ReadAloudChapterReport,
   ReadAloudDecisions,
@@ -134,3 +149,26 @@ export const readAloudJobReports = pgTable('read_aloud_job_reports', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 export type NewReadAloudJobEventRow = typeof readAloudJobEvents.$inferInsert;
+
+/**
+ * The length of the audio timeline a read-along EPUB carries, as the book page compares it with
+ * the audiobook. Reading it parses every media overlay document in the file, so it is measured
+ * once per file version: a row counts only while the file still has the size and mtime it was
+ * measured at. A null total is a measured file whose overlays reach no audio.
+ */
+export const bookFileAudioTimelines = pgTable(
+  'book_file_audio_timelines',
+  {
+    fileId: integer('file_id')
+      .primaryKey()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    mtimeMs: doublePrecision('mtime_ms').notNull(),
+    totalSeconds: doublePrecision('total_seconds'),
+    measuredAt: timestamp('measured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('book_file_audio_timelines_total_seconds_nonnegative_chk', sql`${t.totalSeconds} is null or ${t.totalSeconds} >= 0`)],
+);
+
+export type BookFileAudioTimelineRow = typeof bookFileAudioTimelines.$inferSelect;
+export type NewBookFileAudioTimelineRow = typeof bookFileAudioTimelines.$inferInsert;

@@ -13,13 +13,21 @@ function makeGateway() {
   const authenticator = { authenticateSocket: vi.fn() };
   const books = { verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
   const changes = new AiJobChanges();
-  const gateway = new StoryGuidesGateway(authenticator as never, books as never, changes);
+  const textListeners = new Set<(bookId: number) => void>();
+  const texts = {
+    onComputed: vi.fn((listener: (bookId: number) => void) => {
+      textListeners.add(listener);
+      return () => textListeners.delete(listener);
+    }),
+  };
+  const textComputed = (bookId: number) => textListeners.forEach((listener) => listener(bookId));
+  const gateway = new StoryGuidesGateway(authenticator as never, books as never, changes, texts as never);
   const emit = vi.fn();
   const to = vi.fn().mockReturnValue({ emit });
   const serverEmit = vi.fn();
   gateway.server = { to, emit: serverEmit } as never;
   gateway.onModuleInit();
-  return { gateway, authenticator, books, changes, to, emit, serverEmit };
+  return { gateway, authenticator, books, changes, textComputed, to, emit, serverEmit };
 }
 
 function socket(user: object | null) {
@@ -159,6 +167,28 @@ describe('StoryGuidesGateway', () => {
       changes.changed(change());
       vi.advanceTimersByTime(STORY_GUIDE_PUSH_MS);
       expect(emit).toHaveBeenCalledTimes(2);
+    });
+
+    it("tells a book's page when its text has been read, so checking ends without a reload", () => {
+      const { textComputed, changes, to, emit, serverEmit } = makeGateway();
+      textComputed(7);
+      changes.changed(change());
+      textComputed(9);
+      vi.advanceTimersByTime(STORY_GUIDE_PUSH_MS);
+      expect(to.mock.calls).toEqual([['story-guide:book:7'], ['story-guide:book:9']]);
+      expect(emit.mock.calls).toEqual([
+        ['story-guide:changed', { bookId: 7 }],
+        ['story-guide:changed', { bookId: 9 }],
+      ]);
+      expect(serverEmit).not.toHaveBeenCalled();
+    });
+
+    it('stops hearing read texts on shutdown', () => {
+      const { gateway, textComputed, emit } = makeGateway();
+      gateway.onModuleDestroy();
+      textComputed(7);
+      vi.advanceTimersByTime(STORY_GUIDE_PUSH_MS);
+      expect(emit).not.toHaveBeenCalled();
     });
 
     it('does not throw without a socket server, as in a script context', () => {

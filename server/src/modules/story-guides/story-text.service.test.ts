@@ -91,6 +91,27 @@ describe('StoryTextService', () => {
     expect(storyTextRefusal(row!, 20_000)).toBe('too-long');
   });
 
+  it("tells listeners the file's book once its text row is saved, and keeps going when one throws", async () => {
+    const { repository, service } = setup();
+    repository.files.set(7, { ...fileFor(7, FIXTURE), bookId: 42 });
+    const failing = vi.fn(() => {
+      throw new Error('listener broke');
+    });
+    const heard = vi.fn();
+    service.onComputed(failing);
+    const stop = service.onComputed(heard);
+
+    expect(await service.cached(repository.files.get(7)!)).toBeNull();
+    await service.idle();
+    expect(heard).toHaveBeenCalledWith(42);
+    expect(repository.rows.get(7)?.outcome).toBe('ready');
+
+    stop();
+    await service.compute(7);
+    expect(heard).toHaveBeenCalledTimes(1);
+    expect(failing).toHaveBeenCalledTimes(2);
+  });
+
   it('keeps the key when metadata is written back into the file', async () => {
     const { repository, service } = setup();
     const path = join(dir, 'book.epub');

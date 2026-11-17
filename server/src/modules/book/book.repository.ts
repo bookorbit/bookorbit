@@ -42,6 +42,7 @@ import * as schema from '../../db/schema';
 import {
   authors,
   bookAuthors,
+  bookFileAudioTimelines,
   bookCommunityRatings,
   bookFiles,
   bookGenres,
@@ -73,6 +74,7 @@ import {
   tags,
   userBookStatus,
 } from '../../db/schema';
+import type { BookFileAudioTimelineRow, NewBookFileAudioTimelineRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
 type DbTransaction = Parameters<Parameters<Db['transaction']>[0]>[0];
@@ -1815,6 +1817,22 @@ export class BookRepository {
       .update(bookFiles)
       .set({ ...data, updatedAt: new Date() })
       .where(eq(bookFiles.id, fileId));
+  }
+
+  async findAudioTimeline(fileId: number): Promise<BookFileAudioTimelineRow | null> {
+    const [row] = await this.db.select().from(bookFileAudioTimelines).where(eq(bookFileAudioTimelines.fileId, fileId)).limit(1);
+    return row ?? null;
+  }
+
+  async saveAudioTimeline(row: NewBookFileAudioTimelineRow): Promise<void> {
+    const measuredAt = new Date();
+    await this.db
+      .insert(bookFileAudioTimelines)
+      .values({ ...row, measuredAt })
+      .onConflictDoUpdate({
+        target: bookFileAudioTimelines.fileId,
+        set: { sizeBytes: row.sizeBytes, mtimeMs: row.mtimeMs, totalSeconds: row.totalSeconds ?? null, measuredAt },
+      });
   }
 
   async updateBookPrimaryFile(bookId: number, primaryFileId: number | null): Promise<void> {

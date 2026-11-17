@@ -38,7 +38,7 @@ describe('book file retire rule registry', () => {
     const keys = fileForeignKeys.map((foreignKey) => foreignKey.key);
     expect(keys.filter((key) => !(key in BOOK_FILE_RETIRE_RULES))).toEqual([]);
     expect(Object.keys(BOOK_FILE_RETIRE_RULES).filter((key) => !keys.includes(key))).toEqual([]);
-    expect(keys).toHaveLength(23);
+    expect(keys).toHaveLength(24);
   });
 
   it('never drops reading time or a reader’s position', () => {

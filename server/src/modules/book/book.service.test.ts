@@ -160,6 +160,8 @@ function makeService(
     findKoboSyncCollectionNamesForBook: vi.fn(),
     findFileById: vi.fn(),
     updateBookFile: vi.fn().mockResolvedValue(undefined),
+    findAudioTimeline: vi.fn().mockResolvedValue(null),
+    saveAudioTimeline: vi.fn().mockResolvedValue(undefined),
     updateBookPrimaryFile: vi.fn().mockResolvedValue(undefined),
     findLibraryIdByBookId: vi.fn(),
     findProgress: vi.fn(),
@@ -5340,6 +5342,8 @@ describe('BookService', () => {
       bookRepo: ReturnType<typeof makeService>['bookRepo'],
       overlay: { mediaOverlayDurationSeconds: number | null; mediaOverlayCheckedAt: Date | null },
     ) {
+      mockStat.mockResolvedValue({ size: 10, mtimeMs: 1_790_000_000_000.25 } as Awaited<ReturnType<typeof stat>>);
+      bookRepo.findAudioTimeline.mockResolvedValue(null);
       bookRepo.findById.mockResolvedValue({
         book: {
           books: {
@@ -5450,6 +5454,72 @@ describe('BookService', () => {
       expect(result.readAloudSync).toEqual(
         expect.objectContaining({ audioDurationSeconds: 21103, overlayDurationSeconds: 21090, state: 'enabled', unavailableReason: null }),
       );
+    });
+
+    it('stores a measured audio timeline against the file size and mtime it was read at', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+
+      await service.getDetail(31, makeUser());
+
+      expect(bookRepo.findAudioTimeline).toHaveBeenCalledWith(300);
+      expect(bookRepo.saveAudioTimeline).toHaveBeenCalledWith({ fileId: 300, sizeBytes: 10, mtimeMs: 1_790_000_000_000.25, totalSeconds: 21090 });
+    });
+
+    it.each([
+      ['a measured length', 21090, 'enabled', null],
+      ['no audio found when it was measured', null, 'unavailable', 'missing_duration'],
+    ] as const)(
+      'answers from a stored audio timeline with %s while the file is unchanged, without opening it',
+      async (_case, totalSeconds, state, unavailableReason) => {
+        const { service, bookRepo } = makeService();
+        vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+        mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+        bookRepo.findAudioTimeline.mockResolvedValue({
+          fileId: 300,
+          sizeBytes: 10,
+          mtimeMs: 1_790_000_000_000.25,
+          totalSeconds,
+          measuredAt: new Date('2026-10-01T00:00:00.000Z'),
+        });
+
+        const result = await service.getDetail(31, makeUser());
+
+        expect(mockReadAudioTimelineSeconds).not.toHaveBeenCalled();
+        expect(bookRepo.saveAudioTimeline).not.toHaveBeenCalled();
+        expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: totalSeconds, state, unavailableReason }));
+      },
+    );
+
+    it.each([
+      ['size', { sizeBytes: 9, mtimeMs: 1_790_000_000_000.25 }],
+      ['mtime', { sizeBytes: 10, mtimeMs: 1_790_000_000_000 }],
+    ] as const)('measures again when the file %s differs from the stored audio timeline', async (_case, stored) => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      bookRepo.findAudioTimeline.mockResolvedValue({ fileId: 300, ...stored, totalSeconds: 15000, measuredAt: new Date('2026-10-01T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+
+      const result = await service.getDetail(31, makeUser());
+
+      expect(mockReadAudioTimelineSeconds).toHaveBeenCalledWith('/books/me-talk/readaloud.epub');
+      expect(bookRepo.saveAudioTimeline).toHaveBeenCalledWith({ fileId: 300, sizeBytes: 10, mtimeMs: 1_790_000_000_000.25, totalSeconds: 21090 });
+      expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: 21090, state: 'enabled' }));
+    });
+
+    it('still answers with the measured audio timeline when storing it fails', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+      bookRepo.saveAudioTimeline.mockRejectedValueOnce(new Error('connection terminated'));
+
+      const result = await service.getDetail(31, makeUser());
+
+      expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: 21090, state: 'enabled' }));
     });
 
     it('reports a missing duration, and still answers, when the EPUB audio timeline cannot be read', async () => {

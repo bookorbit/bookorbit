@@ -1114,6 +1114,13 @@
       "when": 1794856038964,
       "tag": "0158_add_book_metadata_edition_id_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 159,
+      "version": "7",
+      "when": 1794899962043,
+      "tag": "0159_add_book_file_audio_timelines",
+      "breakpoints": true
     }
   ]
 }

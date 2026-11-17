@@ -3854,9 +3854,22 @@ export class BookService {
     return this.buildReadAloudProgressSync(fileRows, overlayFile, timelineSeconds, mode);
   }
 
+  /**
+   * Measuring parses every media overlay document of a read-along EPUB, which takes seconds for a
+   * long book, so the answer is stored per file version and survives restarts.
+   */
   private async measureReadAloudTimeline(overlayFile: { id: number; absolutePath: string }): Promise<number | null> {
     try {
-      return await readEpubAudioTimelineSeconds(overlayFile.absolutePath);
+      const [{ size, mtimeMs }, stored] = await Promise.all([stat(overlayFile.absolutePath), this.bookRepo.findAudioTimeline(overlayFile.id)]);
+      if (stored && stored.sizeBytes === size && stored.mtimeMs === mtimeMs) return stored.totalSeconds;
+      const totalSeconds = await readEpubAudioTimelineSeconds(overlayFile.absolutePath);
+      await this.bookRepo.saveAudioTimeline({ fileId: overlayFile.id, sizeBytes: size, mtimeMs, totalSeconds }).catch((err: unknown) => {
+        const error = err instanceof Error ? err : new Error(String(err));
+        this.logger.warn(
+          `[book.read_aloud_timeline] [fail] fileId=${overlayFile.id} errorClass=${error.constructor.name} error="${sanitizeLogValue(error.message)}" - read-aloud EPUB audio timeline could not be stored`,
+        );
+      });
+      return totalSeconds;
     } catch (err) {
       const error = err instanceof Error ? err : new Error(String(err));
       this.logger.warn(

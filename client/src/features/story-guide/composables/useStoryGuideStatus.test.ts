@@ -349,16 +349,47 @@ describe('useStoryGuideStatus', () => {
     expect(getStatus).toHaveBeenCalledTimes(1)
   })
 
-  it('asks once more after 3 seconds while the server is checking the book, and not again', async () => {
+  it('asks once more after 3 seconds while the server is checking the book, then waits for the push', async () => {
     const checking = status({ build: { allowed: false, reason: 'checking' }, estimate: undefined })
     getStatus.mockResolvedValue(fresh(checking))
     const { api } = mountStatus()
     await flushPromises()
+    socket.watchers.get(7)!.live(true)
+    await flushPromises()
     expect(api().presentation.value.rows).toEqual([{ kind: 'checking' }])
+    const asked = getStatus.mock.calls.length
+    await vi.advanceTimersByTimeAsync(3_000)
+    expect(getStatus).toHaveBeenCalledTimes(asked + 1)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(getStatus).toHaveBeenCalledTimes(asked + 1)
+
+    getStatus.mockResolvedValue(fresh(status(), '"e2"'))
+    socket.watchers.get(7)!.changed()
+    await flushPromises()
+    expect(api().presentation.value.rows).not.toContainEqual({ kind: 'checking' })
+  })
+
+  it('keeps asking, waiting twice as long each time, while checking with no socket push', async () => {
+    const checking = status({ build: { allowed: false, reason: 'checking' }, estimate: undefined })
+    getStatus.mockResolvedValue(fresh(checking))
+    const { api } = mountStatus()
+    await flushPromises()
+    expect(getStatus).toHaveBeenCalledTimes(1)
     await vi.advanceTimersByTimeAsync(3_000)
     expect(getStatus).toHaveBeenCalledTimes(2)
-    await vi.advanceTimersByTimeAsync(60_000)
+    await vi.advanceTimersByTimeAsync(5_999)
     expect(getStatus).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(getStatus).toHaveBeenCalledTimes(3)
+    await vi.advanceTimersByTimeAsync(12_000)
+    expect(getStatus).toHaveBeenCalledTimes(4)
+
+    getStatus.mockResolvedValue(fresh(status(), '"e2"'))
+    await vi.advanceTimersByTimeAsync(24_000)
+    expect(getStatus).toHaveBeenCalledTimes(5)
+    expect(api().presentation.value.rows).not.toContainEqual({ kind: 'checking' })
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(getStatus).toHaveBeenCalledTimes(5)
   })
 
   it('drops an answer for a book the page has left', async () => {

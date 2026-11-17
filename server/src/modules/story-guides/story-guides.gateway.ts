@@ -10,6 +10,7 @@ import { wsCorsOrigin } from '../../common/utils/ws-cors.utils';
 import { AI_JOB_CHANGED, AiJobChanges, type AiJobChange } from '../ai-jobs/ai-job-changes.service';
 import { AuthenticatorService } from '../auth/authenticator.service';
 import { BookService } from '../book/book.service';
+import { StoryTextService } from './story-text.service';
 
 /** Changes heard within this window go out together, so a build's many writes reach a page as a few events. */
 export const STORY_GUIDE_PUSH_MS = 500;
@@ -41,19 +42,25 @@ export class StoryGuidesGateway implements OnGatewayConnection, OnGatewayDisconn
   private queueChanged = false;
   private flushTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly handleChange = (change: AiJobChange): void => this.note(change);
+  private stopHearingTexts: (() => void) | null = null;
 
   constructor(
     private readonly authenticator: AuthenticatorService,
     private readonly books: BookService,
     private readonly changes: AiJobChanges,
+    private readonly texts: StoryTextService,
   ) {}
 
   onModuleInit(): void {
     this.changes.on(AI_JOB_CHANGED, this.handleChange);
+    // A page showing "Checking this book" is waiting for exactly this.
+    this.stopHearingTexts = this.texts.onComputed((bookId) => this.noteBook(bookId));
   }
 
   onModuleDestroy(): void {
     this.changes.off(AI_JOB_CHANGED, this.handleChange);
+    this.stopHearingTexts?.();
+    this.stopHearingTexts = null;
     if (this.flushTimer) clearTimeout(this.flushTimer);
     this.flushTimer = null;
   }
@@ -112,6 +119,16 @@ export class StoryGuidesGateway implements OnGatewayConnection, OnGatewayDisconn
     const bookId = change.subjectRef.bookId;
     if (isBookId(bookId)) this.changedBooks.add(bookId);
     if (change.kind === 'state') this.queueChanged = true;
+    this.scheduleFlush();
+  }
+
+  private noteBook(bookId: number): void {
+    if (!isBookId(bookId)) return;
+    this.changedBooks.add(bookId);
+    this.scheduleFlush();
+  }
+
+  private scheduleFlush(): void {
     if (this.flushTimer) return;
     this.flushTimer = setTimeout(() => this.flush(), STORY_GUIDE_PUSH_MS);
     this.flushTimer.unref?.();
