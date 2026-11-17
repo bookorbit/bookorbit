@@ -389,6 +389,26 @@
             "label": "Vergrendelstatus",
             "hint": "Metadata-vergrendelpictogram rechtsboven - oranje bij vergrendeld, groen bij ontgrendeld"
           }
+        },
+        "formatBadgeStyle": {
+          "options": {
+            "primary": {
+              "label": "Primair formaat"
+            },
+            "underline": {
+              "label": "Onderstrepen"
+            },
+            "seal": {
+              "label": "Verzegelen"
+            },
+            "dots": {
+              "label": "Stippen",
+              "hint": "Een gekleurde stip per formaat. Beweeg over de omslag voor de volledige lijst."
+            },
+            "kinds": {
+              "label": "Lezen en luisteren"
+            }
+          }
         }
       },
       "layout": {
@@ -561,7 +581,8 @@
         "profile": "Profiel",
         "privacy": "Privacy & delen",
         "notifications": "Meldingen",
-        "restrictions": "Beperkingen"
+        "restrictions": "Beperkingen",
+        "apiKeys": "API-sleutels"
       },
       "demoRestricted": {
         "cannotEdit": "Demo-beperkt account kan accountinstellingen niet bewerken",
@@ -1487,7 +1508,8 @@
         "magic-links": "Magische links",
         "oidc": "OIDC / SSO",
         "tts": "Tekst-naar-spraak",
-        "server-fonts": "Serverlettertypen"
+        "server-fonts": "Serverlettertypen",
+        "api-keys": "API-sleutels"
       },
       "tts": {
         "title": "Providers",
@@ -2043,7 +2065,44 @@
         "add": "Toevoegen",
         "addLabel": "{name} toevoegen",
         "alreadyAdded": "Al toegevoegd: {names}",
-        "allAdded": "U heeft elke provider uit deze lijst toegevoegd."
+        "allAdded": "U heeft elke provider uit deze lijst toegevoegd.",
+        "docs": "Documenten",
+        "media": {
+          "book": "Boeken",
+          "audiobook": "Audioboeken",
+          "comic": "Stripboeken"
+        }
+      },
+      "buildYourOwn": {
+        "links": {
+          "suggest": "Bron voorstellen"
+        }
+      },
+      "movedProviders": {
+        "title": "Sommige bronnen zijn niet langer ingebouwd"
+      },
+      "externalProviders": {
+        "title": "Externe providers",
+        "add": "Provider toevoegen",
+        "edit": "Bewerk {name}",
+        "toggle": "{name} inschakelen",
+        "row": "{host} · versie {version}",
+        "added": "{name} toegevoegd. Het blijft uitgeschakeld tot je het inschakelt.",
+        "removed": "{name} verwijderd. De opgeslagen id's zijn bewaard en de beoordelingen zijn behouden.",
+        "purged": "{name} verwijderd met zijn opgeslagen id's en beoordelingen.",
+        "status": {
+          "active": "Actief",
+          "ready": "Klaar",
+          "stale": "Laatste controle mislukt",
+          "unreachable": "Onbereikbaar",
+          "incompatible": "Incompatibel"
+        },
+        "sheet": {
+          "identity": "Sleutel {key} · versie {version}",
+          "remove": "Provider verwijderen",
+          "removeConfirm": "{name} verwijderen?",
+          "purge": "Verwijder en verwijder zijn data"
+        }
       },
       "fieldRules": {
         "clearAllProviders": "Alle providers wissen",
