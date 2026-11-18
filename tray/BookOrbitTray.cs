@@ -62,6 +62,7 @@ namespace BookOrbitTrayApp
         private ServiceState _currentState = ServiceState.Unknown;
         private DateTime _stateChangeTime = DateTime.MinValue;
         private bool _isCheckingHealth = false;
+        private static Process _wslKeepAliveProcess;
 
         private const string BaseUrl = "http://localhost:3500";
         private const string HealthUrl = "http://127.0.0.1:3500/api/v1/health";
@@ -179,6 +180,9 @@ namespace BookOrbitTrayApp
             _pollTimer.Tick += (s, e) => CheckHealthAsync();
             _pollTimer.Start();
 
+            // Гарантируем, что подсистема WSL2 не засыпает при активном сервере
+            EnsureWslKeepAlive();
+
             // Первый опрос сразу
             CheckHealthAsync();
         }
@@ -187,6 +191,11 @@ namespace BookOrbitTrayApp
         {
             if (_isCheckingHealth) return;
             _isCheckingHealth = true;
+
+            if (_currentState != ServiceState.Stopped)
+            {
+                EnsureWslKeepAlive();
+            }
 
             ThreadPool.QueueUserWorkItem(state =>
             {
@@ -315,6 +324,7 @@ namespace BookOrbitTrayApp
 
         private void StartService()
         {
+            EnsureWslKeepAlive();
             _currentState = ServiceState.Starting;
             _stateChangeTime = DateTime.Now;
             UpdateStateFromHealth(false);
@@ -350,6 +360,7 @@ namespace BookOrbitTrayApp
 
             ThreadPool.QueueUserWorkItem(s =>
             {
+                StopWslKeepAlive();
                 RunWslCommand("systemctl stop bookorbit.service", true);
                 _syncContext.Post(st =>
                 {
@@ -382,6 +393,7 @@ namespace BookOrbitTrayApp
 
             ThreadPool.QueueUserWorkItem(s =>
             {
+                EnsureWslKeepAlive();
                 RunWslCommand("systemctl restart bookorbit.service", true);
                 for (int i = 0; i < 25; i++)
                 {
@@ -565,6 +577,7 @@ namespace BookOrbitTrayApp
 
                 if (choice == DialogResult.Yes)
                 {
+                    StopWslKeepAlive();
                     RunWslCommand("systemctl stop bookorbit.service", false);
                 }
             }
@@ -672,10 +685,48 @@ namespace BookOrbitTrayApp
             return null;
         }
 
+        private static void EnsureWslKeepAlive()
+        {
+            try
+            {
+                if (_wslKeepAliveProcess == null || _wslKeepAliveProcess.HasExited)
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = "wsl.exe",
+                        Arguments = "-d Ubuntu -u root -- sleep infinity",
+                        CreateNoWindow = true,
+                        UseShellExecute = false,
+                        WindowStyle = ProcessWindowStyle.Hidden
+                    };
+                    _wslKeepAliveProcess = Process.Start(psi);
+                }
+            }
+            catch { }
+        }
+
+        private static void StopWslKeepAlive()
+        {
+            try
+            {
+                if (_wslKeepAliveProcess != null)
+                {
+                    if (!_wslKeepAliveProcess.HasExited)
+                    {
+                        _wslKeepAliveProcess.Kill();
+                    }
+                    _wslKeepAliveProcess.Dispose();
+                    _wslKeepAliveProcess = null;
+                }
+            }
+            catch { }
+        }
+
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
+                StopWslKeepAlive();
                 if (_pollTimer != null) _pollTimer.Dispose();
                 if (_notifyIcon != null) _notifyIcon.Dispose();
             }
