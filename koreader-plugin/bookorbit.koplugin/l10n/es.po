@@ -139,7 +139,7 @@ msgstr "%1h %2m"
 
 #: bookorbit_board_data.lua:102 bookorbit_catalog_util.lua:213 bookorbit_menu_ui.lua:352
 msgid "just now"
-msgstr "justo ahora"
+msgstr "hace un momento"
 
 #: bookorbit_board_data.lua:103 bookorbit_catalog_util.lua:216 bookorbit_menu_ui.lua:353
 msgid "%1 min ago"
@@ -1099,7 +1099,7 @@ msgstr "Volver al estado inicial"
 
 #: bookorbit_board_edit.lua:373
 msgid "Reset all pages"
-msgstr "Reiniciar todas las páginas"
+msgstr "Restablecer todas las páginas"
 
 #: bookorbit_board_edit.lua:373
 msgid "Every page back to how it started"
@@ -1107,7 +1107,7 @@ msgstr "Cada página vuelve a su estado inicial"
 
 #: bookorbit_board_edit.lua:375
 msgid "Reset all pages?"
-msgstr "¿Reiniciar todas las páginas?"
+msgstr "¿Restablecer todas las páginas?"
 
 #: bookorbit_board_edit.lua:376
 msgid "Every page goes back to its starting layout."
@@ -1115,7 +1115,7 @@ msgstr "Cada página vuelve a su diseño inicial."
 
 #: bookorbit_board_edit.lua:377 bookorbit_settings_page.lua:874
 msgid "Reset"
-msgstr "Reiniciar"
+msgstr "Restablecer"
 
 #: bookorbit_board_store.lua:37 bookorbit_catalog_detail.lua:461 bookorbit_menu_sheet.lua:198
 #: bookorbit_settings_page.lua:96 bookorbit_settings_page.lua:377
@@ -2209,7 +2209,7 @@ msgstr "Rejilla: %1"
 
 #: bookorbit_catalog.lua:1769 bookorbit_catalog_dashboard.lua:39
 msgid "Dashboard"
-msgstr "Panel de control"
+msgstr "Panel"
 
 #: bookorbit_catalog.lua:1780 bookorbit_menu_sheet.lua:201
 msgid "Close BookOrbit"
@@ -4177,7 +4177,7 @@ msgstr ", cambios guardados aquí"
 
 #: bookorbit_menu_sheet.lua:191
 msgid "Just now"
-msgstr "Justo ahora"
+msgstr "Hace un momento"
 
 #: bookorbit_menu_sheet.lua:193 bookorbit_menu_sheet.lua:195 bookorbit_menu_sheet.lua:225
 msgid "%1 waiting"
@@ -4674,7 +4674,7 @@ msgstr "Tus páginas se sustituirán por las de este diseño."
 
 #: bookorbit_settings_page.lua:874
 msgid "Reset Home?"
-msgstr "¿Reiniciar inicio?"
+msgstr "¿Restablecer Inicio?"
 
 #: bookorbit_settings_page.lua:874
 msgid "Your pages and tile style go back to how they started."
