@@ -152,8 +152,8 @@ function handleActionChange(value: string | number): void {
     :data-group-id="group.id"
   >
     <div class="duplicate-row items-center gap-2.5 px-3 py-2 transition-colors hover:bg-accent/60">
-      <label class="duplicate-cell-check grid size-8 cursor-pointer place-items-center">
-        <input type="checkbox" class="peer sr-only" :checked="selected" @change="handleSelect" />
+      <label class="duplicate-cell-check relative grid size-8 cursor-pointer place-items-center">
+        <input type="checkbox" class="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0" :checked="selected" @change="handleSelect" />
         <span class="sr-only">{{ t('tools.bookDuplicates.selectGroup', { title }) }}</span>
         <span
           class="grid size-4 place-items-center rounded-xs border peer-focus-visible:ring-2 peer-focus-visible:ring-ring"

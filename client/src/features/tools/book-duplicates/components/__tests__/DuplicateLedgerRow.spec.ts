@@ -113,6 +113,15 @@ describe('DuplicateLedgerRow', () => {
     expect(wrapper.emitted('expand')?.[0]).toEqual([7])
   })
 
+  it('keeps the checkbox focus target over its visible control', () => {
+    const wrapper = mountRow([candidate({ id: 1 }), candidate({ id: 2 })], 1)
+    const checkbox = wrapper.get('input[type="checkbox"]')
+
+    expect(checkbox.element.parentElement?.classList.contains('relative')).toBe(true)
+    expect(checkbox.classes()).toEqual(expect.arrayContaining(['absolute', 'inset-0', 'size-full', 'opacity-0']))
+    expect(checkbox.classes()).not.toContain('sr-only')
+  })
+
   it("shows the scan's reclaimable space whatever the action, and drops the deletion warning when the group merges", () => {
     const books = [candidate({ id: 1, metadataScore: 88 }), candidate({ id: 2, metadataScore: 70, readingProgress: 19 })]
     const wrapper = mountRow(books, 1, { action: 'merge' })
