@@ -1,6 +1,19 @@
 import type { AiApiType } from "./ai";
 
-export const AI_PRESET_IDS = ["openai", "anthropic", "gemini", "openrouter", "cliproxyapi", "ollama", "lmstudio", "vllm", "azure", "other"] as const;
+export const AI_PRESET_IDS = [
+  "openai",
+  "anthropic",
+  "gemini",
+  "openrouter",
+  "opencodezen",
+  "opencodego",
+  "cliproxyapi",
+  "ollama",
+  "lmstudio",
+  "vllm",
+  "azure",
+  "other",
+] as const;
 export type AiPresetId = (typeof AI_PRESET_IDS)[number];
 
 export interface AiPreset {
@@ -19,8 +32,26 @@ export interface AiPreset {
 }
 
 export const AI_PRESETS: Record<AiPresetId, AiPreset> = {
-  openai: { id: "openai", name: "OpenAI", baseUrl: "https://api.openai.com/v1", apiType: "openai-responses", keyOptional: false, headers: [], modelLabel: "model", warning: false },
-  anthropic: { id: "anthropic", name: "Anthropic", baseUrl: "https://api.anthropic.com", apiType: "anthropic-messages", keyOptional: false, headers: [], modelLabel: "model", warning: true },
+  openai: {
+    id: "openai",
+    name: "OpenAI",
+    baseUrl: "https://api.openai.com/v1",
+    apiType: "openai-responses",
+    keyOptional: false,
+    headers: [],
+    modelLabel: "model",
+    warning: false,
+  },
+  anthropic: {
+    id: "anthropic",
+    name: "Anthropic",
+    baseUrl: "https://api.anthropic.com",
+    apiType: "anthropic-messages",
+    keyOptional: false,
+    headers: [],
+    modelLabel: "model",
+    warning: true,
+  },
   gemini: {
     id: "gemini",
     name: "Google Gemini",
@@ -44,10 +75,66 @@ export const AI_PRESETS: Record<AiPresetId, AiPreset> = {
     modelLabel: "model",
     warning: true,
   },
-  cliproxyapi: { id: "cliproxyapi", name: "CLIProxyAPI", baseUrl: "http://localhost:8317/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: true },
-  ollama: { id: "ollama", name: "Ollama", baseUrl: "http://localhost:11434/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: true },
-  lmstudio: { id: "lmstudio", name: "LM Studio", baseUrl: "http://localhost:1234/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: true },
-  vllm: { id: "vllm", name: "vLLM", baseUrl: "http://localhost:8000/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: false },
+  opencodezen: {
+    id: "opencodezen",
+    name: "OpenCode Zen",
+    baseUrl: "https://opencode.ai/zen/v1",
+    apiType: "openai-chat",
+    keyOptional: false,
+    headers: [],
+    modelLabel: "model",
+    warning: false,
+  },
+  opencodego: {
+    id: "opencodego",
+    name: "OpenCode Go",
+    baseUrl: "https://opencode.ai/zen/go/v1",
+    apiType: "openai-chat",
+    keyOptional: false,
+    headers: [{ name: "x-opencode-session", value: "bookorbit" }],
+    modelLabel: "model",
+    warning: false,
+  },
+  cliproxyapi: {
+    id: "cliproxyapi",
+    name: "CLIProxyAPI",
+    baseUrl: "http://localhost:8317/v1",
+    apiType: "openai-chat",
+    keyOptional: true,
+    headers: [],
+    modelLabel: "model",
+    warning: true,
+  },
+  ollama: {
+    id: "ollama",
+    name: "Ollama",
+    baseUrl: "http://localhost:11434/v1",
+    apiType: "openai-chat",
+    keyOptional: true,
+    headers: [],
+    modelLabel: "model",
+    warning: true,
+  },
+  lmstudio: {
+    id: "lmstudio",
+    name: "LM Studio",
+    baseUrl: "http://localhost:1234/v1",
+    apiType: "openai-chat",
+    keyOptional: true,
+    headers: [],
+    modelLabel: "model",
+    warning: true,
+  },
+  vllm: {
+    id: "vllm",
+    name: "vLLM",
+    baseUrl: "http://localhost:8000/v1",
+    apiType: "openai-chat",
+    keyOptional: true,
+    headers: [],
+    modelLabel: "model",
+    warning: false,
+  },
   azure: {
     id: "azure",
     name: "Azure OpenAI",
@@ -105,7 +192,7 @@ function isAzureHost(host: string): boolean {
 /** The path with any pasted endpoint and trailing slashes removed. */
 function stripEndpoint(pathname: string): string {
   let path = pathname.replace(/\/+$/, "");
-  for (let changed = true; changed; ) {
+  for (let changed = true; changed;) {
     changed = false;
     for (const suffix of ENDPOINT_SUFFIXES) {
       if (path.toLowerCase().endsWith(suffix)) {
@@ -198,6 +285,10 @@ export function detectAiConnection(raw: string): AiUrlDetection | null {
     preset = "azure";
   } else if (host === "openrouter.ai") {
     preset = "openrouter";
+  } else if (host === "opencode.ai" && /^\/zen\/go$/i.test(path)) {
+    preset = "opencodego";
+  } else if (host === "opencode.ai" && /^\/zen$/i.test(path)) {
+    preset = "opencodezen";
   } else {
     preset = PORT_PRESETS[url.port] ?? "other";
   }
