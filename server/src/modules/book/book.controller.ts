@@ -53,7 +53,7 @@ import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
-import { CoverReadQueryDto } from './dto/cover-read-query.dto';
+import { CoverImageQueryDto, CoverReadQueryDto } from './dto/cover-read-query.dto';
 import { CoverMediumQueryDto } from '../cover/dto/cover-medium-query.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
@@ -345,10 +345,10 @@ export class BookController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
-    @Query() query: CoverReadQueryDto = {},
+    @Query() query: CoverImageQueryDto = {},
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    const coverPath = await this.bookService.getCoverPath(id, user, { medium: query.medium, strict: query.strict });
+    const coverPath = await this.bookService.getCoverPath(id, user, { medium: query.medium, strict: query.strict, size: query.size });
     if (!coverPath) throw new NotFoundException(`No cover for book ${id}`);
 
     const { mtimeMs } = await stat(coverPath);

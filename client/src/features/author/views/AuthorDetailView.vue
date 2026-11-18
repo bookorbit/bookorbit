@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useWindowSize } from '@vueuse/core'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
@@ -59,7 +59,9 @@ const { hasPermissionInAnyLibrary } = useLibraryPermissions()
 
 const authorBooksViewMode = ref<'grid' | 'list'>('grid')
 
-const authorId = computed(() => Number(route.params.id))
+// Kept alive per path, so this page's author never changes. The shared route moves on while the
+// page is hidden, and following its `id` would load whichever author shares the next page's id.
+const authorId = shallowRef(Number(route.params.id))
 const { author, loading: loadingAuthor, error: authorError, notFound: authorNotFound, load: loadAuthor } = useAuthorDetail(authorId)
 const {
   items: books,
@@ -532,13 +534,6 @@ onUnmounted(() => {
   observer?.disconnect()
   if (mergeSearchTimer) clearTimeout(mergeSearchTimer)
   cancelMetadataPreview()
-})
-
-watch(authorId, () => {
-  selectedMergeIds.value = []
-  mergeCandidates.value = []
-  mergeQuery.value = ''
-  void Promise.all([loadAuthor(), loadBooks(true)]).then(() => loadMetadataPreview())
 })
 
 watch([sort, order, libraryId, collapseSeries], () => {

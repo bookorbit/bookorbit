@@ -176,7 +176,6 @@ const {
 
 onMounted(() => {
   void fetchWeights()
-  void reloadReadingLog()
   void loadProviderLinkSettings()
 })
 
@@ -353,7 +352,7 @@ const hasCover = computed(() => props.book.coverSource !== null)
 const showCoverStack = computed(() => hasCoverPair(props.book))
 const coverLightboxMedium = ref<CoverMedium | undefined>(undefined)
 const { coverUrl } = useCoverVersions()
-const coverSrc = computed(() => coverUrl(props.book.id, 'cover', props.book.coverVersion))
+const coverSrc = computed(() => coverUrl(props.book.id, 'display', props.book.coverVersion))
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -659,7 +658,7 @@ async function savePersonalNote() {
 }
 
 const bookIdRef = computed(() => props.book.id)
-const { sessions: readingSessions, stats: readingStats, loading: readingLogLoading, reload: reloadReadingLog } = useBookReadingLog(bookIdRef)
+const { sessions: readingSessions, stats: readingStats, loading: readingLogLoading } = useBookReadingLog(bookIdRef)
 
 const { setStatus, updateStatus } = useBookStatus()
 
@@ -995,10 +994,6 @@ const editionProgress = computed<EditionProgress[]>(() => {
     byKey.set(audioEntry.key, { key: audioEntry.key, percentage: audioPercentage, finished: audioPercentage >= 100, resetFileId: -props.book.id })
   }
   return [...byKey.values()]
-})
-
-watch(bookIdRef, () => {
-  void reloadReadingLog()
 })
 
 function handleEditionReset(key: string) {

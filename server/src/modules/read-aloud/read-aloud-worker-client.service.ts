@@ -7,6 +7,8 @@ import { readAloudConfig } from '../../config/config';
 
 const HEALTH_TTL_MS = 10_000;
 const HEALTH_FAILURE_TTL_MS = 3_000;
+/** `/health` is tiny; the job timeout would let a worker host that drops packets hold a caller for half a minute. */
+const HEALTH_TIMEOUT_MS = 5_000;
 /** Worker answers are small: a job's state carries at most the events this server has not stored yet. */
 const MAX_RESPONSE_BYTES = 8 * 1024 * 1024;
 
@@ -46,6 +48,7 @@ export type WorkerHealthState =
 @Injectable()
 export class ReadAloudWorkerClientService {
   private healthCache: { expiresAt: number; value: WorkerHealthState } | null = null;
+  private healthProbe: Promise<WorkerHealthState> | null = null;
 
   constructor(@Inject(readAloudConfig.KEY) private readonly config: ConfigType<typeof readAloudConfig>) {}
 
@@ -53,12 +56,34 @@ export class ReadAloudWorkerClientService {
     return Boolean(this.config.workerUrl && this.config.workerToken);
   }
 
+  /** A fresh state, or one cached for a few seconds. Callers asking at the same time share one probe; `force` always asks anew. */
   async healthState(force = false): Promise<WorkerHealthState> {
     if (!this.configured) return { state: 'not_configured' };
-    if (!force && this.healthCache && this.healthCache.expiresAt > Date.now()) return this.healthCache.value;
+    if (force) return this.probeHealth();
+    if (this.healthCache && this.healthCache.expiresAt > Date.now()) return this.healthCache.value;
+    this.healthProbe ??= this.probeHealth().finally(() => {
+      this.healthProbe = null;
+    });
+    return this.healthProbe;
+  }
+
+  /**
+   * For display: the last state known, at once, refreshed behind the answer when it has gone stale.
+   * Only a server that has never asked waits for the worker, so a worker host that is off cannot
+   * hold up every book page while each probe times out.
+   */
+  async lastKnownHealthState(): Promise<WorkerHealthState> {
+    if (!this.configured) return { state: 'not_configured' };
+    const cached = this.healthCache;
+    if (!cached) return this.healthState();
+    if (cached.expiresAt <= Date.now()) void this.healthState();
+    return cached.value;
+  }
+
+  private async probeHealth(): Promise<WorkerHealthState> {
     let value: WorkerHealthState;
     try {
-      const health = await this.request<ReadAloudWorkerHealth>('/health', { method: 'GET' });
+      const health = await this.request<ReadAloudWorkerHealth>('/health', { method: 'GET', timeoutMs: HEALTH_TIMEOUT_MS });
       value = health.protocol === READ_ALOUD_WORKER_PROTOCOL ? { state: 'ok', health } : { state: 'incompatible', health };
     } catch {
       value = { state: 'unreachable' };
@@ -84,16 +109,16 @@ export class ReadAloudWorkerClientService {
     return this.request(`/v1/jobs/${encodeURIComponent(jobId)}`, { method: 'DELETE', jobId });
   }
 
-  private async request<T>(path: string, init: RequestInit & { jobId?: string }): Promise<T> {
+  private async request<T>(path: string, init: RequestInit & { jobId?: string; timeoutMs?: number }): Promise<T> {
     if (!this.config.workerUrl || !this.config.workerToken) throw new WorkerUnreachableError('Read-aloud worker is not configured');
-    const { jobId, ...requestInit } = init;
+    const { jobId, timeoutMs, ...requestInit } = init;
     let response: Response;
     try {
       response = await fetch(`${this.config.workerUrl}${path}`, {
         ...requestInit,
         // The bearer token goes with every request, so it must never follow a redirect elsewhere.
         redirect: 'error',
-        signal: AbortSignal.timeout(this.config.requestTimeoutMs),
+        signal: AbortSignal.timeout(Math.min(timeoutMs ?? this.config.requestTimeoutMs, this.config.requestTimeoutMs)),
         headers: { ...requestInit.headers, Authorization: `Bearer ${this.config.workerToken}` },
       });
     } catch (error) {

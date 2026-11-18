@@ -52,7 +52,7 @@ import CbzReaderView from './cbz/CbzReaderView.vue'
 import AudiobookReaderView from './audiobook/AudiobookReaderView.vue'
 import type { ReaderState } from './epub/composables/useReaderState'
 import type { FoliateLocationContext, FoliateRenderer } from './epub/composables/useFoliate'
-import type { BookDetail, EpubMediaOverlayPlaylist, EpubReaderSettings } from '@bookorbit/types'
+import type { EpubMediaOverlayPlaylist, EpubReaderSettings } from '@bookorbit/types'
 import { findMatchingCfiRange } from './epub/utils'
 import { getFormatGroup } from '@bookorbit/types'
 import { resolveReaderResumeTarget } from '@/lib/reading-checkpoint'
@@ -68,7 +68,7 @@ const { coverUrl } = useCoverVersions()
 const bookId = Number(route.params.bookId)
 const fileId = Number(route.params.fileId)
 const fileFormat = (route.query.format as string) || 'epub'
-useReaderPageTitle(bookId)
+const bookMeta = useReaderPageTitle(bookId)
 const normalizedFileFormat = fileFormat.toLowerCase()
 const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
 const isPdfFormat = fileFormat === 'pdf'
@@ -257,7 +257,6 @@ function handleTranslate() {
   showTranslation.value = true
 }
 
-const bookMeta = ref<BookDetail | null>(null)
 const initialNavigationPending = ref(true)
 
 const {
@@ -946,15 +945,7 @@ onMounted(async () => {
   // Specialized readers own their own progress/settings/loading lifecycle.
   if (isAudioFormat || isPdfFormat || isComicFormat) return
 
-  void Promise.all([
-    api(`/api/v1/books/${bookId}`)
-      .then((r) => r.json() as Promise<BookDetail>)
-      .then((b) => {
-        bookMeta.value = b
-      })
-      .catch(() => {}),
-    ...(isTtsAvailable ? [loadUserPreferences().catch(() => {})] : []),
-  ])
+  if (isTtsAvailable) void loadUserPreferences().catch(() => {})
 
   await customFonts.fetchAllFonts()
   await refreshFontFaces()

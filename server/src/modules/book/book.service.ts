@@ -71,6 +71,7 @@ import type {
   BookWriteAndRenameResult,
   BooksPage,
   CustomMetadataFieldTypeMap,
+  CoverImageSize,
   CoverMedium,
   FileRenameResult,
   GroupRule,
@@ -1549,9 +1550,14 @@ export class BookService {
     }
   }
 
-  async getCoverPath(id: number, user: RequestUser, options: { medium?: CoverMedium; strict?: boolean } = {}): Promise<string | null> {
+  async getCoverPath(
+    id: number,
+    user: RequestUser,
+    options: { medium?: CoverMedium; strict?: boolean; size?: CoverImageSize } = {},
+  ): Promise<string | null> {
     await this.verifyBookAccess(id, user);
-    return this.coverStore.resolve(id, { variant: 'cover', ...options });
+    const { size, ...resolveOptions } = options;
+    return this.coverStore.resolve(id, { variant: size === 'display' ? 'display' : 'cover', ...resolveOptions });
   }
 
   async getThumbnailPath(id: number, user: RequestUser, options: { medium?: CoverMedium; strict?: boolean } = {}): Promise<string | null> {

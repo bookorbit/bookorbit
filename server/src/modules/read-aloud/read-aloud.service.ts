@@ -93,7 +93,7 @@ export class ReadAloudService {
       this.libraries.findOne(book.libraryId),
       this.jobs.findBookPlacement(bookId),
       this.jobs.findReadAlongFiles(bookId),
-      this.worker.healthState(),
+      this.worker.lastKnownHealthState(),
     ]);
     const epubFiles = this.epubCandidates(book).map((file) => this.candidate(file, 'epub'));
     const audioFiles = this.audioCandidates(book).map((file) => this.candidate(file, file.format!.toLowerCase()));

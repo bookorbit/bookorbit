@@ -5,6 +5,7 @@ export const COVER_CUSTOM_FILE_PREFIX = 'cover_custom.';
 export const COVER_EXTRACTED_FILE_PREFIX = 'cover_extracted.';
 export const COVER_LEGACY_FILE_PREFIX = 'cover.';
 export const COVER_THUMBNAIL_FILE_NAME = 'thumbnail.jpg';
+export const COVER_DISPLAY_FILE_NAME = 'display.jpg';
 
 export function bookCoverDirPath(appDataPath: string, bookId: number): string {
   return join(appDataPath, 'covers', String(bookId));

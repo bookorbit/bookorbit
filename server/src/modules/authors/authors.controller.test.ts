@@ -229,7 +229,7 @@ describe('AuthorsController', () => {
   it('answers an empty selection at once with an empty done and creates no run', async () => {
     const registry = new BulkRunHandlerRegistry();
     registry.register(new AuthorBulkRefreshHandler(registry, {} as never));
-    const repo = { countUnfinished: vi.fn(), insert: vi.fn() };
+    const repo = { insertWithinLimit: vi.fn() };
     const bulkRuns = new BulkRunsService(repo as never, registry, {} as never, {} as never, {} as never, {} as never);
     const { controller, authorsService } = makeController(bulkRuns);
     const { reply, raw } = makeReply();
@@ -241,7 +241,7 @@ describe('AuthorsController', () => {
     expect(raw.write).toHaveBeenCalledTimes(1);
     expect(raw.write).toHaveBeenCalledWith(`data: ${JSON.stringify({ done: true, processed: 0, failed: 0, updated: 0 })}\n\n`);
     expect(raw.end).toHaveBeenCalled();
-    expect(repo.insert).not.toHaveBeenCalled();
+    expect(repo.insertWithinLimit).not.toHaveBeenCalled();
   });
 
   it('records the bulk refresh in the audit log itself instead of through @Auditable', () => {

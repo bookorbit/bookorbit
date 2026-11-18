@@ -1,9 +1,11 @@
-import { computed } from 'vue'
+import { computed, type Ref } from 'vue'
+import type { BookDetail } from '@bookorbit/types'
 import { useI18n } from 'vue-i18n'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useBookDetail } from '@/features/book/composables/useBookDetail'
 
-export function useReaderPageTitle(bookId: number): void {
+/** Sets the tab title from the book, and hands the reader the record it fetched for that. */
+export function useReaderPageTitle(bookId: number): Readonly<Ref<BookDetail | null>> {
   const { t } = useI18n()
   const { detail, fetch } = useBookDetail()
   const pageTitle = computed(() => {
@@ -14,4 +16,5 @@ export function useReaderPageTitle(bookId: number): void {
 
   usePageTitle(pageTitle)
   if (Number.isFinite(bookId)) void fetch(bookId)
+  return detail
 }

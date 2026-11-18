@@ -134,6 +134,10 @@ type BookMediaFile = Pick<BookFileRef, "format" | "role">;
 export const COVER_MEDIA = ["ebook", "audio"] as const;
 export type CoverMedium = (typeof COVER_MEDIA)[number];
 
+/** `size` on the cover route. `display` is a screen-sized copy for pages that show the cover large. */
+export const COVER_IMAGE_SIZES = ["display"] as const;
+export type CoverImageSize = (typeof COVER_IMAGE_SIZES)[number];
+
 type CoverMediaFile = BookMediaFile & {
   mediaOverlay?: Pick<EpubMediaOverlayCapability, "available"> | null;
   mediaOverlayAvailable?: boolean | null;

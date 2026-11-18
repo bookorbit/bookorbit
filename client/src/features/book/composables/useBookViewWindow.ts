@@ -1,4 +1,4 @@
-import { computed, getCurrentInstance, onActivated, ref, watch, type Ref } from 'vue'
+import { computed, getCurrentInstance, getCurrentScope, onActivated, onScopeDispose, ref, watch, type Ref } from 'vue'
 import { useElementSize, useWindowSize } from '@vueuse/core'
 import {
   MAX_RANDOM_SORT_SEED,
@@ -21,6 +21,7 @@ const LIST_CHUNK = 100
 const RAIL_SLOT_PX = 20
 const RAIL_VERTICAL_FRACTION = 0.85
 const RAIL_VERTICAL_PADDING_PX = 16
+const RAIL_RESIZE_SETTLE_MS = 250
 
 function isValidScopeId(value: number | null): value is number {
   return value !== null && Number.isInteger(value) && value > 0
@@ -99,8 +100,34 @@ export function useBookViewWindow(options: {
   const { height: windowHeight } = useWindowSize()
   const fallbackRailViewport = ref<HTMLElement | null>(null)
   const { height: railViewportHeight } = useElementSize(options.railViewport ?? fallbackRailViewport)
+  // The rail's height picks how many buckets to ask for, so every change is a request. A view
+  // hidden by KeepAlive measures 0, which would ask again for a page nobody sees: keep the last
+  // real height. A drag-resize changes it every few pixels: ask once it settles.
+  const railHeight = ref(0)
+  let railHeightTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    railViewportHeight,
+    (height) => {
+      if (height <= 0) return
+      if (railHeightTimer) clearTimeout(railHeightTimer)
+      if (railHeight.value === 0) {
+        railHeight.value = height
+        return
+      }
+      railHeightTimer = setTimeout(() => {
+        railHeightTimer = null
+        railHeight.value = height
+      }, RAIL_RESIZE_SETTLE_MS)
+    },
+    { immediate: true },
+  )
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      if (railHeightTimer) clearTimeout(railHeightTimer)
+    })
+  }
   const railCapacity = computed(() => {
-    const viewportHeight = railViewportHeight.value || windowHeight.value
+    const viewportHeight = railHeight.value || windowHeight.value
     const available = viewportHeight * RAIL_VERTICAL_FRACTION - RAIL_VERTICAL_PADDING_PX
     return Math.min(64, Math.max(8, Math.floor(available / RAIL_SLOT_PX)))
   })

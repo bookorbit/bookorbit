@@ -998,6 +998,15 @@ describe('BookService', () => {
       expect(coverStore.resolve).toHaveBeenCalledWith(9, { variant: 'cover', medium: 'audio', strict: true });
     });
 
+    it('asks the slot store for the screen-sized copy when the display size is requested', async () => {
+      const { service, bookRepo, coverStore } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+
+      await service.getCoverPath(9, makeUser(), { medium: 'ebook', size: 'display' });
+
+      expect(coverStore.resolve).toHaveBeenCalledWith(9, { variant: 'display', medium: 'ebook' });
+    });
+
     it('resolves the thumbnail through the slot store', async () => {
       const { service, bookRepo, coverStore } = makeService();
       bookRepo.findLibraryIdByBookId.mockResolvedValue(5);

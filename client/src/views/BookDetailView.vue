@@ -20,6 +20,7 @@ import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useCoverTint } from '@/features/book/composables/useCoverTint'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import EntityNotFound from '@/components/EntityNotFound.vue'
+import { prefetchPdfReader } from '@/features/reader/pdf-v4/prefetch-pdf-reader'
 
 const loadReadingLogTab = () => import('@/features/book/components/detail/tabs/ReadingLogTab.vue')
 const loadHighlightsTab = () => import('@/features/book/components/detail/tabs/HighlightsTab.vue')
@@ -84,7 +85,7 @@ const { bookDetailCoverTint } = useDisplaySettings()
 const tintSource = computed(() => {
   const book = detail.value
   if (bookDetailCoverTint.value === 'off' || tab.value !== 'details' || !book || book.coverSource === null) return null
-  return coverUrl(book.id, 'cover', book.coverVersion)
+  return coverUrl(book.id, 'display', book.coverVersion)
 })
 const { tint } = useCoverTint(tintSource)
 const coverTint = computed(() => {
@@ -159,6 +160,11 @@ watch(mergedInto, (targetBookId) => {
 })
 
 watch(bookId, (id) => fetch(id), { immediate: true })
+
+// Read opens from here, so a book with a PDF warms the PDF reader; no other page pays for it.
+watch(detail, (book) => {
+  if (book?.files?.some((file) => file.format?.toLowerCase() === 'pdf')) prefetchPdfReader()
+})
 
 // The two lazy tabs render nothing at all while their chunk arrives, so a cold click on either
 // blanks the pane. Warm both once the page is idle and the first click has a component to mount.

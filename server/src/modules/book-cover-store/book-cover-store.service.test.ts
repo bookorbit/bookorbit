@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, utimes, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import sharp from 'sharp';
@@ -330,6 +330,60 @@ describe('BookCoverStore', () => {
     it('resolves null when the slot directory is gone', async () => {
       await withSlot(null, async (store) => {
         await expect(store.resolve(7, { variant: 'thumbnail' })).resolves.toBeNull();
+      });
+    });
+  });
+
+  describe('display cover', () => {
+    const ebookOnly = () => context({ media: { hasEbook: true, hasAudio: false }, slots: [slot('ebook')] });
+
+    async function withCover(cover: Buffer, run: (store: BookCoverStore, dir: string) => Promise<void>): Promise<void> {
+      const root = await mkdtemp(join(tmpdir(), 'cover-store-display-'));
+      try {
+        const dir = bookCoverSlotDirPath(root, 7, 'ebook');
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, 'cover_extracted.jpg'), cover);
+        await run(makeStore(root, ebookOnly()).store, dir);
+      } finally {
+        await rm(root, { recursive: true, force: true });
+      }
+    }
+
+    it('serves a screen-sized copy of a large cover, made once and then reused', async () => {
+      await withCover(await image(1600, 2400), async (store, dir) => {
+        await expect(store.resolve(7, { variant: 'display' })).resolves.toBe(join(dir, 'display.jpg'));
+        expect(await sharp(await readFile(join(dir, 'display.jpg'))).metadata()).toMatchObject({ format: 'jpeg', width: 600, height: 900 });
+        expect((await readdir(dir)).sort()).toEqual(['cover_extracted.jpg', 'display.jpg']);
+
+        await writeFile(join(dir, 'display.jpg'), Buffer.from('kept'));
+        await expect(store.resolve(7, { variant: 'display' })).resolves.toBe(join(dir, 'display.jpg'));
+        await expect(readFile(join(dir, 'display.jpg'), 'utf8')).resolves.toBe('kept');
+      });
+    });
+
+    it('redraws the copy once the cover is newer than it', async () => {
+      await withCover(await image(1600, 2400), async (store, dir) => {
+        await store.resolve(7, { variant: 'display' });
+        const past = new Date(Date.now() - 60_000);
+        await utimes(join(dir, 'display.jpg'), past, past);
+        await writeFile(join(dir, 'cover_extracted.jpg'), await image(2400, 2400));
+
+        await expect(store.resolve(7, { variant: 'display' })).resolves.toBe(join(dir, 'display.jpg'));
+        expect(await sharp(await readFile(join(dir, 'display.jpg'))).metadata()).toMatchObject({ width: 600, height: 600 });
+      });
+    });
+
+    it('serves a cover already small enough as it is', async () => {
+      await withCover(await image(400, 600), async (store, dir) => {
+        await expect(store.resolve(7, { variant: 'display' })).resolves.toBe(join(dir, 'cover_extracted.jpg'));
+        expect(await readdir(dir)).toEqual(['cover_extracted.jpg']);
+      });
+    });
+
+    it('falls back to the full cover when the cover cannot be decoded', async () => {
+      await withCover(Buffer.from('not an image'), async (store, dir) => {
+        await expect(store.resolve(7, { variant: 'display' })).resolves.toBe(join(dir, 'cover_extracted.jpg'));
+        expect(await readdir(dir)).toEqual(['cover_extracted.jpg']);
       });
     });
   });

@@ -1,4 +1,4 @@
-import { defineComponent, nextTick, ref } from 'vue'
+import { defineComponent, nextTick, ref, type Ref } from 'vue'
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookCard, BooksPage, GroupRule, JumpBucket, SortSpec } from '@bookorbit/types'
@@ -21,6 +21,14 @@ vi.mock('../useBookEvents', () => ({
     },
   }),
 }))
+
+const elementSizeMock = vi.hoisted(() => ({ height: null as unknown as Ref<number> }))
+
+vi.mock('@vueuse/core', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@vueuse/core')>()
+  const vue = await import('vue')
+  return { ...actual, useElementSize: () => ({ width: vue.ref(0), height: elementSizeMock.height }) }
+})
 
 import { BOOK_WINDOW_BLOCK_SIZE } from '../useBookWindow'
 import { useBookViewWindow } from '../useBookViewWindow'
@@ -147,6 +155,8 @@ describe('useBookViewWindow', () => {
   beforeEach(() => {
     fetchMock.mockReset()
     bookEventsMock.progressChangedCallback = null
+    // Each test's views stay alive, so each gets its own height to move.
+    elementSizeMock.height = ref(0)
   })
 
   afterEach(() => {
@@ -422,6 +432,42 @@ describe('useBookViewWindow', () => {
     expect(listRequests()).toContain(1)
 
     win.releaseRailGutter()
+  })
+
+  it('asks for no buckets while a kept-alive view is hidden, and asks once when a resize settles', async () => {
+    vi.useFakeTimers()
+    elementSizeMock.height.value = 800
+    mockApi(250, [bucket('A', 0), bucket('B', 120)])
+    setup({ viewMode: 'grid' })
+    await flush()
+    await flush()
+    expect(jumpRequestCount()).toBe(1)
+
+    elementSizeMock.height.value = 0
+    await flush()
+    vi.advanceTimersByTime(1000)
+    await flush()
+    elementSizeMock.height.value = 800
+    await flush()
+    vi.advanceTimersByTime(1000)
+    await flush()
+    expect(jumpRequestCount()).toBe(1)
+
+    for (const height of [760, 720, 680, 640]) {
+      elementSizeMock.height.value = height
+      await flush()
+      vi.advanceTimersByTime(50)
+    }
+    await flush()
+    expect(jumpRequestCount()).toBe(1)
+
+    vi.advanceTimersByTime(300)
+    await flush()
+    expect(jumpRequestCount()).toBe(2)
+    const jumpBodies = fetchMock.mock.calls
+      .filter(([url]) => url.includes('jump-buckets'))
+      .map(([, init]) => JSON.parse(String(init?.body)) as { maxBuckets: number })
+    expect(jumpBodies.map((body) => body.maxBuckets)).toEqual([33, 26])
   })
 
   it('omits the shuffle seed until a sort tier is random', async () => {

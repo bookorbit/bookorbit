@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onScopeDispose, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onScopeDispose, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Orbit } from '@lucide/vue'
@@ -28,8 +28,10 @@ import { useSidebarLibraryActivity } from '@/composables/useSidebarLibraryActivi
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import CreateSmartScopeDialog from '@/features/smart-scope/components/CreateSmartScopeDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
-import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import SettingsSidebar from '@/features/settings/components/SettingsSidebar.vue'
+
+// Only opened to create a library, so it stays out of every page's first load.
+const LibraryCreatorModal = defineAsyncComponent(() => import('@/features/library/components/LibraryCreatorModal.vue'))
 
 const { t } = useI18n()
 const route = useRoute()

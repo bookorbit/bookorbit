@@ -234,6 +234,17 @@ describe('BookController', () => {
     expect(mockCreateReadStream).not.toHaveBeenCalled();
   });
 
+  it('passes a requested display size on to the service', async () => {
+    const { controller, bookService } = makeController();
+    const { reply } = makeReply();
+    bookService.getCoverPath.mockResolvedValue('/tmp/display.jpg');
+    mockStat.mockResolvedValue({ mtimeMs: 1234 } as never);
+
+    await controller.getCover(7, makeUser(), reply, { t: '1', size: 'display' }, '"1234"');
+
+    expect(bookService.getCoverPath).toHaveBeenCalledWith(7, expect.anything(), { medium: undefined, strict: undefined, size: 'display' });
+  });
+
   it('returns 304 with immutable cache when cover etag matches and ?t= present', async () => {
     const { controller, bookService } = makeController();
     const { reply, headers } = makeReply();
@@ -550,9 +561,9 @@ describe('BookController', () => {
       for (const Handler of [BookRefreshMetadataBulkHandler, BookReExtractCoverBulkHandler, BookEmbedAudioCoverBulkHandler]) {
         new Handler(registry, bookService as never).onModuleInit();
       }
+      // Mirrors the repository's atomic check: no row once the account holds `max` unfinished runs.
       const repo = {
-        countUnfinished: vi.fn().mockResolvedValue(unfinished),
-        insert: vi.fn(),
+        insertWithinLimit: vi.fn((_values: unknown, max: number) => Promise.resolve(unfinished >= max ? null : { id: 'run-1' })),
         findById: vi.fn(),
       };
       const service = new BulkRunsService(
@@ -582,7 +593,7 @@ describe('BookController', () => {
       expect(raw.write).toHaveBeenCalledOnce();
       expect(raw.write).toHaveBeenCalledWith(`data: ${JSON.stringify(done)}\n\n`);
       expect(raw.end).toHaveBeenCalled();
-      expect(repo.insert).not.toHaveBeenCalled();
+      expect(repo.insertWithinLimit).not.toHaveBeenCalled();
     });
 
     it.each(['bulkRefreshMetadata', 'bulkReExtractCover', 'bulkEmbedAudioCover'] as const)(
@@ -595,7 +606,8 @@ describe('BookController', () => {
 
         await expect(result).rejects.toBeInstanceOf(HttpException);
         await expect(result).rejects.toMatchObject({ status: HttpStatus.TOO_MANY_REQUESTS });
-        expect(repo.insert).not.toHaveBeenCalled();
+        expect(repo.insertWithinLimit).toHaveBeenCalledOnce();
+        await expect(repo.insertWithinLimit.mock.results[0]!.value).resolves.toBeNull();
         expect(raw.writeHead).not.toHaveBeenCalled();
         expect(raw.write).not.toHaveBeenCalled();
       },

@@ -1,4 +1,4 @@
-import { COVER_MEDIA, type CoverMedium } from '@bookorbit/types';
+import { COVER_IMAGE_SIZES, COVER_MEDIA, type CoverImageSize, type CoverMedium } from '@bookorbit/types';
 import { Transform } from 'class-transformer';
 import { IsBoolean, IsIn, IsOptional } from 'class-validator';
 
@@ -16,4 +16,10 @@ export class CoverReadQueryDto extends CoverMediumQueryDto {
 
   @IsOptional()
   t?: string;
+}
+
+export class CoverImageQueryDto extends CoverReadQueryDto {
+  @IsOptional()
+  @IsIn(COVER_IMAGE_SIZES)
+  size?: CoverImageSize;
 }

@@ -47,7 +47,11 @@ function makeService(
     resync: vi.fn(),
     dismiss: vi.fn(),
   };
-  const worker = { healthState: vi.fn().mockResolvedValue(options.health ?? okHealth()), cancel: vi.fn().mockResolvedValue(undefined) };
+  const worker = {
+    healthState: vi.fn().mockResolvedValue(options.health ?? okHealth()),
+    lastKnownHealthState: vi.fn().mockResolvedValue(options.health ?? okHealth()),
+    cancel: vi.fn().mockResolvedValue(undefined),
+  };
   const books = { getDetail: vi.fn().mockResolvedValue(options.book ?? bookDetail()), verifyBookAccess: vi.fn().mockResolvedValue(undefined) };
   const users = { findByIdWithPermissions: vi.fn().mockResolvedValue(OWNER) };
   const libraries = { findOne: vi.fn().mockResolvedValue({ organizationMode: options.organizationMode ?? 'book_per_folder' }) };

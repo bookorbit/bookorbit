@@ -1,1 +1,1 @@
-export { CoverReadQueryDto } from '../../cover/dto/cover-medium-query.dto';
+export { CoverImageQueryDto, CoverReadQueryDto } from '../../cover/dto/cover-medium-query.dto';

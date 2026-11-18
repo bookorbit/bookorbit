@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { defineAsyncComponent, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { BookOpen, Plus, Users } from '@lucide/vue'
 import type { Library } from '@bookorbit/types'
-import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
+
+// Only opened to create a library, so it stays out of every page's first load.
+const LibraryCreatorModal = defineAsyncComponent(() => import('@/features/library/components/LibraryCreatorModal.vue'))
 
 defineProps<{ canCreate: boolean }>()
 
