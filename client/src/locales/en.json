@@ -17977,5 +17977,458 @@
         "description": "Read 500 pages this month"
       }
     }
+  },
+  "setupOverview": {
+    "title": "How this is set up",
+    "navDescription": "Every flow BookOrbit runs for you, with your own settings on it. Nothing here changes anything.",
+    "loading": "Reading how this install is set up",
+    "empty": "Nothing is set up yet. Add a library and a dock to see this fill in.",
+    "needYou": "{count, plural, one {# needs you} other {# need you}}",
+    "allClear": "Nothing needs you",
+    "error": {
+      "title": "This could not be read",
+      "detail": "The server could not describe how it is set up. The settings themselves are unaffected.",
+      "retry": "Try again"
+    },
+    "map": {
+      "title": "Everything, in one picture",
+      "lede": "Three ways a book gets in, what the dock does to it, and everywhere it goes afterwards.",
+      "alt": "A map of every flow: how books arrive, what the dock does to them, and where they go afterwards",
+      "dock": "The dock",
+      "out": "Going out",
+      "services": "Asked by the others, not a flow of their own"
+    },
+    "ingest": {
+      "title": "Books coming in",
+      "summary": "{docks} of {libraries, plural, one {# library takes} other {# libraries take}} files straight from a dock. Everything else waits in Unsorted.",
+      "state": {
+        "ok": "All filing",
+        "attention": "{count, plural, one {# needs you} other {# need you}}"
+      },
+      "stats": {
+        "libraries": "{count, plural, one {library} other {libraries}}",
+        "docks": "{count, plural, one {dock} other {docks}}"
+      },
+      "steps": {
+        "arrives": "Arrives",
+        "read": "Read",
+        "matched": "Matched",
+        "files": "Files itself",
+        "library": "In the library"
+      },
+      "lines": {
+        "arrivesA": "an upload, or a file",
+        "arrivesB": "dropped in a dock",
+        "readA": "cover and embedded",
+        "readB": "metadata, always",
+        "matchedA": "the best score wins",
+        "filesA": "{auto} of {total, plural, one {# dock} other {# docks}}",
+        "filesB": "file by themselves"
+      },
+      "edges": {
+        "docks": "{count, plural, one {# dock} other {# docks}}",
+        "fetch": "{count, plural, =0 {nothing fetched} one {# dock fetches} other {# docks fetch}}",
+        "threshold": "at {percent}%",
+        "byHand": "filed by hand",
+        "filed": "moved in"
+      },
+      "branch": {
+        "onHold": "On hold",
+        "waiting": "{count, plural, one {# waiting now} other {# waiting now}}"
+      },
+      "facts": {
+        "folder": "Dock folder _libraries",
+        "unsorted": "Unsorted takes the rest",
+        "mode": {
+          "safe_merge": "Safe merge of metadata",
+          "fetched_only": "Fetched metadata only",
+          "embedded_only": "Embedded metadata only"
+        },
+        "autoOn": "Files itself at {percent}%",
+        "autoOff": "Never files by itself"
+      },
+      "table": {
+        "dock": "Dock",
+        "folder": "Folder",
+        "filesAt": "Files itself at",
+        "metadata": "Metadata",
+        "filing": "Filing",
+        "state": "State"
+      },
+      "cells": {
+        "at": "{percent}%",
+        "never": "Never",
+        "mode": {
+          "safe_merge": "Safe merge",
+          "fetched_only": "Fetched only",
+          "embedded_only": "Embedded only"
+        },
+        "keepsOriginal": "Keeps the original",
+        "moves": "Moves the file",
+        "folderMissing": "Folder missing",
+        "off": "Off",
+        "on": "On",
+        "paused": "Paused",
+        "onWaiting": "On · {count} waiting",
+        "unsorted": "Unsorted",
+        "dockRoot": "Dock root"
+      },
+      "warnings": {
+        "paused": "The Book Dock is paused, so nothing dropped in is read or filed until it is resumed.",
+        "folderMissing": "has a dock whose folder is not on disk, so nothing dropped there is taken in.",
+        "noFolder": "files into a folder that was removed from the library, so arrivals wait until one is chosen.",
+        "unrecognised": "{count, plural, one {# folder in _libraries belongs to no dock, so files dropped there are never taken in.} other {# folders in _libraries belong to no dock, so files dropped there are never taken in.}}",
+        "stray": "{count, plural, one {# file sits directly in _libraries, where no dock takes it in.} other {# files sit directly in _libraries, where no dock takes them in.}}",
+        "strayMany": "More than {count} files sit directly in _libraries, where no dock takes them in.",
+        "fix": {
+          "chooseFolder": "Choose a folder",
+          "openDock": "Open Book Dock"
+        }
+      },
+      "links": {
+        "bookDock": "Book Dock",
+        "libraries": "Libraries"
+      },
+      "map": {
+        "dropped": "Dropped in",
+        "upload": "An upload",
+        "dockFolder": "The dock folder",
+        "readSub": "always",
+        "matchedSub": "best score wins",
+        "onHold": "{count, plural, one {# on hold} other {# on hold}}",
+        "onDisk": "Already on disk",
+        "libraryFolder": "A library folder",
+        "scanned": "Scanned",
+        "scanBoth": "{watched} watched, {scheduled} scheduled",
+        "scanWatched": "{count, plural, one {# library watched} other {# libraries watched}}",
+        "scanScheduled": "{count, plural, one {# on a schedule} other {# on a schedule}}",
+        "scanByHand": "when you ask",
+        "library": "Your library",
+        "books": "{count, plural, one {# book} other {# books}}",
+        "libraries": "{count, plural, one {# library} other {# libraries}}"
+      }
+    },
+    "requests": {
+      "title": "Books you ask for",
+      "summary": "{sources, plural, one {# source} other {# sources}} and {clients, plural, one {# download client} other {# download clients}} switched on.",
+      "state": {
+        "ok": "All answering",
+        "attention": "{count, plural, one {# needs you} other {# need you}}",
+        "off": "Nothing switched on"
+      },
+      "stats": {
+        "sources": "{count, plural, one {request source} other {request sources}}"
+      },
+      "steps": {
+        "asked": "Asked",
+        "searched": "Searched",
+        "picked": "Picked",
+        "downloaded": "Downloaded",
+        "filed": "Filed"
+      },
+      "lines": {
+        "askedA": "anyone who may",
+        "askedB": "request a book",
+        "searchedA": "{count, plural, one {# source} other {# sources}}",
+        "pickedA": "a profile per kind",
+        "pickedAuto": "takes above {score}",
+        "pickedByHand": "you pick the release",
+        "downloadedA": "{count, plural, one {# client} other {# clients}}",
+        "downloadedB": "up to {tries, plural, one {# try} other {# tries}}",
+        "filedNowhere": "nowhere set yet",
+        "filedB": "by media kind",
+        "filedMore": "and {count} more"
+      },
+      "edges": {
+        "approved": "approved",
+        "retry": "every {hours} h",
+        "onAsk": "when asked",
+        "sent": "to a client",
+        "checked": "checked at {score}",
+        "unchecked": "as it comes"
+      },
+      "branch": {
+        "nothingFound": "Nothing found",
+        "triesAgain": "tries again in {hours} h"
+      },
+      "facts": {
+        "autoGrab": "Takes a release above {score}",
+        "byHand": "You pick every release",
+        "verify": "Checked against the request at {score}",
+        "noVerify": "Not checked against the request",
+        "retry": "Up to {tries, plural, one {# try} other {# tries}}",
+        "noRetry": "No retries",
+        "autoSearch": "Keeps looking for {days, plural, one {# day} other {# days}}",
+        "formats": {
+          "all": "Imports every format",
+          "preferred": "Imports preferred formats"
+        }
+      },
+      "table": {
+        "source": "Source",
+        "kind": "Kind",
+        "usedFor": "Used for",
+        "state": "State"
+      },
+      "kinds": {
+        "torznab": "Torznab",
+        "newznab": "Newznab",
+        "plugin": "Plugin",
+        "client": "Download client"
+      },
+      "cells": {
+        "allKinds": "Every kind",
+        "noKinds": "Nothing",
+        "someKinds": "{count} kinds",
+        "only": {
+          "ebook": "E-books only",
+          "audiobook": "Audiobooks only"
+        },
+        "on": "On",
+        "off": "Off",
+        "hardlinks": "Hardlinks",
+        "copies": "Copies",
+        "notAnswering": "Not answering",
+        "testFailed": "Last test failed",
+        "failingSearches": "{count, plural, one {Last search failed} other {# searches failed}}"
+      },
+      "warnings": {
+        "noSources": "No request source is switched on, so nothing can be searched for.",
+        "noClients": "No download client is switched on, so a release cannot be taken.",
+        "clientFailing": "did not answer its last test, so releases sent to it may go nowhere.",
+        "sourceFailing": "{count, plural, one {failed its last search, so requests may find nothing there.} other {has failed its last # searches, so requests may find nothing there.}}",
+        "noDestination": {
+          "ebook": "No library is set for e-books to land in, so a filled request has nowhere to go.",
+          "audiobook": "No library is set for audiobooks to land in, so a filled request has nowhere to go."
+        },
+        "fix": {
+          "openIndexers": "Open sources",
+          "openClients": "Open clients",
+          "testIt": "Test it",
+          "setDestination": "Set a library"
+        }
+      },
+      "links": {
+        "indexers": "Sources",
+        "clients": "Download clients",
+        "requests": "Requests"
+      },
+      "map": {
+        "asked": "Asked for",
+        "request": "A request",
+        "intoDock": "into the dock"
+      }
+    },
+    "metadata": {
+      "title": "Where metadata comes from",
+      "summary": "{providers, plural, one {# provider answers} other {# providers answer}} for {fields, plural, one {# field} other {# fields}}, each in its own order.",
+      "state": {
+        "ok": "All answering",
+        "attention": "{count, plural, one {# needs you} other {# need you}}",
+        "off": "No provider chosen"
+      },
+      "stats": {
+        "providers": "{count, plural, one {metadata provider} other {metadata providers}}"
+      },
+      "steps": {
+        "book": "A book",
+        "asked": "Asked in order",
+        "merged": "Merged",
+        "saved": "Saved"
+      },
+      "lines": {
+        "bookA": "new, or refreshed",
+        "bookB": "by hand",
+        "askedA": "{count, plural, one {# provider} other {# providers}}",
+        "askedB": "first answer wins",
+        "mergedA": "per field, not per book",
+        "mergedB": "genres up to {count}",
+        "mergedNoCap": "genres uncapped",
+        "savedA": "{count, plural, one {# field kept} other {# fields kept}}"
+      },
+      "edges": {
+        "perField": "per field",
+        "firstWins": "first answer",
+        "saved": "written to the book"
+      },
+      "facts": {
+        "genresMerged": "Genres merged from every provider",
+        "genresFirst": "Genres from the first provider that answers",
+        "genresBlocked": "{count, plural, one {# genre blocked} other {# genres blocked}}",
+        "idsSaved": "Provider ids saved",
+        "idsNotSaved": "Provider ids not saved"
+      },
+      "table": {
+        "field": "Field",
+        "order": "Asked in this order",
+        "whenPresent": "When the book already has one"
+      },
+      "cells": {
+        "noProvider": "No provider",
+        "notFetched": "Not fetched",
+        "strategy": {
+          "fillMissing": "Fill if missing",
+          "overwrite": "Replace",
+          "overwriteIfProvided": "Replace when answered",
+          "mergeExisting": "Merge with what is there"
+        }
+      },
+      "warnings": {
+        "noProvider": "{count, plural, one {# field is fetched but has no provider to ask, so it stays empty.} other {# fields are fetched but have no provider to ask, so they stay empty.}}",
+        "fix": {
+          "openPreferences": "Open field rules"
+        }
+      },
+      "links": {
+        "preferences": "Field rules",
+        "providers": "Providers"
+      },
+      "map": {
+        "service": "Metadata",
+        "serviceSub": "{count, plural, one {# provider, per field} other {# providers, per field}}"
+      }
+    },
+    "ai": {
+      "title": "What the AI does",
+      "summary": "{features, plural, one {# feature runs} other {# features run}} on {connections, plural, one {# connection} other {# connections}}.",
+      "state": {
+        "ok": "All working",
+        "attention": "{count, plural, one {# needs you} other {# need you}}",
+        "off": "Nothing switched on"
+      },
+      "stats": {
+        "connections": "{count, plural, one {AI connection} other {AI connections}}"
+      },
+      "steps": {
+        "asks": "A feature asks",
+        "slot": "Picks a slot",
+        "runs": "Runs on",
+        "kept": "Kept"
+      },
+      "lines": {
+        "asksA": "{count} switched on",
+        "slotA": "fast, careful or vision",
+        "slotB": "{count} of {total} set",
+        "runsA": "{count, plural, one {# connection} other {# connections}}",
+        "keptA": "with the book,",
+        "keptB": "re-used after"
+      },
+      "edges": {
+        "slot": "by slot",
+        "runsOn": "a model",
+        "budget": "{amount} a month",
+        "noBudget": "no budget"
+      },
+      "facts": {
+        "budget": "Up to {amount} a month",
+        "noBudget": "No monthly budget",
+        "builds": "Up to {count, plural, one {# build} other {# builds}} a month",
+        "unusable": "{count, plural, one {# connection this build cannot use} other {# connections this build cannot use}}"
+      },
+      "table": {
+        "feature": "Feature",
+        "slot": "Slot",
+        "connection": "Connection",
+        "model": "Model",
+        "state": "State"
+      },
+      "features": {
+        "story-guides": "Story guides",
+        "vision-scan": "Vision scan",
+        "reading-help": "Reading help"
+      },
+      "slots": {
+        "fast": "Fast",
+        "careful": "Careful",
+        "vision": "Vision"
+      },
+      "cells": {
+        "noConnection": "None chosen",
+        "noModel": "No model",
+        "featureOff": "Switched off",
+        "unset": "Needs a connection",
+        "failing": "Failing",
+        "working": "Working"
+      },
+      "warnings": {
+        "slotUnset": {
+          "fast": "The fast slot has no connection, so the features that use it cannot run.",
+          "careful": "The careful slot has no connection, so the features that use it cannot run.",
+          "vision": "The vision slot has no connection, so the features that use it cannot run."
+        },
+        "slotFailing": "has been failing since its last run, so anything using it will fail too.",
+        "fix": {
+          "openAi": "Open AI settings",
+          "testIt": "Test it"
+        }
+      },
+      "links": {
+        "connections": "Connections",
+        "features": "Features"
+      },
+      "map": {
+        "service": "The AI",
+        "serviceSub": "{count, plural, one {# connection} other {# connections}}",
+        "serviceBudget": "{count, plural, one {# connection} other {# connections}}, up to {amount} a month"
+      }
+    },
+    "out": {
+      "title": "Books going out",
+      "summary": "A book in the library can reach {places, plural, one {# place} other {# places}} from here.",
+      "state": {
+        "ok": "All reachable",
+        "attention": "{count, plural, one {# needs you} other {# need you}}"
+      },
+      "stats": {
+        "places": "{count, plural, one {place books go} other {places books go}}"
+      },
+      "steps": {
+        "library": "Your library",
+        "kobo": "Kobo",
+        "koreader": "KOReader",
+        "opds": "OPDS",
+        "email": "Email"
+      },
+      "lines": {
+        "library": "where a book sits",
+        "koboA": "{count, plural, one {# device} other {# devices}}",
+        "koboKepub": "converted to kepub",
+        "koboEpub": "sent as EPUB",
+        "koreaderA": "{count, plural, one {# account syncing} other {# accounts syncing}}",
+        "opdsA": "{count, plural, one {# account} other {# accounts}}",
+        "emailA": "{count, plural, one {# provider} other {# providers}}",
+        "emailB": "{count, plural, one {# recipient} other {# recipients}}"
+      },
+      "facts": {
+        "twoWay": "{count, plural, one {# Kobo account sends progress back} other {# Kobo accounts send progress back}}",
+        "sharedMail": "{count, plural, one {# mail provider shared with everyone} other {# mail providers shared with everyone}}",
+        "opdsReadOnly": "OPDS is read only"
+      },
+      "table": {
+        "goesTo": "Goes to",
+        "howSet": "How it is set",
+        "state": "State"
+      },
+      "cells": {
+        "on": "In use",
+        "unused": "Nobody set it up",
+        "koboSet": "{kepub} on kepub, {twoWay} with two-way progress",
+        "koreaderSet": "Progress and bookmarks sync both ways",
+        "opdsSet": "A catalogue to browse, read only",
+        "emailSet": "{count, plural, one {# recipient} other {# recipients}}"
+      },
+      "warnings": {
+        "noRecipient": "Mail is set up with nobody to send to, so nothing can be emailed yet.",
+        "fix": {
+          "openEmail": "Add a recipient"
+        }
+      },
+      "links": {
+        "kobo": "Kobo",
+        "koreader": "KOReader",
+        "opds": "OPDS",
+        "email": "Email"
+      }
+    }
   }
 }

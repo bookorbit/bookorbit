@@ -119,6 +119,7 @@ import { ReadingHelpModule } from './modules/reading-help/reading-help.module';
 import { StoryEditsModule } from './modules/story-edits/story-edits.module';
 import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
 import { JobsModule } from './modules/jobs/jobs.module';
+import { SetupOverviewModule } from './modules/setup-overview/setup-overview.module';
 import { BulkRunsModule } from './modules/bulk-runs/bulk-runs.module';
 
 @Module({
@@ -248,6 +249,7 @@ import { BulkRunsModule } from './modules/bulk-runs/bulk-runs.module';
     StoryEditsModule,
     StoryGuidesModule,
     JobsModule,
+    SetupOverviewModule,
     BulkRunsModule,
   ],
   providers: [

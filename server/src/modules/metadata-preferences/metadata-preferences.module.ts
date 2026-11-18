@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { SetupOverviewModule } from '../setup-overview/setup-overview.module';
+import { MetadataPreferencesSetupFlow } from './metadata-preferences.setup-flow';
 
 import { MetadataHttpProviderModule } from '../metadata-http-provider/metadata-http-provider.module';
 import { MetadataPreferenceResolver } from './metadata-preference-resolver';
@@ -9,9 +11,9 @@ import { ProviderConfigService } from './provider-config.service';
 import { ProviderLinkSettingsController } from './provider-link-settings.controller';
 
 @Module({
-  imports: [MetadataHttpProviderModule],
+  imports: [SetupOverviewModule, MetadataHttpProviderModule],
   controllers: [MetadataPreferencesController, ProviderConfigController, ProviderLinkSettingsController],
-  providers: [MetadataPreferencesService, MetadataPreferenceResolver, ProviderConfigService],
+  providers: [MetadataPreferencesSetupFlow, MetadataPreferencesService, MetadataPreferenceResolver, ProviderConfigService],
   exports: [MetadataPreferencesService, MetadataPreferenceResolver, ProviderConfigService],
 })
 export class MetadataPreferencesModule {}

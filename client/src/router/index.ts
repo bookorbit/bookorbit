@@ -514,6 +514,12 @@ export const routes: RouteRecordRaw[] = [
             },
           },
           {
+            path: 'admin/setup',
+            name: 'settings-admin-setup',
+            component: () => import('@/features/setup-overview/views/SetupOverviewView.vue'),
+            meta: { maxWidth: 'max-w-6xl', title: () => t('setupOverview.title') },
+          },
+          {
             path: 'admin/book-dock',
             name: 'settings-admin-book-dock',
             component: () => import('@/features/settings/BookDockSettings.vue'),

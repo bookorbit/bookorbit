@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { SetupOverviewModule } from '../setup-overview/setup-overview.module';
+import { AiSetupFlow } from './ai.setup-flow';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AuditModule } from '../audit/audit.module';
@@ -21,9 +23,10 @@ import { AiTryService } from './ai-try.service';
 import { AiUsageFoldJob } from './ai-usage-fold.job';
 
 @Module({
-  imports: [AppSettingsModule, AuditModule],
+  imports: [SetupOverviewModule, AppSettingsModule, AuditModule],
   controllers: [AiAdminController],
   providers: [
+    AiSetupFlow,
     AiConnectionRepository,
     AiLedgerRepository,
     AiBudgetRepository,

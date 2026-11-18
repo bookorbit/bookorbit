@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { SetupOverviewModule } from '../setup-overview/setup-overview.module';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AuditModule } from '../audit/audit.module';
@@ -20,6 +21,7 @@ import { BookRequestGateway } from './book-request.gateway';
 import { BookRequestNotifier } from './book-request-notifier.service';
 import { BookRequestRepository } from './book-request.repository';
 import { BookRequestService } from './book-request.service';
+import { BookRequestSetupFlow } from './book-request.setup-flow';
 import { RequestCredentialService } from './request-credential.service';
 import { RequestDownloadJobRepository } from './request-download-job.repository';
 import { RequestDownloadJobSource } from './request-download-job-source';
@@ -78,6 +80,7 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
  */
 @Module({
   imports: [
+    SetupOverviewModule,
     LibraryModule,
     AppSettingsModule,
     AuditModule,
@@ -98,6 +101,7 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     IndexerManagerController,
   ],
   providers: [
+    BookRequestSetupFlow,
     BookRequestService,
     BookRequestRepository,
     BookRequestAttributionService,

@@ -7,6 +7,7 @@ import {
   BookOpen,
   BrainCircuit,
   Database,
+  Waypoints,
   DownloadCloud,
   EyeOff,
   FileText,
@@ -528,6 +529,15 @@ export const SETTINGS_NAV: readonly SettingsNavGroup[] = [
             isVisible: anyPermission(Permission.ManageAppSettings),
           },
         ],
+      },
+      {
+        id: 'setup',
+        routeName: 'settings-admin-setup',
+        labelKey: 'setupOverview.title',
+        descriptionKey: 'setupOverview.navDescription',
+        icon: Waypoints,
+        keywords: 'setup overview wiring flow map how it works dock requests metadata ai delivery',
+        isVisible: anyPermission(Permission.ManageAppSettings),
       },
       {
         id: 'requests',

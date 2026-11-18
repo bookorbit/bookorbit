@@ -117,3 +117,4 @@ export * from "./story-guide-ties";
 export * from "./story-guide-payload";
 export * from "./story-guide";
 export * from "./story-guide-fixes";
+export * from "./setup-overview";
