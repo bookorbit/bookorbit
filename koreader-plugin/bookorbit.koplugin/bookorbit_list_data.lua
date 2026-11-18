@@ -46,7 +46,7 @@ function ListData.plural(n, one, many)
 end
 
 function ListData.bookCount(n)
-    return ListData.plural(n, _("%1 book"), _("%1 books"))
+    return T(_.ngettext("%1 book", "%1 books", n), n)
 end
 
 local function formats(book)
