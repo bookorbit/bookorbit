@@ -2,7 +2,9 @@
 -- KOReader's singleton only knows about the core catalog, so standalone
 -- plugin strings need a small catalog of their own.
 local GetText = require("gettext")
-local logger = require("logger")
+local function coreIndex(key)
+    if type(GetText) == "table" then return GetText[key] end
+end
 
 local function pluginDir()
     local source = debug.getinfo(1, "S").source
@@ -19,31 +21,46 @@ local function loadCatalog(lang)
         if not chunk then return nil end
         local ok, catalog = pcall(chunk)
         if ok and type(catalog) == "table" then return catalog end
-        logger.warn("BookOrbit: failed to load translation catalog", code)
+        require("logger").warn("BookOrbit: failed to load translation catalog", code)
         return nil
     end
 
     return try(lang) or try(lang:match("^(%a%a)")) or {}
 end
 
-local catalog = loadCatalog(GetText.current_lang)
+local currentLang = coreIndex("current_lang")
+local catalog = loadCatalog(currentLang)
+
+local function getCatalog()
+    local lang = coreIndex("current_lang")
+    if lang ~= currentLang then
+        currentLang = lang
+        catalog = loadCatalog(lang)
+    end
+    return catalog
+end
 
 local BookOrbitGetText = setmetatable({}, {
     __call = function(_, msgid)
-        return catalog[msgid] or GetText(msgid)
+        local value = getCatalog()[msgid]
+        if type(value) == "table" then value = value[0] end
+        return value or GetText(msgid)
     end,
     __index = function(_, key)
         if key == "ngettext" then
             return function(msgid, msgid_plural, n)
-                local value = catalog[msgid]
+                local value = getCatalog()[msgid]
                 if type(value) == "table" then
-                    local index = GetText.getPlural(n)
-                    return value[index] or value[1] or msgid_plural
+                    local getPlural = coreIndex("getPlural")
+                    local index = getPlural and getPlural(n) or (n == 1 and 0 or 1)
+                    return value[index] or (index == 0 and msgid or msgid_plural)
                 end
-                return GetText.ngettext(msgid, msgid_plural, n)
+                local ngettext = coreIndex("ngettext")
+                return ngettext and ngettext(msgid, msgid_plural, n)
+                    or GetText(n == 1 and msgid or msgid_plural)
             end
         end
-        return GetText[key]
+        return coreIndex(key)
     end,
 })
 
