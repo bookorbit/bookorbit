@@ -1,0 +1,15 @@
+[Unit]
+Description=BookOrbit Container Service
+After=network-online.target podman.socket podman-restart.service
+Wants=network-online.target podman.socket
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/mnt/e/Program Files/bookorbit
+ExecStart=/usr/bin/podman compose --project-directory '/mnt/e/Program Files/bookorbit' up -d
+ExecStop=/usr/bin/podman compose --project-directory '/mnt/e/Program Files/bookorbit' down
+TimeoutStartSec=180
+
+[Install]
+WantedBy=multi-user.target
