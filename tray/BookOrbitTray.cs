@@ -24,7 +24,7 @@ namespace BookOrbitTrayApp
                 {
                     try
                     {
-                        Process.Start("http://localhost:3500");
+                        Process.Start("http://localhost:" + BookOrbitTrayContext.Port);
                     }
                     catch { }
                     return;
@@ -59,15 +59,25 @@ namespace BookOrbitTrayApp
         private ToolStripMenuItem _itemRestart;
         private ToolStripMenuItem _itemAutostart;
 
+        private ToolStripMenuItem _itemLanIp;
+        private ToolStripMenuItem _itemZeroTierIp;
+        private ToolStripMenuItem _itemLocalhostIp;
+
         private ServiceState _currentState = ServiceState.Unknown;
         private DateTime _stateChangeTime = DateTime.MinValue;
         private bool _isCheckingHealth = false;
+        private bool _keepServerRunningOnExit = false;
+
+        private static readonly object _keepAliveLock = new object();
         private static Process _wslKeepAliveProcess;
 
-        private const string BaseUrl = "http://localhost:3500";
-        private const string HealthUrl = "http://127.0.0.1:3500/api/v1/health";
-        private const string AppDir = @"E:\Program Files\bookorbit";
-        private const string IconPath = @"E:\Program Files\bookorbit\bookorbit.ico";
+        public static readonly string AppDir = AppDomain.CurrentDomain.BaseDirectory.TrimEnd('\\', '/');
+        public static readonly string IconPath = Path.Combine(AppDir, "bookorbit.ico");
+        public static readonly int Port = GetConfiguredPort();
+        public static readonly string WslDistro = GetConfiguredWslDistro();
+        public static readonly string BaseUrl = "http://localhost:" + Port;
+        public static readonly string HealthUrl = "http://127.0.0.1:" + Port + "/api/v1/health";
+
         private const string RunRegistryKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
         private const string AppRegistryName = "BookOrbitTray";
 
@@ -90,7 +100,7 @@ namespace BookOrbitTrayApp
             menu.Items.Add(new ToolStripSeparator());
 
             // 2. Открыть в браузере (действие по умолчанию)
-            _itemOpenBrowser = new ToolStripMenuItem("Открыть в браузере (localhost:3500)", null, OnOpenBrowserClicked)
+            _itemOpenBrowser = new ToolStripMenuItem("Открыть в браузере (localhost:" + Port + ")", null, OnOpenBrowserClicked)
             {
                 Font = new Font("Segoe UI", 9F, FontStyle.Bold)
             };
@@ -122,16 +132,17 @@ namespace BookOrbitTrayApp
             menuSettings.DropDownItems.Add(new ToolStripMenuItem("Логи базы данных PostgreSQL (live консоль)", null, (s, e) => OpenConsoleLogs("bookorbit-db")));
             menuSettings.DropDownItems.Add(new ToolStripSeparator());
 
-            // Копирование сетевых адресов
-            string lanIp = GetLocalIpAddress();
-            string zeroTierIp = GetZeroTierIpAddress();
+            // Динамические сетевые адреса
+            _itemLanIp = new ToolStripMenuItem("Скопировать LAN-адрес...", null, OnCopyNetworkAddressClicked);
+            _itemZeroTierIp = new ToolStripMenuItem("Скопировать ZeroTier-адрес...", null, OnCopyNetworkAddressClicked);
+            _itemLocalhostIp = new ToolStripMenuItem("Скопировать локальный адрес (localhost:" + Port + ")", null, (s, e) => CopyToClipboard(BaseUrl, "Локальный веб-адрес"));
 
-            menuSettings.DropDownItems.Add(new ToolStripMenuItem("Скопировать LAN-адрес (" + lanIp + ":3500)", null, (s, e) => CopyToClipboard("http://" + lanIp + ":3500", "LAN-адрес для смартфона в домашней сети Wi-Fi")));
-            if (!string.IsNullOrEmpty(zeroTierIp))
-            {
-                menuSettings.DropDownItems.Add(new ToolStripMenuItem("Скопировать ZeroTier-адрес (" + zeroTierIp + ":3500)", null, (s, e) => CopyToClipboard("http://" + zeroTierIp + ":3500", "Удаленный ZeroTier-адрес")));
-            }
-            menuSettings.DropDownItems.Add(new ToolStripMenuItem("Скопировать локальный адрес (localhost:3500)", null, (s, e) => CopyToClipboard(BaseUrl, "Локальный веб-адрес")));
+            menuSettings.DropDownItems.Add(_itemLanIp);
+            menuSettings.DropDownItems.Add(_itemZeroTierIp);
+            menuSettings.DropDownItems.Add(_itemLocalhostIp);
+
+            // Обновление адресов на лету при открытии подменю
+            menuSettings.DropDownOpening += (s, e) => RefreshNetworkMenuItems();
 
             menuSettings.DropDownItems.Add(new ToolStripSeparator());
 
@@ -180,22 +191,54 @@ namespace BookOrbitTrayApp
             _pollTimer.Tick += (s, e) => CheckHealthAsync();
             _pollTimer.Start();
 
-            // Гарантируем, что подсистема WSL2 не засыпает при активном сервере
-            EnsureWslKeepAlive();
-
             // Первый опрос сразу
             CheckHealthAsync();
+        }
+
+        private void RefreshNetworkMenuItems()
+        {
+            try
+            {
+                string lanIp = GetLocalIpAddress();
+                string zeroTierIp = GetZeroTierIpAddress();
+
+                _itemLanIp.Text = "Скопировать LAN-адрес (" + lanIp + ":" + Port + ")";
+                _itemLanIp.Tag = "http://" + lanIp + ":" + Port;
+
+                if (!string.IsNullOrEmpty(zeroTierIp))
+                {
+                    _itemZeroTierIp.Text = "Скопировать ZeroTier-адрес (" + zeroTierIp + ":" + Port + ")";
+                    _itemZeroTierIp.Tag = "http://" + zeroTierIp + ":" + Port;
+                    _itemZeroTierIp.Visible = true;
+                }
+                else
+                {
+                    _itemZeroTierIp.Visible = false;
+                }
+
+                _itemLocalhostIp.Text = "Скопировать локальный адрес (localhost:" + Port + ")";
+                _itemLocalhostIp.Tag = BaseUrl;
+            }
+            catch { }
+        }
+
+        private void OnCopyNetworkAddressClicked(object sender, EventArgs e)
+        {
+            var item = sender as ToolStripMenuItem;
+            if (item != null)
+            {
+                string url = item.Tag as string;
+                if (!string.IsNullOrEmpty(url))
+                {
+                    CopyToClipboard(url, "Сетевой адрес");
+                }
+            }
         }
 
         private void CheckHealthAsync()
         {
             if (_isCheckingHealth) return;
             _isCheckingHealth = true;
-
-            if (_currentState != ServiceState.Stopped)
-            {
-                EnsureWslKeepAlive();
-            }
 
             ThreadPool.QueueUserWorkItem(state =>
             {
@@ -232,15 +275,18 @@ namespace BookOrbitTrayApp
             if (isHealthy)
             {
                 _currentState = ServiceState.Running;
-                _itemStatusHeader.Text = "[●] BookOrbit: Работает (порт 3500)";
-                _notifyIcon.Text = "BookOrbit: Работает (порт 3500)";
+                _itemStatusHeader.Text = "[●] BookOrbit: Работает (порт " + Port + ")";
+                _notifyIcon.Text = "BookOrbit: Работает (порт " + Port + ")";
                 _itemStart.Enabled = false;
                 _itemStop.Enabled = true;
                 _itemRestart.Enabled = true;
+
+                // Если сервер подтвержденно активен, гарантируем сторож WSL
+                EnsureWslKeepAlive();
             }
             else
             {
-                if (_currentState == ServiceState.Starting && (DateTime.Now - _stateChangeTime).TotalSeconds < 25)
+                if (_currentState == ServiceState.Starting && (DateTime.Now - _stateChangeTime).TotalSeconds < 60)
                 {
                     _itemStatusHeader.Text = "[◌] BookOrbit: Запуск службы...";
                     _notifyIcon.Text = "BookOrbit: Запуск службы...";
@@ -248,7 +294,7 @@ namespace BookOrbitTrayApp
                     _itemStop.Enabled = true;
                     _itemRestart.Enabled = false;
                 }
-                else if (_currentState == ServiceState.Stopping && (DateTime.Now - _stateChangeTime).TotalSeconds < 10)
+                else if (_currentState == ServiceState.Stopping && (DateTime.Now - _stateChangeTime).TotalSeconds < 15)
                 {
                     _itemStatusHeader.Text = "[◌] BookOrbit: Остановка...";
                     _notifyIcon.Text = "BookOrbit: Остановка...";
@@ -283,7 +329,7 @@ namespace BookOrbitTrayApp
                     StartService();
                     ThreadPool.QueueUserWorkItem(st =>
                     {
-                        for (int i = 0; i < 20; i++)
+                        for (int i = 0; i < 40; i++)
                         {
                             Thread.Sleep(1000);
                             try
@@ -324,10 +370,10 @@ namespace BookOrbitTrayApp
 
         private void StartService()
         {
-            EnsureWslKeepAlive();
             _currentState = ServiceState.Starting;
             _stateChangeTime = DateTime.Now;
             UpdateStateFromHealth(false);
+            EnsureWslKeepAlive();
 
             ShowBalloon("Запуск BookOrbit...", "Служба запускается в фоне, пожалуйста подождите.", ToolTipIcon.Info);
 
@@ -360,14 +406,25 @@ namespace BookOrbitTrayApp
 
             ThreadPool.QueueUserWorkItem(s =>
             {
-                StopWslKeepAlive();
-                RunWslCommand("systemctl stop bookorbit.service", true);
-                _syncContext.Post(st =>
+                bool stopped = RunWslCommand("systemctl stop bookorbit.service", true);
+                if (stopped)
                 {
-                    _currentState = ServiceState.Stopped;
-                    UpdateStateFromHealth(false);
-                    ShowBalloon("BookOrbit остановлен", "Контейнеры BookOrbit успешно остановлены.", ToolTipIcon.None);
-                }, null);
+                    StopWslKeepAlive();
+                    _syncContext.Post(st =>
+                    {
+                        _currentState = ServiceState.Stopped;
+                        UpdateStateFromHealth(false);
+                        ShowBalloon("BookOrbit остановлен", "Контейнеры BookOrbit успешно остановлены.", ToolTipIcon.None);
+                    }, null);
+                }
+                else
+                {
+                    _syncContext.Post(st =>
+                    {
+                        UpdateStateFromHealth(false);
+                        ShowBalloon("Ошибка остановки", "Не удалось остановить службу BookOrbit.", ToolTipIcon.Error);
+                    }, null);
+                }
             });
         }
 
@@ -388,14 +445,14 @@ namespace BookOrbitTrayApp
             _currentState = ServiceState.Starting;
             _stateChangeTime = DateTime.Now;
             UpdateStateFromHealth(false);
+            EnsureWslKeepAlive();
 
             ShowBalloon("Перезагрузка BookOrbit...", "Служба перезапускается, ожидаем готовности сервера.", ToolTipIcon.Info);
 
             ThreadPool.QueueUserWorkItem(s =>
             {
-                EnsureWslKeepAlive();
                 RunWslCommand("systemctl restart bookorbit.service", true);
-                for (int i = 0; i < 25; i++)
+                for (int i = 0; i < 40; i++)
                 {
                     Thread.Sleep(1000);
                     try
@@ -409,7 +466,7 @@ namespace BookOrbitTrayApp
                                 _syncContext.Post(st =>
                                 {
                                     UpdateStateFromHealth(true);
-                                    ShowBalloon("BookOrbit перезагружен!", "Сервер успешно перезапущен и готов к работе на http://localhost:3500", ToolTipIcon.Info);
+                                    ShowBalloon("BookOrbit перезагружен!", "Сервер успешно перезапущен и готов к работе на " + BaseUrl, ToolTipIcon.Info);
                                 }, null);
                                 return;
                             }
@@ -438,7 +495,7 @@ namespace BookOrbitTrayApp
             }
         }
 
-        private void OpenOpenFileWithNotepad(string filePath)
+        private void OpenFileWithNotepad(string filePath)
         {
             try
             {
@@ -457,17 +514,12 @@ namespace BookOrbitTrayApp
             }
         }
 
-        private void OpenFileWithNotepad(string filePath)
-        {
-            OpenOpenFileWithNotepad(filePath);
-        }
-
         private void OpenConsoleLogs(string containerName)
         {
             try
             {
                 string title = "Логи BookOrbit: " + containerName;
-                string cmd = string.Format("/c \"title {0} && wsl.exe -d Ubuntu -u root -- podman logs -f {1}\"", title, containerName);
+                string cmd = string.Format("/c \"title {0} && wsl.exe -d {1} -u root -- podman logs -f {2}\"", title, WslDistro, containerName);
                 Process.Start(new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
@@ -546,10 +598,10 @@ namespace BookOrbitTrayApp
                 "BookOrbit Tray Manager\n\n" +
                 "Управление локальным сервером чтения электронных книг BookOrbit.\n" +
                 "Версия: 1.0.0\n" +
-                "Порт веб-интерфейса: 3500\n" +
-                "Путь установки: E:\\Program Files\\bookorbit\n\n" +
+                "Порт веб-интерфейса: " + Port + "\n" +
+                "Путь установки: " + AppDir + "\n\n" +
                 "База данных: PostgreSQL 18 (pgvector)\n" +
-                "Контейнеры: Podman (WSL2 Ubuntu)",
+                "Контейнеры: Podman (WSL2 " + WslDistro + ")",
                 "О программе BookOrbit",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information
@@ -580,6 +632,11 @@ namespace BookOrbitTrayApp
                     StopWslKeepAlive();
                     RunWslCommand("systemctl stop bookorbit.service", false);
                 }
+                else if (choice == DialogResult.No)
+                {
+                    // Пользователь явно выбрал оставить сервер работать в фоне
+                    _keepServerRunningOnExit = true;
+                }
             }
 
             _pollTimer.Stop();
@@ -597,14 +654,14 @@ namespace BookOrbitTrayApp
             catch { }
         }
 
-        private static void RunWslCommand(string args, bool wait)
+        private static bool RunWslCommand(string args, bool wait)
         {
             try
             {
                 var psi = new ProcessStartInfo
                 {
                     FileName = "wsl.exe",
-                    Arguments = "-d Ubuntu -u root -- " + args,
+                    Arguments = "-d " + WslDistro + " -u root -- " + args,
                     CreateNoWindow = true,
                     UseShellExecute = false,
                     WindowStyle = ProcessWindowStyle.Hidden
@@ -612,10 +669,15 @@ namespace BookOrbitTrayApp
                 var p = Process.Start(psi);
                 if (wait && p != null)
                 {
-                    p.WaitForExit(40000);
+                    bool exited = p.WaitForExit(40000);
+                    return exited && p.ExitCode == 0;
                 }
+                return p != null;
             }
-            catch { }
+            catch
+            {
+                return false;
+            }
         }
 
         private static string GetLocalIpAddress()
@@ -685,48 +747,112 @@ namespace BookOrbitTrayApp
             return null;
         }
 
-        private static void EnsureWslKeepAlive()
+        private static int GetConfiguredPort()
         {
             try
             {
-                if (_wslKeepAliveProcess == null || _wslKeepAliveProcess.HasExited)
+                string envPath = Path.Combine(AppDir, ".env");
+                if (File.Exists(envPath))
                 {
-                    var psi = new ProcessStartInfo
+                    foreach (string line in File.ReadAllLines(envPath))
                     {
-                        FileName = "wsl.exe",
-                        Arguments = "-d Ubuntu -u root -- sleep infinity",
-                        CreateNoWindow = true,
-                        UseShellExecute = false,
-                        WindowStyle = ProcessWindowStyle.Hidden
-                    };
-                    _wslKeepAliveProcess = Process.Start(psi);
+                        string trimmed = line.Trim();
+                        if (trimmed.StartsWith("#")) continue;
+                        if (trimmed.StartsWith("APP_PORT=") || trimmed.StartsWith("PORT="))
+                        {
+                            string val = trimmed.Substring(trimmed.IndexOf('=') + 1).Trim().Trim('"', '\'');
+                            int p;
+                            if (int.TryParse(val, out p) && p > 0 && p < 65536)
+                            {
+                                return p;
+                            }
+                        }
+                    }
                 }
             }
             catch { }
+            return 3500;
+        }
+
+        private static string GetConfiguredWslDistro()
+        {
+            try
+            {
+                string envPath = Path.Combine(AppDir, ".env");
+                if (File.Exists(envPath))
+                {
+                    foreach (string line in File.ReadAllLines(envPath))
+                    {
+                        string trimmed = line.Trim();
+                        if (trimmed.StartsWith("#")) continue;
+                        if (trimmed.StartsWith("WSL_DISTRO="))
+                        {
+                            string val = trimmed.Substring(trimmed.IndexOf('=') + 1).Trim().Trim('"', '\'');
+                            if (!string.IsNullOrEmpty(val)) return val;
+                        }
+                    }
+                }
+            }
+            catch { }
+            return "Ubuntu";
+        }
+
+        private void EnsureWslKeepAlive()
+        {
+            lock (_keepAliveLock)
+            {
+                if (_currentState == ServiceState.Stopping || _currentState == ServiceState.Stopped)
+                {
+                    return;
+                }
+
+                try
+                {
+                    if (_wslKeepAliveProcess == null || _wslKeepAliveProcess.HasExited)
+                    {
+                        var psi = new ProcessStartInfo
+                        {
+                            FileName = "wsl.exe",
+                            Arguments = "-d " + WslDistro + " -u root -- sleep infinity",
+                            CreateNoWindow = true,
+                            UseShellExecute = false,
+                            WindowStyle = ProcessWindowStyle.Hidden
+                        };
+                        _wslKeepAliveProcess = Process.Start(psi);
+                    }
+                }
+                catch { }
+            }
         }
 
         private static void StopWslKeepAlive()
         {
-            try
+            lock (_keepAliveLock)
             {
-                if (_wslKeepAliveProcess != null)
+                try
                 {
-                    if (!_wslKeepAliveProcess.HasExited)
+                    if (_wslKeepAliveProcess != null)
                     {
-                        _wslKeepAliveProcess.Kill();
+                        if (!_wslKeepAliveProcess.HasExited)
+                        {
+                            _wslKeepAliveProcess.Kill();
+                        }
+                        _wslKeepAliveProcess.Dispose();
+                        _wslKeepAliveProcess = null;
                     }
-                    _wslKeepAliveProcess.Dispose();
-                    _wslKeepAliveProcess = null;
                 }
+                catch { }
             }
-            catch { }
         }
 
         protected override void Dispose(bool disposing)
         {
             if (disposing)
             {
-                StopWslKeepAlive();
+                if (!_keepServerRunningOnExit)
+                {
+                    StopWslKeepAlive();
+                }
                 if (_pollTimer != null) _pollTimer.Dispose();
                 if (_notifyIcon != null) _notifyIcon.Dispose();
             }

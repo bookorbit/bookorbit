@@ -58,8 +58,15 @@ services:
       - /bin/sh
       - -c
       - |
-        echo "Waiting for PostgreSQL to be ready..."
-        while ! node -e "const { Client } = require('pg'); const u = encodeURIComponent(process.env.POSTGRES_USER || 'bookorbit'); const p = encodeURIComponent(process.env.POSTGRES_PASSWORD || ''); const h = process.env.POSTGRES_HOST || 'postgres'; const port = process.env.POSTGRES_PORT || 5432; const d = encodeURIComponent(process.env.POSTGRES_DB || 'bookorbit'); const c = new Client({ connectionString: process.env.DATABASE_URL || ('postgres://' + u + ':' + p + '@' + h + ':' + port + '/' + d), connectionTimeoutMillis: 2000 }); c.connect().then(() => c.query('SELECT 1')).then(() => { c.end(); process.exit(0); }).catch(() => process.exit(1));" 2>/dev/null; do
+        echo "Verifying PostgreSQL connection..."
+        ATTEMPTS=0
+        MAX_ATTEMPTS=30
+        until node -e "const { Client } = require('pg'); const u = encodeURIComponent(process.env.POSTGRES_USER || 'bookorbit'); const p = encodeURIComponent(process.env.POSTGRES_PASSWORD || ''); const h = process.env.POSTGRES_HOST || 'postgres'; const port = process.env.POSTGRES_PORT || 5432; const d = encodeURIComponent(process.env.POSTGRES_DB || 'bookorbit'); const c = new Client({ connectionString: process.env.DATABASE_URL || ('postgres://' + u + ':' + p + '@' + h + ':' + port + '/' + d), connectionTimeoutMillis: 2000 }); c.connect().then(() => c.query('SELECT 1')).then(() => { c.end(); process.exit(0); }).catch((err) => { console.error(err.message); process.exit(1); });"; do
+          ATTEMPTS=$$((ATTEMPTS + 1))
+          if [ "$$ATTEMPTS" -ge "$$MAX_ATTEMPTS" ]; then
+            echo "Error: Timed out waiting for PostgreSQL after $$MAX_ATTEMPTS attempts."
+            exit 1
+          fi
           sleep 1
         done
         echo "PostgreSQL is ready. Starting BookOrbit..."
