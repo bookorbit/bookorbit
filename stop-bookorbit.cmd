@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
-echo Остановка контейнеров BookOrbit через Kiri...
-wsl bash -c "cd '/mnt/e/Program Files/bookorbit' && docker compose down"
+echo Остановка контейнеров BookOrbit...
+wsl.exe -d Ubuntu -u root -- systemctl stop bookorbit.service
 echo.
-echo Контейнеры остановлены.
+echo Контейнеры BookOrbit успешно остановлены.
 pause
