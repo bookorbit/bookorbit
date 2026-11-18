@@ -7,6 +7,7 @@ import * as schema from '../../../db/schema';
 import { BookAliasService } from '../../book-alias/book-alias.service';
 
 type Db = NodePgDatabase<typeof schema>;
+type Executor = Pick<Db, 'update'>;
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const LEGACY_ENTITLEMENT_RE = /^\d+$/;
@@ -110,11 +111,11 @@ export class KoboBookIdentityService {
     return null;
   }
 
-  async markLegacyNumericRemovalComplete(userId: number, bookIds: number[]): Promise<void> {
+  async markLegacyNumericRemovalComplete(userId: number, bookIds: number[], executor: Executor = this.db): Promise<void> {
     const uniqueBookIds = [...new Set(bookIds)];
     if (uniqueBookIds.length === 0) return;
 
-    await this.db
+    await executor
       .update(schema.koboBookEntitlements)
       .set({ needsLegacyNumericRemoval: false })
       .where(and(eq(schema.koboBookEntitlements.userId, userId), inArray(schema.koboBookEntitlements.bookId, uniqueBookIds)));

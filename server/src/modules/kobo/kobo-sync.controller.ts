@@ -29,7 +29,7 @@ import { KoboDevice } from './decorators/kobo-device.decorator';
 import type { KoboDeviceContext } from './guards/kobo-token.guard';
 import { KoboTokenGuard } from './guards/kobo-token.guard';
 import { KoboSettingsService } from './services/kobo-settings.service';
-import { KoboSyncService } from './services/kobo-sync.service';
+import { KoboSyncService, type KoboSyncPage } from './services/kobo-sync.service';
 import { KoboReadingStateService } from './services/kobo-reading-state.service';
 import type { KoboProxyResponse } from './services/kobo-proxy.service';
 import { KoboProxyService } from './services/kobo-proxy.service';
@@ -56,6 +56,14 @@ type StoreSyncResult = {
   hasMore: boolean;
   syncToken: string | undefined;
 };
+
+/** Recorded in the sync history for a page whose device stopped waiting before it was ready. */
+export class KoboDeviceDisconnectedError extends Error {
+  constructor() {
+    super('The device stopped waiting before this page was ready. Its books stay pending and are offered on the next sync.');
+    this.name = 'KoboDeviceDisconnectedError';
+  }
+}
 
 function readHeaderValue(value: string | string[] | undefined): string | undefined {
   return Array.isArray(value) ? value[0] : value;
@@ -172,27 +180,14 @@ export class KoboSyncController {
     const startedAt = Date.now();
     this.logger.debug(`[kobo.library_sync] [start] userId=${user.id} deviceId=${device.deviceId} - library sync started`);
     const baseUrl = buildBaseUrl(req, this.app.appUrl);
-    let result: { entitlements: unknown[]; hasMore: boolean; syncToken: string };
+    let result: KoboSyncPage;
     try {
       result = await this.syncService.getDelta(user.id, device.deviceId, device.deviceToken, baseUrl);
     } catch (error: unknown) {
-      const errorClass = error instanceof Error ? error.name : 'UnknownError';
-      const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
-      this.logger.error(
-        `[kobo.library_sync] [fail] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - library sync failed`,
-      );
-      await this.historyService.recordFailure(
-        {
-          userId: user.id,
-          deviceId: device.deviceId,
-          event: 'library_sync',
-          durationMs: Date.now() - startedAt,
-        },
-        error,
-      );
+      await this.recordLibrarySyncFailure(user.id, device.deviceId, startedAt, error);
       throw error;
     }
-    const { entitlements, hasMore, syncToken } = result;
+    const { entitlements, hasMore, syncToken, commit } = result;
 
     // Reach for the store only once BookOrbit has drained its own pages, so the device is never
     // asked to reconcile two independent cursors out of a single response.
@@ -220,24 +215,55 @@ export class KoboSyncController {
       );
     }
     const combinedHasMore = hasMore || (store?.hasMore === true && storeCursorAdvanced);
+    const counts = {
+      entitlements: merged.length,
+      hasMore: combinedHasMore,
+      ...(store ? { storeEntitlements: store.entitlements.length } : {}),
+    };
 
-    this.logger.debug(
-      `[kobo.library_sync] [end] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} entitlementCount=${entitlements.length} storeEntitlementCount=${store?.entitlements.length ?? 0} hasMore=${combinedHasMore} - library sync completed`,
-    );
-    await this.historyService.recordSuccess({
-      userId: user.id,
-      deviceId: device.deviceId,
-      event: 'library_sync',
-      durationMs: Date.now() - startedAt,
-      counts: {
-        entitlements: merged.length,
-        hasMore: combinedHasMore,
-        ...(store ? { storeEntitlements: store.entitlements.length } : {}),
-      },
-    });
+    // A Kobo that stops waiting keeps nothing from the request, so a page is recorded as delivered
+    // only while its device is still connected. Once it has gone, the page stays pending and is
+    // built again on the next sync instead of being lost (#2250).
+    if (reply.raw.destroyed) {
+      const durationMs = Date.now() - startedAt;
+      this.logger.warn(
+        `[kobo.library_sync] [fail] userId=${user.id} deviceId=${device.deviceId} durationMs=${durationMs} entitlementCount=${entitlements.length} errorClass=KoboDeviceDisconnectedError - device stopped waiting before the page was ready; its books stay pending`,
+      );
+      await this.historyService.recordFailure(
+        { userId: user.id, deviceId: device.deviceId, event: 'library_sync', durationMs, counts },
+        new KoboDeviceDisconnectedError(),
+      );
+    } else {
+      try {
+        await this.syncService.commitPage(commit);
+      } catch (error: unknown) {
+        await this.recordLibrarySyncFailure(user.id, device.deviceId, startedAt, error);
+        throw error;
+      }
+      this.logger.debug(
+        `[kobo.library_sync] [end] userId=${user.id} deviceId=${device.deviceId} durationMs=${Date.now() - startedAt} entitlementCount=${entitlements.length} storeEntitlementCount=${store?.entitlements.length ?? 0} hasMore=${combinedHasMore} - library sync completed`,
+      );
+      await this.historyService.recordSuccess({
+        userId: user.id,
+        deviceId: device.deviceId,
+        event: 'library_sync',
+        durationMs: Date.now() - startedAt,
+        counts,
+      });
+    }
     reply.header('x-kobo-sync', combinedHasMore ? 'continue' : '');
     reply.header('x-kobo-synctoken', withKoboSyncToken(syncToken, store?.syncToken ?? incomingKoboSyncToken));
     reply.send(merged);
+  }
+
+  private async recordLibrarySyncFailure(userId: number, deviceId: number, startedAt: number, error: unknown): Promise<void> {
+    const durationMs = Date.now() - startedAt;
+    const errorClass = error instanceof Error ? error.name : 'UnknownError';
+    const errorMessage = sanitizeLogValue(error instanceof Error ? error.message : 'unknown error');
+    this.logger.error(
+      `[kobo.library_sync] [fail] userId=${userId} deviceId=${deviceId} durationMs=${durationMs} errorClass=${errorClass} error="${errorMessage}" - library sync failed`,
+    );
+    await this.historyService.recordFailure({ userId, deviceId, event: 'library_sync', durationMs }, error);
   }
 
   /**

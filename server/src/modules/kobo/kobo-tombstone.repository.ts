@@ -6,6 +6,7 @@ import { DB } from '../../db';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
+type Executor = Pick<Db, 'delete'>;
 
 /** A tombstone is dropped after this long even if a device never synced to receive it. */
 export const KOBO_TOMBSTONE_RETENTION_DAYS = 90;
@@ -44,9 +45,9 @@ export class KoboTombstoneRepository {
       .limit(limit);
   }
 
-  async markServed(userId: number, deviceId: number, entitlementIds: string[]): Promise<void> {
+  async markServed(userId: number, deviceId: number, entitlementIds: string[], executor: Executor = this.db): Promise<void> {
     if (entitlementIds.length === 0) return;
-    await this.db
+    await executor
       .delete(schema.koboDeviceEntitlementTombstones)
       .where(
         and(
@@ -58,10 +59,10 @@ export class KoboTombstoneRepository {
   }
 
   /** Drops the user's tombstones every device has been sent, and any past retention with what devices still owe. */
-  async prune(userId: number): Promise<void> {
+  async prune(userId: number, executor: Executor = this.db): Promise<void> {
     const tombstone = schema.koboEntitlementTombstones;
     const device = schema.koboDeviceEntitlementTombstones;
-    await this.db.delete(tombstone).where(
+    await executor.delete(tombstone).where(
       and(
         eq(tombstone.userId, userId),
         sql`(${tombstone.removedAt} < now() - make_interval(days => ${KOBO_TOMBSTONE_RETENTION_DAYS})

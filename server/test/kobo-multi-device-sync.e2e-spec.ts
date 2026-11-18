@@ -1,12 +1,14 @@
 import { createHash, randomUUID } from 'crypto';
 import { mkdir, readFile, readdir } from 'fs/promises';
+import type { AddressInfo } from 'net';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { Client } from 'pg';
 
 import * as schema from '../src/db/schema';
 import { LibraryRepository } from '../src/modules/library/library.repository';
+import { KoboDeliveryService } from '../src/modules/kobo/services/kobo-delivery.service';
 import { SYNC_PAGE_SIZE } from '../src/modules/kobo/services/kobo-sync.service';
 import { waitForCondition } from './e2e/app-harness';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
@@ -1133,6 +1135,71 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
       expect(removedEntitlementIds(entries).filter((id) => id === deferred.entitlementId)).toHaveLength(1);
       expect(await deviceRow(deferred.bookId)).toBeNull();
       expect(removedEntitlementIds(await drainEntries(device))).toEqual([]);
+    });
+  });
+
+  describe('a page the device stopped waiting for (#2250)', () => {
+    async function snapshotRows(device: KoboDevice): Promise<Array<{ bookId: number; synced: boolean; pendingDelete: boolean }>> {
+      return ctx.db
+        .select({
+          bookId: schema.koboSnapshotBooks.bookId,
+          synced: schema.koboSnapshotBooks.synced,
+          pendingDelete: schema.koboSnapshotBooks.pendingDelete,
+        })
+        .from(schema.koboSnapshotBooks)
+        .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
+        .where(eq(schema.koboLibrarySnapshots.deviceId, device.id));
+    }
+
+    async function latestLibrarySync(device: KoboDevice) {
+      const [row] = await ctx.db
+        .select({ status: schema.koboSyncHistory.status, errorClass: schema.koboSyncHistory.errorClass })
+        .from(schema.koboSyncHistory)
+        .where(and(eq(schema.koboSyncHistory.deviceId, device.id), eq(schema.koboSyncHistory.event, 'library_sync')))
+        .orderBy(desc(schema.koboSyncHistory.id))
+        .limit(1);
+      return row;
+    }
+
+    it('keeps an abandoned page pending, records the failure, and delivers every book on the next sync', async () => {
+      const device = await createDevice('Kobo that gives up');
+      const deliveries = ctx.app.get(KoboDeliveryService);
+      const offer = deliveries.offer.bind(deliveries);
+      // Stands in for KEPUB conversion on a slow host, so the page outlasts the device's patience.
+      const slowOffer = vi.spyOn(deliveries, 'offer').mockImplementation(async (...args) => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        return offer(...args);
+      });
+      try {
+        await ctx.app.listen(0, '127.0.0.1');
+        const { port } = ctx.app.getHttpServer().address() as AddressInfo;
+        const outcome = await fetch(`http://127.0.0.1:${port}${syncUrl(device)}`, { signal: AbortSignal.timeout(500) }).then(
+          () => 'received',
+          (error: Error) => error.name,
+        );
+        expect(outcome).toBe('TimeoutError');
+
+        await waitForCondition(async () => {
+          expect(await latestLibrarySync(device)).toEqual({ status: 'failed', errorClass: 'KoboDeviceDisconnectedError' });
+        }, 60_000);
+      } finally {
+        slowOffer.mockRestore();
+      }
+
+      const afterAbort = await snapshotRows(device);
+      const owedBookIds = afterAbort.filter((row) => !row.pendingDelete).map((row) => row.bookId);
+      expect(owedBookIds.length).toBeGreaterThan(SYNC_PAGE_SIZE);
+      expect(afterAbort.filter((row) => row.synced)).toEqual([]);
+
+      const delivered = newEntitlementIds(await drainEntries(device));
+      const expectedIds = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), inArray(schema.koboBookEntitlements.bookId, owedBookIds)));
+
+      expect([...delivered].sort()).toEqual(expectedIds.map((row) => row.entitlementId).sort());
+      expect((await snapshotRows(device)).filter((row) => !row.synced)).toEqual([]);
+      expect(await latestLibrarySync(device)).toEqual({ status: 'success', errorClass: null });
     });
   });
 });
