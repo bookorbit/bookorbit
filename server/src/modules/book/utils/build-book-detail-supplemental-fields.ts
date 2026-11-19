@@ -49,15 +49,23 @@ function buildAudioMetadata(
   audioMeta: AudioMetaSource,
   chapters: AudiobookChapter[] | null,
 ): BookDetailDto['audioMetadata'] {
-  if (!hasAudioFiles) return null;
+  if (!hasAudioFiles && narratorRows.length === 0) return null;
+
+  const narrators = narratorRows.map<NarratorRef>((narrator, index) => ({
+    id: narrator.id,
+    name: narrator.name,
+    sortName: narrator.sortName,
+    displayOrder: index,
+  }));
+
+  // Narrators outlive the audio (a read-along EPUB, or a merged entry whose audio was removed).
+  // Stored duration and chapters describe audio files the book no longer has.
+  if (!hasAudioFiles) {
+    return { narrators, durationSeconds: null, abridged: false, chapters: null, chaptersSource: null, chaptersUpdatedAt: null };
+  }
 
   return {
-    narrators: narratorRows.map<NarratorRef>((narrator, index) => ({
-      id: narrator.id,
-      name: narrator.name,
-      sortName: narrator.sortName,
-      displayOrder: index,
-    })),
+    narrators,
     durationSeconds: audioMeta.durationSeconds ?? null,
     abridged: audioMeta.abridged ?? false,
     chapters,
