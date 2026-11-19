@@ -32,6 +32,8 @@ namespace BookOrbitTrayApp
 
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
+                WindowsFormsSynchronizationContext.AutoInstall = true;
+                SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
                 Application.Run(new BookOrbitTrayContext());
             }
         }
@@ -294,7 +296,7 @@ namespace BookOrbitTrayApp
                     _itemStop.Enabled = true;
                     _itemRestart.Enabled = false;
                 }
-                else if (_currentState == ServiceState.Stopping && (DateTime.Now - _stateChangeTime).TotalSeconds < 15)
+                else if (_currentState == ServiceState.Stopping && (DateTime.Now - _stateChangeTime).TotalSeconds < 45)
                 {
                     _itemStatusHeader.Text = "[◌] BookOrbit: Остановка...";
                     _notifyIcon.Text = "BookOrbit: Остановка...";
@@ -310,6 +312,7 @@ namespace BookOrbitTrayApp
                     _itemStart.Enabled = true;
                     _itemStop.Enabled = false;
                     _itemRestart.Enabled = false;
+                    StopWslKeepAlive();
                 }
             }
         }
@@ -421,8 +424,9 @@ namespace BookOrbitTrayApp
                 {
                     _syncContext.Post(st =>
                     {
-                        UpdateStateFromHealth(false);
-                        ShowBalloon("Ошибка остановки", "Не удалось остановить службу BookOrbit.", ToolTipIcon.Error);
+                        // Не сбрасываем операцию остановки: проверяем реальный статус и сохраняем keepalive если сервер работает
+                        CheckHealthAsync();
+                        ShowBalloon("Ошибка остановки", "Не удалось остановить службу BookOrbit (таймаут или ошибка выполнения команды).", ToolTipIcon.Error);
                     }, null);
                 }
             });
@@ -758,7 +762,7 @@ namespace BookOrbitTrayApp
                     {
                         string trimmed = line.Trim();
                         if (trimmed.StartsWith("#")) continue;
-                        if (trimmed.StartsWith("APP_PORT=") || trimmed.StartsWith("PORT="))
+                        if (trimmed.StartsWith("APP_PORT="))
                         {
                             string val = trimmed.Substring(trimmed.IndexOf('=') + 1).Trim().Trim('"', '\'');
                             int p;
