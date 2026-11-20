@@ -14,7 +14,15 @@ function request(overrides: Record<string, unknown> = {}) {
   } as never;
 }
 
-const folderBook = { bookId: 42, libraryId: 3, libraryFolderId: 4, folderPath: '/lib/Dune', status: 'present', organizationMode: 'book_per_folder' };
+const folderBook = {
+  bookId: 42,
+  libraryId: 3,
+  libraryFolderId: 4,
+  folderPath: '/lib/Dune',
+  status: 'present',
+  organizationMode: 'book_per_folder',
+  allowedFormats: [] as string[],
+};
 
 function makeService(repoOverrides: Record<string, unknown> = {}) {
   const repo = {
@@ -79,6 +87,12 @@ describe('RequestCompanionService.resolveJoin', () => {
 
   it('refuses a library where a book is one file, because there is no folder to share', async () => {
     const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, organizationMode: 'book_per_file' }) });
+
+    await expect(service.resolveJoin(request({ targetBookId: 42 }))).resolves.toBeNull();
+  });
+
+  it('refuses a library that keeps this format out, so the request files wherever it is headed instead', async () => {
+    const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, allowedFormats: ['epub', 'pdf'] }) });
 
     await expect(service.resolveJoin(request({ targetBookId: 42 }))).resolves.toBeNull();
   });

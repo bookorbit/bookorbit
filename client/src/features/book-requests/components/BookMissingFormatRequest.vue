@@ -3,7 +3,7 @@ import { computed, toRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { BookOpen, Check, Headphones, Library, Loader2, Users, WandSparkles } from '@lucide/vue'
-import { Permission, type BookDetail } from '@bookorbit/types'
+import { Permission, type BookDetail, type BookRequestSubmitResult } from '@bookorbit/types'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookRequestVisibility } from '../composables/useBookRequestVisibility'
 import { useMissingFormatRequest } from '../composables/useMissingFormatRequest'
@@ -12,7 +12,8 @@ import { submitFailureText } from '../composables/useRequestSubmission'
 /**
  * The format a book does not have yet, offered where the book's formats are listed: an ebook's
  * missing audiobook, or an audiobook's missing ebook. Requesting it here names this book, so when
- * the new format arrives it joins the book rather than becoming a second one beside it.
+ * the new format arrives it joins the book rather than becoming a second one beside it, wherever
+ * the book's library can hold that format.
  */
 const props = defineProps<{ book: BookDetail }>()
 
@@ -54,9 +55,17 @@ async function handleRequest() {
     toast.error(t('bookRequests.search.submitFailed'), { description: submitFailureText(failure, t) ?? undefined })
     return
   }
-  if (result.subscribed) toast.success(t('bookRequests.search.joinedExisting'))
-  else
-    toast.success(missing.value === 'audiobook' ? t('bookRequests.missingFormat.submittedAudiobook') : t('bookRequests.missingFormat.submittedEbook'))
+  toast.success(submittedText(result))
+}
+
+/**
+ * The server pins the request to this book only where the book's library can hold the new format,
+ * so the promise that it joins this book is made only when it did.
+ */
+function submittedText(result: BookRequestSubmitResult): string {
+  if (result.subscribed) return t('bookRequests.search.joinedExisting')
+  if (result.request.targetBookId !== props.book.id) return t('bookRequests.search.submitted')
+  return missing.value === 'audiobook' ? t('bookRequests.missingFormat.submittedAudiobook') : t('bookRequests.missingFormat.submittedEbook')
 }
 </script>
 

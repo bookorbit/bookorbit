@@ -75,6 +75,7 @@ import {
 } from './book-request.repository';
 import { RequestAutomationService } from './fulfillment/request-automation.service';
 import { RequestCompanionService } from './fulfillment/request-companion.service';
+import { libraryTakesMedium } from './library-takes-medium';
 import { RETIRED_MEDIUM_REFUSAL } from './retired-media';
 import { RequestAutomationSettingsService } from './fulfillment/request-automation-settings.service';
 import { IndexerConfigService } from './indexers/indexer-config.service';
@@ -519,9 +520,15 @@ export class BookRequestService {
     if (!work.title) throw submitRefusal('SUBMIT_TITLE_REQUIRED', 'A title is required');
 
     // A book that can hold another format pins where this one lands: next to the format it has.
-    // A loose-file library cannot hold two formats as one book, so there the request lands the way
-    // any other does and becomes a book of its own.
-    const joinsBook = half.targetBook !== null && half.targetBook.organizationMode === 'book_per_folder' ? half.targetBook : null;
+    // A loose-file library cannot hold two formats as one book, and a library limited to other
+    // formats would refuse the files, so there the request lands the way any other does and
+    // becomes a book of its own.
+    const joinsBook =
+      half.targetBook !== null &&
+      half.targetBook.organizationMode === 'book_per_folder' &&
+      libraryTakesMedium(half.targetBook.allowedFormats, half.mediaKind)
+        ? half.targetBook
+        : null;
 
     // Fold into an existing live request rather than opening a second one. A second grab of the
     // same torrent is exactly what the dedupe claim exists to prevent, so even a self-server is

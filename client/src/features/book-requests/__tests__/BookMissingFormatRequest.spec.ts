@@ -102,7 +102,7 @@ describe('BookMissingFormatRequest', () => {
 
   it('asks for the format against this book, so it joins it rather than becoming another', async () => {
     const wrapper = await render(['epub'])
-    state.api.mockResolvedValueOnce(json({ request: { id: 77, status: 'pending' }, subscribed: false }))
+    state.api.mockResolvedValueOnce(json({ request: { id: 77, status: 'pending', targetBookId: 42 }, subscribed: false }))
 
     await wrapper.get('button').trigger('click')
     await flushPromises()
@@ -113,6 +113,17 @@ describe('BookMissingFormatRequest', () => {
     expect(state.toastSuccess).toHaveBeenCalledWith('Requested. The audiobook will join this book when it arrives')
     expect(wrapper.text()).toContain('Requested')
     expect(wrapper.findComponent(RouterLinkStub).props('to')).toMatchObject({ name: 'book-request-detail', params: { id: 77 } })
+  })
+
+  it('does not promise the book a join the server did not make, as when its library keeps that format out', async () => {
+    const wrapper = await render(['m4b'])
+    state.api.mockResolvedValueOnce(json({ request: { id: 78, status: 'pending', targetBookId: null }, subscribed: false }))
+
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(state.toastSuccess).toHaveBeenCalledWith('Request submitted')
+    expect(wrapper.findComponent(RouterLinkStub).props('to')).toMatchObject({ name: 'book-request-detail', params: { id: 78 } })
   })
 
   it('says the translated reason when the server refuses', async () => {

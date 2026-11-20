@@ -182,6 +182,7 @@ export interface BookPlacement {
   folderPath: string;
   status: string;
   organizationMode: string;
+  allowedFormats: string[];
 }
 
 /** The other half of a pair, joined back onto the same table. */
@@ -661,6 +662,7 @@ export class BookRequestRepository {
         folderPath: books.folderPath,
         status: books.status,
         organizationMode: libraries.organizationMode,
+        allowedFormats: libraries.allowedFormats,
       })
       .from(books)
       .innerJoin(libraries, eq(libraries.id, books.libraryId))

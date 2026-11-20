@@ -2412,7 +2412,9 @@ describe('BookRequestService.submit for a book that is missing a format', () => 
     folderPath: '/lib/Dune',
     status: 'present',
     organizationMode: 'book_per_folder',
+    allowedFormats: [] as string[],
   };
+  const audioOnlyBook = { ...folderBook, allowedFormats: ['m4b', 'mp3'] };
 
   it("pins the request to the book, landing it in the book's own library and folder", async () => {
     const { service, repo } = makeService({
@@ -2435,6 +2437,34 @@ describe('BookRequestService.submit for a book that is missing a format', () => 
     await service.submit({ ...dto, mediaKind: 'audiobook', targetBookId: 42, targetLibraryId: 8 }, user({ isSuperuser: true }));
 
     expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: null, targetLibraryId: 8 }), expect.any(Array));
+  });
+
+  it("files the ordinary way when the book's library keeps that format out, so the files are not refused on arrival", async () => {
+    const { service, repo, automationSettings } = makeService({
+      repo: { findBookPlacement: vi.fn().mockResolvedValue(audioOnlyBook), findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['audiobook'])) },
+      automationSettings: { resolveDestinationFor: vi.fn().mockResolvedValue({ libraryId: 7, folderId: 21 }) },
+    });
+
+    await service.submit({ ...dto, mediaKind: 'ebook', targetBookId: 42 }, user({ isSuperuser: true }));
+
+    expect(automationSettings.resolveDestinationFor).toHaveBeenCalledWith('ebook');
+    expect(repo.create).toHaveBeenCalledWith(
+      expect.objectContaining({ targetBookId: null, targetLibraryId: 7, targetFolderId: 21 }),
+      expect.any(Array),
+    );
+  });
+
+  it("still pins the request when the book's library lets in a format of that medium", async () => {
+    const { service, repo } = makeService({
+      repo: {
+        findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, allowedFormats: ['m4b', 'epub'] }),
+        findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['audiobook'])),
+      },
+    });
+
+    await service.submit({ ...dto, mediaKind: 'ebook', targetBookId: 42 }, user({ isSuperuser: true }));
+
+    expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: 42, targetLibraryId: 3, targetFolderId: 4 }), expect.any(Array));
   });
 
   it('refuses a book in a library the requester cannot reach as if it did not exist', async () => {
@@ -2476,6 +2506,24 @@ describe('BookRequestService.submit for a book that is missing a format', () => 
 
     expect(result.subscribed).toBe(true);
     expect(repo.setTargetBookIfUnset).toHaveBeenCalledWith(7, 42);
+  });
+
+  it("leaves a request it joins unpinned when the book's library keeps that format out", async () => {
+    const existing = row({ id: 7, userId: 2, mediaKind: 'ebook', targetLibraryId: 3 });
+    const { service, repo } = makeService({
+      dedupe: { findActiveRequestFor: vi.fn().mockResolvedValue(existing) },
+      repo: {
+        findBookPlacement: vi.fn().mockResolvedValue(audioOnlyBook),
+        findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['audiobook'])),
+        setTargetBookIfUnset: vi.fn().mockResolvedValue(true),
+        findById: vi.fn().mockResolvedValue(joined({ id: 7, userId: 2, mediaKind: 'ebook' })),
+      },
+    });
+
+    const result = await service.submit({ ...dto, mediaKind: 'ebook', targetBookId: 42 }, user({ isSuperuser: true }));
+
+    expect(result.subscribed).toBe(true);
+    expect(repo.setTargetBookIfUnset).not.toHaveBeenCalled();
   });
 });
 

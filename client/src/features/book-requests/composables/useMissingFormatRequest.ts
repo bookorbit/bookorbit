@@ -14,7 +14,8 @@ export type MissingFormatState = 'checking' | PairHalfState
  *
  * Only an ebook missing its audiobook, or the other way round: those are the two formats one book
  * folder holds together. The request names this book, so the server lands the new format beside
- * the one already here instead of filing it as a second book.
+ * the one already here instead of filing it as a second book, unless the book's library keeps
+ * that format out.
  */
 export function useMissingFormatRequest(book: Ref<BookDetail | null>, enabled: Ref<boolean>) {
   const availability = ref<BookRequestAvailability | null>(null)
