@@ -295,6 +295,27 @@ describe('BookDockFileSheet', () => {
     }
   })
 
+  it('waits for extraction and preserves embedded metadata when applying a cover', async () => {
+    const pending = makeFile({ fileName: 'Dune.epub', format: 'epub', status: 'pending', embeddedMetadata: null })
+    const wrapper = mountSheet(pending)
+    const searchButton = () => wrapper.findAll('button').find((button) => button.text().trim() === 'Search')
+
+    expect(wrapper.get('[role="status"]').text()).toBe('Editing is available after embedded metadata has been read.')
+    expect(searchButton()).toBeUndefined()
+    await wrapper.setProps({ file: { ...pending, status: 'extracting' } })
+    expect(searchButton()).toBeUndefined()
+
+    const embeddedMetadata = { title: 'Dune', authors: ['Frank Herbert'], publisher: 'Original Press', language: 'en' }
+    await wrapper.setProps({ file: { ...pending, status: 'fetching', embeddedMetadata } })
+    await searchButton()!.trigger('click')
+    const workspace = wrapper.getComponent(WorkspaceStub)
+    expect(workspace.props('searchDefaults')).toMatchObject({ title: 'Dune', author: 'Frank Herbert' })
+
+    await wrapper.setProps({ file: { ...pending, status: 'ready', embeddedMetadata } })
+    workspace.vm.$emit('apply', { formPatch: {}, coverUrl: 'https://covers.example/dune.jpg' })
+    expect(mocks.saveMetadata).toHaveBeenCalledWith(1, expect.objectContaining({ ...embeddedMetadata, coverUrl: 'https://covers.example/dune.jpg' }))
+  })
+
   it('persists every metadata field emitted by the search diff', async () => {
     const candidate: MetadataCandidate = {
       provider: 'hardcover',

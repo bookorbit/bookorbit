@@ -26,6 +26,7 @@ import { useBookDockStatistics } from '@/features/book-dock/composables/useBookD
 import { useBookDockUpload, SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT } from '@/features/book-dock/composables/useBookDockUpload'
 import { useBookDockConflicts } from '@/features/book-dock/composables/useBookDockConflicts'
 import { refetchBookDockMetadata } from '@/features/book-dock/api/book-dock.api'
+import { isAwaitingMetadataExtraction } from '@/features/book-dock/lib/file-display'
 import BookDockActionCluster from '@/features/book-dock/components/BookDockActionCluster.vue'
 import BookDockUploadFailures from '@/features/book-dock/components/BookDockUploadFailures.vue'
 import BookDockFilterBar from '@/features/book-dock/components/BookDockFilterBar.vue'
@@ -240,6 +241,7 @@ let prevTotal = -1
 const unsubscribeChange = onBookDockChange(() => {
   const currentTotal = summary.value.total
   fetchFiles()
+  void refreshSelectedFile()
   if (prevTotal >= 0 && currentTotal > prevTotal) {
     newFilesDetected.value = true
     if (newFilesTimer) clearTimeout(newFilesTimer)
@@ -252,6 +254,23 @@ const unsubscribeChange = onBookDockChange(() => {
 
 function openSheet(file: BookDockFile) {
   selectedFile.value = file
+  void refreshSelectedFile()
+}
+
+async function refreshSelectedFile() {
+  const selected = selectedFile.value
+  if (!selected || (!isAwaitingMetadataExtraction(selected) && selected.status !== 'fetching')) return
+
+  // The file may have left the current list as its status or metadata changed.
+  try {
+    const res = await api(`/api/v1/book-dock/files/${selected.id}`)
+    if (!res.ok) return
+    const updated: BookDockFile = await res.json()
+    const current = selectedFile.value
+    if (current?.id === updated.id && current.updatedAt <= updated.updatedAt) selectedFile.value = updated
+  } catch {
+    // Keep the last known state until the next dock update.
+  }
 }
 
 function handleSelect(id: number, shiftKey: boolean) {
@@ -271,7 +290,8 @@ function refresh() {
 function onFileUpdated(updated: BookDockFile) {
   const idx = items.value.findIndex((f) => f.id === updated.id)
   if (idx !== -1) items.value[idx] = updated
-  if (selectedFile.value?.id === updated.id) selectedFile.value = updated
+  const current = selectedFile.value
+  if (current?.id === updated.id && current.updatedAt <= updated.updatedAt) selectedFile.value = updated
   scheduleVisibleNamePreview()
 }
 
@@ -587,6 +607,10 @@ function onDrop(e: DragEvent) {
 
 watch(isUploading, (uploading, was) => {
   if (was && !uploading) refresh()
+})
+
+watch(socketConnected, (connected) => {
+  if (connected) void refreshSelectedFile()
 })
 
 watch(

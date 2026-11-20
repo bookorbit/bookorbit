@@ -10554,6 +10554,7 @@
     },
     "sheet": {
       "saved": "Saved",
+      "waitingForExtraction": "Editing is available after embedded metadata has been read.",
       "providerMetadataFound": "Provider metadata found",
       "providerMetadataFoundEdited": "Provider metadata found - bulk apply will skip this file (you have edits)",
       "review": "Review",

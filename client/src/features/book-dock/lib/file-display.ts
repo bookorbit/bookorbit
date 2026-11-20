@@ -54,6 +54,10 @@ export function isTargetUnassigned(file: BookDockFile): boolean {
   return file.targetLibraryId == null || file.targetFolderId == null
 }
 
+export function isAwaitingMetadataExtraction(file: BookDockFile): boolean {
+  return file.status === 'pending' || file.status === 'extracting'
+}
+
 export function isInProgress(file: BookDockFile): boolean {
   return file.status === 'extracting' || file.status === 'fetching'
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import { reactive, ref } from 'vue'
+import type { BookDockFile } from '@bookorbit/types'
 import BookDockView from '../BookDockView.vue'
 
 const { route, replaceMock, access } = vi.hoisted(() => ({
@@ -47,12 +48,13 @@ vi.mock('@/lib/api', () => ({ api: (url: string) => apiMock(url) }))
 vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ isDemoRestrictedAccount: ref(false), hasPermission: () => access.manager }),
 }))
+const onBookDockChangeMock = vi.fn<(listener: () => void) => () => void>(() => vi.fn<() => void>())
 vi.mock('@/features/book-dock/composables/useBookDockSummary', () => ({
   useBookDockSummary: () => ({
     summary: ref({ total: 7000, paused: false }),
     fetchSummary: vi.fn<() => void>(),
     subscribe: vi.fn<() => void>(),
-    onBookDockChange: () => vi.fn<() => void>(),
+    onBookDockChange: onBookDockChangeMock,
     socketConnected: ref(true),
   }),
 }))
@@ -119,6 +121,58 @@ describe('BookDockView uploads', () => {
 
     expect(addFilesMock).not.toHaveBeenCalled()
     wrapper.unmount()
+  })
+})
+
+describe('BookDockView editor', () => {
+  it('refreshes an open editor when extraction moves the file off the current list', async () => {
+    const pending: BookDockFile = {
+      id: 1,
+      fileName: 'Dune.epub',
+      fileSize: 1024,
+      format: 'epub',
+      status: 'pending',
+      embeddedMetadata: null,
+      selectedMetadata: null,
+      fetchedMetadata: null,
+      targetLibraryId: null,
+      targetFolderId: null,
+      confidence: null,
+      fetchedMetadataSources: null,
+      errorMessage: null,
+      metadataEditedAt: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+      unitFiles: [],
+    }
+    const ready: BookDockFile = {
+      ...pending,
+      status: 'ready',
+      embeddedMetadata: { title: 'Dune', authors: ['Frank Herbert'] },
+      updatedAt: '2026-01-01T00:01:00.000Z',
+    }
+    let extracted = false
+    await apiMock.withImplementation(
+      async (url) => {
+        const file = extracted ? ready : pending
+        const items = extracted ? [] : [pending]
+        const data = url === '/api/v1/book-dock/files/1' ? file : { items, total: items.length, page: 1, size: 20 }
+        return { ok: true, json: async () => data } as Response
+      },
+      async () => {
+        const wrapper = shallowMount(BookDockView, { global: { stubs: { Teleport: true } } })
+        await flushPromises()
+        wrapper.getComponent({ name: 'BookDockFileListView' }).vm.$emit('open', pending)
+        await flushPromises()
+        const editedFile = () => wrapper.getComponent({ name: 'BookDockFileSheet' }).props('file')
+        expect(editedFile()).toEqual(pending)
+
+        extracted = true
+        onBookDockChangeMock.mock.lastCall![0]()
+        await vi.waitFor(() => expect(editedFile()).toEqual(ready))
+        wrapper.unmount()
+      },
+    )
   })
 })
 
