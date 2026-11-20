@@ -62,4 +62,4 @@ allowBuilds:
   vue-demi: false
 patchedDependencies:
   "@storyteller-platform/ghost-story@0.3.4": patches/@storyteller-platform__ghost-story@0.3.4.patch
-  music-metadata@12.4.0: patches/music-metadata@12.4.0.patch
+  music-metadata@12.7.0: patches/music-metadata@12.7.0.patch

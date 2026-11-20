@@ -64,14 +64,14 @@
     "@commitlint/cli": "^21.2.4",
     "@commitlint/config-conventional": "^21.2.4",
     "@semantic-release/commit-analyzer": "^13.0.1",
-    "@semantic-release/github": "^12.0.10",
+    "@semantic-release/github": "^12.0.11",
     "@semantic-release/release-notes-generator": "^14.1.1",
     "concurrently": "^10.0.7",
     "conventional-changelog-conventionalcommits": "^10.4.1",
     "husky": "^9.1.7",
-    "lint-staged": "^17.6.0",
+    "lint-staged": "^17.6.1",
     "prettier": "^3.10.1",
-    "semantic-release": "^25.0.9"
+    "semantic-release": "^26.0.1"
   },
   "lint-staged": {
     "*.{md,json,yml,yaml}": [
