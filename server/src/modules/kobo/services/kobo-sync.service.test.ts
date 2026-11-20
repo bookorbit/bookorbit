@@ -893,6 +893,110 @@ describe('KoboSyncService', () => {
     });
   });
 
+  describe('format announced for a prepared delivery (#1946)', () => {
+    const deliveries = { offer: vi.fn() };
+
+    function makeServiceWithDeliveries(db: ReturnType<typeof makeDb>) {
+      db.query.koboLibrarySnapshots.findFirst.mockResolvedValue({ id: 22, userId: 7, deviceId: 101 });
+      Object.assign(db.query, { koboDevices: { findFirst: vi.fn().mockResolvedValue({ id: 101 }) } });
+      return new KoboSyncService(
+        db as never,
+        bookAccessService as never,
+        readingStateService as never,
+        contentFilterRepository as never,
+        bookIdentityService as never,
+        queryBuilder as never,
+        smartScopeService as never,
+        metadataExtractionService as never,
+        tombstoneRepository as never,
+        deliveries as never,
+      );
+    }
+
+    function deliverAs(format: string) {
+      deliveries.offer.mockResolvedValue({ id: 'delivery-5', metadata: { sizeBytes: 4321, format } });
+    }
+
+    async function announcedOnPage(deliveryFormat: string, preparedFormat: string) {
+      deliverAs(preparedFormat);
+      const db = makeDb({ select: [[{ bookId: 5, pendingDelete: false, isNew: true, needsLegacyNumericRemoval: false }]] });
+      const service = makeServiceWithDeliveries(db);
+      vi.spyOn(service as any, 'fetchEligibleBooksByIds').mockResolvedValue(new Map([[5, { ...makeBook(5), deliveryFormat }]]));
+
+      const result = await (service as any).getPageFromSnapshot(
+        7,
+        101,
+        22,
+        'tok',
+        'https://base',
+        new Map(),
+        () => Promise.resolve(new Set([5])),
+        Date.now() + SYNC_PAGE_TIME_BUDGET_MS,
+      );
+      const [entry] = result.entitlements as Array<{ NewEntitlement: { BookMetadata: { DownloadUrls: Array<{ Format: string; Size: number }> } } }>;
+      return entry!.NewEntitlement.BookMetadata.DownloadUrls[0]!;
+    }
+
+    it.each([
+      ['EPUB3FL', 'kepub', 'EPUB3FL'],
+      ['EPUB3FL', 'epub', 'EPUB3FL'],
+      ['KEPUB', 'kepub', 'KEPUB'],
+      ['EPUB3', 'kepub', 'KEPUB'],
+      ['KEPUB', 'epub', 'EPUB3'],
+      ['EPUB3', 'epub', 'EPUB3'],
+      ['PDF', 'pdf', 'PDF'],
+    ])('announces a book planned as %s and prepared as %s as %s in a sync page', async (planned, prepared, announced) => {
+      const download = await announcedOnPage(planned, prepared);
+
+      expect(download.Format).toBe(announced);
+      expect(download.Size).toBe(4321);
+    });
+
+    it('keeps EPUB3FL in the metadata a device fetches for a comic converted to kepub', async () => {
+      deliverAs('kepub');
+      const db = makeDb({
+        select: [
+          [
+            {
+              bookId: 5,
+              title: 'Manga Vol. 1',
+              description: null,
+              publisher: null,
+              publishedYear: null,
+              language: 'English',
+              isbn10: null,
+              isbn13: null,
+              seriesName: null,
+              seriesIndex: null,
+              metadataUpdatedAt: new Date('2026-01-01T00:00:00.000Z'),
+              addedAt: new Date('2026-01-01T00:00:00.000Z'),
+              updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+              fileFormat: 'epub',
+              fileSizeBytes: 1234,
+              fileHash: 'file-hash',
+              isFixedLayout: true,
+            },
+          ],
+          [{ bookId: 5, name: 'Mangaka' }],
+          [],
+        ],
+      });
+      const service = makeServiceWithDeliveries(db);
+      vi.spyOn(service as any, 'buildEligibleBooksWhereClause').mockResolvedValue({ where: true });
+      vi.spyOn(service as any, 'hasDeviceSnapshot').mockResolvedValue(true);
+      vi.spyOn(service as any, 'getDeliverySettings').mockResolvedValue({
+        convertToKepub: true,
+        forceEnableHyphenation: false,
+        kepubConversionLimitMb: 100,
+      });
+
+      const [metadata] = (await service.getBookMetadata(7, 5, 'tok', 'https://base')) as Array<{ DownloadUrls: Array<{ Format: string }> }>;
+
+      expect(deliveries.offer).toHaveBeenCalledWith(7, 101, 5);
+      expect(metadata!.DownloadUrls[0]!.Format).toBe('EPUB3FL');
+    });
+  });
+
   describe('deleted book removals', () => {
     function removedIds(entitlements: unknown[]): string[] {
       return entitlements.map(
@@ -1274,15 +1378,15 @@ describe('KoboSyncService', () => {
       return [];
     }
 
-    it('issues only CREATE TEMP and 9 maintenance queries when eligibleBooks is empty', async () => {
+    it('issues only CREATE TEMP and 10 maintenance queries when eligibleBooks is empty', async () => {
       const { fn: txExecute } = makeTxExecute();
       const db = makeReconcileDb(txExecute);
       const service = makeService(db);
 
       await (service as any).reconcileSnapshot(42, []);
 
-      // CREATE TEMP + 9 maintenance queries (no batch insert when list is empty)
-      expect(txExecute).toHaveBeenCalledTimes(10);
+      // CREATE TEMP + 10 maintenance queries (no batch insert when list is empty)
+      expect(txExecute).toHaveBeenCalledTimes(11);
     });
 
     it('issues one batch INSERT when eligibleBooks fits in a single batch', async () => {
@@ -1295,8 +1399,8 @@ describe('KoboSyncService', () => {
         { bookId: 2, fileHash: null, deliveryHash: 'd2', metadataHash: 'm2' },
       ]);
 
-      // CREATE TEMP + 1 batch INSERT + 9 maintenance queries
-      expect(txExecute).toHaveBeenCalledTimes(11);
+      // CREATE TEMP + 1 batch INSERT + 10 maintenance queries
+      expect(txExecute).toHaveBeenCalledTimes(12);
 
       const batchInsert = captured[1];
       const sqlStrings = extractSqlStrings(batchInsert);
@@ -1349,8 +1453,8 @@ describe('KoboSyncService', () => {
       }));
       await (service as any).reconcileSnapshot(99, eligible);
 
-      // CREATE TEMP + 2 batch INSERTs + 9 maintenance queries
-      expect(txExecute).toHaveBeenCalledTimes(12);
+      // CREATE TEMP + 2 batch INSERTs + 10 maintenance queries
+      expect(txExecute).toHaveBeenCalledTimes(13);
     });
 
     it('includes snapshotId as a param in all maintenance queries', async () => {
@@ -1361,8 +1465,8 @@ describe('KoboSyncService', () => {
       const snapshotId = 77;
       await (service as any).reconcileSnapshot(snapshotId, [{ bookId: 1, fileHash: 'f', deliveryHash: 'd', metadataHash: 'm' }]);
 
-      // Statements at index 2-10 are the 9 maintenance queries
-      const maintenanceStmts = captured.slice(2, 11);
+      // Statements at index 2-11 are the 10 maintenance queries
+      const maintenanceStmts = captured.slice(2, 12);
       for (const stmt of maintenanceStmts) {
         const params = extractSqlParams(stmt);
         expect(params).toContain(snapshotId);
@@ -1921,7 +2025,20 @@ describe('KoboSyncService', () => {
       expect(db.__updateChains[0]!.set).toHaveBeenCalledWith({ isFixedLayout: true });
       // The same pass that learns the flag also stores the EPUB3FL hash, so the device is told
       // about the comic on this sync rather than the next one.
-      expect(rows[0].deliveryHash).toBe('6a8354534ee2c5c8');
+      expect(rows[0].deliveryHash).toBe('79954cfd931e7757');
+    });
+
+    // Comics announced as KEPUB by the delivery path (#1946) are only told again if their stored
+    // hash moves, so the fixed-layout hashes must differ from the ones every device already holds.
+    it('moves fixed-layout delivery hashes off the values announced before #1946', () => {
+      const service = makeService(makeDb());
+      const settings = { convertToKepub: true, forceEnableHyphenation: false, kepubConversionLimitMb: 100 };
+
+      expect((service as any).getDeliveryInfo('epub', 1024, settings, true).hash).toBe('79954cfd931e7757');
+      expect((service as any).getDeliveryInfo('epub', 1024, { ...settings, forceEnableHyphenation: true }, true).hash).toBe('84e3e48afcd932f2');
+      expect((service as any).getDeliveryInfo('kepub', 1024, settings, true).hash).toBe('79954cfd931e7757');
+      // The hashes stored for comics before the revision: plain and hyphenated.
+      expect(['6a8354534ee2c5c8', 'e3a526cde44930e7']).not.toContain((service as any).getDeliveryInfo('epub', 1024, settings, true).hash);
     });
 
     it('does no filesystem work on the mid-page pass that only needs eligible ids', async () => {

@@ -29,6 +29,8 @@ interface EpubFixtureInput {
   uid?: string;
   /** Adds a stored entry of this many bytes, for a file genuinely over a size limit on disk. */
   paddingBytes?: number;
+  /** Declares `rendition:layout` pre-paginated, as comic converters such as KCC do. */
+  fixedLayout?: boolean;
 }
 
 interface Fb2FixtureInput {
@@ -153,7 +155,7 @@ export async function createEpubFixture(rootPath: string, relativePath: string, 
     <dc:identifier id="uid">${escapeXml(uid)}</dc:identifier>
     <dc:title>${escapeXml(title)}</dc:title>
     <dc:language>${escapeXml(language)}</dc:language>
-    <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+    <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>${input.fixedLayout ? '\n    <meta property="rendition:layout">pre-paginated</meta>' : ''}
   </metadata>
   <manifest>
     <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />

@@ -1202,4 +1202,136 @@ describe('Kobo multi-device library sync (e2e)', { timeout: 180_000 }, () => {
       expect(await latestLibrarySync(device)).toEqual({ status: 'success', errorClass: null });
     });
   });
+
+  describe('fixed-layout comics converted to kepub (#1946)', () => {
+    type DownloadUrl = { Format: string; Url: string };
+
+    // The hash a comic's snapshot row carried before the fixed-layout revision moved it.
+    const PRE_REVISION_COMIC_HASH = createHash('sha256').update('EPUB3FL|plain').digest('hex').slice(0, 16);
+
+    let comicBookId!: number;
+    let comicEntitlementId!: string;
+
+    function downloadUrls(entries: unknown[]): Map<string, DownloadUrl> {
+      return new Map(
+        entries.flatMap((entry) => {
+          const value = entry as { NewEntitlement?: { BookEntitlement: { Id: string }; BookMetadata: { DownloadUrls: DownloadUrl[] } } };
+          return value.NewEntitlement ? [[value.NewEntitlement.BookEntitlement.Id, value.NewEntitlement.BookMetadata.DownloadUrls[0]!] as const] : [];
+        }),
+      );
+    }
+
+    async function entitlementIdOf(bookId: number): Promise<string> {
+      const [identity] = await ctx.db
+        .select({ entitlementId: schema.koboBookEntitlements.entitlementId })
+        .from(schema.koboBookEntitlements)
+        .where(and(eq(schema.koboBookEntitlements.userId, userId), eq(schema.koboBookEntitlements.bookId, bookId)));
+      if (!identity) throw new Error(`Book ${bookId} has no Kobo entitlement identity`);
+      return identity.entitlementId;
+    }
+
+    async function comicSnapshotRow(device: KoboDevice) {
+      const [row] = await ctx.db
+        .select({ snapshotId: schema.koboSnapshotBooks.snapshotId, deliveryHash: schema.koboSnapshotBooks.deliveryHash })
+        .from(schema.koboSnapshotBooks)
+        .innerJoin(schema.koboLibrarySnapshots, eq(schema.koboLibrarySnapshots.id, schema.koboSnapshotBooks.snapshotId))
+        .where(and(eq(schema.koboLibrarySnapshots.deviceId, device.id), eq(schema.koboSnapshotBooks.bookId, comicBookId)));
+      if (!row) throw new Error(`Device ${device.id} has no snapshot row for the comic`);
+      return row;
+    }
+
+    async function comicDeliveryFormats(device: KoboDevice): Promise<string[]> {
+      const rows = await ctx.db
+        .select({ metadata: schema.koboDeviceDeliveries.metadata })
+        .from(schema.koboDeviceDeliveries)
+        .where(and(eq(schema.koboDeviceDeliveries.deviceId, device.id), eq(schema.koboDeviceDeliveries.bookId, comicBookId)));
+      return rows.map((row) => row.metadata.format);
+    }
+
+    beforeAll(async () => {
+      const settingsResponse = await ctx.app.inject({
+        method: 'PATCH',
+        url: '/api/v1/kobo/settings',
+        headers: authHeader(ctx.adminToken),
+        payload: { convertToKepub: true, forceEnableHyphenation: false },
+      });
+      expect(settingsResponse.statusCode).toBe(200);
+
+      const comicLibrary = await createLibraryWithFolder(ctx, { name: `kobo-comics-${randomUUID()}` });
+      const path = await createEpubFixture(comicLibrary.folderPath, `kobo-comic-${randomUUID()}.epub`, {
+        title: 'Kobo Fixed Layout Comic',
+        uid: `urn:uuid:${randomUUID()}`,
+        fixedLayout: true,
+      });
+      await triggerAndWaitForLibraryScan(ctx, comicLibrary.libraryId);
+      comicBookId = (await locateBookByAbsolutePath(ctx, path)).bookId;
+
+      const addBooksResponse = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/collections/${collectionId}/books`,
+        headers: authHeader(ctx.adminToken),
+        payload: { bookIds: [comicBookId] },
+      });
+      expect([200, 201]).toContain(addBooksResponse.statusCode);
+    }, 180_000);
+
+    it('announces the comic as EPUB3FL while delivering kepub bytes, beside a reflowable book announced as KEPUB', async () => {
+      const device = await createDevice('Kobo comic reader');
+      const urls = downloadUrls(await drainEntries(device));
+      comicEntitlementId = await entitlementIdOf(comicBookId);
+
+      expect(urls.get(comicEntitlementId)?.Format).toBe('EPUB3FL');
+      expect(urls.get(await entitlementIdOf(bookIds[0]!))?.Format).toBe('KEPUB');
+      expect(await comicDeliveryFormats(device)).toEqual(['kepub']);
+
+      const metadataResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/kobo/${device.token}/v1/library/${comicEntitlementId}/metadata`,
+      });
+      expect(metadataResponse.statusCode).toBe(200);
+      expect((metadataResponse.json() as Array<{ DownloadUrls: DownloadUrl[] }>)[0]!.DownloadUrls[0]!.Format).toBe('EPUB3FL');
+
+      const downloadUrl = new URL(urls.get(comicEntitlementId)!.Url);
+      const download = await ctx.app.inject({ method: 'GET', url: `${downloadUrl.pathname}${downloadUrl.search}` });
+      expect(download.statusCode).toBe(200);
+      expect(download.headers['content-disposition']).toContain('.kepub.epub');
+    });
+
+    it('tells a device about a comic again only if the delivery path announced it as KEPUB', async () => {
+      const toldKepub = await createDevice('Kobo told KEPUB');
+      const toldFixedLayout = await createDevice('Kobo told EPUB3FL');
+      await drainEntries(toldKepub);
+      await drainEntries(toldFixedLayout);
+
+      // Rewinds both devices to the state a release before the fix left them in. A device served by
+      // the delivery path holds a kepub delivery record for the comic; one that received the comic
+      // before that path existed holds none.
+      for (const device of [toldKepub, toldFixedLayout]) {
+        const row = await comicSnapshotRow(device);
+        await ctx.db
+          .update(schema.koboSnapshotBooks)
+          .set({ deliveryHash: PRE_REVISION_COMIC_HASH })
+          .where(and(eq(schema.koboSnapshotBooks.snapshotId, row.snapshotId), eq(schema.koboSnapshotBooks.bookId, comicBookId)));
+      }
+      await ctx.db
+        .delete(schema.koboDeviceDeliveries)
+        .where(and(eq(schema.koboDeviceDeliveries.deviceId, toldFixedLayout.id), eq(schema.koboDeviceDeliveries.bookId, comicBookId)));
+      expect(await comicDeliveryFormats(toldKepub)).toEqual(['kepub']);
+
+      const reannounced = await drainEntries(toldKepub);
+      expect(newEntitlementIds(reannounced)).toEqual([comicEntitlementId]);
+      expect(downloadUrls(reannounced).get(comicEntitlementId)?.Format).toBe('EPUB3FL');
+
+      const spared = await drainEntries(toldFixedLayout);
+      expect(entitlementIds(spared)).not.toContain(comicEntitlementId);
+      expect(await comicDeliveryFormats(toldFixedLayout)).toEqual([]);
+
+      const currentHash = (await comicSnapshotRow(toldKepub)).deliveryHash;
+      expect(currentHash).not.toBe(PRE_REVISION_COMIC_HASH);
+      expect((await comicSnapshotRow(toldFixedLayout)).deliveryHash).toBe(currentHash);
+
+      expect(entitlementIds(await drainEntries(toldKepub))).not.toContain(comicEntitlementId);
+      expect(entitlementIds(await drainEntries(toldFixedLayout))).not.toContain(comicEntitlementId);
+    });
+  });
 });

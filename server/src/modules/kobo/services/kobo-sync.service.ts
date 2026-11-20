@@ -43,6 +43,11 @@ const METADATA_SERIALIZER_VERSION = 2;
 const FIXED_LAYOUT_BACKFILL_LIMIT = 500;
 const FIXED_LAYOUT_BACKFILL_CONCURRENCY = 8;
 
+// Part of every fixed-layout delivery hash. A device only hears about a book it already holds
+// again when that hash moves, so changing this re-announces fixed-layout books. 'r2': from v3.4.0
+// the delivery path announced comics converted to kepub as KEPUB instead of EPUB3FL (#1946).
+const FIXED_LAYOUT_DELIVERY_REVISION = 'r2';
+
 type EligibleSnapshotRow = {
   bookId: number;
   fileHash: string | null;
@@ -280,14 +285,7 @@ export class KoboSyncService {
       if (device) {
         const delivery = await this.deliveries.offer(userId, device.id, bookId);
         book.fileSizeBytes = delivery.metadata.sizeBytes;
-        book.deliveryFormat =
-          delivery.metadata.format === 'kepub'
-            ? 'KEPUB'
-            : delivery.metadata.format === 'pdf'
-              ? 'PDF'
-              : book.deliveryFormat === 'EPUB3FL'
-                ? 'EPUB3FL'
-                : 'EPUB3';
+        book.deliveryFormat = this.announcedFormat(book.deliveryFormat, delivery.metadata.format);
         book.deliveryId = delivery.id;
       }
     }
@@ -647,6 +645,32 @@ export class KoboSyncService {
           AND sb.file_hash IS NOT DISTINCT FROM e.file_hash
       `);
 
+      // The fixed-layout revision moved every comic's hash to re-announce the ones the delivery path
+      // told the device were KEPUB. Those all have a kepub delivery record on this device; a comic
+      // without one was announced as EPUB3FL before that path existed, so it takes the new hash
+      // silently instead of being downloaded again.
+      await tx.execute(sql`
+        UPDATE ${schema.koboSnapshotBooks} AS sb
+        SET delivery_hash = e.delivery_hash
+        FROM kobo_eligible_books_tmp e, ${schema.koboLibrarySnapshots} s
+        WHERE sb.snapshot_id = ${snapshotId}
+          AND sb.book_id = e.book_id
+          AND s.id = sb.snapshot_id
+          AND sb.pending_delete = false
+          AND sb.removed_by_device = false
+          AND (
+            (sb.delivery_hash = ${this.buildDeliveryHash('EPUB3FL', false)} AND e.delivery_hash = ${this.buildDeliveryHash('EPUB3FL', false, FIXED_LAYOUT_DELIVERY_REVISION)})
+            OR (sb.delivery_hash = ${this.buildDeliveryHash('EPUB3FL', true)} AND e.delivery_hash = ${this.buildDeliveryHash('EPUB3FL', true, FIXED_LAYOUT_DELIVERY_REVISION)})
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM ${schema.koboDeviceDeliveries} d
+            WHERE d.user_id = s.user_id
+              AND d.device_id = s.device_id
+              AND d.book_id = sb.book_id
+              AND d.metadata->>'format' = 'kepub'
+          )
+      `);
+
       await tx.execute(sql`
         UPDATE ${schema.koboSnapshotBooks} AS sb
         SET synced = false,
@@ -797,14 +821,7 @@ export class KoboSyncService {
         if (this.deliveries && snapshot) {
           const delivery = await this.deliveries.offer(userId, snapshot.deviceId, row.bookId);
           book.fileSizeBytes = delivery.metadata.sizeBytes;
-          book.deliveryFormat =
-            delivery.metadata.format === 'kepub'
-              ? 'KEPUB'
-              : delivery.metadata.format === 'pdf'
-                ? 'PDF'
-                : book.deliveryFormat === 'EPUB3FL'
-                  ? 'EPUB3FL'
-                  : 'EPUB3';
+          book.deliveryFormat = this.announcedFormat(book.deliveryFormat, delivery.metadata.format);
           book.deliveryId = delivery.id;
         }
       } catch (error) {
@@ -1156,9 +1173,9 @@ export class KoboSyncService {
    * `hyphenate` describes the bytes actually delivered, not the announced format, so a hyphenated
    * kepub and a plain one never collide even when both are announced as EPUB3FL.
    */
-  private buildDeliveryHash(format: KoboDeliveryFormat, hyphenate: boolean): string {
+  private buildDeliveryHash(format: KoboDeliveryFormat, hyphenate: boolean, revision?: string): string {
     return createHash('sha256')
-      .update([format, hyphenate ? 'hyphenate' : 'plain'].join('|'))
+      .update([format, hyphenate ? 'hyphenate' : 'plain', ...(revision ? [revision] : [])].join('|'))
       .digest('hex')
       .slice(0, 16);
   }
@@ -1183,7 +1200,7 @@ export class KoboSyncService {
     // alone. A kepub renders full screen just the same once the format says fixed layout, and
     // keeping the conversion preserves the KoboSpan positions two-way progress sync depends on.
     if (isFixedLayout && (normalizedFormat === 'epub' || normalizedFormat === 'kepub')) {
-      return { format: 'EPUB3FL', hash: this.buildDeliveryHash('EPUB3FL', hyphenated) };
+      return { format: 'EPUB3FL', hash: this.buildDeliveryHash('EPUB3FL', hyphenated, FIXED_LAYOUT_DELIVERY_REVISION) };
     }
 
     if (normalizedFormat === 'kepub') {
@@ -1195,6 +1212,16 @@ export class KoboSyncService {
     }
 
     return { format: 'EPUB3', hash: this.buildDeliveryHash('EPUB3', false) };
+  }
+
+  /**
+   * The format the device is told for a prepared delivery. A fixed-layout book keeps EPUB3FL even
+   * when its bytes are a kepub, as `getDeliveryInfo` plans it.
+   */
+  private announcedFormat(planned: KoboDeliveryFormat, deliveredFormat: string): KoboDeliveryFormat {
+    if (deliveredFormat === 'pdf') return 'PDF';
+    if (planned === 'EPUB3FL') return 'EPUB3FL';
+    return deliveredFormat === 'kepub' ? 'KEPUB' : 'EPUB3';
   }
 
   /**
