@@ -13,6 +13,12 @@ import { join } from 'path';
 export const WALK_MAX_PATH_LENGTH = 4096;
 export const WALK_DIR_CONCURRENCY_LIMIT = 50;
 
+const PERMISSION_ERROR_CODES = new Set(['EACCES', 'EPERM']);
+// Network shares can list an entry in its parent that then fails to open (a stale SMB entry gives
+// ENOENT, a stale NFS handle ESTALE), so a subdirectory that vanished or cannot be read is skipped
+// rather than failing the whole walk.
+const UNREADABLE_SUBDIRECTORY_ERROR_CODES = new Set(['ENOENT', 'ENOTDIR', 'EIO', 'ELOOP', 'ESTALE']);
+
 export interface WalkedDirectory {
   /** Absolute path of the directory being visited. */
   path: string;
@@ -38,7 +44,7 @@ export interface WalkDirectoryTreeOptions {
 }
 
 export interface WalkDirectoryTreeResult {
-  /** Directories that could not be read because of permissions. */
+  /** Directories that could not be read: denied by permissions, or subdirectories that vanished or failed to open. */
   skippedDirs: Set<string>;
 }
 
@@ -64,11 +70,11 @@ export function buildNameExcludeMatcher(patterns: string[]): (name: string) => b
 export async function walkDirectoryTree(root: string, options: WalkDirectoryTreeOptions): Promise<WalkDirectoryTreeResult> {
   const skippedDirs = new Set<string>();
   if (options.skipDirectories?.has(root)) return { skippedDirs };
-  await collectDirectory(root, options, skippedDirs);
+  await collectDirectory(root, options, skippedDirs, true);
   return { skippedDirs };
 }
 
-async function collectDirectory(dir: string, options: WalkDirectoryTreeOptions, skippedDirs: Set<string>): Promise<void> {
+async function collectDirectory(dir: string, options: WalkDirectoryTreeOptions, skippedDirs: Set<string>, isRoot = false): Promise<void> {
   const maxPathLength = options.maxPathLength ?? WALK_MAX_PATH_LENGTH;
   const concurrencyLimit = options.concurrencyLimit ?? WALK_DIR_CONCURRENCY_LIMIT;
   const shouldExclude = options.shouldExclude ?? (() => false);
@@ -78,8 +84,14 @@ async function collectDirectory(dir: string, options: WalkDirectoryTreeOptions, 
     entries = await readdir(dir, { withFileTypes: true });
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === 'EACCES' || code === 'EPERM') {
+    if (code && PERMISSION_ERROR_CODES.has(code)) {
       options.logger?.(`Permission denied reading folder, skipping: ${dir}`);
+      skippedDirs.add(dir);
+      return;
+    }
+    // A missing root means the library itself is gone or unmounted, which must not read as an empty library.
+    if (!isRoot && code && UNREADABLE_SUBDIRECTORY_ERROR_CODES.has(code)) {
+      options.logger?.(`Cannot read folder (${code}), skipping: ${dir}`);
       skippedDirs.add(dir);
       return;
     }

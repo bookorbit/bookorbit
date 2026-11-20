@@ -548,6 +548,105 @@ describe('missing book detection', () => {
   });
 });
 
+describe('folders the walk could not read', () => {
+  const bookPath = '/library/Author/Audiobook';
+  const book = { id: 5, libraryId: 1, libraryFolderId: 1, folderPath: bookPath, status: 'present' };
+  const discOneTrack = makeBookFile({
+    id: 10,
+    bookId: 5,
+    absolutePath: `${bookPath}/CD 1/01.mp3`,
+    relPath: 'Author/Audiobook/CD 1/01.mp3',
+    ino: 5010n,
+    format: 'mp3',
+  });
+  const discTwoTrack = makeBookFile({
+    id: 11,
+    bookId: 5,
+    absolutePath: `${bookPath}/CD 2/01.mp3`,
+    relPath: 'Author/Audiobook/CD 2/01.mp3',
+    ino: 5011n,
+    format: 'mp3',
+  });
+  const discTwoTrackGone = makeBookFile({
+    id: 12,
+    bookId: 5,
+    absolutePath: `${bookPath}/CD 2/02.mp3`,
+    relPath: 'Author/Audiobook/CD 2/02.mp3',
+    ino: 5012n,
+    format: 'mp3',
+  });
+  const discTwoTrackOnDisk = makeFileStat({
+    absolutePath: discTwoTrack.absolutePath,
+    relPath: discTwoTrack.relPath,
+    ino: discTwoTrack.ino,
+    format: 'mp3',
+    role: 'content',
+  });
+
+  it('keeps the files of a partly read book that sit under an unreadable folder', async () => {
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi.fn().mockResolvedValue([book]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([discOneTrack, discTwoTrack, discTwoTrackGone]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate(bookPath, [discTwoTrackOnDisk])],
+      skippedDirs: new Set([`${bookPath}/CD 1`]),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.deleteBookFile).toHaveBeenCalledTimes(1);
+    expect(repo.deleteBookFile).toHaveBeenCalledWith(discTwoTrackGone.id);
+    expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
+  });
+
+  it('does not mark a book missing when every folder holding its files could not be read', async () => {
+    const repo = makeRepo({
+      findBooksByLibraryFolder: vi.fn().mockResolvedValue([book]),
+      findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([discOneTrack, discTwoTrack]),
+      findBookFilesByBookIds: vi.fn().mockResolvedValue([discOneTrack, discTwoTrack]),
+    });
+    mockFindCandidates.mockResolvedValue({
+      candidates: [],
+      skippedDirs: new Set([`${bookPath}/CD 1`, `${bookPath}/CD 2`]),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    mockStat.mockRejectedValue(Object.assign(new Error('ENOENT'), { code: 'ENOENT' }));
+
+    const done = awaitScan(repo);
+    const { service } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
+  });
+
+  it('keeps those files when a targeted directory scan reads the book only in part', async () => {
+    mockBuildSingleCandidate.mockResolvedValue(null);
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate(bookPath, [discTwoTrackOnDisk])],
+      skippedDirs: new Set([`${bookPath}/CD 1`]),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const repo = makeRepo({
+      findBooksByFolderPath: vi.fn().mockResolvedValue([book]),
+      findBookFilesByBookIds: vi.fn().mockResolvedValue([discOneTrack, discTwoTrack]),
+    });
+    const { service } = makeService(repo);
+
+    await (service as any).scanBookDirectory('/library/Author', 1);
+
+    expect(repo.deleteBookFile).not.toHaveBeenCalled();
+  });
+});
+
 describe('books unavailable notifications', () => {
   it('buffers and deduplicates missing book notifications', () => {
     const repo = makeRepo();

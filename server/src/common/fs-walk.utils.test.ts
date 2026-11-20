@@ -130,4 +130,42 @@ describe('walkDirectoryTree', () => {
     expect([...skippedDirs]).toEqual([join(root, 'locked')]);
     expect(visited.map((directory) => basename(directory.path))).toEqual([basename(root)]);
   });
+
+  it('skips a subdirectory that disappears after its parent lists it and keeps walking its siblings', async () => {
+    await mkdir(join(root, 'stale'), { recursive: true });
+    await mkdir(join(root, 'sibling'), { recursive: true });
+    await writeFile(join(root, 'sibling', 'book.epub'), 'a');
+
+    const visited: string[] = [];
+    const messages: string[] = [];
+    const { skippedDirs } = await walkDirectoryTree(root, {
+      logger: (message) => messages.push(message),
+      visit: async (directory) => {
+        visited.push(basename(directory.path));
+        if (directory.path === root) await rm(join(root, 'stale'), { recursive: true });
+      },
+    });
+
+    expect([...skippedDirs]).toEqual([join(root, 'stale')]);
+    expect(visited.sort()).toEqual([basename(root), 'sibling'].sort());
+    expect(messages).toEqual([`Cannot read folder (ENOENT), skipping: ${join(root, 'stale')}`]);
+  });
+
+  it('skips a subdirectory that was replaced by a file after its parent listed it', async () => {
+    await mkdir(join(root, 'swapped'), { recursive: true });
+
+    const { skippedDirs } = await walkDirectoryTree(root, {
+      visit: async (directory) => {
+        if (directory.path !== root) return;
+        await rm(join(root, 'swapped'), { recursive: true });
+        await writeFile(join(root, 'swapped'), 'now a file');
+      },
+    });
+
+    expect([...skippedDirs]).toEqual([join(root, 'swapped')]);
+  });
+
+  it('still fails when the root itself is missing', async () => {
+    await expect(walkDirectoryTree(join(root, 'unmounted'), { visit: () => undefined })).rejects.toMatchObject({ code: 'ENOENT' });
+  });
 });
