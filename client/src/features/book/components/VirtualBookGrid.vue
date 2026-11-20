@@ -377,7 +377,7 @@ defineExpose({ scrollToIndex })
 
 @media (pointer: coarse) {
   .book-grid-scroller {
-    touch-action: pan-y;
+    touch-action: pan-y pinch-zoom;
   }
 }
 

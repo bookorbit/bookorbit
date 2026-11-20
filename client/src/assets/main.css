@@ -340,7 +340,7 @@ html[data-glow='off'] .shell-glow {
   @media (pointer: coarse) {
     .app-shell-inset,
     .app-shell-scroll {
-      touch-action: pan-y;
+      touch-action: pan-y pinch-zoom;
     }
 
     /* Prevent double-tap zoom on tappable controls while preserving normal taps. */

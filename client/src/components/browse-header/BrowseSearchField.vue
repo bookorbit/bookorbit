@@ -251,7 +251,7 @@ defineExpose({ focus: () => inputRef.value?.focus() })
       type="search"
       :placeholder="placeholderText"
       :aria-label="t('common.search')"
-      class="browse-search-input h-full min-w-[3rem] flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+      class="browse-search-input h-full min-w-[3rem] flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground pointer-coarse:text-base"
       @input="handleInput"
       @keydown.escape="handleEscape"
     />
