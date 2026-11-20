@@ -1263,6 +1263,11 @@ export class ScannerService implements OnApplicationBootstrap {
       totals.updated += result.updated;
     }
 
+    // Files under a folder the walk could not read were hidden, not removed: keep them.
+    for (const [absolutePath, file] of maps.fileByPath) {
+      if (isUnderAnyDir(absolutePath, skippedDirs)) allRetainedFileIds.add(file.id);
+    }
+
     const pruneCounts = { added: 0, updated: 0 };
     for (const bookId of seenBookIds) {
       if (await this.pruneMissingBookFiles(bookId, allRetainedFileIds, maps.fileIdsByBookId, maps.fileByPath, maps.fileByIno, pruneCounts)) {
@@ -1920,6 +1925,19 @@ export class ScannerService implements OnApplicationBootstrap {
       await this.repairMissingAudioDurations(knownFiles, unchangedDirs, seenBookIds);
       await this.repairUncheckedMediaOverlays(knownFiles, unchangedDirs, seenBookIds);
 
+      // A folder the walk could not read hides its files without removing them. When it sits inside
+      // a book (a disc folder, or audio beside a same-named ebook), the book is still seen through
+      // its readable folders, so its hidden files must be kept rather than pruned with their
+      // progress and sessions, and the book must not be marked missing for them.
+      const bookIdsWithUnreadFiles = new Set<number>();
+      if (skippedDirs.size > 0) {
+        for (const file of knownFiles) {
+          if (!isUnderAnyDir(file.absolutePath, skippedDirs)) continue;
+          allRetainedFileIds.add(file.id);
+          bookIdsWithUnreadFiles.add(file.bookId);
+        }
+      }
+
       // Deferred prune: delete book files not retained by any candidate.
       // Must happen after ALL batches so cross-book file moves are visible.
       const pruneCounts = { added: 0, updated: 0 };
@@ -1931,7 +1949,7 @@ export class ScannerService implements OnApplicationBootstrap {
       counts.updatedCount += pruneCounts.updated;
       await this.reconcileCoverSlots(coverBookIds);
 
-      // Don't mark books as missing if their folder was skipped due to permission errors
+      // Don't mark books as missing if their folder could not be read
       const isUnderSkippedDir = (folderPath: string) => {
         for (const dir of skippedDirs) {
           if (folderPath === dir || folderPath.startsWith(dir + sep)) return true;
@@ -1948,7 +1966,9 @@ export class ScannerService implements OnApplicationBootstrap {
         return false;
       };
       const missingCandidates = knownBooks
-        .filter((b) => !seenBookIds.has(b.id) && !isUnderSkippedDir(b.folderPath) && !isInUnchangedDir(b.folderPath))
+        .filter(
+          (b) => !seenBookIds.has(b.id) && !isUnderSkippedDir(b.folderPath) && !bookIdsWithUnreadFiles.has(b.id) && !isInUnchangedDir(b.folderPath),
+        )
         .map((b) => b.id);
       const missingIds = await this.filterBookIdsMissingOnDisk(missingCandidates);
       if (missingIds.length > 0) {

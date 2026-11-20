@@ -14,9 +14,10 @@ export const WALK_MAX_PATH_LENGTH = 4096;
 export const WALK_DIR_CONCURRENCY_LIMIT = 50;
 
 const PERMISSION_ERROR_CODES = new Set(['EACCES', 'EPERM']);
-// Network shares can list an entry in its parent that then fails to open (stale SMB/NFS entries),
-// so a subdirectory that vanished or cannot be read is skipped rather than failing the whole walk.
-const UNREADABLE_SUBDIRECTORY_ERROR_CODES = new Set(['ENOENT', 'ENOTDIR', 'EIO', 'ELOOP']);
+// Network shares can list an entry in its parent that then fails to open (a stale SMB entry gives
+// ENOENT, a stale NFS handle ESTALE), so a subdirectory that vanished or cannot be read is skipped
+// rather than failing the whole walk.
+const UNREADABLE_SUBDIRECTORY_ERROR_CODES = new Set(['ENOENT', 'ENOTDIR', 'EIO', 'ELOOP', 'ESTALE']);
 
 export interface WalkedDirectory {
   /** Absolute path of the directory being visited. */
