@@ -2091,6 +2091,8 @@
             "anthropic": "Use Anthropic Messages with this URL. Anthropic's OpenAI-style /v1/ endpoint is not meant for production and ignores JSON schemas.",
             "gemini": "Google calls this endpoint beta, and rejects API keys that have no restrictions.",
             "openrouter": "Requests ask OpenRouter to use only providers that support every parameter, so a model without JSON schema support fails instead of returning loose text.",
+            "opencodezen": "Free-tier models are for OpenCode and return 403 from other clients. Use a paid model or OpenCode Go instead.",
+            "opencodego": "OpenCode Go needs a subscription and an API key from the OpenCode console. Each connection gets its own session ID so requests route correctly.",
             "cliproxyapi": "Use a client key from its api-keys list, not the Management Center key. Its model list mixes every signed-in account.",
             "ollama": "Small local models are unreliable at JSON.",
             "lmstudio": "LM Studio warns that models under 7B often can't follow a JSON schema.",

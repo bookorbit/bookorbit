@@ -1,6 +1,6 @@
 import type { AiApiType } from "./ai";
 
-export const AI_PRESET_IDS = ["openai", "anthropic", "gemini", "openrouter", "cliproxyapi", "ollama", "lmstudio", "vllm", "azure", "other"] as const;
+export const AI_PRESET_IDS = ["openai", "anthropic", "gemini", "openrouter", "opencodezen", "opencodego", "cliproxyapi", "ollama", "lmstudio", "vllm", "azure", "other"] as const;
 export type AiPresetId = (typeof AI_PRESET_IDS)[number];
 
 export interface AiPreset {
@@ -10,8 +10,8 @@ export interface AiPreset {
   baseUrl: string;
   apiType: AiApiType;
   keyOptional: boolean;
-  /** Extra headers to prefill, with a value only where it is not a secret. */
-  headers: Array<{ name: string; value: string }>;
+  /** Extra headers to prefill, with a value only where it is not a secret. `fresh` means a value generated per connection. */
+  headers: Array<{ name: string; value: string; fresh?: boolean }>;
   /** Azure takes a deployment name where others take a model ID. */
   modelLabel: "model" | "deployment";
   /** True when the form shows a warning for this preset. */
@@ -44,6 +44,8 @@ export const AI_PRESETS: Record<AiPresetId, AiPreset> = {
     modelLabel: "model",
     warning: true,
   },
+  opencodezen: { id: "opencodezen", name: "OpenCode Zen", baseUrl: "https://opencode.ai/inference/openai/v1", apiType: "openai-chat", keyOptional: false, headers: [], modelLabel: "model", warning: true },
+  opencodego: { id: "opencodego", name: "OpenCode Go", baseUrl: "https://opencode.ai/inference/go/openai/v1", apiType: "openai-chat", keyOptional: false, headers: [{ name: "x-opencode-session", value: "", fresh: true }], modelLabel: "model", warning: true },
   cliproxyapi: { id: "cliproxyapi", name: "CLIProxyAPI", baseUrl: "http://localhost:8317/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: true },
   ollama: { id: "ollama", name: "Ollama", baseUrl: "http://localhost:11434/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: true },
   lmstudio: { id: "lmstudio", name: "LM Studio", baseUrl: "http://localhost:1234/v1", apiType: "openai-chat", keyOptional: true, headers: [], modelLabel: "model", warning: true },
@@ -198,6 +200,14 @@ export function detectAiConnection(raw: string): AiUrlDetection | null {
     preset = "azure";
   } else if (host === "openrouter.ai") {
     preset = "openrouter";
+  } else if (host === "opencode.ai" && /^\/inference\/go\/openai$/i.test(path)) {
+    preset = "opencodego";
+  } else if (host === "opencode.ai" && /^\/inference\/openai$/i.test(path)) {
+    preset = "opencodezen";
+  } else if (host === "opencode.ai" && /^\/zen\/go$/i.test(path)) {
+    preset = "opencodego";
+  } else if (host === "opencode.ai" && /^\/zen$/i.test(path)) {
+    preset = "opencodezen";
   } else {
     preset = PORT_PRESETS[url.port] ?? "other";
   }

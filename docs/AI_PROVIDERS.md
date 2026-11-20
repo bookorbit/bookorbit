@@ -20,7 +20,7 @@ Put it in `.env` beside the other secrets. With the Docker image you can instead
 
 ## Adding a connection
 
-**Add provider** offers presets for OpenAI, Anthropic, Google Gemini, OpenRouter, CLIProxyAPI, Ollama, LM Studio, vLLM and Azure OpenAI, and **Other** for any server that speaks the OpenAI API. Pasting a URL instead picks the preset and API type from the address. A preset only fills in the form; every field can still be changed.
+**Add provider** offers presets for OpenAI, Anthropic, Google Gemini, OpenRouter, OpenCode Zen, OpenCode Go, CLIProxyAPI, Ollama, LM Studio, vLLM and Azure OpenAI, and **Other** for any server that speaks the OpenAI API. Pasting a URL instead picks the preset and API type from the address. A preset only fills in the form; every field can still be changed. OpenCode Go needs a subscription and a stable `x-opencode-session` header; its preset generates a fresh one for each connection. Zen's free models are for OpenCode only, so use a paid model or Go from BookOrbit.
 
 - **Base URL**: pasted endpoints such as `.../v1/chat/completions` are trimmed to the base, and the form shows the exact URL requests will go to.
 - **API type**: OpenAI-compatible (Chat Completions), Anthropic Messages, or OpenAI Responses. Most providers and proxies speak OpenAI-compatible. Use Anthropic Messages for Anthropic itself, and for Claude behind a proxy that offers it, since that is where a JSON schema is enforced.
