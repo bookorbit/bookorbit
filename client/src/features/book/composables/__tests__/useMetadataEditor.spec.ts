@@ -133,6 +133,73 @@ describe('useMetadataEditor', () => {
     })
   })
 
+  it('edits narrators but not duration or abridged on a read-along EPUB with no audio files', async () => {
+    const book = makeBook({
+      files: [
+        {
+          id: 11,
+          format: 'epub',
+          role: 'primary',
+          sizeBytes: 10,
+          absolutePath: '/books/test.epub',
+          createdAt: '2026-01-01T00:00:00.000Z',
+          filename: 'test.epub',
+          durationSeconds: null,
+          mediaOverlay: { available: true, durationSeconds: 3600 },
+        },
+      ],
+    })
+    apiMock.mockResolvedValue({ ok: true, json: async () => book })
+
+    const { form, includeAudioMetadata, includeNarrators, load, save } = useMetadataEditor()
+    load(book)
+    expect(includeNarrators.value).toBe(true)
+    expect(includeAudioMetadata.value).toBe(false)
+
+    form.narrators = ['Narrator One']
+    form.durationSeconds = 3600
+    form.abridged = true
+    await save(book.id, [])
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    const payload = JSON.parse(String(req.body)) as { metadata: { audioMetadata?: Record<string, unknown> } }
+    expect(payload.metadata.audioMetadata).toEqual({ narrators: ['Narrator One'] })
+  })
+
+  it('keeps narrators editable on a plain EPUB that already has them', () => {
+    const book = makeBook({
+      audioMetadata: {
+        narrators: [{ id: 2, name: 'Narrator One', sortName: null, displayOrder: 0 }],
+        durationSeconds: null,
+        abridged: false,
+        chapters: null,
+      },
+    })
+
+    const { form, includeAudioMetadata, includeNarrators, load } = useMetadataEditor()
+    load(book)
+
+    expect(form.narrators).toEqual(['Narrator One'])
+    expect(includeNarrators.value).toBe(true)
+    expect(includeAudioMetadata.value).toBe(false)
+  })
+
+  it('leaves narrators out for a plain EPUB without any', async () => {
+    const book = makeBook()
+    apiMock.mockResolvedValue({ ok: true, json: async () => book })
+
+    const { form, includeNarrators, load, save } = useMetadataEditor()
+    load(book)
+    expect(includeNarrators.value).toBe(false)
+
+    form.narrators = ['Narrator One']
+    await save(book.id, [])
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    const { metadata } = JSON.parse(String(req.body)) as { metadata: Record<string, unknown> }
+    expect(metadata.audioMetadata).toBeUndefined()
+  })
+
   it('sends only changed fields in the metadata payload', async () => {
     const book = makeBook({ title: 'Original Title', publisher: 'Original Publisher' })
     apiMock.mockResolvedValue({ ok: true, json: async () => book })

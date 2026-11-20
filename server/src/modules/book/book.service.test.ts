@@ -5632,6 +5632,90 @@ describe('BookService', () => {
       ]);
     });
 
+    it('returns narrators for a read-along EPUB without audio files, leaving out stored audio details', async () => {
+      const { service, bookRepo, userBookStatusService, comicMetadataService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: {
+            id: 12,
+            libraryId: 3,
+            primaryFileId: 400,
+            status: 'present',
+            folderPath: '/books/foundation',
+            addedAt: new Date('2026-02-01T00:00:00.000Z'),
+          },
+          libraries: { name: 'Main', formatPriority: null },
+          book_metadata: {
+            title: 'Foundation',
+            subtitle: null,
+            description: null,
+            isbn10: null,
+            isbn13: null,
+            publisher: null,
+            publishedYear: null,
+            language: null,
+            pageCount: null,
+            seriesName: null,
+            seriesIndex: null,
+            rating: null,
+            coverSource: null,
+            lockedFields: null,
+            googleBooksId: null,
+            goodreadsId: null,
+            amazonId: null,
+            hardcoverId: null,
+            openLibraryId: null,
+            itunesId: null,
+            audibleId: null,
+            koboId: null,
+            comicvineId: null,
+            ranobedbId: null,
+            chapters: [{ title: 'Chapter 1', startMs: 0 }],
+            durationSeconds: 7200,
+            abridged: true,
+            lastWrittenAt: null,
+            metadataScore: null,
+          },
+        },
+        authorRows: [{ id: 2, name: 'Isaac Asimov', sortName: 'Asimov, Isaac' }],
+        genreRows: [{ name: 'Sci-Fi' }],
+        tagRows: [],
+        fileRows: [
+          {
+            id: 400,
+            format: 'epub',
+            role: 'content',
+            sizeBytes: 42,
+            updatedAt: new Date('2026-01-01'),
+            absolutePath: '/books/foundation.epub',
+            createdAt: new Date('2026-02-01T00:00:00.000Z'),
+            durationSeconds: null,
+            mediaOverlayAvailable: true,
+            mediaOverlayDurationSeconds: 3600,
+          },
+        ],
+        narratorRows: [{ id: 4, name: 'Simon Vance', sortName: 'Vance, Simon' }],
+        communityRatingRows: [],
+      });
+      userBookStatusService.findOne.mockResolvedValue(null);
+      comicMetadataService.findByBookId.mockResolvedValue(null);
+      bookRepo.findCollectionsByBookId.mockResolvedValue([]);
+      bookRepo.findRatingByBookAndUser.mockResolvedValue(null);
+
+      const result = await service.getDetail(12, user);
+
+      expect(result.audioMetadata).toEqual({
+        narrators: [{ id: 4, name: 'Simon Vance', sortName: 'Vance, Simon', displayOrder: 0 }],
+        durationSeconds: null,
+        abridged: false,
+        chapters: null,
+        chaptersSource: null,
+        chaptersUpdatedAt: null,
+      });
+    });
+
     it('getMetadataFromFile handles missing or unsupported primary files', async () => {
       const { service, bookRepo } = makeService();
       const user = makeUser();

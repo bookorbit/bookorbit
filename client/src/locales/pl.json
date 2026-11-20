@@ -110,7 +110,12 @@
           "label": "Styl",
           "hint": "Ogólny wygląd aplikacji. Tryb, akcent, narożniki i tło zachowują swoje ustawienia.",
           "bookorbit": {
-            "label": "BookOrbit"
+            "label": "BookOrbit",
+            "description": "Przyciemnione powierzchnie, szklane panele i nagłówki serif."
+          },
+          "nostalgia": {
+            "label": "Nostalgia",
+            "description": "Neutralne ziemie, typ systemu, płaskie panele i blask z góry."
           }
         },
         "colorScheme": {
@@ -118,12 +123,34 @@
           "hint": "Jasny lub ciemny interfejs"
         },
         "surfacePalette": {
+          "label": "Powierzchnia",
+          "hint": "Neutralna ziemia za panelami i kartami.",
           "palettes": {
-            "onyx": "Onyx"
+            "onyx": "Onyx",
+            "carbon": "Węgiel",
+            "neutral": "Neutralny",
+            "zinc": "Cynk",
+            "iron": "Żelazo",
+            "steel": "Stal",
+            "ash": "Popiół",
+            "smoke": "Dym",
+            "charcoal": "Węgiel drzewny",
+            "slate": "Łupek",
+            "midnight-blue": "Granatowy",
+            "ocean": "Ocean",
+            "pine": "Sosna",
+            "olive": "Oliwa",
+            "stone": "Kamień",
+            "sepia": "Sepia",
+            "crimson": "Karmazyn",
+            "plum": "Śliwka"
           }
         },
         "topGlow": {
-          "value": "{value}%"
+          "label": "Blask z góry",
+          "hint": "Jak nisko blask akcentów sięga do dołu strony. Przesuń w lewo do końca, aby to wyłączyć.",
+          "value": "{value}%",
+          "off": "Wyłączony"
         },
         "accents": {
           "grey": "Szary",
@@ -201,7 +228,8 @@
           "options": {
             "sharp": "Ostre",
             "default": "Domyślne",
-            "rounded": "Zaokrąglone"
+            "rounded": "Zaokrąglone",
+            "pill": "Tabletka"
           }
         },
         "surfaceBrightness": {
@@ -254,6 +282,18 @@
           "loadError": "Nie udało się załadować domyślnego dostawcy okładek",
           "saveError": "Nie udało się zapisać domyślnego dostawcy okładek"
         },
+        "placeholderStyle": {
+          "title": "Styl zastępczy",
+          "hint": "Książki bez sztuki okładkowej są rysowane w tym stylu.",
+          "options": {
+            "bauhaus": "Bauhaus",
+            "constructivist": "Konstruktywista",
+            "memphis": "Memfis",
+            "poster": "Plakat",
+            "aurora": "Aurora",
+            "marbled": "Zmarmurowany"
+          }
+        },
         "displayMode": {
           "title": "Tryb wyświetlania okładki",
           "hint": "Kontroluje dopasowanie prawdziwych okładek do przegródek na książki w przypadku różnych proporcji",
@@ -302,7 +342,8 @@
             "hint": "Wyłącznie dominujący kolor okładki"
           },
           "duotone": {
-            "label": "Dwukolorowy"
+            "label": "Dwukolorowy",
+            "hint": "Dodaje kolor akcentu okładki, gdy ma odrębny kolor"
           }
         },
         "shadow": {
@@ -343,6 +384,40 @@
           "lockStatus": {
             "label": "Stan blokady",
             "hint": "Ikona blokady metadanych w prawym górnym rogu - pomarańczowa po zablokowaniu i zielona po odblokowaniu"
+          }
+        },
+        "formatBadgeStyle": {
+          "title": "Zformatuj styl odznaki",
+          "hint": "W taki sposób odznaka pokazuje książkę, która ma wiele formatów. Książka z pojedynczym formatem zawsze pokazuje swoją podstawową tabletkę.",
+          "options": {
+            "primary": {
+              "label": "Podstawowy format",
+              "hint": "Jedna tabletka z formatem otworzonym przez kartę."
+            },
+            "bubble": {
+              "label": "Policz bańkę",
+              "hint": "Podstawowa tabletka z małą ilością innych formatów w jej rogu."
+            },
+            "underline": {
+              "label": "Podkreślenie",
+              "hint": "Podstawowa tabletka z paskiem pod nią, jeden pokolorowany segment na każdy inny format."
+            },
+            "pips": {
+              "label": "Pestka",
+              "hint": "Podstawowa pigułka z pokolorowaną pestką nad nią dla każdego innego formatu."
+            },
+            "seal": {
+              "label": "Uszczelnij",
+              "hint": "Pierścień z jednym segmentem na format i ilość w środku."
+            },
+            "dots": {
+              "label": "Kropki",
+              "hint": "Jedna pokolorowana kropka na format. Najedź na okładkę, by zobaczyć pełną listę."
+            },
+            "kinds": {
+              "label": "Czytaj i słuchaj",
+              "hint": "Podstawowy format, a następnie ikony tego, co książka może zrobić."
+            }
           }
         }
       },
@@ -516,7 +591,8 @@
         "profile": "Profil",
         "privacy": "Prywatność i udostępnianie",
         "notifications": "Powiadomienia",
-        "restrictions": "Ograniczenia"
+        "restrictions": "Ograniczenia",
+        "apiKeys": "Klucze API"
       },
       "demoRestricted": {
         "cannotEdit": "Konto z ograniczeniami demo nie może edytować ustawień konta",
@@ -1111,6 +1187,7 @@
         "syncMetadataToFiles": "Synchronizuj metadane z plikami",
         "deleteLibrary": "Usuń bibliotekę",
         "bookCount": "{count, plural, =0 {żadnych książek} one {# książka} other {# książki} few {# książki} many {# książek}}",
+        "booksUnit": "{count, plural,\n    one {książka}\n    few {książki}\n    many {książek}\n    other {książki}\n}",
         "folderCount": "{count, plural, =0 {żadnych folderów} one {# folderze} other {# foldery} few {# foldery} many {# folderów}}",
         "fileMode": "Tryb plików",
         "folderMode": "Tryb folderu",
@@ -1142,20 +1219,31 @@
         "onDiskUnit": "{size} na dysku",
         "noFilesIndexed": "Brak zindeksowanych plików",
         "formatEntry": "{format} {count}",
+        "formatOverflow": "i {count, plural, one {+# format} few {+# formaty} many {+# formatów} other {+# formatu}}",
+        "extraFolders": "{count, plural, one {# folder} few {# foldery} many {# folderów} other {# folderu}}",
         "openLibrary": "Otwórz {name}",
         "moreActions": "Więcej działań dla {name}",
+        "statsFailed": "Nie można załadować licznika bibliotek. Wszystko inne na tej stronie nadal działa.",
         "filterLabel": "Filtruj biblioteki",
         "filterPlaceholder": "Filtruj według nazwy lub ścieżki",
         "filterClear": "Wyczyść filtry",
         "sortLabel": "Sortuj",
+        "noMatchesTitle": "Brak bibliotek pasujących do tego filtru",
+        "noMatchesHint": "Nic nie pasuje do \"{query}\" według nazwy lub ścieżki folderu.",
+        "totalLibraries": "{count, plural,one {# biblioteka} few{# biblioteki} many{# bibliotek} other{# biblioteki}}",
         "neverScanned": "Nigdy nie skanowane",
         "neverScannedHint": "Uruchom skan, aby zindeksować foldery",
         "scanFailedAt": "Nieudane {time}",
         "scanningPercent": "Skanowanie {pct}%",
         "scanCounting": "Liczenie plików",
         "scanCounts": "{processed} z {total}",
+        "scanAdded": "{count, plural, one {dodano +#} few{dodano +#} many {dodano +#} other{dodano +#}}",
+        "scanUpdated": "{count, plural, one {zaaktualizowano #} few {zaaktualizowano #} many {zaaktualizowano #} other {zaaktualizowano #}}",
+        "scanMissing": "{count, plural, one {brak #} few {brak #} many {brak #} other {brak #}}",
         "scanNoChange": "bez zmian",
         "outcomeSeparator": ", ",
+        "scanOutcome": "{trigger} · {outcome}",
+        "syncConfirmBody": "Spowoduje to nadpisanie metadanych w każdym obsługiwanym pliku w {name} bezpośrednio na dysku. Tego nie można cofnąć.",
         "columns": {
           "library": "Biblioteka",
           "contents": "Zawartość",
@@ -1169,7 +1257,8 @@
           "name": "Nazwa",
           "books": "Książki",
           "size": "Rozmiar na dysku",
-          "lastScan": "Ostatni skan"
+          "lastScan": "Ostatni skan",
+          "sidebar": "Kolejność pasku bocznego"
         },
         "trigger": {
           "manual": "Ręczne",
@@ -1211,13 +1300,21 @@
           "path": "Ścieżka {index}",
           "organization": "Organizacje",
           "excludePatterns": "Wyklucz wzorce",
+          "precedence": "Pierwszeństwo źródła",
           "allowedFormats": "Dozwolone formaty",
+          "countsAsStarted": "Liczy się jako zaczęte",
+          "countsAsFinished": "Liczy się jako skończone",
           "peopleWithAccess": "Osoby mające dostęp",
           "added": "Dodano",
           "coverShape": "Kształt okładki",
           "coverShapeValue": {
             "portrait": "2:3 portret",
             "square": "1:1 kwadrat"
+          },
+          "gridShape": "Kształt siatki",
+          "gridShapeValue": {
+            "tall": "Wysokie komórki",
+            "square": "Kwadratowe komórki"
           },
           "none": "Brak",
           "allSupported": "Wszystkie obsługiwane",

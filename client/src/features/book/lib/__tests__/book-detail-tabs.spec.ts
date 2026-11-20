@@ -33,4 +33,9 @@ describe('hasChaptersTab', () => {
   ])('is off for %s', (_label, files) => {
     expect(hasChaptersTab(book(files))).toBe(false)
   })
+
+  it('stays off for a plain EPUB whose detail carries narrators', () => {
+    const narrated = { narrators: [{ id: 1, name: 'Narrator One', sortName: null, displayOrder: 0 }], durationSeconds: null }
+    expect(hasChaptersTab(book([{ id: 1, format: 'epub', role: 'content' }], narrated))).toBe(false)
+  })
 })
