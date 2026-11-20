@@ -180,6 +180,20 @@ assertEqual(local_query.on_device_filter, true, "request does not mutate local c
 filtered_client:catalogManifest(local_query)
 assertEqual(captured_path:find("on_device_filter", 1, true), nil, "bulk manifest also excludes local device context")
 
+local captured_method, captured_body
+filtered_client.request = function(_, method, path, body) captured_method, captured_path, captured_body = method, path, body end
+filtered_client:catalogBooks({ sort = "title", page = 2, not_on_device_filter = true })
+assertEqual(captured_method, "GET", "a list without an exclusion stays a GET")
+assertEqual(captured_path:find("not_on_device_filter", 1, true), nil, "the not-on-device flag never reaches the server")
+filtered_client:catalogBooks({ sort = "title", page = 2, buckets = 1, excludeIds = "4,9", not_on_device_filter = true, on_device_filter = false })
+assertEqual(captured_method, "POST", "an exclusion is sent as a body")
+assertEqual(captured_path, "/koreader/plugin/catalog/books/query", "the body goes to the list query route")
+assertEqual(captured_body.excludeIds, "4,9", "the exclusion travels whole")
+assertEqual(captured_body.page, "2", "body values are the strings the URL would carry")
+assertEqual(captured_body.buckets, "1", "flags keep their query-string form")
+assertEqual(captured_body.not_on_device_filter, nil, "local flags stay out of the body")
+assertEqual(captured_body.on_device_filter, nil, "every local flag stays out of the body")
+
 local loopback_client = BookOrbitApi.new{
     server_url = "http://localhost:3000/api/v1",
 }

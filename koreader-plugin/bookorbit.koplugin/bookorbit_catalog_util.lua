@@ -20,15 +20,9 @@ CatalogUtil.DEFAULT_GRID_ROWS = 3
 -- batch and the page rebuilds once when it lands.
 CatalogUtil.THUMBNAIL_BATCH_SIZE = 3
 CatalogUtil.MAX_RECENT_SEARCHES = 8
--- The server caps its ids filter at 200, so both device-derived lists are
--- bounded by it rather than by the size of the library.
+-- The server caps its ids filter at 200, so the On device list is bounded by it
+-- rather than by the size of the library.
 CatalogUtil.ON_DEVICE_MAX_IDS = 200
-CatalogUtil.NOT_ON_DEVICE_MAX_IDS = 200
--- Not-on-device has no server-side filter, so the list is assembled by walking
--- the newest books. Both bounds keep that walk to a fixed number of requests
--- however large the library is.
-CatalogUtil.NOT_ON_DEVICE_SCAN_PAGES = 5
-CatalogUtil.NOT_ON_DEVICE_SCAN_SIZE = 100
 
 CatalogUtil.SORTS = {
     { id = "title", text = _("Title") },
@@ -248,27 +242,6 @@ function CatalogUtil.shortText(text, max_len)
     text = tostring(text or "")
     if #text <= max_len then return text end
     return util.fixUtf8(text:sub(1, max_len - 3), "?") .. "..."
-end
-
--- Walks the newest books through fetchPage(page) and keeps the ids isOnDevice
--- rejects. There is no server-side filter for this: which books are linked is
--- local KOReader state the server never sees, so the walk is bounded by both
--- the page count and the server's cap on the ids filter to stay predictable on
--- a large library. Returns nil plus the fetch error if a page fails.
-function CatalogUtil.scanNotOnDeviceIds(fetchPage, isOnDevice)
-    local ids = {}
-    for page = 1, CatalogUtil.NOT_ON_DEVICE_SCAN_PAGES do
-        local body, err = fetchPage(page)
-        if not body then return nil, err end
-        for _, book in ipairs(body.items or {}) do
-            if book.id ~= nil and not isOnDevice(book) then
-                table.insert(ids, book.id)
-                if #ids >= CatalogUtil.NOT_ON_DEVICE_MAX_IDS then return ids end
-            end
-        end
-        if body.hasNext ~= true then break end
-    end
-    return ids
 end
 
 -- Paths carry their meaning at the end, so an over-long one keeps its tail

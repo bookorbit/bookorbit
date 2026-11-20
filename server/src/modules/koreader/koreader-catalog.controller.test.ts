@@ -1,4 +1,5 @@
-import { GUARDS_METADATA } from '@nestjs/common/constants';
+import { RequestMethod } from '@nestjs/common';
+import { GUARDS_METADATA, HTTP_CODE_METADATA, METHOD_METADATA, PATH_METADATA } from '@nestjs/common/constants';
 
 import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 import { KoreaderAuthGuard } from './koreader-auth.guard';
@@ -61,6 +62,19 @@ describe('KoreaderCatalogController', () => {
     expect(catalogService.streamThumbnail).toHaveBeenCalledWith(user, 10, reply, '"etag"');
     expect(catalogService.streamAuthorPhoto).toHaveBeenCalledWith(user, 134, reply, '"photo-etag"');
     expect(catalogService.streamFile).toHaveBeenCalledWith(user, 100, reply, undefined, undefined);
+  });
+
+  it('answers a list query sent as a body with 200, like the GET list', async () => {
+    const { controller, catalogService } = makeController();
+    const user = { id: 7 } as never;
+    const body = { page: 1, size: 20, excludeIds: [3, 4] } as never;
+
+    await expect(controller.booksQuery(user, body)).resolves.toEqual(expect.objectContaining({ total: 0 }));
+
+    expect(catalogService.getBooksPage).toHaveBeenCalledWith(user, body);
+    expect(Reflect.getMetadata(METHOD_METADATA, KoreaderCatalogController.prototype.booksQuery)).toBe(RequestMethod.POST);
+    expect(Reflect.getMetadata(PATH_METADATA, KoreaderCatalogController.prototype.booksQuery)).toBe('books/query');
+    expect(Reflect.getMetadata(HTTP_CODE_METADATA, KoreaderCatalogController.prototype.booksQuery)).toBe(200);
   });
 
   it('forwards an unread reset rather than treating it as a missing status', async () => {

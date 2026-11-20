@@ -84,7 +84,7 @@ env._ = function(text) return text end
 env.UIManager = { show = function() end }
 env.InfoMessage = { new = function(_, value) return value end }
 env.Toast = { show = function() end }
-local device_chunk = assert(loadstring(assert(source:match("(function BookOrbitCatalog:loadOnDevice.-)\nfunction BookOrbitCatalog:collectNotOnDeviceIds"))))
+local device_chunk = assert(loadstring(assert(source:match("(function BookOrbitCatalog:loadOnDevice.-)\nfunction BookOrbitCatalog:scopeParams"))))
 setfenv(device_chunk, env)
 device_chunk()
 function catalog:refreshOnDevice() end

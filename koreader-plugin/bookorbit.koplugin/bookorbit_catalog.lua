@@ -62,8 +62,6 @@ local DEFAULT_GRID_COLUMNS = CatalogUtil.DEFAULT_GRID_COLUMNS
 local DEFAULT_GRID_ROWS = CatalogUtil.DEFAULT_GRID_ROWS
 local MAX_RECENT_SEARCHES = CatalogUtil.MAX_RECENT_SEARCHES
 local ON_DEVICE_MAX_IDS = CatalogUtil.ON_DEVICE_MAX_IDS
-local NOT_ON_DEVICE_SCAN_SIZE = CatalogUtil.NOT_ON_DEVICE_SCAN_SIZE
-local scanNotOnDeviceIds = CatalogUtil.scanNotOnDeviceIds
 local SORTS = CatalogUtil.SORTS
 local SORT_LABELS = CatalogUtil.SORT_LABELS
 local NATURAL_ORDER = CatalogUtil.NATURAL_ORDER
@@ -838,10 +836,6 @@ function BookOrbitCatalog:rootItems()
         mandatory = on_device_count > 0 and CatalogUtil.formatCount(on_device_count) or nil,
         kind = "on-device",
     })
-    table.insert(items, {
-        text = _("Not on device"),
-        kind = "not-on-device",
-    })
 
     return items
 end
@@ -1212,49 +1206,6 @@ function BookOrbitCatalog:loadOnDevice()
     self:loadBooks({ ids = table.concat(capped, ","), sort = "title", on_device_filter = true }, _("On device"), true)
 end
 
-function BookOrbitCatalog:collectNotOnDeviceIds()
-    return scanNotOnDeviceIds(function(page)
-        return self:fetch(_("Finding books not on this device…"), function()
-            return self.client:catalogBooks({
-                page = page,
-                size = NOT_ON_DEVICE_SCAN_SIZE,
-                sort = "recently_added",
-                order = "desc",
-            })
-        end)
-    end, function(book)
-        return self:isOnDevice(book)
-    end)
-end
-
-function BookOrbitCatalog:loadNotOnDevice()
-    self:runConnected(function()
-        -- Without the maps every book reads as absent, which would list books
-        -- that are already here. refreshOnDevice starts the scan; the list is
-        -- worth waiting for rather than showing wrong.
-        if not self:refreshOnDevice() then
-            Toast.show(_("Still checking which books are on this device"), { icon = "hourglass", timeout = 3 })
-            return
-        end
-        local ids, err = self:collectNotOnDeviceIds()
-        if not ids then
-            if err ~= "cancelled" then
-                self:showRetry(err, function()
-                    self:loadNotOnDevice()
-                end)
-            end
-            return
-        end
-        if #ids == 0 then
-            Toast.show(_("The newest books are already on this device"), { icon = "info", timeout = 3 })
-            return
-        end
-        -- The tile says "Not on device"; the list says what it actually holds,
-        -- since the walk covers recent additions rather than the whole library.
-        self:fetchBookPage({ ids = table.concat(ids, ","), sort = "recently_added" }, _("Not on device (recent)"), true)
-    end)
-end
-
 function BookOrbitCatalog:scopeParams(query)
     local params = cloneParams(query)
     params.page = nil
@@ -1405,6 +1356,7 @@ function BookOrbitCatalog:showBookPage(body, query, title, push, opts)
         author_summary = body.authorSummary,
         series_summary = body.seriesSummary,
         on_device_filter = query.on_device_filter,
+        not_on_device_filter = query.not_on_device_filter,
         list_offline = opts.offline_saved_at ~= nil or nil,
         list_saved_at = opts.offline_saved_at,
     }, push)
@@ -2428,8 +2380,6 @@ function BookOrbitCatalog:onMenuSelect(item)
         end
     elseif item.kind == "on-device" then
         self:loadOnDevice()
-    elseif item.kind == "not-on-device" then
-        self:loadNotOnDevice()
     elseif item.kind == "books" then
         self:loadBooks(item.params or {}, item.list_title or item.text)
     elseif item.kind == "book" then

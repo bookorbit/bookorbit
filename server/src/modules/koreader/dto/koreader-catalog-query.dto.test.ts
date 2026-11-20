@@ -4,8 +4,10 @@ import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
 import {
+  KOREADER_CATALOG_MAX_EXCLUDED_IDS,
   KOREADER_CATALOG_SETTABLE_READ_STATUSES,
   KoreaderCatalogBooksQueryDto,
+  KoreaderCatalogBooksSearchDto,
   KoreaderCatalogDashboardQueryDto,
   KoreaderCatalogSectionQueryDto,
   KoreaderCatalogSetReadStatusDto,
@@ -142,5 +144,51 @@ describe('offset paging', () => {
         await expect(validate(plainToInstance(Dto, { offset })), `${Dto.name} ${offset}`).resolves.not.toHaveLength(0);
       }
     }
+  });
+});
+
+// The plugin sends its list query as a body with the same string values the URL would carry,
+// plus the ids of the books already on the device.
+describe('KoreaderCatalogBooksSearchDto', () => {
+  it('reads the list fields the way the query string does', async () => {
+    const dto = plainToInstance(KoreaderCatalogBooksSearchDto, {
+      page: '2',
+      size: '12',
+      sort: 'title',
+      order: 'asc',
+      buckets: '1',
+      libraryId: '7',
+      readStatus: 'unread',
+      excludeIds: '9,4,9,x',
+    });
+
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto).toMatchObject({ page: 2, size: 12, sort: 'title', buckets: true, libraryId: 7, readStatus: 'unread', excludeIds: [9, 4] });
+  });
+
+  it('accepts the exclusion as a JSON array too, and leaves it unset when absent', async () => {
+    const dto = plainToInstance(KoreaderCatalogBooksSearchDto, { excludeIds: [3, 5] });
+    await expect(validate(dto)).resolves.toHaveLength(0);
+    expect(dto.excludeIds).toEqual([3, 5]);
+    expect(plainToInstance(KoreaderCatalogBooksSearchDto, {}).excludeIds).toBeUndefined();
+  });
+
+  it('takes a whole library worth of ids and rejects more', async () => {
+    const ids = (count: number) => Array.from({ length: count }, (_, index) => index + 1).join(',');
+
+    await expect(
+      validate(plainToInstance(KoreaderCatalogBooksSearchDto, { excludeIds: ids(KOREADER_CATALOG_MAX_EXCLUDED_IDS) })),
+    ).resolves.toHaveLength(0);
+    await expect(
+      validate(plainToInstance(KoreaderCatalogBooksSearchDto, { excludeIds: ids(KOREADER_CATALOG_MAX_EXCLUDED_IDS + 1) })),
+    ).resolves.not.toHaveLength(0);
+  });
+
+  it('stays out of the GET query, which rejects it as the global pipe does', async () => {
+    const errors = await validate(plainToInstance(KoreaderCatalogBooksQueryDto, { excludeIds: '1' }), {
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    });
+    expect(errors.map((error) => error.property)).toEqual(['excludeIds']);
   });
 });

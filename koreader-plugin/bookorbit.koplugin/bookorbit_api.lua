@@ -383,21 +383,31 @@ function BookOrbitApi:request(method, path, body, extra_headers)
     return result.body, result.err, result.errbody
 end
 
-function BookOrbitApi:query(path, params)
-    if not params then return path end
+-- Params the catalog keeps for itself and never sends.
+local LOCAL_PARAMS = { on_device_filter = true, not_on_device_filter = true }
 
-    local keys = {}
-    for key, value in pairs(params) do
-        if key ~= "on_device_filter" and value ~= nil and value ~= "" then
+-- The params a request carries, every value as the string a query string holds.
+local function wireParams(params)
+    local wire, keys = {}, {}
+    for key, value in pairs(params or {}) do
+        if not LOCAL_PARAMS[key] and value ~= nil and value ~= "" then
+            wire[key] = tostring(value)
             table.insert(keys, key)
         end
     end
     table.sort(keys)
+    return wire, keys
+end
+
+function BookOrbitApi:query(path, params)
+    if not params then return path end
+
+    local wire, keys = wireParams(params)
     if #keys == 0 then return path end
 
     local parts = {}
     for _, key in ipairs(keys) do
-        table.insert(parts, util.urlEncode(key) .. "=" .. util.urlEncode(tostring(params[key])))
+        table.insert(parts, util.urlEncode(key) .. "=" .. util.urlEncode(wire[key]))
     end
     return path .. "?" .. table.concat(parts, "&")
 end
@@ -711,7 +721,13 @@ function BookOrbitApi:catalogSetRating(book_id, rating)
     return self:request("PUT", "/koreader/plugin/catalog/books/" .. tostring(book_id) .. "/rating", { rating = rating })
 end
 
+-- A list that leaves out books (excludeIds, every book on this device) goes as a
+-- body: the set can be far longer than a URL. Only servers advertising
+-- catalogBooksQuery have the route, and the catalog sets excludeIds only for them.
 function BookOrbitApi:catalogBooks(params)
+    if params and params.excludeIds ~= nil and params.excludeIds ~= "" then
+        return self:request("POST", "/koreader/plugin/catalog/books/query", (wireParams(params)))
+    end
     return self:request("GET", self:query("/koreader/plugin/catalog/books", params))
 end
 

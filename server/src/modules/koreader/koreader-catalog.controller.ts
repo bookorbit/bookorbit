@@ -1,4 +1,19 @@
-import { Body, Controller, Get, Header, Headers, Param, ParseEnumPipe, ParseIntPipe, Put, Query, Res, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  Headers,
+  HttpCode,
+  Param,
+  ParseEnumPipe,
+  ParseIntPipe,
+  Post,
+  Put,
+  Query,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
 import type { FastifyReply } from 'fastify';
 
 import { KOREADER_DASHBOARD_SECTION_TYPE } from '@bookorbit/types';
@@ -12,6 +27,7 @@ import {
   KoreaderCatalogBookDetailQueryDto,
   KoreaderCatalogDownloadQueryDto,
   KoreaderCatalogBooksQueryDto,
+  KoreaderCatalogBooksSearchDto,
   KoreaderCatalogDashboardQueryDto,
   KoreaderCatalogDashboardSectionQueryDto,
   KoreaderCatalogManifestQueryDto,
@@ -65,6 +81,13 @@ export class KoreaderCatalogController {
   @Header('Cache-Control', 'private, max-age=30')
   books(@CurrentUser() user: RequestUser, @Query() query: KoreaderCatalogBooksQueryDto) {
     return this.catalogService.getBooksPage(user, query);
+  }
+
+  @Post('books/query')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  booksQuery(@CurrentUser() user: RequestUser, @Body() body: KoreaderCatalogBooksSearchDto) {
+    return this.catalogService.getBooksPage(user, body);
   }
 
   @Get('manifest')

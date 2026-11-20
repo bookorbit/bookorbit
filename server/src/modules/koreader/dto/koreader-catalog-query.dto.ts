@@ -156,6 +156,22 @@ export class KoreaderCatalogBooksQueryDto {
   buckets?: boolean;
 }
 
+// Enough for a device holding a whole large library, and still well inside the 1 MiB body limit.
+export const KOREADER_CATALOG_MAX_EXCLUDED_IDS = 50_000;
+
+// The list query sent as a request body, for an exclusion too long for a URL: the books already
+// on a KOReader device, which only the device knows. Fields keep their query-string forms, so a
+// body is the GET query as an object. Sent only to a server advertising catalogBooksQuery.
+export class KoreaderCatalogBooksSearchDto extends KoreaderCatalogBooksQueryDto {
+  @IsOptional()
+  @Transform(({ value }) => parseIdList(value))
+  @IsArray()
+  @ArrayMaxSize(KOREADER_CATALOG_MAX_EXCLUDED_IDS)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  excludeIds?: number[];
+}
+
 // Bulk download enumeration. Deliberately not a subclass of the list query:
 // the manifest has one fixed cursor order and no page/sort inputs.
 export class KoreaderCatalogManifestQueryDto {

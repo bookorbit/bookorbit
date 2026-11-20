@@ -41,6 +41,8 @@ type OpdsBookFilters = {
   readStatus?: 'unread' | 'reading' | 'finished';
   format?: string;
   ids?: number[];
+  // Books to leave out however many there are, such as those already on a reader's device.
+  excludeIds?: number[];
   excludeAudioOnly?: boolean;
 };
 
@@ -366,7 +368,10 @@ export class OpdsBookService {
     if (filters?.smartScopeId) {
       const where = await this.buildSmartScopeWhere(userId, filters.smartScopeId, accessibleIds, contentFilters, filters.q);
       if (!where) return null;
-      return { where: filters.excludeAudioOnly ? and(where, excludeAudioOnlyBooks())! : where };
+      const narrowed = [where];
+      if (filters.excludeIds?.length) narrowed.push(this.excludeBookIdsClause(filters.excludeIds));
+      if (filters.excludeAudioOnly) narrowed.push(excludeAudioOnlyBooks());
+      return { where: and(...narrowed)! };
     }
 
     const clauses: SQL[] = [inArray(books.libraryId, accessibleIds), eq(books.status, 'present')];
@@ -374,6 +379,8 @@ export class OpdsBookService {
     if (filters?.libraryId) clauses.push(eq(books.libraryId, filters.libraryId));
 
     if (filters?.ids) clauses.push(inArray(books.id, filters.ids));
+
+    if (filters?.excludeIds?.length) clauses.push(this.excludeBookIdsClause(filters.excludeIds));
 
     if (filters?.collectionId) {
       clauses.push(
@@ -415,6 +422,12 @@ export class OpdsBookService {
     if (filters?.excludeAudioOnly) clauses.push(excludeAudioOnlyBooks());
 
     return { where: and(...clauses)!, contextSeries: seriesFilter };
+  }
+
+  // One bound array however long the list: a parameter per id would run into Postgres's
+  // 65,535-parameter limit. Postgres hashes a constant array, so the check stays cheap.
+  private excludeBookIdsClause(ids: number[]): SQL {
+    return sql`${books.id} <> ALL(${sql.param(ids)}::int[])`;
   }
 
   // Content filters bind every reader but a superuser; the audio-only exclusion is the reader's own

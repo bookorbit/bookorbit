@@ -19,11 +19,11 @@ end
 catalog.loadBooks = catalog.fetchBookPage
 catalog.current_context = { kind = "books", title = "On device", on_device_filter = true,
     params = { sort = "title", ids = "1,2", on_device_filter = true },
-    list_sheet = { kind = "sort", staged = { sort = "title", order = "asc", on_device = false } } }
+    list_sheet = { kind = "sort", staged = { sort = "title", order = "asc" } } }
 catalog:listApplySheet()
 assert(captured.title == "Library", "removing device filter restores Library title")
 assert(captured.params.ids == nil and captured.params.on_device_filter == nil, "removing filter clears both IDs and context")
-catalog.current_context.list_sheet = { kind = "sort", staged = { sort = "title", order = "asc", on_device = true } }
+catalog.current_context.list_sheet = { kind = "sort", staged = { sort = "title", order = "asc", device = "on" } }
 catalog:listApplySheet()
 assert(captured.params.ids == "1,2" and captured.params.on_device_filter == true, "adding filter preserves device context with sorted IDs")
 catalog:listReload({ page = 2 })

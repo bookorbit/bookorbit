@@ -407,6 +407,7 @@ export interface KoreaderCatalogPage<T> {
   offset?: number;
   hasNext: boolean;
   hasPrevious: boolean;
+  // Null for a page asked for in a request body (POST books/query): a URL cannot carry its exclusions.
   nextUrl: string | null;
   previousUrl: string | null;
   // Present when the page is scoped to a single series, summarising
@@ -604,7 +605,8 @@ export type KoreaderPluginCapability =
   | "catalogListsV2"
   | "catalogPublishedSort"
   | "sidecarState"
-  | "annotationPendingBooks";
+  | "annotationPendingBooks"
+  | "catalogBooksQuery";
 
 export interface KoreaderPluginVersionInfo {
   pluginVersion: string;
