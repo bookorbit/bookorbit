@@ -8,6 +8,7 @@ import { and, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DEFAULT_FORMAT_PRIORITY, type Permission } from '@bookorbit/types';
 
+import { GlobalExceptionFilter } from '../../../src/common/filters/http-exception.filter';
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
@@ -86,6 +87,7 @@ export async function createOpdsE2EContext(): Promise<OpdsE2EContext> {
 
   const app = moduleFixture.createNestApplication<NestFastifyApplication>(new FastifyAdapter());
   app.setGlobalPrefix('api/v1');
+  app.useGlobalFilters(new GlobalExceptionFilter());
   await app.register(fastifyCookie as never);
   await app.init();
   await app.getHttpAdapter().getInstance().ready();

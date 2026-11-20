@@ -55,7 +55,7 @@ function makeController() {
   };
 
   return {
-    controller: new OpdsController(opdsService, opdsBookService, bookService, coverStore as never),
+    controller: new OpdsController(opdsService, opdsBookService, bookService, coverStore as never, { rescanRegisteredFile: vi.fn() } as never),
     opdsService,
     opdsBookService,
     bookService,

@@ -4447,6 +4447,28 @@ describe('bootstrap, wrappers, and cover refresh', () => {
     await vi.waitFor(() => expect(Logger.prototype.error).toHaveBeenCalledWith(expect.stringContaining('[scanner.targeted_book_scan] [fail]')));
   });
 
+  it('coalesces repeated file repairs through an active library scan and permits a later repair', async () => {
+    const { service, libraryGate } = makeService(makeRepo());
+    const finish = Promise.withResolvers<void>();
+    const repair = vi
+      .spyOn(service as unknown as { refreshRegisteredFile: () => Promise<void> }, 'refreshRegisteredFile')
+      .mockReturnValue(finish.promise);
+    const release = libraryGate.tryAcquire(1, 'scan')!;
+    const request = () => service.rescanRegisteredFile(1, 2, 3, '/library/book.epub');
+    request();
+    request();
+    expect(repair).not.toHaveBeenCalled();
+    release();
+    await vi.waitFor(() => expect(repair).toHaveBeenCalledTimes(1));
+    request();
+    expect(repair).toHaveBeenCalledTimes(1);
+    finish.resolve();
+    await finish.promise;
+    await new Promise<void>((resolve) => setImmediate(resolve));
+    request();
+    expect(repair).toHaveBeenCalledTimes(2);
+  });
+
   it('limits concurrent targeted scans from watcher bursts', async () => {
     const repo = makeRepo();
     const { service } = makeService(repo);

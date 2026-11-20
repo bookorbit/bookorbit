@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, stat, writeFile } from 'fs/promises';
+import { mkdir, readFile, stat, utimes, writeFile } from 'fs/promises';
 import { dirname, join, relative } from 'path';
 
 import { eq, inArray } from 'drizzle-orm';
@@ -732,6 +732,60 @@ describe('OPDS auth and catalog (e2e)', { timeout: 120_000 }, () => {
         ownerCredentials,
       );
       expectError(forbiddenBookDownloadResponse, 403, 'No access to this book');
+    });
+
+    it('recovers a stale OPDS file after a timestamp-only change without a manual scan', async () => {
+      const file = visibleBookBeta;
+      const unsigned = `/api/v1/opds/${file.bookId}/download?fileId=${file.bookFileId}`;
+      const catalogLink = async () => {
+        const feed = await opdsGet('/api/v1/opds/catalog', ownerCredentials);
+        const href = feed.body.match(new RegExp(`href="([^"]*/${file.bookId}/download[^"]*selection=[^"]+)"`))?.[1];
+        expect(href).toBeDefined();
+        return href!.replaceAll('&amp;', '&');
+      };
+      const oldLink = await catalogLink();
+      const original = await opdsGet(oldLink, ownerCredentials);
+      expect(original.statusCode).toBe(200);
+      const info = await stat(file.absolutePath);
+      await utimes(file.absolutePath, info.atime, new Date());
+
+      const conflict = await opdsGet(unsigned, ownerCredentials);
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json()).toMatchObject({ errorCode: 'DELIVERY_SOURCE_CHANGED' });
+      await expect.poll(catalogLink, { timeout: 25_000, interval: 500 }).not.toBe(oldLink);
+      expect((await opdsGet(unsigned, ownerCredentials)).statusCode).toBe(200);
+
+      const freshLink = await catalogLink();
+      expect(freshLink).not.toBe(oldLink);
+      const recovered = await opdsGet(freshLink, ownerCredentials);
+      expect(recovered.statusCode).toBe(200);
+      expect(recovered.rawPayload).toEqual(original.rawPayload);
+      const expired = await opdsGet(oldLink, ownerCredentials);
+      expect(expired.statusCode).toBe(409);
+      expect(expired.json()).toMatchObject({ errorCode: 'DELIVERY_SELECTION_EXPIRED' });
+    });
+
+    it('recovers an externally rewritten secondary format and retains its sibling editions', async () => {
+      const fileId = visibleAlphaAlternativeFileIds.fb2;
+      const url = `/api/v1/opds/${visibleBookAlpha.bookId}/download?fileId=${fileId}`;
+      const path = join(visibleLibrary.folderPath, 'visible-alpha.fb2');
+      const replacement = (await readFile(path, 'utf8')).replace('fixture content', 'updated contents');
+      await writeFile(path, replacement);
+      const past = new Date(Date.now() - 120_000);
+      await utimes(path, past, past);
+      const conflict = await opdsGet(url, ownerCredentials);
+      expect(conflict.statusCode).toBe(409);
+      expect(conflict.json()).toMatchObject({ errorCode: 'DELIVERY_SOURCE_CHANGED' });
+
+      await expect.poll(async () => (await opdsGet(url, ownerCredentials)).statusCode, { timeout: 5000 }).toBe(200);
+      expect((await opdsGet(url, ownerCredentials)).body).toBe(replacement);
+      const files = await ctx.db
+        .select({ id: schema.bookFiles.id })
+        .from(schema.bookFiles)
+        .where(eq(schema.bookFiles.bookId, visibleBookAlpha.bookId));
+      expect(files.map((file) => file.id)).toEqual(
+        expect.arrayContaining([visibleBookAlpha.bookFileId, ...Object.values(visibleAlphaAlternativeFileIds)]),
+      );
     });
 
     it('exposes every content file for multi-format books', async () => {

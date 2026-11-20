@@ -4,6 +4,7 @@ import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { BookModule } from '../book/book.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { UserModule } from '../user/user.module';
+import { ScannerModule } from '../scanner/scanner.module';
 import { CommonModule } from '../../common/common.module';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import { OpdsBookService } from './opds-book.service';
@@ -15,7 +16,7 @@ import { OpdsUserController } from './opds-user.controller';
 import { OpdsUserService } from './opds-user.service';
 
 @Module({
-  imports: [AppSettingsModule, BookModule, BookCoverStoreModule, UserModule, CommonModule],
+  imports: [AppSettingsModule, BookModule, BookCoverStoreModule, UserModule, CommonModule, ScannerModule],
   controllers: [OpdsController, OpdsUserController],
   providers: [OpdsService, OpdsBookService, OpdsCollectionRepository, OpdsUserService, OpdsAuthGuard, OpdsEnabledGuard],
   exports: [OpdsBookService],

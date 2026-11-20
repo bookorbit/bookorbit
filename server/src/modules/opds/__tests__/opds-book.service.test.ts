@@ -323,7 +323,7 @@ describe('OpdsBookService', () => {
   it('resolves getBookFiles with fallback formatting and title values', async () => {
     const { service } = makeService([
       [],
-      [{ id: 1, updatedAt: new Date('2026-01-01'), absolutePath: '/books/a.epub', format: null, title: null }],
+      [{ id: 1, libraryId: 3, updatedAt: new Date('2026-01-01'), absolutePath: '/books/a.epub', format: null, title: null }],
       [],
     ]);
 
@@ -331,6 +331,7 @@ describe('OpdsBookService', () => {
 
     await expect(service.getBookFiles(7)).resolves.toEqual({
       id: 1,
+      libraryId: 3,
       mtime: undefined,
       sizeBytes: undefined,
       ino: undefined,

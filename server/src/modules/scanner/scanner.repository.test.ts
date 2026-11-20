@@ -263,6 +263,15 @@ describe('ScannerRepository', () => {
     expect(db.insert).toHaveBeenCalledTimes(1);
   });
 
+  it('discards a stale repair before writing file state or invalidating reading progress', async () => {
+    const { repo, queues, db } = makeRepo();
+    const expected = { bookId: 1, libraryFolderId: 2, absolutePath: '/books/sample.epub', fileHash: 'old', updatedAt: new Date(1000) };
+    queues.select.push([{ ...expected, path: expected.absolutePath, updatedAt: new Date(2000), fileHash: 'newer' }]);
+    await expect(repo.updateBookFile(3, { fileHash: 'observed' }, expected)).resolves.toBeUndefined();
+    expect(db.update).not.toHaveBeenCalled();
+    expect(db.insert).not.toHaveBeenCalled();
+  });
+
   it('handles missing/present transitions and moving books across libraries', async () => {
     const { repo, queues, db } = makeRepo();
     queues.select.push([

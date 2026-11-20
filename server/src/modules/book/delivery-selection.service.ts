@@ -65,7 +65,7 @@ export class DeliverySelectionService {
       if (![null, 'original', 'audioless_epub'].includes(values[3]) || (explicitOverride && values[3] !== variant)) throw new ForbiddenException();
       policy = values[3] as ReadAloudDeliveryPreference;
       if (values[5] !== DELIVERY_TRANSFORM_VERSION || (contentVersion && values[4] !== contentVersion))
-        throw new ConflictException({ code: 'DELIVERY_SELECTION_EXPIRED' });
+        throw new ConflictException({ code: 'DELIVERY_SELECTION_EXPIRED', errorCode: 'DELIVERY_SELECTION_EXPIRED' });
       selectionId = createHash('sha256').update(descriptor).digest('hex');
     }
     const captured = selectionId ? await this.repository.find(selectionId, userId, scope) : undefined;

@@ -526,15 +526,35 @@ export class ScannerRepository {
     return created;
   }
 
-  async updateBookFile(id: number, data: Partial<typeof bookFiles.$inferInsert>) {
+  async updateBookFile(
+    id: number,
+    data: Partial<typeof bookFiles.$inferInsert>,
+    expected?: Pick<typeof bookFiles.$inferSelect, 'bookId' | 'absolutePath' | 'libraryFolderId' | 'updatedAt' | 'fileHash'>,
+  ) {
     return this.db.transaction(async (tx) => {
       let previousBookId: number | null = null;
-      if (data.fileHash || data.bookId !== undefined) {
+      if (expected || data.fileHash || data.bookId !== undefined) {
         const [previous] = await tx
-          .select({ fileHash: bookFiles.fileHash, bookId: bookFiles.bookId })
+          .select({
+            fileHash: bookFiles.fileHash,
+            bookId: bookFiles.bookId,
+            updatedAt: bookFiles.updatedAt,
+            path: bookFiles.absolutePath,
+            libraryFolderId: bookFiles.libraryFolderId,
+          })
           .from(bookFiles)
           .where(eq(bookFiles.id, id))
           .for('update');
+        if (
+          expected &&
+          (!previous ||
+            previous.updatedAt.getTime() !== expected.updatedAt.getTime() ||
+            previous.bookId !== expected.bookId ||
+            previous.fileHash !== expected.fileHash ||
+            previous.path !== expected.absolutePath ||
+            previous.libraryFolderId !== expected.libraryFolderId)
+        )
+          return;
         previousBookId = previous?.bookId ?? null;
         if (data.fileHash && previous?.fileHash && previous.fileHash !== data.fileHash) {
           await recordBookFileHashHistory(tx, id, previous.fileHash, 'rescan');

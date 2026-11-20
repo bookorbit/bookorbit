@@ -6,6 +6,7 @@ import { CommonModule } from '../../common/common.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { BookModule } from '../book/book.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
+import { ScannerModule } from '../scanner/scanner.module';
 import { UserModule } from '../user/user.module';
 import { OpdsAuthGuard } from './opds-auth.guard';
 import { OpdsBookService } from './opds-book.service';
@@ -25,6 +26,7 @@ describe('OpdsModule', () => {
       BookCoverStoreModule,
       UserModule,
       CommonModule,
+      ScannerModule,
     ]);
     expect(Reflect.getMetadata(MODULE_METADATA.CONTROLLERS, OpdsModule)).toEqual([OpdsController, OpdsUserController]);
     expect(Reflect.getMetadata(MODULE_METADATA.PROVIDERS, OpdsModule)).toEqual([

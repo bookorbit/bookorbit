@@ -39,6 +39,12 @@ async function digestHandle(handle: FileHandle): Promise<string> {
 export const deliveryFileSignature = (value: Awaited<ReturnType<FileHandle['stat']>>) =>
   `${value.dev}:${value.ino}:${value.size}:${value.mtimeMs}:${value.ctimeMs}`;
 
+export class StaleDeliverySourceException extends ConflictException {
+  constructor() {
+    super({ code: 'DELIVERY_SOURCE_CHANGED', errorCode: 'DELIVERY_SOURCE_CHANGED' });
+  }
+}
+
 @Injectable()
 export class DeliveryArtifactService {
   private readonly logger = new Logger(DeliveryArtifactService.name);
@@ -107,13 +113,15 @@ export class DeliveryArtifactService {
             throw new ForbiddenException({ code: 'DELIVERY_SOURCE_OUTSIDE_LIBRARY' });
           handle = await open(resolvedSource, 'r');
           const before = await handle.stat();
-          if (
-            source.mtime &&
-            (Math.floor(before.mtimeMs) !== source.mtime.getTime() ||
-              (source.sizeBytes !== undefined && source.sizeBytes !== null && source.sizeBytes !== before.size) ||
-              (source.ino !== undefined && source.ino !== (await handle.stat({ bigint: true })).ino))
-          )
-            throw new ConflictException({ code: 'DELIVERY_SOURCE_CHANGED' });
+          if (source.mtime) {
+            const diskStat = await handle.stat({ bigint: true });
+            if (
+              Number(diskStat.mtimeMs) !== source.mtime.getTime() ||
+              (source.sizeBytes != null && Number(diskStat.size) !== source.sizeBytes) ||
+              (source.ino !== undefined && diskStat.ino !== source.ino)
+            )
+              throw new StaleDeliverySourceException();
+          }
           const revisionKey = `${source.id}:${resolvedSource}:${deliveryFileSignature(before)}`;
           const knownRevision = this.revisions.get(revisionKey);
           const sourceRevision = knownRevision ?? (await digestHandle(handle));

@@ -1293,6 +1293,7 @@ export class OpdsBookService {
     original = false,
   ): Promise<{
     id: number;
+    libraryId: number;
     contentVersion: string;
     mtime: Date | null;
     sizeBytes: number | null;
@@ -1306,6 +1307,7 @@ export class OpdsBookService {
     const candidates = await this.db
       .select({
         id: bookFiles.id,
+        libraryId: books.libraryId,
         absolutePath: bookFiles.absolutePath,
         updatedAt: bookFiles.updatedAt,
         mtime: bookFiles.mtime,
@@ -1348,6 +1350,7 @@ export class OpdsBookService {
 
     return {
       id: file.id,
+      libraryId: file.libraryId,
       contentVersion: file.updatedAt.toISOString(),
       mtime: file.mtime,
       sizeBytes: file.sizeBytes,
