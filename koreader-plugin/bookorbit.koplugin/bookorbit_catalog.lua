@@ -696,9 +696,15 @@ function BookOrbitCatalog:onDeviceFilePath(file)
         local Delivery = require("bookorbit_delivery")
         local variants = self.settings.catalog_downloaded_variants or {}
         local marker = variants[Delivery.key(self.client) .. "|" .. tostring(file.id) .. "|" .. file.downloadVariant]
-        if type(marker) ~= "table" or marker.selection ~= file.selection then return nil end
-        local path = marker.path
-        return path and lfs.attributes(path, "mode") == "file" and path or nil
+        if type(marker) == "table" then
+            if marker.selection ~= file.selection then return nil end
+            local path = marker.path
+            return path and lfs.attributes(path, "mode") == "file" and path or nil
+        end
+        -- With no delivery record, a file without narration falls back to its matched copy:
+        -- every variant of it is the same bytes, including a copy an older plugin downloaded
+        -- before records existed. A narrated EPUB's copy could be either form, so it cannot.
+        if file.sourceMediaOverlayAvailable ~= false then return nil end
     end
     local path = file and file.id and self.on_device_files and self.on_device_files[file.id]
     return type(path) == "string" and lfs.attributes(path, "mode") == "file" and path or nil

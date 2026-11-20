@@ -56,6 +56,19 @@ file.selection = "current"
 modes[path] = nil
 assert(catalog:onDeviceFilePath(file) == nil)
 
+modes[path] = "file"
+catalog.settings.catalog_downloaded_variants = {}
+local legacy = { id = 10, selection = "current", downloadVariant = "audioless_epub", sourceMediaOverlayAvailable = false }
+assert(catalog:onDeviceFilePath(legacy) == path, "a plain file an older plugin downloaded is found through its matched copy")
+legacy.sourceMediaOverlayAvailable = true
+assert(catalog:onDeviceFilePath(legacy) == nil, "a narrated EPUB's matched copy could be either form")
+legacy.sourceMediaOverlayAvailable = nil
+assert(catalog:onDeviceFilePath(legacy) == nil, "a file not known to be plain keeps the strict check")
+legacy.sourceMediaOverlayAvailable = false
+catalog.settings.catalog_downloaded_variants = { ["account|10|audioless_epub"] = { path = path, selection = "expired" } }
+assert(catalog:onDeviceFilePath(legacy) == nil, "a stale delivery record still wins over the matched copy")
+modes[path] = nil
+
 local detail_source = read("koreader-plugin/bookorbit.koplugin/bookorbit_catalog_detail.lua")
 env.CatalogDetail = catalog
 local detail_chunk = assert(loadstring(assert(detail_source:match("(function CatalogDetail:detailReadPath.-)\nfunction CatalogDetail:detailCache"))))
