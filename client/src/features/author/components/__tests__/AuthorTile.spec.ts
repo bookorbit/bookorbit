@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { mount, RouterLinkStub } from '@vue/test-utils'
 import type { AuthorSummary } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import AuthorTile from '../AuthorTile.vue'
@@ -19,6 +19,7 @@ function mountTile(props: Record<string, unknown> = {}) {
         DropdownMenuContent: { template: '<div><slot /></div>' },
         DropdownMenuItem: { template: '<div><slot /></div>' },
         AuthorPortrait: { template: '<span class="portrait-stub" />' },
+        RouterLink: RouterLinkStub,
       },
     },
   })
@@ -94,10 +95,10 @@ describe('AuthorTile', () => {
     expect(wrapper.find('span.bg-linear-to-t').exists()).toBe(false)
   })
 
-  it('stretches the activate button over the whole tile, not just the artwork', () => {
+  it('stretches the activate link over the whole tile, not just the artwork', () => {
     const wrapper = mountTile()
     const root = wrapper.element as HTMLElement
-    const activate = wrapper.get('button.inset-0')
+    const activate = wrapper.get('a.inset-0')
 
     // Sizing the target to the artwork leaves every corner of a circular tile dead
     // and never lets anyone click the name.
@@ -167,8 +168,40 @@ describe('AuthorTile', () => {
 
   it('opens the author on a plain click', async () => {
     const wrapper = mountTile()
-    await wrapper.get('button.inset-0').trigger('click')
+    await wrapper.get('a.inset-0').trigger('click')
 
     expect(wrapper.emitted('open')?.[0]).toEqual([1])
+  })
+
+  it('links the tile to the author page so the browser can open it in a new tab', () => {
+    const wrapper = mountTile()
+
+    expect(wrapper.findComponent(RouterLinkStub).props('to')).toEqual({ name: 'author-detail', params: { id: 1 } })
+  })
+
+  it('keeps Ctrl+click as a selection gesture instead of opening the author', async () => {
+    const wrapper = mountTile()
+    await wrapper.get('a.inset-0').trigger('click', { ctrlKey: true })
+
+    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(wrapper.emitted('open')).toBeUndefined()
+  })
+
+  it('does not claim a middle-click, which the browser opens in a new tab', async () => {
+    const wrapper = mountTile()
+    await wrapper.get('a.inset-0').trigger('auxclick', { button: 1 })
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+    expect(wrapper.emitted('open')).toBeUndefined()
+  })
+
+  it('swaps the link for a toggle button while selecting', async () => {
+    const wrapper = mountTile({ selectionMode: true, selected: true })
+    const toggle = wrapper.get('button.inset-0')
+
+    expect(wrapper.find('a.inset-0').exists()).toBe(false)
+    expect(toggle.attributes('aria-pressed')).toBe('true')
+    await toggle.trigger('click')
+    expect(wrapper.emitted('select')).toHaveLength(1)
   })
 })

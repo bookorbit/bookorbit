@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
-import { flushPromises, mount } from '@vue/test-utils'
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import type { SeriesFacets, SeriesSummary } from '@bookorbit/types'
 import en from '@/locales/en.json'
@@ -74,7 +74,8 @@ const mocks = vi.hoisted(() => ({
   completionStatus: null as unknown as { value: CompletionStatus | null },
 }))
 
-vi.mock('vue-router', () => ({
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => mocks.route,
   useRouter: () => ({ push: mocks.routerPush, replace: mocks.routerReplace }),
 }))
@@ -131,6 +132,7 @@ async function mountView() {
         PopoverTrigger: { template: '<div><slot /></div>' },
         PopoverContent: { template: '<div><slot /></div>' },
         BookCoverArtwork: true,
+        RouterLink: RouterLinkStub,
       },
     },
   })

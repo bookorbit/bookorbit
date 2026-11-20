@@ -1,33 +1,47 @@
 <script setup lang="ts">
 import { BookOpen, Play } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink, useRouter, type RouteLocationRaw } from 'vue-router'
 import { isComicFormat } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
+import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 import { useCurrentlyReadingWidget } from '../../composables/useCurrentlyReadingWidget'
 
 const { data, loading, error } = useCurrentlyReadingWidget()
 const { t } = useI18n()
 const router = useRouter()
 const { coverUrl } = useCoverVersions()
+const { openInNewTabIfRequested } = useOpenInNewTab()
 
-function goToBook(bookId: number) {
-  void router.push({ name: 'book-detail', params: { bookId } })
+function bookLocation(bookId: number): RouteLocationRaw {
+  return { name: 'book-detail', params: { bookId } }
+}
+
+function continueLocation(bookId: number, fileId: number | null, fileFormat: string | null): RouteLocationRaw {
+  if (!fileId) return bookLocation(bookId)
+  return { name: 'reader', params: { bookId, fileId }, query: { format: fileFormat ?? 'epub' } }
+}
+
+function goToBook(bookId: number, event: MouseEvent) {
+  if (openInNewTabIfRequested(event, bookLocation(bookId))) return
+  void router.push(bookLocation(bookId))
+}
+
+function openBookInNewTab(bookId: number, event: MouseEvent) {
+  openInNewTabIfRequested(event, bookLocation(bookId))
 }
 
 function isComic(fileFormat: string | null): boolean {
   return fileFormat != null && isComicFormat(fileFormat)
 }
 
-function continueReading(bookId: number, fileId: number | null, fileFormat: string | null) {
-  if (fileId) {
-    void router.push({ name: 'reader', params: { bookId, fileId }, query: { format: fileFormat ?? 'epub' } })
-  } else {
-    void router.push({ name: 'book-detail', params: { bookId } })
-  }
+function continueReading(bookId: number, fileId: number | null, fileFormat: string | null, event: MouseEvent) {
+  const location = continueLocation(bookId, fileId, fileFormat)
+  if (openInNewTabIfRequested(event, location)) return
+  void router.push(location)
 }
 </script>
 
@@ -70,7 +84,8 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
           v-for="book in data.books"
           :key="book.bookId"
           class="group/book relative flex min-w-0 cursor-pointer gap-2.5 rounded-lg bg-muted/20 p-1.5 transition-colors hover:bg-muted/40"
-          @click="goToBook(book.bookId)"
+          @click="goToBook(book.bookId, $event)"
+          @auxclick="openBookInNewTab(book.bookId, $event)"
         >
           <!-- Cover thumbnail -->
           <BookCoverSurface
@@ -93,7 +108,14 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
 
           <!-- Info -->
           <div class="flex min-w-0 flex-1 flex-col justify-center">
-            <p class="truncate text-xs font-semibold leading-tight">{{ book.title ?? t('dashboard.common.untitled') }}</p>
+            <RouterLink
+              :to="bookLocation(book.bookId)"
+              class="block truncate text-xs font-semibold leading-tight hover:underline"
+              @click.stop
+              @auxclick.stop
+            >
+              {{ book.title ?? t('dashboard.common.untitled') }}
+            </RouterLink>
             <p v-if="book.authors.length > 0" class="truncate text-xs text-muted-foreground">
               {{ book.authors.join(', ') }}
             </p>
@@ -110,7 +132,8 @@ function continueReading(bookId: number, fileId: number | null, fileFormat: stri
           <button
             class="absolute right-2 top-1/3 -translate-y-1/2 flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground opacity-0 shadow transition-opacity group-hover/book:opacity-100"
             :title="t('dashboard.widgets.currentlyReading.continueReading')"
-            @click.stop="continueReading(book.bookId, book.fileId, book.fileFormat)"
+            @click.stop="continueReading(book.bookId, book.fileId, book.fileFormat, $event)"
+            @auxclick.stop
           >
             <Play :size="11" class="translate-x-px" />
           </button>

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import type { RouteLocationRaw } from 'vue-router'
 import { ChevronDown, ChevronUp } from '@lucide/vue'
 import type { TaxonomyIndexSort, TaxonomyKind, TaxonomySummary } from '@bookorbit/types'
 import { formatNumber } from '@/i18n/formatters'
 import type { SortDirection } from '../api/taxonomy'
-import type { LetterGroup } from '../lib/taxonomy-text'
+import { taxonomyRouteNames, type LetterGroup } from '../lib/taxonomy-text'
 import TaxonomyIndexRow from './TaxonomyIndexRow.vue'
 
 /** The dense index: one row per name, sortable from its head, filed under letters when sorted by name. */
@@ -15,6 +16,7 @@ const props = defineProps<{
   sort: TaxonomyIndexSort
   order: SortDirection
   query?: string
+  libraryId?: number | null
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +42,14 @@ function ariaSort(field: TaxonomyIndexSort | null) {
 
 function handleSort(field: TaxonomyIndexSort | null) {
   if (field) emit('sort', field)
+}
+
+function itemLocation(id: number): RouteLocationRaw {
+  return {
+    name: taxonomyRouteNames(props.kind).detail,
+    params: { id },
+    query: props.libraryId ? { libraryId: String(props.libraryId) } : undefined,
+  }
 }
 
 function handleOpen(id: number) {
@@ -81,7 +91,7 @@ function handleOpen(id: number) {
         <span class="font-medium text-muted-foreground tabular-nums">{{ formatNumber(group.items.length) }}</span>
         <span class="h-px flex-1 bg-border" aria-hidden="true" />
       </div>
-      <TaxonomyIndexRow v-for="item in group.items" :key="item.id" :item="item" :query="query" @open="handleOpen" />
+      <TaxonomyIndexRow v-for="item in group.items" :key="item.id" :item="item" :to="itemLocation(item.id)" :query="query" @open="handleOpen" />
     </template>
   </div>
 </template>

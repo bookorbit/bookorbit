@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight } from '@lucide/vue'
 import type { SeriesSummary } from '@bookorbit/types'
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
+import ActivateLink from '@/components/ActivateLink.vue'
 import SeriesVolumeTrack from './SeriesVolumeTrack.vue'
 import SeriesLibraryChip from './SeriesLibraryChip.vue'
 import { parseAddedAt, seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
@@ -61,6 +63,8 @@ const addedLabel = computed(() => {
   return date ? formatRelativeFromNow(date) : '-'
 })
 
+const location = computed<RouteLocationRaw>(() => ({ name: 'series-detail', params: { seriesId: props.series.id } }))
+
 const rowLabel = computed(() => t('series.card.label', { name: props.series.name, read: facts.value.readVolumes, total: facts.value.ownedVolumes }))
 
 function handleOpen() {
@@ -69,13 +73,12 @@ function handleOpen() {
 </script>
 
 <template>
-  <div
+  <ActivateLink
+    :to="location"
     class="series-index-row cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-    tabindex="0"
     role="row"
     :aria-label="rowLabel"
-    @click="handleOpen"
-    @keydown.enter="handleOpen"
+    @activate="handleOpen"
     @keydown.space.prevent="handleOpen"
   >
     <div class="cell-covers flex h-full min-w-0 items-center">
@@ -137,7 +140,7 @@ function handleOpen() {
     </div>
 
     <div class="cell-added truncate text-right text-[11.5px] tabular-nums text-muted-foreground">{{ addedLabel }}</div>
-  </div>
+  </ActivateLink>
 </template>
 
 <style scoped>

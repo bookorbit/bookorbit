@@ -6,12 +6,13 @@ import BookCardFormatList from './BookCardFormatList.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import {
   BookOpen,
   BookText,
   Check,
   Download,
+  ExternalLink,
   Eye,
   FolderInput,
   FolderPlus,
@@ -57,11 +58,14 @@ import BookCoverSurface from './BookCoverSurface.vue'
 import { fetchAuthors } from '@/features/author/api/author'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import ActivateLink from '@/components/ActivateLink.vue'
+import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 
 const { t } = useI18n()
 
 const route = useRoute()
 const router = useRouter()
+const { openInNewTab, openInNewTabIfRequested } = useOpenInNewTab()
 
 const props = defineProps<{
   book: BookCard
@@ -221,12 +225,21 @@ function handleArtworkError() {
   coverImageRatio.value = null
 }
 
-function openFile(file: BookFileRef, mode?: 'peek') {
-  router.push({
+const detailsLocation = computed<RouteLocationRaw>(() => ({ name: 'book-detail', params: { bookId: props.book.id } }))
+const seriesLocation = computed<RouteLocationRaw | null>(() =>
+  props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } },
+)
+
+function readerLocation(file: BookFileRef, mode?: 'peek'): RouteLocationRaw {
+  return {
     name: 'reader',
     params: { bookId: props.book.id, fileId: file.id },
     query: mode === 'peek' ? { format: file.format ?? 'epub', mode } : { format: file.format ?? 'epub' },
-  })
+  }
+}
+
+function openFile(file: BookFileRef, mode?: 'peek') {
+  router.push(readerLocation(file, mode))
 }
 
 function peekPrimaryFile() {
@@ -235,12 +248,16 @@ function peekPrimaryFile() {
 }
 
 function openBookDetails() {
-  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
+  void router.push(detailsLocation.value)
+}
+
+function openBookDetailsInNewTab() {
+  openInNewTab(detailsLocation.value)
 }
 
 function openSeriesDetails() {
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
+  if (seriesLocation.value == null) return
+  void router.push(seriesLocation.value)
 }
 
 async function openAuthorDetails() {
@@ -307,7 +324,21 @@ const readActionLabel = computed(() => {
 })
 const primaryOverlayActionLabel = computed(() => (thumbnailClickAction.value === 'details' ? t('book.actions.bookDetails') : readActionLabel.value))
 
-function handlePrimaryOverlayAction() {
+const primaryOverlayLocation = computed<RouteLocationRaw | null>(() => {
+  if (thumbnailClickAction.value === 'details') return detailsLocation.value
+  return primaryFile.value && !isMissing.value ? readerLocation(primaryFile.value) : null
+})
+/** Where a plain click on the card goes; touch screens use the first tap to reveal the overlay instead. */
+const cardLocation = computed<RouteLocationRaw | null>(() =>
+  isTouch.value && thumbnailClickAction.value !== 'details' ? null : primaryOverlayLocation.value,
+)
+const explicitReadLocation = computed<RouteLocationRaw | null>(() =>
+  primaryFile.value && !isMissing.value ? readerLocation(primaryFile.value) : null,
+)
+
+function handlePrimaryOverlayAction(event: MouseEvent) {
+  if (openInNewTabIfRequested(event, primaryOverlayLocation.value)) return
+
   if (thumbnailClickAction.value === 'details') {
     openBookDetails()
     return
@@ -316,7 +347,8 @@ function handlePrimaryOverlayAction() {
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
 }
 
-function openPrimaryFileExplicit() {
+function openPrimaryFileExplicit(event: MouseEvent) {
+  if (openInNewTabIfRequested(event, explicitReadLocation.value)) return
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
 }
 
@@ -327,6 +359,7 @@ function handleCardClick(event: MouseEvent) {
     emit('select', event)
     return
   }
+  if (openInNewTabIfRequested(event, cardLocation.value)) return
 
   if (thumbnailClickAction.value === 'details') {
     openBookDetails()
@@ -339,6 +372,20 @@ function handleCardClick(event: MouseEvent) {
   }
 
   if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+}
+
+function handleCardAuxClick(event: MouseEvent) {
+  const target = event.target
+  if (target instanceof Element && target.closest('button, [data-card-click-blocker]')) return
+  if (props.selectionMode) return
+  openInNewTabIfRequested(event, cardLocation.value)
+}
+
+/** The browser's own menu is what offers "Open link in new tab", so it stays on links and is suppressed elsewhere on the card. */
+function handleContextMenu(event: MouseEvent) {
+  const target = event.target
+  if (target instanceof Element && target.closest('a[href]')) return
+  event.preventDefault()
 }
 
 function handleClickOutside(event: MouseEvent) {
@@ -436,6 +483,15 @@ function resolveBookLabel(field: GridCardLabelField): string | null {
 
 const primaryLabelText = computed(() => resolveBookLabel(gridCardPrimaryLabel.value))
 const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabel.value))
+
+function resolveLabelLocation(field: GridCardLabelField): RouteLocationRaw | null {
+  if (field === 'book-title') return detailsLocation.value
+  if (field === 'series-title' || field === 'series-title-position') return seriesLocation.value
+  return null
+}
+
+const primaryLabelLocation = computed(() => (props.selectionMode ? null : resolveLabelLocation(gridCardPrimaryLabel.value)))
+const secondaryLabelLocation = computed(() => (props.selectionMode ? null : resolveLabelLocation(gridCardSecondaryLabel.value)))
 </script>
 
 <template>
@@ -444,7 +500,8 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
     class="flex flex-col @container touch-manipulation"
     :class="[selectionMode || isPrimaryClickAvailable ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
     @click="handleCardClick"
-    @contextmenu.prevent
+    @auxclick="handleCardAuxClick"
+    @contextmenu="handleContextMenu"
   >
     <!-- Cover -->
     <div class="group">
@@ -710,6 +767,10 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
                     <BookText class="size-4 mr-2" />
                     {{ t('book.actions.bookDetails') }}
                   </DropdownMenuItem>
+                  <DropdownMenuItem @click="openBookDetailsInNewTab">
+                    <ExternalLink class="size-4 mr-2" />
+                    {{ t('common.openInNewTab') }}
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator v-if="canEditMetadata" />
                   <DropdownMenuSub v-if="canEditMetadata">
                     <DropdownMenuSubTrigger>
@@ -782,8 +843,17 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
     <!-- Below-cover label row (below-cover mode only) -->
     <div v-if="showBelowCoverLabelArea" class="grid-card-label" data-testid="grid-card-label">
       <div class="grid-card-label__primary-row">
+        <ActivateLink
+          v-if="primaryLabelText && primaryLabelLocation"
+          :to="primaryLabelLocation"
+          class="grid-card-label__button grid-card-label__primary min-w-0 flex-1 truncate"
+          data-testid="grid-card-label-primary"
+          @activate="handlePrimaryLabelClick"
+        >
+          {{ primaryLabelText }}
+        </ActivateLink>
         <button
-          v-if="primaryLabelText"
+          v-else-if="primaryLabelText"
           type="button"
           class="grid-card-label__button grid-card-label__primary min-w-0 flex-1 truncate"
           data-testid="grid-card-label-primary"
@@ -852,6 +922,10 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
               <BookText class="size-4 mr-2" />
               {{ t('book.actions.bookDetails') }}
             </DropdownMenuItem>
+            <DropdownMenuItem @click="openBookDetailsInNewTab">
+              <ExternalLink class="size-4 mr-2" />
+              {{ t('common.openInNewTab') }}
+            </DropdownMenuItem>
             <DropdownMenuSeparator v-if="canEditMetadata" />
             <DropdownMenuSub v-if="canEditMetadata">
               <DropdownMenuSubTrigger>
@@ -908,8 +982,17 @@ const secondaryLabelText = computed(() => resolveBookLabel(gridCardSecondaryLabe
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <ActivateLink
+        v-if="secondaryLabelText && secondaryLabelLocation"
+        :to="secondaryLabelLocation"
+        class="grid-card-label__button grid-card-label__secondary w-full"
+        data-testid="grid-card-label-secondary"
+        @activate="handleSecondaryLabelClick"
+      >
+        {{ secondaryLabelText }}
+      </ActivateLink>
       <button
-        v-if="secondaryLabelText"
+        v-else-if="secondaryLabelText"
         type="button"
         class="grid-card-label__button grid-card-label__secondary w-full"
         data-testid="grid-card-label-secondary"

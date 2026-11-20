@@ -15,7 +15,9 @@ vi.mock('@/features/auth/composables/usePermissions', () => ({
   usePermissions: () => ({ hasPermission: hasPermissionMock, isDemoRestrictedAccount: { value: false }, isSuperuser: { value: false } }),
 }))
 
-vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(to: unknown) => void>() }) }))
+const { resolveMock } = vi.hoisted(() => ({ resolveMock: vi.fn<(to: unknown) => { href: string }>(() => ({ href: '/books/7' })) }))
+
+vi.mock('vue-router', () => ({ useRouter: () => ({ push: vi.fn<(to: unknown) => void>(), resolve: resolveMock }) }))
 
 vi.mock('@/features/book/composables/useRefreshMetadata', () => ({
   useRefreshMetadata: () => ({ refreshWithFeedback: vi.fn<() => Promise<null>>(), refreshing: { value: false } }),
@@ -73,5 +75,20 @@ describe('move to library entry', () => {
     hasPermissionMock.mockImplementation((permission) => permission !== 'library_edit_metadata')
 
     expect(moveButton(mountMenu())).toBeUndefined()
+  })
+})
+
+describe('open in new tab entry', () => {
+  it('opens the right-clicked book in a new tab and closes the menu', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = mountMenu()
+    const entry = wrapper.findAll('button').find((candidate) => candidate.text().includes('Open in new tab'))
+
+    await entry!.trigger('click')
+
+    expect(resolveMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 7 } })
+    expect(openSpy).toHaveBeenCalledWith('/books/7', '_blank', 'noopener,noreferrer')
+    expect(wrapper.emitted('close')).toHaveLength(1)
+    openSpy.mockRestore()
   })
 })

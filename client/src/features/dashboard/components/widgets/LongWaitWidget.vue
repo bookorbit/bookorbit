@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Clock, Play } from '@lucide/vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { isComicFormat } from '@bookorbit/types'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -12,7 +12,6 @@ import { useLongWaitWidget } from '../../composables/useLongWaitWidget'
 
 const { data, loading, error } = useLongWaitWidget()
 const { t } = useI18n()
-const router = useRouter()
 const { coverUrl } = useCoverVersions()
 
 const isComic = computed(() => {
@@ -20,22 +19,13 @@ const isComic = computed(() => {
   return format != null && isComicFormat(format)
 })
 
-function goToBook() {
-  if (!data.value) return
-  void router.push({ name: 'book-detail', params: { bookId: data.value.bookId } })
+function bookLocation(bookId: number): RouteLocationRaw {
+  return { name: 'book-detail', params: { bookId } }
 }
 
-function startReading() {
-  if (!data.value) return
-  if (data.value.fileId) {
-    void router.push({
-      name: 'reader',
-      params: { bookId: data.value.bookId, fileId: data.value.fileId },
-      query: { format: data.value.fileFormat ?? 'epub' },
-    })
-  } else {
-    goToBook()
-  }
+function startLocation(book: { bookId: number; fileId: number | null; fileFormat: string | null }): RouteLocationRaw {
+  if (!book.fileId) return bookLocation(book.bookId)
+  return { name: 'reader', params: { bookId: book.bookId, fileId: book.fileId }, query: { format: book.fileFormat ?? 'epub' } }
 }
 </script>
 
@@ -68,31 +58,30 @@ function startReading() {
     <!-- Long wait book -->
     <div v-else class="flex flex-1 flex-col">
       <div class="flex flex-1 items-center justify-center gap-4">
-        <BookCoverSurface
-          tag="button"
-          type="button"
-          size="mini"
-          class="book-cover-surface--spine-fitted h-24 w-18 shrink-0 cursor-pointer overflow-hidden rounded-xs transition-opacity hover:opacity-80"
-          :is-comic="isComic"
-          @click="goToBook"
-        >
-          <BookCoverArtwork
-            :src="coverUrl(data.bookId)"
-            :has-cover="data.hasCover"
-            :title="data.title"
-            :author-line="null"
-            :is-audio="false"
-            :seed="data.title ?? String(data.bookId)"
-            :alt="data.title ?? t('dashboard.common.cover')"
-            frame-aspect-ratio="3/4"
+        <RouterLink :to="bookLocation(data.bookId)" class="shrink-0">
+          <BookCoverSurface
+            size="mini"
+            class="book-cover-surface--spine-fitted h-24 w-18 cursor-pointer overflow-hidden rounded-xs transition-opacity hover:opacity-80"
             :is-comic="isComic"
-          />
-        </BookCoverSurface>
+          >
+            <BookCoverArtwork
+              :src="coverUrl(data.bookId)"
+              :has-cover="data.hasCover"
+              :title="data.title"
+              :author-line="null"
+              :is-audio="false"
+              :seed="data.title ?? String(data.bookId)"
+              :alt="data.title ?? t('dashboard.common.cover')"
+              frame-aspect-ratio="3/4"
+              :is-comic="isComic"
+            />
+          </BookCoverSurface>
+        </RouterLink>
 
         <div class="min-w-0 text-left">
-          <button class="block cursor-pointer truncate text-xs font-semibold leading-tight hover:underline" @click="goToBook">
+          <RouterLink :to="bookLocation(data.bookId)" class="block cursor-pointer truncate text-xs font-semibold leading-tight hover:underline">
             {{ data.title ?? t('dashboard.common.untitled') }}
-          </button>
+          </RouterLink>
           <p class="mt-2 text-2xl font-bold leading-none tabular-nums text-primary">{{ data.waitingDays }}</p>
           <p class="text-[11px] text-muted-foreground">{{ t('dashboard.widgets.longWait.daysWaiting') }}</p>
 
@@ -105,13 +94,13 @@ function startReading() {
       </div>
 
       <!-- Start Reading CTA -->
-      <button
+      <RouterLink
+        :to="startLocation(data)"
         class="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary/10 py-2 text-[12px] font-medium text-primary transition-colors hover:bg-primary/20"
-        @click="startReading"
       >
         <Play :size="12" class="translate-x-px" />
         {{ t('dashboard.widgets.longWait.startReading') }}
-      </button>
+      </RouterLink>
     </div>
   </div>
 </template>

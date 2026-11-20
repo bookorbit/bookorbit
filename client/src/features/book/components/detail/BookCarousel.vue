@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
@@ -49,7 +49,6 @@ const cardWidthClass = computed(() => {
   return { square, portrait }
 })
 
-const router = useRouter()
 const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
 const scrollEl = ref<HTMLElement | null>(null)
@@ -60,8 +59,8 @@ function scroll(direction: 'left' | 'right') {
   scrollEl.value.scrollBy({ left: direction === 'left' ? -240 : 240, behavior: 'smooth' })
 }
 
-function navigateToBook(bookId: number) {
-  router.push({ name: 'book-detail', params: { bookId } })
+function bookLocation(bookId: number): RouteLocationRaw {
+  return { name: 'book-detail', params: { bookId } }
 }
 
 function formatSeriesIndex(index: string | null | undefined): string {
@@ -140,14 +139,14 @@ defineExpose({ scroll })
     </div>
 
     <div v-else ref="scrollEl" class="flex gap-6 overflow-x-auto pb-2">
-      <button
+      <RouterLink
         v-for="(book, index) in books"
         :key="book.id"
+        :to="bookLocation(book.id)"
         :data-book-id="book.id"
         class="shrink-0 text-left group animate-fade-up"
         :class="book.coverAspectRatio === '1/1' ? cardWidthClass.square : cardWidthClass.portrait"
         :style="{ animationDelay: `${index * 40}ms` }"
-        @click="navigateToBook(book.id)"
       >
         <BookCoverSurface
           class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-transform duration-150 group-hover:[transform:var(--cover-hover-transform)] motion-reduce:group-hover:[transform:none]"
@@ -185,7 +184,7 @@ defineExpose({ scroll })
             {{ formatSeriesIndex(book.seriesIndex) }}
           </span>
         </BookCoverSurface>
-      </button>
+      </RouterLink>
     </div>
   </div>
 </template>

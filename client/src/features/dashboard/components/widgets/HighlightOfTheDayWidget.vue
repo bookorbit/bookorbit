@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Highlighter, ExternalLink } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -10,12 +10,10 @@ import { useHighlightOfTheDayWidget } from '../../composables/useHighlightOfTheD
 
 const { data, loading, error } = useHighlightOfTheDayWidget()
 const { t } = useI18n()
-const router = useRouter()
 const { coverUrl } = useCoverVersions()
 
-function goToBook() {
-  if (!data.value) return
-  void router.push({ name: 'book-detail', params: { bookId: data.value.bookId } })
+function bookLocation(bookId: number): RouteLocationRaw {
+  return { name: 'book-detail', params: { bookId } }
 }
 </script>
 
@@ -52,7 +50,10 @@ function goToBook() {
       >
         "{{ data.text.length > 200 ? data.text.slice(0, 200) + '...' : data.text }}"
       </blockquote>
-      <button class="flex cursor-pointer items-center gap-2 rounded-lg pb-1 pl-1 text-left transition-colors hover:bg-muted/40" @click="goToBook">
+      <RouterLink
+        :to="bookLocation(data.bookId)"
+        class="flex cursor-pointer items-center gap-2 rounded-lg pb-1 pl-1 text-left transition-colors hover:bg-muted/40"
+      >
         <BookCoverSurface size="mini" class="book-cover-surface--spine-fitted h-9 w-6 shrink-0 overflow-hidden rounded-xs">
           <BookCoverArtwork
             :src="coverUrl(data.bookId)"
@@ -70,7 +71,7 @@ function goToBook() {
           <p v-if="data.chapterTitle" class="truncate text-[11px] text-muted-foreground">{{ data.chapterTitle }}</p>
         </div>
         <ExternalLink :size="14" class="mr-1 shrink-0 text-muted-foreground" />
-      </button>
+      </RouterLink>
     </div>
   </div>
 </template>

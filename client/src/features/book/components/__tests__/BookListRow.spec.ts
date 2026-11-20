@@ -1,14 +1,18 @@
-import { mount } from '@vue/test-utils'
+import { config, mount, RouterLinkStub } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import type { MockInstance } from 'vitest'
 import BookListRow from '../BookListRow.vue'
 import type { BookCard } from '@bookorbit/types'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
+config.global.stubs = { ...config.global.stubs, RouterLink: RouterLinkStub }
+
 const routerPushMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => unknown>())
+const routerResolveMock = vi.hoisted(() => vi.fn<(...args: unknown[]) => { href: string }>(() => ({ href: '/resolved' })))
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
-  return { ...actual, useRouter: () => ({ push: routerPushMock }) }
+  return { ...actual, useRouter: () => ({ push: routerPushMock, resolve: routerResolveMock }) }
 })
 vi.mock('@/features/book/composables/useCoverVersions', () => ({
   useCoverVersions: () => ({ coverUrl: (bookId: number) => `/cover-${bookId}.jpg`, bumpVersion: vi.fn<(...args: unknown[]) => void>() }),
@@ -361,5 +365,79 @@ describe('BookListRow collapsed series', () => {
     expect(cover.classes()).not.toContain('w-12')
     expect(wrapper.get('[data-testid="collapsed-series-list-row"]').text()).toContain('1 book')
     expect(wrapper.find('[data-testid="collapsed-series-progress"]').exists()).toBe(false)
+  })
+})
+
+describe('BookListRow - opening in a new tab', () => {
+  let openSpy: MockInstance<typeof window.open>
+
+  beforeEach(() => {
+    routerResolveMock.mockClear()
+    openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    openSpy.mockRestore()
+  })
+
+  it('opens the book details in a new tab on Ctrl+click, whatever a plain click does', async () => {
+    thumbnailClickAction.value = 'reader'
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('click', { ctrlKey: true })
+
+    expect(routerResolveMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
+    expect(openSpy).toHaveBeenCalledWith('/resolved', '_blank', 'noopener,noreferrer')
+    expect(wrapper.emitted('action')).toBeUndefined()
+    expect(routerPushMock).not.toHaveBeenCalled()
+  })
+
+  it('opens the book details in a new tab on a middle click', async () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('auxclick', { button: 1 })
+
+    expect(openSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not open a tab when the middle click lands on a control inside the row', async () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+
+    await wrapper.get('button').trigger('auxclick', { button: 1 })
+
+    expect(openSpy).not.toHaveBeenCalled()
+  })
+
+  it('keeps Ctrl+click as selection while selecting', async () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook, selectionMode: true }, global: globalStubs })
+
+    await wrapper.find('.flex.items-center').trigger('click', { ctrlKey: true })
+
+    expect(wrapper.emitted('select')).toHaveLength(1)
+    expect(openSpy).not.toHaveBeenCalled()
+  })
+
+  it('opens the series page in a new tab for a collapsed series row', async () => {
+    const wrapper = mount(BookListRow, { props: { book: collapsedSeriesBook }, global: globalStubs })
+
+    await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click', { metaKey: true })
+
+    expect(routerResolveMock).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesId: 99 } })
+    expect(openSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders the title as a link to the book page that still runs the row action on a plain click', async () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
+    const title = wrapper.findAll('a').find((link) => link.text() === 'Available Book')
+
+    expect(wrapper.findComponent(RouterLinkStub).props('to')).toEqual({ name: 'book-detail', params: { bookId: 2 } })
+    await title!.trigger('click')
+    expect(wrapper.emitted('action')?.[0]).toEqual(['quick-view'])
+  })
+
+  it('renders the title as plain text while selecting', () => {
+    const wrapper = mount(BookListRow, { props: { book: presentBook, selectionMode: true }, global: globalStubs })
+
+    expect(wrapper.find('a').exists()).toBe(false)
   })
 })

@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChevronRight } from '@lucide/vue'
 import type { TaxonomySummary } from '@bookorbit/types'
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
+import ActivateLink from '@/components/ActivateLink.vue'
 import TaxonomyHighlight from './TaxonomyHighlight.vue'
 
-const props = defineProps<{ item: TaxonomySummary; query?: string }>()
+const props = defineProps<{ item: TaxonomySummary; to: RouteLocationRaw; query?: string }>()
 
 const emit = defineEmits<{ open: [id: number] }>()
 
@@ -36,13 +38,12 @@ function handleOpen() {
 </script>
 
 <template>
-  <div
+  <ActivateLink
+    :to="to"
     class="taxonomy-index-row cursor-pointer border-b border-border transition-colors last:border-b-0 hover:bg-surface-2 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
-    tabindex="0"
     role="row"
     :aria-label="rowLabel"
-    @click="handleOpen"
-    @keydown.enter="handleOpen"
+    @activate="handleOpen"
     @keydown.space.prevent="handleOpen"
   >
     <div class="flex h-full min-w-0 items-center" aria-hidden="true">
@@ -94,7 +95,7 @@ function handleOpen() {
         <ChevronRight :size="13" />
       </span>
     </div>
-  </div>
+  </ActivateLink>
 </template>
 
 <style scoped>

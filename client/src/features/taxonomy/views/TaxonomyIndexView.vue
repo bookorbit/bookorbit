@@ -335,6 +335,7 @@ defineOptions({ name: 'TaxonomyIndexView' })
           :sort="sort"
           :order="order"
           :query="appliedQuery"
+          :library-id="libraryId"
           @open="openItem"
           @sort="setSortField"
         />

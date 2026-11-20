@@ -1,10 +1,13 @@
-import { mount } from '@vue/test-utils'
+import { config, mount, RouterLinkStub } from '@vue/test-utils'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { BookCard } from '@bookorbit/types'
 import CollapsedSeriesCard from '../CollapsedSeriesCard.vue'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
 
+config.global.stubs = { ...config.global.stubs, RouterLink: RouterLinkStub }
+
 const mockRouterPush = vi.fn<(...args: unknown[]) => unknown>()
+const mockRouterResolve = vi.fn<(...args: unknown[]) => { href: string }>(() => ({ href: '/resolved' }))
 const { mockFetchAuthors } = vi.hoisted(() => ({
   mockFetchAuthors: vi.fn<(...args: unknown[]) => unknown>(),
 }))
@@ -13,7 +16,7 @@ vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
   return {
     ...actual,
-    useRouter: () => ({ push: mockRouterPush }),
+    useRouter: () => ({ push: mockRouterPush, resolve: mockRouterResolve }),
     useRoute: () => ({ fullPath: '/test-path' }),
   }
 })
@@ -217,6 +220,28 @@ describe('CollapsedSeriesCard', () => {
       params: { seriesId: 42 },
       query: { from: '/test-path' },
     })
+  })
+
+  it('opens the series page in a new tab on Ctrl+click without leaving the page', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
+
+    await wrapper.trigger('click', { ctrlKey: true })
+
+    expect(mockRouterResolve).toHaveBeenCalledWith({ name: 'series-detail', params: { seriesId: 42 }, query: { from: '/test-path' } })
+    expect(openSpy).toHaveBeenCalledWith('/resolved', '_blank', 'noopener,noreferrer')
+    expect(mockRouterPush).not.toHaveBeenCalled()
+    openSpy.mockRestore()
+  })
+
+  it('opens the series page in a new tab on a middle click', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+    const wrapper = mount(CollapsedSeriesCard, { props: { book: makeBook() } })
+
+    await wrapper.trigger('auxclick', { button: 1 })
+
+    expect(openSpy).toHaveBeenCalledTimes(1)
+    openSpy.mockRestore()
   })
 
   it('does not navigate while selection mode is replacing collapsed rows', async () => {
@@ -796,12 +821,13 @@ describe('CollapsedSeriesCard', () => {
       return mount(CollapsedSeriesCard, { props: { book: makeBook(overrides), showLabel: true } })
     }
 
-    it('renders label buttons not paragraphs in below-cover mode', () => {
+    it('renders a series label as a link and an author label as a button in below-cover mode', () => {
       gridCardPrimaryLabel.value = 'series-title'
+      gridCardSecondaryLabel.value = 'author'
       const wrapper = mountWithBelowCoverLabel()
 
-      const primary = wrapper.find('[data-testid="grid-card-label-primary"]')
-      expect(primary.element.tagName).toBe('BUTTON')
+      expect(wrapper.find('[data-testid="grid-card-label-primary"]').element.tagName).toBe('A')
+      expect(wrapper.find('[data-testid="grid-card-label-secondary"]').element.tagName).toBe('BUTTON')
     })
 
     it('does not render label area when showLabel is false', () => {

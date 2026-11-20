@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { mount, RouterLinkStub } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 
 import BookCarousel, { type CarouselBook } from '../BookCarousel.vue'
@@ -25,7 +25,7 @@ function makeBook(id: number, status: ReadStatus | null): CarouselBook {
 }
 
 function mountCarousel(books: CarouselBook[]) {
-  return mount(BookCarousel, { props: { books, loading: false, showHeader: false } })
+  return mount(BookCarousel, { props: { books, loading: false, showHeader: false }, global: { stubs: { RouterLink: RouterLinkStub } } })
 }
 
 describe('BookCarousel read status badge', () => {

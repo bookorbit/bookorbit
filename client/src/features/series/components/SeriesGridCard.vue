@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { AlertCircle, Check, Layers } from '@lucide/vue'
 import type { SeriesSummary } from '@bookorbit/types'
 import { formatNumber } from '@/i18n/formatters'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
+import ActivateLink from '@/components/ActivateLink.vue'
 import SeriesVolumeTrack from './SeriesVolumeTrack.vue'
 import SeriesLibraryChip from './SeriesLibraryChip.vue'
 import { seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
@@ -54,6 +56,8 @@ const progressLabel = computed(() =>
   facts.value.isSingleVolume ? t('series.card.oneVolumeShort') : `${formatNumber(facts.value.readVolumes)}/${formatNumber(facts.value.ownedVolumes)}`,
 )
 
+const location = computed<RouteLocationRaw>(() => ({ name: 'series-detail', params: { seriesId: props.series.id } }))
+
 const cardLabel = computed(() => t('series.card.label', { name: props.series.name, read: facts.value.readVolumes, total: facts.value.ownedVolumes }))
 
 function handleOpen() {
@@ -62,13 +66,11 @@ function handleOpen() {
 </script>
 
 <template>
-  <article
+  <ActivateLink
+    :to="location"
     class="series-card group flex min-w-0 cursor-pointer flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-[border-color,box-shadow] duration-150 hover:border-ring hover:shadow-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring max-[519px]:flex-row"
-    tabindex="0"
-    role="button"
     :aria-label="cardLabel"
-    @click="handleOpen"
-    @keydown.enter="handleOpen"
+    @activate="handleOpen"
     @keydown.space.prevent="handleOpen"
   >
     <div
@@ -157,7 +159,7 @@ function handleOpen() {
         </span>
       </div>
     </div>
-  </article>
+  </ActivateLink>
 </template>
 
 <style scoped>

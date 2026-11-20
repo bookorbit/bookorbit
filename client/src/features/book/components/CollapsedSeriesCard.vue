@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, inject, ref, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import { getBookMediaProfile, type BookCard, type CoverAspectRatio } from '@bookorbit/types'
 import { Library } from '@lucide/vue'
 import BookCoverArtwork from './BookCoverArtwork.vue'
@@ -10,6 +10,8 @@ import { COVER_ASPECT_RATIO_KEY, DEFAULT_COVER_ASPECT_RATIO, coverAspectRatioVal
 import { useCoverVersions } from '../composables/useCoverVersions'
 import { useDisplaySettings, type GridCardLabelField } from '@/composables/useDisplaySettings'
 import { fetchAuthors } from '@/features/author/api/author'
+import ActivateLink from '@/components/ActivateLink.vue'
+import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 
 const MAX_COLLAPSED_STACK_COVERS = 3
 const STACK_COVER_STEP_PCT = 8
@@ -24,6 +26,7 @@ const props = defineProps<{
 
 const route = useRoute()
 const router = useRouter()
+const { openInNewTabIfRequested } = useOpenInNewTab()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed(() => props.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value)
 const { coverUrl } = useCoverVersions()
@@ -116,14 +119,24 @@ function coverVersionFor(bookId: number): string | null | undefined {
   return collapsed.value.coverUpdatedAtByBookId?.[bookId]
 }
 
-function handleClick() {
+const seriesLocation = computed<RouteLocationRaw | null>(() =>
+  props.selectionMode || props.book.seriesId == null
+    ? null
+    : { name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } },
+)
+
+function handleClick(event: MouseEvent) {
+  if (openInNewTabIfRequested(event, seriesLocation.value)) return
   openSeriesDetails()
 }
 
+function handleAuxClick(event: MouseEvent) {
+  openInNewTabIfRequested(event, seriesLocation.value)
+}
+
 function openSeriesDetails() {
-  if (props.selectionMode) return
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId }, query: { from: route.fullPath } })
+  if (seriesLocation.value == null) return
+  void router.push(seriesLocation.value)
 }
 
 async function openAuthorDetails() {
@@ -199,6 +212,8 @@ function resolveSeriesLabel(field: GridCardLabelField): string | null {
 
 const primaryLabelText = computed(() => resolveSeriesLabel(gridCardPrimaryLabel.value))
 const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLabel.value))
+const primaryLabelLocation = computed(() => (gridCardPrimaryLabel.value === 'author' ? null : seriesLocation.value))
+const secondaryLabelLocation = computed(() => (gridCardSecondaryLabel.value === 'author' ? null : seriesLocation.value))
 </script>
 
 <template>
@@ -207,6 +222,7 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
     :class="selectionMode ? 'cursor-default' : 'cursor-pointer'"
     :inert="selectionMode || undefined"
     @click="handleClick"
+    @auxclick="handleAuxClick"
   >
     <!-- Cover -->
     <div class="group">
@@ -363,8 +379,17 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
     </div>
 
     <div v-if="props.showLabel && cardInfoMode === 'below-cover' && (primaryLabelText || secondaryLabelText)" class="grid-card-label">
+      <ActivateLink
+        v-if="primaryLabelText && primaryLabelLocation"
+        :to="primaryLabelLocation"
+        class="grid-card-label__primary"
+        data-testid="grid-card-label-primary"
+        @activate="handlePrimaryLabelClick"
+      >
+        {{ primaryLabelText }}
+      </ActivateLink>
       <button
-        v-if="primaryLabelText"
+        v-else-if="primaryLabelText"
         type="button"
         class="grid-card-label__primary"
         data-testid="grid-card-label-primary"
@@ -372,8 +397,17 @@ const secondaryLabelText = computed(() => resolveSeriesLabel(gridCardSecondaryLa
       >
         {{ primaryLabelText }}
       </button>
+      <ActivateLink
+        v-if="secondaryLabelText && secondaryLabelLocation"
+        :to="secondaryLabelLocation"
+        class="grid-card-label__secondary"
+        data-testid="grid-card-label-secondary"
+        @activate="handleSecondaryLabelClick"
+      >
+        {{ secondaryLabelText }}
+      </ActivateLink>
       <button
-        v-if="secondaryLabelText"
+        v-else-if="secondaryLabelText"
         type="button"
         class="grid-card-label__secondary"
         data-testid="grid-card-label-secondary"

@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from '@lucide/vue'
 import type { AuthorCoverShape, AuthorSummary } from '@bookorbit/types'
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import ActivateLink from '@/components/ActivateLink.vue'
 import AuthorPortrait from './AuthorPortrait.vue'
 
 const props = withDefaults(
@@ -30,6 +32,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const location = computed<RouteLocationRaw>(() => ({ name: 'author-detail', params: { id: props.author.id } }))
 
 const bookCountLabel = computed(() => formatNumber(props.author.bookCount))
 const lastAdded = computed(() => (props.author.lastAddedAt ? formatRelativeFromNow(new Date(props.author.lastAddedAt)) : ''))
@@ -80,11 +84,20 @@ function handleDelete() {
          instead leaves every corner of a circular tile dead, and never lets anyone
          click the name: 26 of 63 sampled points across a tile did nothing. -->
     <button
+      v-if="selectionMode"
       type="button"
       class="absolute inset-0 z-10 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       :aria-label="accessibleLabel"
-      :aria-pressed="selectionMode ? selected : undefined"
+      :aria-pressed="selected"
       @click="handleActivate"
+    />
+    <ActivateLink
+      v-else
+      :to="location"
+      claim-modifiers
+      class="absolute inset-0 z-10 rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      :aria-label="accessibleLabel"
+      @activate="handleActivate"
     />
     <!-- Two boxes, deliberately: the outer one is the badge positioning context and
          does not clip, the inner one clips the artwork to its shape. Badges hung on

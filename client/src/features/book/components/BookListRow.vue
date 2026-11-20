@@ -6,9 +6,10 @@ import BookCoverSurface from './BookCoverSurface.vue'
 import { api } from '@/lib/api'
 import { computed, inject, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRouter, type RouteLocationRaw } from 'vue-router'
 import {
   BookOpen,
+  BookText,
   Check,
   ChevronRight,
   Eye,
@@ -40,11 +41,14 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { displayPublishedDate } from '../lib/published-date'
 import { bookFormatEntries, formatKeyCode, type BookFormatEntry } from '@/features/book/lib/book-formats'
 import { formatChipStyle } from '@/features/book/lib/format-colors'
+import ActivateLink from '@/components/ActivateLink.vue'
+import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 
 const COLLAPSED_SERIES_COVER_LIMIT = 3
 
 const { t } = useI18n()
 const router = useRouter()
+const { openInNewTab, openInNewTabIfRequested } = useOpenInNewTab()
 
 const props = defineProps<{
   book: BookCard
@@ -176,13 +180,26 @@ function openAuthorBrowse() {
   void router.push({ name: 'authors', query: { q: authorQuery.value } })
 }
 
+const detailsLocation = computed<RouteLocationRaw>(() => ({ name: 'book-detail', params: { bookId: props.book.id } }))
+const seriesLocation = computed<RouteLocationRaw | null>(() =>
+  props.book.seriesId == null ? null : { name: 'series-detail', params: { seriesId: props.book.seriesId } },
+)
+const rowLocation = computed<RouteLocationRaw | null>(() => {
+  if (props.selectionMode) return null
+  return isCollapsedSeries.value ? seriesLocation.value : detailsLocation.value
+})
+
 function openBookDetails() {
-  void router.push({ name: 'book-detail', params: { bookId: props.book.id } })
+  void router.push(detailsLocation.value)
+}
+
+function openBookDetailsInNewTab() {
+  openInNewTab(detailsLocation.value)
 }
 
 function openSeriesDetails() {
-  if (props.book.seriesId == null) return
-  void router.push({ name: 'series-detail', params: { seriesId: props.book.seriesId } })
+  if (seriesLocation.value == null) return
+  void router.push(seriesLocation.value)
 }
 
 function collapsedCoverVersion(bookId: number): string | null | undefined {
@@ -200,6 +217,7 @@ function handleRowClick(event: MouseEvent) {
     emit('select', event)
     return
   }
+  if (openInNewTabIfRequested(event, rowLocation.value)) return
 
   if (isCollapsedSeries.value) {
     openSeriesDetails()
@@ -213,6 +231,12 @@ function handleRowClick(event: MouseEvent) {
 
   emit('action', 'quick-view')
 }
+
+function handleRowAuxClick(event: MouseEvent) {
+  const target = event.target
+  if (target instanceof Element && target.closest('button, a')) return
+  openInNewTabIfRequested(event, rowLocation.value)
+}
 </script>
 
 <template>
@@ -225,6 +249,7 @@ function handleRowClick(event: MouseEvent) {
       selected ? 'bg-primary/8 ring-1 ring-primary/30' : '',
     ]"
     @click="handleRowClick"
+    @auxclick="handleRowAuxClick"
   >
     <div :class="collapsedCoverContainerClass">
       <template v-if="collapsedCoverIds.length > 0">
@@ -266,7 +291,15 @@ function handleRowClick(event: MouseEvent) {
 
     <div class="flex min-w-0 flex-1 flex-col gap-1">
       <div class="flex min-w-0 items-center gap-2">
-        <span class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
+        <ActivateLink
+          v-if="rowLocation"
+          :to="rowLocation"
+          class="truncate text-sm font-semibold leading-snug text-foreground hover:underline"
+          @activate="handleRowClick"
+        >
+          {{ collapsedSeriesName }}
+        </ActivateLink>
+        <span v-else class="truncate text-sm font-semibold leading-snug text-foreground">{{ collapsedSeriesName }}</span>
         <span class="hidden shrink-0 rounded-sm bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary sm:inline-flex">
           {{ t('book.collapsedSeries.label') }}
         </span>
@@ -303,6 +336,7 @@ function handleRowClick(event: MouseEvent) {
       isMissing ? 'grayscale opacity-60' : 'hover:bg-muted/50',
     ]"
     @click="handleRowClick"
+    @auxclick="handleRowAuxClick"
   >
     <!-- Selection checkbox -->
     <div
@@ -344,7 +378,18 @@ function handleRowClick(event: MouseEvent) {
 
     <!-- Main info -->
     <div class="flex flex-col min-w-0 flex-1 gap-0.5">
-      <span class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{ book.title ?? '-' }}</span>
+      <ActivateLink
+        v-if="rowLocation"
+        :to="rowLocation"
+        class="w-fit max-w-full text-sm font-medium text-foreground truncate leading-snug hover:underline"
+        :class="isMissing ? 'opacity-60' : ''"
+        @activate="handleRowClick"
+      >
+        {{ book.title ?? '-' }}
+      </ActivateLink>
+      <span v-else class="text-sm font-medium text-foreground truncate leading-snug" :class="isMissing ? 'opacity-60' : ''">{{
+        book.title ?? '-'
+      }}</span>
       <button v-if="authorLine" class="w-fit max-w-full text-xs text-muted-foreground truncate hover:underline" @click.stop="openAuthorBrowse">
         {{ authorLine }}
       </button>
@@ -364,7 +409,7 @@ function handleRowClick(event: MouseEvent) {
     </div>
 
     <!-- Right badges + actions -->
-    <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop>
+    <div v-if="!selectionMode" class="flex items-center gap-1.5 shrink-0" @click.stop @auxclick.stop>
       <!-- Star rating -->
       <div class="hidden sm:flex items-center gap-0.5" @mouseleave="hoverRating = null">
         <Tooltip v-for="star in RATING_STARS" :key="star">
@@ -425,8 +470,12 @@ function handleRowClick(event: MouseEvent) {
             {{ t('book.actions.quickView') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="openBookDetails">
-            <ExternalLink class="size-4 mr-2" />
+            <BookText class="size-4 mr-2" />
             {{ t('book.actions.bookDetails') }}
+          </DropdownMenuItem>
+          <DropdownMenuItem @click="openBookDetailsInNewTab">
+            <ExternalLink class="size-4 mr-2" />
+            {{ t('common.openInNewTab') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem v-if="canEditMetadata" @click="router.push({ name: 'book-detail', params: { bookId: book.id }, query: { tab: 'edit' } })">

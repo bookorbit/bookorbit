@@ -10,6 +10,7 @@ import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
 import { bookFormatEntries } from '@/features/book/lib/book-formats'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
+import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 import { formatNumber, formatPercent } from '@/i18n/formatters'
 import { useCommandPalette } from '../composables/useCommandPalette'
 import { useCommandPaletteResults, type PaletteItem, type PaletteTab } from '../composables/useCommandPaletteResults'
@@ -17,6 +18,7 @@ import { highlightSegments } from '../lib/highlight'
 
 const { t } = useI18n()
 const router = useRouter()
+const { openInNewTab, openInNewTabIfRequested } = useOpenInNewTab()
 const { isOpen, closePalette } = useCommandPalette()
 
 const query = ref('')
@@ -87,22 +89,31 @@ function handleOpenAutoFocus(event: Event) {
   inputRef.value?.focus()
 }
 
-function select(item: PaletteItem) {
+/** The page a row opens, or null for rows that run something instead of going somewhere. */
+function itemLocation(item: PaletteItem): RouteLocationRaw | null {
   switch (item.kind) {
     case 'book':
     case 'reading':
-      navigate({ name: 'book-detail', params: { bookId: item.book.id } })
-      return
+      return { name: 'book-detail', params: { bookId: item.book.id } }
     case 'author':
-      navigate({ name: 'author-detail', params: { id: item.author.id } })
-      return
+      return { name: 'author-detail', params: { id: item.author.id } }
     case 'series':
-      navigate({ name: 'series-detail', params: { seriesId: item.series.id } })
-      return
+      return { name: 'series-detail', params: { seriesId: item.series.id } }
     case 'place':
     case 'setting':
-      navigate(item.to)
-      return
+      return item.to
+    default:
+      return null
+  }
+}
+
+function select(item: PaletteItem) {
+  const location = itemLocation(item)
+  if (location) {
+    navigate(location)
+    return
+  }
+  switch (item.kind) {
     case 'action':
       closePalette()
       item.run()
@@ -138,11 +149,26 @@ function handleKeydown(event: KeyboardEvent) {
     const item = flatItems.value[activeIndex.value]
     if (!item) return
     event.preventDefault()
+    const location = itemLocation(item)
+    if (location && (event.ctrlKey || event.metaKey)) {
+      openInNewTab(location)
+      return
+    }
     select(item)
   } else if (event.key === 'Tab' && tabs.value.length > 1) {
     event.preventDefault()
     cycleTab(event.shiftKey ? -1 : 1)
   }
+}
+
+/** Ctrl/Cmd+click and middle-click open the page in a new tab and leave the palette open for the next result. */
+function handleItemClick(item: PaletteItem, event: MouseEvent) {
+  if (openInNewTabIfRequested(event, itemLocation(item))) return
+  select(item)
+}
+
+function handleItemAuxClick(item: PaletteItem, event: MouseEvent) {
+  openInNewTabIfRequested(event, itemLocation(item))
 }
 
 function hover(item: PaletteItem) {
@@ -295,7 +321,8 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
               class="flex w-full cursor-pointer items-center gap-3 rounded-md px-2.5 text-start"
               :class="[indexOf(item) === activeIndex ? 'bg-accent' : '', rowSizeClass(item)]"
               @mousemove="hover(item)"
-              @click="select(item)"
+              @click="handleItemClick(item, $event)"
+              @auxclick="handleItemAuxClick(item, $event)"
             >
               <template v-if="item.kind === 'book' || item.kind === 'reading'">
                 <BookCoverImage

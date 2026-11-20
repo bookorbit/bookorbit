@@ -2,7 +2,8 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { BookOpen, ExternalLink, FolderInput, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
+import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
+import { BookOpen, BookText, ExternalLink, FolderInput, FolderPlus, Pencil, RefreshCw, Send, Trash2 } from '@lucide/vue'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
@@ -26,6 +27,7 @@ const emit = defineEmits<{
 }>()
 
 const router = useRouter()
+const { openInNewTab } = useOpenInNewTab()
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
@@ -95,6 +97,12 @@ function openBookDetails(): void {
   closeMenu()
 }
 
+function openBookDetailsInNewTab(): void {
+  if (!props.book) return
+  openInNewTab({ name: 'book-detail', params: { bookId: props.book.id } })
+  closeMenu()
+}
+
 function openEditMetadata(): void {
   if (!props.book) return
   router.push({ name: 'book-detail', params: { bookId: props.book.id }, query: { tab: 'edit' } })
@@ -158,8 +166,12 @@ onBeforeUnmount(() => {
         {{ t('book.table.actions.quickView') }}
       </button>
       <button class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetails">
-        <ExternalLink :size="14" />
+        <BookText :size="14" />
         {{ t('book.table.actions.bookDetails') }}
+      </button>
+      <button class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent" @click="openBookDetailsInNewTab">
+        <ExternalLink :size="14" />
+        {{ t('common.openInNewTab') }}
       </button>
       <button
         v-if="canEditMetadata"

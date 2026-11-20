@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { flushPromises, mount } from '@vue/test-utils'
+import { config, flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
 import { defineComponent, h, ref } from 'vue'
 import type { BookCard, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
 import BookCoverCard from './BookCoverCard.vue'
+
+config.global.stubs = { ...config.global.stubs, RouterLink: RouterLinkStub }
 
 // -- module mocks (must precede imports) -------------------------------------
 
@@ -10,7 +12,8 @@ const mockToastError = vi.hoisted(() => vi.fn<(message: string) => void>())
 vi.mock('vue-sonner', () => ({ toast: { error: mockToastError, success: vi.fn<(message: string) => void>() } }))
 
 const mockRouterPush = vi.fn<() => void>()
-vi.mock('vue-router', () => ({
+vi.mock('vue-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('vue-router')>()),
   useRoute: () => ({ fullPath: '/' }),
   useRouter: () => ({ push: mockRouterPush }),
 }))

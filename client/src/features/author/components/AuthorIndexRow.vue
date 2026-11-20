@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import type { RouteLocationRaw } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Check, ExternalLink, Loader2, MoreHorizontal, RefreshCw, Trash2 } from '@lucide/vue'
 import type { AuthorSummary, TableDensity } from '@bookorbit/types'
 import { formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import ActivateLink from '@/components/ActivateLink.vue'
 import AuthorPortrait from './AuthorPortrait.vue'
 import { hasInformativeSortName } from '../lib/author-identity'
 
@@ -32,6 +34,8 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const location = computed<RouteLocationRaw>(() => ({ name: 'author-detail', params: { id: props.author.id } }))
 
 /** Row height and portrait scale move together, so the portrait never crowds the row. */
 const METRICS: Record<TableDensity, { row: number; portrait: number }> = {
@@ -105,11 +109,20 @@ function handleDelete() {
     <!-- Stretched primary action: keeps the whole row clickable without nesting the
          menu button inside another button, which is invalid and breaks keyboard order. -->
     <button
+      v-if="selectionMode"
       type="button"
       class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
       :aria-label="accessibleLabel"
-      :aria-pressed="selectionMode ? selected : undefined"
+      :aria-pressed="selected"
       @click="handleActivate"
+    />
+    <ActivateLink
+      v-else
+      :to="location"
+      claim-modifiers
+      class="absolute inset-0 z-0 rounded-lg focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring"
+      :aria-label="accessibleLabel"
+      @activate="handleActivate"
     />
 
     <div

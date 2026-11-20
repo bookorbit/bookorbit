@@ -2,7 +2,7 @@
 import { Gem, Star, BookMarked, Check } from '@lucide/vue'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { RouterLink, type RouteLocationRaw } from 'vue-router'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -12,7 +12,6 @@ import { useNeglectedGemsWidget } from '../../composables/useNeglectedGemsWidget
 
 const { data, loading, error } = useNeglectedGemsWidget()
 const { t } = useI18n()
-const router = useRouter()
 const { setStatus } = useBookStatus()
 const { coverUrl } = useCoverVersions()
 
@@ -25,9 +24,8 @@ function handleShuffle() {
   displayIndex.value = (displayIndex.value + 1) % data.value.gems.length
 }
 
-function goToBook() {
-  if (!currentGem.value) return
-  void router.push({ name: 'book-detail', params: { bookId: currentGem.value.bookId } })
+function bookLocation(bookId: number): RouteLocationRaw {
+  return { name: 'book-detail', params: { bookId } }
 }
 
 async function addToQueue() {
@@ -66,27 +64,26 @@ async function addToQueue() {
 
     <!-- Gem -->
     <div v-else-if="currentGem" class="flex flex-1 flex-col items-center justify-center gap-2">
-      <BookCoverSurface
-        tag="button"
-        type="button"
-        size="mini"
-        class="book-cover-surface--spine-fitted h-19 w-13 cursor-pointer overflow-hidden rounded-xs transition-opacity hover:opacity-80"
-        @click="goToBook"
-      >
-        <BookCoverArtwork
-          :src="coverUrl(currentGem.bookId)"
-          :has-cover="currentGem.hasCover"
-          :title="currentGem.title"
-          :author-line="null"
-          :is-audio="false"
-          :seed="currentGem.title ?? String(currentGem.bookId)"
-          :alt="currentGem.title ?? t('dashboard.common.cover')"
-          frame-aspect-ratio="13/19"
-        />
-      </BookCoverSurface>
-      <button class="max-w-full cursor-pointer truncate text-center text-xs font-semibold hover:underline" @click="goToBook">
+      <RouterLink :to="bookLocation(currentGem.bookId)">
+        <BookCoverSurface
+          size="mini"
+          class="book-cover-surface--spine-fitted h-19 w-13 cursor-pointer overflow-hidden rounded-xs transition-opacity hover:opacity-80"
+        >
+          <BookCoverArtwork
+            :src="coverUrl(currentGem.bookId)"
+            :has-cover="currentGem.hasCover"
+            :title="currentGem.title"
+            :author-line="null"
+            :is-audio="false"
+            :seed="currentGem.title ?? String(currentGem.bookId)"
+            :alt="currentGem.title ?? t('dashboard.common.cover')"
+            frame-aspect-ratio="13/19"
+          />
+        </BookCoverSurface>
+      </RouterLink>
+      <RouterLink :to="bookLocation(currentGem.bookId)" class="max-w-full cursor-pointer truncate text-center text-xs font-semibold hover:underline">
         {{ currentGem.title ?? t('dashboard.common.untitled') }}
-      </button>
+      </RouterLink>
       <div class="flex items-center gap-1 text-[11px] text-muted-foreground">
         <Star :size="12" class="fill-amber-400 text-amber-400" />
         <span>{{ t('dashboard.widgets.neglectedGems.rating', { rating: currentGem.rating }) }}</span>
