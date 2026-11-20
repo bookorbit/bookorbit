@@ -288,13 +288,14 @@ namespace BookOrbitTrayApp
             }
             else
             {
-                if (_currentState == ServiceState.Starting && (DateTime.Now - _stateChangeTime).TotalSeconds < 60)
+                if (_currentState == ServiceState.Starting && (DateTime.Now - _stateChangeTime).TotalSeconds < 180)
                 {
                     _itemStatusHeader.Text = "[◌] BookOrbit: Запуск службы...";
                     _notifyIcon.Text = "BookOrbit: Запуск службы...";
                     _itemStart.Enabled = false;
                     _itemStop.Enabled = true;
                     _itemRestart.Enabled = false;
+                    EnsureWslKeepAlive();
                 }
                 else if (_currentState == ServiceState.Stopping && (DateTime.Now - _stateChangeTime).TotalSeconds < 45)
                 {
@@ -312,7 +313,6 @@ namespace BookOrbitTrayApp
                     _itemStart.Enabled = true;
                     _itemStop.Enabled = false;
                     _itemRestart.Enabled = false;
-                    StopWslKeepAlive();
                 }
             }
         }
