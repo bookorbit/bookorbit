@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import { eq } from 'drizzle-orm';
 import { Permission, type JobActionResponse, type JobList, type JobListItem, type JobView } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
@@ -423,5 +424,34 @@ describe('Jobs area (e2e)', { timeout: 180_000 }, () => {
 
     const refused = await act(settingsAdmin, 'retry', [`chapter-edit:${editorChapterJob}`]);
     expect(refused.results[0]).toMatchObject({ outcome: 'refused', status: 'failed' });
+  });
+
+  it('removes a held download from Needs you after the request is manually fulfilled', async () => {
+    const attemptId = await download(otherFulfiller, 'needs_review');
+    const [attempt] = await ctx.db
+      .select({ requestId: schema.bookRequestDownloads.requestId })
+      .from(schema.bookRequestDownloads)
+      .where(eq(schema.bookRequestDownloads.id, attemptId));
+
+    const before = await list(otherFulfiller, 'needs-you', '&counts=1');
+    expect(before.body.items.map((item) => item.id)).toEqual([`request-download:${attemptId}`]);
+    expect(before.body.counts?.needsYou).toBe(1);
+
+    const fulfilled = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/book-requests/${attempt!.requestId}/fulfill`,
+      headers: authHeader(ctx.adminToken),
+      payload: { matchedBookId: bookA.bookId },
+    });
+    expect(fulfilled.statusCode).toBe(200);
+    expect(fulfilled.json()).toMatchObject({ status: 'available', matchedBookId: bookA.bookId, download: { status: 'needs_review' } });
+
+    const mine = await list(otherFulfiller, 'needs-you', '&counts=1');
+    expect(mine.body.items).toEqual([]);
+    expect(mine.body.counts?.needsYou).toBe(0);
+
+    const everyone = await list(requestManager, 'needs-you', '&counts=1&scope=everyone');
+    expect(everyone.body.items.map((item) => item.id)).toEqual([`request-download:${reviewDownload}`]);
+    expect(everyone.body.counts?.needsYou).toBe(1);
   });
 });

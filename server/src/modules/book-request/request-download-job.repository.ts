@@ -23,6 +23,7 @@ const ownerId = sql`coalesce(${bookRequests.fulfillerUserId}, ${bookRequests.use
 /** Non-null for every terminal attempt: a failed one never reached `imported_at`. */
 const FINISH = sql`coalesce(${bookRequestDownloads.importedAt}, ${bookRequestDownloads.updatedAt})`;
 const CANCELLED = inArray(bookRequestDownloads.failureCode, [...CANCELLED_DOWNLOAD_FAILURE_CODES]);
+const NEEDS_REVIEW = and(eq(bookRequestDownloads.status, 'needs_review'), eq(bookRequests.status, 'needs_review'))!;
 
 const PAGE_COLUMNS = {
   id: bookRequestDownloads.id,
@@ -87,16 +88,14 @@ export class RequestDownloadJobRepository {
     const [row] = await this.db
       .select({
         queue: sql<number>`count(*) filter (where ${inArray(bookRequestDownloads.status, IN_QUEUE)})`.mapWith(Number),
-        needsYou: sql<number>`count(*) filter (where ${bookRequestDownloads.status} = 'needs_review')`.mapWith(Number),
+        needsYou: sql<number>`count(*) filter (where ${NEEDS_REVIEW})`.mapWith(Number),
         failed: sql<number>`count(*) filter (where ${this.failedShown(cutoffAt)})`.mapWith(Number),
         running: sql<number>`count(*) filter (where ${inArray(bookRequestDownloads.status, RUNNING)})`.mapWith(Number),
         queued: sql<number>`count(*) filter (where ${inArray(bookRequestDownloads.status, QUEUED)})`.mapWith(Number),
       })
       .from(bookRequestDownloads)
       .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
-      .where(
-        and(or(inArray(bookRequestDownloads.status, [...IN_QUEUE, 'needs_review']), this.failedShown(cutoffAt)), this.latest(), this.owned(owner)),
-      );
+      .where(and(or(inArray(bookRequestDownloads.status, IN_QUEUE), NEEDS_REVIEW, this.failedShown(cutoffAt)), this.latest(), this.owned(owner)));
     return {
       queue: row?.queue ?? 0,
       needsYou: row?.needsYou ?? 0,
@@ -197,7 +196,7 @@ export class RequestDownloadJobRepository {
   }
 
   private settledView(view: JobView, cutoffAt: Date): SQL {
-    if (view === 'needs-you') return eq(bookRequestDownloads.status, 'needs_review');
+    if (view === 'needs-you') return NEEDS_REVIEW;
     if (view === 'failed') return this.failedShown(cutoffAt);
     return and(
       inArray(bookRequestDownloads.status, TERMINAL),
