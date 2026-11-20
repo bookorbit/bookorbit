@@ -68,6 +68,60 @@ function asArray<T>(value: T | T[] | undefined): T[] {
 }
 
 describe('EPUB cover write round trip', () => {
+  it.each([
+    { version: '2.0', format: 'jpeg', extension: 'jpg', guide: true },
+    { version: '3.0', format: 'png', extension: 'png', guide: false },
+  ] as const)('updates the SVG cover dimensions during an EPUB $version $format cover write', async ({ version, format, extension, guide }) => {
+    const filePath = join(testRoot, 'svg-cover-page.epub');
+    const opf = `
+      <package version="${version}" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
+        <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:identifier id="uid">urn:test:svg-cover</dc:identifier>
+          <dc:title>Cover dimensions</dc:title>
+          <dc:language>en</dc:language>
+          ${guide ? '<meta name="cover" content="cover" />' : '<meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>'}
+        </metadata>
+        <manifest>
+          <item id="cover" href="images/cover.jpg" media-type="image/jpeg"${guide ? '' : ' properties="cover-image"'} />
+          <item id="titlepage" href="titlepage.xhtml" media-type="application/xhtml+xml" />
+          <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml" />
+        </manifest>
+        <spine><itemref idref="titlepage"${guide ? '' : ' linear="no"'} /><itemref idref="chapter" /></spine>
+        ${guide ? '<guide><reference type="cover" href="titlepage.xhtml" /></guide>' : ''}
+      </package>`;
+    const coverPage = `<?xml version="1.0"?><html xmlns="http://www.w3.org/1999/xhtml"><body>
+      <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="100%" height="100%" viewBox='0 0 947 1541' preserveAspectRatio="xMidYMid meet">
+        <!-- <image width="947" height="1541" xlink:href="images/cover.jpg" /> -->
+        <image width="947" height="1541" xlink:href="images/cover.jpg" />
+      </svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 21 31"><image width="21" height="31" href="images/other.jpg" /></svg>
+    </body></html>`;
+    const oldCover = await sharp({ create: { width: 947, height: 1541, channels: 3, background: '#808000' } })
+      .jpeg()
+      .toBuffer();
+    const newCover = await sharp({ create: { width: 1707, height: 2560, channels: 3, background: '#000080' } })
+      [format]()
+      .toBuffer();
+    await writeArchive(filePath, opf, [
+      { path: 'OPS/titlepage.xhtml', content: coverPage },
+      { path: 'OPS/images/cover.jpg', content: oldCover },
+      { path: 'OPS/chapter.xhtml', content: coverPage },
+    ]);
+
+    const result = await new EpubFormatWriter().write(filePath, { coverBytes: newCover }, { fieldMask: new Set(['coverBytes']), dryRun: false });
+
+    expect(result).toMatchObject({ status: 'success', fieldsWritten: ['coverBytes'] });
+    await expect(readArchiveEntry(filePath, `OPS/images/cover.${extension}`)).resolves.toEqual(newCover);
+    const expectedPage = coverPage
+      .replace("viewBox='0 0 947 1541'", "viewBox='0 0 1707 2560'")
+      .replace(
+        '\n        <image width="947" height="1541" xlink:href="images/cover.jpg"',
+        `\n        <image width="1707" height="2560" xlink:href="images/cover.${extension}"`,
+      );
+    expect((await readArchiveEntry(filePath, 'OPS/titlepage.xhtml')).toString()).toBe(expectedPage);
+    expect((await readArchiveEntry(filePath, 'OPS/chapter.xhtml')).toString()).toBe(coverPage);
+  });
+
   it('preserves WebP bytes and updates an existing JPEG manifest entry', async () => {
     const filePath = join(testRoot, 'existing-jpeg.epub');
     const opf = `

@@ -11,6 +11,7 @@ import * as EpubCoverHandler from './epub-cover-handler';
 import { inspectCoverImage, toEpubCoreImage } from './epub-cover-image';
 
 const AUDIO_COVER_FIELD = 'audioCoverBytes';
+const MAX_COVER_DOCUMENT_BYTES = 2 * 1024 * 1024;
 
 @Injectable()
 export class EpubFormatWriter implements FormatWriter {
@@ -28,7 +29,9 @@ export class EpubFormatWriter implements FormatWriter {
     if (payload.coverBytes && options.fieldMask.has('coverBytes' as BookWritePayloadKey)) {
       const coverImage = await inspectCoverImage(payload.coverBytes);
       const occupiedEntryPaths = await EpubZipPatcher.listEntryPaths(filePath);
-      const slot = await EpubCoverHandler.locate(opfXml, opfDir, (entryPath) => EpubZipPatcher.readEntry(filePath, entryPath));
+      const slot = await EpubCoverHandler.locate(opfXml, opfDir, (entryPath) =>
+        EpubZipPatcher.readEntry(filePath, entryPath, MAX_COVER_DOCUMENT_BYTES),
+      );
       const coverWrite = slot
         ? EpubCoverHandler.replace(newOpfXml, opfDir, slot, coverImage, occupiedEntryPaths)
         : EpubCoverHandler.inject(newOpfXml, opfDir, coverImage, occupiedEntryPaths);

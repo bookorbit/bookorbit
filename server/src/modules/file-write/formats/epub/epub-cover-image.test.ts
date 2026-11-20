@@ -25,7 +25,7 @@ describe('inspectCoverImage', () => {
   ] as const)('identifies %s bytes without modifying them', async (format, mediaType, extension) => {
     const bytes = await makeImage(format);
 
-    await expect(inspectCoverImage(bytes)).resolves.toEqual({ mediaType, extension });
+    await expect(inspectCoverImage(bytes)).resolves.toEqual({ mediaType, extension, dimensions: { width: 8, height: 12 } });
   });
 
   it('rejects bytes that are not a decodable image', async () => {

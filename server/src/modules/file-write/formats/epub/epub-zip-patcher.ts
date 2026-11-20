@@ -14,15 +14,25 @@ const EPUB_ZIP_REWRITE_EVENT = 'epub_zip.rewrite';
 
 const logger = new Logger('EpubZipPatcher');
 
-export async function readEntryBuffer(filePath: string, entryPath: string): Promise<Buffer> {
+export async function readEntryBuffer(filePath: string, entryPath: string, maxBytes?: number): Promise<Buffer> {
   const zip = await unzipper.Open.file(filePath);
   const entry = zip.files.find((f) => f.path === entryPath);
   if (!entry) throw new Error(`Entry not found in EPUB: ${entryPath}`);
-  return entry.buffer();
+  if (maxBytes === undefined) return entry.buffer();
+  if (entry.uncompressedSize > maxBytes) throw new Error('EPUB entry exceeds the byte limit');
+
+  const chunks: Buffer[] = [];
+  let size = 0;
+  for await (const chunk of entry.stream() as AsyncIterable<Buffer>) {
+    size += chunk.length;
+    if (size > maxBytes) throw new Error('EPUB entry exceeds the byte limit');
+    chunks.push(chunk);
+  }
+  return Buffer.concat(chunks, size);
 }
 
-export async function readEntry(filePath: string, entryPath: string): Promise<string> {
-  return (await readEntryBuffer(filePath, entryPath)).toString('utf-8');
+export async function readEntry(filePath: string, entryPath: string, maxBytes?: number): Promise<string> {
+  return (await readEntryBuffer(filePath, entryPath, maxBytes)).toString('utf-8');
 }
 
 export async function listEntryPaths(filePath: string): Promise<string[]> {

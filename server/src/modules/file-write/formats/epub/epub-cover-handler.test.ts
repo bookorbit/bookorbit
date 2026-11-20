@@ -343,6 +343,24 @@ describe('epub-cover-handler', () => {
     expect(result!.documentPatch!.xml).toBe('<svg><image width="10" xlink:href="art.webp" /></svg>');
   });
 
+  it('preserves the geometry of an SVG cover that contains other artwork', () => {
+    const xml = '<svg viewBox="0 0 10 20"><image width="10" height="20" href="art.jpg" /><text x="5" y="5">Title</text></svg>';
+    const result = replace(
+      '<package version="2.0"><metadata/><manifest><item id="art" href="art.jpg" media-type="image/jpeg"/></manifest></package>',
+      'OPS/',
+      {
+        entryPath: 'OPS/art.jpg',
+        mediaType: 'image/jpeg',
+        manifestItemId: 'art',
+        document: { entryPath: 'OPS/cover.svg', xml, imageHref: 'art.jpg' },
+      },
+      { ...webpImage, dimensions: { width: 30, height: 40 } },
+      ['OPS/art.jpg'],
+    );
+
+    expect(result?.documentPatch?.xml).toBe(xml.replace('art.jpg', 'art.webp'));
+  });
+
   it('uses a collision-free replacement path when the desired extension already exists', () => {
     const result = replace(
       '<package version="3.0"><metadata/><manifest><item id="cover" href="cover.jpg" media-type="image/jpeg"/></manifest></package>',

@@ -14,18 +14,22 @@ const FORMAT_DETAILS = {
 export interface CoverImageInfo {
   mediaType: string;
   extension: string;
+  dimensions?: { width: number; height: number };
 }
 
 export async function inspectCoverImage(bytes: Buffer): Promise<CoverImageInfo> {
   const metadata = await sharp(bytes, { failOn: 'error' }).metadata();
+  const dimensions = metadata.autoOrient;
   const knownFormat = metadata.format ? FORMAT_DETAILS[metadata.format as keyof typeof FORMAT_DETAILS] : undefined;
-  if (knownFormat) return knownFormat;
+  if (knownFormat) return { ...knownFormat, dimensions };
 
   if (metadata.format === 'heif') {
-    return metadata.compression === 'av1' ? { mediaType: 'image/avif', extension: 'avif' } : { mediaType: 'image/heic', extension: 'heic' };
+    return metadata.compression === 'av1'
+      ? { mediaType: 'image/avif', extension: 'avif', dimensions }
+      : { mediaType: 'image/heic', extension: 'heic', dimensions };
   }
 
-  if (isBitmap(bytes)) return { mediaType: 'image/bmp', extension: 'bmp' };
+  if (isBitmap(bytes)) return { mediaType: 'image/bmp', extension: 'bmp', dimensions };
   throw new Error(`Unsupported cover image format: ${metadata.format || 'unknown'}`);
 }
 
