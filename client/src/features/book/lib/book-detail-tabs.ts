@@ -1,5 +1,5 @@
-import { isContentBookFile, type BookDetail } from '@bookorbit/types'
-import { hasReadAlong } from './file-capabilities'
+import type { BookDetail } from '@bookorbit/types'
+import { hasAudioFile, hasReadAlongFile } from './file-capabilities'
 
 export const BOOK_DETAIL_TABS = ['details', 'edit', 'files', 'chapters', 'reading-log', 'highlights'] as const
 
@@ -13,8 +13,7 @@ export function normalizeBookDetailTab(value: unknown): BookDetailTab {
 }
 
 /** The Chapters tab has audio files to lay out, or a read-along EPUB whose narration it can list. */
-export function hasChaptersTab(book: Pick<BookDetail, 'audioMetadata' | 'files'> | null | undefined): boolean {
+export function hasChaptersTab(book: Pick<BookDetail, 'files'> | null | undefined): boolean {
   if (!book) return false
-  if (book.audioMetadata != null) return true
-  return book.files.some((file) => isContentBookFile(file) && hasReadAlong(file))
+  return hasAudioFile(book.files) || hasReadAlongFile(book.files)
 }

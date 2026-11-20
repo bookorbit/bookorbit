@@ -97,7 +97,29 @@
         "saveError": "Dil terchileri kaydedilemedi"
       },
       "pageTitle": "Ekran",
+      "themeMode": {
+        "light": "Aydınlık",
+        "dark": "Karanlık",
+        "system": "Sistem"
+      },
       "theme": {
+        "title": "Tema",
+        "style": {
+          "label": "Stil",
+          "bookorbit": {
+            "label": "BookOrbit"
+          },
+          "nostalgia": {
+            "label": "Nostalji"
+          }
+        },
+        "colorScheme": {
+          "label": "Renk Şeması",
+          "hint": "Aydınlık veya karanlık arayüz"
+        },
+        "surfacePalette": {
+          "label": "Yüzey"
+        },
         "accents": {
           "marigold": "Kadife",
           "fuchsia": "Fuşya",

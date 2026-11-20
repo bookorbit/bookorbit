@@ -37,6 +37,7 @@ import {
   type DraftChapter,
 } from '@/features/book/lib/chapter-edit'
 import { chapterExportFilename, serializeChapters, type ChapterFormat } from '@/features/book/lib/chapter-io'
+import { hasAudioFile } from '@/features/book/lib/file-capabilities'
 import { formatChapterClock } from '@/features/book/lib/chapter-time'
 import { pickPause, snapToPauses, type AnalyzePauses } from '@/features/book/lib/chapter-snap'
 import ChaptersHeroBar from '../chapters/ChaptersHeroBar.vue'
@@ -77,7 +78,7 @@ const TOOLS: { tool: ChapterTool; key: string }[] = [
 
 const bookId = computed(() => props.book.id)
 // A book with only a read-along EPUB has narration to list but no audio files to cut.
-const hasAudioFiles = computed(() => props.book.audioMetadata != null)
+const hasAudioFiles = computed(() => hasAudioFile(props.book.files))
 const canEdit = computed(() => hasAudioFiles.value && hasLibraryPermission(Permission.LibraryEditMetadata, props.book.libraryId, 'editor'))
 
 const store = useBookChapters(bookId)

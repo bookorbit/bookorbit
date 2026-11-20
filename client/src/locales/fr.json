@@ -389,6 +389,15 @@
             "label": "Statut de verrouillage",
             "hint": "Icône de verrouillage des métadonnées en haut à droite : orange lorsqu'elle est verrouillée, verte lorsqu'elle est déverrouillée"
           }
+        },
+        "formatBadgeStyle": {
+          "title": "Style de badge de format",
+          "hint": "Comment le badge montre qu'un livre a plusieurs formats. Un livre avec un seul format a une pilule unie.",
+          "options": {
+            "primary": {
+              "label": "Format principal"
+            }
+          }
         }
       },
       "layout": {

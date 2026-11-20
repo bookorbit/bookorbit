@@ -1053,14 +1053,14 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
       });
       expect(statsResponse.statusCode).toBe(200);
 
-      const primaryFiles = await ctx.db
+      const presentBookFiles = await ctx.db
         .select({
           sizeBytes: schema.bookFiles.sizeBytes,
         })
         .from(schema.books)
-        .innerJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+        .innerJoin(schema.bookFiles, eq(schema.bookFiles.bookId, schema.books.id))
         .where(and(eq(schema.books.libraryId, createdLibrary.id), eq(schema.books.status, 'present')));
-      const expectedTotalSize = primaryFiles.reduce((sum, row) => sum + Number(row.sizeBytes ?? 0), 0);
+      const expectedTotalSize = presentBookFiles.reduce((sum, row) => sum + Number(row.sizeBytes ?? 0), 0);
 
       expect(statsResponse.json()).toEqual({
         totalBooks: 2,
@@ -1083,6 +1083,59 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
         headers: authHeader(scopedUser.accessToken),
       });
       expectError(revokedStatsResponse, 403, 'No library access');
+    });
+
+    it('sizes a library by every file its books hold while formats count each book once', async () => {
+      const library = await createLibraryWithFolder(ctx, { mode: 'book_per_folder', name: `multi-file-stats-${randomUUID()}` });
+      await grantLibraryAccess(ctx, manager.userId, library.libraryId, 'owner');
+
+      const trackFolder = join(library.folderPath, 'Sam Whitfield - Harbour Lights');
+      await mkdir(trackFolder, { recursive: true });
+      const filePaths: string[] = [];
+      for (const track of ['01', '02', '03']) {
+        const trackPath = join(trackFolder, `${track}.mp3`);
+        await writeFile(trackPath, Buffer.concat([Buffer.from(`ID3 track ${track} ${randomUUID()}`), Buffer.alloc(Number(track) * 4096)]));
+        filePaths.push(trackPath);
+      }
+      filePaths.push(await createEpubFixture(library.folderPath, 'Sam Whitfield - The Long Tide/The Long Tide.epub', { title: 'The Long Tide' }));
+      // Older than the scanner's stability window, so the scan does not wait for the files to settle.
+      const settled = new Date(Date.now() - 5 * 60_000);
+      for (const filePath of filePaths) await utimes(filePath, settled, settled);
+
+      await startLibraryScanAs(ctx, manager.accessToken, library.libraryId);
+      await waitForNoRunningScans(ctx, library.libraryId);
+      await waitForCondition(async () => {
+        const [row] = await ctx.db
+          .select({ books: sql<number>`count(distinct ${schema.books.id})::int`, files: sql<number>`count(${schema.bookFiles.id})::int` })
+          .from(schema.books)
+          .innerJoin(schema.bookFiles, eq(schema.bookFiles.bookId, schema.books.id))
+          .where(and(eq(schema.books.libraryId, library.libraryId), eq(schema.books.status, 'present')));
+        expect(row).toEqual({ books: 2, files: 4 });
+      }, 10_000);
+
+      const sizesOnDisk = await Promise.all(filePaths.map(async (filePath) => (await stat(filePath)).size));
+      const expected = {
+        totalBooks: 2,
+        totalSizeBytes: sizesOnDisk.reduce((sum, size) => sum + size, 0),
+        formatCounts: { mp3: 1, epub: 1 },
+      };
+
+      const statsResponse = await ctx.app.inject({
+        method: 'GET',
+        url: `/api/v1/libraries/${library.libraryId}/stats`,
+        headers: authHeader(manager.accessToken),
+      });
+      expect(statsResponse.statusCode).toBe(200);
+      expect(statsResponse.json()).toEqual(expected);
+
+      const overviewResponse = await ctx.app.inject({
+        method: 'GET',
+        url: '/api/v1/libraries/overview',
+        headers: authHeader(manager.accessToken),
+      });
+      expect(overviewResponse.statusCode).toBe(200);
+      const entry = (overviewResponse.json() as Array<{ libraryId: number }>).find((row) => row.libraryId === library.libraryId);
+      expect(entry).toMatchObject(expected);
     });
   });
 
