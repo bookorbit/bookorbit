@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onScopeDispose, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { Orbit } from '@lucide/vue'
@@ -14,11 +14,13 @@ import SidebarSectionPopover from '@/components/sidebar/SidebarSectionPopover.vu
 import SidebarFooterBar from '@/components/sidebar/SidebarFooterBar.vue'
 import SidebarDock from '@/components/sidebar/SidebarDock.vue'
 import SidebarSearchItem from '@/components/sidebar/SidebarSearchItem.vue'
+import SidebarIconRow from '@/components/sidebar/SidebarIconRow.vue'
 import SidebarCustomizer, { type SidebarCustomizeGroup } from '@/components/sidebar/SidebarCustomizer.vue'
 import SidebarCustomizeBar from '@/components/sidebar/SidebarCustomizeBar.vue'
 import { groupRuns } from '@/components/sidebar/sidebar-layout'
 import { useSidebarDataSync } from '@/composables/useSidebarDataSync'
 import { useSidebarNav, type SidebarNavZone } from '@/composables/useSidebarNav'
+import { followJobsSummary } from '@/features/jobs/composables/useJobsSummary'
 import { useSidebarLayout } from '@/composables/useSidebarLayout'
 import { useSidebarCustomizeMode } from '@/composables/useSidebarCustomizeMode'
 import { useSidebarSections, type SidebarListKind, type SidebarSection } from '@/composables/useSidebarSections'
@@ -26,18 +28,35 @@ import { useSidebarLibraryActivity } from '@/composables/useSidebarLibraryActivi
 import { useLibraryCreationRedirect } from '@/features/library/composables/useLibraryCreationRedirect'
 import CreateSmartScopeDialog from '@/features/smart-scope/components/CreateSmartScopeDialog.vue'
 import CreateCollectionDialog from '@/features/collection/components/CreateCollectionDialog.vue'
-import LibraryCreatorModal from '@/features/library/components/LibraryCreatorModal.vue'
 import SettingsSidebar from '@/features/settings/components/SettingsSidebar.vue'
+
+// Only opened to create a library, so it stays out of every page's first load.
+const LibraryCreatorModal = defineAsyncComponent(() => import('@/features/library/components/LibraryCreatorModal.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
 const { state, isMobile, openMobile, setOpen, setOpenMobile } = useSidebar()
 const { outstandingRequestTotal } = useSidebarDataSync()
-const { zones } = useSidebarNav(() => outstandingRequestTotal.value)
+const { zones, jobsAllowed } = useSidebarNav(() => outstandingRequestTotal.value)
+
+// Followed while the viewer may see jobs at all, even with the Jobs row hidden: it comes back with work waiting.
+let stopJobsSummary: (() => void) | null = null
+watch(
+  jobsAllowed,
+  (allowed) => {
+    if (allowed && !stopJobsSummary) stopJobsSummary = followJobsSummary()
+    if (!allowed && stopJobsSummary) {
+      stopJobsSummary()
+      stopJobsSummary = null
+    }
+  },
+  { immediate: true },
+)
+onScopeDispose(() => stopJobsSummary?.())
 const { sections } = useSidebarSections()
 const { subscribe: subscribeLibraryActivity } = useSidebarLibraryActivity()
 const { handleLibraryCreated } = useLibraryCreationRedirect()
-const { isHidden, arrangeRows, visibleRows, arrangeGroups } = useSidebarLayout()
+const { layout, isHidden, arrangeRows, visibleRows, arrangeGroups, groupStyle } = useSidebarLayout()
 const { isCustomizing, stopCustomizing } = useSidebarCustomizeMode()
 
 const isRail = computed(() => state.value === 'collapsed' && !isMobile.value)
@@ -48,6 +67,12 @@ type SidebarBlock = { kind: 'nav'; id: string; zone: SidebarNavZone } | { kind: 
 /** Fixed destinations stay pinned on top: they are a known height, so nothing the user moves can push them off the first screenful. */
 const primaryZone = computed(() => zones.value.find((zone) => zone.id === 'primary') ?? null)
 const primaryEntries = computed(() => (primaryZone.value ? visibleRows('primary', primaryZone.value.entries) : []))
+/** The rail is already an icon column, so the icon row only applies to the expanded sidebar. */
+const showPrimaryIcons = computed(() => layout.primaryStyle === 'icons' && !isRail.value && primaryEntries.value.length > 0)
+
+function showGroupIcons(groupId: string): boolean {
+  return groupStyle(groupId) === 'icons' && !isRail.value
+}
 
 /** Every movable group in the user's order, hidden ones included. */
 const arrangedBlocks = computed<SidebarBlock[]>(() =>
@@ -169,24 +194,28 @@ async function onLibrarySaved(library: Library) {
 
       <template v-else>
         <SidebarZone v-if="primaryZone" :label="null" :always-open="isRail">
-          <SidebarSearchItem />
-          <SidebarNavItem
-            v-for="entry in primaryEntries"
-            :key="entry.id"
-            :is-active="entry.isActive"
-            :tooltip="entry.badge?.label ?? entry.label"
-            :to="entry.to"
-            :icon="entry.icon"
-            :label="entry.label"
-            :data-tour="entry.tourId"
-            @navigate="handleNavigate"
-          >
-            <template #badge>
-              <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
-                formatCompactNumber(entry.badge.value)
-              }}</SidebarBadge>
-            </template>
-          </SidebarNavItem>
+          <SidebarSearchItem :framed="showPrimaryIcons" />
+          <SidebarIconRow v-if="showPrimaryIcons" class="pt-1.5" :entries="primaryEntries" @navigate="handleNavigate" />
+          <template v-else>
+            <SidebarNavItem
+              v-for="entry in primaryEntries"
+              :key="entry.id"
+              :is-active="entry.isActive"
+              :tooltip="entry.badge?.label ?? entry.label"
+              :signal="entry.signal"
+              :to="entry.to"
+              :icon="entry.icon"
+              :label="entry.label"
+              :data-tour="entry.tourId"
+              @navigate="handleNavigate"
+            >
+              <template #badge>
+                <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
+                  formatCompactNumber(entry.badge.value)
+                }}</SidebarBadge>
+              </template>
+            </SidebarNavItem>
+          </template>
         </SidebarZone>
 
         <!-- Groups follow in the user's order. A separator sits wherever nav groups meet list
@@ -202,23 +231,27 @@ async function onLibrarySaved(library: Library) {
                 :section-id="block.zone.sectionId ?? undefined"
                 :always-open="isRail"
               >
-                <SidebarNavItem
-                  v-for="entry in block.zone.entries"
-                  :key="entry.id"
-                  :is-active="entry.isActive"
-                  :tooltip="entry.badge?.label ?? entry.label"
-                  :to="entry.to"
-                  :icon="entry.icon"
-                  :label="entry.label"
-                  :data-tour="entry.tourId"
-                  @navigate="handleNavigate"
-                >
-                  <template #badge>
-                    <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
-                      formatCompactNumber(entry.badge.value)
-                    }}</SidebarBadge>
-                  </template>
-                </SidebarNavItem>
+                <SidebarIconRow v-if="showGroupIcons(block.id)" class="pt-0.5" :entries="block.zone.entries" @navigate="handleNavigate" />
+                <template v-else>
+                  <SidebarNavItem
+                    v-for="entry in block.zone.entries"
+                    :key="entry.id"
+                    :is-active="entry.isActive"
+                    :tooltip="entry.badge?.label ?? entry.label"
+                    :signal="entry.signal"
+                    :to="entry.to"
+                    :icon="entry.icon"
+                    :label="entry.label"
+                    :data-tour="entry.tourId"
+                    @navigate="handleNavigate"
+                  >
+                    <template #badge>
+                      <SidebarBadge v-if="entry.badge !== null" :tone="entry.badge.tone" :label="entry.badge.label">{{
+                        formatCompactNumber(entry.badge.value)
+                      }}</SidebarBadge>
+                    </template>
+                  </SidebarNavItem>
+                </template>
               </SidebarZone>
             </template>
           </template>

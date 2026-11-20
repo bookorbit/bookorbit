@@ -5,7 +5,7 @@ vi.hoisted(() => {
 });
 
 import { randomUUID } from 'crypto';
-import { mkdir, readFile, realpath, utimes, writeFile } from 'fs/promises';
+import { mkdir, readFile, readdir, realpath, stat, unlink, utimes, writeFile } from 'fs/promises';
 import { dirname, join } from 'path';
 import { afterEach } from 'vitest';
 
@@ -16,13 +16,21 @@ import {
   type AudiobookPlaybackState,
   type BookDockDiscardDuplicatesResult,
   type BookDockFile,
+  type BookDockFilesPage,
   type BookDockFinalizePreviewResult,
   type BookDockFinalizeResult,
   type BookDockMetadata,
+  type BookDockSummary,
+  type BookDockUploadTargets,
+  type LibraryDockFilingChecks,
+  type UploadSessionResponse,
   type DashboardScrollerResponse,
+  type LibraryDockAdminEntry,
+  type LibraryDocksAdmin,
 } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
+import { BookDockFinalizeService } from '../src/modules/book-dock/book-dock-finalize.service';
 import { parseFb2File } from '../src/modules/metadata/lib/fb2-parser';
 import { ScannerService } from '../src/modules/scanner/scanner.service';
 import { waitForCondition } from './e2e/app-harness';
@@ -30,6 +38,7 @@ import { buildFb2Fixture } from './e2e/book-dock/book-dock-fixture-builder';
 import { createM4bFixture, createPdfFixture } from './e2e/metadata-write/metadata-write-fixture-builder';
 import {
   authHeader,
+  buildMultipartBody,
   closeBookDockE2EContext,
   createLibraryWithFolder,
   createBookDockE2EContext,
@@ -322,6 +331,320 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(await fileExists(removable.absolutePath)).toBe(false);
     expect(await fileExists(excluded.absolutePath)).toBe(true);
     expect(await fileExists(untouched.absolutePath)).toBe(true);
+  });
+
+  it('runs a library dock through its life: on, arrival, rename, library deleted, moved to Unsorted', async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const name = `Fiction ${suffix}`;
+    const library = await createLibraryWithFolder(context, { name });
+    const dock = await realpath(context.fixture.bookDockPath);
+    const admin = authHeader(context.adminToken);
+    const old = new Date(Date.now() - 120_000);
+
+    const member = await createUserAndLogin(context, { permissions: [Permission.BookDockAccess] });
+    const refused = await context.app.inject({
+      method: 'PUT',
+      url: `/api/v1/book-dock/docks/${library.libraryId}`,
+      headers: authHeader(member.accessToken),
+      payload: { enabled: true },
+    });
+    expect(refused.statusCode).toBe(403);
+
+    const enabled = await context.app.inject({
+      method: 'PUT',
+      url: `/api/v1/book-dock/docks/${library.libraryId}`,
+      headers: admin,
+      payload: { enabled: true, autoFinalizeThreshold: 95 },
+    });
+    expect(enabled.statusCode).toBe(200);
+    const entry = enabled.json() as LibraryDockAdminEntry;
+    expect(entry.dock).toMatchObject({
+      folderName: name,
+      enabled: true,
+      targetFolderId: library.libraryFolderId,
+      overrides: { autoFinalizeThreshold: 95 },
+    });
+    expect(await readdir(join(dock, '_libraries'))).toEqual([name]);
+
+    const arrival = join(dock, '_libraries', name, 'Arrival.fb2');
+    await writeFile(arrival, buildFb2Fixture({ title: 'Dock Arrival' }));
+    await utimes(arrival, old, old);
+    await mkdir(join(dock, '_libraries', 'Leftovers'));
+    await writeFile(join(dock, '_libraries', 'stray.fb2'), buildFb2Fixture({ title: 'Stray' }));
+    const rescan = () => context.app.inject({ method: 'POST', url: '/api/v1/book-dock/rescan', headers: admin });
+    expect((await rescan()).statusCode).toBe(204);
+    const rows = await context.db.select().from(schema.bookDockFiles);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      absolutePath: arrival,
+      dockId: entry.dock!.id,
+      targetLibraryId: library.libraryId,
+      targetFolderId: library.libraryFolderId,
+      holdReason: null,
+    });
+    await waitForBookDockStatus(context, rows[0].id, ['ready']);
+
+    const view = (await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/docks/admin', headers: admin })).json() as LibraryDocksAdmin;
+    expect(view.libraries.find((item) => item.libraryId === library.libraryId)).toMatchObject({ folderPresent: true, suggestedFolderName: null });
+    expect(view.unrecognisedFolders).toEqual([{ name: 'Leftovers', matchesLibraryId: null }]);
+    expect(view.strayFiles).toEqual(['stray.fb2']);
+
+    const renamed = `Novels ${suffix}`;
+    const rename = await context.app.inject({
+      method: 'POST',
+      url: `/api/v1/book-dock/docks/${library.libraryId}/rename-folder`,
+      headers: admin,
+      payload: { folderName: renamed },
+    });
+    expect(rename.statusCode).toBe(200);
+    const movedPath = join(dock, '_libraries', renamed, 'Arrival.fb2');
+    expect(await fileExists(movedPath)).toBe(true);
+    expect((await getBookDockRow(context, rows[0].id))?.absolutePath).toBe(movedPath);
+    expect((await rescan()).statusCode).toBe(204);
+    expect(await context.db.select().from(schema.bookDockFiles)).toHaveLength(1);
+
+    const overlapPath = join(dock, 'library-inside');
+    await mkdir(overlapPath);
+    const overlap = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/libraries',
+      headers: admin,
+      payload: { name: `Inside ${suffix}`, icon: 'BookOpen', folders: [overlapPath] },
+    });
+    expect(overlap.statusCode).toBe(409);
+    expect(overlap.json()).toMatchObject({ errorCode: 'LIBRARY_FOLDER_OVERLAPS_BOOK_DOCK' });
+
+    const deleted = await context.app.inject({ method: 'DELETE', url: `/api/v1/libraries/${library.libraryId}`, headers: admin });
+    expect(deleted.statusCode).toBe(204);
+    expect(await getBookDockRow(context, rows[0].id)).toMatchObject({ dockId: null, targetLibraryId: null, formerLibraryName: name });
+    expect(await context.db.select().from(schema.libraryDocks)).toHaveLength(0);
+    const afterDelete = (
+      await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/docks/admin', headers: admin })
+    ).json() as LibraryDocksAdmin;
+    expect(afterDelete.unrecognisedFolders.map((folder) => folder.name).sort()).toEqual(['Leftovers', renamed].sort());
+
+    const move = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/docks/folders/move-to-unsorted',
+      headers: admin,
+      payload: { folderName: renamed },
+    });
+    expect(move.statusCode).toBe(200);
+    expect(move.json()).toEqual({ moved: 1, folderRemoved: true });
+    expect((await getBookDockRow(context, rows[0].id))?.absolutePath).toBe(join(dock, 'Arrival.fb2'));
+    expect(await fileExists(join(dock, 'Arrival.fb2'))).toBe(true);
+
+    const removed = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/docks/folders/remove',
+      headers: admin,
+      payload: { folderName: 'Leftovers' },
+    });
+    expect(removed.statusCode).toBe(204);
+    expect(await readdir(join(dock, '_libraries'))).toEqual(['stray.fb2']);
+  });
+
+  it('leaves files in a keep-original dock for seeding, and takes one in again only once it changes', async () => {
+    const name = `Seeding ${randomUUID().slice(0, 8)}`;
+    const library = await createLibraryWithFolder(context, { name });
+    const dock = await realpath(context.fixture.bookDockPath);
+    const admin = authHeader(context.adminToken);
+    const old = new Date(Date.now() - 120_000);
+    const enabled = await context.app.inject({
+      method: 'PUT',
+      url: `/api/v1/book-dock/docks/${library.libraryId}`,
+      headers: admin,
+      payload: { enabled: true, keepOriginal: true },
+    });
+    expect(enabled.statusCode).toBe(200);
+    const dockId = (enabled.json() as LibraryDockAdminEntry).dock!.id;
+
+    const keepPath = join(dock, '_libraries', name, 'Keep.fb2');
+    const dropPath = join(dock, '_libraries', name, 'Drop.fb2');
+    await writeFile(keepPath, buildFb2Fixture({ title: 'Seeding Keeper' }));
+    await writeFile(dropPath, buildFb2Fixture({ title: 'Seeding Unwanted' }));
+    await utimes(keepPath, old, old);
+    await utimes(dropPath, old, old);
+    const rescan = () => context.app.inject({ method: 'POST', url: '/api/v1/book-dock/rescan', headers: admin });
+    expect((await rescan()).statusCode).toBe(204);
+    const rows = await context.db.select().from(schema.bookDockFiles);
+    const keep = rows.find((row) => row.absolutePath === keepPath)!;
+    const drop = rows.find((row) => row.absolutePath === dropPath)!;
+    await waitForBookDockStatus(context, keep.id, ['ready']);
+    await waitForBookDockStatus(context, drop.id, ['ready']);
+
+    const finalized = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/finalize',
+      headers: admin,
+      payload: { fileIds: [keep.id] },
+    });
+    expect(finalized.statusCode).toBe(201);
+    const result = finalized.json() as BookDockFinalizeResult;
+    expect(result).toMatchObject({ succeeded: 1, failed: 0 });
+    const [filed] = await context.db.select().from(schema.bookFiles).where(eq(schema.bookFiles.bookId, result.results[0].bookId!));
+    const seeding = await stat(keepPath);
+    expect((await stat(filed.absolutePath)).ino).toBe(seeding.ino);
+    expect(seeding.nlink).toBe(2);
+
+    const discarded = await context.app.inject({ method: 'DELETE', url: `/api/v1/book-dock/files/${drop.id}`, headers: admin });
+    expect(discarded.statusCode).toBe(204);
+    expect(await fileExists(dropPath)).toBe(true);
+    const kept = await context.db.select().from(schema.bookDockKeptFiles);
+    expect(kept.map(({ absolutePath, dockId: keptDockId, bookId, ignored }) => ({ absolutePath, dockId: keptDockId, bookId, ignored }))).toEqual(
+      expect.arrayContaining([
+        { absolutePath: keepPath, dockId, bookId: result.results[0].bookId, ignored: false },
+        { absolutePath: dropPath, dockId, bookId: null, ignored: true },
+      ]),
+    );
+
+    const uploaded = await uploadBookDockFile(context, {
+      token: context.adminToken,
+      fileName: 'Uploaded.fb2',
+      content: buildFb2Fixture({ title: 'Seeding Upload' }),
+      libraryId: library.libraryId,
+    });
+    expect(uploaded.statusCode).toBe(201);
+    const upload = uploaded.json() as BookDockFile;
+    await waitForBookDockStatus(context, upload.id, ['ready']);
+    const filedUpload = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/book-dock/finalize',
+      headers: admin,
+      payload: { fileIds: [upload.id] },
+    });
+    expect(filedUpload.json()).toMatchObject({ succeeded: 1, failed: 0 });
+    expect(await fileExists(join(dock, '_libraries', name, 'Uploaded.fb2'))).toBe(false);
+    expect(await context.db.select().from(schema.bookDockKeptFiles)).toHaveLength(2);
+
+    expect((await rescan()).statusCode).toBe(204);
+    expect(await context.db.select().from(schema.bookDockFiles)).toHaveLength(0);
+    const summary = (await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/summary', headers: admin })).json() as BookDockSummary;
+    expect(summary.keptForSeeding).toBe(1);
+    expect(summary.docks?.find((entry) => entry.dockId === dockId)).toMatchObject({ total: 0, keptForSeeding: 1 });
+
+    await unlink(keepPath);
+    await writeFile(keepPath, buildFb2Fixture({ title: 'Seeding Keeper, Second Edition' }));
+    await utimes(keepPath, old, old);
+    await unlink(dropPath);
+    expect((await rescan()).statusCode).toBe(204);
+    expect((await context.db.select().from(schema.bookDockFiles)).map((row) => row.absolutePath)).toEqual([keepPath]);
+    expect(await context.db.select().from(schema.bookDockKeptFiles)).toHaveLength(0);
+    expect(await fileExists(filed.absolutePath)).toBe(true);
+  });
+
+  it("uploads into a library's dock from the web and from upload sessions, and shows each dock its own files", async () => {
+    const suffix = randomUUID().slice(0, 8);
+    const name = `Shelf ${suffix}`;
+    const library = await createLibraryWithFolder(context, { name, allowedFormats: ['fb2'] });
+    const hidden = await createLibraryWithFolder(context, { name: `Hidden ${suffix}` });
+    const admin = authHeader(context.adminToken);
+    const dock = await realpath(context.fixture.bookDockPath);
+    const member = await createUserAndLogin(context, { permissions: [Permission.BookDockAccess] });
+    const memberAuth = authHeader(member.accessToken);
+    await grantLibraryAccess(context, member.userId, library.libraryId);
+    const listDocks = async () =>
+      (await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/docks', headers: memberAuth })).json() as BookDockUploadTargets;
+
+    expect(await listDocks()).toEqual({ docks: [] });
+    for (const libraryId of [library.libraryId, hidden.libraryId]) {
+      const enabled = await context.app.inject({
+        method: 'PUT',
+        url: `/api/v1/book-dock/docks/${libraryId}`,
+        headers: admin,
+        payload: { enabled: true },
+      });
+      expect(enabled.statusCode).toBe(200);
+    }
+    const [{ id: dockId }] = await context.db.select().from(schema.libraryDocks).where(eq(schema.libraryDocks.libraryId, library.libraryId));
+    expect(await listDocks()).toEqual({ docks: [{ dockId, libraryId: library.libraryId, libraryName: name, allowedFormats: ['fb2'] }] });
+
+    const notAllowed = await uploadBookDockFile(context, {
+      token: member.accessToken,
+      fileName: 'Wrong.pdf',
+      content: '%PDF-1.4',
+      libraryId: library.libraryId,
+    });
+    expect(notAllowed.statusCode).toBe(400);
+    expect(notAllowed.json()).toMatchObject({ errorCode: 'UPLOAD_FORMAT_NOT_ALLOWED' });
+    const notVisible = await uploadBookDockFile(context, {
+      token: member.accessToken,
+      fileName: 'Hidden.fb2',
+      content: buildFb2Fixture({ title: 'Hidden' }),
+      libraryId: hidden.libraryId,
+    });
+    expect(notVisible.statusCode).toBe(403);
+    expect(await context.db.select().from(schema.bookDockFiles)).toHaveLength(0);
+
+    const web = await uploadBookDockFile(context, {
+      token: member.accessToken,
+      fileName: 'Web.fb2',
+      content: buildFb2Fixture({ title: 'Web Upload' }),
+      libraryId: library.libraryId,
+    });
+    expect(web.statusCode).toBe(201);
+    const webFile = web.json() as BookDockFile;
+    expect(webFile).toMatchObject({ dockId, targetLibraryId: library.libraryId, targetFolderId: library.libraryFolderId });
+    expect(await fileExists(join(dock, '_libraries', name, 'Web.fb2'))).toBe(true);
+
+    const bytes = Buffer.from(buildFb2Fixture({ title: 'Session Upload' }));
+    const created = await context.app.inject({
+      method: 'POST',
+      url: '/api/v1/uploads',
+      headers: memberAuth,
+      payload: {
+        filename: 'Session.fb2',
+        sizeBytes: bytes.length,
+        idempotencyKey: randomUUID(),
+        target: { kind: 'book_dock', libraryId: library.libraryId },
+      },
+    });
+    expect(created.statusCode).toBe(201);
+    const session = created.json() as UploadSessionResponse;
+    expect(session.target).toEqual({ kind: 'book_dock', libraryId: library.libraryId });
+    const { body, boundary } = buildMultipartBody('chunk', bytes, 'application/octet-stream');
+    const chunk = await context.app.inject({
+      method: 'POST',
+      url: `/api/v1/uploads/${session.id}/chunks`,
+      headers: {
+        ...memberAuth,
+        'upload-offset': '0',
+        'content-type': `multipart/form-data; boundary=${boundary}`,
+        'content-length': String(body.length),
+      },
+      payload: body,
+    });
+    expect(chunk.statusCode).toBe(201);
+    const completed = await context.app.inject({ method: 'POST', url: `/api/v1/uploads/${session.id}/complete`, headers: memberAuth });
+    expect(completed.statusCode).toBe(202);
+    const sessionFileId = (completed.json() as UploadSessionResponse).bookDockFileId!;
+    expect(await getBookDockRow(context, sessionFileId)).toMatchObject({
+      dockId,
+      absolutePath: join(dock, '_libraries', name, 'Session.fb2'),
+      uploadedBy: member.userId,
+    });
+
+    const request = await createBookDockRow(context, { targetLibraryId: library.libraryId, targetFolderId: library.libraryFolderId });
+    await context.db.update(schema.bookDockFiles).set({ autoFinalizeSuppressed: true }).where(eq(schema.bookDockFiles.id, request.id));
+    const unsorted = await createBookDockRow(context, { targetLibraryId: library.libraryId, targetFolderId: library.libraryFolderId });
+    const listIds = async (dockFilter: string, headers = admin) => {
+      const page = await context.app.inject({ method: 'GET', url: `/api/v1/book-dock/files?limit=100&dock=${dockFilter}`, headers });
+      expect(page.statusCode).toBe(200);
+      return (page.json() as BookDockFilesPage).items.map((item) => item.id).sort((a, b) => a - b);
+    };
+    expect(await listIds(String(dockId))).toEqual([webFile.id, sessionFileId, request.id].sort((a, b) => a - b));
+    expect(await listIds('unsorted')).toEqual([unsorted.id]);
+    expect(await listIds(String(dockId), memberAuth)).toEqual([webFile.id, sessionFileId].sort((a, b) => a - b));
+    expect((await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/files?dock=all', headers: admin })).statusCode).toBe(400);
+    const summary = (await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/summary', headers: admin })).json() as BookDockSummary;
+    expect(summary.docks?.find((entry) => entry.dockId === dockId)?.total).toBe(3);
+    expect(summary.docks?.find((entry) => entry.dockId === null)?.total).toBe(1);
+
+    const check = await context.app.inject({ method: 'POST', url: '/api/v1/book-dock/docks/filing-check', headers: admin });
+    expect(check.statusCode).toBe(200);
+    expect((check.json() as LibraryDockFilingChecks).checks).toContainEqual({ libraryId: library.libraryId, filing: 'move' });
+    expect((await context.app.inject({ method: 'POST', url: '/api/v1/book-dock/docks/filing-check', headers: memberAuth })).statusCode).toBe(403);
+    expect(await readdir(join(dock, '_libraries', name))).toEqual(['Session.fb2', 'Web.fb2']);
   });
 
   it.each(['finalize', 'discard'] as const)('rescans nested shared-folder books and %ss only the selected book', async (action) => {
@@ -792,6 +1115,54 @@ describe('Book Dock ingest + finalize (e2e)', () => {
 
       expect(result.results[0]).toMatchObject({ success: true, bookId });
       expect((await bookState(bookId)).files.map((file) => file.format).sort()).toEqual(['fb2', 'pdf']);
+    });
+
+    it('holds an unattended duplicate until Keep both, joins on a shared ISBN, and waits for a manager when the uploader may not add books', async () => {
+      const suffix = randomUUID().slice(0, 8);
+      const destination = await createLibraryWithFolder(context, { allowedFormats: ['fb2', 'pdf'], name: `Dupes ${suffix}` });
+      const bookId = await seedBook(destination);
+      const admin = authHeader(context.adminToken);
+      const enabled = await context.app.inject({
+        method: 'PUT',
+        url: `/api/v1/book-dock/docks/${destination.libraryId}`,
+        headers: admin,
+        payload: { enabled: true, autoFinalizeEnabled: true, autoFinalizeMetadataMode: 'embedded_only', autoJoin: true },
+      });
+      expect(enabled.statusCode).toBe(200);
+      const dockId = (enabled.json() as LibraryDockAdminEntry).dock!.id;
+      const autoFile = context.app.get(BookDockFinalizeService);
+      const arriveInDock = async (row: { id: number }) => {
+        await context.db.update(schema.bookDockFiles).set({ dockId }).where(eq(schema.bookDockFiles.id, row.id));
+        await autoFile.triggerAutoFinalize(row.id);
+        return getBookDockRow(context, row.id);
+      };
+
+      // A shared ISBN adds the file to the book as another format, with nobody filing it.
+      const sameIsbn = await dockPdf(destination, 'auto-join', { title: 'Join Target', authors: ['Join Author'], isbn13: '9780441172719' });
+      expect(await arriveInDock(sameIsbn)).toBeUndefined();
+      expect((await bookState(bookId)).files.map((file) => file.format).sort()).toEqual(['fb2', 'pdf']);
+
+      // A title and author alone never join: the file waits, naming the book it matches.
+      const sameTitle = await dockPdf(destination, 'auto-dupe', { title: 'Join Target: Collector Edition', authors: ['Join Author'] });
+      expect(await arriveInDock(sameTitle)).toMatchObject({ holdReason: 'duplicate', holdDetail: { libraryId: destination.libraryId, bookId } });
+      const listed = (
+        await context.app.inject({ method: 'GET', url: '/api/v1/book-dock/files?limit=100', headers: admin })
+      ).json() as BookDockFilesPage;
+      expect(listed.items.find((item) => item.id === sameTitle.id)).toMatchObject({ dockId, holdReason: 'duplicate', holdDetail: { bookId } });
+
+      // Keep both files it as a book of its own.
+      const kept = await context.app.inject({ method: 'POST', url: `/api/v1/book-dock/files/${sameTitle.id}/keep-both`, headers: admin });
+      expect(kept.statusCode).toBe(200);
+      await waitForCondition(async () => {
+        expect(await getBookDockRow(context, sameTitle.id)).toBeUndefined();
+      });
+      const shelved = await context.db.select({ id: schema.books.id }).from(schema.books).where(eq(schema.books.libraryId, destination.libraryId));
+      expect(shelved).toHaveLength(2);
+
+      // An upload from someone who may not add books waits for a dock manager.
+      const member = await createUserAndLogin(context, { permissions: [Permission.BookDockAccess] });
+      const upload = await dockPdf(destination, 'auto-member', { title: `Member Upload ${suffix}`, authors: ['Someone'] }, member.userId);
+      expect(await arriveInDock(upload)).toMatchObject({ holdReason: 'waiting_for_manager', holdDetail: { libraryId: destination.libraryId } });
     });
 
     it('never suggests a book sitting loose at the library root, and holds an explicit join to one', async () => {
@@ -1428,7 +1799,7 @@ describe('Book Dock ingest + finalize (e2e)', () => {
     expect(body).toMatchObject({ total: 2, succeeded: 1, failed: 1 });
     expect(body.results.find((result) => result.fileId === missingId)).toMatchObject({
       success: false,
-      message: 'Book Dock file not found',
+      message: 'Library Dock file not found',
     });
     expect(await getBookDockRow(context, successfulRow.id)).toBeUndefined();
   });

@@ -5,6 +5,7 @@ import { NotificationService } from '../notification/notification.service';
 import { chapterProvenance, normalizeAudiobookChapters } from '../../common/utils/audiobook-chapters.utils';
 import { coverFetchInputs, resolveIsAudiobook, resolveSearchMediaKind, type CoverFetchState } from '../../common/utils/book-media.utils';
 import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapters.service';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
@@ -23,6 +24,7 @@ import { BookMetadataFetchEligibilityService } from './book-metadata-fetch-eligi
 import { BookMetadataFetchGateway } from './book-metadata-fetch.gateway';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
+import { metadataFetchQueueStatus } from './metadata-fetch-job-status';
 
 const POLL_INTERVAL_MS = 4_000;
 const BATCH_SIZE = 1;
@@ -53,6 +55,9 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   private paused = false;
   private lastStatusEmitAt = 0;
   private pendingStatusEmit: ReturnType<typeof setTimeout> | null = null;
+  /** Set by a pause, resume, cancel or retry until the next emit tells the Jobs area. */
+  private jobsStateChanged = false;
+  private lastJobsSignature: string | null = null;
 
   constructor(
     private readonly queueRepo: BookMetadataFetchQueueRepository,
@@ -71,6 +76,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     @Optional() private readonly gateway?: BookMetadataFetchGateway,
     @Optional() private readonly audiobookChapters?: AudiobookChaptersService,
     @Optional() private readonly providerIdStore?: ProviderIdStore,
+    @Optional() private readonly jobChanges?: JobChangesService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -153,13 +159,13 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   async pause(): Promise<void> {
     this.paused = true;
     await this.configService.setPaused(true);
-    await this.emitStatus();
+    await this.emitStatus(true);
   }
 
   async resume(): Promise<void> {
     this.paused = false;
     await this.configService.setPaused(false);
-    await this.emitStatus();
+    await this.emitStatus(true);
     void this.pollOnce();
   }
 
@@ -168,14 +174,14 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     await this.configService.setPaused(true);
     await this.queueRepo.cancelPending();
     this.session.reset();
-    await this.emitStatus();
+    await this.emitStatus(true);
   }
 
   async requeueFailed(): Promise<number> {
     const requeued = await this.queueRepo.requeueFailed();
     if (requeued > 0) {
       this.session.addToTotal(requeued);
-      await this.emitStatus();
+      await this.emitStatus(true);
     }
     return requeued;
   }
@@ -614,9 +620,14 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     }
   }
 
-  /** Coalesced: cached books can complete several times a second, which would flood the socket. */
-  private async emitStatus(): Promise<void> {
-    if (!this.gateway) return;
+  /**
+   * Coalesced: cached books can complete several times a second, which would flood the socket.
+   * `jobsState` marks a control action, which the Jobs area hears as a state change even when the
+   * rows it shows keep their status.
+   */
+  private async emitStatus(jobsState = false): Promise<void> {
+    if (!this.gateway && !this.jobChanges) return;
+    if (jobsState) this.jobsStateChanged = true;
     const wait = STATUS_EMIT_MIN_INTERVAL_MS - (Date.now() - this.lastStatusEmitAt);
     if (wait > 0) {
       this.pendingStatusEmit ??= setTimeout(() => {
@@ -629,10 +640,21 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   }
 
   private async emitStatusNow(): Promise<void> {
-    if (!this.gateway) return;
+    if (!this.gateway && !this.jobChanges) return;
     this.lastStatusEmitAt = Date.now();
     const summary = await this.queueRepo.getStatusSummary();
-    this.gateway.emitStatus({ ...summary, paused: this.paused, ...this.session.getSnapshot() });
+    this.gateway?.emitStatus({ ...summary, paused: this.paused, ...this.session.getSnapshot() });
+    this.notifyJobs(summary);
+  }
+
+  /** A row appearing, leaving or changing status is a state change; anything else only moved the numbers. */
+  private notifyJobs(summary: { queued: number; processing: number; failed: number }): void {
+    if (!this.jobChanges) return;
+    const signature = `${metadataFetchQueueStatus(summary, this.paused) ?? 'none'}:${summary.failed > 0 ? 'failed' : 'none'}`;
+    const state = this.jobsStateChanged || signature !== this.lastJobsSignature;
+    this.jobsStateChanged = false;
+    this.lastJobsSignature = signature;
+    this.jobChanges.notify({ type: 'metadata-fetch', ownerId: null, state });
   }
 
   private asNullableString(value: unknown): string | null | undefined {

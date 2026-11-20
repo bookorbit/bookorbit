@@ -90,15 +90,16 @@ const BY_STATUS: Record<Exclude<BookRequestStatus, 'failed' | 'cancelled'>, Requ
 /**
  * Where a request sits, and whether it is still moving.
  *
- * `failed` and `cancelled` carry no stage of their own, so the stage is read off whether a grab
- * ever happened: a request that failed with a download behind it died in transfer, and one that
- * failed without a download never found a release to take. Saying "failed" alone is what the
- * current card does, and it is the least useful thing it could say.
+ * `failed` and `cancelled` carry no stage of their own, so the stage is read off how far the
+ * download got: one the client finished died while being filed, one still in the client died in
+ * transfer, and a failure with no download never found a release to take. Saying "failed" alone
+ * is the least useful thing it could say.
  */
 export function requestPipelineState(request: RequestPipelineInput, live?: BookRequestProgressEvent | null): RequestPipelineState {
   const status = requestPresentationStatus(request, live)
   if (status === 'failed') {
-    return { currentIndex: request.download ? STEP_INDEX.downloading : STEP_INDEX.release, tone: 'failed', halted: true }
+    const stage = request.download?.completedAt ? STEP_INDEX.filed : request.download ? STEP_INDEX.downloading : STEP_INDEX.release
+    return { currentIndex: stage, tone: 'failed', halted: true }
   }
   if (status === 'cancelled') {
     return { currentIndex: request.download ? STEP_INDEX.downloading : STEP_INDEX.approved, tone: 'stopped', halted: true }
@@ -125,4 +126,29 @@ export function requestStepState(state: RequestPipelineState, index: number): Re
   if (index < state.currentIndex) return 'done'
   if (index === state.currentIndex) return 'current'
   return 'upcoming'
+}
+
+export type RequestStepTimeInput = RequestPipelineInput & Pick<BookRequestItem, 'createdAt' | 'decidedAt' | 'updatedAt'>
+
+/**
+ * When a step happened, from timestamps the row already carries, or null for one that has not.
+ *
+ * Only a finished step, or the one a request stopped on, has a time: the step a request is waiting
+ * at has not happened yet. The step a request stopped on is dated by the row's last change, which
+ * is the stop itself; a filing failure leaves no timestamp of its own.
+ */
+export function requestStepTime(request: RequestStepTimeInput, state: RequestPipelineState, index: number): string | null {
+  const stepState = requestStepState(state, index)
+  if (stepState === 'upcoming') return null
+  if (stepState === 'current') return state.halted ? request.updatedAt : null
+
+  const download = request.download
+  const own = [
+    request.createdAt,
+    request.decidedAt,
+    download ? (download.grabbedAt ?? download.createdAt) : null,
+    download?.completedAt ?? null,
+    download?.importedAt ?? null,
+  ][index]
+  return own ?? (index === STEP_INDEX.filed && request.status === 'available' ? request.updatedAt : null)
 }

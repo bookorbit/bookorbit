@@ -271,6 +271,11 @@ export const BOOK_REQUEST_HANDBACK_CODES = [
    * so it stops holding the dedupe claim on a work nobody is actually fetching.
    */
   "ABANDONED",
+  /**
+   * Not automation either: the download finished, but BookOrbit could not read what it left on
+   * disk, so nothing was imported. Carries `path`, the location BookOrbit tried to read.
+   */
+  "DOWNLOAD_UNREADABLE",
 ] as const;
 
 export type BookRequestHandbackCode = (typeof BOOK_REQUEST_HANDBACK_CODES)[number];
@@ -437,6 +442,8 @@ export interface BookRequestItem extends BookRequestWorkSnapshot {
   targetFolderId: number | null;
   decidedByUserId: number | null;
   decidedByUsername: string | null;
+  /** The decider's display name. Null when nobody has decided, or when that account is gone. */
+  decidedByName: string | null;
   decidedAt: string | null;
   decisionNote: string | null;
   matchedBookId: number | null;
@@ -455,7 +462,8 @@ export interface BookRequestItem extends BookRequestWorkSnapshot {
   statusReason: string | null;
   /**
    * Set only where a failure has been classified, which today means automation handing a request
-   * back. Null elsewhere, and the UI falls back to `statusReason` when it is.
+   * back or a finished download that could not be read. Null elsewhere, and the UI falls back to
+   * `statusReason` when it is.
    */
   failureCode: BookRequestHandbackCode | null;
   failureMeta: BookRequestFailureMeta | null;
@@ -650,4 +658,73 @@ export interface BookRequestBulkFailure {
 export interface BookRequestBulkResult {
   updated: BookRequestItem[];
   failed: BookRequestBulkFailure[];
+  /**
+   * Requests the action took off the caller's list entirely (a deletion, or leaving a request
+   * somebody else made), which have no item left to report. Absent on the actions that existed
+   * before it, so a released client that decodes only the two lists above is unaffected.
+   */
+  removed?: number[];
+}
+
+/**
+ * The sections a request list can be narrowed to, as the page names them rather than as the
+ * pipeline does. `hidden` holds only the rows the viewer hid; every other view leaves them out.
+ * Optional on the list routes: a caller that sends none gets the list it always got.
+ */
+export const BOOK_REQUEST_LIST_VIEWS = ["needs_action", "in_progress", "finished", "closed", "hidden"] as const;
+export type BookRequestListView = (typeof BOOK_REQUEST_LIST_VIEWS)[number];
+
+/** The statuses behind each view other than `hidden`, shared so the counts and the list agree. */
+export const BOOK_REQUEST_VIEW_STATUSES: Record<Exclude<BookRequestListView, "hidden">, readonly BookRequestStatus[]> = {
+  needs_action: ["pending", "approved", "needs_review", "failed"],
+  in_progress: ["searching", "grabbed", "downloading", "importing"],
+  finished: ["available"],
+  closed: ["rejected", "cancelled"],
+};
+
+/** The longest list search the routes accept. */
+export const BOOK_REQUEST_SEARCH_MAX_LENGTH = 200;
+
+/**
+ * Row counts for one list under the filters it was asked with, one per view. `active` is every row
+ * that is not hidden. `awaitingManualPick` counts the approved rows automation handed back because
+ * automatic grabbing is off, which is what the list's banner reports instead of every row repeating it.
+ */
+export interface BookRequestViewCounts {
+  active: number;
+  needs_action: number;
+  in_progress: number;
+  finished: number;
+  closed: number;
+  hidden: number;
+  awaitingManualPick: number;
+}
+
+/** The most requests "select all matching" will gather; a larger match is reported as truncated. */
+export const BOOK_REQUEST_SELECT_ALL_LIMIT = 5000;
+
+/**
+ * One request matched by a list's filters, with just enough to decide which bulk actions reach it.
+ * `rowId` is the list row it sits in: its own id, or the id of the ebook half a pair folds into.
+ */
+export interface BookRequestSelectionEntry {
+  id: number;
+  rowId: number;
+  title: string;
+  mediaKind: StoredBookRequestMediaKind;
+  status: BookRequestStatus;
+  userId: number;
+  fulfillerUserId: number | null;
+  /** Hidden by the caller. */
+  dismissed: boolean;
+  /** The caller follows this request without having made it. */
+  subscribed: boolean;
+}
+
+export interface BookRequestSelection {
+  items: BookRequestSelectionEntry[];
+  /** Rows (not requests) the filters match, the same figure the list reports as its total. */
+  totalRows: number;
+  /** More matched than `BOOK_REQUEST_SELECT_ALL_LIMIT`; `items` holds the first of them in list order. */
+  truncated: boolean;
 }

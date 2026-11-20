@@ -36,6 +36,7 @@ export class StorygraphSettingsService {
       bookSyncMode: (row?.bookSyncMode ?? 'all_eligible') as StorygraphBookSyncMode,
       autoSyncOnStatusChange: row?.autoSyncOnStatusChange ?? true,
       autoSyncOnProgressUpdate: row?.autoSyncOnProgressUpdate ?? true,
+      excludedLibraryIds: row?.excludedLibraryIds ?? [],
       lastSyncedAt: row?.lastSyncedAt?.toISOString() ?? null,
     };
   }
@@ -68,6 +69,7 @@ export class StorygraphSettingsService {
     if (payload.bookSyncMode !== undefined) data.bookSyncMode = payload.bookSyncMode;
     if (payload.autoSyncOnStatusChange !== undefined) data.autoSyncOnStatusChange = payload.autoSyncOnStatusChange;
     if (payload.autoSyncOnProgressUpdate !== undefined) data.autoSyncOnProgressUpdate = payload.autoSyncOnProgressUpdate;
+    if (payload.excludedLibraryIds !== undefined) data.excludedLibraryIds = [...new Set(payload.excludedLibraryIds)].sort((a, b) => a - b);
 
     await this.repo.upsertSettings(userId, data);
     return this.getSettings(userId);

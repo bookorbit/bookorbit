@@ -1,0 +1,27 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "id": "msg_01XYZ",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-5-5",
+    "content": [
+      {
+        "type": "text",
+        "text": "Here is the JSON:\n{\"names\":[{\"name\":\"Elizabeth Bennet\",\"kind\":\"person\"}]}"
+      }
+    ],
+    "stop_reason": "end_turn",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 398,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 120,
+      "output_tokens": 44,
+      "service_tier": "standard"
+    }
+  }
+}

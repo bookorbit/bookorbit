@@ -41,26 +41,74 @@ describe('useBookDockFiles deleted selections', () => {
   })
 })
 
-describe('useBookDockFiles ready-to-file filter', () => {
-  it('uses the ready-to-file query and preserves it for select-all actions', async () => {
-    apiMock.mockResolvedValue({
-      ok: true,
-      json: vi
-        .fn<() => Promise<{ items: []; total: number; page: number; size: number }>>()
-        .mockResolvedValue({ items: [], total: 1, page: 1, size: 20 }),
-    } as unknown as Response)
+function respondWithNothing() {
+  apiMock.mockResolvedValue({
+    ok: true,
+    json: vi
+      .fn<() => Promise<{ items: []; total: number; page: number; size: number }>>()
+      .mockResolvedValue({ items: [], total: 1, page: 1, size: 20 }),
+  } as unknown as Response)
+}
+
+function lastRequest(): URLSearchParams {
+  const url = String(apiMock.mock.calls.at(-1)?.[0])
+  return new URLSearchParams(url.slice(url.indexOf('?') + 1))
+}
+
+describe('useBookDockFiles views and docks', () => {
+  it.each([
+    ['onHold', { hold: 'held' }],
+    ['working', { status: 'pending' }],
+    ['ready', { hold: 'clear' }],
+    ['error', { status: 'error' }],
+  ] as const)('asks for the %s view and keeps it for select-all', async (view, expected) => {
+    respondWithNothing()
     const files = useBookDockFiles()
 
-    files.setView('readyToFile')
+    files.setView(view)
 
     await vi.waitFor(() => expect(apiMock).toHaveBeenCalledOnce())
-    const requestUrl = String(apiMock.mock.calls[0]?.[0])
-    expect(requestUrl).toContain('readyToFile=true')
-    expect(requestUrl).not.toContain('status=ready')
-    expect(files.activeView.value).toBe('readyToFile')
+    const params = lastRequest()
+    for (const [key, value] of Object.entries(expected)) expect(params.get(key)).toBe(value)
+    expect(params.has('needsReview')).toBe(false)
+    expect(files.activeView.value).toBe(view)
 
     files.toggleSelectAll()
+    expect(files.getSelectionPayload()).toEqual({ selectAll: true, excludedIds: [], ...expected })
+  })
 
-    expect(files.getSelectionPayload()).toEqual({ selectAll: true, excludedIds: [], readyToFile: true })
+  it('narrows On hold to one reason, and a new view clears it', async () => {
+    respondWithNothing()
+    const files = useBookDockFiles()
+
+    files.setHoldReason('duplicate')
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledOnce())
+    expect(lastRequest().get('hold')).toBe('duplicate')
+    expect(files.activeView.value).toBe('onHold')
+
+    files.setView('onHold')
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2))
+    expect(lastRequest().get('hold')).toBe('held')
+    expect(files.filters.reason).toBeNull()
+  })
+
+  it('filters by dock, sends it with select-all, and leaves it out for every dock', async () => {
+    respondWithNothing()
+    const files = useBookDockFiles()
+
+    files.setDock(7, 'onHold')
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledOnce())
+    expect(lastRequest().get('dock')).toBe('7')
+    files.toggleSelectAll()
+    expect(files.getSelectionPayload()).toEqual({ selectAll: true, excludedIds: [], dock: '7', hold: 'held' })
+
+    files.setDock('unsorted')
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(2))
+    expect(lastRequest().get('dock')).toBe('unsorted')
+    expect(files.selectionCount.value).toBe(0)
+
+    files.setDock('all')
+    await vi.waitFor(() => expect(apiMock).toHaveBeenCalledTimes(3))
+    expect(lastRequest().has('dock')).toBe(false)
   })
 })

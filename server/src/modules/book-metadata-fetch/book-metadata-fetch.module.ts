@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BookModule } from '../book/book.module';
 import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.module';
 import { BookMetadataLockModule } from '../book-metadata-lock/book-metadata-lock.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { MetadataFetchModule } from '../metadata-fetch/metadata-fetch.module';
 import { MetadataModule } from '../metadata/metadata.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
@@ -17,6 +18,7 @@ import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orch
 import { BookMetadataFetchPreviewService } from './book-metadata-fetch-preview.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
+import { MetadataFetchJobSource } from './metadata-fetch-job-source';
 
 @Module({
   imports: [
@@ -24,6 +26,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
     forwardRef(() => BookModule),
     BookCoverStoreModule,
     BookMetadataLockModule,
+    JobsModule,
     MetadataModule,
     MetadataFetchModule,
     MetadataScoreModule,
@@ -39,6 +42,7 @@ import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.s
     BookMetadataFetchOrchestratorService,
     BookMetadataFetchPreviewService,
     BookMetadataFetchGateway,
+    MetadataFetchJobSource,
   ],
   exports: [BookMetadataFetchOrchestratorService],
 })

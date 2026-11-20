@@ -93,12 +93,11 @@ describe('RequestAttemptsPanel', () => {
     expect(text).not.toContain('Download failed')
   })
 
-  it('identifies an NZB attempt as Usenet rather than a torrent', async () => {
+  it('counts the earlier attempts in the line that opens them', async () => {
     const nzb = attempt({ id: 14, source: 'nzb_file', clientKey: 'b'.repeat(64) })
     const wrapper = await render([CURRENT, nzb])
 
-    expect(wrapper.find('.lucide-newspaper').exists()).toBe(true)
-    expect(wrapper.find('.lucide-magnet').exists()).toBe(false)
+    expect(wrapper.get('summary').text()).toContain('1 earlier attempt')
   })
 
   /** The transfer section above is already showing it; saying it twice is not history. */

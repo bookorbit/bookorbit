@@ -1,0 +1,1 @@
+CREATE INDEX "scan_jobs_history_idx" ON "scan_jobs" USING btree (coalesce("completed_at", "started_at") desc,"id" desc) WHERE "scan_jobs"."status" in ('completed', 'failed') and not ("scan_jobs"."status" = 'completed' and "scan_jobs"."triggered_by" <> 'manual' and "scan_jobs"."added_count" = 0 and "scan_jobs"."updated_count" = 0 and "scan_jobs"."missing_count" = 0);

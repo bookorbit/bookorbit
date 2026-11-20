@@ -76,6 +76,7 @@ function runnerJob(sandbox) {
     jobId,
     attempt: 1,
     workDir: join(sandbox.workRoot, jobId),
+    scratchDir: join(sandbox.tmpDir, "read-aloud-worker", "scratch", jobId),
     epub: fingerprint(join(sandbox.book, "book.epub")),
     audio: [fingerprint(join(sandbox.book, "01.mp3"))],
     language: "en",

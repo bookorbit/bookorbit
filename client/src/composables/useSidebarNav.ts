@@ -1,13 +1,29 @@
 import { computed, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, type RouteLocationNormalizedLoaded, type RouteLocationRaw } from 'vue-router'
-import { BarChart3, BookPlus, Highlighter, History, LayoutDashboard, Library, PackageOpen, Trophy, Users, Wrench } from '@lucide/vue'
-import { Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
+import {
+  Activity,
+  BarChart3,
+  BookPlus,
+  Highlighter,
+  History,
+  LayoutDashboard,
+  Library,
+  PackageOpen,
+  Shapes,
+  Trophy,
+  Users,
+  Wrench,
+} from '@lucide/vue'
+import { JOBS_VIEW_PERMISSIONS, Permission, type BrowseCounts, type SidebarSectionId } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import { useBrowseCounts } from '@/composables/useBrowseCounts'
 import { useBookRequestVisibility } from '@/features/book-requests/composables/useBookRequestVisibility'
+import { useAppInfo } from '@/features/settings/composables/useAppInfo'
+import { useJobsSummary } from '@/features/jobs/composables/useJobsSummary'
+import { formatList } from '@/i18n/formatters'
 
 /** `primary` is pinned on top; useSidebarLayout places the others among the list sections in the user's order. */
 export const SIDEBAR_ZONE_IDS = ['primary', 'browse', 'reading'] as const
@@ -21,6 +37,30 @@ interface NavContext {
   outstandingRequestTotal: number
   outstandingRequestLabel: string
   browseCounts: BrowseCounts | null
+  /** The server builds story guides now; until it does, the permission to build them shows no jobs. */
+  storyGuidesBuilding?: boolean
+  /** The viewer's own jobs, phrased for the Jobs entry; null until the summary has loaded. */
+  jobs?: JobsNavState | null
+}
+
+export interface JobsNavState {
+  needsYou: number
+  needsYouLabel: string
+  signal: SidebarNavSignal | null
+}
+
+/** Live state beside an entry's icon: the Jobs entry's glow, tint and failure mark. */
+export interface SidebarNavSignal {
+  /** `running` glows; `waiting` holds a still tint. Null leaves the icon as it is. */
+  activity: 'running' | 'waiting' | null
+  /** Failures the viewer has not dismissed: a small red mark on the icon. */
+  failed: boolean
+  /** Work waiting on the viewer. The count shows as the badge; the collapsed sidebar, with no room for it, shows a dot. */
+  attention: boolean
+  /** Tooltip lines under the label. */
+  details: string[]
+  /** The same lines as one sentence, for screen readers. */
+  description: string
 }
 
 export interface SidebarNavBadge {
@@ -41,6 +81,7 @@ export interface SidebarNavEntry {
   permission?: string | string[]
   visible?: (context: NavContext) => boolean
   badge?: (context: NavContext) => SidebarNavBadge | null
+  signal?: (context: NavContext) => SidebarNavSignal | null
   /** A hidden row comes back while its accent badge counts work waiting on the user. */
   returnsWithWork?: boolean
   tourId?: string
@@ -53,6 +94,7 @@ export interface ResolvedSidebarNavEntry {
   to: RouteLocationRaw
   isActive: boolean
   badge: SidebarNavBadge | null
+  signal: SidebarNavSignal | null
   returnsWithWork: boolean
   tourId?: string
 }
@@ -79,6 +121,15 @@ const ZONE_SECTION_IDS: Record<SidebarZoneId, SidebarSectionId | null> = {
 
 function routeNameStartsWith(route: RouteLocationNormalizedLoaded, prefix: string): boolean {
   return typeof route.name === 'string' && route.name.startsWith(prefix)
+}
+
+/** Tags share the Genres row: the index switches between the two. */
+const GENRE_ROUTE_NAMES = new Set(['genres', 'genre-detail', 'tags', 'tag-detail'])
+
+/** Building story guides shows jobs only while the server builds them; every other Jobs permission always does. */
+function canSeeJobs(context: NavContext): boolean {
+  if (context.storyGuidesBuilding === true) return true
+  return JOBS_VIEW_PERMISSIONS.some((name) => name !== Permission.LibraryGenerateStoryGuide && context.hasPermission(name))
 }
 
 /** Browse badges stay out of the row until the counts have loaded and there is something to count. */
@@ -166,6 +217,20 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     permission: ['manage_libraries', 'library_delete_books', 'library_merge_books', 'library_edit_metadata'],
   },
   {
+    id: 'jobs',
+    labelKey: 'jobsArea.title',
+    icon: Activity,
+    zone: 'primary',
+    to: { name: 'jobs-activity' },
+    isActive: (route) => routeNameStartsWith(route, 'jobs-'),
+    permission: [...JOBS_VIEW_PERMISSIONS],
+    visible: canSeeJobs,
+    badge: (context) =>
+      context.jobs && context.jobs.needsYou > 0 ? { value: context.jobs.needsYou, label: context.jobs.needsYouLabel, tone: 'accent' } : null,
+    signal: (context) => context.jobs?.signal ?? null,
+    returnsWithWork: true,
+  },
+  {
     id: 'authors',
     labelKey: 'components.sidebar.authors',
     icon: Users,
@@ -182,6 +247,15 @@ export const SIDEBAR_NAV_REGISTRY: readonly SidebarNavEntry[] = [
     to: { name: 'series' },
     isActive: (route) => route.name === 'series' || route.name === 'series-detail',
     badge: browseBadge('series'),
+  },
+  {
+    id: 'genres',
+    labelKey: 'components.sidebar.genres',
+    icon: Shapes,
+    zone: 'browse',
+    to: { name: 'genres' },
+    isActive: (route) => GENRE_ROUTE_NAMES.has(route.name as string),
+    badge: browseBadge('genres'),
   },
   {
     id: 'annotations',
@@ -210,19 +284,47 @@ export function resolveNavEntry(entry: SidebarNavEntry, context: NavContext, rou
     to: typeof entry.to === 'function' ? entry.to(context) : entry.to,
     isActive: entry.isActive(route),
     badge: entry.badge ? entry.badge(context) : null,
+    signal: entry.signal ? entry.signal(context) : null,
     returnsWithWork: entry.returnsWithWork === true,
     tourId: entry.tourId,
   } satisfies ResolvedSidebarNavEntry
 }
 
 export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0) {
-  const { t } = useI18n()
+  const { t, te } = useI18n()
   const route = useRoute()
   const { hasPermission } = usePermissions()
   const { user } = useAuth()
   const { summary: bookDockSummary } = useBookDockSummary()
   const { counts: browseCounts } = useBrowseCounts()
   const { showBookRequests } = useBookRequestVisibility()
+  const { storyGuides } = useAppInfo()
+  const { summary: jobsSummary } = useJobsSummary()
+
+  /** A type this build does not know yet still reads as a job. */
+  function jobTypeLabel(type: string): string {
+    const key = `jobsArea.types.${type}.label`
+    return te(key) ? t(key) : t('jobsArea.unknownType')
+  }
+
+  const jobs = computed<JobsNavState | null>(() => {
+    const summary = jobsSummary.value
+    if (!summary) return null
+    const details: string[] = []
+    if (summary.running > 0) details.push(t('components.sidebar.jobs.running', { count: summary.running }))
+    if (summary.waiting > 0) details.push(t('components.sidebar.jobs.waiting', { count: summary.waiting }))
+    const needsYouLabel = t('components.sidebar.jobs.needsYou', { count: summary.needsYou })
+    if (summary.needsYou > 0) details.push(needsYouLabel)
+    if (summary.failed > 0) details.push(t('components.sidebar.jobs.failed', { count: summary.failed }))
+    if (summary.background.length > 0) {
+      const types = formatList(summary.background.map(jobTypeLabel))
+      details.push(t('components.sidebar.jobs.background', { types }))
+    }
+    const activity = summary.running > 0 ? 'running' : summary.waiting > 0 ? 'waiting' : null
+    const signal: SidebarNavSignal | null =
+      details.length > 0 ? { activity, failed: summary.failed > 0, attention: summary.needsYou > 0, details, description: formatList(details) } : null
+    return { needsYou: summary.needsYou, needsYouLabel, signal }
+  })
 
   const context = computed<NavContext>(() => {
     const outstandingRequestTotal = getOutstandingRequestTotal()
@@ -238,6 +340,8 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
       outstandingRequestTotal,
       outstandingRequestLabel: t(outstandingRequestLabelKey, { count: outstandingRequestTotal }),
       browseCounts: browseCounts.value,
+      storyGuidesBuilding: storyGuides.value?.building === true,
+      jobs: jobs.value,
     }
   })
 
@@ -252,5 +356,11 @@ export function useSidebarNav(getOutstandingRequestTotal: () => number = () => 0
     })).filter((zone) => zone.entries.length > 0),
   )
 
-  return { zones }
+  /** Whether this viewer has the Jobs entry at all, hidden by their layout or not; its summary is followed only then. */
+  const jobsAllowed = computed(() => {
+    const entry = SIDEBAR_NAV_REGISTRY.find((candidate) => candidate.id === 'jobs')
+    return entry ? isNavEntryAllowed(entry, context.value) : false
+  })
+
+  return { zones, jobsAllowed }
 }

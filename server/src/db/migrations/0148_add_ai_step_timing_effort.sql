@@ -1,0 +1,1 @@
+ALTER TABLE "ai_step_timings" ADD COLUMN "effort" varchar(16);

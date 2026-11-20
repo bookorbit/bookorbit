@@ -239,6 +239,33 @@ describe('raw EPUB ZIP rewrite', () => {
     await expect(fs.readFile(tmpPath, 'utf8')).resolves.toBe('user-owned');
   });
 
+  it('leaves out removed entries and copies every other record untouched', async () => {
+    const original = await fixture();
+    await fs.writeFile(filePath, original);
+    const before = await snapshot(original);
+
+    await patch(filePath, new Map([['OPS/content.opf', Buffer.from('<package>new</package>')]]), new Set(['OPS/images/stored.jpg', 'OPS/not-there']));
+
+    const after = await snapshot(await fs.readFile(filePath));
+    expect([...after.entries.keys()]).not.toContain('OPS/images/stored.jpg');
+    expect(after.entries.size).toBe(contents.size - 1);
+    for (const name of contents.keys()) {
+      if (name === 'OPS/images/stored.jpg' || name === 'OPS/content.opf' || name === 'mimetype') continue;
+      expect(after.records.get(name), name).toEqual(before.records.get(name));
+    }
+    const independent = await unzipper.Open.file(filePath);
+    expect(independent.files[0]!.path).toBe('mimetype');
+  });
+
+  it('refuses to remove the mimetype', async () => {
+    const original = await fixture();
+    await fs.writeFile(filePath, original);
+
+    await expect(patch(filePath, new Map(), new Set(['mimetype']))).rejects.toThrow('removal path');
+    await expect(fs.readFile(filePath)).resolves.toEqual(original);
+    expect(await fs.readdir(root)).toEqual(['book.epub']);
+  });
+
   it.each(['read', 'write', 'sync', 'zero read', 'zero write', 'changed source', 'source close', 'output close'])(
     'preserves the source and closes handles after %s failure',
     async (failure) => {

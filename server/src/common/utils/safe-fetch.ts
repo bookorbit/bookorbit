@@ -3,7 +3,14 @@ import { Agent, ProxyAgent, fetch as undiciFetch, type Dispatcher } from 'undici
 import type { NetworkProfile } from '@bookorbit/types';
 import { hasNetworkProfile } from '@bookorbit/types';
 
-import { PrivateAddressException, ensureSafeUrl, isPrivateOrLocalAddress, type SafeRemoteHostOptions } from './ssrf.utils';
+import {
+  LinkLocalAddressException,
+  PrivateAddressException,
+  ensureSafeUrl,
+  isLinkLocalOrMetadataAddress,
+  isPrivateOrLocalAddress,
+  type SafeRemoteHostOptions,
+} from './ssrf.utils';
 
 export interface SafeFetchOptions extends SafeRemoteHostOptions {
   /** How to reach this source, where the default path does not work. */
@@ -70,7 +77,12 @@ function dispatcherFor(options: SafeFetchOptions): Dispatcher {
   // An empty profile is a real case here: `pinResolvedAddress` wants the checked lookup without
   // asking for a different resolver or an egress, and that pools as its own agent.
   const profile = options.profile ?? {};
-  const key = JSON.stringify({ r: profile.resolvers ?? [], p: profile.proxyUrl ?? '', a: Boolean(options.allowPrivate) });
+  const key = JSON.stringify({
+    r: profile.resolvers ?? [],
+    p: profile.proxyUrl ?? '',
+    a: Boolean(options.allowPrivate),
+    l: Boolean(options.blockLinkLocal),
+  });
   const existing = dispatchers.get(key);
   if (existing) return existing;
 
@@ -96,6 +108,10 @@ function buildLookup(profile: NetworkProfile, options: SafeFetchOptions) {
       .then((addresses) => {
         if (addresses.length === 0) {
           callback(Object.assign(new Error(`Unable to resolve ${hostname}`), { code: 'ENOTFOUND' }), []);
+          return;
+        }
+        if (options.blockLinkLocal && addresses.some((entry) => isLinkLocalOrMetadataAddress(entry.address))) {
+          callback(Object.assign(new LinkLocalAddressException(), { code: 'EACCES' }) as NodeJS.ErrnoException, []);
           return;
         }
         if (!options.allowPrivate && addresses.some((entry) => isPrivateOrLocalAddress(entry.address))) {

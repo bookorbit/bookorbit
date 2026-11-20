@@ -5,9 +5,12 @@ import { BOOK_METADATA_LOCK_FIELDS, type BookCard, type UserBookStatus } from '@
 import { i18n } from '@/i18n'
 
 const mocks = vi.hoisted(() => ({
-  api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<{ ok: boolean }>>(),
+  api: vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<{ ok: boolean; body?: unknown }>>(),
   toastSuccess: vi.fn<(message: string) => void>(),
   toastError: vi.fn<(message: string) => void>(),
+  toastWarning: vi.fn<(message: string) => void>(),
+  toastInfo: vi.fn<(message: string, options?: unknown) => void>(),
+  actOnJobs: vi.fn<(request: { action: string; ids: string[] }) => Promise<{ results: { id: string; outcome: string; status: string | null }[] }>>(),
   bumpVersion: vi.fn<(bookId: number) => void>(),
   markRefreshing: vi.fn<(bookIds: number[]) => void>(),
   clearRefreshing: vi.fn<(bookIds: number[]) => void>(),
@@ -39,9 +42,30 @@ vi.mock('vue-sonner', () => ({
   toast: {
     success: mocks.toastSuccess,
     error: mocks.toastError,
-    warning: vi.fn<(message: string) => void>(),
+    warning: mocks.toastWarning,
+    info: mocks.toastInfo,
   },
 }))
+
+vi.mock('@/features/jobs/api/jobs.api', () => ({ actOnJobs: mocks.actOnJobs }))
+
+/** A bulk route's answer whose stream the test feeds by hand, naming its run in the header. */
+function liveSse(runId = 'run-7') {
+  const encoder = new TextEncoder()
+  let controller!: ReadableStreamDefaultController<Uint8Array>
+  const body = new ReadableStream<Uint8Array>({
+    start(value) {
+      controller = value
+    },
+  })
+  return {
+    response: { ok: true, status: 200, body, headers: new Headers({ 'X-Bulk-Run-Id': runId }) },
+    send: (event: object) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`)),
+    close: () => controller.close(),
+  }
+}
+
+const flushStream = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 vi.mock('../useCoverVersions', () => ({
   useCoverVersions: () => ({
@@ -590,6 +614,188 @@ describe('useBookBulkActions', () => {
     await handleBulkReExtractCover()
 
     expect(mocks.toastError).toHaveBeenCalledWith('Could not re-extract covers')
+  })
+
+  describe('handleBulkEmbedAudioCover', () => {
+    const event = (value: object) => `data: ${JSON.stringify(value)}`
+    const summary = (value: object) => event({ done: true, cancelled: false, skipped: 0, ...value })
+
+    beforeEach(() => {
+      i18n.global.locale.value = 'en'
+      mocks.toastSuccess.mockReset()
+      mocks.toastWarning.mockReset()
+      mocks.toastError.mockReset()
+    })
+
+    it('posts the selection, follows progress and reports the outcome', async () => {
+      mocks.api.mockResolvedValue(
+        makeSseStream([
+          event({ started: true, total: 2 }),
+          event({ bookId: 3, status: 'success' }),
+          event({ bookId: 5, status: 'skipped', reason: 'audio cover unchanged' }),
+          summary({ processed: 4, succeeded: 1, failed: 0, skipped: 3 }),
+        ]),
+      )
+      const { handleBulkEmbedAudioCover, inFlight } = useBookBulkActions(ref(new Set([3, 4, 5, 6])), vi.fn())
+
+      const running = handleBulkEmbedAudioCover()
+      expect(inFlight.value).toMatchObject({ processed: 0, total: 4 })
+      await running
+
+      expect(mocks.api).toHaveBeenCalledWith(
+        '/api/v1/books/bulk-embed-audio-cover',
+        expect.objectContaining({ method: 'POST', body: JSON.stringify({ bookIds: [3, 4, 5, 6] }) }),
+      )
+      expect(inFlight.value).toBeNull()
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Embedded the audiobook cover in 1 of 4 books')
+    })
+
+    it('counts a book as one when it is the only one', async () => {
+      mocks.api.mockResolvedValue(makeSseStream([summary({ processed: 1, succeeded: 1, failed: 0 })]))
+
+      await useBookBulkActions(ref(new Set([3])), vi.fn()).handleBulkEmbedAudioCover()
+
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Embedded the audiobook cover in 1 of 1 book')
+    })
+
+    it('warns when some books failed', async () => {
+      mocks.api.mockResolvedValue(makeSseStream([summary({ processed: 3, succeeded: 1, failed: 2 })]))
+
+      await useBookBulkActions(ref(new Set([1, 2, 3])), vi.fn()).handleBulkEmbedAudioCover()
+
+      expect(mocks.toastWarning).toHaveBeenCalledWith('Embedded the audiobook cover in 1 of 3 books, 2 failed')
+      expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    })
+
+    it('reads an event the stream splits across chunks', async () => {
+      const done = summary({ processed: 2, succeeded: 2, failed: 0 })
+      const encoder = new TextEncoder()
+      const chunks = [encoder.encode(done.slice(0, 20)), encoder.encode(done.slice(20) + '\n')]
+      let index = 0
+      mocks.api.mockResolvedValue({
+        ok: true,
+        body: {
+          getReader: () => ({ read: () => Promise.resolve(index < chunks.length ? { done: false, value: chunks[index++] } : { done: true }) }),
+        },
+      })
+
+      await useBookBulkActions(ref(new Set([1, 2])), vi.fn()).handleBulkEmbedAudioCover()
+
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Embedded the audiobook cover in 2 of 2 books')
+    })
+
+    it('reports a request the server refused', async () => {
+      mocks.api.mockResolvedValue({ ok: false })
+      const { handleBulkEmbedAudioCover, inFlight } = useBookBulkActions(ref(new Set([1])), vi.fn())
+
+      await handleBulkEmbedAudioCover()
+
+      expect(mocks.toastError).toHaveBeenCalledWith('Could not embed audiobook covers')
+      expect(inFlight.value).toBeNull()
+    })
+
+    it('says a stream that ends without its summary stopped, and points to Jobs', async () => {
+      mocks.api.mockResolvedValue(makeSseStream([event({ started: true, total: 1 })]))
+      const { handleBulkEmbedAudioCover, inFlight } = useBookBulkActions(ref(new Set([1])), vi.fn())
+
+      await handleBulkEmbedAudioCover()
+
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        'The bulk action stopped before it finished.',
+        expect.objectContaining({ action: expect.objectContaining({ label: 'Open Jobs' }) }),
+      )
+      expect(mocks.toastSuccess).not.toHaveBeenCalled()
+      expect(inFlight.value).toBeNull()
+    })
+
+    it('does nothing without a selection', async () => {
+      await useBookBulkActions(ref(new Set<number>()), vi.fn()).handleBulkEmbedAudioCover()
+
+      expect(mocks.api).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('bulk runs', () => {
+    beforeEach(() => {
+      vi.useRealTimers()
+      i18n.global.locale.value = 'en'
+      mocks.toastInfo.mockReset()
+      mocks.toastWarning.mockReset()
+      mocks.actOnJobs.mockReset()
+    })
+
+    it('says the account already has too many bulk actions when the server answers 429', async () => {
+      mocks.api.mockResolvedValue({ ok: false, status: 429 } as never)
+      const { handleBulkReExtractCover, inFlight } = useBookBulkActions(ref(new Set([1, 2])), vi.fn())
+
+      await handleBulkReExtractCover()
+
+      expect(mocks.toastError).toHaveBeenCalledWith(
+        'You already have 10 bulk actions waiting or running. Wait for one to finish, or cancel one in Jobs.',
+      )
+      expect(inFlight.value).toBeNull()
+    })
+
+    it('shows the run waiting until its first book lands, then counts', async () => {
+      const live = liveSse()
+      mocks.api.mockResolvedValue(live.response as never)
+      const { handleBulkRefreshMetadata, inFlight } = useBookBulkActions(ref(new Set([1, 2])), vi.fn())
+
+      const running = handleBulkRefreshMetadata()
+      await flushStream()
+      expect(inFlight.value).toMatchObject({ kind: 'book-refresh-metadata', runId: 'run-7', waiting: true, processed: 0, total: 2 })
+
+      live.send({ bookId: 1, success: true })
+      await flushStream()
+      expect(inFlight.value).toMatchObject({ waiting: false, processed: 1 })
+
+      live.send({ bookId: 2, success: false, error: 'No match' })
+      live.send({ done: true, processed: 1, failed: 1 })
+      live.close()
+      await running
+
+      expect(inFlight.value).toBeNull()
+      expect(mocks.toastWarning).toHaveBeenCalledWith('Refreshed 1 book, 1 failed')
+    })
+
+    it('cancels through Jobs and reports how far the run got instead of its summary', async () => {
+      mocks.actOnJobs.mockResolvedValue({ results: [{ id: 'bulk-run:run-7', outcome: 'done', status: 'running' }] })
+      const live = liveSse()
+      mocks.api.mockResolvedValue(live.response as never)
+      const { handleBulkEmbedAudioCover, cancelInFlight, inFlight } = useBookBulkActions(ref(new Set([1, 2, 3])), vi.fn())
+
+      const running = handleBulkEmbedAudioCover()
+      live.send({ started: true, total: 3 })
+      live.send({ bookId: 1, status: 'success' })
+      await flushStream()
+
+      await cancelInFlight()
+      expect(mocks.actOnJobs).toHaveBeenCalledWith({ action: 'cancel', ids: ['bulk-run:run-7'] })
+      expect(inFlight.value?.cancelling).toBe(true)
+
+      live.send({ done: true, processed: 3, succeeded: 1, failed: 0, skipped: 0, cancelled: 2 })
+      live.close()
+      await running
+
+      expect(mocks.toastInfo).toHaveBeenCalledWith('Bulk action cancelled after 1 of 3.')
+      expect(mocks.toastSuccess).not.toHaveBeenCalled()
+    })
+
+    it('lets the run go on in the background when the pill is hidden', async () => {
+      const live = liveSse()
+      mocks.api.mockResolvedValue(live.response as never)
+      const { handleBulkReExtractCover, hideInFlight, inFlight } = useBookBulkActions(ref(new Set([1, 2])), vi.fn())
+
+      const running = handleBulkReExtractCover()
+      await flushStream()
+      hideInFlight()
+      await running
+
+      expect(inFlight.value).toBeNull()
+      expect(mocks.toastInfo).toHaveBeenCalledWith('The bulk action keeps running in the background.', expect.anything())
+      expect(mocks.toastSuccess).not.toHaveBeenCalled()
+      expect(mocks.toastError).not.toHaveBeenCalled()
+    })
   })
 
   it('bumps all re-extract IDs in finally when stream delivers no events', async () => {

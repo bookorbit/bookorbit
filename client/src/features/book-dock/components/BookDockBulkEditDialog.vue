@@ -5,19 +5,15 @@ import { X, Loader2 } from '@lucide/vue'
 import { isValidSeriesIndex, type BookDockBulkEditResult, type BookDockMetadata, type IdentifierInputKind } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import IdentifierInput from '@/components/ui/IdentifierInput.vue'
+import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
+import { useSeriesNameSearch } from '@/features/book/composables/useMetadataFieldSearch'
+import type { BookDockSelectionPayload } from '../composables/useBookDockFiles'
 
 const { t } = useI18n()
+const { search: searchSeries } = useSeriesNameSearch()
 
 const props = defineProps<{
-  selectionPayload: {
-    fileIds?: number[]
-    selectAll?: boolean
-    excludedIds?: number[]
-    status?: string
-    needsReview?: boolean
-    readyToFile?: boolean
-    search?: string
-  }
+  selectionPayload: BookDockSelectionPayload
   selectionCount: number
 }>()
 
@@ -49,6 +45,10 @@ const FIELD_INPUT_CLASS =
 const enabledFields = reactive<Set<string>>(new Set())
 const values = reactive<Record<string, string>>({})
 const mergeArrays = ref(true)
+
+function onSeriesNameInput(value: string | null) {
+  values.seriesName = value ?? ''
+}
 
 function toggleField(key: string) {
   if (enabledFields.has(key)) enabledFields.delete(key)
@@ -151,6 +151,14 @@ function handleClose() {
                   :kind="f.identifier"
                   :disabled="!enabledFields.has(f.key)"
                   :class="FIELD_INPUT_CLASS"
+                />
+                <InputWithSuggestions
+                  v-else-if="f.key === 'seriesName'"
+                  :model-value="values.seriesName ?? ''"
+                  :search-fn="searchSeries"
+                  :disabled="!enabledFields.has(f.key)"
+                  :class="FIELD_INPUT_CLASS"
+                  @update:model-value="onSeriesNameInput"
                 />
                 <input
                   v-else

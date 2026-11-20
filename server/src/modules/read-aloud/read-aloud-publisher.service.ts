@@ -6,6 +6,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { readAloudConfig } from '../../config/config';
 import type { ReadAloudJobRow } from '../../db/schema';
 import { buildEpubMediaOverlayPlaylistFromFile } from '../reader/epub/epub-media-overlay';
+import { FileWriteService } from '../file-write/file-write.service';
 import { GENERATED_FILENAME_MAX_BYTES, GeneratedBookFileService, truncateUtf8 } from '../upload/generated-book-file.service';
 import { ReadAloudActivityService } from './read-aloud-activity.service';
 import { ReadAloudJobError } from './read-aloud-errors';
@@ -33,6 +34,7 @@ export class ReadAloudPublisher {
     private readonly workspace: ReadAloudWorkspace,
     private readonly files: GeneratedBookFileService,
     private readonly activity: ReadAloudActivityService,
+    private readonly fileWrite: FileWriteService,
   ) {}
 
   /** Checks the worker's output on the server side before anything reaches the library. */
@@ -52,7 +54,7 @@ export class ReadAloudPublisher {
     if (raw == null) throw new ReadAloudJobError('invalid_output', 'The alignment report is missing');
     const parsed = parseAlignmentReport(raw);
     const { coverage, chapters } = assessCoverage(parsed.totals, parsed.chapters);
-    const { warnings, requiresReview } = reportWarnings(parsed.totals, coverage);
+    const { warnings, requiresReview } = reportWarnings(parsed.totals, coverage, parsed.tracks);
     await this.jobs.saveReportChapters(row.id, chapters);
     return { report: parsed.totals, coverage, warnings, requiresReview, outputBytes: output.size };
   }
@@ -69,6 +71,7 @@ export class ReadAloudPublisher {
 
   /** Adds the output to the book, or overwrites the read-along the user chose to replace. */
   async publish(row: ReadAloudJobRow, user: RequestUser): Promise<number> {
+    await this.embedAudioCover(row);
     const source = {
       bookId: row.bookId,
       sourcePath: this.workspace.outputPath(row.id),
@@ -106,6 +109,26 @@ export class ReadAloudPublisher {
       fileId,
     });
     return fileId;
+  }
+
+  /**
+   * Carries the book's audiobook cover into the generated EPUB, the way Storyteller does, so the
+   * file holds its own square cover and an audio screen does not fall back to the portrait one.
+   * It is best effort: a book with no audiobook cover, or an image or disk that will not take the
+   * write, leaves the EPUB as the worker made it and the job still publishes.
+   */
+  private async embedAudioCover(row: ReadAloudJobRow): Promise<void> {
+    const outputPath = this.workspace.outputPath(row.id);
+    // A link in place of the output could point the write at another library's file.
+    if (!(await this.workspace.inspect(row.id, outputPath))?.isFile()) return;
+    const result = await this.fileWrite.embedAudioCoverInDraft(row.bookId, outputPath);
+    if (result.code === 'embedded') {
+      await this.activity.record(row.id, 'info', 'publishing', 'audio_cover_embedded', 'Added the audiobook cover to the read-along');
+    } else if (result.code === 'failed') {
+      await this.activity.record(row.id, 'warn', 'publishing', 'audio_cover_failed', 'The audiobook cover could not be added to the read-along', {
+        reason: result.reason ?? null,
+      });
+    }
   }
 
   private async replaceTarget(row: ReadAloudJobRow): Promise<number | null> {

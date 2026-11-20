@@ -1,0 +1,17 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": [
+    {
+      "id": "meta-llama/Llama-4-Scout",
+      "type": "chat",
+      "context_length": 327680
+    },
+    {
+      "id": "Qwen/Qwen3-235B",
+      "type": "chat"
+    }
+  ]
+}

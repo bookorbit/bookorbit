@@ -61,7 +61,7 @@ export function useOnboardingTour() {
       {
         element: '[data-tour="book-dock-btn"]',
         popover: {
-          title: 'Book Dock',
+          title: 'Library Dock',
           description: 'Uploaded files wait here. Review metadata, set the target library, then finalize to add them to your collection.',
           side: 'right',
           align: 'start',

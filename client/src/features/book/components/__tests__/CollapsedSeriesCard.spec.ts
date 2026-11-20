@@ -427,7 +427,7 @@ describe('CollapsedSeriesCard', () => {
 
       await loadSquareCover(wrapper)
 
-      expect(wrapper.find('.book-cover-surface').attributes('style')).toContain('aspect-ratio: 2/3')
+      expect(wrapper.find('.book-cover-surface').attributes('style')).toContain('aspect-ratio: 2 / 3')
       expect(wrapper.find('[data-testid="series-single-cover"] .book-cover-artwork-frame img').classes()).toContain('object-contain')
     })
 

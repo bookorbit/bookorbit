@@ -295,8 +295,7 @@ function handleShowUndated() {
         <p class="text-xs leading-[17px] text-muted-foreground">
           <b class="font-semibold text-foreground">{{
             t('readingHistory.rail.goalProgress', { reached: summary.goal.reached, target: summary.goal.target })
-          }}</b
-          >{{ ` ${goalDetail}` }}
+          }}</b>{{ ` ${goalDetail}` }}
         </p>
       </div>
     </section>

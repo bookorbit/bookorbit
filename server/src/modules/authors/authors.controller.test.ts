@@ -1,15 +1,18 @@
 import 'reflect-metadata';
 
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { createReadStream } from 'fs';
 import { stat } from 'fs/promises';
 import { of } from 'rxjs';
-import { AuditAction, Permission } from '@bookorbit/types';
+import { AuditAction, AuditResource, Permission } from '@bookorbit/types';
 
 import { AUDITABLE_KEY } from '../../common/decorators/auditable.decorator';
 import { FORBIDDEN_PERMISSION_KEY } from '../../common/decorators/forbid-permission.decorator';
 import { PERMISSION_KEY } from '../../common/decorators/require-permission.decorator';
 import type { RequestUser } from '../../common/types/request-user';
+import { BulkRunHandlerRegistry } from '../bulk-runs/bulk-run-handler.registry';
+import { BulkRunsService } from '../bulk-runs/bulk-runs.service';
+import { AuthorBulkRefreshHandler } from './author-bulk-refresh.handler';
 import { AuthorsController } from './authors.controller';
 import { BulkRefreshAuthorsMetadataDto } from './dto/bulk-refresh-authors-metadata.dto';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
@@ -81,14 +84,14 @@ function makeReply() {
   return { reply: reply as never, raw, headers };
 }
 
-function makeController() {
+function makeController(bulkRunsOverride?: BulkRunsService) {
   const authorsService = {
     findAll: vi.fn(),
     listMetadataProviders: vi.fn(),
     searchMetadata: vi.fn(),
     streamMetadata: vi.fn(),
     lookupMetadata: vi.fn(),
-    bulkRefreshMetadata: vi.fn(),
+    authorizeBulkRefresh: vi.fn(),
     findOne: vi.fn(),
     findBooks: vi.fn(),
     getThumbnailPath: vi.fn(),
@@ -119,9 +122,19 @@ function makeController() {
     countEligibleLinkedAuthors: vi.fn(),
   };
 
-  const controller = new AuthorsController(authorsService as never, enrichmentOrchestrator as never, enrichmentConfig as never, queueRepo as never);
+  const metadataPreferences = {};
+  const bulkRuns = { startAndStream: vi.fn().mockResolvedValue(undefined) };
 
-  return { controller, authorsService, enrichmentOrchestrator, enrichmentConfig, queueRepo };
+  const controller = new AuthorsController(
+    authorsService as never,
+    enrichmentOrchestrator as never,
+    enrichmentConfig as never,
+    queueRepo as never,
+    metadataPreferences as never,
+    (bulkRunsOverride ?? bulkRuns) as never,
+  );
+
+  return { controller, authorsService, enrichmentOrchestrator, enrichmentConfig, queueRepo, bulkRuns };
 }
 
 describe('AuthorsController', () => {
@@ -169,37 +182,70 @@ describe('AuthorsController', () => {
     expect(events).toEqual([{ data: candidate }]);
   });
 
-  it('streams SSE progress and completion for bulk refresh', async () => {
-    const { controller, authorsService } = makeController();
-    const { reply, raw } = makeReply();
-    const user = makeUser();
-    authorsService.bulkRefreshMetadata.mockImplementation((_authorIds: number[], _u: RequestUser, onProgress: (event: object) => void) => {
-      onProgress({ authorId: 5, status: 'queued' });
-      return Promise.resolve({ queued: 1, processed: 1, failed: 0 });
-    });
-
-    await controller.bulkRefreshMetadata({ authorIds: [5] }, user, reply);
-
-    expect(raw.writeHead).toHaveBeenCalledWith(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    expect(raw.write).toHaveBeenNthCalledWith(1, `data: ${JSON.stringify({ authorId: 5, status: 'queued' })}\n\n`);
-    expect(raw.write).toHaveBeenNthCalledWith(2, `data: ${JSON.stringify({ done: true, queued: 1, processed: 1, failed: 0 })}\n\n`);
-    expect(raw.end).toHaveBeenCalled();
-    expect(authorsService.bulkRefreshMetadata).toHaveBeenCalledWith([5], user, expect.any(Function), { ignoreCache: false });
-  });
-
-  it('passes ignoreCache from the bulk refresh body', async () => {
-    const { controller, authorsService } = makeController();
+  it('authorizes the selection, then starts a bulk run that streams it', async () => {
+    const { controller, authorsService, bulkRuns } = makeController();
     const { reply } = makeReply();
     const user = makeUser();
-    authorsService.bulkRefreshMetadata.mockResolvedValue({ processed: 1, failed: 0, updated: 1 });
+    authorsService.authorizeBulkRefresh.mockResolvedValue([5, 6]);
 
-    await controller.bulkRefreshMetadata({ authorIds: [5], ignoreCache: true }, user, reply);
+    await controller.bulkRefreshMetadata({ authorIds: [5, 6, 5], ignoreCache: true }, user, reply);
 
-    expect(authorsService.bulkRefreshMetadata).toHaveBeenCalledWith([5], user, expect.any(Function), { ignoreCache: true });
+    expect(authorsService.authorizeBulkRefresh).toHaveBeenCalledWith(user, [5, 6, 5]);
+    expect(bulkRuns.startAndStream).toHaveBeenCalledWith(reply, {
+      kind: 'author-refresh-metadata',
+      subjectIds: [5, 6],
+      options: { ignoreCache: true },
+      actor: user,
+      audit: expect.objectContaining({ action: AuditAction.AuthorBulkMetadataRefresh, resource: AuditResource.Author }),
+    });
+    const audit = bulkRuns.startAndStream.mock.calls[0]![1].audit as { description: (count: number) => string };
+    expect(audit.description(1)).toBe('Bulk refreshed metadata for 1 author');
+    expect(audit.description(2)).toBe('Bulk refreshed metadata for 2 authors');
+  });
+
+  it('defaults ignoreCache to false', async () => {
+    const { controller, authorsService, bulkRuns } = makeController();
+    const { reply } = makeReply();
+    authorsService.authorizeBulkRefresh.mockResolvedValue([5]);
+
+    await controller.bulkRefreshMetadata({ authorIds: [5] }, makeUser(), reply);
+
+    expect(bulkRuns.startAndStream).toHaveBeenCalledWith(reply, expect.objectContaining({ options: { ignoreCache: false } }));
+  });
+
+  it('refuses an unauthorized selection before the stream starts', async () => {
+    const { controller, authorsService, bulkRuns } = makeController();
+    const { reply, raw } = makeReply();
+    authorsService.authorizeBulkRefresh.mockRejectedValue(
+      new ForbiddenException('Insufficient library access to mutate one or more selected authors'),
+    );
+
+    await expect(controller.bulkRefreshMetadata({ authorIds: [5] }, makeUser(), reply)).rejects.toBeInstanceOf(ForbiddenException);
+
+    expect(bulkRuns.startAndStream).not.toHaveBeenCalled();
+    expect(raw.writeHead).not.toHaveBeenCalled();
+  });
+
+  it('answers an empty selection at once with an empty done and creates no run', async () => {
+    const registry = new BulkRunHandlerRegistry();
+    registry.register(new AuthorBulkRefreshHandler(registry, {} as never));
+    const repo = { insertWithinLimit: vi.fn() };
+    const bulkRuns = new BulkRunsService(repo as never, registry, {} as never, {} as never, {} as never, {} as never);
+    const { controller, authorsService } = makeController(bulkRuns);
+    const { reply, raw } = makeReply();
+    authorsService.authorizeBulkRefresh.mockResolvedValue([]);
+
+    await controller.bulkRefreshMetadata({ authorIds: [] }, makeUser(), reply);
+
+    expect(raw.writeHead).toHaveBeenCalledWith(200, expect.objectContaining({ 'Content-Type': 'text/event-stream' }));
+    expect(raw.write).toHaveBeenCalledTimes(1);
+    expect(raw.write).toHaveBeenCalledWith(`data: ${JSON.stringify({ done: true, processed: 0, failed: 0, updated: 0 })}\n\n`);
+    expect(raw.end).toHaveBeenCalled();
+    expect(repo.insertWithinLimit).not.toHaveBeenCalled();
+  });
+
+  it('records the bulk refresh in the audit log itself instead of through @Auditable', () => {
+    expect(Reflect.getMetadata(AUDITABLE_KEY, AuthorsController.prototype.bulkRefreshMetadata)).toBeUndefined();
   });
 
   it('accepts the bulk refresh body with an optional ignoreCache only on that endpoint', () => {

@@ -11,9 +11,11 @@ The `generated-charts` branch contains the generated files:
 - `star-history.svg`: the self-contained star history chart
 - `translation-progress.svg`: the self-contained Crowdin translation chart
 
-The workflow creates normal commits on this branch. It does not force-push, so
-previous chart data remains recoverable without adding automated commits to
-`main`.
+The branch holds a single parentless commit. Each refresh replaces it with a
+force-push (guarded by `--force-with-lease`), so daily runs do not accumulate
+history and no automated commits reach `main`. The chart data itself is not
+lost: `star-history.json` on the branch tip carries the full daily series and
+is restored at the start of every run.
 
 The bootstrap snapshot at `scripts/star-history/bootstrap.json` contains the
 initial exact aggregate history. It is used only when no published series

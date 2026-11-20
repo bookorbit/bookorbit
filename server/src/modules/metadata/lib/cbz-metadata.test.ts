@@ -173,6 +173,29 @@ describe('extractCbzMetadata', () => {
       expect(r?.authors.map((a) => a.name)).toEqual(['Writer One', 'Writer Two']);
     });
 
+    it('decodes numeric character references before splitting metadata lists', async () => {
+      const xml = `<ComicInfo>
+        <Title>Le r&#234;ve &#x2019;ternel</Title>
+        <Summary>L&#39;histoire d&#233;bute</Summary>
+        <Writer>Thierry M&#233;barki</Writer>
+        <Penciller>Andr&#233; Dupont</Penciller>
+        <Characters>H&#233;ros;Rival</Characters>
+      </ComicInfo>`;
+      mockZipFile(buildZipWithComicInfo(xml));
+
+      const r = await extractCbzMetadata('/book.cbz');
+
+      expect(r).toMatchObject({
+        title: 'Le rêve ’ternel',
+        description: "L'histoire débute",
+        authors: [{ name: 'Thierry Mébarki', sortName: null }],
+        comicMetadata: {
+          pencillers: ['André Dupont'],
+          characters: ['Héros', 'Rival'],
+        },
+      });
+    });
+
     it('extracts Genre and Tags into separate deduplicated lists', async () => {
       const xml = `<ComicInfo><Genre>Superhero,Fantasy</Genre><Tags>Fantasy,Horror</Tags></ComicInfo>`;
       mockZipFile(buildZipWithComicInfo(xml));

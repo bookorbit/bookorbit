@@ -1,9 +1,33 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { AlertCircle, ArrowRight, Check, ChevronRight, Copy, Files, FolderPlus, PenLine, RotateCw, Trash2, Wand2 } from '@lucide/vue'
+import { computed, ref } from 'vue'
+import {
+  AlertCircle,
+  ArrowRight,
+  Check,
+  ChevronRight,
+  CircleAlert,
+  Copy,
+  ExternalLink,
+  FilePlus,
+  Files,
+  FolderInput,
+  FolderOpen,
+  FolderPlus,
+  FolderX,
+  Info,
+  Loader2,
+  Lock,
+  PenLine,
+  RotateCw,
+  Trash2,
+  Wand2,
+} from '@lucide/vue'
 import type { BookDockFile } from '@bookorbit/types'
+import { formatList } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
+import { keepBookDockDuplicate } from '../api/book-dock.api'
+import { HOLD_TONE_CLASS, holdChipText, holdStyle } from '../lib/hold-reason'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
 import BookDockCoverPeek from './BookDockCoverPeek.vue'
 import type { BookDockConflict } from '../composables/useBookDockConflicts'
@@ -28,6 +52,8 @@ const props = defineProps<{
   libraryName: string | null
   targetLabel: string
   conflict?: BookDockConflict
+  /** Dock managers may file what waits for a manager and resolve duplicates for anyone. */
+  canManage?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -39,6 +65,8 @@ const emit = defineEmits<{
   open: [BookDockFile]
   discard: [BookDockFile]
   retry: [BookDockFile]
+  /** "Keep both" cleared the duplicate hold; the list should reload the file. */
+  changed: []
 }>()
 
 const { t } = useI18n()
@@ -46,8 +74,50 @@ const { t } = useI18n()
 const title = computed(() => proposedTitle(props.file) ?? displayTitle(props.file))
 const author = computed(() => displayAuthor(props.file))
 const diff = computed(() => metadataDiff(props.file))
-const filable = computed(() => isReadyToFile(props.file))
+const hold = computed(() => props.file.holdReason ?? null)
+const holdTone = computed(() => (hold.value ? HOLD_TONE_CLASS[holdStyle(hold.value).tone] : null))
+const holdIcon = computed(() => (hold.value ? holdStyle(hold.value).icon : null))
+const holdText = computed(() => holdChipText(props.file, t))
+const isDuplicate = computed(() => hold.value === 'duplicate')
+const waitsForManager = computed(() => hold.value === 'waiting_for_manager' && !props.canManage)
+
+/** Holds that "File" cannot get past; each has its own action instead. */
+const BLOCKING_HOLDS = new Set(['duplicate', 'not_allowed_in_library', 'unsupported_layout', 'no_destination', 'no_folder'])
+const filable = computed(() => isReadyToFile(props.file) && !waitsForManager.value && !(hold.value && BLOCKING_HOLDS.has(hold.value)))
 const unassigned = computed(() => isTargetUnassigned(props.file))
+
+/** The destination button names what is wrong with the destination when a hold is about it. */
+const destination = computed(() => {
+  const working = props.file.status !== 'ready' && props.file.status !== 'error'
+  if (hold.value === 'no_destination') return { label: t('bookDock.layout.row.setDestination'), icon: CircleAlert, class: HOLD_TONE_CLASS.sky.action }
+  if (hold.value === 'no_folder') return { label: t('bookDock.hold.action.chooseFolder'), icon: FolderOpen, class: HOLD_TONE_CLASS.sky.action }
+  if (hold.value === 'not_allowed_in_library' || hold.value === 'unsupported_layout') {
+    return { label: t('bookDock.hold.action.moveTo'), icon: FolderInput, class: HOLD_TONE_CLASS.violet.action }
+  }
+  if (unassigned.value) {
+    return working
+      ? null
+      : {
+          label: t('bookDock.layout.row.setDestination'),
+          icon: AlertCircle,
+          class: 'border-dashed border-amber-500/55 bg-amber-500/10 font-semibold text-amber-700 dark:text-amber-300',
+        }
+  }
+  return {
+    label: props.libraryName ?? t('bookDock.fileList.unknownLibrary'),
+    icon: FolderPlus,
+    class: 'border-border bg-muted/55 text-foreground hover:border-primary/40',
+  }
+})
+
+const alsoIn = computed(() => (props.file.alsoIn?.length ? t('bookDock.layout.row.alsoIn', { libraries: formatList(props.file.alsoIn) }) : ''))
+const formerLibrary = computed(() =>
+  props.file.formerLibraryName ? t('bookDock.layout.row.fromDeletedLibrary', { library: props.file.formerLibraryName }) : '',
+)
+
+const keepingBoth = ref(false)
+const keepBothFailed = ref(false)
+const existingBookId = computed(() => props.file.holdDetail?.bookId ?? null)
 const newCover = computed(() => proposedCoverUrl(props.file))
 
 const state = computed(() => metadataState(props.file))
@@ -63,6 +133,7 @@ const canRefetch = computed(() => props.file.status === 'ready' || props.file.st
 
 const edgeClass = computed(() => {
   if (props.file.status === 'error' || props.conflict) return 'border-l-red-500/60'
+  if (holdTone.value && hold.value !== 'waiting_for_manager') return holdTone.value.edge
   if (weakMatch.value) return 'border-l-amber-500/60'
   return 'border-l-transparent'
 })
@@ -118,6 +189,15 @@ function onDiscard() {
 function onRetry() {
   emit('retry', props.file)
 }
+async function onKeepBoth() {
+  if (keepingBoth.value) return
+  keepingBoth.value = true
+  keepBothFailed.value = false
+  const result = await keepBookDockDuplicate(props.file.id)
+  keepingBoth.value = false
+  if (result.ok) emit('changed')
+  else keepBothFailed.value = true
+}
 </script>
 
 <template>
@@ -149,8 +229,27 @@ function onRetry() {
       >
         <span class="block truncate text-[13px] font-medium tracking-tight text-foreground">{{ title }}</span>
         <span class="mt-0.5 block truncate text-[11.5px] text-muted-foreground">{{ subtitle }}</span>
-        <span class="mt-0.5 block truncate text-[10.5px]" :class="unassigned ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'">
-          {{ props.targetLabel }}
+        <span
+          class="mt-0.5 flex min-w-0 items-center gap-2 text-[10.5px]"
+          :class="unassigned ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'"
+        >
+          <span class="truncate">{{ props.targetLabel }}</span>
+          <span
+            v-if="alsoIn"
+            data-testid="book-dock-row-also-in"
+            class="inline-flex shrink-0 items-center gap-[3px] font-semibold text-sky-600 dark:text-sky-400"
+          >
+            <Info class="size-2.5" aria-hidden="true" />
+            {{ alsoIn }}
+          </span>
+          <span
+            v-if="formerLibrary"
+            data-testid="book-dock-row-former-library"
+            class="inline-flex shrink-0 items-center gap-[3px] font-semibold text-muted-foreground"
+          >
+            <FolderX class="size-2.5" aria-hidden="true" />
+            {{ formerLibrary }}
+          </span>
         </span>
       </button>
 
@@ -163,6 +262,17 @@ function onRetry() {
         >
           <Files class="size-2.5" aria-hidden="true" />
           {{ t('bookDock.layout.unit.fileCount', { count: props.file.unitFiles.length }) }}
+        </span>
+
+        <span
+          v-if="hold && holdTone"
+          data-testid="book-dock-row-hold"
+          class="inline-flex shrink-0 cursor-default items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold"
+          :class="holdTone.chip"
+          :title="waitsForManager ? t('bookDock.hold.managerHint') : holdText"
+        >
+          <component :is="holdIcon" class="size-2.5" aria-hidden="true" />
+          {{ holdText }}
         </span>
 
         <!-- Known before finalize rather than discovered during it. -->
@@ -178,8 +288,9 @@ function onRetry() {
         <BookDockStatusBadge v-if="props.file.status !== 'ready'" :status="props.file.status" />
 
         <span
-          v-if="hasScore"
+          v-if="hasScore && hold !== 'low_confidence'"
           class="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold tabular-nums"
+          :data-narrow-hidden="hold ? '1' : undefined"
           :class="confidenceBadgeClass(props.file.confidence)"
         >
           {{ t('bookDock.layout.row.match', { percent: props.file.confidence }) }}
@@ -206,20 +317,15 @@ function onRetry() {
         </button>
 
         <button
+          v-if="destination"
           type="button"
+          data-testid="book-dock-row-destination"
           class="inline-flex h-7 max-w-[11rem] items-center gap-1.5 rounded-lg border px-2 text-[11.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-          :class="
-            unassigned
-              ? 'border-dashed border-amber-500/55 bg-amber-500/10 font-semibold text-amber-700 dark:text-amber-300'
-              : 'border-border bg-muted/55 text-foreground hover:border-primary/40'
-          "
+          :class="destination.class"
           @click="onSetDestination"
         >
-          <AlertCircle v-if="unassigned" class="size-3 shrink-0" aria-hidden="true" />
-          <FolderPlus v-else class="size-3 shrink-0" aria-hidden="true" />
-          <span class="truncate">{{
-            unassigned ? t('bookDock.layout.row.setDestination') : (props.libraryName ?? t('bookDock.fileList.unknownLibrary'))
-          }}</span>
+          <component :is="destination.icon" class="size-3 shrink-0" aria-hidden="true" />
+          <span class="truncate">{{ destination.label }}</span>
         </button>
       </span>
 
@@ -261,7 +367,29 @@ function onRetry() {
         </span>
 
         <button
-          v-if="filable"
+          v-if="isDuplicate"
+          type="button"
+          data-testid="book-dock-row-resolve"
+          class="row-file inline-flex h-7 items-center gap-1.5 rounded-lg bg-red-500/15 px-2.5 text-[11.5px] font-medium text-red-700 transition-colors hover:bg-red-500/22 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-red-300"
+          :aria-expanded="props.expanded"
+          @click="onToggleExpand"
+        >
+          <Copy class="size-3" aria-hidden="true" />
+          {{ t('bookDock.hold.action.resolve') }}
+        </button>
+
+        <span
+          v-else-if="waitsForManager"
+          data-testid="book-dock-row-locked"
+          class="inline-grid size-7 place-items-center text-muted-foreground"
+          :title="t('bookDock.hold.managerHint')"
+        >
+          <Lock class="size-3.5" aria-hidden="true" />
+          <span class="sr-only">{{ t('bookDock.hold.managerHint') }}</span>
+        </span>
+
+        <button
+          v-else-if="filable"
           type="button"
           class="row-file inline-flex h-7 items-center gap-1.5 rounded-lg bg-primary px-2.5 text-[11.5px] font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           @click="onFile"
@@ -302,7 +430,66 @@ function onRetry() {
         </ol>
       </div>
 
-      <div class="rounded-lg border border-border bg-card p-3">
+      <div
+        v-if="isDuplicate"
+        role="group"
+        data-testid="book-dock-row-duplicate"
+        :aria-label="holdText"
+        class="grid gap-3 rounded-[10px] border border-red-500/35 bg-card p-3"
+      >
+        <div class="flex items-center gap-2">
+          <p class="text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">{{ holdText }}</p>
+          <span class="h-px flex-1 bg-border" />
+          <RouterLink
+            v-if="existingBookId"
+            :to="{ name: 'book-detail', params: { bookId: existingBookId } }"
+            class="inline-flex items-center gap-1 text-[11px] font-medium text-foreground hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            {{ t('bookDock.hold.duplicate.openExisting') }}
+            <ExternalLink class="size-3" aria-hidden="true" />
+          </RouterLink>
+        </div>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <button
+            type="button"
+            data-testid="book-dock-row-add-format"
+            class="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            @click="onFile"
+          >
+            <FilePlus class="size-3.5" aria-hidden="true" />
+            {{ t('bookDock.hold.duplicate.addAsFormat') }}
+          </button>
+          <button
+            v-if="props.canManage"
+            type="button"
+            data-testid="book-dock-row-keep-both"
+            class="inline-flex h-8 items-center gap-1.5 rounded-lg border border-border px-3 text-xs font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-60"
+            :disabled="keepingBoth"
+            @click="onKeepBoth"
+          >
+            <Loader2 v-if="keepingBoth" class="size-3.5 animate-spin" aria-hidden="true" />
+            <Files v-else class="size-3.5" aria-hidden="true" />
+            {{ t('bookDock.hold.duplicate.keepBoth') }}
+          </button>
+          <button
+            type="button"
+            data-testid="book-dock-row-duplicate-discard"
+            class="inline-flex h-8 items-center gap-1.5 rounded-lg px-3 text-xs font-medium text-red-600 transition-colors hover:bg-red-500/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-red-400"
+            @click="onDiscard"
+          >
+            <Trash2 class="size-3.5" aria-hidden="true" />
+            {{ t('bookDock.discard') }}
+          </button>
+          <p class="basis-full text-[11px] text-muted-foreground">
+            {{ props.canManage ? t('bookDock.hold.duplicate.hint') : t('bookDock.hold.duplicate.hintMember') }}
+          </p>
+          <p v-if="keepBothFailed" role="alert" class="basis-full text-[11px] text-red-600 dark:text-red-400">
+            {{ t('bookDock.hold.duplicate.keepBothFailed') }}
+          </p>
+        </div>
+      </div>
+
+      <div v-else class="rounded-lg border border-border bg-card p-3">
         <div class="mb-2 flex items-center gap-2">
           <p class="text-[9.5px] font-semibold uppercase tracking-[0.09em] text-muted-foreground">
             {{ t('bookDock.layout.row.proposedChanges') }}
@@ -378,7 +565,12 @@ function onRetry() {
     padding-inline-start: 1.75rem;
   }
 
-  .row-file {
+  .row-meta {
+    flex-wrap: wrap;
+  }
+
+  .row-file,
+  [data-narrow-hidden='1'] {
     display: none;
   }
 }

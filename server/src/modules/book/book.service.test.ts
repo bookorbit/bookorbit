@@ -29,6 +29,7 @@ import { BulkEditFieldsDto } from './dto/bulk-edit-metadata.dto';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookService } from './book.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
+import { readEpubAudioTimelineSeconds } from '../reader/epub/epub-audio-timeline';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
 import { EMPTY_CONTENT_FILTER_RULES } from '@bookorbit/types';
 
@@ -68,6 +69,10 @@ vi.mock('../metadata/lib/pdf-parser', () => ({
   parsePdfFile: vi.fn(),
 }));
 
+vi.mock('../reader/epub/epub-audio-timeline', () => ({
+  readEpubAudioTimelineSeconds: vi.fn(),
+}));
+
 vi.mock('../reader/epub/epub-media-overlay-capability', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../reader/epub/epub-media-overlay-capability')>();
   return { ...actual, inspectEpubMediaOverlayFields: vi.fn(actual.inspectEpubMediaOverlayFields) };
@@ -84,6 +89,7 @@ const mockParseFb2File = parseFb2File as MockedFunction<typeof parseFb2File>;
 const mockParseMobiFile = parseMobiFile as MockedFunction<typeof parseMobiFile>;
 const mockParsePdfFile = parsePdfFile as MockedFunction<typeof parsePdfFile>;
 const mockInspectMediaOverlayFields = vi.mocked(inspectEpubMediaOverlayFields);
+const mockReadAudioTimelineSeconds = vi.mocked(readEpubAudioTimelineSeconds);
 
 function makeUser(overrides?: Partial<RequestUser>): RequestUser {
   return {
@@ -154,6 +160,8 @@ function makeService(
     findKoboSyncCollectionNamesForBook: vi.fn(),
     findFileById: vi.fn(),
     updateBookFile: vi.fn().mockResolvedValue(undefined),
+    findAudioTimeline: vi.fn().mockResolvedValue(null),
+    saveAudioTimeline: vi.fn().mockResolvedValue(undefined),
     updateBookPrimaryFile: vi.fn().mockResolvedValue(undefined),
     findLibraryIdByBookId: vi.fn(),
     findProgress: vi.fn(),
@@ -232,6 +240,8 @@ function makeService(
     scheduleWrite: vi.fn(),
     cancelPendingWrite: vi.fn(),
     writeToFile: vi.fn(),
+    embedAudioCover: vi.fn(),
+    findBookIdsWithReadAlongFiles: vi.fn(),
     findLibraryWriteSettingsForBook: vi.fn().mockResolvedValue({ fileWriteEnabled: false, fileRenameEnabled: false }),
     resolveBookFileWriteStatus: vi.fn().mockReturnValue({ enabled: false, reason: 'library_disabled', writableFormats: [], writableFields: [] }),
   };
@@ -986,6 +996,15 @@ describe('BookService', () => {
       );
 
       expect(coverStore.resolve).toHaveBeenCalledWith(9, { variant: 'cover', medium: 'audio', strict: true });
+    });
+
+    it('asks the slot store for the screen-sized copy when the display size is requested', async () => {
+      const { service, bookRepo, coverStore } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(5);
+
+      await service.getCoverPath(9, makeUser(), { medium: 'ebook', size: 'display' });
+
+      expect(coverStore.resolve).toHaveBeenCalledWith(9, { variant: 'display', medium: 'ebook' });
     });
 
     it('resolves the thumbnail through the slot store', async () => {
@@ -2769,79 +2788,103 @@ describe('BookService', () => {
       expect(bookMetadataLockService.assertFieldsUnlocked).not.toHaveBeenCalled();
     });
 
-    it('stops bulk metadata refresh when cancelled', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
-      const onProgress = vi.fn();
+    describe('bulk run items', () => {
+      it('refreshMetadataBulkItem refreshes one book live or from the cache as asked', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        const user = makeUser();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
 
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-        { id: 3, libraryId: 7 },
-      ]);
+        await expect(service.refreshMetadataBulkItem(1, user)).resolves.toEqual({ status: 'success', detail: { id: 1 } });
+        await service.refreshMetadataBulkItem(1, user, { ignoreCache: true });
 
-      const result = await service.bulkRefreshMetadata([1, 2, 3], user, onProgress, {
-        isCancelled: () => refreshSpy.mock.calls.length > 0,
+        expect(libraryService.verifyAccessLevel).toHaveBeenCalledWith(user, 7, 'editor');
+        expect(refreshSpy).toHaveBeenNthCalledWith(1, 1, false, user, { cacheDirective: { policy: 'default', allowFallback: true } });
+        expect(refreshSpy).toHaveBeenNthCalledWith(2, 1, false, user, { cacheDirective: { policy: 'refresh', allowFallback: true } });
       });
 
-      expect(result).toEqual({ processed: 1, failed: 0 });
-      expect(refreshSpy).toHaveBeenCalledTimes(1);
-      expect(onProgress).toHaveBeenCalledTimes(1);
-    });
+      it('refreshMetadataBulkItem turns a provider failure into a failed item instead of a throw', async () => {
+        const { service, bookRepo } = makeService();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        vi.spyOn(service, 'refreshMetadata').mockRejectedValue(new Error('provider timeout'));
 
-    it('stops bulk metadata refresh when progress callback throws', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
+        await expect(service.refreshMetadataBulkItem(1, makeUser())).resolves.toEqual({ status: 'failed', error: 'provider timeout' });
+      });
 
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-      ]);
+      it('passes over a book deleted or out of reach since the run was queued', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        const user = makeUser();
+        const refreshSpy = vi.spyOn(service, 'refreshMetadata');
+        bookRepo.findLibraryIdByBookId.mockResolvedValueOnce(null).mockResolvedValueOnce(7);
+        libraryService.verifyAccessLevel.mockRejectedValueOnce(new ForbiddenException('Editor access required'));
 
-      const onProgress = vi
-        .fn()
-        .mockImplementationOnce(() => {
-          throw new Error('stream closed');
-        })
-        .mockImplementation(() => undefined);
+        await expect(service.refreshMetadataBulkItem(1, user)).resolves.toEqual({ status: 'skipped', code: 'not-found' });
+        await expect(service.refreshMetadataBulkItem(2, user)).resolves.toEqual({ status: 'skipped', code: 'no-access' });
 
-      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
+        expect(refreshSpy).not.toHaveBeenCalled();
+      });
 
-      expect(result).toEqual({ processed: 1, failed: 0 });
-      expect(refreshSpy).toHaveBeenCalledTimes(1);
-      expect(onProgress).toHaveBeenCalledTimes(1);
-    });
+      it('passes over a book deleted between the access check and the refresh', async () => {
+        const { service, bookRepo } = makeService();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        vi.spyOn(service, 'refreshMetadata').mockRejectedValue(new NotFoundException('Book 1 not found'));
 
-    it('bulkRefreshMetadata delegates each item to non-preview refreshMetadata', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
-      const onProgress = vi.fn();
+        await expect(service.refreshMetadataBulkItem(1, makeUser())).resolves.toEqual({ status: 'skipped', code: 'not-found' });
+      });
 
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-      ]);
+      it('reExtractCoverBulkItem reads only that book and reports attempted, locked and sourceless books', async () => {
+        const { service, bookRepo, bookMetadataLockService, metadataService } = makeService();
+        const user = makeUser();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        bookRepo.findCoverSourceFilesByBookIds.mockImplementation((ids: number[]) =>
+          Promise.resolve(
+            ids
+              .filter((id) => id !== 3)
+              .map((id) => ({
+                id: id * 10,
+                bookId: id,
+                absolutePath: `/books/${id}.epub`,
+                format: 'epub',
+                role: 'content',
+                sizeBytes: 10,
+                mediaOverlayAvailable: false,
+                formatPriority: ['epub', 'm4b'],
+              })),
+          ),
+        );
+        bookMetadataLockService.getCoverLockedBookIds.mockImplementation((ids: number[]) => Promise.resolve(new Set(ids.filter((id) => id === 2))));
+        metadataService.refreshCoverForBook.mockResolvedValue(true);
 
-      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
+        await expect(service.reExtractCoverBulkItem(1, user)).resolves.toEqual({ status: 'attempted', updated: true });
+        await expect(service.reExtractCoverBulkItem(2, user)).resolves.toEqual({ status: 'locked' });
+        await expect(service.reExtractCoverBulkItem(3, user)).resolves.toEqual({ status: 'no-source' });
 
-      expect(result).toEqual({ processed: 2, failed: 0 });
-      expect(refreshSpy).toHaveBeenCalledWith(1, false, user, { cacheDirective: { policy: 'default', allowFallback: true } });
-      expect(refreshSpy).toHaveBeenCalledWith(2, false, user, { cacheDirective: { policy: 'default', allowFallback: true } });
-      expect(onProgress).toHaveBeenCalledTimes(2);
-    });
+        expect(bookRepo.findCoverSourceFilesByBookIds.mock.calls).toEqual([[[1]], [[2]], [[3]]]);
+        expect(metadataService.refreshCoverForBook).toHaveBeenCalledOnce();
+        expect(metadataService.refreshCoverForBook).toHaveBeenCalledWith(1, '/books/1.epub', 'epub', 'ebook');
+      });
 
-    it('bulkRefreshMetadata asks providers live when the caller ignores the cache', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      const refreshSpy = vi.spyOn(service, 'refreshMetadata').mockResolvedValue({ id: 1 } as never);
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 1, libraryId: 7 }]);
+      it('reExtractCoverBulkItem passes over a book the actor can no longer edit', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+        libraryService.verifyAccessLevel.mockRejectedValue(new ForbiddenException('Editor access required'));
 
-      await service.bulkRefreshMetadata([1], user, undefined, { ignoreCache: true });
+        await expect(service.reExtractCoverBulkItem(1, makeUser())).resolves.toEqual({ status: 'skipped', code: 'no-access' });
 
-      expect(refreshSpy).toHaveBeenCalledWith(1, false, user, { cacheDirective: { policy: 'refresh', allowFallback: true } });
+        expect(bookRepo.findCoverSourceFilesByBookIds).not.toHaveBeenCalled();
+      });
+
+      it('findReadAlongBookIds reads the selection in bounded chunks', async () => {
+        const { service, fileWriteService } = makeService();
+        const ids = Array.from({ length: 2500 }, (_, index) => index + 1);
+        fileWriteService.findBookIdsWithReadAlongFiles.mockImplementation((chunk: number[]) =>
+          Promise.resolve(chunk.filter((id) => id % 1000 === 0)),
+        );
+
+        await expect(service.findReadAlongBookIds(ids)).resolves.toEqual(new Set([1000, 2000]));
+
+        expect(fileWriteService.findBookIdsWithReadAlongFiles.mock.calls.map(([chunk]) => (chunk as number[]).length)).toEqual([1000, 1000, 500]);
+      });
     });
 
     it('removes every content file before deleting records, then cleans up covers', async () => {
@@ -4511,46 +4554,6 @@ describe('BookService', () => {
       await expect(service.refreshMetadata(1, false, user)).rejects.toThrow('provider timeout');
     });
 
-    it('bulkRefreshMetadata increments failed count when individual books fail', async () => {
-      const { service, bookRepo } = makeService();
-      const user = makeUser();
-      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
-        { id: 1, libraryId: 7 },
-        { id: 2, libraryId: 7 },
-      ]);
-      const refreshSpy = vi
-        .spyOn(service, 'refreshMetadata')
-        .mockRejectedValueOnce(new Error('failed one'))
-        .mockResolvedValueOnce({ id: 2 } as never);
-      const onProgress = vi.fn();
-
-      const result = await service.bulkRefreshMetadata([1, 2], user, onProgress);
-
-      expect(result).toEqual({ processed: 1, failed: 1 });
-      expect(refreshSpy).toHaveBeenCalledTimes(2);
-      expect(onProgress).toHaveBeenCalledTimes(2);
-    });
-
-    it('bulkRefreshMetadata returns zero counts without checking access when no books are requested', async () => {
-      const { service, bookRepo } = makeService();
-
-      await expect(service.bulkRefreshMetadata([], makeUser())).resolves.toEqual({ processed: 0, failed: 0 });
-
-      expect(bookRepo.findLibraryIdsByBookIds).not.toHaveBeenCalled();
-    });
-
-    it('bulkRefreshMetadata logs and rethrows access failures before iteration starts', async () => {
-      const { service } = makeService();
-      const warnSpy = vi.spyOn((service as unknown as { logger: { warn: (message: string) => void } }).logger, 'warn').mockImplementation();
-      const user = makeUser();
-      const accessError = new ForbiddenException('denied');
-      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockRejectedValue(accessError);
-
-      await expect(service.bulkRefreshMetadata([1], user)).rejects.toThrow(accessError);
-
-      expect(warnSpy).toHaveBeenCalled();
-    });
-
     it('bulkReExtractCover aborts early when cancellation is requested', async () => {
       const { service, bookRepo } = makeService();
       const user = makeUser();
@@ -5348,6 +5351,8 @@ describe('BookService', () => {
       bookRepo: ReturnType<typeof makeService>['bookRepo'],
       overlay: { mediaOverlayDurationSeconds: number | null; mediaOverlayCheckedAt: Date | null },
     ) {
+      mockStat.mockResolvedValue({ size: 10, mtimeMs: 1_790_000_000_000.25 } as Awaited<ReturnType<typeof stat>>);
+      bookRepo.findAudioTimeline.mockResolvedValue(null);
       bookRepo.findById.mockResolvedValue({
         book: {
           books: {
@@ -5408,6 +5413,7 @@ describe('BookService', () => {
         mediaOverlayCheckedAt: new Date('2026-10-01T00:00:00.000Z'),
       };
       mockInspectMediaOverlayFields.mockResolvedValueOnce(inspected);
+      mockReadAudioTimelineSeconds.mockResolvedValue(21103.35);
 
       const result = await service.getDetail(31, makeUser());
 
@@ -5427,19 +5433,113 @@ describe('BookService', () => {
     });
 
     it.each([
-      ['an unknown duration', null, 'unavailable', 'missing_duration'],
-      ['a measured duration', 21103.35, 'enabled', null],
-    ] as const)('trusts a checked read-along EPUB with %s without opening it again', async (_case, durationSeconds, state, unavailableReason) => {
+      ['an audio timeline that cannot be measured', null, 'unavailable', 'missing_duration'],
+      ['an audio timeline close to the audiobook', 21103.35, 'enabled', null],
+      ['an audio timeline far from the audiobook', 15000, 'unavailable', 'duration_mismatch'],
+    ] as const)('judges a checked read-along EPUB with %s without opening it again', async (_case, timelineSeconds, state, unavailableReason) => {
       const { service, bookRepo } = makeService();
       vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
-      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: durationSeconds, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(timelineSeconds);
 
       const result = await service.getDetail(31, makeUser());
 
       expect(mockInspectMediaOverlayFields).not.toHaveBeenCalled();
       expect(bookRepo.updateBookFile).not.toHaveBeenCalled();
-      expect(result.files.find((file) => file.id === 300)?.mediaOverlay).toEqual({ available: true, durationSeconds });
-      expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: durationSeconds, state, unavailableReason }));
+      expect(mockReadAudioTimelineSeconds).toHaveBeenCalledWith('/books/me-talk/readaloud.epub');
+      expect(result.files.find((file) => file.id === 300)?.mediaOverlay).toEqual({ available: true, durationSeconds: 21103.35 });
+      expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: timelineSeconds, state, unavailableReason }));
+    });
+
+    it('enables sync for an EPUB whose clipped sentences cover less than the audiobook but whose audio spans all of it', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 13203.4, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+
+      const result = await service.getDetail(31, makeUser());
+
+      expect(result.files.find((file) => file.id === 300)?.mediaOverlay).toEqual({ available: true, durationSeconds: 13203.4 });
+      expect(result.readAloudSync).toEqual(
+        expect.objectContaining({ audioDurationSeconds: 21103, overlayDurationSeconds: 21090, state: 'enabled', unavailableReason: null }),
+      );
+    });
+
+    it('stores a measured audio timeline against the file size and mtime it was read at', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+
+      await service.getDetail(31, makeUser());
+
+      expect(bookRepo.findAudioTimeline).toHaveBeenCalledWith(300);
+      expect(bookRepo.saveAudioTimeline).toHaveBeenCalledWith({ fileId: 300, sizeBytes: 10, mtimeMs: 1_790_000_000_000.25, totalSeconds: 21090 });
+    });
+
+    it.each([
+      ['a measured length', 21090, 'enabled', null],
+      ['no audio found when it was measured', null, 'unavailable', 'missing_duration'],
+    ] as const)(
+      'answers from a stored audio timeline with %s while the file is unchanged, without opening it',
+      async (_case, totalSeconds, state, unavailableReason) => {
+        const { service, bookRepo } = makeService();
+        vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+        mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+        bookRepo.findAudioTimeline.mockResolvedValue({
+          fileId: 300,
+          sizeBytes: 10,
+          mtimeMs: 1_790_000_000_000.25,
+          totalSeconds,
+          measuredAt: new Date('2026-10-01T00:00:00.000Z'),
+        });
+
+        const result = await service.getDetail(31, makeUser());
+
+        expect(mockReadAudioTimelineSeconds).not.toHaveBeenCalled();
+        expect(bookRepo.saveAudioTimeline).not.toHaveBeenCalled();
+        expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: totalSeconds, state, unavailableReason }));
+      },
+    );
+
+    it.each([
+      ['size', { sizeBytes: 9, mtimeMs: 1_790_000_000_000.25 }],
+      ['mtime', { sizeBytes: 10, mtimeMs: 1_790_000_000_000 }],
+    ] as const)('measures again when the file %s differs from the stored audio timeline', async (_case, stored) => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      bookRepo.findAudioTimeline.mockResolvedValue({ fileId: 300, ...stored, totalSeconds: 15000, measuredAt: new Date('2026-10-01T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+
+      const result = await service.getDetail(31, makeUser());
+
+      expect(mockReadAudioTimelineSeconds).toHaveBeenCalledWith('/books/me-talk/readaloud.epub');
+      expect(bookRepo.saveAudioTimeline).toHaveBeenCalledWith({ fileId: 300, sizeBytes: 10, mtimeMs: 1_790_000_000_000.25, totalSeconds: 21090 });
+      expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: 21090, state: 'enabled' }));
+    });
+
+    it('still answers with the measured audio timeline when storing it fails', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockResolvedValue(21090);
+      bookRepo.saveAudioTimeline.mockRejectedValueOnce(new Error('connection terminated'));
+
+      const result = await service.getDetail(31, makeUser());
+
+      expect(result.readAloudSync).toEqual(expect.objectContaining({ overlayDurationSeconds: 21090, state: 'enabled' }));
+    });
+
+    it('reports a missing duration, and still answers, when the EPUB audio timeline cannot be read', async () => {
+      const { service, bookRepo } = makeService();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      mockReadAlongDetail(bookRepo, { mediaOverlayDurationSeconds: 21103.35, mediaOverlayCheckedAt: new Date('2026-09-30T00:00:00.000Z') });
+      mockReadAudioTimelineSeconds.mockRejectedValue(new Error('end of central directory not found'));
+
+      const result = await service.getDetail(31, makeUser());
+
+      expect(result.readAloudSync).toEqual(expect.objectContaining({ state: 'unavailable', unavailableReason: 'missing_duration' }));
     });
 
     it('preserves null personal detail fields when no user-specific state exists', async () => {
@@ -5530,6 +5630,90 @@ describe('BookService', () => {
           filename: 'foundation.epub',
         }),
       ]);
+    });
+
+    it('returns narrators for a read-along EPUB without audio files, leaving out stored audio details', async () => {
+      const { service, bookRepo, userBookStatusService, comicMetadataService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      bookRepo.findById.mockResolvedValue({
+        book: {
+          books: {
+            id: 12,
+            libraryId: 3,
+            primaryFileId: 400,
+            status: 'present',
+            folderPath: '/books/foundation',
+            addedAt: new Date('2026-02-01T00:00:00.000Z'),
+          },
+          libraries: { name: 'Main', formatPriority: null },
+          book_metadata: {
+            title: 'Foundation',
+            subtitle: null,
+            description: null,
+            isbn10: null,
+            isbn13: null,
+            publisher: null,
+            publishedYear: null,
+            language: null,
+            pageCount: null,
+            seriesName: null,
+            seriesIndex: null,
+            rating: null,
+            coverSource: null,
+            lockedFields: null,
+            googleBooksId: null,
+            goodreadsId: null,
+            amazonId: null,
+            hardcoverId: null,
+            openLibraryId: null,
+            itunesId: null,
+            audibleId: null,
+            koboId: null,
+            comicvineId: null,
+            ranobedbId: null,
+            chapters: [{ title: 'Chapter 1', startMs: 0 }],
+            durationSeconds: 7200,
+            abridged: true,
+            lastWrittenAt: null,
+            metadataScore: null,
+          },
+        },
+        authorRows: [{ id: 2, name: 'Isaac Asimov', sortName: 'Asimov, Isaac' }],
+        genreRows: [{ name: 'Sci-Fi' }],
+        tagRows: [],
+        fileRows: [
+          {
+            id: 400,
+            format: 'epub',
+            role: 'content',
+            sizeBytes: 42,
+            updatedAt: new Date('2026-01-01'),
+            absolutePath: '/books/foundation.epub',
+            createdAt: new Date('2026-02-01T00:00:00.000Z'),
+            durationSeconds: null,
+            mediaOverlayAvailable: true,
+            mediaOverlayDurationSeconds: 3600,
+          },
+        ],
+        narratorRows: [{ id: 4, name: 'Simon Vance', sortName: 'Vance, Simon' }],
+        communityRatingRows: [],
+      });
+      userBookStatusService.findOne.mockResolvedValue(null);
+      comicMetadataService.findByBookId.mockResolvedValue(null);
+      bookRepo.findCollectionsByBookId.mockResolvedValue([]);
+      bookRepo.findRatingByBookAndUser.mockResolvedValue(null);
+
+      const result = await service.getDetail(12, user);
+
+      expect(result.audioMetadata).toEqual({
+        narrators: [{ id: 4, name: 'Simon Vance', sortName: 'Vance, Simon', displayOrder: 0 }],
+        durationSeconds: null,
+        abridged: false,
+        chapters: null,
+        chaptersSource: null,
+        chaptersUpdatedAt: null,
+      });
     });
 
     it('getMetadataFromFile handles missing or unsupported primary files', async () => {
@@ -6628,6 +6812,75 @@ describe('BookService', () => {
       const { service } = makeService();
 
       await expect(service.resolveSelectionToIds({}, makeUser())).rejects.toThrow(BadRequestException);
+    });
+  });
+
+  describe('embedAudioCover', () => {
+    it('refuses a book the user cannot edit before touching any file', async () => {
+      const { service, bookRepo, fileWriteService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(null);
+
+      await expect(service.embedAudioCover(999, makeUser())).rejects.toThrow(NotFoundException);
+
+      expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
+    });
+
+    it("embeds on the user's behalf and returns the write result as it is", async () => {
+      const { service, bookRepo, fileWriteService } = makeService();
+      bookRepo.findLibraryIdByBookId.mockResolvedValue(1);
+      const result = { status: 'skipped', fieldsWritten: [], durationMs: 3, reason: 'no audiobook cover' };
+      fileWriteService.embedAudioCover.mockResolvedValue(result);
+
+      await expect(service.embedAudioCover(10, makeUser({ id: 7 }))).resolves.toEqual(result);
+
+      expect(fileWriteService.embedAudioCover).toHaveBeenCalledWith(10, 7);
+    });
+  });
+
+  describe('embedAudioCoverBulkItem', () => {
+    const user = makeUser({ id: 7 });
+
+    function arrange() {
+      const context = makeService();
+      context.bookRepo.findLibraryIdByBookId.mockResolvedValue(7);
+      return context;
+    }
+
+    it('embeds one book as the actor and returns the write result', async () => {
+      const { service, fileWriteService } = arrange();
+      fileWriteService.embedAudioCover.mockResolvedValue({ status: 'success', code: 'embedded', fieldsWritten: ['audioCoverBytes'], durationMs: 1 });
+
+      await expect(service.embedAudioCoverBulkItem(2, user)).resolves.toEqual({
+        status: 'success',
+        code: 'embedded',
+        fieldsWritten: ['audioCoverBytes'],
+        durationMs: 1,
+      });
+      expect(fileWriteService.embedAudioCover).toHaveBeenCalledWith(2, 7);
+    });
+
+    it('records an unexpected error as a failed book instead of throwing', async () => {
+      const { service, fileWriteService } = arrange();
+      fileWriteService.embedAudioCover.mockRejectedValue(new Error('db down'));
+
+      await expect(service.embedAudioCoverBulkItem(1, user)).resolves.toEqual({
+        status: 'failed',
+        code: 'failed',
+        fieldsWritten: [],
+        durationMs: 0,
+        reason: 'unexpected error',
+      });
+    });
+
+    it('passes over a book that is gone or no longer editable without touching its files', async () => {
+      const { service, bookRepo, libraryService, fileWriteService } = arrange();
+      bookRepo.findLibraryIdByBookId.mockResolvedValueOnce(null);
+      libraryService.verifyAccessLevel.mockRejectedValueOnce(new ForbiddenException('Editor access required'));
+
+      await expect(service.embedAudioCoverBulkItem(1, user)).resolves.toEqual(expect.objectContaining({ status: 'skipped', code: 'not-found' }));
+      await expect(service.embedAudioCoverBulkItem(2, user)).resolves.toEqual(expect.objectContaining({ status: 'skipped', code: 'no-access' }));
+
+      expect(fileWriteService.embedAudioCover).not.toHaveBeenCalled();
     });
   });
 

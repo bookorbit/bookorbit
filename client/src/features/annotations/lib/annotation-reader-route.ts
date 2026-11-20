@@ -5,14 +5,16 @@ import type { RouteLocationRaw } from 'vue-router'
  * Builds the reader deep link for a hub annotation: it opens the annotation's jump
  * file and carries the position as a `cfi` query for reflowable formats or a `page`
  * query for paged formats (PDF). Returns null when the annotation has no resolvable
- * jump file to open.
+ * jump file to open. With `peek`, the reader opens in Peek mode so the visit leaves the
+ * reading position and status alone.
  */
-export function annotationReaderRoute(annotation: AnnotationHubItem): RouteLocationRaw | null {
+export function annotationReaderRoute(annotation: AnnotationHubItem, options: { peek?: boolean } = {}): RouteLocationRaw | null {
   if (!annotation.jumpFileId || !annotation.jumpFileFormat) return null
 
   const query: Record<string, string> = { format: annotation.jumpFileFormat }
   if (annotation.cfi) query.cfi = annotation.cfi
   else if (annotation.pageno != null) query.page = String(annotation.pageno)
+  if (options.peek) query.mode = 'peek'
 
   return {
     name: 'reader',

@@ -9,6 +9,7 @@ import type { ConfiguredCtcDevice, DeviceCheck, ResolvedCtcDevice } from "./acce
 import { workerTmpDir, type WorkerConfig } from "./config.js";
 import { JobRegistry, freeBytes, type RegistryOptions } from "./jobs.js";
 import { errorClass, errorMessage, logLine } from "./log.js";
+import { toRemotePath } from "./path-map.js";
 import { RequestError, within } from "./paths.js";
 import { isJobId, validateRequest } from "./validation.js";
 
@@ -78,8 +79,9 @@ async function handle(request: IncomingMessage, response: ServerResponse, option
       device: options.device,
       configuredDevice: options.configuredDevice,
       deviceCheck: options.deviceCheck,
-      libraryRoots: await registry.libraryRoots(),
-      workRoot: options.config.workRoot,
+      // Reported the way the server names them, since it compares these with its own library paths.
+      libraryRoots: (await registry.libraryRoots()).map((root) => toRemotePath(root, options.config.pathMap)),
+      workRoot: toRemotePath(options.config.workRoot, options.config.pathMap),
       freeBytes: await (options.freeBytes ?? freeBytes)(options.config.workRoot),
       platform: process.platform,
       architecture: process.arch,

@@ -304,59 +304,22 @@ export async function streamAuthorMetadataCandidates(
   }
 }
 
-export async function bulkRefreshAuthorsMetadata(
-  authorIds: number[],
-  onProgress?: (event: BulkAuthorMetadataRefreshEvent) => void,
-  options: IgnoreCacheOptions = {},
-): Promise<BulkAuthorMetadataRefreshResult> {
-  if (authorIds.length === 0) {
-    return { processed: 0, failed: 0, updated: 0 }
-  }
+/** What a bulk author refresh streams: one event per author, then the summary. */
+export type BulkAuthorMetadataRefreshStreamEvent =
+  (BulkAuthorMetadataRefreshEvent & { done?: false }) | (BulkAuthorMetadataRefreshResult & { done: true })
 
-  const res = await api('/api/v1/authors/bulk-refresh-metadata', {
+/**
+ * Starts refreshing several authors as a bulk run on the server. The response streams one
+ * `BulkAuthorMetadataRefreshStreamEvent` per author and then the summary, and names the run in its
+ * `X-Bulk-Run-Id` header. Aborting `signal` only stops reading: the run goes on.
+ */
+export function startBulkAuthorsMetadataRefresh(authorIds: number[], options: IgnoreCacheOptions = {}, signal?: AbortSignal): Promise<Response> {
+  return api('/api/v1/authors/bulk-refresh-metadata', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(withIgnoreCache({ authorIds }, options)),
+    signal,
   })
-  if (!res.ok || !res.body) throw new Error('Failed to refresh author metadata')
-
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let summary: BulkAuthorMetadataRefreshResult = { processed: 0, failed: 0, updated: 0 }
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    for (const line of decoder.decode(value, { stream: true }).split('\n')) {
-      if (!line.startsWith('data: ')) continue
-      try {
-        const payload = JSON.parse(line.slice(6)) as
-          (BulkAuthorMetadataRefreshEvent & { done?: false }) | (BulkAuthorMetadataRefreshResult & { done: true })
-
-        if ('done' in payload && payload.done) {
-          summary = {
-            processed: payload.processed,
-            failed: payload.failed,
-            updated: payload.updated,
-          }
-          continue
-        }
-
-        onProgress?.({
-          authorId: payload.authorId,
-          updated: payload.updated,
-          imageUpdated: payload.imageUpdated,
-          imageUrl: payload.imageUrl,
-          error: payload.error,
-        })
-      } catch {
-        // Ignore malformed SSE payloads
-      }
-    }
-  }
-
-  return summary
 }
 
 /** One provider's person by id; null when the id matches nobody. The cache marker comes back beside it. */

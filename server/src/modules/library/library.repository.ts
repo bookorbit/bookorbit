@@ -177,68 +177,74 @@ export class LibraryRepository {
     });
   }
 
+  /**
+   * Formats count each book once, by its primary file, so they add up to the book count. The size
+   * adds up every file a book has: a multi-track audiobook or a title kept in several formats takes
+   * all of that space on disk, not just its primary file's.
+   */
   async getStats(libraryId: number) {
-    const [countRow] = await this.db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(books)
-      .where(and(eq(books.libraryId, libraryId), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)));
-
-    const formatRows = await this.db
-      .select({
-        format: bookFiles.format,
-        count: sql<number>`count(*)::int`,
-        totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint`,
-      })
-      .from(books)
-      .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-      .where(and(eq(books.libraryId, libraryId), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
-      .groupBy(bookFiles.format);
+    const presentInLibrary = and(eq(books.libraryId, libraryId), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT));
+    const [[countRow], formatRows, [sizeRow]] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(books)
+        .where(presentInLibrary),
+      this.db
+        .select({ format: bookFiles.format, count: sql<number>`count(*)::int` })
+        .from(books)
+        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
+        .where(presentInLibrary)
+        .groupBy(bookFiles.format),
+      this.db
+        .select({ totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint` })
+        .from(bookFiles)
+        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .where(presentInLibrary),
+    ]);
 
     const formatCounts: Record<string, number> = {};
-    let totalSizeBytes = 0n;
     for (const row of formatRows) {
       if (row.format) formatCounts[row.format] = row.count;
-      totalSizeBytes += toBigInt(row.totalSize);
     }
 
     return {
       totalBooks: countRow?.count ?? 0,
-      totalSizeBytes: toSafeNumber(totalSizeBytes),
+      totalSizeBytes: toSafeNumber(toBigInt(sizeRow?.totalSize ?? 0)),
       formatCounts,
     };
   }
 
   /**
-   * The same aggregates as getStats, for many libraries in two round trips instead of two per
-   * library. Book counts come from books alone so titles with no primary file still count, while
-   * sizes and formats need the bookFiles join.
+   * The same aggregates as getStats, for many libraries in three round trips instead of three per
+   * library. Book counts come from books alone so titles with no primary file still count.
    */
   async getStatsForLibraries(libraryIds: number[]) {
     if (libraryIds.length === 0) return new Map<number, LibraryStats>();
 
-    const [countRows, formatRows] = await Promise.all([
+    const presentInLibraries = and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT));
+    const [countRows, formatRows, sizeRows] = await Promise.all([
       this.db
         .select({ libraryId: books.libraryId, count: sql<number>`count(*)::int` })
         .from(books)
-        .where(and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+        .where(presentInLibraries)
         .groupBy(books.libraryId),
       this.db
-        .select({
-          libraryId: books.libraryId,
-          format: bookFiles.format,
-          count: sql<number>`count(*)::int`,
-          totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint`,
-        })
+        .select({ libraryId: books.libraryId, format: bookFiles.format, count: sql<number>`count(*)::int` })
         .from(books)
         .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-        .where(and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT)))
+        .where(presentInLibraries)
         .groupBy(books.libraryId, bookFiles.format),
+      this.db
+        .select({ libraryId: books.libraryId, totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint` })
+        .from(bookFiles)
+        .innerJoin(books, eq(books.id, bookFiles.bookId))
+        .where(presentInLibraries)
+        .groupBy(books.libraryId),
     ]);
 
-    const sizeByLibrary = new Map<number, bigint>();
+    const sizeByLibrary = new Map(sizeRows.map((row) => [row.libraryId, toBigInt(row.totalSize)]));
     const formatsByLibrary = new Map<number, Record<string, number>>();
     for (const row of formatRows) {
-      sizeByLibrary.set(row.libraryId, (sizeByLibrary.get(row.libraryId) ?? 0n) + toBigInt(row.totalSize));
       if (!row.format) continue;
       const formats = formatsByLibrary.get(row.libraryId);
       if (formats) formats[row.format] = row.count;

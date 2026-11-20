@@ -1,3 +1,7 @@
+import type { StoryGuidesAppInfo } from "./story-guide";
+import type { ReadingHelpAppInfo } from "./reading-help";
+import type { VisionScanAppInfo } from "./vision-scan";
+
 /**
  * Capabilities this server supports, advertised so a client can tell a newer server from an
  * older one before sending a field or calling a route the older one would reject. Append only:
@@ -29,6 +33,10 @@ export const SERVER_FEATURES = [
    * provider match.
    */
   "author-metadata-match",
+  /** `PATCH /authors/:id` accepts `gender`, and book filters accept the `authorGender` field. */
+  "author-gender",
+  /** Book filters accept the `storyGuide` field for built Story Guide artifacts. */
+  "story-guide-filter",
   /**
    * `GET /metadata-fetch/stream` accepts `resultsPerProvider` (up to
    * `METADATA_SEARCH_MAX_RESULTS_PER_PROVIDER`), and Open Library and Hardcover answer a search that
@@ -39,6 +47,8 @@ export const SERVER_FEATURES = [
   "relative-date-ranges",
   /** The `format` book filter accepts `epub:readalong` for EPUBs with media overlays. */
   "read-along-filter",
+  /** The `format` book filter accepts `epub:plain` for EPUBs without media overlays. */
+  "plain-epub-filter",
   /**
    * `GET /reading-history` (offset pages, the first carrying every month's size), `/summary`,
    * `/:attemptId/marks` and `PATCH /:attemptId/rating`.
@@ -84,6 +94,35 @@ export const SERVER_FEATURES = [
    * Attest guards accept its signature with `X-BookOrbit-Attest-Nonce` beside the other three headers.
    */
   "android-key-attest",
+  /**
+   * `GET /books/:bookId/story-guide` with its build, retry, cancel and delete routes, and
+   * `GET /mobile/books/files/:fileId/story-guide` for the guide itself. `app-info` carries
+   * `storyGuides`.
+   */
+  "story-guides",
+  /**
+   * `GET /mobile/books/files/:fileId/story-guide/fixes` pages the fixes made to a text's story guide
+   * for everyone by revision cursor, with the ones that find no target marked, and
+   * `PUT /mobile/books/files/:fileId/story-guide/fixes/:id` writes one. The guide is served with them
+   * applied, and its status carries `guide.orphanedFixes`.
+   */
+  "story-guide-fixes",
+  /**
+   * `POST /mobile/vision-scan` reads the books in a photo of a cover or a shelf with the admin's AI
+   * model and matches them to the reader's libraries. `app-info` carries `visionScan`.
+   */
+  "vision-scan",
+  /**
+   * `POST /mobile/reading-help` writes a short answer about passages of a book with the admin's AI
+   * model and streams it back. `app-info` carries `readingHelp`.
+   */
+  "reading-help",
+  /**
+   * `POST /books/:id/embed-audio-cover` and `POST /books/bulk-embed-audio-cover` write a book's square
+   * audiobook cover into its read-along EPUBs. The single route answers a `WriteResult` with `code`
+   * (`AudioCoverEmbedCode`), where a client that does not know a code reads `status`.
+   */
+  "audio-cover-embed",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
@@ -97,6 +136,12 @@ export interface AppInfoResponse {
   maxUploadSizeMb: number;
   /** Absent on servers older than the field itself, which a client treats as an empty list. */
   features?: ServerFeature[];
+  /** Whether story guides can be built and whether any exists; absent on servers without them. */
+  storyGuides?: StoryGuidesAppInfo;
+  /** Whether photo scans can run now; absent on servers without them. */
+  visionScan?: VisionScanAppInfo;
+  /** Whether reading help can answer now; absent on servers without it. */
+  readingHelp?: ReadingHelpAppInfo;
 }
 
 /** Public, credential-free identity check for explicitly enrolled connection aliases. */

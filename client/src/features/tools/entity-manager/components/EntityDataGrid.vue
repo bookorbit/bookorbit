@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CircleSlash, MoreHorizontal, Pencil, Scissors, Search, Trash2 } from '@lucide/vue'
+import type { RouteLocationRaw } from 'vue-router'
+import { ArrowUpRight, CircleSlash, MoreHorizontal, Pencil, Scissors, Search, Trash2 } from '@lucide/vue'
 import type { BrowseEntityItem, BrowseEntitySortBy, BrowseEntitySortOrder, EntityTypeCapabilities } from '@bookorbit/types'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatNumber } from '@/i18n/formatters'
@@ -19,6 +20,8 @@ const props = defineProps<{
   sortBy: BrowseEntitySortBy
   sortOrder: BrowseEntitySortOrder
   hasActiveFilters: boolean
+  /** Where a name leads, for types that have a page of their own. */
+  itemRoute?: (item: BrowseEntityItem) => RouteLocationRaw | null
 }>()
 
 const emit = defineEmits<{
@@ -40,6 +43,8 @@ const columnCount = computed(() => 4 + (showSortName.value ? 1 : 0) + (showStatu
 
 const allSelected = computed(() => props.items.length > 0 && props.items.every((item) => props.selectedIds.has(item.id)))
 const someSelected = computed(() => !allSelected.value && props.items.some((item) => props.selectedIds.has(item.id)))
+
+const itemRoutes = computed(() => new Map(props.items.map((item) => [item.id, props.itemRoute?.(item) ?? null])))
 
 const cellPadding = computed(() => (props.density === 'compact' ? 'py-1' : 'py-2'))
 const rowHeight = computed(() => (props.density === 'compact' ? 'h-8' : 'h-[46px]'))
@@ -180,7 +185,11 @@ function handleClearFilters(): void {
               />
             </td>
             <td class="max-w-0 px-3 font-medium text-foreground" :class="cellPadding">
-              <span class="block truncate">{{ item.name }}</span>
+              <RouterLink v-if="itemRoutes.get(item.id)" :to="itemRoutes.get(item.id)!" class="entity-name-link">
+                <span class="truncate">{{ item.name }}</span>
+                <ArrowUpRight :size="13" class="entity-name-arrow" aria-hidden="true" />
+              </RouterLink>
+              <span v-else class="block truncate">{{ item.name }}</span>
             </td>
             <td v-if="showSortName" class="max-w-0 px-3 text-muted-foreground" :class="cellPadding">
               <span v-if="item.sortName" class="block truncate">{{ item.sortName }}</span>
@@ -268,7 +277,12 @@ function handleClearFilters(): void {
             @click="handleSelect(item.id, $event)"
           />
           <div class="min-w-0 flex-1">
-            <p class="truncate text-sm font-medium text-foreground">{{ item.name }}</p>
+            <p v-if="itemRoutes.get(item.id)" class="text-sm font-medium text-foreground">
+              <RouterLink :to="itemRoutes.get(item.id)!" class="entity-name-link">
+                <span class="truncate">{{ item.name }}</span>
+              </RouterLink>
+            </p>
+            <p v-else class="truncate text-sm font-medium text-foreground">{{ item.name }}</p>
             <p class="truncate text-xs text-muted-foreground">
               <span v-if="item.sortName">{{ t('tools.entityManager.browse.sortLabel', { sortName: item.sortName }) }} &middot; </span>
               <span :class="item.bookCount === 0 ? 'text-[var(--pill-warning)]' : ''">
@@ -307,3 +321,43 @@ function handleClearFilters(): void {
     </div>
   </div>
 </template>
+
+<style scoped>
+.entity-name-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  border-radius: 4px;
+  color: var(--foreground);
+}
+
+.entity-name-link:hover span {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in oklch, var(--foreground) 45%, transparent);
+}
+
+.entity-name-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.entity-name-arrow {
+  flex: none;
+  color: var(--muted-foreground);
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+tr:hover .entity-name-arrow,
+.entity-name-link:focus-visible .entity-name-arrow {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .entity-name-arrow {
+    transition: none;
+  }
+}
+</style>

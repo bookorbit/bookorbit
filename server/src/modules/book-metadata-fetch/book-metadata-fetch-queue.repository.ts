@@ -27,10 +27,22 @@ import {
   books,
   libraries,
 } from '../../db/schema';
+import { microseconds } from '../jobs/job-keyset';
 
 type Db = NodePgDatabase<typeof schema>;
 
 type BookMetadataFetchStatusSummary = Pick<BookMetadataFetchStatus, 'queued' | 'processing' | 'failed' | 'latestFailureAt'>;
+
+/** What the Jobs area's two summary rows read. Times are epoch microseconds, exact for a sort key. */
+export interface BookMetadataFetchJobCounts {
+  queued: number;
+  processing: number;
+  failed: number;
+  /** When the oldest queued or processing entry was queued; null when none waits. */
+  queueSince: number | null;
+  /** When the newest failure happened; null when none failed. */
+  failedAt: number | null;
+}
 
 export interface PreviewBookRow {
   bookId: number;
@@ -200,6 +212,38 @@ export class BookMetadataFetchQueueRepository {
       }
     }
     return summary;
+  }
+
+  /**
+   * Counts only, for the Jobs area: the grouped count and oldest entry come from the
+   * `(status, created_at, book_id)` index alone, and the latest failure reads failed entries only.
+   */
+  async countForJobs(): Promise<BookMetadataFetchJobCounts> {
+    const [groups, failures] = await Promise.all([
+      this.db
+        .select({ status: bookMetadataFetchQueue.status, cnt: count(), since: microseconds(sql`min(${bookMetadataFetchQueue.createdAt})`) })
+        .from(bookMetadataFetchQueue)
+        .groupBy(bookMetadataFetchQueue.status),
+      this.db
+        .select({ latest: microseconds(sql`max(${bookMetadataFetchQueue.updatedAt})`) })
+        .from(bookMetadataFetchQueue)
+        .where(eq(bookMetadataFetchQueue.status, QUEUE_STATUS.FAILED)),
+    ]);
+
+    const counts: BookMetadataFetchJobCounts = { queued: 0, processing: 0, failed: 0, queueSince: null, failedAt: null };
+    for (const group of groups) {
+      const value = Number(group.cnt);
+      if (group.status === QUEUE_STATUS.FAILED) {
+        counts.failed = value;
+        continue;
+      }
+      if (group.status === QUEUE_STATUS.QUEUED) counts.queued = value;
+      else if (group.status === QUEUE_STATUS.PROCESSING) counts.processing = value;
+      else continue;
+      if (group.since !== null && (counts.queueSince === null || group.since < counts.queueSince)) counts.queueSince = group.since;
+    }
+    if (counts.failed > 0) counts.failedAt = failures[0]?.latest ?? null;
+    return counts;
   }
 
   async resetAllProcessingOnBoot(): Promise<number> {

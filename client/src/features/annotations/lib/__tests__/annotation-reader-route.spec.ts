@@ -44,6 +44,20 @@ describe('annotationReaderRoute', () => {
     })
   })
 
+  it('opens in Peek mode only when asked to', () => {
+    expect(annotationReaderRoute(annotation(), { peek: true })).toEqual({
+      name: 'reader',
+      params: { bookId: 5, fileId: 9 },
+      query: { format: 'epub', cfi: 'epubcfi(/6/4!/4/2/1:0)', mode: 'peek' },
+    })
+    expect(annotationReaderRoute(annotation(), { peek: false })).toEqual(annotationReaderRoute(annotation()))
+    expect(annotationReaderRoute(annotation({ cfi: null, jumpFileFormat: 'pdf', pageno: 42 }), { peek: true })).toEqual({
+      name: 'reader',
+      params: { bookId: 5, fileId: 9 },
+      query: { format: 'pdf', page: '42', mode: 'peek' },
+    })
+  })
+
   it('does not build a route without a jump file and its format', () => {
     expect(annotationReaderRoute(annotation({ jumpFileId: null }))).toBeNull()
     expect(annotationReaderRoute(annotation({ jumpFileFormat: null }))).toBeNull()

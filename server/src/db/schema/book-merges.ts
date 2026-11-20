@@ -85,6 +85,12 @@ export const bookMergeJobs = pgTable(
       .on(t.status)
       .where(sql`${t.status} not in ('done', 'failed', 'rolled_back')`),
     index('book_merge_jobs_library_idx').on(t.libraryId),
+    index('book_merge_jobs_finish_idx')
+      .on(sql`coalesce(${t.finishedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('done', 'failed', 'rolled_back')`),
+    index('book_merge_jobs_user_finish_idx')
+      .on(t.requestedByUserId, sql`coalesce(${t.finishedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('done', 'failed', 'rolled_back')`),
     check('book_merge_jobs_status_chk', sql`${t.status} in ('planned', 'moving', 'committing', 'committed', 'done', 'failed', 'rolled_back')`),
     check('book_merge_jobs_counts_nonnegative_chk', sql`${t.processed} >= 0 and ${t.total} >= 0`),
   ],

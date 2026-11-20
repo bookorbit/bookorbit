@@ -7,7 +7,7 @@ import { MetadataExportOptionsDto } from './metadata-export-options.dto';
 export const METADATA_EXPORT_FORMATS = ['csv', 'json'] as const;
 export type MetadataExportFormat = (typeof METADATA_EXPORT_FORMATS)[number];
 
-export const METADATA_EXPORT_VIEW_TYPES = ['library', 'collection', 'smartScope'] as const;
+export const METADATA_EXPORT_VIEW_TYPES = ['library', 'collection', 'smartScope', 'genre', 'tag'] as const;
 export type MetadataExportViewType = (typeof METADATA_EXPORT_VIEW_TYPES)[number];
 
 export class MetadataExportDto extends BulkSelectionDto {

@@ -14,6 +14,7 @@ import { LibraryScanSchedulerService } from './library-scan-scheduler.service';
 import { LibraryService } from './library.service';
 import { LibraryAddedAtService } from './library-added-at.service';
 import { BulkRenameService } from './bulk-rename.service';
+import { LibraryLifecycleService } from './library-lifecycle.service';
 
 describe('LibraryModule', () => {
   it('registers expected controller/providers/exports', () => {
@@ -24,7 +25,8 @@ describe('LibraryModule', () => {
       LibraryScanSchedulerService,
       BulkRenameService,
       LibraryAddedAtService,
+      LibraryLifecycleService,
     ]);
-    expect(Reflect.getMetadata('exports', LibraryModule)).toEqual([LibraryService, LibraryRepository]);
+    expect(Reflect.getMetadata('exports', LibraryModule)).toEqual([LibraryService, LibraryRepository, LibraryLifecycleService]);
   });
 });

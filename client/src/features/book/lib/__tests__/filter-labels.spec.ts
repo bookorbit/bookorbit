@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CustomMetadataFieldSummary, Rule } from '@bookorbit/types'
-import { RULE_FIELDS, RULE_OPERATORS, SORT_FIELDS } from '@bookorbit/types'
+import { PLAIN_EPUB_FILTER_FORMAT, READ_ALONG_FORMAT_PRIORITY, RULE_FIELDS, RULE_OPERATORS, SORT_FIELDS } from '@bookorbit/types'
 import { activateI18nLocale, i18n } from '@/i18n'
 import { compileIcuCatalog } from '@/i18n/icu'
 import en from '@/locales/en.json'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
-import { fieldLabel, operatorLabel, ruleToParts, sortFieldLabel } from '../filter-labels'
+import { fieldLabel, filterValueLabel, operatorLabel, ruleToParts, ruleToTokenParts, sortFieldLabel } from '../filter-labels'
 
 vi.mock('@/features/book/composables/useActiveCustomFields', () => ({
   activeCustomFieldLabel: vi.fn<(fieldId: number) => string | null>(() => null),
@@ -143,6 +143,31 @@ describe('community rating labels', () => {
   })
 })
 
+describe('author gender labels', () => {
+  it('uses translated field and value labels', () => {
+    expect(fieldLabel('authorGender')).toBe('Author Gender')
+    expect(filterValueLabel('authorGender', 'non_binary')).toBe('Non-binary')
+  })
+
+  it('uses translated values in rule summaries', () => {
+    const rule: Rule = { type: 'rule', field: 'authorGender', operator: 'includesAny', value: ['female', 'non_binary'] }
+    expect(ruleToParts(rule)).toEqual({ field: 'Author Gender', operator: 'includes any of', value: 'Female, Non-binary' })
+  })
+})
+
+describe('format labels', () => {
+  it('names the EPUB edition keys and shows other formats as codes', () => {
+    expect(filterValueLabel('format', READ_ALONG_FORMAT_PRIORITY)).toBe('Read-aloud EPUB')
+    expect(filterValueLabel('format', PLAIN_EPUB_FILTER_FORMAT)).toBe('EPUB without read-aloud')
+    expect(filterValueLabel('format', 'm4b')).toBe('M4B')
+  })
+
+  it('names the plain EPUB key in a filter token', () => {
+    const rule: Rule = { type: 'rule', field: 'format', operator: 'includesAny', value: [PLAIN_EPUB_FILTER_FORMAT, 'm4b'] }
+    expect(ruleToTokenParts(rule).value).toBe('EPUB without read-aloud, M4B')
+  })
+})
+
 describe('ruleToParts', () => {
   it('renders a locked rule with no value', () => {
     const rule: Rule = { type: 'rule', field: 'lockStatus', operator: 'isLocked' }
@@ -161,7 +186,7 @@ describe('ruleToParts', () => {
 
   it('renders withinLast rules with a days suffix', () => {
     const rule: Rule = { type: 'rule', field: 'addedAt', operator: 'withinLast', value: 7 }
-    expect(ruleToParts(rule)).toEqual({ field: 'Added Date', operator: 'within last', value: '7 days' })
+    expect(ruleToParts(rule)).toEqual({ field: 'Date Added', operator: 'within last', value: '7 days' })
   })
 
   it('renders moreThanAgo rules as a day age', () => {
@@ -181,7 +206,7 @@ describe('ruleToParts', () => {
 
   it('formats primary file size values as readable byte sizes', () => {
     const rule: Rule = { type: 'rule', field: 'fileSize', operator: 'between', value: 10_485_760, valueTo: 26_214_400 }
-    expect(ruleToParts(rule)).toEqual({ field: 'Primary File Size', operator: 'between', value: '10 MB - 25 MB' })
+    expect(ruleToParts(rule)).toEqual({ field: 'File Size', operator: 'between', value: '10 MB - 25 MB' })
   })
 
   it('renders an empty value when a valued operator has no value', () => {

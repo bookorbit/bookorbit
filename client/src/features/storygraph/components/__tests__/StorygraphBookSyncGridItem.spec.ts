@@ -42,6 +42,7 @@ function makeSettings(overrides: Partial<StorygraphSettings> = {}): StorygraphSe
     bookSyncMode: 'all_eligible',
     autoSyncOnStatusChange: true,
     autoSyncOnProgressUpdate: true,
+    excludedLibraryIds: [],
     lastSyncedAt: null,
     ...overrides,
   }

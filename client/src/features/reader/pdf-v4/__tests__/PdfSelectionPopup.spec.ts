@@ -10,7 +10,7 @@ const tooltipStubs = {
 
 function mountPopup(selectedText: string) {
   return mount(PdfSelectionPopup, {
-    props: { visible: true, position: { x: 10, y: 10 }, showBelow: true, selectedText, overlappingAnnotationId: null },
+    props: { visible: true, selectedText, overlappingAnnotationId: null },
     global: { stubs: tooltipStubs },
   })
 }
@@ -28,8 +28,6 @@ describe('PdfSelectionPopup', () => {
     const wrapper = mount(PdfSelectionPopup, {
       props: {
         visible: true,
-        position: { x: 10, y: 10 },
-        showBelow: true,
         selectedText: 'selected text',
         overlappingAnnotationId: null,
       },

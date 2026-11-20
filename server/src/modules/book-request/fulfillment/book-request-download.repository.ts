@@ -118,7 +118,7 @@ export class BookRequestDownloadRepository {
   async failInFlightForRequest(requestId: number, reason: string): Promise<number> {
     const rows = await this.db
       .update(bookRequestDownloads)
-      .set({ status: 'failed', errorMessage: reason })
+      .set({ status: 'failed', errorMessage: reason, failureCode: 'removed' })
       .where(and(eq(bookRequestDownloads.requestId, requestId), inArray(bookRequestDownloads.status, [...IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES])))
       .returning({ id: bookRequestDownloads.id });
     return rows.length;
@@ -263,7 +263,7 @@ export class BookRequestDownloadRepository {
       return await this.db.transaction(async (tx) => {
         const [download] = await tx
           .update(bookRequestDownloads)
-          .set({ ...data, downloadClientId: clientId, errorMessage: null })
+          .set({ ...data, downloadClientId: clientId, errorMessage: null, failureCode: null })
           .where(
             and(eq(bookRequestDownloads.id, downloadId), eq(bookRequestDownloads.clientKey, clientKey), eq(bookRequestDownloads.status, 'failed')),
           )

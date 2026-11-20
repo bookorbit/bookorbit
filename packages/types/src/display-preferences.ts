@@ -87,5 +87,7 @@ export interface DisplayPreferences {
   gridCardSecondaryLabel: GridCardLabelField;
   cardInfoMode: CardInfoMode;
   thumbnailClickAction: BookThumbnailClickAction;
+  /** Jumping to a highlight opens the book in Peek mode, leaving progress and read status untouched. */
+  openHighlightsInPeek: boolean;
   placeholderCoverStyle: PlaceholderCoverStyle;
 }

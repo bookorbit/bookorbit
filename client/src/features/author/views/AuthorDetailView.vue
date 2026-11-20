@@ -1,14 +1,16 @@
 <script setup lang="ts">
 import { useWindowSize } from '@vueuse/core'
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowUpDown, ChevronDown, ChevronLeft, ImageMinus, Layers, LayoutGrid, List, Upload } from '@lucide/vue'
+import { ChevronLeft, ImageMinus, Layers, LayoutGrid, List, Upload } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
 import type { AuthorDetail, AuthorSummary, BookCard } from '@bookorbit/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
+import SingleSortControl from '@/features/book/components/sort-filter/SingleSortControl.vue'
+import LibraryMenuButton from '@/components/browse-header/LibraryMenuButton.vue'
 import BookListRow from '@/features/book/components/BookListRow.vue'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import { useScrollRestoreOnActivate } from '@/features/book/composables/useScrollRestoreOnActivate'
@@ -35,6 +37,7 @@ import {
   uploadAuthorImage,
 } from '../api/author'
 import { useAuthorBooks } from '../composables/useAuthorBooks'
+import type { AuthorBookSort, SortDirection } from '../types/author'
 import { useAuthorDetail } from '../composables/useAuthorDetail'
 import { useAuthorMetadataPreview } from '../composables/useAuthorMetadataPreview'
 import EntityNotFound from '@/components/EntityNotFound.vue'
@@ -56,7 +59,9 @@ const { hasPermissionInAnyLibrary } = useLibraryPermissions()
 
 const authorBooksViewMode = ref<'grid' | 'list'>('grid')
 
-const authorId = computed(() => Number(route.params.id))
+// Kept alive per path, so this page's author never changes. The shared route moves on while the
+// page is hidden, and following its `id` would load whichever author shares the next page's id.
+const authorId = shallowRef(Number(route.params.id))
 const { author, loading: loadingAuthor, error: authorError, notFound: authorNotFound, load: loadAuthor } = useAuthorDetail(authorId)
 const {
   items: books,
@@ -155,13 +160,13 @@ const selectedMergeBookCount = computed(() => {
   return mergeCandidates.value.filter((candidate) => selected.has(candidate.id)).reduce((sum, candidate) => sum + candidate.bookCount, 0)
 })
 
-const BOOK_SORT_OPTIONS = [{ value: 'addedAt' }, { value: 'title' }, { value: 'publishedYear' }] as const
+const BOOK_SORT_FIELDS: AuthorBookSort[] = ['addedAt', 'title', 'publishedYear']
 
-const bookSortOptions = computed(() => [
-  { value: 'addedAt', label: t('author.detail.books.sort.recentlyAdded') },
-  { value: 'title', label: t('author.detail.books.sort.title') },
-  { value: 'publishedYear', label: t('author.detail.books.sort.publishedYear') },
-])
+const bookSortLabels = computed<Record<AuthorBookSort, string>>(() => ({
+  addedAt: t('author.detail.books.sort.recentlyAdded'),
+  title: t('author.detail.books.sort.title'),
+  publishedYear: t('author.detail.books.sort.publishedYear'),
+}))
 
 // 'move-to-library' is part of the shared card contract; this view does not
 // opt in, so it never fires here.
@@ -466,20 +471,13 @@ const authorBookGridGap = computed(() => {
   return Math.min(normalizedGap, 12)
 })
 
-function onLibraryFilterChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  libraryId.value = value ? Number(value) : null
+function handleLibraryChange(value: number | null) {
+  libraryId.value = value
 }
 
-function onMobileSortChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  if (BOOK_SORT_OPTIONS.some((option) => option.value === value)) {
-    sort.value = value as (typeof BOOK_SORT_OPTIONS)[number]['value']
-  }
-}
-
-function toggleBookOrder() {
-  order.value = order.value === 'asc' ? 'desc' : 'asc'
+function handleBookSort(field: AuthorBookSort, dir: SortDirection) {
+  sort.value = field
+  order.value = dir
 }
 
 async function refreshMetadata() {
@@ -536,13 +534,6 @@ onUnmounted(() => {
   observer?.disconnect()
   if (mergeSearchTimer) clearTimeout(mergeSearchTimer)
   cancelMetadataPreview()
-})
-
-watch(authorId, () => {
-  selectedMergeIds.value = []
-  mergeCandidates.value = []
-  mergeQuery.value = ''
-  void Promise.all([loadAuthor(), loadBooks(true)]).then(() => loadMetadataPreview())
 })
 
 watch([sort, order, libraryId, collapseSeries], () => {
@@ -722,26 +713,18 @@ defineOptions({ name: 'AuthorDetailView' })
           <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <h2 class="text-sm font-semibold text-foreground">{{ t('author.detail.books.heading') }}</h2>
             <div class="w-full space-y-2 sm:hidden">
-              <div class="grid grid-cols-[minmax(0,1fr)_auto_auto_auto] gap-2">
-                <div class="relative min-w-0">
-                  <select
-                    :value="sort"
-                    class="h-8 w-full appearance-none rounded-md border border-input bg-background px-2.5 pr-8 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-                    @change="onMobileSortChange"
-                  >
-                    <option v-for="opt in bookSortOptions" :key="opt.value" :value="opt.value">
-                      {{ opt.label }}
-                    </option>
-                  </select>
-                  <ArrowUpDown :size="13" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <div class="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2">
+                <div class="flex min-w-0 items-center">
+                  <SingleSortControl
+                    :field="sort"
+                    :dir="order"
+                    :fields="BOOK_SORT_FIELDS"
+                    :labels="bookSortLabels"
+                    default-field="addedAt"
+                    default-dir="desc"
+                    @change="handleBookSort"
+                  />
                 </div>
-
-                <button
-                  class="h-8 rounded-md border border-input bg-background px-2.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  @click="toggleBookOrder"
-                >
-                  {{ order === 'asc' ? t('author.detail.books.asc') : t('author.detail.books.desc') }}
-                </button>
 
                 <button
                   data-testid="author-collapse-series-toggle-mobile"
@@ -781,47 +764,32 @@ defineOptions({ name: 'AuthorDetailView' })
                 </div>
               </div>
 
-              <div class="relative min-w-0">
-                <select
-                  :value="libraryId ?? ''"
-                  class="h-8 w-full appearance-none rounded-md border border-input bg-background px-2.5 pr-8 text-sm text-foreground outline-none transition-colors focus:border-primary/60"
-                  @change="onLibraryFilterChange"
-                >
-                  <option value="">{{ t('author.detail.books.allLibraries') }}</option>
-                  <option v-for="library in libraries" :key="library.id" :value="library.id">
-                    {{ library.name }}
-                  </option>
-                </select>
-                <ChevronDown :size="14" class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground" />
+              <div class="flex">
+                <LibraryMenuButton
+                  :library-id="libraryId"
+                  :libraries="libraries"
+                  :all-label="t('author.detail.books.allLibraries')"
+                  @update:library-id="handleLibraryChange"
+                />
               </div>
             </div>
 
             <div class="hidden flex-wrap items-center gap-2 sm:flex">
-              <select
-                v-model="sort"
-                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-              >
-                <option value="addedAt">{{ t('author.detail.books.sort.recentlyAdded') }}</option>
-                <option value="title">{{ t('author.detail.books.sort.title') }}</option>
-                <option value="publishedYear">{{ t('author.detail.books.sort.publishedYear') }}</option>
-              </select>
-
-              <select
-                v-model="order"
-                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-              >
-                <option value="desc">{{ t('author.detail.books.descending') }}</option>
-                <option value="asc">{{ t('author.detail.books.ascending') }}</option>
-              </select>
-
-              <select
-                :value="libraryId ?? ''"
-                class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-                @change="onLibraryFilterChange"
-              >
-                <option value="">{{ t('author.detail.books.allLibraries') }}</option>
-                <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-              </select>
+              <SingleSortControl
+                :field="sort"
+                :dir="order"
+                :fields="BOOK_SORT_FIELDS"
+                :labels="bookSortLabels"
+                default-field="addedAt"
+                default-dir="desc"
+                @change="handleBookSort"
+              />
+              <LibraryMenuButton
+                :library-id="libraryId"
+                :libraries="libraries"
+                :all-label="t('author.detail.books.allLibraries')"
+                @update:library-id="handleLibraryChange"
+              />
 
               <button
                 data-testid="author-collapse-series-toggle"

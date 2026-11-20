@@ -1,4 +1,5 @@
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
+import { visibleIdsOrAllForPlace } from '../../common/library-visibility/library-visibility';
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import type { ReadingHistoryMarks, ReadingHistoryPage, ReadingHistoryRatingResponse, ReadingHistorySummary } from '@bookorbit/types';
 
@@ -46,10 +47,11 @@ export class ReadingHistoryService implements OnModuleInit, OnModuleDestroy {
     this.readingAttemptEvents.removeListener(READING_ATTEMPT_CHANGED, this.onReadingAttemptChanged);
   }
 
-  private async scope(user: RequestUser): Promise<ReadingHistoryScope> {
+  /** History of one book is about that book, so only the whole-history views leave out libraries hidden from Stats. */
+  private async scope(user: RequestUser, bookId: number | null = null): Promise<ReadingHistoryScope> {
     return {
       userId: user.id,
-      libraryIds: await this.libraryScope.visibleIdsOrAll(user),
+      libraryIds: bookId === null ? await visibleIdsOrAllForPlace(this.libraryScope, user, 'stats') : await this.libraryScope.visibleIdsOrAll(user),
       contentFilters: user.isSuperuser ? undefined : user.contentFilters,
       timeZone: resolveTimeZone(user.settings?.timezone),
     };
@@ -66,7 +68,7 @@ export class ReadingHistoryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async list(user: RequestUser, query: ReadingHistoryQueryDto): Promise<ReadingHistoryPage> {
-    const scope = await this.scope(user);
+    const scope = await this.scope(user, query.bookId ?? null);
     const filter = {
       period: this.period(query),
       outcomes: query.outcomes?.length ? [...new Set(query.outcomes)] : ['completed' as const],
@@ -161,7 +163,7 @@ export class ReadingHistoryService implements OnModuleInit, OnModuleDestroy {
     const read = await this.repo.findOwnedRead(user.id, attemptId);
     if (!read) throw new NotFoundException('Read not found');
     if (read.bookId === null || read.endedOn === null) return { highlights: [], highlightCount: 0, journal: [], journalCount: 0 };
-    const scope = await this.scope(user);
+    const scope = await this.scope(user, read.bookId);
     return this.repo.marks(user.id, { bookId: read.bookId, startedOn: read.startedOn, endedOn: read.endedOn }, scope.timeZone, MARKS_PREVIEW);
   }
 

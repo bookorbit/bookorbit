@@ -118,8 +118,7 @@ function toggleExpanded() {
           <del
             v-if="part.kind === 'removed'"
             class="rounded-[3px] bg-destructive/20 decoration-destructive/70 [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
-            >{{ part.text }}</del
-          ><ins
+            >{{ part.text }}</del><ins
             v-else-if="part.kind === 'added'"
             class="rounded-[3px] bg-success/25 no-underline [box-decoration-break:clone] [-webkit-box-decoration-break:clone]"
             >{{ part.text }}</ins

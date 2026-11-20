@@ -13,7 +13,16 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const fetchLibraries = vi.fn<() => Promise<void>>()
 const startUpload = vi.fn<(...args: unknown[]) => Promise<void>>()
+const startDockUpload = vi.fn<(libraryId: number) => Promise<void>>()
+const applyAllowedFormats = vi.fn<(formats: readonly string[]) => void>()
 const files = ref<FileUploadItem[]>([])
+const { dockTargetsMock, permissions } = vi.hoisted(() => ({
+  dockTargetsMock: vi.fn<() => Promise<{ dockId: number; libraryId: number; libraryName: string; allowedFormats: string[] }[]>>(),
+  permissions: { dockAccess: false },
+}))
+vi.mock('@/features/auth/composables/useAuth', () => ({ useAuth: () => ({ user: ref({ id: 12 }) }) }))
+vi.mock('@/features/auth/composables/usePermissions', () => ({ usePermissions: () => ({ hasPermission: () => permissions.dockAccess }) }))
+vi.mock('@/features/book-dock/api/book-dock.api', () => ({ fetchDockUploadTargets: dockTargetsMock }))
 vi.mock('../../composables/useLibraries', () => ({
   useLibraries: () => ({ libraries, loaded, loading, error, fetchLibraries, refreshLibraries: vi.fn<() => Promise<void>>() }),
 }))
@@ -34,7 +43,9 @@ vi.mock('../../composables/useBookUpload', () => ({
     removeFile: vi.fn<(id: string) => void>(),
     retryFile: vi.fn<(id: string) => void>(),
     reset: vi.fn<() => void>(),
+    applyAllowedFormats,
     startUpload,
+    startDockUpload,
   }),
 }))
 let wrapper: VueWrapper
@@ -54,6 +65,10 @@ beforeEach(() => {
   error.value = null
   fetchLibraries.mockReset().mockResolvedValue(undefined)
   startUpload.mockReset().mockResolvedValue(undefined)
+  startDockUpload.mockReset().mockResolvedValue(undefined)
+  dockTargetsMock.mockReset().mockResolvedValue([{ dockId: 7, libraryId: 3, libraryName: 'Main Library', allowedFormats: [] }])
+  permissions.dockAccess = false
+  localStorage.clear()
   files.value = [{ id: 'book', file: new File(['book'], 'book.epub'), status: 'pending', progress: 0 }]
 })
 afterEach(() => wrapper?.unmount())
@@ -145,5 +160,64 @@ describe('BookUploadModal destination', () => {
     await flushPromises()
     expect(uploadButton().attributes('disabled')).toBeDefined()
     expect(startUpload).not.toHaveBeenCalled()
+  })
+})
+
+describe('BookUploadModal library dock (D23)', () => {
+  function dockButton() {
+    return wrapper.findAll('button').find((button) => button.text().startsWith('Send 1 to Main Library dock'))
+  }
+
+  it('offers no choice to someone without dock access, and does not ask for docks', async () => {
+    mountUpload(3)
+    await flushPromises()
+
+    expect(dockTargetsMock).not.toHaveBeenCalled()
+    expect(wrapper.find('[data-testid="library-upload-mode"]').exists()).toBe(false)
+    await uploadButton().trigger('click')
+    expect(startUpload).toHaveBeenCalledOnce()
+  })
+
+  it('sends files to the library dock for review by default and remembers it', async () => {
+    permissions.dockAccess = true
+    mountUpload(3)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="library-upload-mode"]').exists()).toBe(true)
+    await dockButton()!.trigger('click')
+
+    expect(startDockUpload).toHaveBeenCalledExactlyOnceWith(3)
+    expect(startUpload).not.toHaveBeenCalled()
+    expect(localStorage.getItem('bookorbit:library-upload-mode:12:3')).toBe('review')
+  })
+
+  it('opens on the last choice for that library and files straight in with it', async () => {
+    permissions.dockAccess = true
+    localStorage.setItem('bookorbit:library-upload-mode:12:3', 'now')
+    mountUpload(3)
+    await flushPromises()
+
+    expect((wrapper.get('[data-testid="library-upload-mode-now"]').element as HTMLInputElement).checked).toBe(true)
+    await uploadButton().trigger('click')
+
+    expect(startUpload).toHaveBeenCalledExactlyOnceWith(3, 30)
+    expect(startDockUpload).not.toHaveBeenCalled()
+  })
+
+  it('offers no choice for a library whose dock is off', async () => {
+    permissions.dockAccess = true
+    dockTargetsMock.mockResolvedValue([])
+    mountUpload(3)
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="library-upload-mode"]').exists()).toBe(false)
+  })
+
+  it('holds back formats the chosen library does not take', async () => {
+    libraries.value = [makeLibrary({ allowedFormats: ['epub'] })]
+    mountUpload(3)
+    await flushPromises()
+
+    expect(applyAllowedFormats).toHaveBeenLastCalledWith(['epub'])
   })
 })

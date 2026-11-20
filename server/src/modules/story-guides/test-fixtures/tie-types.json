@@ -1,0 +1,191 @@
+{
+  "kinds": ["character", "place", "group", "event", "object", "idea"],
+  "groups": [
+    {
+      "group": "family",
+      "label": "Family"
+    },
+    {
+      "group": "love",
+      "label": "Love"
+    },
+    {
+      "group": "bonds",
+      "label": "Bonds"
+    },
+    {
+      "group": "friends-and-enemies",
+      "label": "Friends and enemies"
+    },
+    {
+      "group": "work-and-study",
+      "label": "Work and study"
+    },
+    {
+      "group": "belongs-to",
+      "label": "Belongs to"
+    },
+    {
+      "group": "owns",
+      "label": "Owns"
+    },
+    {
+      "group": "lives-at",
+      "label": "Lives at"
+    }
+  ],
+  "types": [
+    {
+      "type": "parent_of",
+      "symmetric": false,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "parent of"
+    },
+    {
+      "type": "grandparent_of",
+      "symmetric": false,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "grandparent of"
+    },
+    {
+      "type": "aunt_or_uncle_of",
+      "symmetric": false,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "aunt or uncle of"
+    },
+    {
+      "type": "sibling_of",
+      "symmetric": true,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "sibling of"
+    },
+    {
+      "type": "spouse_of",
+      "symmetric": true,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "spouse of"
+    },
+    {
+      "type": "betrothed_to",
+      "symmetric": true,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "betrothed to"
+    },
+    {
+      "type": "cousin_of",
+      "symmetric": true,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "cousin of"
+    },
+    {
+      "type": "relative_of",
+      "symmetric": true,
+      "group": "family",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "relative of"
+    },
+    {
+      "type": "loves",
+      "symmetric": false,
+      "group": "love",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "loves"
+    },
+    {
+      "type": "bonded_to",
+      "symmetric": true,
+      "group": "bonds",
+      "from": ["character"],
+      "to": ["character"],
+      "label": "bonded to"
+    },
+    {
+      "type": "friend_of",
+      "symmetric": true,
+      "group": "friends-and-enemies",
+      "from": ["character", "group"],
+      "to": ["character", "group"],
+      "label": "friend of"
+    },
+    {
+      "type": "enemy_of",
+      "symmetric": true,
+      "group": "friends-and-enemies",
+      "from": ["character", "group"],
+      "to": ["character", "group"],
+      "label": "enemy of"
+    },
+    {
+      "type": "rival_of",
+      "symmetric": true,
+      "group": "friends-and-enemies",
+      "from": ["character", "group"],
+      "to": ["character", "group"],
+      "label": "rival of"
+    },
+    {
+      "type": "teaches",
+      "symmetric": false,
+      "group": "work-and-study",
+      "from": ["character"],
+      "to": ["character", "group", "place"],
+      "label": "teaches"
+    },
+    {
+      "type": "works_for",
+      "symmetric": false,
+      "group": "work-and-study",
+      "from": ["character"],
+      "to": ["character", "group", "place"],
+      "label": "works for"
+    },
+    {
+      "type": "studies_at",
+      "symmetric": false,
+      "group": "work-and-study",
+      "from": ["character"],
+      "to": ["character", "group", "place"],
+      "label": "studies at"
+    },
+    {
+      "type": "member_of",
+      "symmetric": false,
+      "group": "belongs-to",
+      "from": ["character", "group"],
+      "to": ["group"],
+      "label": "member of"
+    },
+    {
+      "type": "owns",
+      "symmetric": false,
+      "group": "owns",
+      "from": ["character", "group"],
+      "to": ["character", "place", "group", "event", "object", "idea"],
+      "label": "owns"
+    },
+    {
+      "type": "lives_at",
+      "symmetric": false,
+      "group": "lives-at",
+      "from": ["character", "group"],
+      "to": ["place", "character"],
+      "label": "lives at"
+    }
+  ]
+}

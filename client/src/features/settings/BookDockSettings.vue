@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute } from 'vue-router'
 import { Loader2 } from '@lucide/vue'
 import { toast } from 'vue-sonner'
-import type { BookDockAutoFinalizeMetadataMode, BookDockSettings, UpdateBookDockSettingsRequest } from '@bookorbit/types'
+import type { BookDockAutoFinalizeMetadataMode, BookDockSettings, LibraryDockAdminEntry, UpdateBookDockSettingsRequest } from '@bookorbit/types'
+import FormSheet from '@/components/FormSheet.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import SettingsPageHeader from './SettingsPageHeader.vue'
 import { api } from '@/lib/api'
 import { useLibraries } from '@/features/library/composables/useLibraries'
+import { updateLibraryDock } from '@/features/book-dock/api/book-dock.api'
+import { useLibraryDocks } from '@/features/book-dock/composables/useLibraryDocks'
+import { libraryDockErrorMessage } from '@/features/book-dock/lib/library-dock-error'
+import LibraryDocksTable from '@/features/book-dock/components/LibraryDocksTable.vue'
+import LibraryDockEditSheet from '@/features/book-dock/components/LibraryDockEditSheet.vue'
+import LibraryDockTurnOnDialog from '@/features/book-dock/components/LibraryDockTurnOnDialog.vue'
+import BookDockAttention from '@/features/book-dock/components/BookDockAttention.vue'
 
 const { t } = useI18n()
 const props = withDefaults(defineProps<{ embedded?: boolean }>(), {
@@ -19,35 +28,64 @@ const autoFinalizeThreshold = ref(85)
 const autoFinalizeLibraryId = ref<number | null>(null)
 const autoFinalizeFolderId = ref<number | null>(null)
 const autoFinalizeMetadataMode = ref<BookDockAutoFinalizeMetadataMode>('safe_merge')
+const unsortedAutoJoin = ref(false)
+const unsortedKeepOriginal = ref(false)
 const bookDockPath = ref('')
 const loading = ref(true)
 const saving = ref(false)
+const settings = ref<BookDockSettings | null>(null)
 
 const { libraries, fetchLibraries } = useLibraries()
+const { admin, filing, refreshDocks, refreshFiling } = useLibraryDocks()
+const route = useRoute()
 
-const autoFinalizeLibrary = computed(() => libraries.value.find((l) => l.id === autoFinalizeLibraryId.value))
-const autoFinalizeFolders = computed(() => autoFinalizeLibrary.value?.folders ?? [])
 const isThresholdApplicable = computed(() => autoFinalizeMetadataMode.value !== 'embedded_only')
+const metadataModeHint = computed(() => {
+  switch (autoFinalizeMetadataMode.value) {
+    case 'fetched_only':
+      return t('settings.reader.bookDock.metadataModeHint.fetched_only')
+    case 'embedded_only':
+      return t('settings.reader.bookDock.metadataModeHint.embedded_only')
+    default:
+      return t('settings.reader.bookDock.metadataModeHint.safe_merge')
+  }
+})
+
+const editingLibraryId = ref<number | null>(null)
+const editOpen = ref(false)
+const editingEntry = computed(() => admin.value?.libraries.find((entry) => entry.libraryId === editingLibraryId.value) ?? null)
+const turningOn = ref<LibraryDockAdminEntry | null>(null)
+const matchingFolder = computed(
+  () => admin.value?.unrecognisedFolders.find((folder) => folder.matchesLibraryId === turningOn.value?.libraryId) ?? null,
+)
+const togglingLibraryId = ref<number | null>(null)
 
 onMounted(async () => {
   try {
-    const [res] = await Promise.all([api('/api/v1/book-dock/settings'), fetchLibraries()])
+    const [res] = await Promise.all([api('/api/v1/book-dock/settings'), fetchLibraries(), refreshDocks(true)])
     if (res.ok) {
       applySettings(await res.json())
     }
   } finally {
     loading.value = false
   }
+  void refreshFiling()
+  // "Choose a folder" on the dock page opens this dock's panel.
+  const linked = Number(route.query.dock)
+  if (Number.isInteger(linked) && admin.value?.libraries.some((entry) => entry.libraryId === linked && entry.dock)) openEdit(linked)
 })
 
-function applySettings(settings: BookDockSettings) {
-  bookDockPath.value = settings.bookDockPath
-  autoFetch.value = settings.autoFetchMetadata
-  autoFinalizeEnabled.value = settings.autoFinalizeEnabled
-  autoFinalizeThreshold.value = settings.autoFinalizeThreshold
-  autoFinalizeLibraryId.value = settings.autoFinalizeLibraryId
-  autoFinalizeFolderId.value = settings.autoFinalizeFolderId
-  autoFinalizeMetadataMode.value = settings.autoFinalizeMetadataMode
+function applySettings(next: BookDockSettings) {
+  settings.value = next
+  unsortedAutoJoin.value = next.unsortedAutoJoin ?? false
+  unsortedKeepOriginal.value = next.unsortedKeepOriginal ?? false
+  bookDockPath.value = next.bookDockPath
+  autoFetch.value = next.autoFetchMetadata
+  autoFinalizeEnabled.value = next.autoFinalizeEnabled
+  autoFinalizeThreshold.value = next.autoFinalizeThreshold
+  autoFinalizeLibraryId.value = next.autoFinalizeLibraryId
+  autoFinalizeFolderId.value = next.autoFinalizeFolderId
+  autoFinalizeMetadataMode.value = next.autoFinalizeMetadataMode
 }
 
 function settingsPayload(overrides: Partial<UpdateBookDockSettingsRequest> = {}): UpdateBookDockSettingsRequest {
@@ -58,6 +96,8 @@ function settingsPayload(overrides: Partial<UpdateBookDockSettingsRequest> = {})
     autoFinalizeLibraryId: autoFinalizeLibraryId.value,
     autoFinalizeFolderId: autoFinalizeFolderId.value,
     autoFinalizeMetadataMode: autoFinalizeMetadataMode.value,
+    unsortedAutoJoin: unsortedAutoJoin.value,
+    unsortedKeepOriginal: unsortedKeepOriginal.value,
     ...overrides,
   }
 }
@@ -94,22 +134,6 @@ async function handleAutoFinalizeChange(enabled: boolean) {
   }
 }
 
-async function onLibraryChange(event: Event) {
-  const libraryId = Number((event.target as HTMLSelectElement).value)
-  const library = libraries.value.find((candidate) => candidate.id === libraryId)
-  const folderId = library?.folders?.[0]?.id ?? null
-  if (await saveSettings({ autoFinalizeLibraryId: libraryId, autoFinalizeFolderId: folderId })) {
-    toast.success(t('settings.reader.bookDock.destinationLibraryUpdated'))
-  }
-}
-
-async function onFolderChange(event: Event) {
-  const folderId = Number((event.target as HTMLSelectElement).value)
-  if (await saveSettings({ autoFinalizeFolderId: folderId })) {
-    toast.success(t('settings.reader.bookDock.destinationFolderUpdated'))
-  }
-}
-
 async function onThresholdChange() {
   if (!isThresholdApplicable.value) return
   if (await saveSettings({ autoFinalizeThreshold: autoFinalizeThreshold.value })) {
@@ -123,6 +147,83 @@ async function onMetadataModeChange(event: Event) {
     toast.success(t('settings.reader.bookDock.metadataModeUpdated'))
   }
 }
+
+function openEdit(libraryId: number) {
+  editingLibraryId.value = libraryId
+  editOpen.value = true
+}
+
+async function onDockSaved() {
+  await refreshDocks(true)
+  void refreshFiling()
+}
+
+async function onToggleDock(entry: LibraryDockAdminEntry, enabled: boolean) {
+  if (!entry.dock) {
+    if (enabled) turningOn.value = entry
+    return
+  }
+  togglingLibraryId.value = entry.libraryId
+  const result = await updateLibraryDock(entry.libraryId, { enabled })
+  togglingLibraryId.value = null
+  if (!result.ok) {
+    toast.error(libraryDockErrorMessage(result.errorCode, t))
+    return
+  }
+  await refreshDocks(true)
+}
+
+async function onTurnedOn() {
+  turningOn.value = null
+  await onDockSaved()
+}
+
+function cancelTurnOn() {
+  turningOn.value = null
+}
+
+/* The Unsorted panel: where files dropped in the root go, and the two Unsorted-only switches. */
+const unsortedOpen = ref(false)
+const unsortedLibraryId = ref<number | null>(null)
+const unsortedFolderId = ref<number | null>(null)
+const unsortedJoin = ref(false)
+const unsortedKeep = ref(false)
+const unsortedFolders = computed(() => libraries.value.find((library) => library.id === unsortedLibraryId.value)?.folders ?? [])
+const unsortedDirty = computed(
+  () =>
+    unsortedLibraryId.value !== autoFinalizeLibraryId.value ||
+    unsortedFolderId.value !== autoFinalizeFolderId.value ||
+    unsortedJoin.value !== unsortedAutoJoin.value ||
+    unsortedKeep.value !== unsortedKeepOriginal.value,
+)
+
+function openUnsorted() {
+  unsortedOpen.value = true
+}
+
+function resetUnsorted() {
+  unsortedLibraryId.value = autoFinalizeLibraryId.value
+  unsortedFolderId.value = autoFinalizeFolderId.value
+  unsortedJoin.value = unsortedAutoJoin.value
+  unsortedKeep.value = unsortedKeepOriginal.value
+}
+
+function onUnsortedLibraryChange() {
+  unsortedFolderId.value = unsortedFolders.value[0]?.id ?? null
+}
+
+async function saveUnsorted() {
+  const saved = await saveSettings({
+    autoFinalizeLibraryId: unsortedLibraryId.value,
+    autoFinalizeFolderId: unsortedLibraryId.value === null ? null : unsortedFolderId.value,
+    unsortedAutoJoin: unsortedJoin.value,
+    unsortedKeepOriginal: unsortedKeep.value,
+  })
+  if (saved) {
+    unsortedOpen.value = false
+    toast.success(t('settings.reader.bookDock.docks.unsortedSaved'))
+  }
+}
 </script>
 
 <template>
@@ -130,7 +231,7 @@ async function onMetadataModeChange(event: Event) {
     v-if="!props.embedded"
     class="hidden md:flex"
     :title="t('settings.reader.bookDock.title')"
-    :subtitle="t('settings.reader.bookDock.subtitle')"
+    :subtitle="t('settings.reader.bookDock.docks.subtitle')"
   />
   <div v-if="!props.embedded" class="md:hidden px-1">
     <h1 class="text-xl font-semibold tracking-tight text-foreground">
@@ -139,7 +240,7 @@ async function onMetadataModeChange(event: Event) {
     <p
       class="mt-1 text-sm text-muted-foreground leading-5 overflow-hidden text-ellipsis [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]"
     >
-      {{ t('settings.reader.bookDock.subtitle') }}
+      {{ t('settings.reader.bookDock.docks.subtitle') }}
     </p>
   </div>
 
@@ -158,7 +259,7 @@ async function onMetadataModeChange(event: Event) {
             {{ t('settings.reader.bookDock.containerPath') }}
           </p>
           <p class="settings-hint mb-2">
-            {{ t('settings.reader.bookDock.containerPathHint') }}
+            {{ t('settings.reader.bookDock.docks.containerPathHint') }}
           </p>
           <code
             v-if="bookDockPath"
@@ -177,9 +278,9 @@ async function onMetadataModeChange(event: Event) {
       </div>
     </section>
 
-    <section aria-labelledby="book-dock-metadata-heading" class="space-y-2">
-      <h2 id="book-dock-metadata-heading" class="settings-group-label">
-        {{ t('settings.reader.bookDock.metadata') }}
+    <section aria-labelledby="book-dock-defaults-heading" class="space-y-2">
+      <h2 id="book-dock-defaults-heading" class="settings-group-label">
+        {{ t('settings.reader.bookDock.docks.defaults') }}
       </h2>
 
       <div class="settings-card">
@@ -189,42 +290,37 @@ async function onMetadataModeChange(event: Event) {
               {{ t('settings.reader.bookDock.autoFetch') }}
             </p>
             <p class="settings-hint">
-              {{ t('settings.reader.bookDock.autoFetchHint') }}
+              {{ t('settings.reader.bookDock.docks.autoFetchDefaultHint') }}
             </p>
           </div>
           <ToggleSwitch
             :model-value="autoFetch"
             :disabled="saving"
+            :aria-label="t('settings.reader.bookDock.autoFetch')"
             class="self-start md:self-auto md:ml-4"
             @update:model-value="handleAutoFetchChange"
           />
         </div>
-      </div>
-    </section>
 
-    <section aria-labelledby="book-dock-auto-finalize-heading" class="space-y-2">
-      <h2 id="book-dock-auto-finalize-heading" class="settings-group-label">
-        {{ t('settings.reader.bookDock.autoFinalize') }}
-      </h2>
-      <div class="settings-card">
         <div class="flex flex-col gap-3 px-4 py-3.5 bg-card md:flex-row md:items-center md:justify-between md:px-5 md:py-4">
           <div class="min-w-0">
             <p class="settings-label">
-              {{ t('settings.reader.bookDock.enableAutoFinalize') }}
+              {{ t('settings.reader.bookDock.docks.autoFile') }}
             </p>
             <p class="settings-hint">
-              {{ t('settings.reader.bookDock.enableAutoFinalizeHint') }}
+              {{ t('settings.reader.bookDock.docks.autoFileDefaultHint') }}
             </p>
           </div>
           <ToggleSwitch
             :model-value="autoFinalizeEnabled"
             :disabled="saving"
+            :aria-label="t('settings.reader.bookDock.docks.autoFile')"
             class="self-start md:self-auto md:ml-4"
             @update:model-value="handleAutoFinalizeChange"
           />
         </div>
 
-        <div v-if="autoFinalizeEnabled" class="px-4 py-3.5 bg-card space-y-4 md:px-5 md:py-4">
+        <div class="px-4 py-3.5 bg-card space-y-4 md:px-5 md:py-4">
           <label class="block">
             <span class="text-xs font-medium text-muted-foreground">
               {{
@@ -250,46 +346,117 @@ async function onMetadataModeChange(event: Event) {
             </div>
           </label>
 
-          <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationLibrary') }}</span>
-            <select class="select-field mt-1 w-full" :value="autoFinalizeLibraryId ?? ''" @change="onLibraryChange">
-              <option value="" disabled>
-                {{ t('settings.reader.bookDock.selectLibrary') }}
-              </option>
-              <option v-for="lib in libraries" :key="lib.id" :value="lib.id">
-                {{ lib.name }}
-              </option>
-            </select>
-          </label>
-
-          <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.metadataMode') }}</span>
-            <select class="select-field mt-1 w-full" :value="autoFinalizeMetadataMode" @change="onMetadataModeChange">
-              <option value="safe_merge">
-                {{ t('settings.reader.bookDock.metadataModeSafeMerge') }}
-              </option>
-              <option value="fetched_only">
-                {{ t('settings.reader.bookDock.metadataModeFetchedOnly') }}
-              </option>
-              <option value="embedded_only">
-                {{ t('settings.reader.bookDock.metadataModeEmbeddedOnly') }}
-              </option>
-            </select>
-          </label>
-
-          <label class="block">
-            <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationFolder') }}</span>
-            <select class="select-field mt-1 w-full" :value="autoFinalizeFolderId ?? ''" @change="onFolderChange">
-              <option value="" disabled>
-                {{ t('settings.reader.bookDock.selectFolder') }}
-              </option>
-              <option v-for="folder in autoFinalizeFolders" :key="folder.id" :value="folder.id">
-                {{ folder.path }}
-              </option>
-            </select>
-          </label>
+          <div>
+            <label class="block">
+              <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.metadataMode') }}</span>
+              <select
+                class="select-field mt-1 w-full"
+                :value="autoFinalizeMetadataMode"
+                aria-describedby="book-dock-metadata-mode-hint"
+                @change="onMetadataModeChange"
+              >
+                <option value="safe_merge">
+                  {{ t('settings.reader.bookDock.metadataModeSafeMerge') }}
+                </option>
+                <option value="fetched_only">
+                  {{ t('settings.reader.bookDock.metadataModeFetchedOnly') }}
+                </option>
+                <option value="embedded_only">
+                  {{ t('settings.reader.bookDock.metadataModeEmbeddedOnly') }}
+                </option>
+              </select>
+            </label>
+            <p id="book-dock-metadata-mode-hint" class="settings-hint mt-1.5">{{ metadataModeHint }}</p>
+          </div>
         </div>
       </div>
     </section>
+
+    <section v-if="admin && settings" aria-labelledby="book-dock-docks-heading" class="space-y-2">
+      <div class="flex flex-wrap items-baseline justify-between gap-x-3">
+        <h2 id="book-dock-docks-heading" class="settings-group-label">
+          {{ t('settings.reader.bookDock.docks.title') }}
+        </h2>
+        <span class="settings-hint">{{ t('settings.reader.bookDock.docks.defaultExplained') }}</span>
+      </div>
+      <LibraryDocksTable
+        :libraries="admin.libraries"
+        :settings="settings"
+        :filing="filing"
+        :busy-library-id="togglingLibraryId"
+        @edit="openEdit"
+        @edit-unsorted="openUnsorted"
+        @toggle="onToggleDock"
+      />
+    </section>
+
+    <section
+      v-if="admin && (admin.unrecognisedFolders.length || admin.strayFiles.length)"
+      aria-labelledby="book-dock-folders-heading"
+      class="space-y-2"
+    >
+      <h2 id="book-dock-folders-heading" class="settings-group-label">
+        {{ t('settings.reader.bookDock.docks.unownedFolders') }}
+      </h2>
+      <BookDockAttention :admin="admin" @changed="onDockSaved" />
+    </section>
+
+    <LibraryDockEditSheet v-if="settings" v-model:open="editOpen" :entry="editingEntry" :settings="settings" @saved="onDockSaved" />
+
+    <LibraryDockTurnOnDialog v-if="turningOn" :entry="turningOn" :matching-folder="matchingFolder" @done="onTurnedOn" @cancel="cancelTurnOn" />
+
+    <FormSheet
+      v-model:open="unsortedOpen"
+      :title="t('bookDock.switcher.unsorted')"
+      :description="t('settings.reader.bookDock.docks.unsortedDescription')"
+      :busy="saving"
+      :dirty="unsortedDirty"
+      content-class="sm:max-w-md"
+      data-testid="library-dock-unsorted-sheet"
+      @opened="resetUnsorted"
+      @submit="saveUnsorted"
+    >
+      <div class="flex-1 space-y-5 overflow-y-auto px-4 py-4">
+        <label class="grid gap-1.5">
+          <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.docks.unsortedLibrary') }}</span>
+          <select
+            v-model="unsortedLibraryId"
+            class="select-field w-full"
+            data-testid="library-dock-unsorted-library"
+            @change="onUnsortedLibraryChange"
+          >
+            <option :value="null">{{ t('settings.reader.bookDock.noDefaultLibrary') }}</option>
+            <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
+          </select>
+          <span class="text-xs text-muted-foreground">{{ t('settings.reader.bookDock.defaultLibraryHint') }}</span>
+        </label>
+        <label v-if="unsortedLibraryId !== null" class="grid gap-1.5">
+          <span class="text-xs font-medium text-muted-foreground">{{ t('settings.reader.bookDock.destinationFolder') }}</span>
+          <select v-model="unsortedFolderId" class="select-field w-full">
+            <option :value="null" disabled>{{ t('settings.reader.bookDock.selectFolder') }}</option>
+            <option v-for="folder in unsortedFolders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
+          </select>
+        </label>
+        <fieldset class="grid gap-3">
+          <legend class="mb-1 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+            {{ t('settings.reader.bookDock.docks.unsortedOnly') }}
+          </legend>
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-0.5">
+              <span class="text-sm font-medium text-foreground">{{ t('settings.reader.bookDock.docks.autoJoin') }}</span>
+              <span class="text-xs text-muted-foreground">{{ t('settings.reader.bookDock.docks.autoJoinHint') }}</span>
+            </div>
+            <ToggleSwitch v-model="unsortedJoin" :aria-label="t('settings.reader.bookDock.docks.autoJoin')" />
+          </div>
+          <div class="flex items-start justify-between gap-3">
+            <div class="grid gap-0.5">
+              <span class="text-sm font-medium text-foreground">{{ t('settings.reader.bookDock.docks.keepOriginal') }}</span>
+              <span class="text-xs text-muted-foreground">{{ t('settings.reader.bookDock.docks.keepOriginalHint') }}</span>
+            </div>
+            <ToggleSwitch v-model="unsortedKeep" :aria-label="t('settings.reader.bookDock.docks.keepOriginal')" />
+          </div>
+        </fieldset>
+      </div>
+    </FormSheet>
   </div>
 </template>

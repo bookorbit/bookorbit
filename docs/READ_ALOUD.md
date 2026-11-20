@@ -102,7 +102,7 @@ pnpm --filter @bookorbit/types build
 pnpm --filter @bookorbit/read-aloud-worker build
 ```
 
-The worker must see book files at the same paths the BookOrbit server uses, and its job folder must be the server's `<APP_DATA_PATH>/read-aloud/jobs`:
+The worker must see book files at the same paths the BookOrbit server uses, and its job folder must be the server's `<APP_DATA_PATH>/read-aloud/jobs` (or translate the paths with a path map, see "Folders mounted at other paths" below):
 
 ```bash
 READ_ALOUD_WORKER_TOKEN=<shared-token> \
@@ -122,7 +122,24 @@ READ_ALOUD_WORKER_TOKEN=<shared-token>
 
 A native worker listens on `127.0.0.1` only. To reach it from another machine or from a container, set `READ_ALOUD_WORKER_HOST=0.0.0.0` (or a specific address) and keep the port off untrusted networks; the token is the only protection. `PORT` changes the port from 8787.
 
-Temporary files go to a `read-aloud-worker` folder inside `READ_ALOUD_TMP_DIR` (by default a `tmp` folder beside the job folder). The worker empties only that folder when it starts, so a shared folder such as `/tmp` is safe to use. On macOS the speech models are cached in `~/Library/Application Support/ghost-story/models`.
+Temporary files go to a `read-aloud-worker` folder inside `READ_ALOUD_TMP_DIR` (by default a `tmp` folder beside the job folder). This includes each job's unpacked working copy of the EPUB, which is removed when the run ends. The worker empties only that folder when it starts, so a shared folder such as `/tmp` is safe to use. When the job folder is a network share, point `READ_ALOUD_TMP_DIR` at a local disk: unpacking and deleting thousands of small files over SMB can leave placeholder files that make the delete fail with `ENOTEMPTY`, and the job then stops at "The ebook text couldn't be prepared for matching". On macOS the speech models are cached in `~/Library/Application Support/ghost-story/models`.
+
+### Folders mounted at other paths
+
+A worker on another machine often reaches the library and the job folder through network shares mounted somewhere else than where the server sees them. macOS cannot create top-level folders such as `/books` without a reboot, so recreating the server's paths there is awkward. `READ_ALOUD_PATH_MAP` translates instead: a comma-separated list of `server-path=local-path` pairs, where the server path is what BookOrbit calls the folder and the local path is where this machine reaches it.
+
+```bash
+READ_ALOUD_WORKER_TOKEN=<shared-token> \
+READ_ALOUD_PATH_MAP=/books=/path/to/mounts/books,/data/read-aloud=/path/to/mounts/read-aloud \
+READ_ALOUD_LIBRARY_ROOTS=/path/to/mounts/books \
+READ_ALOUD_WORK_ROOT=/path/to/mounts/read-aloud/jobs \
+pnpm --filter @bookorbit/read-aloud-worker start
+```
+
+- With a path map, every other path setting (`READ_ALOUD_LIBRARY_ROOTS`, `READ_ALOUD_WORK_ROOT`, `READ_ALOUD_TMP_DIR`) is still a folder on the worker's own machine.
+- The paths in each job request are translated before anything is read. The longest matching server path wins, and a path no pair covers is used as written. The usual checks then apply to the translated path: a source must resolve inside a library folder, and the job folder must be `READ_ALOUD_WORK_ROOT` plus the job id.
+- The health reply reports the library folders and the job folder under the server's names, so BookOrbit's mount checks and the library placement shown in the dialog work as usual.
+- Each server path and each local path may appear only once, and neither may be a filesystem root.
 
 ## Hardware acceleration
 
@@ -172,5 +189,7 @@ Job, stage, cancellation and startup lines carry the job id and durations; STAli
 - The requester is notified when a read-along is ready, needs review, or fails, through the Read-aloud generation notification category.
 
 Publishing copies the output into the book's folder as `<book>.readaloud.epub` (with a number added if that name is taken), staged next to its destination and renamed into place. The admin upload size limit does not apply; `READ_ALOUD_MAX_OUTPUT_BYTES` (default 20 GB) is the only cap. BookOrbit checks the library volume has room for the file first.
+
+Just before that copy, if the book has an audiobook cover, BookOrbit writes it into the generated EPUB as its square audiobook cover, the way Storyteller does (see [READ_ALOUD_AUDIO_COVER.md](READ_ALOUD_AUDIO_COVER.md)). The EPUB is rewritten in the job folder, which needs one more copy of the output there while it runs. A book with no audiobook cover, an unusable image or a full disk leaves the EPUB as the worker made it, the job still publishes, and the job's activity log says so.
 
 The source EPUB and audiobook are not modified.

@@ -105,6 +105,14 @@ describe('AppSettingsService', () => {
       await expect(service.update(key, 'anything')).rejects.toThrow(BadRequestException);
       expect(repo.updateByKey).not.toHaveBeenCalled();
     });
+
+    it.each(['ai.slots', 'ai.features', 'ai.budget', 'ai.privacy', 'ai.slot_health'])(
+      'rejects %s so it cannot bypass the AI settings validation',
+      async (key) => {
+        await expect(service.update(key, '{}')).rejects.toThrow(BadRequestException);
+        expect(repo.updateByKey).not.toHaveBeenCalled();
+      },
+    );
   });
 
   describe('API key settings', () => {
@@ -473,6 +481,8 @@ describe('AppSettingsService', () => {
         autoFinalizeLibraryId: null,
         autoFinalizeFolderId: null,
         autoFinalizeMetadataMode: 'safe_merge',
+        unsortedAutoJoin: false,
+        unsortedKeepOriginal: false,
       });
     });
 
@@ -484,6 +494,8 @@ describe('AppSettingsService', () => {
         { key: 'book_dock_auto_finalize_library_id', value: '7' },
         { key: 'book_dock_auto_finalize_folder_id', value: '11' },
         { key: 'book_dock_auto_finalize_metadata_mode', value: 'embedded_only' },
+        { key: 'book_dock_unsorted_auto_join', value: 'true' },
+        { key: 'book_dock_unsorted_keep_original', value: 'true' },
       ] as never);
 
       await expect(service.getBookDockSettings()).resolves.toMatchObject({
@@ -493,6 +505,8 @@ describe('AppSettingsService', () => {
         autoFinalizeLibraryId: 7,
         autoFinalizeFolderId: 11,
         autoFinalizeMetadataMode: 'embedded_only',
+        unsortedAutoJoin: true,
+        unsortedKeepOriginal: true,
       });
     });
 
@@ -518,6 +532,31 @@ describe('AppSettingsService', () => {
         { key: 'book_dock_auto_finalize_metadata_mode', value: 'fetched_only' },
       ]);
       expect(repo.findMany).toHaveBeenCalledAfter(repo.upsertMany);
+    });
+
+    it("writes Unsorted's toggles only when the request carries them", async () => {
+      repo.findMany.mockResolvedValue([]);
+      const base = {
+        autoFetchMetadata: true,
+        autoFinalizeEnabled: false,
+        autoFinalizeThreshold: 85,
+        autoFinalizeLibraryId: null,
+        autoFinalizeFolderId: null,
+        autoFinalizeMetadataMode: 'safe_merge' as const,
+      };
+
+      await service.updateBookDockSettings({ ...base, unsortedAutoJoin: true, unsortedKeepOriginal: false });
+      expect(repo.upsertMany).toHaveBeenLastCalledWith(
+        expect.arrayContaining([
+          { key: 'book_dock_unsorted_auto_join', value: 'true' },
+          { key: 'book_dock_unsorted_keep_original', value: 'false' },
+        ]),
+      );
+
+      await service.updateBookDockSettings(base);
+      const keys = (repo.upsertMany.mock.lastCall?.[0] as Array<{ key: string }>).map((entry) => entry.key);
+      expect(keys).not.toContain('book_dock_unsorted_auto_join');
+      expect(keys).not.toContain('book_dock_unsorted_keep_original');
     });
   });
 

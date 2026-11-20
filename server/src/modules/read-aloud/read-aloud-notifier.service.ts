@@ -5,6 +5,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { ReadAloudJobRow } from '../../db/schema';
 import { BookService } from '../book/book.service';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { NotificationService } from '../notification/notification.service';
 import { UserService } from '../user/user.service';
 import { ReadAloudJobRepository } from './read-aloud-job.repository';
@@ -43,10 +44,17 @@ export class ReadAloudNotifier {
     private readonly notifications: NotificationService,
     private readonly users: UserService,
     private readonly books: BookService,
+    private readonly jobChanges: JobChangesService,
   ) {}
 
-  async pushUpdate(row: ReadAloudJobRow | null): Promise<void> {
-    if (!row || row.requestedByUserId == null) return;
+  /**
+   * Pushes the job to its requester's book page and tells the Jobs area. `progress` is for an update
+   * that only moved the job along, which leaves every other job's place in line where it was.
+   */
+  async pushUpdate(row: ReadAloudJobRow | null, kind: 'state' | 'progress' = 'state'): Promise<void> {
+    if (!row) return;
+    this.jobsChanged(row.requestedByUserId, kind === 'state');
+    if (row.requestedByUserId == null) return;
     try {
       if (!(await this.requesterStillSees(row.requestedByUserId, row.bookId))) return;
       const job = await this.presenter.present(row, { id: row.requestedByUserId, isSuperuser: false });
@@ -54,6 +62,11 @@ export class ReadAloudNotifier {
     } catch (error) {
       this.warn('push', row.id, error);
     }
+  }
+
+  /** Tells the Jobs area alone, for a change no book page needs, or several jobs at once. */
+  jobsChanged(ownerId: number | null, state = true): void {
+    this.jobChanges.notify({ type: 'read-along', ownerId, state });
   }
 
   async notify(row: ReadAloudJobRow, outcome: ReadAloudOutcome): Promise<void> {

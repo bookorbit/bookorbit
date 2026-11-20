@@ -5,6 +5,7 @@ import { validate } from 'class-validator';
 import { ValidationPipe } from '@nestjs/common';
 
 import { BulkEditBookDockDto, BulkSetTargetDto, FinalizeBookDockDto, UpdateBookDockFileDto } from './dto';
+import { toBookDockFilter } from './dto/book-dock-filter';
 import { ListBookDockFilesDto } from './dto/list-book-dock-files.dto';
 import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 
@@ -32,10 +33,48 @@ describe('BookDock DTO validation', () => {
     expect((await errorsFor(ListBookDockFilesDto, { limit: 200 })).length).toBeGreaterThan(0);
   });
 
+  it('takes a dock filter of unsorted or a dock id, on the list and on bulk actions', async () => {
+    for (const dock of ['unsorted', '7', '999999999']) {
+      expect(await errorsFor(ListBookDockFilesDto, { dock })).toEqual([]);
+      expect(await errorsFor(BulkSetTargetDto, { dock, selectAll: true })).toEqual([]);
+    }
+    for (const dock of ['Unsorted', '0', '07', '-1', '1234567890', 'all', 7]) {
+      expect((await errorsFor(ListBookDockFilesDto, { dock })).length).toBeGreaterThan(0);
+      expect((await errorsFor(FinalizeBookDockDto, { dock })).length).toBeGreaterThan(0);
+    }
+    expect(toBookDockFilter({ dock: 'unsorted' })).toEqual({ dock: 'unsorted' });
+    expect(toBookDockFilter({ dock: '7' })).toEqual({ dock: 7 });
+    expect(toBookDockFilter({})).toBeUndefined();
+  });
+
+  it('takes a hold filter of held, clear or one hold reason, on the list and on bulk actions', async () => {
+    for (const hold of ['held', 'clear', 'duplicate', 'waiting_for_manager']) {
+      expect(await errorsFor(ListBookDockFilesDto, { hold })).toEqual([]);
+      expect(await errorsFor(FinalizeBookDockDto, { hold, selectAll: true })).toEqual([]);
+    }
+    for (const hold of ['Held', 'any', 'unknown_reason', 1]) {
+      expect((await errorsFor(ListBookDockFilesDto, { hold })).length).toBeGreaterThan(0);
+      expect((await errorsFor(BulkSetTargetDto, { hold })).length).toBeGreaterThan(0);
+    }
+    expect(toBookDockFilter({ hold: 'held' })).toEqual({ hold: 'held' });
+    expect(toBookDockFilter({ dock: '7', hold: 'duplicate' })).toEqual({ dock: 7, hold: 'duplicate' });
+  });
+
   it('FinalizeBookDockDto requires default destination values to be complete pair', async () => {
     expect((await errorsFor(FinalizeBookDockDto, { defaultLibraryId: 1 })).length).toBeGreaterThan(0);
     expect((await errorsFor(FinalizeBookDockDto, { defaultFolderId: 2 })).length).toBeGreaterThan(0);
     expect((await errorsFor(FinalizeBookDockDto, { defaultLibraryId: 1, defaultFolderId: 2, fileIds: [1, 2] })).length).toBe(0);
+  });
+
+  it('FinalizeBookDockDto rejects a request that selects nothing to finalize', async () => {
+    for (const body of [{}, { fileIds: [] }, { selectAll: false, fileIds: [] }, { readyToFile: true }, { status: 'ready' }]) {
+      expect((await errorsFor(FinalizeBookDockDto, body)).length).toBeGreaterThan(0);
+    }
+    const [error] = await errorsFor(FinalizeBookDockDto, {});
+    expect(error?.constraints?.hasFinalizeSelection).toContain('selectAll');
+
+    expect(await errorsFor(FinalizeBookDockDto, { fileIds: [996, 997] })).toEqual([]);
+    expect(await errorsFor(FinalizeBookDockDto, { selectAll: true, readyToFile: true })).toEqual([]);
   });
 
   it('FinalizeBookDockDto accepts an optional existing book to join per override and nothing else in it', async () => {

@@ -1,16 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
 import type { BookRequestAvailability, BookRequestItem } from '@bookorbit/types'
-import {
-  flattenRequestRows,
-  orderedHalves,
-  pairActionKey,
-  pairHalfState,
-  pairRowActions,
-  pairSubmission,
-  pairSubmissionLabelKey,
-  type PairAvailability,
-} from '../requestPair'
+import { flattenRequestRows, orderedHalves, pairHalfState, pairSubmission, pairSubmissionLabelKey, type PairAvailability } from '../requestPair'
 
 const OWNED: BookRequestAvailability = { ownedBookId: 42, existingRequestId: null, existingRequestStatus: null, alreadySubscribed: false }
 const FOLLOWING: BookRequestAvailability = { ownedBookId: null, existingRequestId: 7, existingRequestStatus: 'pending', alreadySubscribed: true }
@@ -104,46 +95,5 @@ describe('pair rows', () => {
 
   it('reads the ebook first whichever half leads the row', () => {
     expect(orderedHalves({ ...audiobook, companion: ebook }).map((item) => item.mediaKind)).toEqual(['ebook', 'audiobook'])
-  })
-
-  it('offers each action only for the halves it applies to', () => {
-    const row = { ...ebook, companion: { ...audiobook, status: 'available' as const } }
-    const actions = pairRowActions(row, { userId: 4, canManage: true, canSelfFulfil: false })
-
-    expect(actions.approve.map((item) => item.id)).toEqual([10])
-    expect(actions.dismiss.map((item) => item.id)).toEqual([11])
-    expect(actions.cancel.map((item) => item.id)).toEqual([10])
-    expect(actions.grab).toBeNull()
-  })
-
-  it('lists every half waiting on a release the viewer can pick, so the row can say "releases"', () => {
-    const row = { ...ebook, status: 'approved' as const, companion: { ...audiobook, status: 'approved' as const } }
-    const both = pairRowActions(row, { userId: 4, canManage: true, canSelfFulfil: false })
-    expect(both.grabHalves.map((item) => item.id)).toEqual([10, 11])
-    expect(both.grab?.id).toBe(10)
-
-    const oneLeft = pairRowActions(
-      { ...row, companion: { ...audiobook, status: 'downloading' as const } },
-      { userId: 4, canManage: true, canSelfFulfil: false },
-    )
-    expect(oneLeft.grabHalves.map((item) => item.id)).toEqual([10])
-  })
-
-  it('only counts the halves a self-fulfiller drives', () => {
-    const row = { ...ebook, status: 'approved' as const, companion: { ...audiobook, status: 'approved' as const, userId: 9 } }
-    const actions = pairRowActions(row, { userId: 4, canManage: false, canSelfFulfil: true })
-    expect(actions.grabHalves.map((item) => item.id)).toEqual([10])
-  })
-
-  it('offers no approval to somebody who does not moderate the queue', () => {
-    const actions = pairRowActions({ ...ebook, companion: audiobook }, { userId: 4, canManage: false, canSelfFulfil: false })
-    expect(actions.approve).toEqual([])
-    expect(actions.cancel.map((item) => item.id)).toEqual([10, 11])
-  })
-
-  it('names both halves, or the one, in every action label', () => {
-    expect(pairActionKey('approve', [ebook, audiobook])).toBe('bookRequests.actions.pair.approveBoth')
-    expect(pairActionKey('cancel', [audiobook])).toBe('bookRequests.actions.pair.cancelAudiobook')
-    expect(pairActionKey('dismiss', [ebook])).toBe('bookRequests.actions.pair.dismissEbook')
   })
 })

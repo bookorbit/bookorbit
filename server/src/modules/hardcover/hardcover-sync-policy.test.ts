@@ -136,4 +136,53 @@ describe('hardcover-sync-policy', () => {
       }),
     ).toEqual({ syncEnabled: true, effectiveReason: null });
   });
+  it('keeps books in an excluded library out of sync', () => {
+    expect(
+      resolveHardcoverBookSyncDecision({
+        settings: baseSettings,
+        status: 'reading',
+        syncOverride: null,
+        libraryExcluded: true,
+      }),
+    ).toEqual({ syncEnabled: false, effectiveReason: 'library_excluded' });
+  });
+
+  it('lets a book included on its own sync from an excluded library', () => {
+    expect(
+      resolveHardcoverBookSyncDecision({
+        settings: baseSettings,
+        status: 'reading',
+        syncOverride: 'included',
+        libraryExcluded: true,
+      }),
+    ).toEqual({ syncEnabled: true, effectiveReason: null });
+  });
+
+  it('reports an explicit exclusion before the library exclusion', () => {
+    expect(
+      resolveHardcoverBookSyncDecision({
+        settings: baseSettings,
+        status: 'reading',
+        syncOverride: 'excluded',
+        libraryExcluded: true,
+      }),
+    ).toEqual({ syncEnabled: false, effectiveReason: 'excluded' });
+  });
+
+  it('reports an unread book in an excluded library as excluded, not as waiting to sync', () => {
+    expect(resolveHardcoverBookSyncDecision({ settings: baseSettings, status: 'unread', syncOverride: null, libraryExcluded: true })).toEqual({
+      syncEnabled: false,
+      effectiveReason: 'library_excluded',
+    });
+    expect(resolveHardcoverBookSyncDecision({ settings: baseSettings, status: 'unread', syncOverride: 'included', libraryExcluded: true })).toEqual({
+      syncEnabled: false,
+      effectiveReason: 'unread',
+    });
+  });
+
+  it('includes a book on its own when turned on inside an excluded library', () => {
+    expect(resolveHardcoverBookSyncOverrideForToggle('all_eligible', true, true)).toBe('included');
+    expect(resolveHardcoverBookSyncOverrideForToggle('all_eligible', false, true)).toBeNull();
+    expect(resolveHardcoverBookSyncOverrideForToggle('all_eligible', true, false)).toBeNull();
+  });
 });

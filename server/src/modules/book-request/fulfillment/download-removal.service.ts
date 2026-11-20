@@ -238,6 +238,7 @@ export class DownloadRemovalService {
     const failed = await this.downloads.updateIf(download.id, IN_FLIGHT_BOOK_REQUEST_DOWNLOAD_STATUSES, {
       status: 'failed',
       errorMessage: reason,
+      failureCode: 'removed',
     });
     return failed !== undefined;
   }

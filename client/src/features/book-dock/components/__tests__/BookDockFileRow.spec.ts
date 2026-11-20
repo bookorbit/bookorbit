@@ -1,8 +1,12 @@
-import { mount, shallowMount } from '@vue/test-utils'
-import { describe, expect, it } from 'vitest'
+import { flushPromises, mount, shallowMount } from '@vue/test-utils'
+import { describe, expect, it, vi } from 'vitest'
 import type { BookDockFile, BookDockUnitFile } from '@bookorbit/types'
 
+import { formatList } from '@/i18n/formatters'
 import BookDockFileRow from '../BookDockFileRow.vue'
+
+const { keepBothMock } = vi.hoisted(() => ({ keepBothMock: vi.fn<(id: number) => Promise<{ ok: boolean; errorCode?: string | null }>>() }))
+vi.mock('../../api/book-dock.api', () => ({ keepBookDockDuplicate: keepBothMock }))
 
 function unitFile(overrides: Partial<BookDockUnitFile> = {}): BookDockUnitFile {
   return { fileName: 'track-01.mp3', fileSize: 1024, format: 'mp3', role: 'content', sortOrder: 0, ...overrides }
@@ -144,5 +148,82 @@ describe('BookDockFileRow with a multi-file unit', () => {
 
     expect(list.findAll('button')).toHaveLength(0)
     expect(list.findAll('input')).toHaveLength(0)
+  })
+})
+
+describe('BookDockFileRow holds', () => {
+  function mountHeld(overrides: Partial<BookDockFile>, options: { canManage?: boolean; expanded?: boolean } = {}) {
+    return mount(BookDockFileRow, {
+      props: {
+        file: file({ fileName: 'dune.epub', format: 'epub', embeddedMetadata: { title: 'Dune' }, ...overrides }),
+        selected: false,
+        expanded: options.expanded ?? false,
+        focused: false,
+        libraryName: 'Fiction',
+        targetLabel: 'Target: Fiction',
+        canManage: options.canManage ?? false,
+      },
+      global: { stubs: { RouterLink: { template: '<a><slot /></a>' } } },
+    })
+  }
+
+  it('says why a file waits, with the facts the server sent', () => {
+    const wrapper = mountHeld({ holdReason: 'low_confidence', holdDetail: { confidence: 72, threshold: 85 }, confidence: 72 })
+
+    expect(wrapper.get('[data-testid="book-dock-row-hold"]').text()).toBe('72% match, needs 85%')
+    // The chip already gives the score, so the match badge is not repeated.
+    expect(wrapper.text()).not.toContain('72% match ')
+    expect(wrapper.find('.row-file').exists()).toBe(true)
+  })
+
+  it('reads a reason this client does not know as a plain wait', () => {
+    const wrapper = mountHeld({ holdReason: 'a_future_reason' as never })
+
+    expect(wrapper.get('[data-testid="book-dock-row-hold"]').text()).toBe('Waiting for review')
+  })
+
+  it.each([
+    ['not_allowed_in_library', 'Move to…'],
+    ['no_folder', 'Choose a folder'],
+    ['no_destination', 'Set destination'],
+  ] as const)('turns the destination button into the fix for %s, and holds back File', (holdReason, label) => {
+    const wrapper = mountHeld({ holdReason, holdDetail: { libraryName: 'Fiction' } })
+
+    expect(wrapper.get('[data-testid="book-dock-row-destination"]').text()).toBe(label)
+    expect(wrapper.find('.row-file').exists()).toBe(false)
+  })
+
+  it('locks a file waiting for a manager for anyone else, and lets a manager file it', () => {
+    const member = mountHeld({ holdReason: 'waiting_for_manager' })
+    expect(member.find('[data-testid="book-dock-row-locked"]').exists()).toBe(true)
+    expect(member.find('.row-file').exists()).toBe(false)
+
+    const manager = mountHeld({ holdReason: 'waiting_for_manager' }, { canManage: true })
+    expect(manager.find('[data-testid="book-dock-row-locked"]').exists()).toBe(false)
+    expect(manager.find('.row-file').exists()).toBe(true)
+  })
+
+  it('notes other libraries that hold the book and a library that was deleted', () => {
+    const wrapper = mountHeld({ alsoIn: ['Audiobooks', 'Kids'], formerLibraryName: 'Sci-fi' })
+
+    expect(wrapper.get('[data-testid="book-dock-row-also-in"]').text()).toBe(`Also in ${formatList(['Audiobooks', 'Kids'])}`)
+    expect(wrapper.get('[data-testid="book-dock-row-former-library"]').text()).toBe('From deleted library Sci-fi')
+  })
+
+  it('resolves a duplicate in the row: add as format files it, keep both is for managers', async () => {
+    keepBothMock.mockResolvedValue({ ok: true })
+    const duplicate = { holdReason: 'duplicate' as const, holdDetail: { libraryName: 'Fiction', bookId: 9 } }
+    const member = mountHeld(duplicate, { expanded: true })
+    expect(member.find('[data-testid="book-dock-row-keep-both"]').exists()).toBe(false)
+    await member.get('[data-testid="book-dock-row-add-format"]').trigger('click')
+    expect(member.emitted('file')).toHaveLength(1)
+
+    const manager = mountHeld(duplicate, { expanded: true, canManage: true })
+    expect(manager.get('[data-testid="book-dock-row-resolve"]').text()).toBe('Resolve')
+    await manager.get('[data-testid="book-dock-row-keep-both"]').trigger('click')
+    await flushPromises()
+
+    expect(keepBothMock).toHaveBeenCalledWith(1)
+    expect(manager.emitted('changed')).toHaveLength(1)
   })
 })

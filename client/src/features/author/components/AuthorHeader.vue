@@ -52,6 +52,7 @@ const bornLabel = computed(() => lifeDateLabel(props.author.birthDate, props.aut
 const diedLabel = computed(() => lifeDateLabel(props.author.deathDate, props.author.deathYear))
 const genres = computed(() => props.author.genres ?? [])
 const influences = computed(() => props.author.influences ?? [])
+const genderLabel = computed(() => (props.author.gender ? t(`author.gender.${props.author.gender}`) : null))
 const websiteIsLink = computed(() => isSafeWebsite(props.author.website))
 const sourceLabel = computed(() => (props.author.metadataProvider ? authorProviderLabel(props.author.metadataProvider) : null))
 const sourceUrl = computed(() => {
@@ -59,7 +60,16 @@ const sourceUrl = computed(() => {
   return metadataProvider && metadataProviderId ? authorProviderSourceUrl(metadataProvider, metadataProviderId) : null
 })
 const hasFacts = computed(
-  () => !!(bornLabel.value || diedLabel.value || props.author.website || genres.value.length || influences.value.length || sourceLabel.value),
+  () =>
+    !!(
+      genderLabel.value ||
+      bornLabel.value ||
+      diedLabel.value ||
+      props.author.website ||
+      genres.value.length ||
+      influences.value.length ||
+      sourceLabel.value
+    ),
 )
 
 const resolvedBio = computed(() => {
@@ -205,6 +215,10 @@ watch(resolvedBio, () => {
           </div>
 
           <dl v-if="hasFacts" class="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+            <div v-if="genderLabel" class="flex gap-1.5">
+              <dt class="text-muted-foreground">{{ t('author.header.gender') }}</dt>
+              <dd class="text-foreground">{{ genderLabel }}</dd>
+            </div>
             <div v-if="bornLabel" class="flex gap-1.5">
               <dt class="text-muted-foreground">{{ t('author.header.born') }}</dt>
               <dd class="text-foreground">{{ bornLabel }}</dd>

@@ -83,6 +83,22 @@ export class ApiKeyAuthenticator {
     }
   }
 
+  /**
+   * The owner as a stored key may act right now, for work a key started that outlives its request,
+   * such as a bulk run. The same checks as a presented key, without a token, the failure limiter or
+   * a last-used update; null whenever the key could no longer authenticate.
+   */
+  async actorForStoredKey(keyId: number, ownerId: number): Promise<RequestUser | null> {
+    const settings = await this.appSettings.getApiKeySettings();
+    if (!settings.enabled) return null;
+    const key = await this.repo.findOwned(ownerId, keyId);
+    if (!key || key.revokedAt || key.audience !== 'api') return null;
+    if (key.expiresAt && key.expiresAt.getTime() <= Date.now()) return null;
+    const owner = await this.authService.findActingUser(key.userId);
+    if (!owner || !this.permissions.userHas(owner, Permission.ApiKeys)) return null;
+    return narrowToApiKey(owner, key);
+  }
+
   private async verify(token: string, address: string | null): Promise<RequestUser> {
     if (!hasValidApiKeyChecksum(token)) throw new ApiKeyRefusal('malformed', null);
 

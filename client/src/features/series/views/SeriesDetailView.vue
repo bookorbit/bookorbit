@@ -8,6 +8,8 @@ import { toast } from 'vue-sonner'
 
 import type { BookCard, BookDetail } from '@bookorbit/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
+import SingleSortControl from '@/features/book/components/sort-filter/SingleSortControl.vue'
+import LibraryMenuButton from '@/components/browse-header/LibraryMenuButton.vue'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import { bookCoverStyle } from '@/features/book/lib/book-cover'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
@@ -31,6 +33,7 @@ import SeriesGapBanner from '../components/SeriesGapBanner.vue'
 import { fetchSeriesBooks } from '../api/series'
 import { groupSeriesBooksByMedia } from '../composables/useSeriesBookMediaGroups'
 import { useSeriesDetail } from '../composables/useSeriesDetail'
+import type { SeriesBookSort, SortDirection } from '../types/series'
 import { useCoverStack, MAX_VISIBLE as MAX_STACK_VISIBLE } from '../composables/useCoverStack'
 import {
   PORTRAIT_STACK_FRAME_ASPECT_RATIO,
@@ -228,9 +231,21 @@ function goBack() {
   void router.push({ name: 'series' })
 }
 
-function onLibraryFilterChange(event: Event) {
-  const value = (event.target as HTMLSelectElement).value
-  libraryId.value = value ? Number(value) : null
+const BOOK_SORT_FIELDS: SeriesBookSort[] = ['seriesIndex', 'title', 'addedAt']
+
+const bookSortLabels = computed<Record<SeriesBookSort, string>>(() => ({
+  seriesIndex: t('series.detail.sort.seriesOrder'),
+  title: t('series.detail.sort.title'),
+  addedAt: t('series.detail.sort.recentlyAdded'),
+}))
+
+function handleLibraryChange(value: number | null) {
+  libraryId.value = value
+}
+
+function handleBookSort(field: SeriesBookSort, dir: SortDirection) {
+  sort.value = field
+  order.value = dir
 }
 
 function handleLeadCoverError(bookId: number) {
@@ -653,31 +668,23 @@ defineOptions({ name: 'SeriesDetailView' })
                 {{ t('series.detail.booksHeading') }}
               </h2>
               <div class="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                <select
-                  v-model="sort"
-                  class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-                >
-                  <option value="seriesIndex">{{ t('series.detail.sort.seriesOrder') }}</option>
-                  <option value="title">{{ t('series.detail.sort.title') }}</option>
-                  <option value="addedAt">{{ t('series.detail.sort.recentlyAdded') }}</option>
-                </select>
-
-                <select
-                  v-model="order"
-                  class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-                >
-                  <option value="asc">{{ t('series.detail.order.ascending') }}</option>
-                  <option value="desc">{{ t('series.detail.order.descending') }}</option>
-                </select>
-
-                <select
-                  :value="libraryId ?? ''"
-                  class="h-8 w-full min-w-0 rounded-md border border-input bg-background px-2.5 text-sm outline-none transition-colors focus:border-primary/60 sm:w-auto"
-                  @change="onLibraryFilterChange"
-                >
-                  <option value="">{{ t('series.detail.allLibraries') }}</option>
-                  <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-                </select>
+                <div class="flex flex-wrap items-center gap-1">
+                  <SingleSortControl
+                    :field="sort"
+                    :dir="order"
+                    :fields="BOOK_SORT_FIELDS"
+                    :labels="bookSortLabels"
+                    default-field="seriesIndex"
+                    default-dir="asc"
+                    @change="handleBookSort"
+                  />
+                  <LibraryMenuButton
+                    :library-id="libraryId"
+                    :libraries="libraries"
+                    :all-label="t('series.detail.allLibraries')"
+                    @update:library-id="handleLibraryChange"
+                  />
+                </div>
 
                 <div class="flex h-8 w-full items-center justify-between gap-2 rounded-md border border-input px-2.5 text-sm sm:w-auto">
                   <span class="whitespace-nowrap text-muted-foreground">{{ t('series.detail.groupByMedia') }}</span>

@@ -11,6 +11,8 @@ const props = withDefaults(
     title: string
     description: string
     confirmLabel: string
+    /** Says what staying put keeps, where a bare "Cancel" would read as the action itself. */
+    cancelLabel?: string
     busy?: boolean
     destructive?: boolean
     confirmDisabled?: boolean
@@ -75,7 +77,7 @@ function handleCancel() {
           </div>
         </div>
         <div class="mt-6 flex justify-end gap-2">
-          <Button variant="outline" :disabled="busy" @click="handleCancel">{{ t('common.cancel') }}</Button>
+          <Button variant="outline" :disabled="busy" @click="handleCancel">{{ cancelLabel ?? t('common.cancel') }}</Button>
           <Button :variant="destructive ? 'destructive' : 'default'" :disabled="busy || confirmDisabled || !phraseMatched" @click="handleConfirm">
             <Loader2 v-if="busy" class="animate-spin motion-reduce:animate-none" aria-hidden="true" />
             {{ confirmLabel }}

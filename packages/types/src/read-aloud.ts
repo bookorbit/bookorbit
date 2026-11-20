@@ -176,8 +176,9 @@ export type ReadAloudNarrationCoverage = {
   /** Sentences from where the narration starts to where it ends. */
   storySentences: number;
   storyUnmatchedSentences: number;
-  /** Unmatched sentences outside the narration. */
+  /** Unmatched sentences outside the narration, including the unread lines of a chapter that is otherwise read. */
   outsideSentences: number;
+  /** Chapters outside the narration with no audio at all. */
   outsideChapterCount: number;
   /** Titles of those chapters in book order, at most READ_ALOUD_OUTSIDE_TITLES_SHOWN of them. */
   outsideTitles: string[];
@@ -212,8 +213,10 @@ export type ReadAloudJob = {
   stage: ReadAloudJobStage;
   progress: number;
   stageDetail: ReadAloudStageDetail | null;
-  /** Jobs ahead of this one while it is queued; null otherwise. */
+  /** Jobs ahead of this one, counting the running one, while it waits in line; null otherwise, paused included. */
   queuePosition: number | null;
+  /** When a queued job was paused: it stays queued but the worker skips it until resumed. */
+  pausedAt: string | null;
   input: ReadAloudJobInput;
   decisions: ReadAloudDecisions;
   outputFileId: number | null;
@@ -305,7 +308,7 @@ export type ReadAloudChapterReport = {
   preview: string | null;
   firstMatch: string | null;
   lastMatch: string | null;
-  /** Unmatched text before the narration starts or after it ends; see ReadAloudNarrationCoverage. */
+  /** Before the narration starts or after it ends, with no audio at all; see ReadAloudNarrationCoverage. */
   outsideNarration: boolean;
 };
 

@@ -4,6 +4,8 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { X, FolderSync, PackageOpen, Mail, ArrowRightLeft, FileDown, TriangleAlert, BookOpenCheck } from '@lucide/vue'
 import { NOTIFICATION_TYPE_META, NotificationSeverity, type NotificationItem, type NotificationTypeMeta } from '@bookorbit/types'
+import { dockDigestNotificationCopy } from '@/features/book-dock/lib/dock-digest-notification-copy'
+import { bulkRunNotificationCopy } from '@/features/jobs/lib/bulk-run-notification-copy'
 import { readAloudNotificationCopy } from '@/features/read-aloud/lib/read-aloud'
 import { useNotifications } from '../composables/useNotifications'
 import { NOTIFICATION_CATEGORY_ICONS } from '../lib/notification-category-groups'
@@ -17,7 +19,10 @@ const { formatRelativeTime } = useNotifications()
 
 /** Types the client can phrase itself render in the reader's locale; the rest show the server's text. */
 const copy = computed(
-  () => readAloudNotificationCopy(props.notification, t, te) ?? { title: props.notification.title, message: props.notification.message },
+  () =>
+    readAloudNotificationCopy(props.notification, t, te) ??
+    bulkRunNotificationCopy(props.notification, t, te) ??
+    dockDigestNotificationCopy(props.notification, t) ?? { title: props.notification.title, message: props.notification.message },
 )
 
 // Only types whose icon should differ from their category's. Everything else falls back to the
@@ -29,6 +34,8 @@ const TYPE_ICON_OVERRIDES: Partial<Record<NotificationItem['type'], typeof Folde
   books_restored: BookOpenCheck,
   book_dock_finalized: PackageOpen,
   book_dock_finalized_with_errors: PackageOpen,
+  book_dock_digest: PackageOpen,
+  book_dock_digest_needs_review: PackageOpen,
   email_sent: Mail,
   email_failed: Mail,
   migration_completed: ArrowRightLeft,

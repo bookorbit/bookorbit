@@ -20,3 +20,19 @@ export function nextRovingIndex(key: string, index: number, count: number): numb
       return null
   }
 }
+
+/**
+ * Arrow, Home and End keys for a `role="radiogroup"` of buttons: checks the radio the key moves
+ * to and focuses it. Keys pressed in anything else inside the group, such as an input, pass through.
+ */
+export function handleRadioGroupKeydown(event: KeyboardEvent) {
+  const group = event.currentTarget as HTMLElement | null
+  const from = (event.target as HTMLElement | null)?.closest<HTMLElement>('[role="radio"]')
+  if (!group || !from) return
+  const radios = [...group.querySelectorAll<HTMLElement>('[role="radio"]')]
+  const next = nextRovingIndex(event.key, radios.indexOf(from), radios.length)
+  if (next === null) return
+  event.preventDefault()
+  radios[next]!.click()
+  radios[next]!.focus()
+}

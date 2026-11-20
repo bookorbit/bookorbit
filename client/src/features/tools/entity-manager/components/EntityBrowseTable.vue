@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { RouteLocationRaw } from 'vue-router'
 import type { BrowseEntityItem, BrowseEntitySortBy, BrowseEntitySortOrder, EntityTypeCapabilities } from '@bookorbit/types'
 
 import EntityBrowsePager from './EntityBrowsePager.vue'
@@ -19,6 +20,7 @@ defineProps<{
   selectedIds: Set<number | string>
   capabilities: EntityTypeCapabilities
   isInline: boolean
+  itemRoute?: (item: BrowseEntityItem) => RouteLocationRaw | null
 }>()
 
 const emit = defineEmits<{
@@ -82,6 +84,7 @@ function handleClearFilters(): void {
       :sort-by="sortBy"
       :sort-order="sortOrder"
       :has-active-filters="hasActiveFilters"
+      :item-route="itemRoute"
       @select="handleSelect"
       @toggle-all="handleToggleAll"
       @sort-change="handleSortChange"

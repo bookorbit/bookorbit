@@ -1,5 +1,5 @@
 import { computed } from 'vue'
-import type { SidebarLayout } from '@bookorbit/types'
+import { SIDEBAR_ICON_GROUP_IDS, type SidebarIconGroupId, type SidebarLayout, type SidebarPrimaryStyle } from '@bookorbit/types'
 import { arrangeIds, mergeSubsetOrder } from '@/components/sidebar/sidebar-layout'
 import { SIDEBAR_NAV_REGISTRY, type ResolvedSidebarNavEntry } from '@/composables/useSidebarNav'
 import { SIDEBAR_SECTIONS } from '@/composables/useSidebarSections'
@@ -20,7 +20,13 @@ function copyLayout(layout: SidebarLayout): SidebarLayout {
     hidden: [...layout.hidden],
     groupOrder: [...layout.groupOrder],
     rowOrder: Object.fromEntries(Object.entries(layout.rowOrder).map(([id, ids]) => [id, [...ids]])),
+    primaryStyle: layout.primaryStyle,
+    groupStyles: { ...layout.groupStyles },
   }
+}
+
+export function isSidebarIconGroup(id: string): id is SidebarIconGroupId {
+  return (SIDEBAR_ICON_GROUP_IDS as readonly string[]).includes(id)
 }
 
 export function useSidebarLayout() {
@@ -90,6 +96,18 @@ export function useSidebarLayout() {
     )
   }
 
+  function setPrimaryStyle(style: SidebarPrimaryStyle) {
+    layout.primaryStyle = style
+  }
+
+  function groupStyle(id: string): SidebarPrimaryStyle {
+    return isSidebarIconGroup(id) ? (layout.groupStyles[id] ?? 'list') : 'list'
+  }
+
+  function setGroupStyle(id: SidebarIconGroupId, style: SidebarPrimaryStyle) {
+    layout.groupStyles = { ...layout.groupStyles, [id]: style }
+  }
+
   /** Restores the stock layout and hands back the one it replaced, for Undo. */
   function resetLayout(): SidebarLayout {
     const previous = copyLayout(layout)
@@ -101,5 +119,19 @@ export function useSidebarLayout() {
     Object.assign(layout, copyLayout(previous))
   }
 
-  return { layout, isHidden, toggleHidden, arrangeRows, visibleRows, arrangeGroups, moveRows, moveGroups, resetLayout, restoreLayout }
+  return {
+    layout,
+    isHidden,
+    toggleHidden,
+    arrangeRows,
+    visibleRows,
+    arrangeGroups,
+    moveRows,
+    moveGroups,
+    setPrimaryStyle,
+    groupStyle,
+    setGroupStyle,
+    resetLayout,
+    restoreLayout,
+  }
 }

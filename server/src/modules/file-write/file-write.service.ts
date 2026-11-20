@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'fs/promises';
 
 import type {
+  AudioCoverEmbedCode,
+  AudioCoverEmbedResult,
   AudiobookChapter,
   BookChapterWriteBack,
   BookFileWriteDisabledReason,
@@ -17,6 +19,7 @@ import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapte
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
 import { sliceChaptersAcrossFiles } from '../../common/utils/audiobook-chapters.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { isReadAlongBookFile } from '../../common/utils/primary-file-selection.utils';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { NotificationService } from '../notification/notification.service';
 import { probeAudioChapters } from '../metadata/extractors/audio.extractor';
@@ -36,8 +39,10 @@ import { inspectCoverImage } from './formats/shared/cover-image';
 import { probeAudioDurationMs } from './formats/audio/audio-metadata-embedder';
 import type { BookWritePayload } from './interfaces/book-write-payload.interface';
 import type { FormatWriteOptions } from './interfaces/format-write-options.interface';
+import { AUDIO_COVER_UNCHANGED_REASON } from './interfaces/format-writer.interface';
 import { describeWriteFailure } from './write-failure-reason';
 import {
+  compareWriteTargets,
   coverMediumForFormat,
   isWriterSupported,
   needsBookFileList,
@@ -57,6 +62,7 @@ const FILE_WRITE_SCHEDULE_EVENT = 'file_write.schedule';
 const FILE_WRITE_COVER_EVENT = 'file_write.cover_load';
 const FILE_WRITE_SKIP_LOG_EVENT = 'file_write.skip_log';
 const FILE_WRITE_CHAPTERS_EVENT = 'file_write.chapters';
+const FILE_WRITE_AUDIO_COVER_EVENT = 'file_write.audio_cover';
 const CHAPTER_WRITE_FORMAT_SET = new Set<string>(CHAPTER_WRITE_FORMATS);
 const UNKNOWN_FORMAT = 'unknown';
 const DEFAULT_WRITE_DEBOUNCE_MS = 3_000;
@@ -314,6 +320,173 @@ export class FileWriteService implements OnModuleDestroy {
     } finally {
       this.releaseWriteSlot();
     }
+  }
+
+  /**
+   * Embeds the book's square audiobook cover in each of its read-along EPUBs, leaving their
+   * metadata and book cover alone. Each rewrite copies a file that runs to hundreds of megabytes,
+   * so only an explicit request comes here, and it honours the library's read-along write toggle
+   * and size limit. The library's automatic write-back switch does not apply, as with any sync.
+   */
+  async embedAudioCover(bookId: number, userId: number | undefined, dryRun = false): Promise<AudioCoverEmbedResult> {
+    const result = await this.lockService.withLock(bookOperationLockKey(bookId), () => this.embedAudioCoverLocked(bookId, userId, dryRun));
+    return { ...result, code: audioCoverEmbedCode(result) };
+  }
+
+  /**
+   * Embeds the book's audiobook cover in a read-along EPUB that is not a library file yet, such as
+   * one a read-aloud job has just generated. The library's write settings do not apply, because the
+   * file is not part of the library, and no lock or hash history is needed, because nothing else
+   * holds the file and no device has a copy to match. A failure is reported, never thrown, so
+   * publishing the file does not depend on it.
+   */
+  async embedAudioCoverInDraft(bookId: number, filePath: string): Promise<AudioCoverEmbedResult> {
+    const startedAt = Date.now();
+    const writer = this.registry.get('epub');
+    let result: WriteResult;
+    if (typeof writer?.embedAudioCover !== 'function') {
+      result = skipResult(WRITE_TARGET_SKIP_REASON.formatNotSupported);
+    } else {
+      const coverBytes = await this.loadCoverBytes(bookId, 'audio');
+      if (!coverBytes) {
+        result = skipResult(AUDIO_COVER_SKIP_REASON.noAudioCover);
+      } else {
+        try {
+          result = await writer.embedAudioCover(filePath, coverBytes, { dryRun: false });
+        } catch (error) {
+          const reason = describeWriteFailure(error, filePath);
+          this.logger.warn(
+            `[${FILE_WRITE_AUDIO_COVER_EVENT}] [fail] bookId=${bookId} draft=true durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeErrorMessage(reason)}" - audio cover embed in generated file failed`,
+          );
+          result = { status: 'failed', fieldsWritten: [], durationMs: Date.now() - startedAt, reason };
+        }
+      }
+    }
+    return { ...result, code: audioCoverEmbedCode(result) };
+  }
+
+  /** The books among `bookIds` that hold a read-along EPUB, so a bulk embed visits only those. */
+  findBookIdsWithReadAlongFiles(bookIds: readonly number[]): Promise<number[]> {
+    return this.fileWriteRepo.findBookIdsWithReadAlongFiles(bookIds);
+  }
+
+  private async embedAudioCoverLocked(bookId: number, userId: number | undefined, dryRun: boolean): Promise<WriteResult> {
+    await this.acquireWriteSlot();
+    const startedAt = Date.now();
+    this.logger.log(
+      `[${FILE_WRITE_AUDIO_COVER_EVENT}] [start] bookId=${bookId} userId=${formatUserId(userId)} dryRun=${dryRun} - audio cover embed started`,
+    );
+    try {
+      const result = await this.embedAudioCoverInTargets(bookId, userId, dryRun, startedAt);
+      const counts = result.fileCounts;
+      const countsPart = counts
+        ? ` files=${counts.processed} succeededFiles=${counts.succeeded} failedFiles=${counts.failed} skippedFiles=${counts.skipped}`
+        : '';
+      const reasonPart = result.reason ? ` reason="${sanitizeErrorMessage(result.reason)}"` : '';
+      this.logger.log(
+        `[${FILE_WRITE_AUDIO_COVER_EVENT}] [end] bookId=${bookId} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} status=${result.status}${countsPart}${reasonPart} - audio cover embed completed`,
+      );
+      return result;
+    } catch (error) {
+      this.logger.warn(
+        `[${FILE_WRITE_AUDIO_COVER_EVENT}] [fail] bookId=${bookId} userId=${formatUserId(userId)} dryRun=${dryRun} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeErrorMessage(error instanceof Error ? error.message : String(error))}" - audio cover embed failed`,
+      );
+      throw error;
+    } finally {
+      this.releaseWriteSlot();
+    }
+  }
+
+  private async embedAudioCoverInTargets(bookId: number, userId: number | undefined, dryRun: boolean, startedAt: number): Promise<WriteResult> {
+    const files = await this.fileWriteRepo.findFilesForBook(bookId);
+    const readAlong = files
+      .filter((file) => (file.role === 'content' || file.role === 'primary') && isReadAlongBookFile(file))
+      .sort(compareWriteTargets);
+    if (readAlong.length === 0) return skipResult(AUDIO_COVER_SKIP_REASON.noReadAlongFile);
+
+    const libConfig = await this.fileWriteRepo.findLibraryFileWriteConfig(readAlong[0]!.libraryId);
+    if (!libConfig) return skipResult(AUDIO_COVER_SKIP_REASON.libraryNotFound);
+
+    const plan: PlannedTarget[] = (await this.withSizesOnDisk(readAlong)).map((file) => ({
+      file,
+      skip:
+        skipResultOrNull(resolveWriteTargetSkip(file, libConfig, this.supports)) ??
+        (this.canEmbedAudioCover(file) ? null : skipResult(WRITE_TARGET_SKIP_REASON.formatNotSupported)),
+    }));
+    const skipped = plan.filter((entry) => entry.skip !== null);
+    const writable = plan.filter((entry) => entry.skip === null).map((entry) => entry.file);
+    await this.insertSkipLogsIfSync(bookId, skipped, 'sync', userId);
+    if (writable.length === 0) {
+      return aggregateWriteResults(
+        skipped.map((entry) => entry.skip!),
+        Date.now() - startedAt,
+      );
+    }
+
+    const coverBytes = await this.loadCoverBytes(bookId, 'audio');
+    if (!coverBytes) return skipResult(AUDIO_COVER_SKIP_REASON.noAudioCover);
+
+    const targetResults: WriteResult[] = skipped.map((entry) => entry.skip!);
+    const suppressPaths = dryRun ? [] : writable.map((target) => target.absolutePath);
+    this.selfWriteRegistry.begin(suppressPaths);
+    try {
+      for (const target of writable) {
+        targetResults.push(await this.embedAudioCoverInTarget(bookId, target, coverBytes, { userId, dryRun, startedAt }));
+      }
+    } finally {
+      this.selfWriteRegistry.end(suppressPaths);
+    }
+
+    const result = aggregateWriteResults(targetResults, Date.now() - startedAt);
+    if (result.status === 'success') await this.fileWriteRepo.setLastWrittenAt(bookId, new Date());
+    return result;
+  }
+
+  private canEmbedAudioCover(file: FileWriteTarget): boolean {
+    return typeof this.registry.get(normalizeWriteFormat(file.format))?.embedAudioCover === 'function';
+  }
+
+  private async embedAudioCoverInTarget(
+    bookId: number,
+    file: FileWriteTarget,
+    coverBytes: Buffer,
+    options: { userId: number | undefined; dryRun: boolean; startedAt: number },
+  ): Promise<WriteResult> {
+    const { userId, dryRun, startedAt } = options;
+    const format = normalizeWriteFormat(file.format);
+    const writer = this.registry.get(format)!;
+
+    let result: WriteResult;
+    try {
+      result = await this.lockService.withLock(file.absolutePath, () =>
+        writer.embedAudioCover!(file.absolutePath, coverBytes, {
+          dryRun,
+          beforeWrite: async () => {
+            if (file.fileHash) await this.fileWriteRepo.recordHashHistory(file.id, file.fileHash, 'file_write');
+          },
+        }),
+      );
+    } catch (error) {
+      const reason = describeWriteFailure(error, file.absolutePath);
+      result = { status: 'failed', fieldsWritten: [], durationMs: 0, reason };
+      this.logWriteFail(bookId, format, 'sync', userId, dryRun, startedAt, error, reason);
+      await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy: 'sync' });
+      return result;
+    }
+
+    if (result.status === 'failed' && result.reason) {
+      result = { ...result, reason: describeWriteFailure(result.reason, file.absolutePath) };
+    }
+    if (result.status === 'success' && !(await this.updateTargetFileState(bookId, file))) {
+      result = {
+        status: 'failed',
+        fieldsWritten: result.fieldsWritten,
+        durationMs: Date.now() - startedAt,
+        reason: 'post-write file state refresh failed',
+      };
+    }
+    await this.fileWriteRepo.insertLog({ bookId, bookFileId: file.id, userId: userId ?? null, format, result, triggeredBy: 'sync' });
+    return result;
   }
 
   /** Whether a book's chapters can be written into its audio files. It is every file or none. */
@@ -786,7 +959,34 @@ export class FileWriteService implements OnModuleDestroy {
   }
 }
 
-function skipResult(reason: WriteTargetSkipReason): WriteResult {
+export const AUDIO_COVER_SKIP_REASON = {
+  noReadAlongFile: 'no read-along EPUB',
+  libraryNotFound: 'library not found',
+  noAudioCover: 'no audiobook cover',
+} as const;
+
+const AUDIO_COVER_CODE_BY_SKIP_REASON: Record<string, AudioCoverEmbedCode> = {
+  [AUDIO_COVER_UNCHANGED_REASON]: 'unchanged',
+  [AUDIO_COVER_SKIP_REASON.noReadAlongFile]: 'no_read_along_file',
+  [AUDIO_COVER_SKIP_REASON.noAudioCover]: 'no_audio_cover',
+  [AUDIO_COVER_SKIP_REASON.libraryNotFound]: 'unsupported',
+  [WRITE_TARGET_SKIP_REASON.formatDisabled]: 'write_disabled',
+  [WRITE_TARGET_SKIP_REASON.fileExceedsSizeLimit]: 'over_size_limit',
+  [WRITE_TARGET_SKIP_REASON.formatNotSupported]: 'unsupported',
+};
+
+/** Several files that all skipped join their reasons, so the first one a client has copy for decides. */
+function audioCoverEmbedCode(result: WriteResult): AudioCoverEmbedCode {
+  if (result.status === 'success') return 'embedded';
+  if (result.status === 'failed') return 'failed';
+  for (const reason of (result.reason ?? '').split('; ')) {
+    const code = AUDIO_COVER_CODE_BY_SKIP_REASON[reason];
+    if (code) return code;
+  }
+  return 'unsupported';
+}
+
+function skipResult(reason: WriteTargetSkipReason | (typeof AUDIO_COVER_SKIP_REASON)[keyof typeof AUDIO_COVER_SKIP_REASON]): WriteResult {
   return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason };
 }
 

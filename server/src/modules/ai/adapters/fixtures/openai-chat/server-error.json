@@ -1,0 +1,12 @@
+{
+  "status": 503,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "The server is overloaded",
+      "type": "server_error"
+    }
+  }
+}

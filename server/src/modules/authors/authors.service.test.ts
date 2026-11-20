@@ -808,6 +808,7 @@ describe('AuthorsService', () => {
 
     it('update writes facts, takes the year from a full date and tidies lists', async () => {
       await service.update(reqUser(), 32, {
+        gender: 'female',
         website: '  https://johnreid.example  ',
         birthDate: '1965-03-14',
         birthYear: 1900,
@@ -817,6 +818,7 @@ describe('AuthorsService', () => {
       });
 
       expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(32, {
+        gender: 'female',
         website: 'https://johnreid.example',
         birthDate: '1965-03-14',
         birthYear: 1965,
@@ -829,9 +831,10 @@ describe('AuthorsService', () => {
     });
 
     it('update clears facts sent as null and keeps a year sent beside a cleared date', async () => {
-      await service.update(reqUser(), 32, { website: null, birthDate: null, birthYear: 1965, deathDate: null, genres: null });
+      await service.update(reqUser(), 32, { gender: null, website: null, birthDate: null, birthYear: 1965, deathDate: null, genres: null });
 
       expect(authorsRepo.updateAuthorById).toHaveBeenCalledWith(32, {
+        gender: null,
         website: null,
         birthDate: null,
         birthYear: 1965,
@@ -1043,118 +1046,119 @@ describe('AuthorsService', () => {
     expect(result).toEqual(expect.objectContaining({ id: 42, imageUrl: null }));
   });
 
-  it('bulkRefreshMetadata returns zero counters for empty input', async () => {
-    await expect(service.bulkRefreshMetadata([], reqUser())).resolves.toEqual({
-      processed: 0,
-      failed: 0,
-      updated: 0,
-    });
-  });
-
-  it('bulkRefreshMetadata stops iterating when progress callback throws', async () => {
-    authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2]);
-    authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
-    authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue('https://cdn.example.com/1-thumb.jpg');
-    vi.spyOn(service as any, 'refreshEnrichmentInternal').mockResolvedValue({
-      descriptionUpdated: true,
-      imageUpdated: true,
-      provider: 'audnexus',
-    });
-
-    const progress = vi.fn(() => {
-      throw new Error('client disconnected');
-    });
-
-    const result = await service.bulkRefreshMetadata([1, 2], reqUser(), progress);
-
-    expect(result).toEqual({ processed: 1, failed: 0, updated: 1 });
-    expect(progress).toHaveBeenCalledTimes(1);
-  });
-
-  it('bulkRefreshMetadata deduplicates ids and continues after per-item failures', async () => {
-    authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2]);
-    authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
-    vi.spyOn(service as any, 'refreshEnrichmentInternal')
-      .mockRejectedValueOnce(new Error('provider timeout'))
-      .mockResolvedValueOnce({
-        descriptionUpdated: false,
-        imageUpdated: true,
-        provider: 'audnexus',
-      });
-    vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
-    authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue('https://cdn.example.com/2-thumb.jpg');
-
-    const progress = vi.fn();
-    const result = await service.bulkRefreshMetadata([1, 1, 2], reqUser(), progress);
-
-    expect(result).toEqual({ processed: 2, failed: 1, updated: 1 });
-    expect(progress).toHaveBeenCalledTimes(2);
-  });
-
-  describe('bulkRefreshMetadata metadata cache', () => {
-    function doneResult(outboundRequests: number) {
-      return { kind: 'done', provider: 'audnexus', descriptionUpdated: true, imageUpdated: false, outboundRequests, cacheServed: [] };
+  describe('bulk refresh', () => {
+    function doneResult(outboundRequests: number, imageUpdated = false) {
+      return { kind: 'done', provider: 'audnexus', descriptionUpdated: true, imageUpdated, outboundRequests, cacheServed: [] };
     }
 
-    beforeEach(() => {
-      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2, 3]);
+    it('authorizes a selection before the run, without duplicates', async () => {
+      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2]);
       authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
+
+      await expect(service.authorizeBulkRefresh(reqUser(), [1, 1, 2])).resolves.toEqual([1, 2]);
+      expect(authorsRepo.findVisibleAuthorIds).toHaveBeenCalledWith([1, 2], [1, 2]);
     });
 
-    it('uses the cache with fallback by default', async () => {
+    it('answers an empty selection without a query', async () => {
+      await expect(service.authorizeBulkRefresh(reqUser(), [])).resolves.toEqual([]);
+      expect(authorsRepo.findVisibleAuthorIds).not.toHaveBeenCalled();
+    });
+
+    it('refuses a selection with an author in a library the user cannot edit', async () => {
       authorsRepo.findVisibleAuthorIds.mockResolvedValue([1]);
+      authorsRepo.findRelatedLibraryIds.mockResolvedValue([3]);
+
+      await expect(service.authorizeBulkRefresh(reqUser(), [1])).rejects.toBeInstanceOf(ForbiddenException);
+    });
+
+    it('refuses a selection with an author the user cannot see', async () => {
+      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1]);
+      authorsRepo.findRelatedLibraryIds.mockResolvedValue([1]);
+
+      await expect(service.authorizeBulkRefresh(reqUser(), [1, 2])).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    it('checks one author against the scope as the run reaches it', async () => {
+      const scope = await service.bulkRefreshScope(reqUser());
+      expect(scope).toEqual({ libraryIds: [1, 2], editableLibraryIds: new Set([1, 2]) });
+
+      authorsRepo.findVisibleAuthorIds.mockResolvedValueOnce([]);
+      authorsRepo.findRelatedLibraryIds.mockResolvedValueOnce([]);
+      await expect(service.bulkRefreshItemAccess(9, scope)).resolves.toBe('not-found');
+
+      authorsRepo.findVisibleAuthorIds.mockResolvedValueOnce([9]);
+      authorsRepo.findRelatedLibraryIds.mockResolvedValueOnce([1, 3]);
+      await expect(service.bulkRefreshItemAccess(9, scope)).resolves.toBe('no-access');
+
+      authorsRepo.findVisibleAuthorIds.mockResolvedValueOnce([9]);
+      authorsRepo.findRelatedLibraryIds.mockResolvedValueOnce([2]);
+      await expect(service.bulkRefreshItemAccess(9, scope)).resolves.toBe('ok');
+      expect(authorsRepo.findVisibleAuthorIds).toHaveBeenLastCalledWith([9], [1, 2]);
+    });
+
+    it('refreshes one author with the cache and fallback by default', async () => {
       enrichmentExecutor.execute.mockResolvedValue(doneResult(1));
-      vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
 
-      await service.bulkRefreshMetadata([1], reqUser());
-
+      await expect(service.refreshAuthorForBulk(1, false, 7)).resolves.toEqual({
+        kind: 'refreshed',
+        updated: true,
+        imageUpdated: false,
+        imageUrl: undefined,
+        outboundRequests: 1,
+      });
       expect(enrichmentExecutor.execute).toHaveBeenCalledWith(expect.objectContaining({ authorId: 1 }), { policy: 'default', allowFallback: true });
+      expect(authorImageStorage.getThumbnailUrlIfExists).not.toHaveBeenCalled();
     });
 
-    it('goes live with fallback when asked to ignore the cache', async () => {
-      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1]);
-      enrichmentExecutor.execute.mockResolvedValue(doneResult(1));
-      vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    it('goes live with fallback when asked to ignore the cache, and reads the new thumbnail', async () => {
+      enrichmentExecutor.execute.mockResolvedValue(doneResult(2, true));
+      authorImageStorage.getThumbnailUrlIfExists.mockResolvedValue('https://cdn.example.com/1-thumb.jpg');
 
-      await service.bulkRefreshMetadata([1], reqUser(), undefined, { ignoreCache: true });
-
+      await expect(service.refreshAuthorForBulk(1, true, 7)).resolves.toEqual(
+        expect.objectContaining({ kind: 'refreshed', imageUpdated: true, imageUrl: 'https://cdn.example.com/1-thumb.jpg' }),
+      );
       expect(enrichmentExecutor.execute).toHaveBeenCalledWith(expect.objectContaining({ authorId: 1 }), { policy: 'refresh', allowFallback: true });
     });
 
-    it('only yields between items that made no outbound requests', async () => {
-      enrichmentExecutor.execute.mockResolvedValueOnce(doneResult(0)).mockResolvedValueOnce(doneResult(3)).mockResolvedValueOnce(doneResult(0));
-      const sleep = vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
+    it('reports a provider failure instead of throwing', async () => {
+      enrichmentExecutor.execute.mockResolvedValue({
+        kind: 'failed',
+        message: 'down',
+        provider: 'audnexus',
+        httpStatus: 503,
+        retryAfterMs: null,
+        transient: true,
+        descriptionUpdated: false,
+        imageUpdated: false,
+        outboundRequests: 0,
+        cacheServed: [],
+      });
 
-      await service.bulkRefreshMetadata([1, 2, 3], reqUser());
-
-      expect(sleep).toHaveBeenCalledTimes(2);
-      expect(sleep).toHaveBeenNthCalledWith(1, 100);
-      const providerDelay = sleep.mock.calls[1]![0] as number;
-      expect(providerDelay).toBeGreaterThanOrEqual(250);
-      expect(providerDelay).toBeLessThanOrEqual(1_000);
+      await expect(service.refreshAuthorForBulk(1, false, 7)).resolves.toEqual({
+        kind: 'failed',
+        error: 'Author enrichment failed for provider audnexus: down',
+      });
     });
 
-    it('keeps the provider delay after a failed item', async () => {
-      authorsRepo.findVisibleAuthorIds.mockResolvedValue([1, 2]);
-      enrichmentExecutor.execute
-        .mockResolvedValueOnce({
-          kind: 'failed',
-          message: 'down',
-          provider: 'audnexus',
-          httpStatus: 503,
-          retryAfterMs: null,
-          transient: true,
-          descriptionUpdated: false,
-          imageUpdated: false,
-          outboundRequests: 0,
-          cacheServed: [],
-        })
-        .mockResolvedValueOnce(doneResult(0));
+    it('reports an author deleted since the check as not found', async () => {
+      enrichmentExecutor.execute.mockResolvedValue({ kind: 'skipped', reason: 'author_not_found' });
+
+      await expect(service.refreshAuthorForBulk(1, false, 7)).resolves.toEqual({ kind: 'not-found' });
+    });
+
+    it('only yields after an author served from the cache, and waits the provider delay otherwise', async () => {
       const sleep = vi.spyOn(service as any, 'sleep').mockResolvedValue(undefined);
 
-      await service.bulkRefreshMetadata([1, 2], reqUser());
+      await service.pauseBetweenBulkAuthors(0);
+      await service.pauseBetweenBulkAuthors(3);
+      await service.pauseBetweenBulkAuthors(undefined);
 
-      expect((sleep.mock.calls[0]![0] as number) >= 250).toBe(true);
+      expect(sleep).toHaveBeenNthCalledWith(1, 100);
+      for (const call of [1, 2]) {
+        const delay = sleep.mock.calls[call]![0] as number;
+        expect(delay).toBeGreaterThanOrEqual(250);
+        expect(delay).toBeLessThanOrEqual(1_000);
+      }
     });
   });
 

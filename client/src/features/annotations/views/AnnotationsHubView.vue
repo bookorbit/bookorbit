@@ -8,6 +8,7 @@ import { toast } from 'vue-sonner'
 import { ANNOTATION_HIGHLIGHT_COLORS, type AnnotationHubItem, type AnnotationItem } from '@bookorbit/types'
 import { formatDate } from '@/i18n/formatters'
 import { downloadFromUrl } from '@/lib/download'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import PageTitleRow from '@/components/page-header/PageTitleRow.vue'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import AnnotationStream from '../components/shared/AnnotationStream.vue'
@@ -29,6 +30,7 @@ const router = useRouter()
 const hub = useAnnotationsHub()
 useAnnotationsUrlSync(hub)
 const { density } = useDensity()
+const { openHighlightsInPeek } = useDisplaySettings()
 
 /**
  * The source margin only earns its column when there is room for it and a cursor to scan
@@ -121,7 +123,7 @@ function handleCloseDetail() {
 }
 
 function handleJump(annotation: AnnotationItem | AnnotationHubItem) {
-  const route = annotationReaderRoute(annotation as AnnotationHubItem)
+  const route = annotationReaderRoute(annotation as AnnotationHubItem, { peek: openHighlightsInPeek.value })
   if (route) void router.push(route)
 }
 

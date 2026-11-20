@@ -89,6 +89,7 @@ describe('FileWriteService', () => {
     };
     const writer = {
       write: vi.fn(),
+      embedAudioCover: vi.fn(),
     };
     const registry = {
       supports: vi.fn().mockReturnValue(true),
@@ -1906,7 +1907,10 @@ describe('FileWriteService', () => {
       registry.supports.mockReturnValue(false);
       fileWriteRepo.insertLog.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('connection reset')).mockResolvedValueOnce(undefined);
 
-      await expect(service.writeToFile(20, 'sync', 7)).resolves.toMatchObject({ status: 'skipped', reason: 'format not supported' });
+      await expect(service.writeToFile(20, 'sync', 7)).resolves.toMatchObject({
+        status: 'skipped',
+        reason: 'format not supported',
+      });
       expect(fileWriteRepo.insertLog).toHaveBeenCalledTimes(3);
     });
   });
@@ -1973,6 +1977,285 @@ describe('FileWriteService', () => {
         { fileId: 1, format: 'epub', writable: true, reason: null, writableFields: [...EPUB_BOOK_FILE_WRITE_FIELDS] },
         { fileId: 2, format: 'epub', writable: false, reason: 'format_disabled', writableFields: [] },
       ]);
+    });
+  });
+
+  describe('audio cover embed', () => {
+    const readAlong = {
+      id: 2,
+      absolutePath: '/books/lib/book.readaloud.epub',
+      format: 'epub',
+      sizeBytes: 40,
+      fileHash: 'old-hash',
+      libraryId: 2,
+      role: 'content',
+      sortOrder: 1,
+      mediaOverlayAvailable: true,
+    };
+    const plain = { ...readAlong, id: 1, absolutePath: '/books/lib/book.epub', fileHash: 'plain-hash', sortOrder: 0, mediaOverlayAvailable: false };
+
+    function arrange(config: Record<string, unknown> = {}, files: unknown[] = [plain, readAlong]) {
+      const coverStore = { resolve: vi.fn().mockResolvedValue('/covers/5/audio/cover_extracted.jpg') };
+      const context = makeService({}, coverStore);
+      context.fileWriteRepo.findFilesForBook.mockResolvedValue(files);
+      context.fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, fileWriteReadAlongEnabled: true, ...config });
+      mockReadFile.mockResolvedValue(Buffer.from('square') as never);
+      context.writer.embedAudioCover.mockImplementation(async (_path: string, _bytes: Buffer, options: { beforeWrite?: () => Promise<void> }) => {
+        await options.beforeWrite?.();
+        return { status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 5 };
+      });
+      return context;
+    }
+
+    it("writes the audio slot into the read-along EPUB only, never the plain one, and never the book's metadata", async () => {
+      const { service, writer, coverStore, fileWriteRepo, lockService } = arrange();
+
+      const result = await service.embedAudioCover(5, 7);
+
+      expect(coverStore.resolve).toHaveBeenCalledWith(5, { medium: 'audio', variant: 'cover', strict: true });
+      expect(writer.embedAudioCover).toHaveBeenCalledTimes(1);
+      expect(writer.embedAudioCover).toHaveBeenCalledWith(
+        '/books/lib/book.readaloud.epub',
+        Buffer.from('square'),
+        expect.objectContaining({ dryRun: false }),
+      );
+      expect(writer.write).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ status: 'success', code: 'embedded', fieldsWritten: ['audioCoverBytes'] });
+      expect(lockService.withLock).toHaveBeenCalledWith(bookOperationLockKey(5), expect.any(Function));
+      expect(lockService.withLock).toHaveBeenCalledWith('/books/lib/book.readaloud.epub', expect.any(Function));
+      expect(fileWriteRepo.setLastWrittenAt).toHaveBeenCalledWith(5, expect.any(Date));
+      expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          bookId: 5,
+          bookFileId: 2,
+          userId: 7,
+          format: 'epub',
+          triggeredBy: 'sync',
+          result: expect.objectContaining({ status: 'success' }),
+        }),
+      );
+    });
+
+    it('records the old hash before the file changes and refreshes its state after', async () => {
+      computeFileHashMock.mockReset();
+      computeFileHashMock.mockResolvedValue('new-hash');
+      const { service, fileWriteRepo, writer } = arrange();
+      const order: string[] = [];
+      fileWriteRepo.recordHashHistory.mockImplementation(() => Promise.resolve(void order.push('history')));
+      writer.embedAudioCover.mockImplementation(async (_path: string, _bytes: Buffer, options: { beforeWrite?: () => Promise<void> }) => {
+        await options.beforeWrite?.();
+        order.push('write');
+        return { status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 5 };
+      });
+      fileWriteRepo.updateFileStateAfterMetadataWrite.mockImplementation(() => Promise.resolve(void order.push('state')));
+
+      await service.embedAudioCover(5, 7);
+
+      expect(order).toEqual(['history', 'write', 'state']);
+      expect(fileWriteRepo.recordHashHistory).toHaveBeenCalledWith(2, 'old-hash', 'file_write');
+      expect(fileWriteRepo.updateFileStateAfterMetadataWrite).toHaveBeenCalledWith(
+        5,
+        2,
+        'old-hash',
+        expect.objectContaining({ fileHash: 'new-hash' }),
+      );
+    });
+
+    it('does not touch the hash history or the file state when the cover is already embedded', async () => {
+      const { service, fileWriteRepo, writer } = arrange();
+      writer.embedAudioCover.mockResolvedValue({ status: 'skipped', reason: 'audio cover unchanged', fieldsWritten: [], durationMs: 1 });
+
+      const result = await service.embedAudioCover(5, 7);
+
+      expect(result).toMatchObject({ status: 'skipped', code: 'unchanged', reason: 'audio cover unchanged' });
+      expect(fileWriteRepo.recordHashHistory).not.toHaveBeenCalled();
+      expect(fileWriteRepo.updateFileStateAfterMetadataWrite).not.toHaveBeenCalled();
+      expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
+    });
+
+    it('writes while the library switch for automatic write-back is off', async () => {
+      const { service, writer } = arrange({ fileWriteEnabled: false });
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({ status: 'success' });
+      expect(writer.embedAudioCover).toHaveBeenCalled();
+    });
+
+    it('stays out of a read-along EPUB while the library does not write to them, and says why', async () => {
+      const { service, writer, coverStore, fileWriteRepo } = arrange({ fileWriteReadAlongEnabled: false });
+
+      const result = await service.embedAudioCover(5, 7);
+
+      expect(result).toMatchObject({ status: 'skipped', code: 'write_disabled', reason: 'format disabled' });
+      expect(writer.embedAudioCover).not.toHaveBeenCalled();
+      expect(coverStore.resolve).not.toHaveBeenCalled();
+      expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
+        expect.objectContaining({ bookFileId: 2, result: expect.objectContaining({ reason: 'format disabled' }) }),
+      );
+    });
+
+    it('applies the read-along size limit to the size on disk', async () => {
+      const { service, writer } = arrange({ fileWriteReadAlongMaxFileSizeMb: 100 });
+      diskSizes.set(readAlong.absolutePath, 400 * 1024 * 1024);
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({
+        status: 'skipped',
+        code: 'over_size_limit',
+        reason: 'file exceeds size limit',
+      });
+      expect(writer.embedAudioCover).not.toHaveBeenCalled();
+    });
+
+    it('skips a book with no read-along EPUB', async () => {
+      const { service, writer } = arrange({}, [plain]);
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({
+        status: 'skipped',
+        code: 'no_read_along_file',
+        reason: 'no read-along EPUB',
+      });
+      expect(writer.embedAudioCover).not.toHaveBeenCalled();
+    });
+
+    it('ignores a read-along EPUB that is only a supplement', async () => {
+      const { service } = arrange({}, [{ ...readAlong, role: 'supplement' }]);
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({ status: 'skipped', reason: 'no read-along EPUB' });
+    });
+
+    it('skips a book with no audiobook cover, never falling back to the book cover', async () => {
+      const { service, writer, coverStore } = arrange();
+      coverStore.resolve.mockResolvedValue(null);
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({ status: 'skipped', code: 'no_audio_cover', reason: 'no audiobook cover' });
+      expect(coverStore.resolve).toHaveBeenCalledTimes(1);
+      expect(writer.embedAudioCover).not.toHaveBeenCalled();
+    });
+
+    it('reports a dry run without recording anything or suppressing the watcher', async () => {
+      const { service, writer, selfWriteRegistry } = arrange();
+      const begin = vi.spyOn(selfWriteRegistry, 'begin');
+      writer.embedAudioCover.mockResolvedValue({ status: 'skipped', reason: 'dry-run', fieldsWritten: ['audioCoverBytes'], durationMs: 1 });
+
+      await expect(service.embedAudioCover(5, 7, true)).resolves.toMatchObject({ status: 'skipped', reason: 'dry-run' });
+
+      expect(writer.embedAudioCover).toHaveBeenCalledWith(expect.any(String), expect.any(Buffer), expect.objectContaining({ dryRun: true }));
+      expect(begin).toHaveBeenCalledWith([]);
+    });
+
+    it('keeps the watcher quiet about the file while it is written', async () => {
+      const { service, writer, selfWriteRegistry } = arrange();
+      let suppressed = false;
+      writer.embedAudioCover.mockImplementation(() => {
+        suppressed = selfWriteRegistry.isSuppressed('/books/lib/book.readaloud.epub');
+        return Promise.resolve({ status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 1 });
+      });
+
+      await service.embedAudioCover(5, 7);
+
+      expect(suppressed).toBe(true);
+      expect(selfWriteRegistry.isSuppressed('/books/lib/book.readaloud.epub')).toBe(false);
+    });
+
+    it('returns a short, path-free reason when the writer throws, and logs the failure', async () => {
+      const { service, writer, fileWriteRepo } = arrange();
+      writer.embedAudioCover.mockRejectedValue(new Error('ENOSPC: no space left on device, write'));
+
+      const result = await service.embedAudioCover(5, 7);
+
+      expect(result).toMatchObject({ status: 'failed', code: 'failed' });
+      expect(result.reason).not.toContain('/books');
+      expect(fileWriteRepo.insertLog).toHaveBeenCalledWith(
+        expect.objectContaining({ bookFileId: 2, result: expect.objectContaining({ status: 'failed' }) }),
+      );
+      expect(fileWriteRepo.setLastWrittenAt).not.toHaveBeenCalled();
+    });
+
+    it('fails the file when its state cannot be refreshed after the write', async () => {
+      const { service, fileWriteRepo } = arrange();
+      fileWriteRepo.updateFileStateAfterMetadataWrite.mockRejectedValue(new Error('db down'));
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({ status: 'failed', reason: 'post-write file state refresh failed' });
+    });
+
+    it('gives a book whose read-along EPUBs all skipped for different reasons the first code a client has copy for', async () => {
+      const second = { ...readAlong, id: 3, absolutePath: '/books/lib/book.two.readaloud.epub', fileHash: 'h3', sortOrder: 2 };
+      const { service, writer } = arrange({ fileWriteReadAlongMaxFileSizeMb: 100 }, [plain, readAlong, second]);
+      diskSizes.set(readAlong.absolutePath, 400 * 1024 * 1024);
+      writer.embedAudioCover.mockResolvedValue({ status: 'skipped', reason: 'audio cover unchanged', fieldsWritten: [], durationMs: 1 });
+
+      const result = await service.embedAudioCover(5, 7);
+
+      expect(result).toMatchObject({ status: 'skipped', code: 'over_size_limit', reason: 'file exceeds size limit; audio cover unchanged' });
+    });
+
+    it('writes every read-along EPUB of the book and combines the outcomes', async () => {
+      const second = { ...readAlong, id: 3, absolutePath: '/books/lib/book.two.readaloud.epub', fileHash: 'h3', sortOrder: 2 };
+      const { service, writer } = arrange({}, [plain, readAlong, second]);
+      writer.embedAudioCover
+        .mockResolvedValueOnce({ status: 'success', fieldsWritten: ['audioCoverBytes'], durationMs: 5 })
+        .mockResolvedValueOnce({ status: 'failed', fieldsWritten: [], durationMs: 5, reason: 'disk full' });
+
+      const result = await service.embedAudioCover(5, 7);
+
+      expect(result).toMatchObject({ status: 'failed', fileCounts: { processed: 2, succeeded: 1, failed: 1, skipped: 0 } });
+    });
+
+    it('skips a writer that cannot hold an audiobook cover', async () => {
+      const { service, writer } = arrange();
+      Reflect.deleteProperty(writer, 'embedAudioCover');
+
+      await expect(service.embedAudioCover(5, 7)).resolves.toMatchObject({ status: 'skipped', code: 'unsupported', reason: 'format not supported' });
+    });
+
+    describe('in a generated file', () => {
+      it('writes the audio slot into the file at that path, outside the library locks, switches and hash history', async () => {
+        const { service, writer, coverStore, fileWriteRepo, lockService } = arrange({ fileWriteReadAlongEnabled: false });
+
+        const result = await service.embedAudioCoverInDraft(5, '/work/job/output.epub');
+
+        expect(coverStore.resolve).toHaveBeenCalledWith(5, { medium: 'audio', variant: 'cover', strict: true });
+        expect(writer.embedAudioCover).toHaveBeenCalledWith('/work/job/output.epub', Buffer.from('square'), { dryRun: false });
+        expect(result).toMatchObject({ status: 'success', code: 'embedded' });
+        expect(lockService.withLock).not.toHaveBeenCalled();
+        expect(fileWriteRepo.recordHashHistory).not.toHaveBeenCalled();
+        expect(fileWriteRepo.insertLog).not.toHaveBeenCalled();
+        expect(fileWriteRepo.findFilesForBook).not.toHaveBeenCalled();
+      });
+
+      it('skips a book with no audiobook cover without touching the file', async () => {
+        const { service, writer, coverStore } = arrange();
+        coverStore.resolve.mockResolvedValue(null);
+
+        await expect(service.embedAudioCoverInDraft(5, '/work/job/output.epub')).resolves.toMatchObject({
+          status: 'skipped',
+          code: 'no_audio_cover',
+        });
+        expect(writer.embedAudioCover).not.toHaveBeenCalled();
+      });
+
+      it('reports a write that throws instead of throwing, with a path-free reason', async () => {
+        const { service, writer } = arrange();
+        writer.embedAudioCover.mockRejectedValue(new Error('ENOSPC: no space left on device, write /work/job/output.epub.tmp'));
+
+        const result = await service.embedAudioCoverInDraft(5, '/work/job/output.epub');
+
+        expect(result).toMatchObject({ status: 'failed', code: 'failed' });
+        expect(result.reason).not.toContain('/work');
+      });
+
+      it('reports a file already holding the cover as unchanged', async () => {
+        const { service, writer } = arrange();
+        writer.embedAudioCover.mockResolvedValue({ status: 'skipped', reason: 'audio cover unchanged', fieldsWritten: [], durationMs: 1 });
+
+        await expect(service.embedAudioCoverInDraft(5, '/work/job/output.epub')).resolves.toMatchObject({ status: 'skipped', code: 'unchanged' });
+      });
+
+      it('skips when the EPUB writer cannot hold an audiobook cover', async () => {
+        const { service, writer } = arrange();
+        Reflect.deleteProperty(writer, 'embedAudioCover');
+
+        await expect(service.embedAudioCoverInDraft(5, '/work/job/output.epub')).resolves.toMatchObject({ status: 'skipped', code: 'unsupported' });
+      });
     });
   });
 

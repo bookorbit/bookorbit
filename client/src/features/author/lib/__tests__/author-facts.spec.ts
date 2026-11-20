@@ -8,6 +8,7 @@ function author(overrides: Partial<AuthorDetail> = {}): AuthorDetail {
     name: 'John Reid',
     sortName: null,
     description: null,
+    gender: null,
     imageUrl: null,
     bookCount: 1,
     lastAddedAt: null,
@@ -70,11 +71,20 @@ describe('authorFactsPayload', () => {
   })
 
   it('sends changed facts, clearing emptied ones', () => {
-    const seeded = authorFactsDraft(author({ website: 'https://old.example', birthYear: 1950, genres: ['Journalism'] }))
-    const draft = { ...seeded, website: '', born: '1965-03-14', died: '2020', genres: [], influences: ['Alistair MacLean'] }
+    const seeded = authorFactsDraft(author({ gender: 'male', website: 'https://old.example', birthYear: 1950, genres: ['Journalism'] }))
+    const draft = {
+      ...seeded,
+      gender: 'non_binary' as const,
+      website: '',
+      born: '1965-03-14',
+      died: '2020',
+      genres: [],
+      influences: ['Alistair MacLean'],
+    }
 
     expect(authorFactsPayload(draft, seeded)).toEqual({
       payload: {
+        gender: 'non_binary',
         website: null,
         birthDate: '1965-03-14',
         birthYear: 1965,
@@ -98,5 +108,6 @@ describe('authorFactsPayload', () => {
     const seeded = authorFactsDraft(author({ genres: ['Thriller'] }))
     expect(sameFactsDraft(seeded, authorFactsDraft(author({ genres: ['Thriller'] })))).toBe(true)
     expect(sameFactsDraft(seeded, { ...seeded, genres: ['Thriller', 'Crime'] })).toBe(false)
+    expect(sameFactsDraft(seeded, { ...seeded, gender: 'female' })).toBe(false)
   })
 })

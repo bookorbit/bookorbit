@@ -1,4 +1,4 @@
-ARG NODE_IMAGE=node:26.12.1-alpine3.23@sha256:bc2b334006f15c7167bbeb2f08f28c2df883f7594a0470e04454ebe7560cfe68
+ARG NODE_IMAGE=node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
 
 FROM ${NODE_IMAGE} AS base
 RUN npm install -g pnpm@11.28.9
@@ -20,8 +20,8 @@ COPY client/ ./client/
 # re-installs first. Each stage installed its own filtered subset with a frozen
 # lockfile two steps up, and no stage carries the whole workspace, so that
 # re-install is both redundant and wrong: it resolves against a partial
-# workspace. In the server stage it is fatal, because client/ is absent and the
-# @embedpdf patches then look unused.
+# workspace. In the server stage it is fatal, because only server/ is present and
+# the patches for packages it does not install then look unused.
 RUN pnpm --config.verify-deps-before-run=false --filter client run build-only
 
 # Stage 2: Build server + create deploy bundle
@@ -76,6 +76,7 @@ COPY --from=client-builder --chown=node:node /app/client/src/locales ./locales
 COPY --from=server-builder --chown=node:node /app/server/entrypoint.sh /app/server/file-env.sh ./
 COPY --chown=node:node LICENSE NOTICE ADDITIONAL_TERMS.md ./
 COPY --chown=node:node server/bin/kepubify/ ./bin/kepubify/
+COPY --chown=node:node server/vendor/foliate/ ./vendor/foliate/
 COPY --chown=node:node koreader-plugin/bookorbit.koplugin/ ./koreader-plugin/bookorbit.koplugin/
 
 RUN sed -i 's/\r$//' /app/entrypoint.sh /app/file-env.sh && chmod +x /app/entrypoint.sh /app/bin/kepubify/* && mkdir -p /books /data/covers /data/book-bucket /tmp && chown -R node:node /data /tmp

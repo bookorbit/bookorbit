@@ -23,6 +23,7 @@ const SETTINGS: StorygraphSettings = {
   bookSyncMode: 'all_eligible',
   autoSyncOnStatusChange: true,
   autoSyncOnProgressUpdate: true,
+  excludedLibraryIds: [],
   lastSyncedAt: null,
 }
 

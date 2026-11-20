@@ -201,11 +201,14 @@ describe('CoverSlotReconciler on real files', () => {
       .toBuffer();
   }
 
-  async function epub(path: string, cover: Buffer | null): Promise<void> {
+  async function epub(path: string, cover: Buffer | null, audioCover: Buffer | null = null): Promise<void> {
     const manifestCover = cover ? '<item id="cover" href="cover.jpg" media-type="image/jpeg" properties="cover-image" />' : '';
+    const manifestAudioCover = audioCover
+      ? '<item id="audio-cover-image" href="audio-art.jpg" media-type="image/jpeg" properties="storyteller:audio-cover-image" />'
+      : '';
     const opf = `<?xml version="1.0"?><package version="3.0" unique-identifier="uid" xmlns="http://www.idpf.org/2007/opf">
       <metadata xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:identifier id="uid">urn:test</dc:identifier><dc:title>T</dc:title><dc:language>en</dc:language></metadata>
-      <manifest>${manifestCover}<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml" /></manifest>
+      <manifest>${manifestCover}${manifestAudioCover}<item id="c1" href="c1.xhtml" media-type="application/xhtml+xml" /></manifest>
       <spine><itemref idref="c1" /></spine></package>`;
     const output = createWriteStream(path);
     const archive = new ZipArchive({ zlib: { level: 6 } });
@@ -223,6 +226,7 @@ describe('CoverSlotReconciler on real files', () => {
       archive.append(Buffer.from(opf), { name: 'OPS/content.opf' });
       archive.append(Buffer.from('<html xmlns="http://www.w3.org/1999/xhtml"><body><p>x</p></body></html>'), { name: 'OPS/c1.xhtml' });
       if (cover) archive.append(cover, { name: 'OPS/cover.jpg' });
+      if (audioCover) archive.append(audioCover, { name: 'OPS/audio-art.jpg' });
       void archive.finalize();
     });
   }
@@ -238,12 +242,15 @@ describe('CoverSlotReconciler on real files', () => {
     await execFile(ffmpegPath, args);
   }
 
-  async function folder(files: Record<string, 'epub' | 'epub-no-cover' | 'kepub' | 'm4b' | 'm4b-no-art' | 'mp3' | 'square' | 'portrait'>) {
+  async function folder(
+    files: Record<string, 'epub' | 'epub-audio-cover' | 'epub-no-cover' | 'kepub' | 'm4b' | 'm4b-no-art' | 'mp3' | 'square' | 'portrait'>,
+  ) {
     const dir = await mkdtemp(join(root, 'book-'));
     const sources: SourceFile[] = [];
     for (const [name, kind] of Object.entries(files)) {
       const path = join(dir, name);
       if (kind === 'epub' || kind === 'kepub') await epub(path, await image(200, 300));
+      else if (kind === 'epub-audio-cover') await epub(path, await image(200, 300), await image(320, 320, { r: 240, g: 160, b: 20 }));
       else if (kind === 'epub-no-cover') await epub(path, null);
       else if (kind === 'm4b') await audio(path, { width: 300, height: 300 });
       else if (kind === 'm4b-no-art' || kind === 'mp3') await audio(path, null);
@@ -337,6 +344,39 @@ describe('CoverSlotReconciler on real files', () => {
 
     expect(shapeOf(bookId, 'ebook')).toBe('embedded:200x300');
     expect(shapeOf(bookId, 'audio')).toBeNull();
+  });
+
+  it('fills the audio slot of a read-along EPUB from the audiobook cover it declares', async () => {
+    const bookId = nextBookId++;
+    repository.addBook(bookId, withOverlay(await folder({ 'book.epub': 'epub-audio-cover' })));
+
+    const result = await reconciler.reconcile(bookId);
+
+    expect(result.filled.sort()).toEqual(['audio', 'ebook']);
+    expect(shapeOf(bookId, 'ebook')).toBe('embedded:200x300');
+    expect(shapeOf(bookId, 'audio')).toBe('embedded:320x320');
+  });
+
+  it('prefers the audiobook cover a read-along EPUB declares over a square folder image', async () => {
+    const bookId = nextBookId++;
+    repository.addBook(bookId, withOverlay(await folder({ 'book.epub': 'epub-audio-cover', 'cover.jpg': 'square' })));
+
+    await reconciler.reconcile(bookId);
+
+    expect(shapeOf(bookId, 'audio')).toBe('embedded:320x320');
+  });
+
+  it('replaces a folder-image audio slot with the audiobook cover the EPUB gains later', async () => {
+    const bookId = nextBookId++;
+    repository.addBook(bookId, withOverlay(await folder({ 'book.epub': 'epub', 'cover.jpg': 'square' })));
+    await reconciler.reconcile(bookId);
+    expect(shapeOf(bookId, 'audio')).toBe('folder_image:500x500');
+
+    const gained = withOverlay(await folder({ 'book.epub': 'epub-audio-cover', 'cover.jpg': 'square' }));
+    repository.setFiles(bookId, gained);
+    await reconciler.reconcile(bookId, { filesChanged: true });
+
+    expect(shapeOf(bookId, 'audio')).toBe('embedded:320x320');
   });
 
   it('fills the audio slot of a read-along EPUB from a square folder image', async () => {

@@ -1,4 +1,5 @@
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
+import { hiddenLibrariesCacheKey, visibleIdsOrAllForPlace } from '../../common/library-visibility/library-visibility';
 import { principalCacheKey } from '../../common/types/request-user';
 import {
   READING_ATTEMPT_CHANGED,
@@ -187,11 +188,16 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
   }
 
   private buildUserCacheKey(metric: string, user: RequestUser, params: Record<string, string | number | undefined>): string {
-    const pieces = Object.entries(params)
+    const scoped: Record<string, string | number | undefined> = { ...params, hidden: hiddenLibrariesCacheKey(user, 'stats') };
+    const pieces = Object.entries(scoped)
       .filter((entry): entry is [string, string | number] => entry[1] !== undefined)
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => `${key}=${value}`);
     return `${metric}|su=${user.isSuperuser ? 1 : 0}|${pieces.join('|')}`;
+  }
+
+  private statsLibraryIds(user: RequestUser, requestedLibraryIds?: number[]): Promise<number[] | null> {
+    return visibleIdsOrAllForPlace(this.libraryScope, user, 'stats', requestedLibraryIds);
   }
 
   private emptyDuration(): ActivityDurationBreakdown {
@@ -295,7 +301,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       const rangeStartDay = addDateKeyDays(today, -(ACTIVITY_OVERVIEW_DAYS - 1));
       const range = getDayRangeForDateKeys([rangeStartDay, today], timeZone)!;
       const byDay = new Map<string, ActivityDayPoint>();
@@ -499,7 +505,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       const availableYears = [...new Set([...(await this.repo.getActivityAvailableYears(user.id, libraryIds, timeZone)), currentYear])].sort(
         (a, b) => a - b,
       );
@@ -528,7 +534,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
   async getActivityDay(user: RequestUser, day: string, query: ActivityDayQueryDto): Promise<ActivityDayDetailResponse> {
     if (!isDateKey(day)) throw new BadRequestException('Invalid activity day');
     const timeZone = resolveTimeZone(user.settings?.timezone, 'UTC');
-    const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+    const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
     const range = getDayRangeForDateKeys([day], timeZone)!;
     const totals = this.emptyActivityDay(day);
     const sessions: ActivityDayDetailResponse['sessions'] = [];
@@ -573,7 +579,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       const range = getDayRangeForDateKeys([startDay, today], timeZone)!;
       const durations: number[] = [];
       const bucketTotals = new Map<ActivitySessionDurationBucket, { sessionsCount: number; totalSeconds: number }>();
@@ -635,7 +641,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       const range = getDayRangeForDateKeys([startDay, today], timeZone)!;
       const rows = await this.repo.getActivityCompletionSpeedRows(user.id, libraryIds, range.start);
       const availableFormats = [...new Set(rows.map((row) => row.format.toUpperCase()))].sort();
@@ -690,7 +696,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       const range = getDayRangeForDateKeys([startDay, today], timeZone)!;
       const rows = await this.repo.getActivityGenreTimeRows(user.id, libraryIds, range.start);
       const genres: ActivityGenreTimeResponse['genres'] = [];
@@ -734,7 +740,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const libraryIds = this.repo.resolveActivityLibraryIds(await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const libraryIds = this.repo.resolveActivityLibraryIds(await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       const range = getDayRangeForDateKeys([startDay, today], timeZone)!;
       const detail = await this.repo.getActivityPaceBands(user.id, libraryIds, range.start, selectedFormat ?? undefined, selectedMedia ?? undefined);
       const byBand = new Map(detail.bands.map((item) => [item.band, item]));
@@ -761,7 +767,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('summary', user, { libraries: this.normalizeLibraryIds(query.libraryIds) });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const summary = await this.repo.getSummary(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds);
+      const summary = await this.repo.getSummary(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds);
       return {
         ...summary,
         meanProgressPercent: Number(summary.meanProgressPercent.toFixed(2)),
@@ -774,7 +780,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('daily-reading', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const items = await this.repo.getDailyReadingStats(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const items = await this.repo.getDailyReadingStats(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       return items.map((item) => ({
         ...item,
         progressDelta: this.roundProgressDelta(item.progressDelta),
@@ -787,10 +793,10 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('reading-heatmap', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const items = await this.repo.getDailyReadingStats(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const items = await this.repo.getDailyReadingStats(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const bySourceRows = await this.repo.getDailyReadingSecondsBySource(
         user.id,
-        await this.libraryScope.visibleIdsOrAll(user),
+        await this.statsLibraryIds(user, query.libraryIds),
         query.libraryIds,
         days,
       );
@@ -829,7 +835,12 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('source-distribution', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getDailyReadingSecondsBySource(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const rows = await this.repo.getDailyReadingSecondsBySource(
+        user.id,
+        await this.statsLibraryIds(user, query.libraryIds),
+        query.libraryIds,
+        days,
+      );
       const totals = emptySourceBucketRecord();
       for (const row of rows) {
         totals[toReadingSessionSourceBucket(row.source)] += row.readingSeconds;
@@ -849,7 +860,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('peak-hours', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days, timeZone });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getPeakReadingHours(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days, timeZone);
+      const rows = await this.repo.getPeakReadingHours(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days, timeZone);
 
       const byHour = new Map<
         number,
@@ -885,7 +896,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('favorite-days', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getFavoriteReadingDays(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const rows = await this.repo.getFavoriteReadingDays(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const byDay = new Map<
         number,
         { readingSeconds: number; eventsCount: number; byFormat: Record<string, number>; bySource: Record<ReadingSessionSourceBucket, number> }
@@ -958,7 +969,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
       const rows = await this.repo.getSessionTimelineItems(
         user.id,
-        await this.libraryScope.visibleIdsOrAll(user),
+        await this.statsLibraryIds(user, query.libraryIds),
         query.libraryIds,
         weekStart,
         weekEndExclusive,
@@ -1036,7 +1047,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('completion-timeline', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getCompletionTimeline(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const rows = await this.repo.getCompletionTimeline(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const byMonth = new Map(rows.map((row) => [`${row.year}-${row.month}`, row.count]));
       const start = this.startOfUtcMonth(this.sinceDateForDays(days));
       const end = this.startOfUtcMonth(new Date());
@@ -1066,7 +1077,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getMonthlyCompletions(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const rows = await this.repo.getMonthlyCompletions(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const byMonth = new Map(rows.map((row) => [`${row.year}-${row.month}`, row.count]));
       const start = this.startOfUtcMonth(this.sinceDateForDays(days));
       const end = this.startOfUtcMonth(new Date());
@@ -1111,7 +1122,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
 
       const current = await this.repo.getProgressFunnelInRange(
         user.id,
-        await this.libraryScope.visibleIdsOrAll(user),
+        await this.statsLibraryIds(user, query.libraryIds),
         query.libraryIds,
         currentSince,
         currentUntilExclusive,
@@ -1123,7 +1134,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
         previousSince.setUTCDate(previousSince.getUTCDate() - days);
         previous = await this.repo.getProgressFunnelInRange(
           user.id,
-          await this.libraryScope.visibleIdsOrAll(user),
+          await this.statsLibraryIds(user, query.libraryIds),
           query.libraryIds,
           previousSince,
           currentSince,
@@ -1143,7 +1154,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('completion-latency', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const values = await this.repo.getCompletionLatencyDays(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const values = await this.repo.getCompletionLatencyDays(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const sorted = [...values].sort((a, b) => a - b);
 
       const buckets = [
@@ -1179,7 +1190,12 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('reading-survival', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const values = await this.repo.getReadingSurvivalMaxProgress(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const values = await this.repo.getReadingSurvivalMaxProgress(
+        user.id,
+        await this.statsLibraryIds(user, query.libraryIds),
+        query.libraryIds,
+        days,
+      );
       const total = values.length;
       const thresholds = Array.from({ length: 21 }, (_, i) => i * 5);
       return thresholds.map((threshold) => {
@@ -1198,7 +1214,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('completion-race', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getCompletionRaceRawSessions(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const rows = await this.repo.getCompletionRaceRawSessions(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const byBook = new Map<number, { title: string; sessions: { startedAt: Date; endProgress: number }[] }>();
 
       for (const row of rows) {
@@ -1232,7 +1248,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('session-archetypes', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days, timeZone });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () =>
-      this.repo.getSessionArchetypePoints(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days, timeZone),
+      this.repo.getSessionArchetypePoints(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days, timeZone),
     );
   }
 
@@ -1241,7 +1257,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('genre-reading-time', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
-      const rows = await this.repo.getGenreReadingTime(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days);
+      const rows = await this.repo.getGenreReadingTime(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days);
       const byGenre = new Map<string, { readingSeconds: number; bySource: Record<ReadingSessionSourceBucket, number> }>();
       for (const row of rows) {
         let entry = byGenre.get(row.genre);
@@ -1264,7 +1280,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('reading-pace', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () =>
-      this.repo.getReadingPacePoints(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days),
+      this.repo.getReadingPacePoints(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days),
     );
   }
 
@@ -1273,7 +1289,7 @@ export class UserStatisticsService implements OnModuleInit, OnModuleDestroy {
     const key = this.buildUserCacheKey('author-genre-chord', user, { libraries: this.normalizeLibraryIds(query.libraryIds), days });
     this.readingAttemptEvents.flushPendingChanges(user.id);
     return this.cache.get(String(user.id), principalCacheKey(user, key), async () =>
-      this.repo.getAuthorGenreChord(user.id, await this.libraryScope.visibleIdsOrAll(user), query.libraryIds, days),
+      this.repo.getAuthorGenreChord(user.id, await this.statsLibraryIds(user, query.libraryIds), query.libraryIds, days),
     );
   }
 

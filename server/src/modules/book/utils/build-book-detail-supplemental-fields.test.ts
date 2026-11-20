@@ -62,6 +62,46 @@ describe('buildBookDetailSupplementalFields', () => {
     expect(result.collections).toEqual([{ id: 9, name: 'Favorites' }]);
   });
 
+  it('keeps narrators without audio files and leaves out stored audio details', () => {
+    const result = buildBookDetailSupplementalFields({
+      readStatus: null,
+      hasAudioFiles: false,
+      narratorRows: [{ id: 4, name: 'Read-Along Narrator', sortName: 'Narrator, Read-Along' }],
+      audioMeta: {
+        durationSeconds: 7200,
+        abridged: true,
+        chaptersSource: 'manual',
+        chaptersUpdatedAt: new Date('2026-01-03T00:00:00.000Z'),
+      },
+      chapters: [{ title: 'Chapter 1', startMs: 0 }],
+      comicMeta: null,
+      collections: [],
+    });
+
+    expect(result.audioMetadata).toEqual({
+      narrators: [{ id: 4, name: 'Read-Along Narrator', sortName: 'Narrator, Read-Along', displayOrder: 0 }],
+      durationSeconds: null,
+      abridged: false,
+      chapters: null,
+      chaptersSource: null,
+      chaptersUpdatedAt: null,
+    });
+  });
+
+  it('returns null audio metadata without audio files or narrators, even with stored audio details', () => {
+    const result = buildBookDetailSupplementalFields({
+      readStatus: null,
+      hasAudioFiles: false,
+      narratorRows: [],
+      audioMeta: { durationSeconds: 7200, abridged: true },
+      chapters: [{ title: 'Chapter 1', startMs: 0 }],
+      comicMeta: null,
+      collections: [],
+    });
+
+    expect(result.audioMetadata).toBeNull();
+  });
+
   it('maps comic metadata and drops null fields to undefined', () => {
     const result = buildBookDetailSupplementalFields({
       readStatus: null,

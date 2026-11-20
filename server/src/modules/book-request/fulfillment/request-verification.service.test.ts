@@ -733,7 +733,7 @@ describe('RequestVerificationService review surface', () => {
     await service.discardHeldImport(7, { id: 9, isSuperuser: false, permissions: [] } as never);
 
     expect(requests.updateIf).toHaveBeenCalledWith(7, ['needs_review'], expect.objectContaining({ status: 'failed' }));
-    expect(downloads.updateIf).toHaveBeenCalledWith(11, ['needs_review'], expect.objectContaining({ status: 'failed' }));
+    expect(downloads.updateIf).toHaveBeenCalledWith(11, ['needs_review'], expect.objectContaining({ status: 'failed', failureCode: 'discarded' }));
     expect(dock.discardFile).toHaveBeenCalledWith(100, 9, true);
     expect(notifier.notifyResponsible).toHaveBeenCalledWith(
       expect.objectContaining({ id: 7 }),

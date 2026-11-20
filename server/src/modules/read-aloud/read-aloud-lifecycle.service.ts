@@ -58,6 +58,7 @@ export class ReadAloudLifecycleService implements OnApplicationBootstrap {
       for (const jobId of requeuedIds) {
         await this.activity.record(jobId, 'warn', 'queued', 'recovered', 'The server restarted during this job; it will resume');
       }
+      if (cancelledIds.length + requeuedIds.length > 0) this.notifier.jobsChanged(null);
       if (cancelledIds.length + failed.length + requeuedIds.length > 0) {
         this.logger.warn(
           `[read_aloud.jobs_recover] [end] cancelled=${cancelledIds.length} failed=${failed.length} requeued=${requeuedIds.length} - expired read-aloud jobs recovered`,
@@ -77,7 +78,8 @@ export class ReadAloudLifecycleService implements OnApplicationBootstrap {
       const now = new Date();
       const reminded = await this.remindReviews(now);
       const expired = await this.expireReviews(now);
-      await this.jobs.clearExpiredWorkWindows(now);
+      // Retry is no longer offered on those jobs.
+      if ((await this.jobs.clearExpiredWorkWindows(now)) > 0) this.notifier.jobsChanged(null);
       const removed = await this.removeOrphanFolders(now);
       if (reminded + expired + removed > 0) {
         this.logger.log(

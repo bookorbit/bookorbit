@@ -3,11 +3,14 @@ import {
   SIDEBAR_CAPPED_SECTION_IDS,
   SIDEBAR_CAP_OPTIONS,
   SIDEBAR_DEFAULT_CAP,
+  SIDEBAR_ICON_GROUP_IDS,
+  SIDEBAR_PRIMARY_STYLES,
   SIDEBAR_SECTION_IDS,
   type SidebarCap,
   type SidebarCappedSectionId,
   type SidebarConfig,
   type SidebarLayout,
+  type SidebarPrimaryStyle,
   type SidebarSectionId,
   type SidebarSectionState,
 } from '@bookorbit/types'
@@ -73,19 +76,30 @@ function parseIdList(raw: unknown): string[] {
 }
 
 export function defaultSidebarLayout(): SidebarLayout {
-  return { hidden: [], groupOrder: [], rowOrder: {} }
+  return { hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list', groupStyles: {} }
+}
+
+function isSidebarStyle(value: unknown): value is SidebarPrimaryStyle {
+  return (SIDEBAR_PRIMARY_STYLES as readonly unknown[]).includes(value)
 }
 
 /** Shape-checks the stored layout only; which ids still exist is decided where it is applied. */
 export function parseSidebarLayout(raw: unknown): SidebarLayout {
   const layout = defaultSidebarLayout()
   if (typeof raw !== 'object' || raw === null) return layout
-  const stored = raw as { hidden?: unknown; groupOrder?: unknown; rowOrder?: unknown }
+  const stored = raw as { hidden?: unknown; groupOrder?: unknown; rowOrder?: unknown; primaryStyle?: unknown; groupStyles?: unknown }
   layout.hidden = parseIdList(stored.hidden)
   layout.groupOrder = parseIdList(stored.groupOrder)
   if (typeof stored.rowOrder === 'object' && stored.rowOrder !== null && !Array.isArray(stored.rowOrder)) {
     for (const [groupId, ids] of Object.entries(stored.rowOrder).slice(0, LAYOUT_MAX_IDS)) {
       if (groupId.length > 0 && groupId.length <= LAYOUT_MAX_ID_LENGTH) layout.rowOrder[groupId] = parseIdList(ids)
+    }
+  }
+  if (isSidebarStyle(stored.primaryStyle)) layout.primaryStyle = stored.primaryStyle
+  if (typeof stored.groupStyles === 'object' && stored.groupStyles !== null) {
+    for (const groupId of SIDEBAR_ICON_GROUP_IDS) {
+      const style = (stored.groupStyles as Record<string, unknown>)[groupId]
+      if (isSidebarStyle(style)) layout.groupStyles[groupId] = style
     }
   }
   return layout
@@ -111,6 +125,8 @@ function currentLayout(): SidebarLayout {
     hidden: [...layout.hidden],
     groupOrder: [...layout.groupOrder],
     rowOrder: Object.fromEntries(Object.entries(layout.rowOrder).map(([id, ids]) => [id, [...ids]])),
+    primaryStyle: layout.primaryStyle,
+    groupStyles: { ...layout.groupStyles },
   }
 }
 

@@ -94,6 +94,7 @@ const validDisplayPreferences: DisplayPreferences = {
   gridCardSecondaryLabel: 'hidden',
   cardInfoMode: 'hover-overlay',
   thumbnailClickAction: 'reader',
+  openHighlightsInPeek: false,
   placeholderCoverStyle: 'bauhaus',
 };
 
@@ -465,13 +466,13 @@ describe('UserPreferencesService', () => {
     }
   });
 
-  it('upsertDisplayPreferences defaults thumbnailClickAction to reader when omitted', async () => {
+  it('upsertDisplayPreferences defaults thumbnailClickAction to details when omitted', async () => {
     const { thumbnailClickAction, ...withoutAction } = validDisplayPreferences;
     void thumbnailClickAction;
 
     await expect(service.upsertDisplayPreferences(11, withoutAction as unknown as Record<string, unknown>)).resolves.toBeUndefined();
 
-    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ thumbnailClickAction: 'reader' }));
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ thumbnailClickAction: 'details' }));
   });
 
   it('upsertDisplayPreferences defaults formatBadgeStyle to underline when omitted', async () => {
@@ -568,6 +569,31 @@ describe('UserPreferencesService', () => {
   it('upsertDisplayPreferences rejects non-boolean showSpineOnComics', async () => {
     await expect(
       service.upsertDisplayPreferences(11, { ...validDisplayPreferences, showSpineOnComics: 'yes' } as unknown as Record<string, unknown>),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it('upsertDisplayPreferences accepts both openHighlightsInPeek values', async () => {
+    for (const value of [true, false]) {
+      await expect(
+        service.upsertDisplayPreferences(11, { ...validDisplayPreferences, openHighlightsInPeek: value } as unknown as Record<string, unknown>),
+      ).resolves.toBeUndefined();
+      expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ openHighlightsInPeek: value }));
+    }
+  });
+
+  it('upsertDisplayPreferences defaults openHighlightsInPeek to false when omitted', async () => {
+    const { openHighlightsInPeek, ...withoutFlag } = validDisplayPreferences;
+    void openHighlightsInPeek;
+
+    await expect(service.upsertDisplayPreferences(11, withoutFlag as unknown as Record<string, unknown>)).resolves.toBeUndefined();
+
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'display', expect.objectContaining({ openHighlightsInPeek: false }));
+  });
+
+  it('upsertDisplayPreferences rejects non-boolean openHighlightsInPeek', async () => {
+    await expect(
+      service.upsertDisplayPreferences(11, { ...validDisplayPreferences, openHighlightsInPeek: 'yes' } as unknown as Record<string, unknown>),
     ).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });

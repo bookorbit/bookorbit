@@ -1,11 +1,15 @@
-import { isBookRequestFulfiller, isCancellableBookRequestStatus, isSettledBookRequestStatus } from '@bookorbit/types'
+import { isBookRequestFulfiller, isCancellableBookRequestStatus, isGrabbableBookRequestStatus, isSettledBookRequestStatus } from '@bookorbit/types'
 import type { BookRequestItem } from '@bookorbit/types'
 
 /**
- * Who may do what to a request, in one place. The list, the table and the detail page all offer
- * the same three actions, and three copies of these rules is how a card ends up offering a button
- * the endpoint refuses.
+ * Who may do what to a request, in one place. The row menu, the bulk bar and the drawer all ask
+ * these, and separate copies of the rules is how a row offers a button the endpoint refuses, or
+ * the drawer offers one the row does not.
+ *
+ * Each rule takes only the fields it reads, so a selection entry gathered by "select all
+ * matching" is judged exactly like a row on the page.
  */
+type Ownership = Pick<BookRequestItem, 'userId' | 'fulfillerUserId' | 'status'>
 
 /**
  * The requester, a moderator, or the self-fulfiller who took the request on. The last of those is
@@ -13,27 +17,48 @@ import type { BookRequestItem } from '@bookorbit/types'
  * action from them would leave work that only runs forwards. `canSelfFulfil` is asked for the same
  * reason the server asks: the permission can be taken away after the request was taken on.
  */
-export function canCancelRequest(request: BookRequestItem, userId: number | null, canManage: boolean, canSelfFulfil = false): boolean {
+export function canCancelRequest(request: Ownership, userId: number | null, canManage: boolean, canSelfFulfil = false): boolean {
   const isOwner = userId !== null && request.userId === userId
   const drives = canSelfFulfil && isBookRequestFulfiller(request, userId)
   return (isOwner || canManage || drives) && isCancellableBookRequestStatus(request.status)
 }
 
-/** Hiding is personal, so anyone who can see a settled request may take it off their own list. */
-export function canDismissRequest(request: BookRequestItem): boolean {
-  return isSettledBookRequestStatus(request.status)
+/** Approving and rejecting are the same decision, and only a moderator makes it on a pending row. */
+export function canDecideRequest(request: Pick<BookRequestItem, 'status'>, canManage: boolean): boolean {
+  return canManage && request.status === 'pending'
 }
 
 /**
- * Whether ticking this row would let the bulk bar offer anything.
- *
- * Selection used to mean "pending", which on a list of twenty-two settled rows rendered a column
- * of blanks under a dead select-all box and read as a broken control. A row earns a checkbox when
- * at least one bulk action can reach it.
+ * Picking a release by hand: a moderator on any request still waiting for one, or the person
+ * driving a self-served request. Mirrors the server's own rule, so the row, the bulk bar and the
+ * drawer all offer it to the same people.
  */
-export function canBulkActRequest(request: BookRequestItem, canManage: boolean): boolean {
-  if (canManage && request.status === 'pending') return true
+export function canPickRelease(request: Ownership, userId: number | null, canManage: boolean, canSelfFulfil: boolean): boolean {
+  return isGrabbableBookRequestStatus(request.status) && canFulfilRequest(request, userId, canManage, canSelfFulfil)
+}
+
+/** A moderator, or the self-fulfiller driving this request. Mirrors `assertCanFulfil` on the server. */
+export function canFulfilRequest(
+  request: Pick<BookRequestItem, 'userId' | 'fulfillerUserId'>,
+  userId: number | null,
+  canManage: boolean,
+  canSelfFulfil: boolean,
+): boolean {
+  return canManage || (canSelfFulfil && isBookRequestFulfiller(request, userId))
+}
+
+/** Hiding is personal, so anyone who can see a settled request may take it off their own list. */
+export function canDismissRequest(request: Pick<BookRequestItem, 'status'>): boolean {
+  return isSettledBookRequestStatus(request.status)
+}
+
+/** A request can be hidden once it has settled, and brought back once it is hidden. */
+export function canHideRequest(request: Pick<BookRequestItem, 'status' | 'dismissed'>): boolean {
   return canDismissRequest(request) && !request.dismissed
+}
+
+export function canUnhideRequest(request: Pick<BookRequestItem, 'dismissed'>): boolean {
+  return request.dismissed
 }
 
 /**
@@ -41,14 +66,26 @@ export function canBulkActRequest(request: BookRequestItem, canManage: boolean):
  * leave. The fulfiller is excluded: their subscription is what makes their own work visible to
  * them, and the server refuses for that reason too.
  */
-export function canLeaveRequest(request: BookRequestItem, userId: number | null): boolean {
+export function canLeaveSubscription(
+  request: Pick<BookRequestItem, 'userId' | 'fulfillerUserId'> & { subscribed: boolean },
+  userId: number | null,
+): boolean {
   if (userId === null || request.userId === userId) return false
   if (isBookRequestFulfiller(request, userId)) return false
-  return request.subscribers.some((subscriber) => subscriber.userId === userId)
+  return request.subscribed
+}
+
+export function canLeaveRequest(request: BookRequestItem, userId: number | null): boolean {
+  return canLeaveSubscription({ ...request, subscribed: isSubscriber(request, userId) }, userId)
+}
+
+/** Following a request somebody else made. */
+export function isSubscriber(request: Pick<BookRequestItem, 'subscribers'>, userId: number | null): boolean {
+  return userId !== null && request.subscribers.some((subscriber) => subscriber.userId === userId)
 }
 
 /** Deleting takes the row from everyone, so it is a moderator action on a settled request only. */
-export function canDeleteRequest(request: BookRequestItem, canManage: boolean): boolean {
+export function canDeleteRequest(request: Pick<BookRequestItem, 'status'>, canManage: boolean): boolean {
   return canManage && isSettledBookRequestStatus(request.status)
 }
 

@@ -1,0 +1,14 @@
+{
+  "status": 400,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "error": {
+      "message": "reasoning is not supported for this model",
+      "type": "invalid_request_error",
+      "param": null,
+      "code": null
+    }
+  }
+}

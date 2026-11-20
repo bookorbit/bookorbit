@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it } from 'vitest'
-import { READ_ALONG_FORMAT_PRIORITY, type BookFileRef } from '@bookorbit/types'
+import { PLAIN_EPUB_FILTER_FORMAT, READ_ALONG_FORMAT_PRIORITY, type BookFileRef } from '@bookorbit/types'
 
 import { i18n } from '@/i18n'
 import { bookFormatCodes, bookFormatEntries, formatKeyCode, formatKeyName, rankedContentFiles } from './book-formats'
@@ -62,11 +62,13 @@ describe('format labels', () => {
   it('shows the file format as the code, EPUB for a read-along', () => {
     expect(formatKeyCode('m4b')).toBe('M4B')
     expect(formatKeyCode(READ_ALONG_FORMAT_PRIORITY)).toBe('EPUB')
+    expect(formatKeyCode(PLAIN_EPUB_FILTER_FORMAT)).toBe('EPUB')
   })
 
   it('names formats from the translated catalog', () => {
     expect(formatKeyName('epub')).toBe('EPUB e-book')
     expect(formatKeyName(READ_ALONG_FORMAT_PRIORITY)).toBe('Read-aloud EPUB')
+    expect(formatKeyName(PLAIN_EPUB_FILTER_FORMAT)).toBe('EPUB without read-aloud')
     expect(formatKeyName('djvu')).toBe('DjVu document')
   })
 })

@@ -80,6 +80,8 @@ export class BookDetailDto {
   authors: { id: number; name: string; sortName: string | null }[];
   genres: string[];
   tags: string[];
+  genreRefs: { id: number; name: string }[];
+  tagRefs: { id: number; name: string }[];
   files: BookFileDto[];
   lastWrittenAt: Date | null;
   metadataScore: number | null;

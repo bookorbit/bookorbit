@@ -39,6 +39,7 @@ describe('Docker file-backed environment values', () => {
   });
 
   it.each([
+    'AI_ENCRYPTION_KEY',
     'BOOK_REQUEST_ENCRYPTION_KEY',
     'DATABASE_URL',
     'EMAIL_ENCRYPTION_KEY',

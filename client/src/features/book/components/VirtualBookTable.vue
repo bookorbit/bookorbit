@@ -24,7 +24,7 @@ import { usePublisherSearch, useSeriesNameSearch, useLanguageSearch } from '@/fe
 import { useRefreshMetadata } from '@/features/book/composables/useRefreshMetadata'
 import { useRefreshingBooks } from '@/features/book/composables/useRefreshingBooks'
 import { useBookRefreshFeedback } from '@/features/book/composables/useBookRefreshFeedback'
-import type { InFlightOp } from '@/features/book/composables/useBookBulkActions'
+import type { BulkRunInFlight } from '@/features/jobs/composables/useBulkRunTracker'
 import { useRouter } from 'vue-router'
 import { detectChangedColumns, mergeBookCardWithDetail } from '@/features/book/lib/book-card-mapper'
 import { buildLockStateBookUpdate, mergeBookPatchWithLatest, sameLockFields } from '@/features/book/lib/table-row-state-sync'
@@ -63,7 +63,7 @@ const props = withDefaults(
     selectedCount?: number
     filterActive?: boolean
     initialized?: boolean
-    inFlight?: InFlightOp | null
+    inFlight?: BulkRunInFlight | null
   }>(),
   { sortable: true, initialized: true },
 )
@@ -211,7 +211,7 @@ function getTextSearchFn(colId: string): ((q: string) => Promise<string[]>) | un
   return undefined
 }
 
-const metadataInFlight = computed(() => (props.inFlight?.label === 'Refreshing metadata' ? props.inFlight : null))
+const metadataInFlight = computed(() => (props.inFlight?.kind === 'book-refresh-metadata' ? props.inFlight : null))
 const metadataFailed = computed(() => metadataInFlight.value?.failed ?? 0)
 const metadataRemaining = computed(() => {
   if (!metadataInFlight.value) return 0

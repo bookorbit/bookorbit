@@ -1,4 +1,5 @@
 import type { Router } from 'vue-router'
+import type { Permission } from '@bookorbit/types'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { useChangePasswordDialog } from '@/composables/useChangePasswordDialog'
 import { useSetupStatus } from '@/features/auth/composables/useSetupStatus'
@@ -9,6 +10,11 @@ const PASSWORD_ONLY_PUBLIC_PATHS = new Set(['/forgot-password', '/reset-password
 
 function permissionFallback(name: string | undefined) {
   return name ? { name } : { path: '/' }
+}
+
+function holdsRequired(required: Permission | readonly Permission[], permissions: readonly string[]): boolean {
+  const anyOf: readonly Permission[] = typeof required === 'string' ? [required] : required
+  return anyOf.some((permission) => permissions.includes(permission))
 }
 
 export function registerAuthGuard(router: Router): void {
@@ -67,7 +73,7 @@ export function registerAuthGuard(router: Router): void {
       return permissionFallback(to.meta.permissionFallback)
     }
 
-    if (to.meta.requiredPermission && !user.value.isSuperuser && !permissions.includes(to.meta.requiredPermission)) {
+    if (to.meta.requiredPermission && !user.value.isSuperuser && !holdsRequired(to.meta.requiredPermission, permissions)) {
       return permissionFallback(to.meta.permissionFallback)
     }
 

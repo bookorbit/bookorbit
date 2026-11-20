@@ -38,7 +38,7 @@ const cards = computed(() =>
   MEDIA.map((medium) => ({
     medium,
     isFront: medium === front.value,
-    src: coverUrl(props.book.id, 'cover', props.book.covers[medium]?.updatedAt ?? props.book.coverVersion, medium),
+    src: coverUrl(props.book.id, 'display', props.book.covers[medium]?.updatedAt ?? props.book.coverVersion, medium),
     label: medium === front.value ? t('book.detail.details.viewCover') : t(`book.detail.details.coverStack.show.${medium}`),
   })),
 )

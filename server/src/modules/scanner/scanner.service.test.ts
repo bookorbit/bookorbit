@@ -180,6 +180,7 @@ function makeService(
   const selfWriteRegistry = new SelfWriteRegistry();
   const regexMetadata = { evaluate: vi.fn() };
   const libraryGate = new LibraryOperationGate();
+  const jobChanges = { notify: vi.fn() };
   const service = new ScannerService(
     repo as any,
     mockMetadata as any,
@@ -190,11 +191,12 @@ function makeService(
     coverStore as any,
     regexMetadata as any,
     libraryGate,
+    jobChanges as any,
     autoFetchOrchestrator as any,
     achievementEvents as any,
     coverReconciler as any,
   );
-  return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry, regexMetadata, libraryGate };
+  return { service, jobStore, notificationService, achievementEvents, selfWriteRegistry, regexMetadata, libraryGate, jobChanges };
 }
 
 /**
@@ -291,6 +293,53 @@ describe('scan history', () => {
     const { service } = makeService(repo);
 
     await expect(service.getScanHistory(7)).resolves.toEqual([]);
+  });
+});
+
+describe('Jobs area changes', () => {
+  const stateChange = { type: 'library-scan', ownerId: null, state: true };
+  const progressChange = { type: 'library-scan', ownerId: null, state: false };
+
+  it('tells the Jobs area when a scan starts and when it completes', async () => {
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service, jobChanges } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    await vi.waitFor(() => expect(jobChanges.notify).toHaveBeenCalledTimes(3));
+    expect(jobChanges.notify.mock.calls.map(([change]) => change)).toEqual([stateChange, stateChange, stateChange]);
+  });
+
+  it('reports a scan moving along as progress only, through the store throttle', async () => {
+    mockFindCandidates.mockResolvedValue({
+      candidates: [makeCandidate('/library/Author/Book', [makeFileStat()])],
+      skippedDirs: new Set(),
+      unchangedDirs: new Set(),
+      dirMtimes: new Map(),
+    });
+    const repo = makeRepo();
+    const done = awaitScan(repo);
+    const { service, jobChanges } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    await vi.waitFor(() => expect(jobChanges.notify).toHaveBeenLastCalledWith(stateChange));
+    expect(jobChanges.notify).toHaveBeenCalledWith(progressChange);
+  });
+
+  it('tells the Jobs area when a scan fails', async () => {
+    const repo = makeRepo({ findAllLibraryRoots: vi.fn().mockRejectedValue(new Error('roots unavailable')) });
+    const done = awaitScan(repo);
+    const { service, jobChanges } = makeService(repo);
+    await service.startScan(1, 'manual');
+    await done;
+
+    await vi.waitFor(() =>
+      expect(mockGateway.emitProgress).toHaveBeenCalledWith(expect.objectContaining({ status: 'failed', errorMessage: 'roots unavailable' })),
+    );
+    expect(jobChanges.notify).toHaveBeenLastCalledWith(stateChange);
+    expect(jobChanges.notify).not.toHaveBeenCalledWith(progressChange);
   });
 });
 

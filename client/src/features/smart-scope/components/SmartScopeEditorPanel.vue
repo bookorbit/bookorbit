@@ -114,7 +114,7 @@ function applyTemplate(tpl: (typeof TEMPLATES)[number]) {
 }
 
 function initFilter() {
-  draftFilter.value = { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains' }] }
+  draftFilter.value = { type: 'group', join: 'AND', rules: [] }
 }
 
 function hasCompleteRules(group: GroupRule | undefined): boolean {
@@ -300,7 +300,12 @@ async function save() {
 
             <!-- Filter builder -->
             <template v-else>
-              <BookFilterBuilder v-model="draftFilter" preserve-incomplete-root />
+              <BookFilterBuilder
+                v-model="draftFilter"
+                preserve-incomplete-root
+                :match-count="previewCount"
+                class="max-h-[460px] rounded-[calc(var(--radius)-2px)] border border-border bg-background"
+              />
               <div class="flex flex-wrap items-center gap-1.5 pt-3 border-t border-border/50">
                 <span class="text-xs text-muted-foreground shrink-0">{{ t('smartScope.editorPanel.replaceWithTemplate') }}</span>
                 <button

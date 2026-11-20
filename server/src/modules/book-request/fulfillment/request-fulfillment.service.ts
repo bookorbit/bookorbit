@@ -47,7 +47,7 @@ import type {
 import { isUniqueViolation } from '../../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../../common/types/request-user';
-import type { BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
+import type { BookRequestDownloadRow, BookRequestRow, NewBookRequestRow } from '../../../db/schema';
 import { BOOK_REQUEST_DOWNLOAD_FAILED, BookRequestEventsService } from '../book-request-events.service';
 import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestNotifier } from '../book-request-notifier.service';
@@ -95,6 +95,12 @@ const UNSEARCHABLE: BookRequestStatus[] = ['rejected', 'cancelled'];
 
 /** Tracker conditions that pass on their own, so the same release is worth another attempt later. */
 const RETRYABLE_INDEXER_FAILURES: IndexerSearchFailure[] = ['timeout', 'unreachable', 'throttled'];
+
+/** The stable code a failure is recorded with beside its English reason, and the code's parameters. */
+export interface ClassifiedRequestFailure {
+  code: BookRequestHandbackCode;
+  meta?: BookRequestFailureMeta;
+}
 
 function normalizeReleaseSearchOverrides(dto: SearchBookRequestReleasesDto): ReleaseSearchOverrides {
   const overrides: ReleaseSearchOverrides = {};
@@ -438,7 +444,7 @@ export class RequestFulfillmentService {
     requestId: number,
     status: BookRequestStatus,
     statusReason?: string | null,
-    failure?: { code: BookRequestHandbackCode; meta?: BookRequestFailureMeta } | null,
+    failure?: ClassifiedRequestFailure | null,
     from: readonly BookRequestStatus[] = WORKER_WRITABLE_BOOK_REQUEST_STATUSES,
   ): Promise<boolean> {
     const updated = await this.requests.updateIf(requestId, from, {
@@ -452,9 +458,10 @@ export class RequestFulfillmentService {
 
   /**
    * The single way an attempt ends badly, so every caller produces the same request state, the
-   * same audit trail and the same approver notification.
+   * same audit trail and the same approver notification. `reason` is always recorded; `failure`
+   * only adds a code a client can translate, so a client that does not know it still has the prose.
    */
-  async failDownload(download: BookRequestDownloadRow, reason: string): Promise<void> {
+  async failDownload(download: BookRequestDownloadRow, reason: string, failure?: ClassifiedRequestFailure): Promise<void> {
     // Both writes are conditional, and both callers are sweeps over rows read some time ago: the
     // poll loop and the watchdog. An attempt somebody already settled keeps the reason it settled
     // for, and a request somebody already cancelled, rejected or filed stays that way rather than
@@ -468,7 +475,12 @@ export class RequestFulfillmentService {
     ) {
       return;
     }
-    if (!(await this.requests.updateIf(download.requestId, WORKER_WRITABLE_BOOK_REQUEST_STATUSES, { status: 'failed', statusReason: reason }))) {
+    const failed: Partial<NewBookRequestRow> = {
+      status: 'failed',
+      statusReason: reason,
+      ...(failure ? { failureCode: failure.code, failureMeta: failure.meta ?? null } : {}),
+    };
+    if (!(await this.requests.updateIf(download.requestId, WORKER_WRITABLE_BOOK_REQUEST_STATUSES, failed))) {
       this.logger.log(
         `[book_request.download] [end] requestId=${download.requestId} downloadId=${download.id} - the attempt failed after the request was settled, so the request was left alone`,
       );

@@ -1,5 +1,11 @@
 import { BadRequestException, ForbiddenException, HttpException, NotFoundException } from '@nestjs/common';
-import { FULFILLABLE_BOOK_REQUEST_STATUSES, NotificationType, Permission, withRequiredPermissions } from '@bookorbit/types';
+import {
+  BOOK_REQUEST_SELECT_ALL_LIMIT,
+  FULFILLABLE_BOOK_REQUEST_STATUSES,
+  NotificationType,
+  Permission,
+  withRequiredPermissions,
+} from '@bookorbit/types';
 
 import { BookRequestAttributionService } from './book-request-attribution.service';
 import { BookRequestNotifier } from './book-request-notifier.service';
@@ -77,6 +83,7 @@ function joined(overrides: Record<string, unknown> = {}) {
     requesterUsername: 'reader',
     requesterName: 'Reader',
     decidedByUsername: null,
+    decidedByName: null,
     targetLibraryName: null,
   };
 }
@@ -1742,6 +1749,23 @@ describe('BookRequestService.getOne', () => {
     const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ userId: 2 })) } });
     await expect(service.getOne(10, user())).rejects.toThrow(ForbiddenException);
   });
+
+  /** The username stays for clients that read it; the display name is beside it, not instead of it. */
+  it('names the decider by username and by display name', async () => {
+    const decided = { ...joined({ status: 'approved', decidedByUserId: 4 }), decidedByUsername: 'mod', decidedByName: 'Sam Whitfield' };
+    const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue(decided) } });
+
+    await expect(service.getOne(10, user())).resolves.toMatchObject({
+      decidedByUserId: 4,
+      decidedByUsername: 'mod',
+      decidedByName: 'Sam Whitfield',
+    });
+  });
+
+  it('names no decider on an undecided request', async () => {
+    const { service } = makeService();
+    await expect(service.getOne(10, user())).resolves.toMatchObject({ decidedByUsername: null, decidedByName: null });
+  });
 });
 
 /**
@@ -2494,5 +2518,331 @@ describe('BookRequestService.markFulfilled for one half of a pair', () => {
     await service.markFulfilled(10, { matchedBookId: 42 }, moderator());
 
     expect(companions.handOn).toHaveBeenCalledWith(expect.objectContaining({ id: 10 }), 42);
+  });
+});
+
+describe('BookRequestService list views', () => {
+  const approver = () => user({ permissions: [Permission.BookRequestAccess, Permission.ManageBookRequests] });
+
+  it('leaves the list exactly as it was when no view is asked for', async () => {
+    const { service, repo } = makeService();
+
+    await service.listMine({}, user());
+    await service.listMine({ includeDismissed: true }, user());
+
+    expect(repo.findAll).toHaveBeenNthCalledWith(1, expect.objectContaining({ userId: 1, excludeDismissedFor: 1 }));
+    expect(repo.findAll).toHaveBeenNthCalledWith(2, expect.objectContaining({ excludeDismissedFor: undefined }));
+    for (const [options] of repo.findAll.mock.calls) {
+      expect(options).not.toHaveProperty('statuses');
+      expect(options).not.toHaveProperty('onlyDismissedFor');
+    }
+  });
+
+  it("narrows to the view's statuses without the caller's hidden rows, whatever includeDismissed says", async () => {
+    const { service, repo } = makeService();
+
+    await service.listAll({ view: 'closed', includeDismissed: true, q: 'dune', status: 'rejected' }, approver());
+
+    expect(repo.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({ statuses: ['rejected', 'cancelled'], status: 'rejected', search: 'dune', excludeDismissedFor: 1 }),
+    );
+  });
+
+  it('keeps only the hidden rows for the hidden view', async () => {
+    const { service, repo } = makeService();
+
+    await service.listMine({ view: 'hidden' }, user());
+
+    const [options] = repo.findAll.mock.calls[0] as [Record<string, unknown>];
+    expect(options).toMatchObject({ userId: 1, onlyDismissedFor: 1 });
+    expect(options.excludeDismissedFor).toBeUndefined();
+    expect(options).not.toHaveProperty('statuses');
+  });
+});
+
+describe('BookRequestService view counts', () => {
+  const approver = () => user({ permissions: [Permission.BookRequestAccess, Permission.ManageBookRequests] });
+
+  /** Every figure goes through the list's own where clause, one count per view, all at once. */
+  it('counts every view under the same filters, with hidden rows only in the hidden view', async () => {
+    const countRows = vi.fn((options: Record<string, unknown>) => {
+      if (options.failureCode === 'AUTOMATION_DISABLED') return Promise.resolve(1);
+      if (options.onlyDismissedFor !== undefined) return Promise.resolve(4);
+      const statuses = options.statuses as string[] | undefined;
+      return Promise.resolve(statuses ? statuses.length : 20);
+    });
+    const { service } = makeService({ repo: { countRows } });
+
+    const counts = await service.getMineViewCounts({ q: 'dune', mediaKind: 'ebook', view: 'closed', includeDismissed: true }, user());
+
+    expect(counts).toEqual({ active: 20, needs_action: 4, in_progress: 4, finished: 1, closed: 2, hidden: 4, awaitingManualPick: 1 });
+    expect(countRows).toHaveBeenCalledTimes(7);
+    for (const [options] of countRows.mock.calls) {
+      expect(options).toMatchObject({ userId: 1, search: 'dune', mediaKind: 'ebook' });
+      if (options.onlyDismissedFor === undefined) expect(options.excludeDismissedFor).toBe(1);
+    }
+    expect(countRows).toHaveBeenCalledWith(
+      expect.objectContaining({ statuses: ['approved'], failureCode: 'AUTOMATION_DISABLED', excludeDismissedFor: 1 }),
+    );
+  });
+
+  it('counts the approver queue without scoping it to the caller', async () => {
+    const countRows = vi.fn().mockResolvedValue(0);
+    const { service } = makeService({ repo: { countRows } });
+
+    await service.getAllViewCounts({ requesterUserId: 42 }, approver());
+
+    for (const [options] of countRows.mock.calls) {
+      expect(options).toMatchObject({ requesterUserId: 42 });
+      expect(options).not.toHaveProperty('userId');
+    }
+  });
+
+  it('refuses the approver counts to somebody who cannot moderate', async () => {
+    const countRows = vi.fn();
+    const { service } = makeService({ repo: { countRows } });
+
+    await expect(service.getAllViewCounts({}, user())).rejects.toThrow(ForbiddenException);
+    expect(countRows).not.toHaveBeenCalled();
+  });
+});
+
+describe('BookRequestService selection', () => {
+  const approver = () => user({ permissions: [Permission.BookRequestAccess, Permission.ManageBookRequests] });
+
+  function selected(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 10,
+      title: 'Dune',
+      mediaKind: 'ebook',
+      status: 'pending',
+      userId: 1,
+      fulfillerUserId: null,
+      dismissed: false,
+      subscribed: false,
+      ...overrides,
+    };
+  }
+
+  it('reports both halves of a pair under the row that leads it, in list order', async () => {
+    const findSelection = vi.fn().mockResolvedValue({
+      rows: [
+        { lead: selected({ id: 10 }), companion: selected({ id: 11, mediaKind: 'audiobook', status: 'rejected' }) },
+        { lead: selected({ id: 12, title: 'Emma', userId: 5, subscribed: true, dismissed: true }), companion: null },
+      ],
+      totalRows: 2,
+    });
+    const { service } = makeService({ repo: { findSelection } });
+
+    const selection = await service.selectMine({ view: 'needs_action', q: 'a', sortBy: 'title', sortDir: 'asc', page: 3, limit: 5 }, user());
+
+    expect(findSelection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: 1,
+        statuses: ['pending', 'approved', 'needs_review', 'failed'],
+        search: 'a',
+        sortBy: 'title',
+        sortDir: 'asc',
+      }),
+      1,
+      BOOK_REQUEST_SELECT_ALL_LIMIT,
+    );
+    expect(selection.items.map((item) => [item.id, item.rowId])).toEqual([
+      [10, 10],
+      [11, 10],
+      [12, 12],
+    ]);
+    expect(selection.items[2]).toMatchObject({ title: 'Emma', userId: 5, subscribed: true, dismissed: true });
+    expect(selection).toMatchObject({ totalRows: 2, truncated: false });
+  });
+
+  /** A requester can sit in their own request's subscribers, and that is not following it. */
+  it('never reports the caller as following their own request', async () => {
+    const findSelection = vi.fn().mockResolvedValue({ rows: [{ lead: selected({ userId: 1, subscribed: true }), companion: null }], totalRows: 1 });
+    const { service } = makeService({ repo: { findSelection } });
+
+    const selection = await service.selectMine({}, user());
+
+    expect(selection.items[0]!.subscribed).toBe(false);
+  });
+
+  it('says when more rows matched than a selection may hold', async () => {
+    const findSelection = vi.fn().mockResolvedValue({ rows: [], totalRows: BOOK_REQUEST_SELECT_ALL_LIMIT + 1 });
+    const { service } = makeService({ repo: { findSelection } });
+
+    await expect(service.selectAll({}, approver())).resolves.toMatchObject({ truncated: true, totalRows: BOOK_REQUEST_SELECT_ALL_LIMIT + 1 });
+  });
+
+  it('refuses the approver selection to somebody who cannot moderate', async () => {
+    const findSelection = vi.fn();
+    const { service } = makeService({ repo: { findSelection } });
+
+    await expect(service.selectAll({}, user())).rejects.toThrow(ForbiddenException);
+    expect(findSelection).not.toHaveBeenCalled();
+  });
+});
+
+/** The latest attempt of a request, as `findLatestForRequests` hands it back. */
+function latestDownload(requestId: number, adapterType: string | null, clientKey: string | null = 'abc') {
+  return { download: { id: requestId * 10, requestId, clientKey }, downloadClientAdapterType: adapterType };
+}
+
+describe('BookRequestService.cancelMany', () => {
+  it('cancels every id and reports each one as updated, with no removed list', async () => {
+    const { service, repo } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'pending' })) } });
+
+    const result = await service.cancelMany({ ids: [10, 11, 10] }, user());
+
+    expect(result.updated).toHaveLength(2);
+    expect(result.failed).toEqual([]);
+    expect(result).not.toHaveProperty('removed');
+    expect(repo.updateIf).toHaveBeenCalledTimes(2);
+  });
+
+  it('names the rows it could not cancel instead of failing the whole batch', async () => {
+    const { service } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockImplementation((id: number) =>
+            Promise.resolve(id === 11 ? joined({ id: 11, status: 'available', title: 'Watchers' }) : joined({ id, status: 'pending' })),
+          ),
+      },
+    });
+
+    const result = await service.cancelMany({ ids: [10, 11] }, user());
+
+    expect(result.updated.map((item) => item.id)).toEqual([10]);
+    expect(result.failed).toEqual([
+      {
+        id: 11,
+        title: 'Watchers',
+        reason: 'A request that is available can no longer be cancelled',
+        errorCode: 'BOOK_REQUEST_NOT_CANCELLABLE',
+        errorMeta: { status: 'available' },
+      },
+    ]);
+  });
+
+  /** The same files a single cancel from the page would take, read for the whole batch at once. */
+  it('deletes files only where the latest attempt sits with a client that always deletes them', async () => {
+    const findLatestForRequests = vi.fn().mockResolvedValue(
+      new Map([
+        [10, latestDownload(10, 'torbox')],
+        [11, latestDownload(11, 'qbittorrent')],
+        [12, latestDownload(12, 'torbox', null)],
+      ]),
+    );
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockImplementation((id: number) => Promise.resolve(joined({ id, status: 'downloading' }))) },
+      downloads: { findLatestForRequests },
+    });
+
+    await service.cancelMany({ ids: [10, 11, 12, 13] }, user());
+
+    // One read for the whole batch; the later ones are each cancelled row being mapped back.
+    expect(findLatestForRequests).toHaveBeenNthCalledWith(1, [10, 11, 12, 13]);
+    expect(removal.removeLatestForRequest.mock.calls.map(([id, deleteFiles]) => [id, deleteFiles])).toEqual([
+      [10, true],
+      [11, false],
+      [12, false],
+      [13, false],
+    ]);
+  });
+});
+
+describe('BookRequestService.restoreMany', () => {
+  it('restores every visible id and names the ones the caller cannot see', async () => {
+    const { service, repo } = makeService({
+      repo: {
+        findById: vi.fn().mockImplementation((id: number) => Promise.resolve(joined({ id, userId: id === 11 ? 9 : 1, status: 'cancelled' }))),
+      },
+    });
+
+    const result = await service.restoreMany({ ids: [10, 11] }, user());
+
+    expect(result.updated.map((item) => item.id)).toEqual([10]);
+    expect(result.failed.map((failure) => failure.id)).toEqual([11]);
+    expect(result).not.toHaveProperty('removed');
+    expect(repo.restore).toHaveBeenCalledExactlyOnceWith(10, 1);
+  });
+});
+
+describe('BookRequestService.leaveMany', () => {
+  it('reports every request left as removed and none as updated, refusing the caller their own', async () => {
+    const removeSubscriber = vi.fn().mockResolvedValue(true);
+    const { service } = makeService({
+      repo: {
+        findById: vi.fn().mockImplementation((id: number) => Promise.resolve(joined({ id, userId: id === 12 ? 1 : 9 }))),
+        isSubscriber: vi.fn().mockResolvedValue(true),
+        removeSubscriber,
+      },
+    });
+
+    const result = await service.leaveMany({ ids: [10, 11, 12] }, user());
+
+    expect(result.updated).toEqual([]);
+    expect(result.removed).toEqual([10, 11]);
+    expect(result.failed.map((failure) => [failure.id, failure.reason])).toEqual([
+      [12, 'This is your own request, so cancel or hide it rather than leaving it'],
+    ]);
+    expect(removeSubscriber).toHaveBeenCalledTimes(2);
+  });
+
+  it('still reports an empty removed list when nothing could be left', async () => {
+    const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue(undefined) } });
+
+    const result = await service.leaveMany({ ids: [10] }, user());
+
+    expect(result).toMatchObject({ updated: [], removed: [] });
+    expect(result.failed.map((failure) => failure.id)).toEqual([10]);
+  });
+});
+
+describe('BookRequestService.removeMany', () => {
+  const approver = () => user({ id: 2, permissions: [Permission.BookRequestAccess, Permission.ManageBookRequests] });
+
+  it('deletes the settled rows, reports them as removed, and names the ones still being worked on', async () => {
+    const { service, repo } = makeService({
+      repo: {
+        findById: vi
+          .fn()
+          .mockImplementation((id: number) =>
+            Promise.resolve(id === 11 ? joined({ id: 11, status: 'downloading', title: 'Whistler' }) : joined({ id, status: 'available' })),
+          ),
+      },
+    });
+
+    const result = await service.removeMany({ ids: [10, 11, 12] }, approver());
+
+    expect(result.updated).toEqual([]);
+    expect(result.removed).toEqual([10, 12]);
+    expect(result.failed.map((failure) => [failure.id, failure.title])).toEqual([[11, 'Whistler']]);
+    expect(repo.remove).toHaveBeenCalledTimes(2);
+  });
+
+  it('applies the same file rule as a single delete from the page', async () => {
+    const findLatestForRequests = vi.fn().mockResolvedValue(new Map([[10, latestDownload(10, 'torbox')]]));
+    const { service, removal } = makeService({
+      repo: { findById: vi.fn().mockImplementation((id: number) => Promise.resolve(joined({ id, status: 'available' }))) },
+      downloads: { findLatestForRequests },
+    });
+
+    await service.removeMany({ ids: [10, 11] }, approver());
+
+    expect(removal.removeLatestForRequest.mock.calls.map(([id, deleteFiles]) => [id, deleteFiles])).toEqual([
+      [10, true],
+      [11, false],
+    ]);
+  });
+
+  it('refuses every row to somebody who cannot moderate', async () => {
+    const { service, repo } = makeService({ repo: { findById: vi.fn().mockResolvedValue(joined({ status: 'available' })) } });
+
+    const result = await service.removeMany({ ids: [10] }, user());
+
+    expect(result.removed).toEqual([]);
+    expect(result.failed.map((failure) => failure.reason)).toEqual(['You cannot delete book requests']);
+    expect(repo.remove).not.toHaveBeenCalled();
   });
 });

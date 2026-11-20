@@ -48,6 +48,11 @@ import { ReadAloudWorkspace } from './read-aloud-workspace.service';
 import { READ_ALOUD_FAILED_WORK_TTL_MS } from './read-aloud.constants';
 
 const QUARTZNET_LANGUAGES = new Set<string>(READ_ALOUD_QUARTZNET_LANGUAGES);
+
+/** Sees and reorders everyone's read-along jobs in the Jobs area. */
+export function managesReadAlong(user: { isSuperuser: boolean; permissions: readonly string[] }): boolean {
+  return user.isSuperuser || user.permissions.includes(Permission.ManageAppSettings);
+}
 const ACTIVE_STATUSES = new Set<string>(READ_ALOUD_ACTIVE_JOB_STATUSES);
 const OUTPUT_ESTIMATE_FACTOR = 1.08;
 
@@ -88,7 +93,7 @@ export class ReadAloudService {
       this.libraries.findOne(book.libraryId),
       this.jobs.findBookPlacement(bookId),
       this.jobs.findReadAlongFiles(bookId),
-      this.worker.healthState(),
+      this.worker.lastKnownHealthState(),
     ]);
     const epubFiles = this.epubCandidates(book).map((file) => this.candidate(file, 'epub'));
     const audioFiles = this.audioCandidates(book).map((file) => this.candidate(file, file.format!.toLowerCase()));
@@ -198,6 +203,7 @@ export class ReadAloudService {
     this.logger.log(
       `[read_aloud.create] [end] jobId=${row.id} bookId=${bookId} userId=${user.id} tracks=${audioFileIds.length} - read-aloud job queued`,
     );
+    this.notifier.jobsChanged(user.id);
     return this.presenter.present(row, user);
   }
 
@@ -206,15 +212,20 @@ export class ReadAloudService {
   }
 
   async cancel(jobId: string, user: RequestUser): Promise<ReadAloudJob> {
+    return this.presenter.present(await this.cancelJob(jobId, user), user);
+  }
+
+  /** Cancels or discards the job; one already settled comes back as it is. */
+  async cancelJob(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
     const row = await this.findManageable(jobId, user);
-    if (!ACTIVE_STATUSES.has(row.status)) return this.presenter.present(row, user);
+    if (!ACTIVE_STATUSES.has(row.status)) return row;
     const updated = await this.jobs.requestCancellation(jobId);
     if (!updated) {
       const current = (await this.jobs.findById(jobId)) ?? row;
       if (ACTIVE_STATUSES.has(current.status) && (current.stage === 'publishing' || current.publishApproved)) {
         throw new ConflictException('This read-along is already being added to the book');
       }
-      return this.presenter.present(current, user);
+      return current;
     }
     if (updated.status === 'cancelled') {
       await this.workspace.remove(jobId);
@@ -226,7 +237,7 @@ export class ReadAloudService {
       await this.activity.record(jobId, 'info', updated.stage as ReadAloudJob['stage'], 'cancel_requested');
     }
     await this.notifier.pushUpdate(updated);
-    return this.presenter.present(updated, user);
+    return updated;
   }
 
   /** Starts publishing in the background: copying a large audiobook can outlast an HTTP request. */
@@ -235,6 +246,7 @@ export class ReadAloudService {
     const row = await this.jobs.claimForPublishing(jobId);
     if (!row) throw new ConflictException('This read-aloud job is not awaiting review');
     await this.activity.record(jobId, 'info', 'publishing', 'publish_requested');
+    this.notifier.jobsChanged(row.requestedByUserId);
     void this.publishClaimed(row, user).catch((error: unknown) => {
       // Recording the failure failed too; the job's lease lapses and recovery puts it back in line.
       this.logger.error(
@@ -245,12 +257,16 @@ export class ReadAloudService {
   }
 
   async retry(jobId: string, user: RequestUser): Promise<ReadAloudJob> {
+    return this.presenter.present(await this.retryJob(jobId, user), user);
+  }
+
+  async retryJob(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
     await this.findManageable(jobId, user);
     const row = await this.jobs.retry(jobId);
     if (!row) throw new ConflictException('This job cannot be retried; start a new one instead');
     await this.activity.record(jobId, 'info', 'queued', 'retry_requested');
     await this.notifier.pushUpdate(row);
-    return this.presenter.present(row, user);
+    return row;
   }
 
   async resync(jobId: string, dto: ResyncReadAloudJobDto, user: RequestUser): Promise<ReadAloudJob> {
@@ -267,10 +283,75 @@ export class ReadAloudService {
   }
 
   async dismiss(jobId: string, user: RequestUser): Promise<ReadAloudJob> {
+    return this.presenter.present(await this.dismissJob(jobId, user), user);
+  }
+
+  async dismissJob(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
     await this.findManageable(jobId, user);
     const row = await this.jobs.dismiss(jobId);
     if (!row) throw new ConflictException('Only a finished job can be dismissed');
-    return this.presenter.present(row, user);
+    this.notifier.jobsChanged(row.requestedByUserId);
+    return row;
+  }
+
+  async pause(jobId: string, user: RequestUser): Promise<ReadAloudJob> {
+    return this.presenter.present(await this.pauseJob(jobId, user), user);
+  }
+
+  /** Holds a queued job off the worker until resumed. Refused once the worker has it; one already paused comes back as it is. */
+  async pauseJob(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
+    const current = await this.findManageable(jobId, user);
+    if (current.status !== 'queued') throw new ConflictException('Only a queued job can be paused');
+    if (current.pausedAt != null) return current;
+    const health = await this.worker.healthState(true);
+    if (health.state === 'ok' && health.health.activeJobId === jobId) throw new ConflictException('The worker has already started this job');
+    const row = await this.jobs.pause(jobId);
+    if (!row) {
+      const latest = await this.jobs.findById(jobId);
+      if (latest?.status === 'queued' && latest.pausedAt != null) return latest;
+      throw new ConflictException('This job can no longer be paused');
+    }
+    await this.activity.record(jobId, 'info', 'queued', 'paused');
+    await this.notifier.pushUpdate(row);
+    return row;
+  }
+
+  async resume(jobId: string, user: RequestUser): Promise<ReadAloudJob> {
+    return this.presenter.present(await this.resumeJob(jobId, user), user);
+  }
+
+  /** Puts a paused job back in its place in line; one not paused comes back as it is. */
+  async resumeJob(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
+    const current = await this.findManageable(jobId, user);
+    const row = await this.jobs.resume(jobId);
+    if (!row) return (await this.jobs.findById(jobId)) ?? current;
+    await this.activity.record(jobId, 'info', 'queued', 'resumed');
+    await this.notifier.pushUpdate(row);
+    return row;
+  }
+
+  /** First among the requester's own queued jobs. */
+  async moveToTop(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
+    await this.findManageable(jobId, user);
+    const row = await this.jobs.moveToTop(jobId);
+    if (!row) throw new ConflictException('Only a queued job can be moved');
+    await this.activity.record(jobId, 'info', 'queued', 'moved_to_top');
+    await this.notifier.pushUpdate(row);
+    return row;
+  }
+
+  /**
+   * Ahead of every requester's queued jobs. For someone who manages the server, who may not reach
+   * the book itself, so only the job's existence is checked.
+   */
+  async prioritize(jobId: string, user: RequestUser): Promise<ReadAloudJobRow> {
+    if (!managesReadAlong(user)) throw new ForbiddenException('Only a manager can move a job ahead of everyone');
+    if (!(await this.jobs.findById(jobId))) throw new NotFoundException('Read-aloud job not found');
+    const row = await this.jobs.prioritize(jobId);
+    if (!row) throw new ConflictException('Only a queued job that is not paused can be prioritized');
+    await this.activity.record(jobId, 'info', 'queued', 'prioritized', null, { by: user.id });
+    await this.notifier.pushUpdate(row);
+    return row;
   }
 
   async report(jobId: string, user: RequestUser): Promise<ReadAloudJobReport> {

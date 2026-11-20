@@ -63,6 +63,29 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['POST', '/mobile/shelf-match'],
   ['GET', '/mobile/books/1/story-edits'],
   ['PUT', `/mobile/books/1/story-edits/${ID}`],
+  ['GET', '/mobile/books/files/1/story-guide?format=1'],
+  ['GET', '/mobile/books/files/1/story-guide/fixes'],
+  ['PUT', `/mobile/books/files/1/story-guide/fixes/${ID}`],
+  ['POST', '/mobile/vision-scan'],
+  ['POST', '/mobile/reading-help'],
+];
+
+/**
+ * Guarded routes that, outside production, also accept a request with no assertion at all, each
+ * with a body that passes validation and the answer that shows the request got past the guard:
+ * no such book file, a photo that is not an image, or a recap with more passages than it reads.
+ */
+const UNSIGNED_OUTSIDE_PRODUCTION: Array<[method: string, path: string, body: object | undefined, status: number]> = [
+  ['GET', '/mobile/books/files/1/story-guide?format=1', undefined, 404],
+  ['GET', '/mobile/books/files/1/story-guide/fixes', undefined, 404],
+  [
+    'PUT',
+    `/mobile/books/files/1/story-guide/fixes/${ID}`,
+    { kind: 'hide', target: { key: 'tom', names: [] }, data: {}, updatedAt: '2026-11-10T10:00:00.000Z' },
+    404,
+  ],
+  ['POST', '/mobile/vision-scan', { kind: 'cover', image: 'AAAA' }, 400],
+  ['POST', '/mobile/reading-help', { kind: 'recap-note', fileId: 1, language: 'en', passages: ['He came in.', 'She left.'] }, 400],
 ];
 
 const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [
@@ -82,7 +105,8 @@ describe('App Attest enforcement (e2e)', { timeout: TIMEOUT }, () => {
   let ctx: E2EContext;
 
   beforeAll(async () => {
-    ctx = await createE2EContext({ isolateAppData: true, realAppAttest: true });
+    // A production server: every guarded route refuses a request with no assertion.
+    ctx = await createE2EContext({ isolateAppData: true, realAppAttest: true, appAttestNodeEnv: 'production' });
   });
 
   afterAll(async () => {
@@ -192,6 +216,60 @@ describe('App Attest enforcement (e2e)', { timeout: TIMEOUT }, () => {
     const replay = await send('GET', path, headers);
     expect(replay.statusCode).toBe(403);
     expect((replay.json() as { errorCode?: string }).errorCode).toBe('APP_ATTEST_INVALID');
+  });
+});
+
+describe('App Attest enforcement outside production (e2e)', { timeout: TIMEOUT }, () => {
+  let ctx: E2EContext;
+
+  beforeAll(async () => {
+    ctx = await createE2EContext({ isolateAppData: true, realAppAttest: true, appAttestNodeEnv: 'development' });
+  });
+
+  afterAll(async () => {
+    await closeE2EContext(ctx);
+  });
+
+  function send(method: string, path: string, body?: object, headers: Record<string, string> = {}) {
+    return ctx.app.inject({
+      method: method as 'GET',
+      url: `/api/v1${path}`,
+      headers: { authorization: `Bearer ${ctx.adminToken}`, ...(body ? { 'content-type': 'application/json' } : {}), ...headers },
+      ...(body ? { payload: body } : {}),
+    });
+  }
+
+  it('accepts an unsigned request on the routes marked for it, and still verifies a signed one', async () => {
+    for (const [method, path, body, status] of UNSIGNED_OUTSIDE_PRODUCTION) {
+      const unsigned = await send(method, path, body);
+      expect({ method, path, status: unsigned.statusCode }).toEqual({ method, path, status });
+      const forged = await send(method, path, body, {
+        'x-bookorbit-attest-key': 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',
+        'x-bookorbit-attest-assertion': 'AAAA',
+        'x-bookorbit-attest-time': String(Date.now()),
+      });
+      expect(forged.statusCode).toBe(403);
+      expect((forged.json() as { errorCode?: string }).errorCode).toBe('APP_ATTEST_KEY_UNKNOWN');
+    }
+  });
+
+  it('still refuses an unsigned request on every other guarded route', async () => {
+    const marked = new Set(UNSIGNED_OUTSIDE_PRODUCTION.map(([method, path]) => `${method} ${path}`));
+    const failures: string[] = [];
+    for (const [method, path] of GUARDED_ROUTES) {
+      if (marked.has(`${method} ${path}`)) continue;
+      const hasBody = method !== 'GET' && method !== 'DELETE';
+      const response = await ctx.app.inject({
+        method: method as 'GET',
+        url: `/api/v1${path}`,
+        headers: { authorization: `Bearer ${ctx.adminToken}`, ...(hasBody ? { 'content-type': 'application/json' } : {}) },
+        ...(hasBody ? { payload: '{}' } : {}),
+      });
+      const errorCode = (response.json() as { errorCode?: string }).errorCode;
+      if (response.statusCode !== 403 || errorCode !== 'APP_ATTEST_REQUIRED')
+        failures.push(`${method} ${path} -> ${response.statusCode} ${errorCode}`);
+    }
+    expect(failures).toEqual([]);
   });
 });
 

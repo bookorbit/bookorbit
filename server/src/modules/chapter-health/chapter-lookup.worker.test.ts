@@ -12,14 +12,15 @@ const APPLIED: BulkLookupOutcome = {
 function setup(options: { jobs?: Job[]; nodeEnv?: string } = {}) {
   const jobs = (options.jobs ?? []).map((job) => ({ ...job, claimToken: 'claim' }));
   const repo = {
-    requeueProcessing: vi.fn().mockResolvedValue(undefined),
+    requeueProcessing: vi.fn().mockResolvedValue(0),
     claimNext: vi.fn().mockImplementation(() => Promise.resolve(jobs.shift() ?? null)),
     finish: vi.fn().mockResolvedValue(undefined),
     retryLater: vi.fn().mockResolvedValue(undefined),
   };
   const editor = { bulkLookup: vi.fn<(bookId: number, userId: number | null) => Promise<BulkLookupOutcome>>().mockResolvedValue(APPLIED) };
-  const worker = new ChapterLookupWorker(repo as never, editor as never, { nodeEnv: options.nodeEnv ?? 'test' } as never);
-  return { worker, repo, editor };
+  const jobChanges = { notify: vi.fn() };
+  const worker = new ChapterLookupWorker(repo as never, editor as never, { nodeEnv: options.nodeEnv ?? 'test' } as never, jobChanges as never);
+  return { worker, repo, editor, jobChanges };
 }
 
 /** Runs a tick to the end, skipping the pauses between lookups. */
@@ -188,5 +189,68 @@ describe('ChapterLookupWorker', () => {
     await tick(worker);
 
     expect(repo.claimNext).not.toHaveBeenCalled();
+  });
+
+  describe('Jobs area changes', () => {
+    const owners = (jobChanges: { notify: ReturnType<typeof vi.fn> }) =>
+      jobChanges.notify.mock.calls.map(([change]) => (change as { ownerId: number | null }).ownerId);
+
+    it('tells the Jobs area when a restart puts interrupted lookups back, and stays quiet when there were none', async () => {
+      const quiet = setup();
+      await quiet.worker.onModuleInit();
+      expect(quiet.jobChanges.notify).not.toHaveBeenCalled();
+
+      const { worker, repo, jobChanges } = setup();
+      repo.requeueProcessing.mockResolvedValueOnce(2);
+      await worker.onModuleInit();
+      expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'chapter-lookup', ownerId: null, state: true });
+    });
+
+    it('announces each claim, each review or failure, and the queue running dry, but not other outcomes', async () => {
+      const review: BulkLookupOutcome = { status: 'review', reason: 'runtime_mismatch', result: APPLIED.result };
+      const { worker, editor, jobChanges } = setup({
+        jobs: [
+          { bookId: 41, userId: 7, attemptCount: 1 },
+          { bookId: 42, userId: 7, attemptCount: 1 },
+          { bookId: 43, userId: null, attemptCount: 1 },
+        ],
+      });
+      editor.bulkLookup.mockResolvedValueOnce(APPLIED).mockResolvedValueOnce(review).mockResolvedValueOnce(APPLIED);
+
+      await tick(worker);
+
+      // Claim 41; claim 42 and its review; claim 43; then the empty queue, for the last requester.
+      expect(owners(jobChanges)).toEqual([7, 7, 7, null, null]);
+      expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'chapter-lookup', ownerId: 7, state: true });
+    });
+
+    it('announces a lookup that used up its attempts, but not one put back to try again', async () => {
+      const { worker, editor, jobChanges } = setup({
+        jobs: [
+          { bookId: 41, userId: 7, attemptCount: 1 },
+          { bookId: 42, userId: 8, attemptCount: 3 },
+        ],
+      });
+      editor.bulkLookup.mockRejectedValue(new Error('unreachable'));
+
+      await tick(worker);
+
+      expect(owners(jobChanges)).toEqual([7, 8, 8, 8]);
+    });
+
+    it('announces a queue that runs dry in a later tick than its last claim', async () => {
+      const jobs = Array.from({ length: 10 }, (_, index) => ({ bookId: 100 + index, userId: 7, attemptCount: 1 }));
+      const { worker, jobChanges } = setup({ jobs });
+
+      await tick(worker);
+      expect(jobChanges.notify).toHaveBeenCalledTimes(10);
+
+      await tick(worker);
+      expect(jobChanges.notify).toHaveBeenCalledTimes(11);
+      expect(owners(jobChanges).at(-1)).toBe(7);
+
+      await tick(worker);
+      expect(jobChanges.notify).toHaveBeenCalledTimes(11);
+    });
   });
 });

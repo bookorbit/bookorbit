@@ -7,11 +7,15 @@ vi.mock('drizzle-orm', () => ({
   isNull: vi.fn((value: unknown) => ({ op: 'isNull', value })),
   lte: vi.fn((left: unknown, right: unknown) => ({ op: 'lte', left, right })),
   max: vi.fn((value: unknown) => ({ op: 'max', value })),
+  min: vi.fn((value: unknown) => ({ op: 'min', value })),
+  ne: vi.fn((left: unknown, right: unknown) => ({ op: 'ne', left, right })),
   or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
 
-import { and, eq, inArray, lte, or } from 'drizzle-orm';
+vi.mock('../jobs/job-keyset', () => ({ microseconds: vi.fn((expr: unknown) => ({ op: 'microseconds', expr })) }));
+
+import { and, eq, inArray, lte, ne, or } from 'drizzle-orm';
 
 import { authorEnrichmentQueue } from '../../db/schema';
 import { AUTHOR_ENRICHMENT_REASONS } from './author-enrichment-reasons';
@@ -399,6 +403,43 @@ describe('AuthorEnrichmentRepository', () => {
       done: 0,
       total: 10,
     });
+  });
+
+  it('countForJobs counts tracked unfinished entries apart from silent ones, and every failure', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.groupBy.mockResolvedValueOnce([
+      { status: 'queued', cnt: 30, since: 1_700_000_000_000_200 },
+      { status: 'processing', cnt: 1, since: 1_700_000_000_000_100 },
+      { status: 'rate_limited', cnt: 2, since: 1_700_000_000_000_300 },
+    ]);
+    selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ cnt: 4, latest: 1_700_000_000_900_000 }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    await expect(repo.countForJobs()).resolves.toEqual({
+      queued: 30,
+      processing: 1,
+      rateLimited: 2,
+      queueSince: 1_700_000_000_000_100,
+      failed: 4,
+      failedAt: 1_700_000_000_900_000,
+    });
+    expect(selectBuilder.where).toHaveBeenNthCalledWith(
+      1,
+      and(
+        inArray(authorEnrichmentQueue.status, ['queued', 'processing', 'rate_limited']),
+        ne(authorEnrichmentQueue.reason, AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE),
+      ),
+    );
+    expect(selectBuilder.where).toHaveBeenNthCalledWith(2, eq(authorEnrichmentQueue.status, 'failed'));
+  });
+
+  it('countForJobs answers zeros and no times for an empty queue', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.groupBy.mockResolvedValueOnce([]);
+    selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ cnt: 0, latest: null }]);
+    const repo = new AuthorEnrichmentRepository(db as never);
+
+    await expect(repo.countForJobs()).resolves.toEqual({ queued: 0, processing: 0, rateLimited: 0, queueSince: null, failed: 0, failedAt: null });
   });
 
   it('filterEligibleAuthorIds short-circuits empty ids or disabled conditions', async () => {

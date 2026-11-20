@@ -2,6 +2,10 @@ import type { BooksPage } from "./book";
 import type { MetadataCandidateCacheInfo } from "./metadata-cache";
 import type { MergeStrategy } from "./metadata-preferences";
 
+export const AUTHOR_GENDERS = ["female", "male", "non_binary"] as const;
+
+export type AuthorGender = (typeof AUTHOR_GENDERS)[number];
+
 export type AuthorSummary = {
   id: number;
   name: string;
@@ -26,6 +30,7 @@ export type AuthorLetterCount = {
 
 export type AuthorDetail = AuthorSummary & {
   description: string | null;
+  gender: AuthorGender | null;
   birthDate: string | null;
   birthYear: number | null;
   deathDate: string | null;

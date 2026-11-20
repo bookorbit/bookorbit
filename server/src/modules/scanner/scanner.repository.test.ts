@@ -445,6 +445,26 @@ describe('ScannerRepository', () => {
     expect(db.selectDistinctOn).not.toHaveBeenCalled();
   });
 
+  it('reads nothing for the Jobs area when the viewer can access no library, or for Needs you', async () => {
+    const { repo, db } = makeRepo();
+    const query = { cutoffAt: new Date(), after: null, typeIndex: 7, limit: 50 };
+
+    await expect(repo.pageForJobs({ ...query, view: 'history', libraryIds: [] })).resolves.toEqual([]);
+    await expect(repo.pageForJobs({ ...query, view: 'needs-you', libraryIds: null })).resolves.toEqual([]);
+    await expect(repo.countForJobs([], new Date())).resolves.toEqual({ running: 0, failed: 0 });
+    await expect(repo.findLibraryNames([])).resolves.toEqual(new Map());
+    await expect(repo.findScanJobsByIds([])).resolves.toEqual([]);
+    expect(db.select).not.toHaveBeenCalled();
+  });
+
+  it('reports how many scan jobs the sweep deleted', async () => {
+    const { repo, db } = makeRepo();
+    db.execute.mockResolvedValueOnce({ rowCount: 7 }).mockResolvedValueOnce({ rowCount: null });
+
+    await expect(repo.deleteFinishedScanJobsBefore(new Date('2026-08-17T00:00:00.000Z'), 1000)).resolves.toBe(7);
+    await expect(repo.deleteFinishedScanJobsBefore(new Date('2026-08-17T00:00:00.000Z'), 1000)).resolves.toBe(0);
+  });
+
   describe('realignAudioTrackOrder', () => {
     it('renumbers the tracks inside a transaction that holds the book row', async () => {
       const { repo, queues, db, chains } = makeRepo();

@@ -2,16 +2,18 @@ import { Injectable } from '@nestjs/common';
 
 import type { BrowseCounts } from '@bookorbit/types';
 import { StatsCache } from '../../common/cache/stats-cache';
+import { hiddenLibrariesCacheKey } from '../../common/library-visibility/library-visibility';
 import { principalCacheKey, type RequestUser } from '../../common/types/request-user';
 import { AnnotationHubService } from '../annotation/annotation-hub.service';
 import { AuthorsService } from '../authors/authors.service';
 import { SeriesService } from '../series/series.service';
+import { TaxonomyService } from '../taxonomy/taxonomy.service';
 
 const BROWSE_COUNTS_TTL_MS = 60_000;
 const BROWSE_COUNTS_CACHE_MAX_ENTRIES = 200;
 
 /**
- * Feeds the sidebar Browse badges. Every shell mount asks for all three totals at once,
+ * Feeds the sidebar Browse badges. Every shell mount asks for every total at once,
  * so they are fanned out in parallel and cached per user to keep them off the hot path.
  */
 @Injectable()
@@ -22,16 +24,19 @@ export class BrowseCountsService {
     private readonly authorsService: AuthorsService,
     private readonly seriesService: SeriesService,
     private readonly annotationHubService: AnnotationHubService,
+    private readonly taxonomyService: TaxonomyService,
   ) {}
 
   async getCounts(user: RequestUser): Promise<BrowseCounts> {
-    return this.cache.get(String(user.id), principalCacheKey(user, 'browse-counts'), async () => {
-      const [authors, series, annotations] = await Promise.all([
+    const key = `browse-counts:${hiddenLibrariesCacheKey(user, 'series')}`;
+    return this.cache.get(String(user.id), principalCacheKey(user, key), async () => {
+      const [authors, series, annotations, genres] = await Promise.all([
         this.authorsService.countAll(user),
         this.seriesService.countAll(user),
         this.annotationHubService.countActive(user),
+        this.taxonomyService.countVisible('genre', user),
       ]);
-      return { authors, series, annotations };
+      return { authors, series, annotations, genres };
     });
   }
 }

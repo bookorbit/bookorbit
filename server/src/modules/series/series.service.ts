@@ -3,6 +3,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesNextBookResponse, SeriesPage, SeriesSummary } from '@bookorbit/types';
 import { READER_OPENABLE_FORMATS, SERIES_GAP_PREVIEW_LIMIT, getOpenableFormatsForGroup, isOptInReaderFormat } from '@bookorbit/types';
 import { MAX_OFFSET_ROWS, isOffsetWithinLimit } from '../../common/constants/pagination.constants';
+import { withoutHiddenLibraries } from '../../common/library-visibility/library-visibility';
 import type { RequestUser } from '../../common/types/request-user';
 import { normalizeSeriesTotalBooks } from '../../common/utils/series-total-books.utils';
 import { assembleBookCards } from '../book/utils/assemble-book-cards';
@@ -38,7 +39,7 @@ export class SeriesService {
     const size = dto.size ?? 50;
     this.assertPaginationWindow(page, size);
 
-    const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
+    const libraryIds = await this.resolveSeriesPageLibraryIds(user, dto.libraryId);
     if (libraryIds.length === 0) {
       return { items: [], total: 0, page, size, facets: { all: 0, notStarted: 0, inProgress: 0, complete: 0, hasGaps: 0 } };
     }
@@ -94,7 +95,7 @@ export class SeriesService {
 
   /** Total series the user can browse; matches the unfiltered total of {@link findAll}. */
   async countAll(user: RequestUser): Promise<number> {
-    const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
+    const libraryIds = withoutHiddenLibraries(await this.libraryService.findAccessibleLibraryIds(user), user, 'series');
     if (libraryIds.length === 0) return 0;
     return this.seriesRepo.countSeries({ libraryIds, contentFilters: user.isSuperuser ? undefined : user.contentFilters });
   }
@@ -104,28 +105,35 @@ export class SeriesService {
     const size = dto.size ?? 50;
     this.assertPaginationWindow(page, size);
 
-    const libraryIds = await this.resolveLibraryIds(user, dto.libraryId);
-    if (libraryIds.length === 0) {
+    const accessibleLibraryIds = await this.resolveLibraryIds(user, dto.libraryId);
+    if (accessibleLibraryIds.length === 0) {
       throw new NotFoundException('Series not found');
     }
 
-    const [detail, bookPage] = await Promise.all([
-      this.seriesRepo.findDetail({
-        seriesId,
-        userId: user.id,
-        libraryIds,
-        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
-      }),
-      this.seriesRepo.findBookIds({
-        seriesId,
-        page,
-        size,
-        sort: dto.sort ?? 'seriesIndex',
-        order: dto.order ?? 'asc',
-        libraryIds,
-        contentFilters: user.isSuperuser ? undefined : user.contentFilters,
-      }),
-    ]);
+    const load = (libraryIds: number[]) =>
+      Promise.all([
+        this.seriesRepo.findDetail({
+          seriesId,
+          userId: user.id,
+          libraryIds,
+          contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+        }),
+        this.seriesRepo.findBookIds({
+          seriesId,
+          page,
+          size,
+          sort: dto.sort ?? 'seriesIndex',
+          order: dto.order ?? 'asc',
+          libraryIds,
+          contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+        }),
+      ]);
+
+    const shownLibraryIds = dto.libraryId ? accessibleLibraryIds : withoutHiddenLibraries(accessibleLibraryIds, user, 'series');
+    const narrowed = shownLibraryIds.length > 0 && shownLibraryIds.length < accessibleLibraryIds.length;
+    let [detail, bookPage] = await load(narrowed ? shownLibraryIds : accessibleLibraryIds);
+    // A series kept entirely in hidden libraries still opens, from a book's page, with all its books.
+    if (!detail && narrowed) [detail, bookPage] = await load(accessibleLibraryIds);
 
     if (!detail) {
       if (dto.libraryId) {
@@ -235,6 +243,12 @@ export class SeriesService {
         seriesIndex: row.seriesIndex,
       },
     };
+  }
+
+  /** A library filter wins; otherwise the Series page reads every visible library not hidden from it. */
+  private async resolveSeriesPageLibraryIds(user: RequestUser, scopedLibraryId?: number): Promise<number[]> {
+    const libraryIds = await this.resolveLibraryIds(user, scopedLibraryId);
+    return scopedLibraryId ? libraryIds : withoutHiddenLibraries(libraryIds, user, 'series');
   }
 
   private async resolveLibraryIds(user: RequestUser, scopedLibraryId?: number): Promise<number[]> {

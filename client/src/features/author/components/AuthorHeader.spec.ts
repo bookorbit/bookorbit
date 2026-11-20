@@ -8,6 +8,7 @@ const author: AuthorDetail = {
   name: 'Author',
   sortName: null,
   description: null,
+  gender: null,
   imageUrl: null,
   bookCount: 24,
   lastAddedAt: '2026-01-01T00:00:00.000Z',
@@ -51,6 +52,17 @@ describe('life dates', () => {
     })
 
     expect(wrapper.text()).toContain('1929')
+  })
+})
+
+describe('gender', () => {
+  it('renders the controlled value with its translated label', () => {
+    const wrapper = mount(AuthorHeader, {
+      props: { author: { ...author, gender: 'non_binary' } },
+    })
+
+    expect(wrapper.text()).toContain('Gender')
+    expect(wrapper.text()).toContain('Non-binary')
   })
 })
 

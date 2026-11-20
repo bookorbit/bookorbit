@@ -198,6 +198,7 @@ describe('RequestSeedService.removeFromClient', () => {
     expect(downloads.updateIf).toHaveBeenCalledWith(11, expect.arrayContaining(['downloading']), {
       status: 'failed',
       errorMessage: expect.stringContaining('ann'),
+      failureCode: 'removed',
     });
     expect(requests.updateIf).toHaveBeenCalledWith(7, expect.arrayContaining(['downloading']), {
       status: 'failed',

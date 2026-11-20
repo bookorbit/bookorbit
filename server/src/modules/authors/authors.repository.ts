@@ -2,7 +2,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, asc, desc, eq, exists, inArray, isNull, max, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import type { ContentFilterRules } from '@bookorbit/types';
+import type { AuthorGender, ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
 import { DB } from '../../db';
@@ -38,6 +38,7 @@ type AuthorBookIdRow = {
 };
 
 export type AuthorDetailRow = AuthorSummaryRow & {
+  gender: AuthorGender | null;
   birthDate: string | null;
   birthYear: number | null;
   deathDate: string | null;
@@ -183,6 +184,7 @@ export class AuthorsRepository {
         name: authors.name,
         sortName: authors.sortName,
         description: authors.description,
+        gender: authors.gender,
         birthDate: authors.birthDate,
         birthYear: authors.birthYear,
         deathDate: authors.deathDate,
@@ -205,6 +207,7 @@ export class AuthorsRepository {
         authors.name,
         authors.sortName,
         authors.description,
+        authors.gender,
         authors.birthDate,
         authors.birthYear,
         authors.deathDate,
@@ -335,6 +338,7 @@ export class AuthorsRepository {
       name: string;
       sortName: string | null;
       description: string | null;
+      gender: AuthorGender | null;
       hasPhoto: boolean;
       birthDate: string | null;
       birthYear: number | null;
@@ -354,6 +358,7 @@ export class AuthorsRepository {
       name: authors.name,
       sortName: authors.sortName,
       description: authors.description,
+      gender: authors.gender,
       hasPhoto: authors.hasPhoto,
       lastEnrichedAt: authors.lastEnrichedAt,
     });

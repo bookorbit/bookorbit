@@ -28,6 +28,7 @@ import {
   WORKER_WRITABLE_BOOK_REQUEST_STATUSES,
 } from '@bookorbit/types';
 import type {
+  BookRequestHandbackCode,
   BookRequestMediaKind,
   BookRequestRequesterOption,
   BookRequestSortDirection,
@@ -99,6 +100,11 @@ async function countLiveSelfServe(executor: RequestReadExecutor, userId: number)
 
 const REQUESTER_OPTION_LIMIT = 100;
 
+/** A `%fragment%` ILIKE pattern in which the wildcards a person typed match only themselves. */
+function containsPattern(term: string): string {
+  return `%${term.replace(/[\\%_]/g, '\\$&')}%`;
+}
+
 /**
  * The two states an untouched self-serve row can be sitting in. Anything further along has a
  * download behind it, and anything settled is nobody's problem.
@@ -111,10 +117,11 @@ const ABANDONABLE_SELF_SERVE_STATUSES: readonly BookRequestStatus[] = ['approved
  */
 const SELF_SERVE_CAP_LOCK_NAMESPACE = 248_001;
 
-export interface ListRequestsOptions {
-  page: number;
-  limit: number;
+/** What narrows a list, as opposed to how it is paged and ordered. */
+export interface RequestListFilters {
   status?: BookRequestStatus;
+  /** Any of these statuses, which is what a list view asks for. Combines with `status`. */
+  statuses?: readonly BookRequestStatus[];
   mediaKind?: BookRequestMediaKind;
   /** Exact original requester. Unlike userId, this does not include subscribers. */
   requesterUserId?: number;
@@ -122,8 +129,19 @@ export interface ListRequestsOptions {
   userId?: number;
   /** Drops the rows this user has hidden. Applies to the approver queue too: dismissal is personal. */
   excludeDismissedFor?: number;
+  /** Keeps only the rows this user has hidden, which is the hidden view. */
+  onlyDismissedFor?: number;
   /** Narrows to self-served rows, or to the ones that went through approval. */
   selfServe?: boolean;
+  /** A fragment of the title or of any author, matched case-insensitively. */
+  search?: string;
+  /** Why automation handed the request back, for a count of the rows handed back for one reason. */
+  failureCode?: BookRequestHandbackCode;
+}
+
+export interface ListRequestsOptions extends RequestListFilters {
+  page: number;
+  limit: number;
   sortBy?: BookRequestSortField;
   sortDir?: BookRequestSortDirection;
   /**
@@ -131,6 +149,26 @@ export interface ListRequestsOptions {
    * `visibleCompanionId` instead, and the pair matches a filter when either half does.
    */
   groupPairs?: boolean;
+}
+
+/** One request as "select all matching" reports it: enough to decide which bulk actions reach it. */
+export interface BookRequestSelectionRequest {
+  id: number;
+  title: string;
+  mediaKind: string;
+  status: string;
+  userId: number;
+  fulfillerUserId: number | null;
+  /** Hidden by the viewer. */
+  dismissed: boolean;
+  /** The viewer is among the subscribers, which for the requester is not the same as following it. */
+  subscribed: boolean;
+}
+
+/** A row of the grouped list: the request that leads it and the companion folded into it, if any. */
+export interface BookRequestSelectionRow {
+  lead: BookRequestSelectionRequest;
+  companion: BookRequestSelectionRequest | null;
 }
 
 /** A list row, plus the companion folded into it when the list groups pairs. */
@@ -157,6 +195,7 @@ export interface BookRequestJoinedRow {
   requesterUsername: string;
   requesterName: string;
   decidedByUsername: string | null;
+  decidedByName: string | null;
   targetLibraryName: string | null;
 }
 
@@ -177,10 +216,10 @@ export class BookRequestRepository {
 
   /**
    * Who may see a row on this list: the requester or a subscriber when the list is personal, and
-   * never a row this viewer hid. Built against a table rather than `bookRequests` itself, so the
-   * same rule can be asked of a pair's other half.
+   * never a row this viewer hid (or, for the hidden view, only those). Built against a table rather
+   * than `bookRequests` itself, so the same rule can be asked of a pair's other half.
    */
-  private visibilityConditions(table: RequestTable, opts: ListRequestsOptions): SQL[] {
+  private visibilityConditions(table: RequestTable, opts: RequestListFilters): SQL[] {
     const conditions: SQL[] = [];
     if (opts.userId !== undefined) {
       const subscribed = this.db
@@ -196,20 +235,74 @@ export class BookRequestRepository {
         .where(eq(bookRequestDismissals.userId, opts.excludeDismissedFor));
       conditions.push(notInArray(table.id, dismissed));
     }
+    if (opts.onlyDismissedFor !== undefined) {
+      const dismissed = this.db
+        .select({ id: bookRequestDismissals.requestId })
+        .from(bookRequestDismissals)
+        .where(eq(bookRequestDismissals.userId, opts.onlyDismissedFor));
+      conditions.push(inArray(table.id, dismissed));
+    }
     return conditions;
   }
 
   /** What the viewer narrowed the list to, as opposed to what they are allowed to see. */
-  private filterConditions(table: RequestTable, opts: ListRequestsOptions): SQL[] {
+  private filterConditions(table: RequestTable, opts: RequestListFilters): SQL[] {
     const conditions: SQL[] = [];
     if (opts.status) conditions.push(eq(table.status, opts.status));
+    if (opts.statuses) conditions.push(inArray(table.status, [...opts.statuses]));
     if (opts.mediaKind) conditions.push(eq(table.mediaKind, opts.mediaKind));
     if (opts.requesterUserId !== undefined) conditions.push(eq(table.userId, opts.requesterUserId));
     if (opts.selfServe !== undefined) conditions.push(eq(table.selfServe, opts.selfServe));
+    if (opts.failureCode) conditions.push(eq(table.failureCode, opts.failureCode));
+    if (opts.search) {
+      const pattern = containsPattern(opts.search);
+      // Element by element rather than over the array's JSON text, so a pattern cannot match the
+      // quotes and commas between two names.
+      const author = sql`exists (select 1 from jsonb_array_elements_text(${table.authors}) as author(value) where author.value ilike ${pattern})`;
+      conditions.push(or(ilike(table.title, pattern), author) as SQL);
+    }
     return conditions;
   }
 
-  async findAll(opts: ListRequestsOptions): Promise<{ items: BookRequestListRow[]; total: number }> {
+  /** Both pointers have to agree, so a half-written link can never fold a row away. */
+  private pairJoin(): SQL {
+    return and(
+      eq(companionRequests.id, bookRequests.companionRequestId),
+      eq(companionRequests.companionRequestId, bookRequests.id),
+      ne(companionRequests.mediaKind, bookRequests.mediaKind),
+    ) as SQL;
+  }
+
+  /**
+   * The where clause of a list. Shared by the page, its total, the view counts and "select all
+   * matching", so no figure the page shows can disagree with the rows it lists.
+   *
+   * Grouped, it also answers whether each row's companion is visible, which is what folds a pair
+   * into one row; the query it is used in must join the companion with `pairJoin`.
+   */
+  private listWhere(opts: RequestListFilters, groupPairs: boolean): { where: SQL | undefined; companionVisible: SQL | null } {
+    const visible = this.visibilityConditions(bookRequests, opts);
+    const filters = this.filterConditions(bookRequests, opts);
+
+    if (!groupPairs) {
+      const conditions = [...visible, ...filters];
+      return { where: conditions.length ? and(...conditions) : undefined, companionVisible: null };
+    }
+
+    const companion = companionRequests;
+    const companionVisible = and(isNotNull(companion.id), ...this.visibilityConditions(companion, opts)) as SQL;
+    const companionFilters = this.filterConditions(companion, opts);
+    const companionMatches = companionFilters.length ? (and(companionVisible, ...companionFilters) as SQL) : companionVisible;
+
+    const conditions: SQL[] = [...visible];
+    // The pair is one row, so it stays on the list when either half is what the viewer asked for.
+    if (filters.length) conditions.push(or(and(...filters), companionMatches) as SQL);
+    // The audiobook half folds into its ebook whenever the viewer can see both.
+    conditions.push(not(and(companionVisible, eq(bookRequests.mediaKind, 'audiobook')) as SQL));
+    return { where: and(...conditions), companionVisible };
+  }
+
+  private listOrder(opts: Pick<ListRequestsOptions, 'sortBy' | 'sortDir'>): SQL[] {
     const direction = opts.sortDir === 'asc' ? asc : desc;
     const SORT_COLUMNS = {
       createdAt: bookRequests.createdAt,
@@ -220,15 +313,16 @@ export class BookRequestRepository {
     } as const;
     // The id tie-break runs the same way as the sort, so a row cannot sit on both sides of a page
     // boundary when two requests share a title or a timestamp.
-    const orderBy = [direction(SORT_COLUMNS[opts.sortBy ?? 'createdAt']), direction(bookRequests.id)];
+    return [direction(SORT_COLUMNS[opts.sortBy ?? 'createdAt']), direction(bookRequests.id)];
+  }
 
-    const visible = this.visibilityConditions(bookRequests, opts);
-    const filters = this.filterConditions(bookRequests, opts);
+  async findAll(opts: ListRequestsOptions): Promise<{ items: BookRequestListRow[]; total: number }> {
+    const groupPairs = opts.groupPairs === true;
+    const orderBy = this.listOrder(opts);
+    const { where, companionVisible } = this.listWhere(opts, groupPairs);
 
-    if (!opts.groupPairs) {
-      const conditions = [...visible, ...filters];
-      const where = conditions.length ? and(...conditions) : undefined;
-      const [rows, [totals]] = await Promise.all([
+    if (!companionVisible) {
+      const [rows, total] = await Promise.all([
         this.db
           .select({
             request: bookRequests,
@@ -243,30 +337,13 @@ export class BookRequestRepository {
           .orderBy(...orderBy)
           .limit(opts.limit)
           .offset((opts.page - 1) * opts.limit),
-        this.db.select({ total: count() }).from(bookRequests).where(where),
+        this.countRows(opts, false),
       ]);
-      return { items: await this.withDecidedBy(rows.map((row) => ({ ...row, visibleCompanionId: null }))), total: totals?.total ?? 0 };
+      return { items: await this.withDecidedBy(rows.map((row) => ({ ...row, visibleCompanionId: null }))), total };
     }
 
-    // Both pointers have to agree, so a half-written link can never fold a row away.
     const companion = companionRequests;
-    const pairJoin = and(
-      eq(companion.id, bookRequests.companionRequestId),
-      eq(companion.companionRequestId, bookRequests.id),
-      ne(companion.mediaKind, bookRequests.mediaKind),
-    );
-    const companionVisible = and(isNotNull(companion.id), ...this.visibilityConditions(companion, opts)) as SQL;
-    const companionFilters = this.filterConditions(companion, opts);
-    const companionMatches = companionFilters.length ? (and(companionVisible, ...companionFilters) as SQL) : companionVisible;
-
-    const conditions: SQL[] = [...visible];
-    // The pair is one row, so it stays on the list when either half is what the viewer asked for.
-    if (filters.length) conditions.push(or(and(...filters), companionMatches) as SQL);
-    // The audiobook half folds into its ebook whenever the viewer can see both.
-    conditions.push(not(and(companionVisible, eq(bookRequests.mediaKind, 'audiobook')) as SQL));
-    const where = and(...conditions);
-
-    const [rows, [totals]] = await Promise.all([
+    const [rows, total] = await Promise.all([
       this.db
         .select({
           request: bookRequests,
@@ -278,15 +355,114 @@ export class BookRequestRepository {
         .from(bookRequests)
         .innerJoin(users, eq(users.id, bookRequests.userId))
         .leftJoin(libraries, eq(libraries.id, bookRequests.targetLibraryId))
-        .leftJoin(companion, pairJoin)
+        .leftJoin(companion, this.pairJoin())
         .where(where)
         .orderBy(...orderBy)
         .limit(opts.limit)
         .offset((opts.page - 1) * opts.limit),
-      this.db.select({ total: count() }).from(bookRequests).leftJoin(companion, pairJoin).where(where),
+      this.countRows(opts, true),
     ]);
 
-    return { items: await this.withDecidedBy(rows), total: totals?.total ?? 0 };
+    return { items: await this.withDecidedBy(rows), total };
+  }
+
+  /**
+   * The rows a list would report as its total under these filters. Grouped by default, because
+   * every count the page shows is a count of the rows it would list.
+   */
+  async countRows(opts: RequestListFilters, groupPairs = true): Promise<number> {
+    const { where } = this.listWhere(opts, groupPairs);
+    const [row] = groupPairs
+      ? await this.db.select({ total: count() }).from(bookRequests).leftJoin(companionRequests, this.pairJoin()).where(where)
+      : await this.db.select({ total: count() }).from(bookRequests).where(where);
+    return row?.total ?? 0;
+  }
+
+  /**
+   * "Select all matching": the grouped list in its own order, up to `limit` rows, with only what a
+   * bulk action needs to know about each request. Whether the viewer hid or follows each one is
+   * answered in the same statement, so the batch costs two queries however many rows it holds.
+   */
+  async findSelection(
+    opts: RequestListFilters & Pick<ListRequestsOptions, 'sortBy' | 'sortDir'>,
+    viewerId: number,
+    limit: number,
+  ): Promise<{ rows: BookRequestSelectionRow[]; totalRows: number }> {
+    const { where, companionVisible } = this.listWhere(opts, true);
+    const companion = companionRequests;
+    const dismissedBy = (table: RequestTable) =>
+      sql<boolean>`${exists(
+        this.db
+          .select({ id: bookRequestDismissals.requestId })
+          .from(bookRequestDismissals)
+          .where(and(eq(bookRequestDismissals.requestId, table.id), eq(bookRequestDismissals.userId, viewerId))),
+      )}`;
+    const subscribedBy = (table: RequestTable) =>
+      sql<boolean>`${exists(
+        this.db
+          .select({ id: bookRequestSubscribers.requestId })
+          .from(bookRequestSubscribers)
+          .where(and(eq(bookRequestSubscribers.requestId, table.id), eq(bookRequestSubscribers.userId, viewerId))),
+      )}`;
+
+    const [rows, totalRows] = await Promise.all([
+      this.db
+        .select({
+          id: bookRequests.id,
+          title: bookRequests.title,
+          mediaKind: bookRequests.mediaKind,
+          status: bookRequests.status,
+          userId: bookRequests.userId,
+          fulfillerUserId: bookRequests.fulfillerUserId,
+          dismissed: dismissedBy(bookRequests),
+          subscribed: subscribedBy(bookRequests),
+          visibleCompanionId: sql<number | null>`case when ${companionVisible} then ${companion.id} else null end`,
+          companionTitle: companion.title,
+          companionMediaKind: companion.mediaKind,
+          companionStatus: companion.status,
+          companionUserId: companion.userId,
+          companionFulfillerUserId: companion.fulfillerUserId,
+          companionDismissed: dismissedBy(companion),
+          companionSubscribed: subscribedBy(companion),
+        })
+        .from(bookRequests)
+        .innerJoin(users, eq(users.id, bookRequests.userId))
+        .leftJoin(companion, this.pairJoin())
+        .where(where)
+        .orderBy(...this.listOrder(opts))
+        .limit(limit),
+      this.countRows(opts, true),
+    ]);
+
+    return {
+      rows: rows.map((row) => ({
+        lead: {
+          id: row.id,
+          title: row.title,
+          mediaKind: row.mediaKind,
+          status: row.status,
+          userId: row.userId,
+          fulfillerUserId: row.fulfillerUserId,
+          dismissed: row.dismissed,
+          subscribed: row.subscribed,
+        },
+        companion:
+          row.visibleCompanionId === null
+            ? null
+            : {
+                // A visible companion is a joined row, so its required columns are present.
+                id: row.visibleCompanionId,
+                title: row.companionTitle!,
+                mediaKind: row.companionMediaKind!,
+                status: row.companionStatus!,
+                userId: row.companionUserId!,
+                fulfillerUserId: row.companionFulfillerUserId,
+                dismissed: row.companionDismissed,
+                subscribed: row.companionSubscribed,
+              },
+      })),
+      totalRows,
+    };
   }
 
   /** The joined form of a set of requests, in no particular order, for a pair's folded-away halves. */
@@ -307,12 +483,14 @@ export class BookRequestRepository {
     return this.withDecidedBy(rows);
   }
 
-  private async withDecidedBy<T extends { request: BookRequestRow }>(rows: T[]): Promise<Array<T & { decidedByUsername: string | null }>> {
-    const decidedByNames = await this.findUsernames(rows.map((r) => r.request.decidedByUserId));
-    return rows.map((row) => ({
-      ...row,
-      decidedByUsername: row.request.decidedByUserId != null ? (decidedByNames.get(row.request.decidedByUserId) ?? null) : null,
-    }));
+  private async withDecidedBy<T extends { request: BookRequestRow }>(
+    rows: T[],
+  ): Promise<Array<T & { decidedByUsername: string | null; decidedByName: string | null }>> {
+    const deciders = await this.findDeciders(rows.map((r) => r.request.decidedByUserId));
+    return rows.map((row) => {
+      const decider = row.request.decidedByUserId != null ? deciders.get(row.request.decidedByUserId) : undefined;
+      return { ...row, decidedByUsername: decider?.username ?? null, decidedByName: decider?.name ?? null };
+    });
   }
 
   /**
@@ -324,7 +502,7 @@ export class BookRequestRepository {
    */
   async findRequesterOptions(search: string | null): Promise<BookRequestRequesterOption[]> {
     const term = search?.trim();
-    const pattern = term ? `%${term.replace(/[\\%_]/g, '\\$&')}%` : null;
+    const pattern = term ? containsPattern(term) : null;
 
     return this.db
       .selectDistinct({ userId: users.id, username: users.username, name: users.name })
@@ -351,18 +529,15 @@ export class BookRequestRepository {
 
     if (!row) return undefined;
 
-    const names = await this.findUsernames([row.request.decidedByUserId]);
-    return {
-      ...row,
-      decidedByUsername: row.request.decidedByUserId != null ? (names.get(row.request.decidedByUserId) ?? null) : null,
-    };
+    const [withDecider] = await this.withDecidedBy([row]);
+    return withDecider;
   }
 
-  private async findUsernames(ids: Array<number | null>): Promise<Map<number, string>> {
+  private async findDeciders(ids: Array<number | null>): Promise<Map<number, { username: string; name: string }>> {
     const unique = [...new Set(ids.filter((id): id is number => id != null))];
     if (unique.length === 0) return new Map();
-    const rows = await this.db.select({ id: users.id, username: users.username }).from(users).where(inArray(users.id, unique));
-    return new Map(rows.map((r) => [r.id, r.username]));
+    const rows = await this.db.select({ id: users.id, username: users.username, name: users.name }).from(users).where(inArray(users.id, unique));
+    return new Map(rows.map((r) => [r.id, { username: r.username, name: r.name }]));
   }
 
   /**

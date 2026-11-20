@@ -113,7 +113,7 @@ Take your library anywhere with the official native BookOrbit app. Read ebooks, 
 - **Multi-User & SSO**: Granular per-user permissions and isolated reading data, with native support for Authentik, Keycloak, and Authelia via OIDC.
 - **Multilingual Interface**: Community translations are managed on [Crowdin](https://crowdin.com/project/bookorbit). See the [localization guide](docs/LOCALIZATION.md) for current language support and contributor instructions.
 - **Content Delivery**: OPDS support for compatible apps, Send-to-Kindle via email, and browser drag-and-drop uploads.
-- **Automated Ingestion**: Configure a Book Dock drop folder for hands-free importing.
+- **Automated Ingestion**: Drop files into the Library Dock folder to review them before they reach a library. Each library can have its own dock, where incoming files get metadata and, with auto-file on, are named and filed into that library.
 
 <a id="quick-start-docker"></a>
 
@@ -190,8 +190,10 @@ Full documentation lives at **[bookorbit.app](https://bookorbit.app/what-is-book
 **Guides**
 
 - **Book requests**: indexers, download clients, path mappings, automation and the encryption key they need. See the [book requests guide](https://bookorbit.app/book-requests/).
+- **AI providers**: connect OpenAI, Anthropic, Gemini, OpenRouter, a proxy or a local runner for AI features such as story guides, and the `AI_ENCRYPTION_KEY` that keeps provider keys encrypted. See [docs/AI_PROVIDERS.md](docs/AI_PROVIDERS.md).
 - **Read-aloud**: optional STAlign generation and QuartzNet hardware acceleration. See [docs/READ_ALOUD.md](docs/READ_ALOUD.md).
 - **API keys**: script and automation access with read-only, permission and library limits. See [docs/API_KEYS.md](docs/API_KEYS.md).
+- **Jobs and bulk actions**: the Jobs page for long-running work, and bulk actions that keep running after the tab closes. See [docs/JOBS.md](docs/JOBS.md).
 - **External metadata providers**: add a source that runs beside BookOrbit, such as FantLab or MangaBaka, with [docs/METADATA_PROVIDERS.md](docs/METADATA_PROVIDERS.md), or build your own with [docs/BUILDING_METADATA_PROVIDERS.md](docs/BUILDING_METADATA_PROVIDERS.md).
 
 **Contributing**

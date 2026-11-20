@@ -16,6 +16,7 @@ import sharp from 'sharp';
 
 import {
   COVER_CUSTOM_FILE_PREFIX,
+  COVER_DISPLAY_FILE_NAME,
   COVER_EXTRACTED_FILE_PREFIX,
   COVER_THUMBNAIL_FILE_NAME,
   bookCoverDirPath,
@@ -26,7 +27,8 @@ import {
   isExtractedBookCoverFileName,
 } from '../../common/book-cover-storage';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { generateThumbnail, imageExt, normalizeProgressiveJpeg } from '../metadata/lib/cover';
+import { isReadAlongBookFile } from '../../common/utils/primary-file-selection.utils';
+import { generateDisplayCover, generateThumbnail, imageExt, normalizeProgressiveJpeg } from '../metadata/lib/cover';
 import { BookCoverEventsService } from './book-cover-events.service';
 import { classifyCoverShape } from './cover-shape';
 import {
@@ -40,7 +42,7 @@ import {
   type BookCoverSources,
 } from './book-cover-store.repository';
 
-export type CoverVariant = 'cover' | 'thumbnail';
+export type CoverVariant = 'cover' | 'display' | 'thumbnail';
 
 type SaveOptions = {
   origin: BookCoverOrigin;
@@ -200,6 +202,7 @@ export class BookCoverStore {
     if (!extracted) {
       await this.deleteFilesByPrefix(dir, COVER_CUSTOM_FILE_PREFIX);
       await rm(bookCoverSlotThumbnailPath(this.appDataPath, bookId, medium), { force: true });
+      await rm(join(dir, COVER_DISPLAY_FILE_NAME), { force: true });
       await this.repository.applySlotMutation(
         bookId,
         medium,
@@ -425,11 +428,12 @@ export class BookCoverStore {
   /**
    * The cover a book shows when no medium is asked for, as the frame it is drawn in and its cache
    * key. The face follows the primary file's medium, so an audiobook-primary book shows square art
-   * in any library; only a book with no content file takes its library's shape. The frame follows
-   * the slot actually served, so a book whose preferred slot is empty is framed for its fallback.
+   * in any library; a book with no content file, or whose primary file is a read-along EPUB, takes
+   * its library's shape. The frame follows the slot actually served, so a book whose preferred slot
+   * is empty is framed for its fallback.
    */
   faceOf(input: BookCoverFaceInput): BookCoverFace {
-    const preferred = this.preferredFace(input.libraryCoverAspectRatio, input.primaryFormat);
+    const preferred = this.preferredFace(input.libraryCoverAspectRatio, input.primaryFormat, input.primaryReadAlong);
     return {
       coverAspectRatio: this.servedFace(preferred, input.slots, input.media) === 'audio' ? '1/1' : '2/3',
       coverVersion: this.coverVersion(preferred, input.slots, input.legacyVersion),
@@ -437,9 +441,11 @@ export class BookCoverStore {
   }
 
   faceForContext(context: BookCoverContext, legacyVersion: string): BookCoverFace {
+    const primary = this.primaryFile(context);
     return this.faceOf({
       libraryCoverAspectRatio: context.coverAspectRatio,
-      primaryFormat: this.primaryFile(context)?.format,
+      primaryFormat: primary?.format,
+      primaryReadAlong: primary !== undefined && isReadAlongBookFile(primary),
       media: context.media,
       slots: context.slots,
       legacyVersion,
@@ -460,9 +466,12 @@ export class BookCoverStore {
   async enrichCardFaces(cards: BookCard[]): Promise<void> {
     const slotsByBookId = await this.repository.slotsFor(cards.map((card) => card.id));
     for (const card of cards) {
+      const primary = card.files.find((file) => file.role === 'primary');
       const face = this.faceOf({
         libraryCoverAspectRatio: card.coverAspectRatio,
-        primaryFormat: card.files.find((file) => file.role === 'primary')?.format,
+        primaryFormat: primary?.format,
+        primaryReadAlong:
+          primary !== undefined && isReadAlongBookFile({ format: primary.format, mediaOverlayAvailable: primary.mediaOverlay?.available }),
         media: getCoverMediaFromDatabaseFiles(
           card.files.map((file) => ({ format: file.format, role: file.role, mediaOverlayAvailable: file.mediaOverlay?.available === true })),
         ),
@@ -752,11 +761,16 @@ export class BookCoverStore {
   }
 
   private faceMedium(context: BookCoverContext): CoverMedium {
-    return this.preferredFace(context.coverAspectRatio, this.primaryFile(context)?.format);
+    const primary = this.primaryFile(context);
+    return this.preferredFace(context.coverAspectRatio, primary?.format, primary !== undefined && isReadAlongBookFile(primary));
   }
 
-  private preferredFace(libraryCoverAspectRatio: string, primaryFormat: string | null | undefined): CoverMedium {
-    if (primaryFormat) return this.formatMedium(primaryFormat);
+  /**
+   * A read-along EPUB is read and listened to alike, so its medium does not say which cover suits
+   * it and the library's shape decides, the way it does for a book with no content file.
+   */
+  private preferredFace(libraryCoverAspectRatio: string, primaryFormat: string | null | undefined, primaryReadAlong: boolean): CoverMedium {
+    if (primaryFormat && !primaryReadAlong) return this.formatMedium(primaryFormat);
     return libraryCoverAspectRatio === '1/1' ? 'audio' : 'ebook';
   }
 
@@ -796,6 +810,7 @@ export class BookCoverStore {
 
   private async resolveSlotArtifact(bookId: number, medium: CoverMedium, variant: CoverVariant): Promise<string | null> {
     const dir = bookCoverSlotDirPath(this.appDataPath, bookId, medium);
+    if (variant === 'display') return this.resolveDisplayArtifact(bookId, medium, dir);
     if (variant === 'thumbnail') {
       const thumbnailPath = bookCoverSlotThumbnailPath(this.appDataPath, bookId, medium);
       if (await this.exists(thumbnailPath)) return thumbnailPath;
@@ -813,6 +828,72 @@ export class BookCoverStore {
     const files = await this.readDirIfExists(dir);
     const cover = findPreferredBookCoverFileName(files);
     return cover ? join(dir, cover) : null;
+  }
+
+  /**
+   * A screen-sized copy of the served cover, for pages that show it large: otherwise a book page
+   * downloads the full scan, often over a megabyte. Made on first ask and again once the cover is
+   * newer than it, so no cover write has to know about it. A cover already that small, or one sharp
+   * cannot read, is served as it is.
+   */
+  private async resolveDisplayArtifact(bookId: number, medium: CoverMedium, dir: string): Promise<string | null> {
+    const cover = findPreferredBookCoverFileName(await this.readDirIfExists(dir));
+    if (!cover) return null;
+    const coverPath = join(dir, cover);
+    const displayPath = join(dir, COVER_DISPLAY_FILE_NAME);
+    const [coverStat, displayStat] = await Promise.all([stat(coverPath), this.statIfExists(displayPath)]);
+    if (displayStat && displayStat.mtimeMs >= coverStat.mtimeMs) return displayPath;
+    const key = `${bookId}:${medium}:display`;
+    const existing = this.thumbnailRepairs.get(key);
+    if (existing) return existing;
+    const build = this.withThumbnailRepairSlot(() => this.buildDisplayArtifact(bookId, medium, coverPath, coverStat.mtimeMs, displayPath));
+    this.thumbnailRepairs.set(key, build);
+    try {
+      return await build;
+    } finally {
+      if (this.thumbnailRepairs.get(key) === build) this.thumbnailRepairs.delete(key);
+    }
+  }
+
+  private async buildDisplayArtifact(
+    bookId: number,
+    medium: CoverMedium,
+    coverPath: string,
+    coverMtimeMs: number,
+    displayPath: string,
+  ): Promise<string> {
+    const startedAt = Date.now();
+    const tempPath = `${displayPath}.${randomUUID()}.tmp`;
+    try {
+      const display = await generateDisplayCover(await readFile(coverPath));
+      if (!display) return coverPath;
+      await writeFile(tempPath, display);
+      // A cover replaced while this copy was made would look older than it and never be redrawn.
+      if ((await stat(coverPath)).mtimeMs !== coverMtimeMs) return coverPath;
+      await rename(tempPath, displayPath);
+      this.logger.debug(
+        `[cover.display] [end] bookId=${bookId} medium=${medium} durationMs=${Date.now() - startedAt} bytes=${display.length} - display cover made`,
+      );
+      return displayPath;
+    } catch (error) {
+      const errorClass = error instanceof Error ? error.name : 'Error';
+      const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[cover.display] [fail] bookId=${bookId} medium=${medium} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${message}" - serving the full cover instead`,
+      );
+      return coverPath;
+    } finally {
+      await rm(tempPath, { force: true }).catch(() => undefined);
+    }
+  }
+
+  private async statIfExists(path: string): Promise<Awaited<ReturnType<typeof stat>> | null> {
+    try {
+      return await stat(path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return null;
+      throw error;
+    }
   }
 
   /**

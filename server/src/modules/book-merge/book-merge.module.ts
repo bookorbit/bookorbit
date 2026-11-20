@@ -7,6 +7,7 @@ import { BookCoverStoreModule } from '../book-cover-store/book-cover-store.modul
 import { BookModule } from '../book/book.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { MetadataScoreModule } from '../metadata-score/metadata-score.module';
 import { ScannerModule } from '../scanner/scanner.module';
 import { StoryEditsModule } from '../story-edits/story-edits.module';
@@ -15,6 +16,7 @@ import { UserBookStatusModule } from '../user-book-status/user-book-status.modul
 import { UserStatisticsModule } from '../user-statistics/user-statistics.module';
 import { BookMergeController } from './book-merge.controller';
 import { BookMergeEffectsService } from './book-merge-effects.service';
+import { BookMergeJobSource } from './book-merge-job-source';
 import { BookMergeExecutor } from './book-merge.executor';
 import { BookMergePlanner } from './book-merge.planner';
 import { BookMergeRecoveryService } from './book-merge-recovery.service';
@@ -28,6 +30,7 @@ import { BookMergeService } from './book-merge.service';
     BookCoverStoreModule,
     ScannerModule,
     FileWriteModule,
+    JobsModule,
     SelfWriteRegistryModule,
     MetadataScoreModule,
     EmbeddingModule,
@@ -38,7 +41,15 @@ import { BookMergeService } from './book-merge.service';
     UserStatisticsModule,
   ],
   controllers: [BookMergeController],
-  providers: [BookMergeService, BookMergePlanner, BookMergeExecutor, BookMergeEffectsService, BookMergeRecoveryService, BookMergeRepository],
+  providers: [
+    BookMergeService,
+    BookMergePlanner,
+    BookMergeExecutor,
+    BookMergeEffectsService,
+    BookMergeRecoveryService,
+    BookMergeRepository,
+    BookMergeJobSource,
+  ],
   exports: [BookMergeService],
 })
 export class BookMergeModule {}

@@ -5,11 +5,19 @@ const apiMock = vi.hoisted(() => vi.fn<(...args: [RequestInfo | URL, RequestInit
 
 vi.mock('@/lib/api', () => ({ api: apiMock }))
 
+import { DEFAULT_LIST_STATE } from '../requestListQuery'
+
 function response(body: unknown, ok = true): Pick<Response, 'json' | 'ok'> {
   return {
     ok,
     json: vi.fn<() => Promise<unknown>>().mockResolvedValue(body),
   }
+}
+
+async function freshActions() {
+  vi.resetModules()
+  const { useBookRequestActions } = await import('../composables/useBookRequests')
+  return useBookRequestActions(() => true)
 }
 
 async function freshRequests(scope: 'mine' | 'all') {
@@ -37,6 +45,56 @@ describe('useBookRequests filters', () => {
     expect(params.get('requesterUserId')).toBe('42')
     expect(params.get('mediaKind')).toBe('audiobook')
     expect(params.get('status')).toBe('needs_review')
+  })
+
+  it('sends the search, the view and the approval filter from the URL state', async () => {
+    apiMock.mockResolvedValue(response({ items: [], total: 0 }))
+    const requests = await freshRequests('mine')
+    requests.applyState({ ...DEFAULT_LIST_STATE, q: 'dune', view: 'hidden', approval: 'skipped', requester: 7, page: 2 })
+
+    await requests.fetchRequests()
+
+    const params = new URLSearchParams(String(apiMock.mock.calls[0]?.[0]).split('?')[1])
+    expect(params.get('q')).toBe('dune')
+    expect(params.get('view')).toBe('hidden')
+    expect(params.get('selfServe')).toBe('true')
+    expect(params.get('page')).toBe('2')
+    // The personal list refuses a requester filter, so it is never sent from there.
+    expect(params.has('requesterUserId')).toBe(false)
+    expect(params.has('includeDismissed')).toBe(false)
+  })
+
+  it('asks for the view counts with the filters but not the view, sort or page', async () => {
+    const counts = { active: 3, needs_action: 1, in_progress: 1, finished: 1, closed: 0, hidden: 5, awaitingManualPick: 0 }
+    apiMock.mockResolvedValue(response(counts))
+    const requests = await freshRequests('all')
+    requests.applyState({ ...DEFAULT_LIST_STATE, q: 'dune', view: 'finished', page: 3 })
+
+    await requests.fetchViewCounts()
+
+    const [path, query] = String(apiMock.mock.calls[0]?.[0]).split('?')
+    expect(path).toBe('/api/v1/admin/book-requests/view-counts')
+    const params = new URLSearchParams(query)
+    expect(params.get('q')).toBe('dune')
+    expect(params.has('view')).toBe(false)
+    expect(params.has('page')).toBe(false)
+    expect(requests.viewCounts.value).toEqual(counts)
+  })
+
+  it('asks for every matching request with the same view and order as the list', async () => {
+    apiMock.mockResolvedValue(response({ items: [], totalRows: 0, truncated: false }))
+    const requests = await freshRequests('mine')
+    requests.applyState({ ...DEFAULT_LIST_STATE, view: 'needs_action', sort: 'title', dir: 'asc' })
+
+    await requests.fetchSelection({ status: 'approved' })
+
+    const [path, query] = String(apiMock.mock.calls[0]?.[0]).split('?')
+    expect(path).toBe('/api/v1/book-requests/selection')
+    const params = new URLSearchParams(query)
+    expect(params.get('view')).toBe('needs_action')
+    expect(params.get('status')).toBe('approved')
+    expect(params.get('sortBy')).toBe('title')
+    expect(params.has('page')).toBe(false)
   })
 
   it('loads requester options once for the all-requests scope', async () => {
@@ -85,8 +143,8 @@ describe('useBookRequests out-of-order answers', () => {
     apiMock.mockImplementationOnce(() => Promise.resolve(response({ items: [{ id: 2 }], total: 1 })))
 
     const older = requests.fetchRequests()
-    requests.status.value = 'pending'
-    await requests.applyFilters()
+    requests.applyState({ ...DEFAULT_LIST_STATE, status: 'pending' })
+    await requests.fetchRequests()
     stale.release()
     await older
 
@@ -299,5 +357,49 @@ describe('useBookRequests pairs', () => {
     requests.dropItem(11)
     expect(requests.items.value).toHaveLength(0)
     expect(requests.total.value).toBe(0)
+  })
+})
+
+describe('useBookRequestActions batches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('sends a selection larger than one batch in slices and adds up what came back', async () => {
+    const actions = await freshActions()
+    apiMock.mockImplementation((_path, init) => {
+      const { ids } = JSON.parse(String(init?.body)) as { ids: number[] }
+      return Promise.resolve(response({ updated: [], failed: [], removed: ids }))
+    })
+    const ids = Array.from({ length: 230 }, (_, index) => index + 1)
+
+    const result = await actions.deleteMany(ids)
+
+    expect(apiMock).toHaveBeenCalledTimes(3)
+    expect(String(apiMock.mock.calls[0]?.[0])).toBe('/api/v1/admin/book-requests/delete')
+    expect(result?.removed).toHaveLength(230)
+    expect(actions.bulkPending.value).toBe(false)
+  })
+
+  it('reports the rest as failed when a later slice is refused outright', async () => {
+    const actions = await freshActions()
+    apiMock
+      .mockImplementationOnce(() => Promise.resolve(response({ updated: [], failed: [], removed: [] })))
+      .mockImplementationOnce(() => Promise.resolve(response({ message: 'Too many' }, false)))
+    const ids = Array.from({ length: 150 }, (_, index) => index + 1)
+
+    const result = await actions.cancelMany(ids)
+
+    expect(String(apiMock.mock.calls[0]?.[0])).toBe('/api/v1/book-requests/cancel')
+    expect(result?.failed).toHaveLength(50)
+    expect(result?.failed[0]).toMatchObject({ id: 101, reason: 'Too many' })
+  })
+
+  it('reports a batch refused at once as a failed call', async () => {
+    const actions = await freshActions()
+    apiMock.mockResolvedValueOnce(response({ message: 'Nope' }, false))
+
+    expect(await actions.leaveMany([1, 2])).toBeNull()
+    expect(actions.lastReason.value).toBe('Nope')
   })
 })

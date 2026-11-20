@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, inArray, ne, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { BookDuplicateGroupSort, BookDuplicateKind, BookDuplicateMatchReason, BookDuplicateSortOrder } from '@bookorbit/types';
@@ -8,6 +8,7 @@ import { buildContentFilterClauses } from '../../common/utils/content-filter-sql
 import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
+import { afterPosition, keysetOrder, microseconds, type JobKey, type JobPosition, type KeysetColumns } from '../jobs/job-keyset';
 import { crossFormatTitleSql, mediaFamilySql } from './book-duplicate-normalize';
 import {
   bookDuplicateDismissals,
@@ -19,12 +20,55 @@ import {
   bookFiles,
   bookMetadata,
   books,
+  libraries,
+  users,
 } from '../../db/schema';
 
 export type Db = NodePgDatabase<typeof schema>;
 type ScanRow = typeof bookDuplicateScans.$inferSelect;
 
 const BOOK_DUPLICATE_SCAN_LOCK_NAMESPACE = 1_112_493_899;
+
+export interface DuplicateScanPageQuery {
+  view: 'queue' | 'needs-you' | 'failed' | 'history';
+  /** One account's scans; null for everyone's. Scans always have an owner. */
+  ownerId: number | null;
+  /** Failed scans that finished at or before this have aged into History. */
+  cutoffAt: Date;
+  after: JobPosition | null;
+  typeIndex: number;
+  limit: number;
+}
+
+const SCAN_PAGE_COLUMNS = {
+  id: bookDuplicateScans.id,
+  userId: bookDuplicateScans.userId,
+  libraryIds: bookDuplicateScans.libraryIds,
+  requestedLibraryId: bookDuplicateScans.requestedLibraryId,
+  status: bookDuplicateScans.status,
+  processedBooks: bookDuplicateScans.processedBooks,
+  totalBooks: bookDuplicateScans.totalBooks,
+  errorCode: bookDuplicateScans.errorCode,
+  createdAt: bookDuplicateScans.createdAt,
+  completedAt: bookDuplicateScans.completedAt,
+};
+
+export type DuplicateScanPageRow = Pick<ScanRow, keyof typeof SCAN_PAGE_COLUMNS> & {
+  requesterName: string | null;
+  /** 1-based place among queued scans, which one worker runs oldest first; 0 otherwise. */
+  rank: number;
+  key: JobKey;
+};
+
+export interface DuplicateScanCounts {
+  queue: number;
+  failed: number;
+  running: number;
+  queued: number;
+}
+
+/** When a scan ended, never null, so no row drops out of a keyset comparison. */
+const SCAN_FINISH = sql`coalesce(${bookDuplicateScans.completedAt}, ${bookDuplicateScans.createdAt})`;
 
 // Whole-library scan statements run in the background on the request pool, whose 30s statement
 // timeout a large library can outlast, so they get a wider but still finite budget of their own.
@@ -915,5 +959,127 @@ export class BookDuplicatesRepository {
       ORDER BY member.group_id, ${bookMetadata.metadataScore} DESC NULLS LAST, ${books.id}
     `);
     return result.rows;
+  }
+
+  /** A page of scans for the Jobs area, in the view's keyset order. Nothing waits on a person, so Needs you is empty. */
+  async pageForJobs(query: DuplicateScanPageQuery): Promise<DuplicateScanPageRow[]> {
+    if (query.view === 'needs-you') return [];
+    return query.view === 'queue' ? await this.scanQueuePage(query) : await this.settledScanPage(query);
+  }
+
+  /** How many scans each Jobs-area view holds, failed ones measured from `cutoffAt`. */
+  async countForJobs(ownerId: number | null, cutoffAt: Date): Promise<DuplicateScanCounts> {
+    const [row] = await this.db
+      .select({
+        running: sql<number>`count(*) filter (where ${bookDuplicateScans.status} = 'running')`.mapWith(Number),
+        queued: sql<number>`count(*) filter (where ${bookDuplicateScans.status} = 'queued')`.mapWith(Number),
+        failed: sql<number>`count(*) filter (where ${this.failedScanShown(cutoffAt)})`.mapWith(Number),
+      })
+      .from(bookDuplicateScans)
+      .where(and(inArray(bookDuplicateScans.status, ['queued', 'running', 'failed']), this.scanOwned(ownerId)));
+    const running = row?.running ?? 0;
+    const queued = row?.queued ?? 0;
+    return { queue: running + queued, failed: row?.failed ?? 0, running, queued };
+  }
+
+  /** Who owns each scan that exists, for answering actions on ids a client sent. */
+  async findScanOwners(scanIds: readonly number[]): Promise<Map<number, number>> {
+    if (scanIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: bookDuplicateScans.id, userId: bookDuplicateScans.userId })
+      .from(bookDuplicateScans)
+      .where(inArray(bookDuplicateScans.id, [...scanIds]));
+    return new Map(rows.map((row) => [row.id, row.userId]));
+  }
+
+  /** Library names by id, for naming what a scan covered. */
+  async findLibraryNames(libraryIds: readonly number[]): Promise<Map<number, string>> {
+    if (libraryIds.length === 0) return new Map();
+    const rows = await this.db
+      .select({ id: libraries.id, name: libraries.name })
+      .from(libraries)
+      .where(inArray(libraries.id, [...libraryIds]));
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
+  /** The running scan, then queued ones in the order the worker takes them. */
+  private async scanQueuePage(query: DuplicateScanPageQuery): Promise<DuplicateScanPageRow[]> {
+    // Aliased: drizzle renders column references unqualified, which inside a subquery would bind to the wrong row.
+    const line = this.db
+      .$with('scan_line')
+      .as(
+        this.db
+          .select({ lineId: sql<number>`scan_order.id`.as('line_id'), place: sql<number>`scan_order.place`.as('place') })
+          .from(
+            sql`(select q.id, row_number() over (order by q.created_at, q.id) as place from book_duplicate_scans q where q.status = 'queued') scan_order`,
+          ),
+      );
+    const group = sql<number>`case when ${bookDuplicateScans.status} = 'running' then 0 else 1 end`;
+    const rank = sql<number>`case when ${bookDuplicateScans.status} = 'queued' then coalesce(${line.place}, 2147483647) else 0 end`;
+    const at = microseconds(sql`${bookDuplicateScans.createdAt}`);
+    const columns: KeysetColumns = {
+      prefix: [
+        { kind: 'number', expr: group },
+        { kind: 'number', expr: rank },
+      ],
+      suffix: [{ kind: 'number', expr: at }],
+      id: { kind: 'number', expr: sql`${bookDuplicateScans.id}` },
+    };
+    const rows = await this.db
+      .with(line)
+      .select({
+        ...SCAN_PAGE_COLUMNS,
+        group: sql<number>`${group}`.mapWith(Number),
+        rank: sql<number>`${rank}`.mapWith(Number),
+        at,
+        requesterName: users.name,
+      })
+      .from(bookDuplicateScans)
+      .leftJoin(line, eq(line.lineId, bookDuplicateScans.id))
+      .leftJoin(users, eq(users.id, bookDuplicateScans.userId))
+      .where(
+        and(
+          inArray(bookDuplicateScans.status, ['queued', 'running']),
+          this.scanOwned(query.ownerId),
+          query.after ? afterPosition(columns, 'queue', query.after, query.typeIndex) : undefined,
+        ),
+      )
+      .orderBy(...keysetOrder(columns, 'queue'))
+      .limit(query.limit);
+    return rows.map(({ group: band, rank: place, at: since, ...row }) => ({
+      ...row,
+      rank: place,
+      key: { prefix: [band, place], suffix: [since], id: row.id },
+    }));
+  }
+
+  /** Failed and History by when the scan ended, newest first. */
+  private async settledScanPage(query: DuplicateScanPageQuery): Promise<DuplicateScanPageRow[]> {
+    const columns: KeysetColumns = {
+      prefix: [{ kind: 'time', expr: SCAN_FINISH }],
+      suffix: [],
+      id: { kind: 'number', expr: sql`${bookDuplicateScans.id}` },
+    };
+    const shown =
+      query.view === 'failed'
+        ? this.failedScanShown(query.cutoffAt)
+        : or(eq(bookDuplicateScans.status, 'completed'), and(eq(bookDuplicateScans.status, 'failed'), lte(SCAN_FINISH, query.cutoffAt)));
+    const rows = await this.db
+      .select({ ...SCAN_PAGE_COLUMNS, finish: microseconds(SCAN_FINISH), requesterName: users.name })
+      .from(bookDuplicateScans)
+      .leftJoin(users, eq(users.id, bookDuplicateScans.userId))
+      .where(and(shown, this.scanOwned(query.ownerId), query.after ? afterPosition(columns, query.view, query.after, query.typeIndex) : undefined))
+      .orderBy(...keysetOrder(columns, query.view))
+      .limit(query.limit);
+    return rows.map(({ finish, ...row }) => ({ ...row, rank: 0, key: { prefix: [finish], suffix: [], id: row.id } }));
+  }
+
+  /** Failed and finished after the cutoff: what the Failed view still shows. */
+  private failedScanShown(cutoffAt: Date): SQL {
+    return and(eq(bookDuplicateScans.status, 'failed'), sql`${SCAN_FINISH} > ${cutoffAt}`)!;
+  }
+
+  private scanOwned(ownerId: number | null): SQL | undefined {
+    return ownerId === null ? undefined : eq(bookDuplicateScans.userId, ownerId);
   }
 }

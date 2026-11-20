@@ -78,24 +78,43 @@ function zipDir(path: string): string {
   return path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '';
 }
 
+interface EpubZipEntryIndex {
+  exact: Map<string, unzipper.File>;
+  decoded: Map<string, unzipper.File>;
+  caseless: Map<string, unzipper.File>;
+}
+
+// Every manifest item is looked up in one archive, and a page-image EPUB has tens of thousands of
+// entries, so each opened archive's entry list, which never changes, is indexed once.
+const zipEntryIndexes = new WeakMap<unzipper.File[], EpubZipEntryIndex>();
+
+function setFirst(map: Map<string, unzipper.File>, key: string, file: unzipper.File): void {
+  if (!map.has(key)) map.set(key, file);
+}
+
+function zipEntryIndex(files: unzipper.File[]): EpubZipEntryIndex {
+  const cached = zipEntryIndexes.get(files);
+  if (cached) return cached;
+  const index: EpubZipEntryIndex = { exact: new Map(), decoded: new Map(), caseless: new Map() };
+  for (const file of files) {
+    setFirst(index.exact, cleanEpubZipPath(file.path), file);
+    const decoded = normalizeEpubZipPath(file.path);
+    setFirst(index.decoded, decoded, file);
+    setFirst(index.caseless, decoded.toLowerCase(), file);
+  }
+  zipEntryIndexes.set(files, index);
+  return index;
+}
+
 /**
  * An entry named exactly `path` wins. Decoded names are compared only after that: hrefs arrive
  * decoded, so an entry whose name holds a literal escape such as `%20` is found only that way, but
- * it must not answer for the entry its escape decodes to.
+ * it must not answer for the entry its escape decodes to. Within each tier the first entry wins.
  */
 export function findEpubZipEntry(files: unzipper.File[], path: string): unzipper.File | undefined {
-  const exact = cleanEpubZipPath(path);
+  const index = zipEntryIndex(files);
   const clean = normalizeEpubZipPath(path);
-  const cleanLower = clean.toLowerCase();
-  let decodedMatch: unzipper.File | undefined;
-  let ciMatch: unzipper.File | undefined;
-  for (const file of files) {
-    if (cleanEpubZipPath(file.path) === exact) return file;
-    const fp = normalizeEpubZipPath(file.path);
-    if (!decodedMatch && fp === clean) decodedMatch = file;
-    if (!ciMatch && fp.toLowerCase() === cleanLower) ciMatch = file;
-  }
-  return decodedMatch ?? ciMatch;
+  return index.exact.get(cleanEpubZipPath(path)) ?? index.decoded.get(clean) ?? index.caseless.get(clean.toLowerCase());
 }
 
 function parseClock(value: unknown): number | null {

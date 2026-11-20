@@ -128,7 +128,7 @@ export class RequestVerificationService implements OnModuleInit {
 
     const row = await this.dockRepo.findById(fileId);
     if (!row) {
-      await this.fulfillment.failDownload(download, 'The Book Dock entry for this download disappeared');
+      await this.fulfillment.failDownload(download, 'The Library Dock entry for this download disappeared');
       return;
     }
 
@@ -217,7 +217,7 @@ export class RequestVerificationService implements OnModuleInit {
       folderId,
       ...(join ? { joinBook: join.joinBook } : {}),
     });
-    if (!result.success) return { ok: false, reason: result.message ?? 'the Book Dock could not file this book' };
+    if (!result.success) return { ok: false, reason: result.message ?? 'the Library Dock could not file this book' };
     if (join) {
       this.logger.log(
         `[book_request.join_book] [end] requestId=${request.id} bookId=${join.joinBook.bookId} landedBookId=${result.bookId ?? 'none'} - filed as another format of an existing book`,
@@ -386,7 +386,7 @@ export class RequestVerificationService implements OnModuleInit {
   async fileHeldImport(requestId: number, user: RequestUser): Promise<void> {
     const { request, download, fileId } = await this.loadHeld(requestId);
     if (fileId === null || download === null) {
-      throw new BadRequestException('The Book Dock entry this request was held over is gone, so there is nothing left to file');
+      throw new BadRequestException('The Library Dock entry this request was held over is gone, so there is nothing left to file');
     }
 
     const filed = await this.fileIntoLibrary(download, request, fileId);
@@ -430,7 +430,7 @@ export class RequestVerificationService implements OnModuleInit {
     }
 
     const claimedDownload = download
-      ? await this.downloads.updateIf(download.id, ['needs_review'], { status: 'failed', errorMessage: reason })
+      ? await this.downloads.updateIf(download.id, ['needs_review'], { status: 'failed', errorMessage: reason, failureCode: 'discarded' })
       : undefined;
     if (download && !claimedDownload) {
       await this.requests.updateIf(requestId, ['failed'], {

@@ -15,6 +15,7 @@ import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
 import * as schema from '../../../src/db/schema';
 import { BookDockWatcherService } from '../../../src/modules/book-dock/book-dock-watcher.service';
+import { LibraryDockRegistry } from '../../../src/modules/book-dock/library-dock-registry.service';
 import { seedLibrary, waitForCondition, type Db } from '../app-harness';
 import { buildFb2Fixture, createBookDockFixtureRoot, writeFixtureFile, type BookDockFixtureRoot } from './book-dock-fixture-builder';
 
@@ -50,6 +51,8 @@ export interface UploadBookDockFileInput {
   fileName: string;
   content: string | Buffer;
   contentType?: string;
+  /** Uploads into this library's dock instead of Unsorted. */
+  libraryId?: number;
 }
 
 export interface CreateBookDockRowInput {
@@ -132,6 +135,9 @@ export async function closeBookDockE2EContext(ctx: BookDockE2EContext): Promise<
 
 export async function resetBookDockState(ctx: BookDockE2EContext): Promise<void> {
   await ctx.db.delete(schema.bookDockFiles);
+  await ctx.db.delete(schema.bookDockKeptFiles);
+  await ctx.db.delete(schema.libraryDocks);
+  await ctx.app.get(LibraryDockRegistry).refresh();
   await rm(ctx.fixture.bookDockPath, { recursive: true, force: true });
   await mkdir(ctx.fixture.bookDockPath, { recursive: true });
 }
@@ -253,7 +259,7 @@ export async function uploadBookDockFile(ctx: BookDockE2EContext, input: UploadB
 
   return ctx.app.inject({
     method: 'POST',
-    url: '/api/v1/book-dock/upload',
+    url: input.libraryId === undefined ? '/api/v1/book-dock/upload' : `/api/v1/book-dock/upload?libraryId=${input.libraryId}`,
     headers: {
       ...authHeader(input.token),
       'content-type': `multipart/form-data; boundary=${boundary}`,
@@ -330,7 +336,7 @@ export async function fileExists(path: string): Promise<boolean> {
     .catch(() => false);
 }
 
-function buildMultipartBody(fileName: string, content: Buffer, contentType: string): { body: Buffer; boundary: string } {
+export function buildMultipartBody(fileName: string, content: Buffer, contentType: string): { body: Buffer; boundary: string } {
   const boundary = `----bookorbit-book-dock-${randomUUID()}`;
   const preamble = Buffer.from(
     `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: ${contentType}\r\n\r\n`,

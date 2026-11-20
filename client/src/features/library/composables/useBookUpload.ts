@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { getValidToken } from '@/lib/api'
-import { UPLOAD_SUPPORTED_FORMATS, type UploadResult } from '@bookorbit/types'
+import { UPLOAD_SUPPORTED_FORMATS, type BookDockFile, type UploadResult } from '@bookorbit/types'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
 export const SUPPORTED_FORMATS: readonly string[] = UPLOAD_SUPPORTED_FORMATS
@@ -16,7 +16,15 @@ export interface FileUploadItem {
   progress: number
   error?: string
   bookId?: number
+  /** Set when the file went to the library's dock for review instead of into the library. */
+  dockFileId?: number
   validationError?: boolean
+  /** The chosen library does not take this format; it is held back and named in the list. */
+  refusedFormat?: boolean
+}
+
+function fileFormat(name: string): string {
+  return name.split('.').pop()?.toLowerCase() ?? ''
 }
 
 const UPLOAD_CONCURRENCY = 3
@@ -53,10 +61,11 @@ async function uploadSingle(item: FileUploadItem, url: string): Promise<void> {
 
     xhr.onload = () => {
       if (xhr.status === 201) {
-        const result: UploadResult = JSON.parse(xhr.responseText)
+        const result = JSON.parse(xhr.responseText) as UploadResult | BookDockFile
         item.status = 'done'
         item.progress = 100
-        item.bookId = result.bookId
+        if ('bookId' in result) item.bookId = result.bookId
+        else item.dockFileId = result.id
       } else {
         item.status = 'error'
         try {
@@ -112,7 +121,7 @@ export function useBookUpload() {
 
   function retryFile(id: string) {
     const item = files.value.find((f) => f.id === id)
-    if (!item || item.status !== 'error' || item.validationError) return
+    if (!item || item.status !== 'error' || item.validationError || item.refusedFormat) return
     item.status = 'pending'
     item.error = undefined
     item.progress = 0
@@ -122,12 +131,33 @@ export function useBookUpload() {
     files.value = []
   }
 
+  /** Holds back files the chosen library does not take, and lets them go again when it does. Empty takes every format. */
+  function applyAllowedFormats(formats: readonly string[]) {
+    for (const item of files.value) {
+      const refused = formats.length > 0 && !formats.includes(fileFormat(item.file.name))
+      if (refused && item.status === 'pending') {
+        item.status = 'error'
+        item.refusedFormat = true
+      } else if (!refused && item.refusedFormat) {
+        item.status = 'pending'
+        item.refusedFormat = false
+      }
+    }
+  }
+
   async function startUpload(libraryId: number, folderId?: number) {
+    const baseUrl = `/api/v1/libraries/${libraryId}/upload`
+    await uploadPending(folderId !== undefined ? `${baseUrl}?folderId=${folderId}` : baseUrl)
+  }
+
+  /** Sends the files to the library's dock, where metadata is fetched and they wait to be filed. */
+  async function startDockUpload(libraryId: number) {
+    await uploadPending(`/api/v1/book-dock/upload?libraryId=${libraryId}`)
+  }
+
+  async function uploadPending(url: string) {
     const pending = files.value.filter((f) => f.status === 'pending')
     if (pending.length === 0) return
-
-    const baseUrl = `/api/v1/libraries/${libraryId}/upload`
-    const url = folderId !== undefined ? `${baseUrl}?folderId=${folderId}` : baseUrl
 
     // Process pending items with a concurrency limit of UPLOAD_CONCURRENCY
     let index = 0
@@ -153,6 +183,8 @@ export function useBookUpload() {
     removeFile,
     retryFile,
     reset,
+    applyAllowedFormats,
     startUpload,
+    startDockUpload,
   }
 }

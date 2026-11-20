@@ -34,6 +34,7 @@ function request(overrides: Partial<BookRequestItem> = {}): BookRequestItem {
     targetFolderId: null,
     decidedByUserId: null,
     decidedByUsername: null,
+    decidedByName: null,
     decidedAt: null,
     decisionNote: null,
     matchedBookId: 42,
@@ -54,62 +55,48 @@ function request(overrides: Partial<BookRequestItem> = {}): BookRequestItem {
   }
 }
 
-function render(item = request()) {
+const MODERATOR = { userId: 1, canManage: true, canSelfFulfil: true }
+
+function render(rows: BookRequestItem[] = [request()], overrides: Record<string, unknown> = {}) {
   return mount(RequestListTable, {
     props: {
-      requests: [item],
-      canManage: true,
-      canSelfFulfil: true,
-      currentUserId: 1,
+      requests: rows,
+      viewer: MODERATOR,
+      showRequester: true,
       busyIds: new Set<number>(),
       progressByRequest: {},
       density: 'comfortable',
       sortBy: 'createdAt',
       sortDir: 'desc',
-      selectedIds: [],
+      selectedRowIds: new Set<number>(),
+      pageSelection: 'none',
+      ...overrides,
     },
     global: {
       stubs: {
         RouterLink: RouterLinkStub,
         RequestCover: true,
-        RequestPipeline: true,
-        RequestRowActions: true,
-        RequestStatusBadge: true,
+        RequestPairCover: true,
+        RequestStatusBadge: { props: ['status'], template: '<span class="status-badge">{{ status }}</span>' },
       },
     },
   })
 }
 
 describe('RequestListTable', () => {
-  it('constrains every intrinsic sizing boundary around a long title', () => {
+  it('lets the book column take the slack, with the title truncated inside it', () => {
     const wrapper = render()
-    const titleButton = wrapper.findAll('tbody button').find((button) => button.text() === LONG_TITLE)
+    const titleButton = wrapper.findAll('table tbody button').find((button) => button.text() === LONG_TITLE)
 
+    expect(wrapper.get('table').classes()).toContain('table-fixed')
     expect(titleButton).toBeDefined()
     expect(titleButton!.classes()).toEqual(expect.arrayContaining(['min-w-0', 'truncate']))
-
-    const titleRow = titleButton!.element.parentElement
-    const titleBlock = titleRow?.parentElement
-    const titleLayout = titleBlock?.parentElement
-    const titleCell = titleLayout?.parentElement
-
-    expect(titleRow?.classList.contains('min-w-0')).toBe(true)
-    expect(titleBlock?.classList.contains('min-w-0')).toBe(true)
-    expect(titleLayout?.classList.contains('min-w-0')).toBe(true)
-    expect(titleCell?.tagName).toBe('TD')
-    expect(titleCell?.classList.contains('max-w-0')).toBe(true)
-  })
-
-  it('keeps the complete title available to the title button', () => {
-    const wrapper = render()
-    const titleButton = wrapper.findAll('tbody button').find((button) => button.text() === LONG_TITLE)
-
-    expect(titleButton?.text()).toBe(LONG_TITLE)
+    expect(titleButton!.attributes('title')).toBe(LONG_TITLE)
   })
 
   // A format asked for from a book's page carries no art, and used to show a blank placeholder.
   it('falls back to the cover of the book a format request joins', () => {
-    const wrapper = render(request({ status: 'approved', matchedBookId: null, targetBookId: 434, coverUrl: null }))
+    const wrapper = render([request({ status: 'approved', matchedBookId: null, targetBookId: 434, coverUrl: null })])
     const covers = wrapper.findAllComponents({ name: 'RequestCover' })
 
     expect(covers.length).toBeGreaterThan(0)
@@ -118,65 +105,71 @@ describe('RequestListTable', () => {
       expect(cover.props('fallbackSources')).toEqual(['/api/v1/books/434/thumbnail?medium=audio'])
     }
   })
+
+  it('gives every row a checkbox, whatever state it is in', () => {
+    const statuses = ['pending', 'approved', 'downloading', 'importing', 'needs_review', 'available', 'cancelled'] as const
+    const wrapper = render(statuses.map((status, index) => request({ id: index + 1, status })))
+    expect(wrapper.findAll('table tbody input[type="checkbox"]')).toHaveLength(statuses.length)
+    expect(wrapper.findAll('ul input[type="checkbox"]')).toHaveLength(statuses.length)
+  })
+
+  it('opens the request from anywhere on the row, but not from its checkbox', async () => {
+    const wrapper = render()
+    await wrapper.get('table tbody td:nth-child(3)').trigger('click')
+    expect(wrapper.emitted('open')?.[0]).toEqual([1613])
+
+    await wrapper.get('table tbody input[type="checkbox"]').trigger('click')
+    expect(wrapper.emitted('open')).toHaveLength(1)
+  })
+
+  it('shows the requester only on the approver list', () => {
+    expect(render().get('table tbody').text()).toContain('Issue Reporter')
+    expect(render([request()], { showRequester: false }).get('table tbody').text()).not.toContain('Issue Reporter')
+  })
+
+  it('says a request needs a release rather than repeating why automation handed it back', () => {
+    const wrapper = render([request({ status: 'approved', failureCode: 'AUTOMATION_DISABLED', matchedBookId: null })])
+    expect(wrapper.get('table tbody').text()).toContain('Needs a release')
+    expect(wrapper.get('table tbody').text()).not.toContain('Automatic grabbing is off')
+  })
+
+  it('offers the next step as one button and keeps it out of the menu', () => {
+    const wrapper = render([request({ status: 'approved', matchedBookId: null })])
+    const step = wrapper.get('table tbody td:last-child button')
+    expect(step.text()).toBe('Pick release')
+  })
 })
 
 describe('RequestListTable pairs', () => {
   const ebook = request({ id: 10, mediaKind: 'ebook', status: 'pending', title: 'Dune', companionRequestId: 11, matchedBookId: null })
   const audiobook = request({ id: 11, mediaKind: 'audiobook', status: 'downloading', title: 'Dune', companionRequestId: 10, matchedBookId: null })
 
-  function renderPair(selectedIds: number[] = []) {
-    return mount(RequestListTable, {
-      props: {
-        requests: [{ ...ebook, companion: audiobook }],
-        canManage: true,
-        canSelfFulfil: false,
-        currentUserId: 1,
-        busyIds: new Set<number>(),
-        progressByRequest: {},
-        density: 'comfortable',
-        sortBy: 'createdAt',
-        sortDir: 'desc',
-        selectedIds,
-      },
-      global: {
-        stubs: {
-          RouterLink: RouterLinkStub,
-          RequestCover: true,
-          RequestPipeline: true,
-          RequestStatusBadge: { props: ['status'], template: '<span class="status-badge">{{ status }}</span>' },
-          RequestPairRowActions: {
-            props: ['row'],
-            emits: ['approve'],
-            template: '<button class="pair-approve" @click="$emit(\'approve\', [row, row.companion])">approve</button>',
-          },
-        },
-      },
-    })
-  }
-
   it('renders the pair as one row with a lane per half, the ebook first', () => {
-    const wrapper = renderPair()
+    const wrapper = render([{ ...ebook, companion: audiobook }])
 
-    expect(wrapper.findAll('tbody tr')).toHaveLength(1)
+    expect(wrapper.findAll('table tbody tr')).toHaveLength(1)
     const lanes = wrapper
       .get('table')
       .findAll('.status-badge')
       .map((badge) => badge.text())
     expect(lanes).toEqual(['pending', 'downloading'])
-    expect(wrapper.find('table').text()).toContain('E-book and audiobook')
+    expect(wrapper.find('table').text()).toContain('E-book + audiobook')
   })
 
-  it('hands a row press on to the page with exactly the halves it applies to', async () => {
-    const wrapper = renderPair()
+  it('approves only the half that is waiting from the row button', async () => {
+    const wrapper = render([{ ...ebook, companion: audiobook }])
 
-    await wrapper.get('table .pair-approve').trigger('click')
+    await wrapper.get('table tbody td:last-child button').trigger('click')
 
-    expect(wrapper.emitted('pair-approve')?.[0]?.[0]).toEqual([expect.objectContaining({ id: 10 }), expect.objectContaining({ id: 11 })])
+    const [step, row] = wrapper.emitted('step')?.[0] ?? []
+    expect(step).toMatchObject({ kind: 'approve', halves: [expect.objectContaining({ id: 10 })] })
+    expect(row).toMatchObject({ id: 10 })
   })
 
-  it('ticks the row only when every half a bulk action can reach is selected', () => {
-    // Only the pending ebook can be acted on in bulk; the downloading audiobook cannot.
-    expect((renderPair([10]).get('table tbody input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
-    expect((renderPair([]).get('table tbody input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
+  it('ticks the row as one, whichever halves an action could reach', () => {
+    const selected = render([{ ...ebook, companion: audiobook }], { selectedRowIds: new Set([10]) })
+    expect((selected.get('table tbody input[type="checkbox"]').element as HTMLInputElement).checked).toBe(true)
+    const none = render([{ ...ebook, companion: audiobook }])
+    expect((none.get('table tbody input[type="checkbox"]').element as HTMLInputElement).checked).toBe(false)
   })
 })

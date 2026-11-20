@@ -62,7 +62,7 @@ function validRuleValue(operator: RuleOperator, field: RuleField): { value?: unk
     case 'includesAny':
     case 'includesAll':
     case 'excludesAll':
-      return { value: ['test'] };
+      return { value: field === 'authorGender' ? ['female'] : ['test'] };
     default: {
       const _exhaustive: never = operator;
       return _exhaustive;
@@ -491,6 +491,20 @@ describe('groupRuleSchema depth enforcement', () => {
       ],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('author gender rules', () => {
+  it('accepts controlled gender values and rejects unknown values', () => {
+    const rule = (value: unknown) => ({
+      type: 'group',
+      join: 'AND',
+      rules: [{ type: 'rule', field: 'authorGender', operator: 'includesAny', value }],
+    });
+
+    expect(validateGroupRule(rule(['female', 'non_binary']))).toBeDefined();
+    expect(() => validateGroupRule(rule(['unknown']))).toThrow(BadRequestException);
+    expect(() => validateGroupRule(rule('female'))).toThrow(BadRequestException);
   });
 });
 

@@ -2,7 +2,7 @@ export type HardcoverSyncDisabledReason = "permission_denied" | "missing_token" 
 export type HardcoverBookSyncMode = "all_eligible" | "selected_only";
 export type HardcoverBookSyncOverride = "included" | "excluded" | null;
 export type HardcoverBookSyncEffectiveReason =
-  HardcoverSyncDisabledReason | "global_disabled" | "not_selected" | "excluded" | "unread" | "unsupported_status";
+  HardcoverSyncDisabledReason | "global_disabled" | "not_selected" | "excluded" | "library_excluded" | "unread" | "unsupported_status";
 
 export interface HardcoverSettings {
   tokenConfigured: boolean;
@@ -14,6 +14,8 @@ export interface HardcoverSettings {
   autoSyncOnProgressUpdate: boolean;
   autoSyncOnRatingChange: boolean;
   privacySettingId: number;
+  /** Books in these libraries never sync unless included one by one. */
+  excludedLibraryIds: number[];
   lastSyncedAt: string | null;
 }
 
@@ -25,6 +27,7 @@ export interface UpsertHardcoverSettingsPayload {
   autoSyncOnProgressUpdate?: boolean;
   autoSyncOnRatingChange?: boolean;
   privacySettingId?: number;
+  excludedLibraryIds?: number[];
 }
 
 export interface HardcoverTokenValidationResult {

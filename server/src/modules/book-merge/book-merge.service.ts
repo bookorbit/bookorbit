@@ -14,6 +14,7 @@ import type {
 import { LibraryOperationGate, type LibraryOperationLease, type LibraryOperationRelease } from '../../common/services/library-operation-gate.service';
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { ScanGateway } from '../scanner/scan.gateway';
 import { BookMergeEffectsService } from './book-merge-effects.service';
 import { BookMergeExecutor, type MergeProgress, type MergeRunResult } from './book-merge.executor';
@@ -47,6 +48,7 @@ export class BookMergeService {
     private readonly effects: BookMergeEffectsService,
     private readonly libraryGate: LibraryOperationGate,
     private readonly gateway: ScanGateway,
+    private readonly jobChanges: JobChangesService,
   ) {}
 
   async preview(dto: BookMergePreviewDto, user: RequestUser): Promise<BookMergePreviewResponse> {
@@ -107,6 +109,7 @@ export class BookMergeService {
       `[${MERGE_EVENT}] [start] jobId=${job.id} libraryId=${plan.libraryId} libraryIds=${libraryIds.join(',')} targetBookId=${plan.targetBookId} ` +
         `sourceCount=${plan.steps.length} destination=${plan.destinationBookId} userId=${user.id} - merge started`,
     );
+    this.jobsChanged(user.id, true);
     void this.runJob(job, plan, user.id, release);
     return { jobId: job.id, libraryIds };
   }
@@ -153,6 +156,7 @@ export class BookMergeService {
       `[${MERGE_EVENT}] [start] jobId=${job.id} libraryId=${plan.libraryId} libraryIds=${libraryIds.join(',')} targetBookId=${plan.targetBookId} ` +
         `sourceCount=${plan.steps.length} destination=${plan.destinationBookId} userId=${user.id} leased=true - merge started`,
     );
+    this.jobsChanged(user.id, true);
     await this.runJob(job, plan, user.id, () => undefined);
 
     const finished = await this.repository.findJob(job.id);
@@ -174,8 +178,14 @@ export class BookMergeService {
   private async runJob(job: MergeJobRow, plan: MergeExecutionPlan, userId: number, release: LibraryOperationRelease): Promise<void> {
     const startedAt = Date.now();
     await this.acquireSlot();
+    let lastStatus: string | undefined = job.status;
     try {
-      const result = await this.executor.run(job, plan, (change) => this.emitProgress(userId, { ...job, ...change }, 'progress', change));
+      const result = await this.executor.run(job, plan, (change) => {
+        // Byte ticks repeat the status; only a new one can move a waiting merge's place in line.
+        this.jobsChanged(userId, change.status !== undefined && change.status !== lastStatus);
+        lastStatus = change.status ?? lastStatus;
+        this.emitProgress(userId, { ...job, ...change }, 'progress', change);
+      });
       const retired = await this.effects.apply({
         job: (await this.repository.findJob(job.id)) ?? job,
         plan,
@@ -195,6 +205,7 @@ export class BookMergeService {
         .updateJob(job.id, { status: 'failed', errorCode: 'MERGE_FAILED', error: sanitizeLogValue(message), finishedAt: new Date() })
         .catch(() => undefined);
       const failed = await this.repository.findJob(job.id).catch(() => null);
+      this.jobsChanged(userId, true);
       if (failed) this.emitProgress(userId, failed, 'finished');
     } finally {
       this.releaseSlot();
@@ -235,6 +246,7 @@ export class BookMergeService {
       });
     }
     const finished = await this.repository.findJob(job.id);
+    this.jobsChanged(userId, true);
     if (finished) this.emitProgress(userId, finished, 'finished');
 
     const line =
@@ -242,6 +254,11 @@ export class BookMergeService {
       `mergedCount=${mergedSourceIds.length} movedFiles=${run.movedFileCount} crossDevice=${run.crossDevice} retiredFiles=${retired} durationMs=${Date.now() - startedAt}`;
     if (status === 'done') this.logger.log(`[${MERGE_EVENT}] [end] ${line} - merge finished`);
     else this.logger.warn(`[${MERGE_EVENT}] [fail] ${line} errorCode=${run.errorCode ?? 'none'} status=${status} - merge stopped`);
+  }
+
+  /** Tells the Jobs area. `state`: a merge changed status, which can move every waiting merge's place. */
+  private jobsChanged(userId: number, state: boolean): void {
+    this.jobChanges.notify({ type: 'book-merge', ownerId: userId, state });
   }
 
   private emitProgress(

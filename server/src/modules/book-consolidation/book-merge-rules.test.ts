@@ -15,8 +15,8 @@ describe('book merge rule registry', () => {
     expect(Object.keys(BOOK_MERGE_RULES).filter((key) => !present.has(key))).toEqual([]);
   });
 
-  it('covers the 59 single columns and the composite file key', () => {
-    expect(bookForeignKeys).toHaveLength(60);
+  it('covers the 60 single columns and the composite file key', () => {
+    expect(bookForeignKeys).toHaveLength(61);
     expect(bookForeignKeys.filter((foreignKey) => foreignKey.key.includes('+'))).toEqual([
       { key: 'book_files.book_id+library_folder_id', onDelete: 'cascade' },
     ]);
@@ -38,7 +38,7 @@ describe('book file retire rule registry', () => {
     const keys = fileForeignKeys.map((foreignKey) => foreignKey.key);
     expect(keys.filter((key) => !(key in BOOK_FILE_RETIRE_RULES))).toEqual([]);
     expect(Object.keys(BOOK_FILE_RETIRE_RULES).filter((key) => !keys.includes(key))).toEqual([]);
-    expect(keys).toHaveLength(22);
+    expect(keys).toHaveLength(24);
   });
 
   it('never drops reading time or a reader’s position', () => {

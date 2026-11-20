@@ -1,0 +1,1 @@
+CREATE INDEX "ai_jobs_feature_finish_idx" ON "ai_jobs" USING btree ("feature",coalesce("finished_at", "updated_at") desc,"id" desc) WHERE "ai_jobs"."status" in ('completed', 'failed', 'cancelled');

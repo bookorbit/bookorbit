@@ -393,6 +393,26 @@ describe('useLibraryCreator', () => {
 
       expect(creator.error.value).toBe('/books overlaps a folder of Comics. A folder can belong to only one library.')
     })
+
+    it('explains a folder the server refuses because it overlaps the Library Dock folder', async () => {
+      const { useLibraryCreator } = await import('../useLibraryCreator')
+      const creator = useLibraryCreator()
+      creator.initEdit(makeLibrary({ id: 12 }))
+      apiMock.mockResolvedValue(
+        jsonResponse(
+          {
+            message: 'Library folders cannot sit inside the Library Dock folder or contain it.',
+            errorCode: 'LIBRARY_FOLDER_OVERLAPS_BOOK_DOCK',
+            errorMeta: { path: '/data/book-dock/Fiction', overlapPath: '/data/book-dock' },
+          },
+          409,
+        ),
+      )
+
+      await expect(creator.save()).resolves.toBeNull()
+
+      expect(creator.error.value).toBe('/data/book-dock/Fiction overlaps the Library Dock folder /data/book-dock. Choose a folder outside the dock.')
+    })
   })
 
   it('shows the read-along entry above EPUB and saves it only once it is moved', async () => {

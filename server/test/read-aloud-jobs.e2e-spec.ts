@@ -3,7 +3,15 @@ import { existsSync } from 'fs';
 import { readdir } from 'fs/promises';
 import { join } from 'path';
 import { and, eq, inArray } from 'drizzle-orm';
-import { Permission, type ReadAloudCapability, type ReadAloudJob, type ReadAloudJobEventsResponse, type ReadAloudJobReport } from '@bookorbit/types';
+import {
+  Permission,
+  type JobActionResponse,
+  type JobList,
+  type ReadAloudCapability,
+  type ReadAloudJob,
+  type ReadAloudJobEventsResponse,
+  type ReadAloudJobReport,
+} from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import { ReadAloudJobRepository } from '../src/modules/read-aloud/read-aloud-job.repository';
@@ -299,6 +307,137 @@ describe('Read-aloud jobs (e2e)', { timeout: 240_000 }, () => {
     const [row] = await ctx.db.select().from(schema.readAloudJobs).where(eq(schema.readAloudJobs.id, jobId));
     return row!;
   }
+
+  describe('the fair line across requesters', () => {
+    let first!: TestUserSession;
+    let second!: TestUserSession;
+    let third!: TestUserSession;
+    const later = () => new Date(Date.now() + 60 * 60_000);
+
+    beforeAll(async () => {
+      [first, second, third] = await Promise.all(
+        [0, 1, 2].map(() => createUserAndLogin(ctx, { permissions: [Permission.LibraryUpload, Permission.LibraryGenerateReadAloud] })),
+      );
+      for (const user of [first, second, third]) await grantLibraryAccess(ctx, user.userId, library.libraryId, 'editor');
+    });
+
+    async function order(ids: string[]): Promise<string[]> {
+      const positions = await ctx.app.get(ReadAloudJobRepository).queuePositions(ids);
+      return ids.filter((id) => positions.has(id)).sort((a, b) => positions.get(a)! - positions.get(b)!);
+    }
+
+    it('takes one job from each requester in turn, longest unserved first, and honours reorders', async () => {
+      // One at a time: each write scans the library, and scans of one library do not overlap.
+      const books: Awaited<ReturnType<typeof writeBook>>[] = [];
+      for (let index = 0; index < 6; index++) books.push(await writeBook());
+      const day = 24 * 60 * 60_000;
+      // The second requester was last served two days ago, the third an hour ago; the first never.
+      await insertJob(books[0]!, {
+        requestedByUserId: second.userId,
+        status: 'completed',
+        startedAt: new Date(Date.now() - 2 * day),
+        completedAt: new Date(),
+      });
+      await insertJob(books[0]!, {
+        requestedByUserId: third.userId,
+        status: 'completed',
+        startedAt: new Date(Date.now() - 60 * 60_000),
+        completedAt: new Date(),
+      });
+      // Not due, so the dispatcher leaves them be while their places are read.
+      const job = async (index: number, user: TestUserSession) =>
+        (await insertJob(books[index]!, { requestedByUserId: user.userId, nextAttemptAt: later() })).id;
+      const a1 = await job(0, first);
+      const b1 = await job(1, second);
+      const c1 = await job(2, third);
+      const a2 = await job(3, first);
+      const b2 = await job(4, second);
+      const c2 = await job(5, third);
+      const ids = [a1, a2, b1, b2, c1, c2];
+      const repository = ctx.app.get(ReadAloudJobRepository);
+      try {
+        expect(await order(ids)).toEqual([a1, b1, c1, a2, b2, c2]);
+        // A retry backoff keeps a job's place, but nothing is claimed until a job is due.
+        expect(await repository.claimNext()).toBeNull();
+
+        const moved = await call<JobActionResponse>(third, 'POST', '/jobs/actions', { action: 'move-to-top', ids: [`read-along:${c2}`] });
+        expect(moved.body.results).toEqual([{ id: `read-along:${c2}`, outcome: 'done', status: 'queued' }]);
+        expect(await order(ids)).toEqual([a1, b1, c2, a2, b2, c1]);
+
+        // Only a manager moves a job ahead of everyone's; the requester is refused.
+        const refused = await call<JobActionResponse>(second, 'POST', '/jobs/actions', { action: 'prioritize', ids: [`read-along:${b2}`] });
+        expect(refused.body.results[0]).toMatchObject({ outcome: 'refused' });
+        const boosted = await ctx.app.inject({
+          method: 'POST',
+          url: '/api/v1/jobs/actions',
+          headers: authHeader(ctx.adminToken),
+          payload: { action: 'prioritize', ids: [`read-along:${b2}`] },
+        });
+        expect(boosted.json<JobActionResponse>().results[0]).toMatchObject({ outcome: 'done', status: 'queued' });
+        expect(await order(ids)).toEqual([b2, a1, b1, c2, a2, c1]);
+
+        const paused = await call<ReadAloudJob>(first, 'POST', `/read-aloud-jobs/${a1}/pause`);
+        expect(paused.body).toMatchObject({ status: 'queued', queuePosition: null, pausedAt: expect.any(String) });
+        expect(await order(ids)).toEqual([b2, a2, b1, c2, c1]);
+        // A paused job is never claimed, but a worker already running it takes it back.
+        expect(await repository.claimQueued(a1)).toBeNull();
+
+        // The book card counts the jobs ahead; the Jobs area numbers places from 1.
+        const page = await ctx.app.inject({
+          method: 'GET',
+          url: '/api/v1/jobs?view=queue&type=read-along&scope=everyone',
+          headers: authHeader(ctx.adminToken),
+        });
+        const items = page.json<JobList>().items.filter((item) => ids.includes(item.id.slice('read-along:'.length)));
+        expect(items.map((item) => item.id.slice('read-along:'.length))).toEqual([b2, a2, b1, c2, c1, a1]);
+        expect(items.at(-1)).toMatchObject({ status: 'paused', position: null, reason: 'user' });
+        const running = (
+          await ctx.db.select({ id: schema.readAloudJobs.id }).from(schema.readAloudJobs).where(eq(schema.readAloudJobs.status, 'processing'))
+        ).length;
+        const card = await call<ReadAloudJob>(first, 'GET', `/read-aloud-jobs/${a2}`);
+        expect(card.body.queuePosition).toBe(items[1]!.position! - 1 + running);
+
+        // Someone else's queue stays out of a requester's own view, and their job is not theirs to touch.
+        const mine = await call<JobList>(second, 'GET', '/jobs?view=queue&type=read-along&scope=mine');
+        expect(
+          mine.body.items
+            .map((item) => item.id.slice('read-along:'.length))
+            .filter((id) => ids.includes(id))
+            .sort(),
+        ).toEqual([b1, b2].sort());
+        const foreign = await call<JobActionResponse>(second, 'POST', '/jobs/actions', { action: 'cancel', ids: [`read-along:${a2}`] });
+        expect(foreign.body.results[0]).toMatchObject({ outcome: 'not-found' });
+
+        const resumed = await call<ReadAloudJob>(first, 'POST', `/read-aloud-jobs/${a1}/resume`);
+        expect(resumed.body).toMatchObject({ status: 'queued', pausedAt: null, queuePosition: expect.any(Number) });
+        expect(await order(ids)).toEqual([b2, a1, b1, c2, a2, c1]);
+
+        await call(first, 'POST', `/read-aloud-jobs/${a1}/pause`);
+        const adopted = await repository.claimQueued(a1, { adopt: true, leaseMs: 60 * 60_000 });
+        expect(adopted).toMatchObject({ status: 'processing', pausedAt: null });
+      } finally {
+        await ctx.db
+          .update(schema.readAloudJobs)
+          .set({ status: 'cancelled', stage: 'queued', leaseUntil: null, completedAt: new Date() })
+          .where(inArray(schema.readAloudJobs.id, ids));
+      }
+    });
+
+    it('refuses to pause a job that already left the queue', async () => {
+      const book = await writeBook();
+      const running = await insertJob(book, { requestedByUserId: first.userId, status: 'processing', stage: 'aligning', leaseUntil: later() });
+      try {
+        expect((await call(first, 'POST', `/read-aloud-jobs/${running.id}/pause`)).status).toBe(409);
+        expect((await call(second, 'POST', `/read-aloud-jobs/${running.id}/pause`)).status).toBe(403);
+        expect(await jobState(running.id)).toMatchObject({ status: 'processing', pausedAt: null });
+      } finally {
+        await ctx.db
+          .update(schema.readAloudJobs)
+          .set({ status: 'cancelled', leaseUntil: null, completedAt: new Date() })
+          .where(eq(schema.readAloudJobs.id, running.id));
+      }
+    });
+  });
 
   it('shows the job that finished last, however recently housekeeping touched an older one', async () => {
     const book = await writeBook();

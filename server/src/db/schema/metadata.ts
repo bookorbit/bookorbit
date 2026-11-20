@@ -19,6 +19,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 
+import { normalizeMetadataTextKeySql } from '../../common/utils/metadata-text-normalize.utils';
+
 const embedding256 = customType<{ data: number[]; driverData: string }>({
   dataType: () => 'vector(256)',
   toDriver: (v) => `[${v.join(',')}]`,
@@ -31,7 +33,7 @@ const embedding256 = customType<{ data: number[]; driverData: string }>({
   },
 });
 
-import type { AudiobookChapter, AudiobookChapterSource, ChapterLookupQueueStatus, ChapterLookupReviewSummary } from '@bookorbit/types';
+import type { AudiobookChapter, AudiobookChapterSource, AuthorGender, ChapterLookupQueueStatus, ChapterLookupReviewSummary } from '@bookorbit/types';
 
 import { users } from './auth';
 import { books } from './books';
@@ -153,6 +155,19 @@ export const bookMetadata = pgTable(
     index('bm_open_library_id_idx')
       .on(t.openLibraryId)
       .where(sql`${t.openLibraryId} is not null`),
+    // Edition ids, matched exactly when a docked file is checked against the books a library holds.
+    index('bm_amazon_id_idx')
+      .on(t.amazonId)
+      .where(sql`${t.amazonId} is not null`),
+    index('bm_audible_id_idx')
+      .on(t.audibleId)
+      .where(sql`${t.audibleId} is not null`),
+    index('bm_google_books_id_idx')
+      .on(t.googleBooksId)
+      .where(sql`${t.googleBooksId} is not null`),
+    index('bm_goodreads_id_idx')
+      .on(t.goodreadsId)
+      .where(sql`${t.goodreadsId} is not null`),
     index('bm_embedding_hnsw_cosine_idx').using('hnsw', sql`${t.embedding} vector_cosine_ops`),
     check('book_metadata_rating_range_chk', sql`${t.rating} is null or (${t.rating} >= 1 and ${t.rating} <= 10)`),
     check(
@@ -223,6 +238,7 @@ export const authors = pgTable(
     name: varchar('name', { length: 500 }).notNull(),
     sortName: varchar('sort_name', { length: 500 }),
     description: text('description'),
+    gender: varchar('gender', { length: 32 }).$type<AuthorGender>(),
     hasPhoto: boolean('has_photo').notNull().default(false),
     birthDate: date('birth_date', { mode: 'string' }),
     birthYear: integer('birth_year'),
@@ -241,6 +257,8 @@ export const authors = pgTable(
     unique('authors_name_unique').on(t.name),
     index('authors_name_trgm_idx').using('gin', t.name.op('gin_trgm_ops')),
     index('authors_name_unaccent_trgm_idx').using('gin', sql`public.bookorbit_unaccent(${t.name}) gin_trgm_ops`),
+    index('authors_name_normalized_key_idx').on(normalizeMetadataTextKeySql(t.name)),
+    check('authors_gender_chk', sql`${t.gender} is null or ${t.gender} in ('female', 'male', 'non_binary')`),
   ],
 );
 

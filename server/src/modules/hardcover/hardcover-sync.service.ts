@@ -339,7 +339,11 @@ export class HardcoverSyncService {
     const book = await this.repo.findBookSyncData(userId, bookId);
     if (!book) return this.bookNotFoundState(bookId);
 
-    const syncOverride = resolveHardcoverBookSyncOverrideForToggle(settings.bookSyncMode, payload.syncEnabled);
+    const syncOverride = resolveHardcoverBookSyncOverrideForToggle(
+      settings.bookSyncMode,
+      payload.syncEnabled,
+      this.isLibraryExcluded(settings, book),
+    );
     const state = await this.repo.setBookSyncOverride(userId, bookId, syncOverride);
 
     if (payload.syncEnabled) {
@@ -945,6 +949,7 @@ export class HardcoverSyncService {
       settings,
       status: book.status,
       syncOverride,
+      libraryExcluded: this.isLibraryExcluded(settings, book),
     });
 
     return {
@@ -964,7 +969,12 @@ export class HardcoverSyncService {
     const syncOverride = normalizeHardcoverBookSyncOverride(state);
     if (syncOverride === 'excluded') return false;
     if (syncOverride === 'included') return true;
+    if (this.isLibraryExcluded(settings, book)) return false;
     return settings.bookSyncMode === 'all_eligible';
+  }
+
+  private isLibraryExcluded(settings: Awaited<ReturnType<HardcoverSettingsService['getSettings']>>, book: BookSyncData): boolean {
+    return settings.excludedLibraryIds.includes(book.libraryId);
   }
 
   private toBookSyncState(
@@ -978,6 +988,7 @@ export class HardcoverSyncService {
       settings,
       status: book.status,
       syncOverride,
+      libraryExcluded: this.isLibraryExcluded(settings, book),
     });
 
     return {

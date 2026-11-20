@@ -119,6 +119,13 @@ describe('generateThumbnail', () => {
     const chain = sharpMock.mock.results[0]?.value as { resize: Mock };
     expect(chain.resize).toHaveBeenCalledWith(400, 600, { fit: 'inside', withoutEnlargement: true });
   });
+
+  it('encodes a mozjpeg JPEG so every client that reads thumbnails directly can still decode it', async () => {
+    await generateThumbnail(JPEG_BYTES);
+    const sharpMock = sharp as unknown as MockedFunction<typeof sharp>;
+    const chain = sharpMock.mock.results.at(-1)?.value as { jpeg: Mock };
+    expect(chain.jpeg).toHaveBeenCalledWith({ quality: 82, mozjpeg: true });
+  });
 });
 
 // ── extractCover (routing) ────────────────────────────────────────────────────

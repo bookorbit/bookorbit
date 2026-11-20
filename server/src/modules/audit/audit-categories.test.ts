@@ -19,6 +19,7 @@ describe('audit categories and views', () => {
     expect(getAuditCategory(AuditAction.RequestIndexerPluginInstall)).toBe('requests');
     expect(getAuditCategory(AuditAction.BookDockFinalize)).toBe('books');
     expect(getAuditCategory(AuditAction.MaintenanceOrphanedCoversClean)).toBe('settings');
+    expect(getAuditCategory(AuditAction.AiJobRebuild)).toBe('books');
   });
 
   it('degrades an action this build has never seen to "other"', () => {

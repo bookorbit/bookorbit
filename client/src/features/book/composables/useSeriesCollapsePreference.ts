@@ -5,10 +5,17 @@ import { useAuth } from '@/features/auth/composables/useAuth'
 import { api } from '@/lib/api'
 
 /**
- * A place whose collapse state is remembered. `authorPages` is a single flag rather than an id,
- * so every author page shares it - see the type in `@bookorbit/types` for why.
+ * A place whose collapse state is remembered. `authorPages` and `taxonomyPages` are single flags
+ * rather than ids, so every author page, and every genre and tag page, shares one - see the type in
+ * `@bookorbit/types` for why.
  */
-export type CollapseScope = { libraryId?: number; collectionId?: number; smartScopeId?: number; authorPages?: boolean }
+export type CollapseScope = {
+  libraryId?: number
+  collectionId?: number
+  smartScopeId?: number
+  authorPages?: boolean
+  taxonomyPages?: boolean
+}
 
 export function useSeriesCollapsePreference() {
   const { user } = useAuth()
@@ -35,6 +42,8 @@ export function useSeriesCollapsePreference() {
       body = { global: value === null ? false : value }
     } else if (ctx.authorPages) {
       body = { authorPages: value === null ? false : value }
+    } else if (ctx.taxonomyPages) {
+      body = { taxonomyPages: value === null ? false : value }
     } else if (ctx.smartScopeId !== undefined) {
       body = { smartScopes: { [String(ctx.smartScopeId)]: value } }
     } else if (ctx.collectionId !== undefined) {
@@ -67,6 +76,7 @@ export function useSeriesCollapsePreference() {
       collections: nextCollections as Record<string, boolean>,
       smartScopes: nextSmartScopes as Record<string, boolean>,
       authorPages: body.authorPages !== undefined ? (body.authorPages as boolean) : (current.authorPages ?? false),
+      taxonomyPages: body.taxonomyPages !== undefined ? (body.taxonomyPages as boolean) : (current.taxonomyPages ?? false),
     }
 
     const previous = user.value?.settings ? { ...user.value.settings } : undefined

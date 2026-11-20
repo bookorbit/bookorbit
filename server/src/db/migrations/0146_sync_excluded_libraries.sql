@@ -1,0 +1,2 @@
+ALTER TABLE "hardcover_user_settings" ADD COLUMN "excluded_library_ids" integer[] DEFAULT '{}'::integer[] NOT NULL;--> statement-breakpoint
+ALTER TABLE "storygraph_user_settings" ADD COLUMN "excluded_library_ids" integer[] DEFAULT '{}'::integer[] NOT NULL;

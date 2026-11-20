@@ -301,7 +301,8 @@ describe('BookMergeExecutor.run', () => {
     expect(coverStore.slotsForAdoption).toHaveBeenCalledTimes(1);
     expect(repository.updateJob).toHaveBeenLastCalledWith(
       40,
-      expect.objectContaining({ status: 'rolled_back', errorCode: 'FILE_CHANGED', moves: [] }),
+      // Stamped by the executor itself, so a crash before the service finishes leaves no ended row without it.
+      expect.objectContaining({ status: 'rolled_back', errorCode: 'FILE_CHANGED', moves: [], finishedAt: expect.any(Date) }),
     );
   });
 

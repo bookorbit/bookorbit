@@ -3,8 +3,9 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { BookHeadphones, ChevronDown, Ellipsis, ExternalLink, EyeOff, FileText, Library, Loader2, Search, TriangleAlert, Users } from '@lucide/vue'
+import { ArrowRight, BookHeadphones, Ellipsis, EyeOff, Library, Loader2, RefreshCw, Search, Trash2, Users } from '@lucide/vue'
 import {
+  DELIVERY_BY_DOWNLOAD_SOURCE,
   isBookRequestFulfiller,
   isBookRequestMediaKind,
   isFulfillableBookRequestStatus,
@@ -12,33 +13,30 @@ import {
   NO_RESOLVED_REQUEST_DESTINATION,
   Permission,
 } from '@bookorbit/types'
-import type { BookCard, BookDockFile, BookRequestItem } from '@bookorbit/types'
+import type { BookRequestItem } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
-import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import { useAuth } from '@/features/auth/composables/useAuth'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from '@/features/library/composables/useLibraries'
-import { formatDateTime } from '@/i18n/formatters'
+import { formatDate, formatList } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import RequestCover from './RequestCover.vue'
 import RequestPairSwitch from './RequestPairSwitch.vue'
 import ReleaseUnitChooser from './ReleaseUnitChooser.vue'
 import RequestReviewPanel from './RequestReviewPanel.vue'
-import RequestDownloadProgress from './RequestDownloadProgress.vue'
+import RequestDrawerSection from './RequestDrawerSection.vue'
 import RequestDrawerToolbar from './RequestDrawerToolbar.vue'
-import RequestPipeline from './RequestPipeline.vue'
 import RequestAttemptsPanel from './RequestAttemptsPanel.vue'
+import RequestFulfilDialog from './RequestFulfilDialog.vue'
 import RequestSeedPanel from './RequestSeedPanel.vue'
-import RequestStatusBadge from './RequestStatusBadge.vue'
+import RequestStatusCard from './RequestStatusCard.vue'
 import { useBookRequestActions, type ActionOutcome } from '../composables/useBookRequests'
 import { useBookRequestDetail } from '../composables/useBookRequestDetail'
 import { useBookRequestProgress } from '../composables/useBookRequestProgress'
 import { useCoalescedRefresh } from '../composables/useCoalescedRefresh'
-import { useFulfilmentPicker, type FulfilmentSource } from '../composables/useFulfilmentPicker'
 import { formatLanguageName } from '@/i18n/formatters'
 import { requestLanguageOptions, useRequestDestinationDefault } from '../composables/useRequestDestinationDefault'
 import { useRequestReview } from '../composables/useRequestReview'
@@ -48,9 +46,9 @@ import { REQUEST_DRAWER } from '../requestDrawerContext'
 import { canCancelRequest, canDeleteRequest, canDismissRequest, canLeaveRequest, cancelStopsATransfer } from '../requestActions'
 import { requestBookCoverSources } from '../requestBookCover'
 import { requestMediaIcon } from '../requestMedia'
-import { requestFailureText } from '../requestOutcome'
 import { localizedRequestActionFailure } from '../requestActionFailure'
-import { currentRequestProgress, requestPresentationStatus } from '../requestPipeline'
+import { currentRequestProgress } from '../requestPipeline'
+import { sourceDotClass } from '../sourceColors'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -83,7 +81,6 @@ const { libraries, fetchLibraries } = useLibraries()
 const { load: loadDefaultDestination, defaultFor: instanceDefaultFor, resolveDestination } = useRequestDestinationDefault()
 const { progressByRequest, onRequestsChanged, pruneSettledProgress } = useBookRequestProgress()
 const actions = useBookRequestActions(canManageFn)
-const picker = useFulfilmentPicker()
 const { review, coverUrl: reviewCoverUrl, fetchReview, reset: resetReview } = useRequestReview(canManageFn)
 
 const decisionNote = ref('')
@@ -122,29 +119,21 @@ const bookCoverSources = computed(() => (request.value ? requestBookCoverSources
 /** Non-empty only while an attempt is held because its release turned out to hold several books. */
 const releaseUnits = computed(() => request.value?.download?.releaseUnits ?? [])
 const isHeld = computed(() => request.value?.status === 'needs_review')
-/**
- * The panel restates the hold in full only when it has a score to show. With no score, or with
- * the dock entry gone, the server's own sentence is the only record of why this stopped, so it
- * stays. It also stays for every ordinary failure, which has no panel at all.
- */
-const failureText = computed(() => (request.value ? requestFailureText(request.value, (key, named) => t(key, named)) : null))
-const showFailureReason = computed(
-  () => failureText.value != null && !(isHeld.value && (review.value?.verification != null || review.value?.heldOnRequest === true)),
-)
-/** Only a request that stopped badly earns the destructive treatment; a hand-back is information. */
-const failureIsAlarming = computed(() => request.value?.status === 'failed' || request.value?.status === 'needs_review')
-/** Whoever is going to say it, the transfer line is not the one that should say it twice. */
-const showDownloadError = computed(() => !showFailureReason.value && !(isHeld.value && review.value !== null))
 const liveProgress = computed(() => {
   if (!request.value) return null
   return currentRequestProgress(request.value, progressByRequest.value[request.value.id])
 })
-const presentationStatus = computed(() => (request.value ? requestPresentationStatus(request.value, liveProgress.value) : null))
+/** A transfer the client is still running, which is the one thing the footer can stop. */
+const transferActive = computed(() => {
+  const status = liveProgress.value?.status ?? request.value?.download?.status
+  return status === 'queued' || status === 'downloading'
+})
 
 const isPending = computed(() => request.value?.status === 'pending')
 const canDecide = computed(() => canManage.value && isPending.value)
 const canGrab = computed(() => canFulfilThis.value && request.value != null && isGrabbableBookRequestStatus(request.value.status))
-const showTransferRetry = computed(() => canGrab.value && request.value?.download?.status === 'failed')
+/** Grabbing again after a failure is a retry, and is named as one. */
+const isRetry = computed(() => request.value?.status === 'failed' || request.value?.download?.status === 'failed')
 const canFulfill = computed(() => canManage.value && request.value != null && isFulfillableBookRequestStatus(request.value.status))
 const canCancel = computed(() =>
   request.value ? canCancelRequest(request.value, user.value?.id ?? null, canManage.value, hasPermission(Permission.BookRequestSelfFulfill)) : false,
@@ -152,7 +141,10 @@ const canCancel = computed(() =>
 const canDismiss = computed(() => (request.value ? canDismissRequest(request.value) : false))
 const canDelete = computed(() => (request.value ? canDeleteRequest(request.value, canManage.value) : false))
 const canLeave = computed(() => (request.value ? canLeaveRequest(request.value, user.value?.id ?? null) : false))
-const hasMenuActions = computed(() => canDismiss.value || canLeave.value || canCancel.value || canDelete.value)
+const canCancelDownload = computed(() => canCancel.value && transferActive.value && request.value?.download != null)
+const hasMenuActions = computed(() => canFulfill.value || canDismiss.value || canLeave.value || canCancel.value || canDelete.value)
+/** The quiet items above the rule and the destructive ones below it; the rule needs both. */
+const menuNeedsRule = computed(() => (canFulfill.value || canDismiss.value || canLeave.value) && (canCancel.value || canDelete.value))
 const canApproveNow = computed(() => canDecide.value && !busy.value && targetLibraryId.value !== null)
 /** Both halves waiting on the same decision, which is the moment one press should cover both. */
 const canApproveBoth = computed(() => canApproveNow.value && companion.value?.status === 'pending' && !actions.isPending(companion.value.id))
@@ -163,24 +155,137 @@ const approveLabel = computed(() => {
 })
 /** A book on the shelf this request's files will join, said until they have. */
 const joinsBookId = computed(() => (request.value && request.value.status !== 'available' ? request.value.targetBookId : null))
-const showFooter = computed(() => canDecide.value || (canGrab.value && !showTransferRetry.value))
+/**
+ * "File it anyway" is an override, which is the wrong word for an import that passed and is only
+ * waiting because whoever sent it asked to look first.
+ */
+const fileIsOverride = computed(() => !review.value?.heldOnRequest || review.value?.verification?.passed === false)
+const goToBookId = computed(() => (request.value?.status === 'available' ? request.value.matchedBookId : null))
+
+type FooterStage = 'decide' | 'transfer' | 'grab' | 'review' | 'reviewGone' | 'done'
+
+/** The one action the stage this request is at asks for, which always lives in the footer. */
+const footerStage = computed<FooterStage | null>(() => {
+  if (!request.value) return null
+  if (canDecide.value) return 'decide'
+  if (canCancelDownload.value) return 'transfer'
+  if (canGrab.value) return 'grab'
+  if (isHeld.value && canFulfilThis.value && review.value) {
+    if (review.value.bookDockFileId !== null) return 'review'
+    return canFulfill.value ? 'reviewGone' : null
+  }
+  if (goToBookId.value !== null) return 'done'
+  return null
+})
+
+/** Letters the keydown handler matches, shown as they are pressed rather than translated. */
+const SHORTCUT_KEYS = { next: 'J', previous: 'K', approve: 'A' } as const
+const KBD_CLASS =
+  'inline-grid h-[18px] min-w-[18px] place-items-center rounded-[4px] border border-b-2 border-border bg-card px-1 font-mono text-[11px] leading-none font-medium text-foreground'
+
+/** Whether the client still seeds the finished download, which the card's sentence mentions. */
+const seeding = ref<boolean | null>(null)
+const fulfilOpen = ref(false)
+
+interface RequestFact {
+  key: string
+  label: string
+  value: string
+  when?: { iso: string; text: string }
+  numeric?: boolean
+}
+
+/** A date from this year leaves the year off; an older one says which year. */
+function factTime(iso: string | null): RequestFact['when'] {
+  if (!iso) return undefined
+  const date = new Date(iso)
+  const year = date.getFullYear() === new Date().getFullYear() ? undefined : 'numeric'
+  return { iso, text: formatDate(date, { year, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) }
+}
+
+const facts = computed<RequestFact[]>(() => {
+  const row = request.value
+  if (!row) return []
+  const rows: RequestFact[] = [
+    { key: 'requester', label: t('bookRequests.detail.requestedBy'), value: row.requesterName, when: factTime(row.createdAt) },
+  ]
+  const decider = row.decidedByName ?? row.decidedByUsername
+  if (decider) rows.push({ key: 'decider', label: t('bookRequests.detail.decidedBy'), value: decider, when: factTime(row.decidedAt) })
+  rows.push({
+    key: 'language',
+    label: t('bookRequests.detail.language'),
+    value: row.language ? formatLanguageName(row.language) : t('bookRequests.detail.languageAny'),
+  })
+  if (row.seriesName) rows.push({ key: 'series', label: t('bookRequests.detail.series'), value: row.seriesName })
+  const isbn = row.isbn13 ?? row.isbn10
+  if (isbn) rows.push({ key: 'isbn', label: t('bookRequests.detail.isbn'), value: isbn, numeric: true })
+  if (row.subscribers.length) {
+    rows.push({
+      key: 'subscribers',
+      label: t('bookRequests.detail.alsoWanted'),
+      value: formatList(row.subscribers.map((subscriber) => subscriber.name)),
+    })
+  }
+  return rows
+})
+
+/** Notes are quoted under the facts, each credited to whoever wrote it. */
+const quotes = computed(() => {
+  const row = request.value
+  if (!row) return []
+  const out: { key: string; text: string; caption: string }[] = []
+  if (row.note) out.push({ key: 'requester', text: row.note, caption: t('bookRequests.detail.noteFrom', { name: row.requesterName }) })
+  if (row.decisionNote) {
+    const decider = row.decidedByName ?? row.decidedByUsername
+    out.push({
+      key: 'decision',
+      text: row.decisionNote,
+      caption: decider ? t('bookRequests.detail.noteFrom', { name: decider }) : t('bookRequests.detail.decisionNote'),
+    })
+  }
+  return out
+})
+
+/** Where the release came from, over what, into which client, how big, and who chose it. */
+const releaseMeta = computed(() => {
+  const download = request.value?.download
+  if (!download) return []
+  const delivery = DELIVERY_BY_DOWNLOAD_SOURCE[download.source]
+  const parts: { text: string; numeric?: boolean }[] = [
+    { text: download.indexerName ?? t('bookRequests.download.source.pasted') },
+    { text: t(`bookRequests.releases.protocol.${delivery === 'file' ? 'direct' : delivery}`) },
+  ]
+  if (download.downloadClientName) parts.push({ text: download.downloadClientName })
+  if (download.releaseSizeBytes !== null) parts.push({ text: formatBytes(download.releaseSizeBytes), numeric: true })
+  parts.push({ text: t(download.automated ? 'bookRequests.download.source.automatic' : 'bookRequests.download.source.manual') })
+  return parts
+})
 
 const confirming = ref<'cancel' | 'cancelDownload' | 'delete' | 'leave' | 'discardImport' | null>(null)
 
+/**
+ * Each dialog names both of its answers, so "Cancel" never stands beside "Cancel request" meaning
+ * the opposite thing. The counted keys are shared with the list's bulk dialogs, at a count of one.
+ */
 const CONFIRM_COPY = {
-  delete: { title: 'bookRequests.confirm.deleteTitle', label: 'bookRequests.actions.delete' },
-  leave: { title: 'bookRequests.confirm.leaveTitle', label: 'bookRequests.actions.leave' },
-  discardImport: { title: 'bookRequests.confirm.discardImportTitle', label: 'bookRequests.review.discard' },
-  cancelDownload: { title: 'bookRequests.confirm.cancelDownloadTitle', label: 'bookRequests.actions.cancelDownload' },
-  cancel: { title: 'bookRequests.confirm.cancelTitle', label: 'bookRequests.actions.cancel' },
+  delete: { title: 'bookRequests.confirm.deleteTitle', label: 'bookRequests.confirm.deleteConfirm', keep: 'bookRequests.confirm.keep' },
+  leave: { title: 'bookRequests.confirm.leaveTitle', label: 'bookRequests.confirm.leaveConfirm', keep: 'bookRequests.confirm.stay' },
+  discardImport: { title: 'bookRequests.confirm.discardImportTitle', label: 'bookRequests.review.discard', keep: 'bookRequests.confirm.goBack' },
+  cancelDownload: {
+    title: 'bookRequests.confirm.cancelDownloadTitle',
+    label: 'bookRequests.actions.cancelDownload',
+    keep: 'bookRequests.confirm.goBack',
+  },
+  cancel: { title: 'bookRequests.confirm.cancelTitle', label: 'bookRequests.confirm.stopConfirm', keep: 'bookRequests.confirm.keep' },
 } as const
 
 const confirmTitle = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].title))
+const confirmKeepLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].keep, { count: 1 }))
 
 const confirmDescription = computed(() => {
   const alwaysDeletesRemote = request.value?.download?.alwaysDeletesRemote ?? false
   if (confirming.value === 'delete') {
-    return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteDescriptionRemoteDelete' : 'bookRequests.confirm.deleteDescription')
+    return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteHideDescriptionRemoteDelete' : 'bookRequests.confirm.deleteHideDescription')
   }
   if (confirming.value === 'leave') return t('bookRequests.confirm.leaveDescription')
   if (confirming.value === 'discardImport') return t('bookRequests.confirm.discardImportDescription')
@@ -195,14 +300,10 @@ const confirmDescription = computed(() => {
   return t('bookRequests.confirm.cancelDescription')
 })
 
-const confirmLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].label))
+const confirmLabel = computed(() => t(CONFIRM_COPY[confirming.value ?? 'cancel'].label, { count: 1 }))
 
 const selectedLibrary = computed(() => libraries.value.find((library) => library.id === targetLibraryId.value) ?? null)
 const folders = computed(() => selectedLibrary.value?.folders ?? [])
-const grabLabel = computed(() => (request.value?.status === 'failed' ? 'bookRequests.actions.retryRelease' : 'bookRequests.actions.grab'))
-
-const pickerResults = computed(() => (picker.source.value === 'book' ? picker.books.value : picker.dockFiles.value))
-const hasSearched = computed(() => picker.query.value.trim() !== '')
 
 onMounted(async () => {
   await fetchRequest(requestId.value)
@@ -284,7 +385,8 @@ watch(request, (row) => {
 // Stepping to the next request keeps this component mounted and only swaps the id under it.
 watch(requestId, async (id) => {
   if (!Number.isInteger(id)) return
-  picker.reset()
+  fulfilOpen.value = false
+  seeding.value = null
   decisionNote.value = ''
   resetReview()
 
@@ -580,14 +682,25 @@ async function handleRestore() {
   if (applyUpdate(outcome, 'bookRequests.errors.restoreFailed')) toast.success(t('bookRequests.toasts.restored'))
 }
 
-async function handleFulfill() {
-  const payload = picker.toPayload()
-  if (!request.value || !payload) return
+function openFulfil() {
+  fulfilOpen.value = true
+}
+
+function handleFulfilCancel() {
+  fulfilOpen.value = false
+}
+
+async function handleFulfill(payload: { matchedBookId?: number; bookDockFileId?: number }) {
+  if (!request.value) return
   const outcome = await actions.fulfill(request.value.id, payload)
   if (applyUpdate(outcome, 'bookRequests.errors.fulfilFailed')) {
-    picker.reset()
+    fulfilOpen.value = false
     toast.success(t('bookRequests.toasts.fulfilled'))
   }
+}
+
+function handleSeeding(value: boolean | null) {
+  seeding.value = value
 }
 
 async function handleRemoveDownload(payload: { request: BookRequestItem; downloadId: number; deleteFiles: boolean }) {
@@ -613,38 +726,14 @@ async function handleFileAnyway() {
   resetReview()
   toast.success(t('bookRequests.review.filed'))
 }
-
-function handlePickerQuery(event: Event) {
-  picker.search((event.target as HTMLInputElement).value)
-}
-
-function selectBookSource() {
-  picker.setSource('book' satisfies FulfilmentSource)
-}
-
-function selectDockSource() {
-  picker.setSource('dockFile' satisfies FulfilmentSource)
-}
-
-function selectBook(book: BookCard) {
-  picker.select({ source: 'book', id: book.id })
-}
-
-function selectDockFile(file: BookDockFile) {
-  picker.select({ source: 'dockFile', id: file.id })
-}
-
-function dockFileMeta(file: BookDockFile): string {
-  return [file.format?.toUpperCase(), file.fileSize === null ? null : formatBytes(file.fileSize)].filter(Boolean).join(' · ')
-}
 </script>
 
 <template>
   <!--
     A container query, not a viewport one: this panel is 600px inside a 1920px window, and every
-    `sm:` or `xl:` in it would otherwise size itself against the screen it cannot see.
+    breakpoint in it would otherwise size itself against the screen it cannot see.
   -->
-  <div class="@container flex h-full min-h-0 flex-col" @keydown="handleKeydown">
+  <div class="@container relative flex h-full min-h-0 flex-col text-sm leading-[1.45] text-foreground" @keydown="handleKeydown">
     <RequestDrawerToolbar stepper>
       <template #actions>
         <DropdownMenu v-if="hasMenuActions">
@@ -653,18 +742,23 @@ function dockFileMeta(file: BookDockFile): string {
               <Ellipsis :size="16" aria-hidden="true" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
+          <DropdownMenuContent align="end" class="min-w-[220px]">
+            <!-- Closing it by hand is the escape hatch, so it is offered here and not in the body. -->
+            <DropdownMenuItem v-if="canFulfill" :disabled="busy" @click="openFulfil">
+              {{ t('bookRequests.actions.closeRequest') }}
+            </DropdownMenuItem>
             <DropdownMenuItem v-if="canDismiss && !request?.dismissed" :disabled="busy" @click="handleDismiss">
-              {{ t('bookRequests.actions.dismiss') }}
+              {{ t('bookRequests.actions.hide') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="canDismiss && request?.dismissed" :disabled="busy" @click="handleRestore">
-              {{ t('bookRequests.actions.restore') }}
+              {{ t('bookRequests.actions.unhide') }}
             </DropdownMenuItem>
             <!-- Only for somebody who joined this rather than made it: the way back out of the
                  attach that folds a second request for the same book into the first. -->
             <DropdownMenuItem v-if="canLeave" :disabled="busy" @click="handleLeave">
               {{ t('bookRequests.actions.leave') }}
             </DropdownMenuItem>
+            <DropdownMenuSeparator v-if="menuNeedsRule" />
             <DropdownMenuItem v-if="canCancel" variant="destructive" :disabled="busy" @click="handleCancel">
               {{ t('bookRequests.actions.cancel') }}
             </DropdownMenuItem>
@@ -676,9 +770,9 @@ function dockFileMeta(file: BookDockFile): string {
       </template>
     </RequestDrawerToolbar>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6 @min-[30rem]:px-5 @min-[30rem]:pt-5 @min-[30rem]:pb-7">
       <div v-if="loading" role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+        <Loader2 class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         {{ t('bookRequests.detail.loading') }}
       </div>
 
@@ -697,371 +791,168 @@ function dockFileMeta(file: BookDockFile): string {
             :src="request.coverUrl"
             :fallback-sources="bookCoverSources"
             :media-kind="request.mediaKind"
-            class="h-[105px] w-[70px] shadow-sm"
-            :icon-size="24"
+            class="h-24 w-16 rounded-sm! shadow-[0_6px_16px_oklch(0_0_0/0.22)]"
+            :icon-size="22"
           />
 
-          <div class="min-w-0 flex-1 space-y-1.5">
-            <h2 class="text-lg leading-snug font-semibold tracking-tight text-foreground">{{ request.title }}</h2>
-            <p class="text-sm text-muted-foreground">{{ authorLine || t('bookRequests.detail.unknownAuthor') }}</p>
+          <div class="min-w-0 flex-1 pt-0.5">
+            <h2 class="text-[19px] leading-[1.25] font-[650] tracking-[-0.01em] text-balance text-foreground">{{ request.title }}</h2>
+            <p class="mt-1 text-sm text-muted-foreground">{{ authorLine || t('bookRequests.detail.unknownAuthor') }}</p>
 
-            <div class="flex flex-wrap items-center gap-1.5 pt-1">
-              <RequestStatusBadge :status="presentationStatus ?? request.status" />
-              <span class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground">
-                <component :is="mediaIcon" :size="12" aria-hidden="true" />
+            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <component :is="mediaIcon" :size="13" class="flex-none" aria-hidden="true" />
                 {{ t(`bookRequests.mediaKind.${request.mediaKind}`) }}
               </span>
-              <span
-                v-if="request.targetLibraryName"
-                class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
-              >
-                <Library :size="12" aria-hidden="true" />
+              <span v-if="request.targetLibraryName" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Library :size="13" class="flex-none" aria-hidden="true" />
                 {{ request.targetLibraryName }}
               </span>
               <!-- Where the files go matters more than which library, once there is a book to join. -->
               <RouterLink
                 v-if="joinsBookId !== null"
                 :to="{ name: 'book-detail', params: { bookId: joinsBookId } }"
-                class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-foreground transition-colors hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
+                class="inline-flex items-center gap-1.5 rounded-sm text-xs text-foreground hover:underline hover:underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 :title="t('bookRequests.detail.joinsBookHint')"
               >
-                <BookHeadphones :size="12" aria-hidden="true" />
+                <BookHeadphones :size="13" class="flex-none" aria-hidden="true" />
                 {{ t('bookRequests.detail.joinsBook') }}
               </RouterLink>
-              <Button
-                v-if="request.status === 'available' && request.matchedBookId !== null"
-                as-child
-                variant="outline"
-                size="sm"
-                class="h-6 rounded-full px-2 text-xs shadow-none"
-              >
-                <RouterLink :to="{ name: 'book-detail', params: { bookId: request.matchedBookId } }">
-                  <ExternalLink class="size-3" aria-hidden="true" />
-                  {{ t('bookRequests.actions.goToBook') }}
-                </RouterLink>
-              </Button>
-              <span
-                v-if="request.subscribers.length"
-                class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
-              >
-                <Users :size="12" aria-hidden="true" />
+              <span v-if="request.subscribers.length" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Users :size="13" class="flex-none" aria-hidden="true" />
                 {{ t('bookRequests.card.alsoWantedCount', { count: request.subscribers.length }) }}
               </span>
-              <span
-                v-if="request.dismissed"
-                class="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5 text-xs text-muted-foreground"
-              >
-                <EyeOff :size="12" aria-hidden="true" />
+              <span v-if="request.dismissed" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <EyeOff :size="13" class="flex-none" aria-hidden="true" />
                 {{ t('bookRequests.card.dismissedBadge') }}
               </span>
             </div>
           </div>
         </header>
 
-        <div class="mt-5 space-y-4">
-          <section class="rounded-lg border border-border bg-card p-4" :aria-label="t('bookRequests.pipeline.label')">
-            <h3 class="mb-3.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{{ t('bookRequests.pipeline.label') }}</h3>
-            <RequestPipeline :request="request" :live="liveProgress" />
-          </section>
+        <RequestStatusCard :request="request" :live="liveProgress" :review="review" :can-decide="canDecide" :seeding="seeding" />
 
-          <section v-if="request.download" class="rounded-lg border border-border bg-card p-4" :aria-label="t('bookRequests.detail.transfer')">
-            <h3 class="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{{ t('bookRequests.detail.transfer') }}</h3>
-            <RequestDownloadProgress
-              :download="request.download"
-              :live="liveProgress"
-              :show-error="showDownloadError"
-              :can-retry="showTransferRetry"
-              :can-cancel="canCancel"
-              @retry="goToReleases"
-              @cancel="handleCancelDownload"
-            />
-          </section>
+        <!-- First, because it is the decision the hold is waiting on. -->
+        <ReleaseUnitChooser v-if="canFulfilThis && releaseUnits.length" :units="releaseUnits" :busy="busy" @choose="handleChooseReleaseUnit" />
 
-          <!--
-            Under the current transfer, because that is the question it answers: what was tried
-            before this, and what did those sources say. Approvers only: it names indexers.
-          -->
-          <RequestAttemptsPanel v-if="canFulfilThis" :request="request" :can-manage="canManage" />
+        <!-- The decision inputs live here; the buttons that consume them sit in the footer. -->
+        <RequestDrawerSection v-if="canDecide" :title="t('bookRequests.detail.decideTitle')">
+          <div class="grid grid-cols-1 gap-3 @min-[30rem]:grid-cols-2">
+            <div class="grid min-w-0 gap-1.5">
+              <label for="request-target-library" class="text-xs font-medium text-foreground">
+                {{ t('bookRequests.detail.destinationLibraryLabel') }}
+              </label>
+              <select
+                id="request-target-library"
+                :value="targetLibraryId ?? ''"
+                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                @change="handleLibraryChange"
+              >
+                <!-- Names the instance default, so an approver can see where a request that
+                     chose nowhere would land rather than guessing from an empty select. -->
+                <option value="">{{ unpickedDestinationLabel }}</option>
+                <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+              </select>
+            </div>
 
-          <!-- Sits above the failure reason: the reason says a choice is needed, and this is it. -->
-          <ReleaseUnitChooser v-if="canFulfilThis && releaseUnits.length" :units="releaseUnits" :busy="busy" @choose="handleChooseReleaseUnit" />
+            <div class="grid min-w-0 gap-1.5">
+              <label for="request-language" class="text-xs font-medium text-foreground">{{ t('bookRequests.detail.languageLabel') }}</label>
+              <select
+                id="request-language"
+                :value="request?.language ?? ''"
+                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                @change="handleLanguageChange"
+              >
+                <option value="">{{ t('bookRequests.detail.languageAny') }}</option>
+                <option v-for="option in languageOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
+              </select>
+            </div>
 
-          <RequestReviewPanel
-            v-if="isHeld && review"
-            :review="review"
-            :cover-url="reviewCoverUrl"
-            :can-manage="canFulfilThis"
-            :busy="busy"
-            @file="handleFileAnyway"
-            @discard="handleDiscardImport"
-          />
+            <div v-if="folders.length > 1" class="grid min-w-0 gap-1.5 @min-[30rem]:col-span-2">
+              <label for="request-target-folder" class="text-xs font-medium text-foreground">
+                {{ t('bookRequests.detail.destinationFolderLabel') }}
+              </label>
+              <select
+                id="request-target-folder"
+                :value="targetFolderId ?? ''"
+                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                @change="handleFolderChange"
+              >
+                <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
+              </select>
+            </div>
 
-          <!--
-            Alarm styling and `role="alert"` are for a request that actually failed. Automation also
-            hands a request back at `approved` with a reason on it, and shouting an interruption at
-            somebody about a request that is simply waiting for them is the wrong register.
-          -->
-          <p
-            v-if="showFailureReason"
-            :role="failureIsAlarming ? 'alert' : 'status'"
-            class="flex items-start gap-2 rounded-lg border p-3"
-            :class="failureIsAlarming ? 'border-destructive/40 bg-destructive/8' : 'border-border bg-muted'"
-          >
-            <TriangleAlert
-              :size="15"
-              class="mt-0.5 shrink-0"
-              :class="failureIsAlarming ? 'text-destructive' : 'text-muted-foreground'"
-              aria-hidden="true"
-            />
-            <span class="text-sm" :class="failureIsAlarming ? 'text-destructive' : 'text-foreground'">{{ failureText }}</span>
+            <div class="grid min-w-0 gap-1.5 @min-[30rem]:col-span-2">
+              <label for="request-decision-note" class="text-xs font-medium text-foreground">{{ t('bookRequests.detail.decisionNoteLabel') }}</label>
+              <input
+                id="request-decision-note"
+                v-model="decisionNote"
+                type="text"
+                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                :placeholder="t('bookRequests.detail.decisionNotePlaceholder')"
+              />
+            </div>
+          </div>
+
+          <p v-if="targetLibraryId === null" class="mt-2.5 text-[13px] text-muted-foreground">{{ t('bookRequests.detail.destinationRequired') }}</p>
+        </RequestDrawerSection>
+
+        <RequestReviewPanel v-if="isHeld && review" :review="review" :cover-url="reviewCoverUrl" :can-manage="canFulfilThis" />
+
+        <RequestDrawerSection v-if="request.download" :title="t('bookRequests.detail.releaseSection')">
+          <p class="text-sm font-medium [overflow-wrap:anywhere] text-foreground">{{ request.download.releaseTitle }}</p>
+          <p class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+            <span class="size-2 flex-none rounded-full" :class="sourceDotClass(request.download.indexerColor)" aria-hidden="true" />
+            <template v-for="(part, index) in releaseMeta" :key="index">
+              <span v-if="index > 0" aria-hidden="true">·</span>
+              <span :class="part.numeric ? 'tabular-nums' : undefined">{{ part.text }}</span>
+            </template>
           </p>
 
-          <!-- The decision inputs live here; the buttons that consume them sit in the footer. -->
-          <section v-if="canDecide" class="space-y-3 rounded-lg border border-border bg-card p-4">
-            <h3 class="text-sm font-semibold text-foreground">{{ t('bookRequests.detail.decideTitle') }}</h3>
+          <RequestSeedPanel
+            v-if="canFulfilThis"
+            :request="request"
+            :busy="busy"
+            :can-manage="canManage"
+            @remove="handleRemoveDownload"
+            @seeding="handleSeeding"
+          />
 
-            <div class="grid gap-3 @xl:grid-cols-2">
-              <div>
-                <label for="request-target-library" class="mb-1 block text-sm font-medium text-foreground">
-                  {{ t('bookRequests.detail.destinationLibraryLabel') }}
-                </label>
-                <select
-                  id="request-target-library"
-                  :value="targetLibraryId ?? ''"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                  @change="handleLibraryChange"
-                >
-                  <!-- Names the instance default, so an approver can see where a request that
-                       chose nowhere would land rather than guessing from an empty select. -->
-                  <option value="">{{ unpickedDestinationLabel }}</option>
-                  <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-                </select>
-              </div>
+          <!-- What was tried before this, and what those sources said. Approvers only: it names indexers. -->
+          <RequestAttemptsPanel v-if="canFulfilThis" :request="request" :can-manage="canManage" />
+        </RequestDrawerSection>
 
-              <div>
-                <label for="request-language" class="mb-1 block text-sm font-medium text-foreground">
-                  {{ t('bookRequests.detail.languageLabel') }}
-                </label>
-                <select
-                  id="request-language"
-                  :value="request?.language ?? ''"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                  @change="handleLanguageChange"
-                >
-                  <option value="">{{ t('bookRequests.detail.languageAny') }}</option>
-                  <option v-for="option in languageOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
-                </select>
-              </div>
-
-              <div v-if="folders.length > 1">
-                <label for="request-target-folder" class="mb-1 block text-sm font-medium text-foreground">
-                  {{ t('bookRequests.detail.destinationFolderLabel') }}
-                </label>
-                <select
-                  id="request-target-folder"
-                  :value="targetFolderId ?? ''"
-                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                  @change="handleFolderChange"
-                >
-                  <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
-                </select>
-              </div>
+        <RequestDrawerSection :title="t('bookRequests.detail.requestSection')">
+          <dl class="grid grid-cols-2 gap-x-6 gap-y-3.5 @min-[35rem]:grid-cols-3">
+            <div v-for="fact in facts" :key="fact.key" class="min-w-0">
+              <dt class="text-xs text-muted-foreground">{{ fact.label }}</dt>
+              <dd class="mt-0.5 text-sm [overflow-wrap:anywhere] text-foreground" :class="fact.numeric ? 'tabular-nums' : undefined">
+                {{ fact.value }}
+                <time v-if="fact.when" class="mt-px block text-xs text-muted-foreground tabular-nums" :datetime="fact.when.iso">{{
+                  fact.when.text
+                }}</time>
+              </dd>
             </div>
+          </dl>
 
-            <div>
-              <label for="request-decision-note" class="mb-1 block text-sm font-medium text-foreground">
-                {{ t('bookRequests.detail.decisionNoteLabel') }}
-              </label>
-              <Input id="request-decision-note" v-model="decisionNote" :placeholder="t('bookRequests.detail.decisionNotePlaceholder')" />
-            </div>
-
-            <p v-if="targetLibraryId === null" class="text-sm text-muted-foreground">{{ t('bookRequests.detail.destinationRequired') }}</p>
-          </section>
-
-          <!--
-            Was two number inputs asking for a database id. Now it searches the thing being named,
-            and the id never reaches the screen.
-
-            Shut by default, and keyed on the request so it shuts again when the drawer steps on:
-            closing a request by hand is the escape hatch, not the reason anyone opened this.
-          -->
-          <details v-if="canFulfill" :key="requestId" class="group rounded-lg border border-border bg-card">
-            <summary
-              class="flex cursor-pointer list-none items-center gap-2 rounded-lg p-4 text-sm font-semibold text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none [&::-webkit-details-marker]:hidden"
-            >
-              {{ t('bookRequests.detail.fulfilTitle') }}
-              <ChevronDown
-                :size="15"
-                class="ms-auto shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
-                aria-hidden="true"
-              />
-            </summary>
-
-            <div class="space-y-3 px-4 pb-4">
-              <p class="text-sm text-muted-foreground">{{ t('bookRequests.detail.fulfilHint') }}</p>
-
-              <div
-                class="inline-flex gap-0.5 rounded-lg border border-border bg-muted p-0.5"
-                role="group"
-                :aria-label="t('bookRequests.detail.fulfilSourceLabel')"
-              >
-                <button
-                  type="button"
-                  class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-                  :class="picker.source.value === 'book' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-                  :aria-pressed="picker.source.value === 'book'"
-                  @click="selectBookSource"
-                >
-                  {{ t('bookRequests.detail.fulfilFromLibrary') }}
-                </button>
-                <button
-                  type="button"
-                  class="rounded-md px-3 py-1.5 text-sm font-medium transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-                  :class="
-                    picker.source.value === 'dockFile' ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'
-                  "
-                  :aria-pressed="picker.source.value === 'dockFile'"
-                  @click="selectDockSource"
-                >
-                  {{ t('bookRequests.detail.fulfilFromDock') }}
-                </button>
-              </div>
-
-              <div class="relative">
-                <Search :size="15" class="absolute start-3 top-1/2 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
-                <label for="fulfil-search" class="sr-only">{{ t('bookRequests.detail.fulfilSearchLabel') }}</label>
-                <input
-                  id="fulfil-search"
-                  type="search"
-                  :value="picker.query.value"
-                  class="h-9 w-full rounded-md border border-input bg-background ps-9 pe-3 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                  :placeholder="
-                    picker.source.value === 'book' ? t('bookRequests.detail.fulfilSearchBooks') : t('bookRequests.detail.fulfilSearchDock')
-                  "
-                  @input="handlePickerQuery"
-                />
-              </div>
-
-              <p v-if="picker.searching.value" role="status" class="text-sm text-muted-foreground">{{ t('bookRequests.detail.fulfilSearching') }}</p>
-
-              <p v-else-if="hasSearched && pickerResults.length === 0" role="status" class="text-sm text-muted-foreground">
-                {{ t('bookRequests.detail.fulfilNoResults') }}
-              </p>
-
-              <ul v-else-if="picker.source.value === 'book' && picker.books.value.length" class="grid gap-2 @xl:grid-cols-2">
-                <li v-for="book in picker.books.value" :key="book.id">
-                  <button
-                    type="button"
-                    class="flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-start transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-                    :class="
-                      picker.isSelected({ source: 'book', id: book.id })
-                        ? 'border-primary bg-primary/8'
-                        : 'border-border bg-card hover:border-ring/50'
-                    "
-                    :aria-pressed="picker.isSelected({ source: 'book', id: book.id })"
-                    @click="selectBook(book)"
-                  >
-                    <BookCoverImage
-                      :book-id="book.id"
-                      type="thumbnail"
-                      :version="book.updatedAt"
-                      class="h-[42px] w-7 shrink-0 rounded-xs bg-muted object-cover"
-                      :alt="''"
-                    />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm font-medium text-foreground">{{ book.title }}</span>
-                      <span class="block truncate text-xs text-muted-foreground">{{ book.authors.join(', ') }}</span>
-                    </span>
-                  </button>
-                </li>
-              </ul>
-
-              <ul v-else-if="picker.source.value === 'dockFile' && picker.dockFiles.value.length" class="grid gap-2 @xl:grid-cols-2">
-                <li v-for="file in picker.dockFiles.value" :key="file.id">
-                  <button
-                    type="button"
-                    class="flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-start transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-                    :class="
-                      picker.isSelected({ source: 'dockFile', id: file.id })
-                        ? 'border-primary bg-primary/8'
-                        : 'border-border bg-card hover:border-ring/50'
-                    "
-                    :aria-pressed="picker.isSelected({ source: 'dockFile', id: file.id })"
-                    @click="selectDockFile(file)"
-                  >
-                    <FileText :size="16" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-                    <span class="min-w-0 flex-1">
-                      <span class="block truncate text-sm font-medium text-foreground">{{ file.fileName }}</span>
-                      <span class="block truncate text-xs text-muted-foreground">{{ dockFileMeta(file) }}</span>
-                    </span>
-                  </button>
-                </li>
-              </ul>
-
-              <Button :disabled="busy || picker.selected.value === null" @click="handleFulfill">
-                {{ t('bookRequests.actions.markFulfilled') }}
-              </Button>
-            </div>
-          </details>
-
-          <RequestSeedPanel v-if="canFulfilThis" :request="request" :busy="busy" :can-manage="canManage" @remove="handleRemoveDownload" />
-
-          <section class="rounded-lg border border-border bg-card p-4">
-            <h3 class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{{ t('bookRequests.detail.requestSection') }}</h3>
-            <dl class="space-y-2.5">
-              <div class="flex items-baseline justify-between gap-4">
-                <dt class="text-sm text-muted-foreground">{{ t('bookRequests.detail.requestedBy') }}</dt>
-                <dd class="text-end text-sm text-foreground">{{ request.requesterName }}</dd>
-              </div>
-              <div class="flex items-baseline justify-between gap-4">
-                <dt class="text-sm text-muted-foreground">{{ t('bookRequests.detail.requestedOn') }}</dt>
-                <dd class="text-end text-sm text-foreground tabular-nums">{{ formatDateTime(new Date(request.createdAt)) }}</dd>
-              </div>
-              <div v-if="request.decidedByUsername" class="flex items-baseline justify-between gap-4">
-                <dt class="text-sm text-muted-foreground">{{ t('bookRequests.detail.decidedBy') }}</dt>
-                <dd class="text-end text-sm text-foreground">{{ request.decidedByUsername }}</dd>
-              </div>
-              <div v-if="request.seriesName" class="flex items-baseline justify-between gap-4">
-                <dt class="text-sm text-muted-foreground">{{ t('bookRequests.detail.series') }}</dt>
-                <dd class="text-end text-sm text-foreground">{{ request.seriesName }}</dd>
-              </div>
-              <div v-if="request.isbn13" class="flex items-baseline justify-between gap-4">
-                <dt class="text-sm text-muted-foreground">{{ t('bookRequests.detail.isbn') }}</dt>
-                <dd class="text-end text-sm text-foreground tabular-nums">{{ request.isbn13 }}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section v-if="request.note || request.decisionNote" class="space-y-3 rounded-lg border border-border bg-card p-4">
-            <div v-if="request.note">
-              <h3 class="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {{ t('bookRequests.detail.requesterNote') }}
-              </h3>
-              <p class="text-sm text-muted-foreground">{{ request.note }}</p>
-            </div>
-            <div v-if="request.decisionNote">
-              <h3 class="mb-1 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-                {{ t('bookRequests.detail.decisionNote') }}
-              </h3>
-              <p class="text-sm text-muted-foreground">{{ request.decisionNote }}</p>
-            </div>
-          </section>
-
-          <section v-if="request.subscribers.length" class="rounded-lg border border-border bg-card p-4">
-            <h3 class="mb-3 text-xs font-semibold tracking-wide text-muted-foreground uppercase">{{ t('bookRequests.detail.alsoWanted') }}</h3>
-            <ul class="space-y-1.5">
-              <li v-for="subscriber in request.subscribers" :key="subscriber.userId" class="text-sm text-muted-foreground">
-                {{ subscriber.name }}
-              </li>
-            </ul>
-          </section>
-        </div>
+          <figure v-for="quote in quotes" :key="quote.key" class="mt-4 border-s-2 border-border py-px ps-3">
+            <blockquote class="text-sm [overflow-wrap:anywhere] text-foreground">{{ quote.text }}</blockquote>
+            <figcaption class="mt-[3px] text-xs text-muted-foreground">{{ quote.caption }}</figcaption>
+          </figure>
+        </RequestDrawerSection>
       </template>
     </div>
 
-    <!-- The action that matters for the stage this request is at, and nothing else. -->
-    <footer v-if="request && showFooter" class="flex shrink-0 flex-wrap items-center gap-2 border-t border-border px-4 py-3">
-      <template v-if="canDecide">
+    <!--
+      The action the stage this request is at asks for, always here and never in the body. On a
+      phone the key legend is hidden, so a footer with no action is not drawn there at all.
+    -->
+    <footer
+      v-if="request"
+      class="shrink-0 flex-wrap items-center gap-2 border-t border-border bg-background p-3 @min-[30rem]:px-4"
+      :class="footerStage ? 'flex' : 'hidden @min-[30rem]:flex'"
+    >
+      <template v-if="footerStage === 'decide'">
         <Button v-if="canApproveBoth" :disabled="!canApproveBoth" @click="handleApproveBoth">
           <BookHeadphones :size="14" aria-hidden="true" />
           {{ t('bookRequests.actions.pair.approveBoth') }}
@@ -1085,10 +976,61 @@ function dockFileMeta(file: BookDockFile): string {
         <Button variant="destructive-outline" :disabled="busy" @click="handleReject">{{ t('bookRequests.actions.reject') }}</Button>
       </template>
 
-      <Button v-else-if="canGrab" :disabled="busy" @click="goToReleases">{{ t(grabLabel) }}</Button>
+      <Button v-else-if="footerStage === 'transfer'" variant="destructive-outline" :disabled="busy" @click="handleCancelDownload">
+        {{ t('bookRequests.actions.cancelDownload') }}
+      </Button>
 
-      <!-- A keyboard hint the keyboard user cannot see is not a hint. The footer already wraps. -->
-      <p class="ms-auto text-xs text-muted-foreground">{{ t('bookRequests.drawer.shortcuts') }}</p>
+      <template v-else-if="footerStage === 'grab'">
+        <Button :disabled="busy" @click="goToReleases">
+          <RefreshCw v-if="isRetry" :size="15" aria-hidden="true" />
+          <Search v-else :size="15" aria-hidden="true" />
+          {{ isRetry ? t('bookRequests.actions.retryRelease') : t('bookRequests.actions.pickRelease') }}
+        </Button>
+        <Button v-if="canFulfill" variant="ghost" class="hidden @min-[30rem]:inline-flex" :disabled="busy" @click="openFulfil">
+          {{ t('bookRequests.actions.closeRequest') }}
+        </Button>
+      </template>
+
+      <template v-else-if="footerStage === 'review' && review">
+        <Button :disabled="!review.canFile || busy" @click="handleFileAnyway">
+          <Loader2 v-if="busy" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          {{ fileIsOverride ? t('bookRequests.review.fileAnyway') : t('bookRequests.review.fileIt') }}
+        </Button>
+        <!--
+          The other answer, beside the first rather than behind a menu: a held import is a question
+          with exactly two answers, and "wrong book" must not mean cancelling and orphaning the file.
+        -->
+        <Button variant="destructive-outline" :disabled="busy" @click="handleDiscardImport">
+          <Trash2 :size="15" aria-hidden="true" />
+          {{ t('bookRequests.review.discard') }}
+        </Button>
+        <Button as-child variant="ghost" class="hidden @min-[30rem]:inline-flex">
+          <RouterLink :to="{ name: 'book-dock' }">{{ t('bookRequests.review.openDock') }}</RouterLink>
+        </Button>
+      </template>
+
+      <Button v-else-if="footerStage === 'reviewGone'" :disabled="busy" @click="openFulfil">{{ t('bookRequests.actions.closeRequest') }}</Button>
+
+      <Button v-else-if="footerStage === 'done' && goToBookId !== null" as-child>
+        <RouterLink :to="{ name: 'book-detail', params: { bookId: goToBookId } }">
+          {{ t('bookRequests.actions.goToBook') }}
+          <ArrowRight :size="15" class="rtl:rotate-180" aria-hidden="true" />
+        </RouterLink>
+      </Button>
+
+      <!-- A legend for sighted keyboard users; the same keys are spoken from the line after it. -->
+      <p class="ms-auto hidden items-center gap-[3px] text-xs whitespace-nowrap text-muted-foreground @min-[30rem]:inline-flex" aria-hidden="true">
+        <kbd :class="KBD_CLASS">{{ SHORTCUT_KEYS.next }}</kbd>
+        <kbd :class="KBD_CLASS">{{ SHORTCUT_KEYS.previous }}</kbd>
+        <span class="ms-0.5 me-1.5">{{ t('bookRequests.drawer.keys.move') }}</span>
+        <template v-if="canDecide">
+          <kbd :class="KBD_CLASS">{{ SHORTCUT_KEYS.approve }}</kbd>
+          <span class="ms-0.5 me-1.5">{{ t('bookRequests.drawer.keys.approve') }}</span>
+        </template>
+        <kbd :class="KBD_CLASS">{{ t('bookRequests.drawer.keys.esc') }}</kbd>
+        <span class="ms-0.5">{{ t('bookRequests.drawer.keys.close') }}</span>
+      </p>
+      <p class="sr-only">{{ canDecide ? t('bookRequests.drawer.shortcuts') : t('bookRequests.drawer.shortcutsNoApprove') }}</p>
     </footer>
 
     <ConfirmDialog
@@ -1096,9 +1038,12 @@ function dockFileMeta(file: BookDockFile): string {
       :title="confirmTitle"
       :description="confirmDescription"
       :confirm-label="confirmLabel"
+      :cancel-label="confirmKeepLabel"
       :busy="busy"
       @confirm="handleConfirm"
       @cancel="handleConfirmCancel"
     />
+
+    <RequestFulfilDialog :open="fulfilOpen" :busy="busy" @fulfil="handleFulfill" @cancel="handleFulfilCancel" />
   </div>
 </template>

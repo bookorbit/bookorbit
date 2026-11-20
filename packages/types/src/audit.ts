@@ -57,6 +57,7 @@ export enum AuditAction {
   BookBulkMetadataRefresh = "book.bulk.metadata_refresh",
   BookBulkDelete = "book.bulk.delete",
   BookBulkCoverReextract = "book.bulk.cover_reextract",
+  BookBulkEmbedAudioCover = "book.bulk.embed_audio_cover",
   BookBulkSetStatus = "book.bulk.set_status",
   BookBulkSetRating = "book.bulk.set_rating",
   BookBulkSetMetadata = "book.bulk.set_metadata",
@@ -64,6 +65,7 @@ export enum AuditAction {
   BookBulkSetMetadataLock = "book.bulk.set_metadata_lock",
   BookBulkEditMetadata = "book.bulk.edit_metadata",
   BookBulkMoveLibrary = "book.bulk.move_library",
+  BulkRunCancel = "book.bulk.run_cancel",
   BookMerge = "book.merge",
   BookLink = "book.link",
   BookUnlink = "book.unlink",
@@ -71,6 +73,7 @@ export enum AuditAction {
   BookReadingStateReset = "book.reading_state.reset",
 
   BookWriteAndRename = "book.write_and_rename",
+  BookEmbedAudioCover = "book.embed_audio_cover",
 
   CollectionCreate = "collection.create",
   CollectionUpdate = "collection.update",
@@ -83,6 +86,20 @@ export enum AuditAction {
   SmartScopeDelete = "smart_scope.delete",
 
   BookDockFinalize = "book_dock.finalize",
+  LibraryDockUpdate = "library_dock.update",
+  LibraryDockFolderRename = "library_dock.folder.rename",
+  LibraryDockFolderAdopt = "library_dock.folder.adopt",
+  LibraryDockFolderMove = "library_dock.folder.move_to_unsorted",
+  LibraryDockFolderRemove = "library_dock.folder.remove",
+
+  AiJobBuild = "ai_job.build",
+  AiJobUpdate = "ai_job.update",
+  AiJobRebuild = "ai_job.rebuild",
+  AiJobRetry = "ai_job.retry",
+  AiJobCancel = "ai_job.cancel",
+  AiJobPause = "ai_job.pause",
+  AiJobPrioritize = "ai_job.prioritize",
+  AiJobOutputDelete = "ai_job.output.delete",
 
   BookRequestCreate = "book_request.create",
   BookRequestApprove = "book_request.approve",
@@ -109,6 +126,17 @@ export enum AuditAction {
   MetadataHttpProviderUpdate = "metadata_http_provider.update",
   MetadataHttpProviderDelete = "metadata_http_provider.delete",
 
+  AiConnectionCreate = "ai.connection.create",
+  AiConnectionUpdate = "ai.connection.update",
+  AiConnectionDelete = "ai.connection.delete",
+  AiConnectionKeyReplace = "ai.connection.key_replace",
+  AiConnectionKeyRemove = "ai.connection.key_remove",
+  AiSlotsUpdate = "ai.slots.update",
+  AiFeatureUpdate = "ai.feature.update",
+  AiBudgetUpdate = "ai.budget.update",
+  AiSpeedsReset = "ai.speeds.reset",
+  AiPrivacyConfirm = "ai.privacy.confirm",
+
   AuthorUpdate = "author.update",
   AuthorDelete = "author.delete",
   AuthorMerge = "author.merge",
@@ -116,6 +144,7 @@ export enum AuditAction {
   AuthorEnrichmentPause = "author.enrichment.pause",
   AuthorEnrichmentResume = "author.enrichment.resume",
   AuthorEnrichmentCancel = "author.enrichment.cancel",
+  AuthorBulkMetadataRefresh = "author.bulk.metadata_refresh",
 
   EntityManagerMerge = "entity_manager.merge",
   EntityManagerRename = "entity_manager.rename",
@@ -164,10 +193,13 @@ export enum AuditResource {
   Collection = "collection",
   SmartScope = "smart_scope",
   BookDockFile = "book_dock_file",
+  LibraryDock = "library_dock",
   BookRequest = "book_request",
   DownloadClient = "download_client",
   RequestIndexer = "request_indexer",
   MetadataHttpProvider = "metadata_http_provider",
+  AiConnection = "ai_connection",
+  AiSettings = "ai_settings",
   Author = "author",
   AppSettings = "app_settings",
   Genre = "genre",
@@ -241,11 +273,11 @@ export const AUDIT_CATEGORY_PREFIXES: Record<Exclude<AuditCategory, "other">, re
   access: ["auth.", "magic_link."],
   users: ["user.", "reading_insights."],
   libraries: ["library."],
-  books: ["book.", "book_dock."],
+  books: ["book.", "book_dock.", "ai_job."],
   requests: ["book_request.", "download_client.", "request_indexer."],
   collections: ["collection.", "smart_scope."],
   devices: ["kobo.", "email."],
-  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider."],
+  settings: ["app_settings.", "entity_manager.", "author.", "maintenance.", "metadata_http_provider.", "ai.", "library_dock."],
 };
 
 export function getAuditCategory(action: string): AuditCategory {

@@ -315,6 +315,9 @@ export const koreaderPageStats = pgTable(
   (t) => [
     uniqueIndex('kps_user_file_device_page_start_uidx').on(t.userId, t.bookFileId, t.deviceId, t.page, t.startTime),
     index('kps_user_file_device_start_idx').on(t.userId, t.bookFileId, t.deviceId, t.startTime),
+    // Serves the device-agnostic lookup that decides which device's row owns an event one
+    // device-to-device statistics copy left on several devices.
+    index('kps_user_file_page_start_idx').on(t.userId, t.bookFileId, t.page, t.startTime),
     index('kps_user_id_idx').on(t.userId),
     index('koreader_page_stats_book_file_id_idx').on(t.bookFileId),
     check('koreader_page_stats_duration_nonnegative_chk', sql`${t.durationSeconds} >= 0`),

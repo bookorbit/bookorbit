@@ -89,7 +89,27 @@ describe('useSidebarPrefs', () => {
     it.each([undefined, null, 'nonsense', 42, []])('falls back to the stock layout for %s', async (raw) => {
       const { parseSidebarLayout } = await loadModule()
 
-      expect(parseSidebarLayout(raw)).toEqual({ hidden: [], groupOrder: [], rowOrder: {} })
+      expect(parseSidebarLayout(raw)).toEqual({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list', groupStyles: {} })
+    })
+
+    it.each([
+      ['icons', 'icons'],
+      ['list', 'list'],
+      ['grid', 'list'],
+      [1, 'list'],
+      [undefined, 'list'],
+    ])('reads primaryStyle %s as %s', async (stored, expected) => {
+      const { parseSidebarLayout } = await loadModule()
+
+      expect(parseSidebarLayout({ primaryStyle: stored }).primaryStyle).toBe(expected)
+    })
+
+    it('keeps group styles only for groups that offer icons, with a known style', async () => {
+      const { parseSidebarLayout } = await loadModule()
+
+      expect(parseSidebarLayout({ groupStyles: { reading: 'icons', browse: 'icons' } }).groupStyles).toEqual({ reading: 'icons' })
+      expect(parseSidebarLayout({ groupStyles: { reading: 'grid' } }).groupStyles).toEqual({})
+      expect(parseSidebarLayout({ groupStyles: 'icons' }).groupStyles).toEqual({})
     })
 
     it('keeps string ids only, once each', async () => {
@@ -101,7 +121,13 @@ describe('useSidebarPrefs', () => {
           groupOrder: 'reading',
           rowOrder: { browse: ['series', 'authors', false], reading: 'statistics' },
         }),
-      ).toEqual({ hidden: ['series', 'annotations'], groupOrder: [], rowOrder: { browse: ['series', 'authors'], reading: [] } })
+      ).toEqual({
+        hidden: ['series', 'annotations'],
+        groupOrder: [],
+        rowOrder: { browse: ['series', 'authors'], reading: [] },
+        primaryStyle: 'list',
+        groupStyles: {},
+      })
     })
 
     it('bounds what it keeps from an oversized payload', async () => {
@@ -190,7 +216,7 @@ describe('useSidebarPrefs', () => {
                   collections: { open: false, cap: 20 },
                 },
               },
-              sidebarLayout: { hidden: [], groupOrder: [], rowOrder: {} },
+              sidebarLayout: { hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list', groupStyles: {} },
             },
           }),
         }),
@@ -206,26 +232,48 @@ describe('useSidebarPrefs', () => {
 
       layout.hidden = ['series']
       layout.groupOrder = ['reading', 'browse']
+      layout.primaryStyle = 'icons'
+      layout.groupStyles = { reading: 'icons' }
       await vi.advanceTimersByTimeAsync(1000)
 
       expect(apiMock).toHaveBeenCalledTimes(1)
       const [, init] = apiMock.mock.calls[0] as [string, { body: string }]
       const body = JSON.parse(init.body)
-      expect(body.settings.sidebarLayout).toEqual({ hidden: ['series'], groupOrder: ['reading', 'browse'], rowOrder: {} })
+      expect(body.settings.sidebarLayout).toEqual({
+        hidden: ['series'],
+        groupOrder: ['reading', 'browse'],
+        rowOrder: {},
+        primaryStyle: 'icons',
+        groupStyles: { reading: 'icons' },
+      })
       vi.useRealTimers()
     })
 
     it('hydrates the layout from the signed-in user settings', async () => {
       user.value = {
         id: 7,
-        settings: { sidebarLayout: { hidden: ['annotations'], groupOrder: ['reading'], rowOrder: { browse: ['series', 'authors'] } } },
+        settings: {
+          sidebarLayout: {
+            hidden: ['annotations'],
+            groupOrder: ['reading'],
+            rowOrder: { browse: ['series', 'authors'] },
+            primaryStyle: 'icons',
+            groupStyles: { reading: 'icons' },
+          },
+        },
       }
 
       const { useSidebarPrefs } = await loadModule()
       const { layout } = useSidebarPrefs()
       await nextTick()
 
-      expect(layout).toEqual({ hidden: ['annotations'], groupOrder: ['reading'], rowOrder: { browse: ['series', 'authors'] } })
+      expect(layout).toEqual({
+        hidden: ['annotations'],
+        groupOrder: ['reading'],
+        rowOrder: { browse: ['series', 'authors'] },
+        primaryStyle: 'icons',
+        groupStyles: { reading: 'icons' },
+      })
     })
 
     it('rejects a cap outside the allowed set', async () => {

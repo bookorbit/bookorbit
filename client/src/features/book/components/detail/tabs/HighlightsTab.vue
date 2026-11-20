@@ -8,6 +8,7 @@ import { ANNOTATION_HIGHLIGHT_COLORS, READER_OPENABLE_FORMATS, type AnnotationIt
 import { formatDate } from '@/i18n/formatters'
 import { downloadFromUrl } from '@/lib/download'
 import { useDeferredLoading } from '@/composables/useDeferredLoading'
+import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import AnnotationStream from '@/features/annotations/components/shared/AnnotationStream.vue'
 import AnnotationEntry from '@/features/annotations/components/shared/AnnotationEntry.vue'
 import AnnotationEntryDetail from '@/features/annotations/components/shared/AnnotationEntryDetail.vue'
@@ -27,6 +28,7 @@ const router = useRouter()
 const bookIdRef = computed(() => props.book.id)
 const hl = useBookHighlights(bookIdRef)
 const { density } = useDensity()
+const { openHighlightsInPeek } = useDisplaySettings()
 
 /**
  * Same rule as the library hub: the source margin only earns a column when there is room for
@@ -109,6 +111,7 @@ function handleJump(annotation: AnnotationItem) {
   if (file?.format) query.format = file.format
   if (annotation.cfi) query.cfi = annotation.cfi
   else if (annotation.pageno != null) query.page = String(annotation.pageno)
+  if (openHighlightsInPeek.value) query.mode = 'peek'
   void router.push({ name: 'reader', params: { bookId: annotation.bookId, fileId: annotation.jumpFileId }, query })
 }
 

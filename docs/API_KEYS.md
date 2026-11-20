@@ -56,7 +56,8 @@ Some routes are for a person at the keyboard and refuse every key with `403` and
 - creating, listing, renaming, regenerating, and revoking API keys, including an administrator's view of someone else's keys;
 - changing a password, listing or ending sessions, and editing one's own profile;
 - changing another person's permissions or superuser status, or resetting their password;
-- App Attest registration and every route that requires an App Attest assertion from the iOS or Android app.
+- App Attest registration and every route that requires an App Attest assertion from the iOS or Android app;
+- the Jobs page's list and actions under `/api/v1/jobs`.
 
 Sign-in, registration, and the other public routes do not need a credential, and a key adds nothing to them.
 
@@ -66,6 +67,7 @@ Sign-in, registration, and the other public routes do not need a credential, and
 - An address that presents more than 30 unknown or invalid keys within a minute gets `429` for the rest of that minute.
 - The last-used time and address are recorded at most once a minute per key.
 - Revoked and expired keys stay visible for 90 days, then they are removed.
+- A bulk action started with a key, such as a metadata refresh for many books, keeps running after the request ends, counts toward the owner's 10 unfinished bulk actions, and stops once the key is revoked or expires; a running action checks its key again at least every 30 seconds. See [Jobs](JOBS.md#bulk-actions).
 
 ## Server settings
 

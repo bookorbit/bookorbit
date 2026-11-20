@@ -5,6 +5,9 @@ import { SidebarMenuButton, SidebarMenuItem, useSidebar } from '@/components/ui/
 import { useModifierKey } from '@/composables/useModifierKey'
 import { useCommandPalette } from '@/features/command-palette/composables/useCommandPalette'
 
+/** `framed` draws the row as a search field, for when the pages under it are an icon row. */
+withDefaults(defineProps<{ framed?: boolean }>(), { framed: false })
+
 const { t } = useI18n()
 const { isMobile, setOpenMobile } = useSidebar()
 const { modifierKey } = useModifierKey()
@@ -20,7 +23,8 @@ function handleOpen() {
   <SidebarMenuItem>
     <SidebarMenuButton
       :tooltip="t('common.search')"
-      class="group/item h-7 w-full min-w-0 gap-2 rounded-md px-2 font-normal"
+      class="group/item w-full min-w-0 gap-2 px-2 font-normal"
+      :class="framed ? 'h-8 rounded-(--shell-radius) border border-(--shell-accent-line)' : 'h-7 rounded-md'"
       data-tour="global-search"
       aria-haspopup="dialog"
       @click="handleOpen"

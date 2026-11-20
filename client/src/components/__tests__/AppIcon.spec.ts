@@ -30,7 +30,7 @@ describe('AppIcon', () => {
 
   it('renders the old name of a renamed icon', () => {
     const wrapper = mount(AppIcon, { props: { icon: 'AlertTriangle' } })
-    expect(wrapper.find('svg').classes()).toContain('lucide-triangle-alert')
+    expect(wrapper.find('svg').classes()).toContain('lucide-triangle-exclamation-point')
   })
 
   it('renders a component fallback when the stored name is unknown', () => {

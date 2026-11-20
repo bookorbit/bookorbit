@@ -5,7 +5,7 @@ import { mkdir, realpath, stat } from 'fs/promises';
 import { Readable } from 'stream';
 
 import { isAudioFormat, MetadataProviderKey, resolveBookDockSearchTitle, type BookDockMetadata } from '@bookorbit/types';
-import type { BookDockFileRow } from '../../db/schema';
+import type { BookDockFileRow, NewBookDockFileRow } from '../../db/schema';
 import { resolveSearchMediaKind } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { canonicalIsbn13, normalizeMetadataIsbn } from '../../common/text-match/isbn-normalize';
@@ -23,9 +23,14 @@ import { BookDockRepository } from './book-dock.repository';
 import { BookDockMetadataService } from './book-dock-metadata.service';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
+import { isIgnoredDockPath } from './book-dock-ignored-entries';
 import { normalizeBookDockMetadata, normalizeBookDockMetadataSources } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue, type BookDockWorkPriority } from './book-dock-work-queue';
+import { LibraryDockRegistry } from './library-dock-registry.service';
+import { BookDockKeptFilesService } from './book-dock-kept-files.service';
+import { findLibrariesDir } from './library-dock-fs';
+import { LIBRARIES_DIR } from './library-dock-paths';
 
 const METADATA_QUEUE_CONCURRENCY = 1;
 const METADATA_QUEUE_DRAIN_DELAY_MS = 250;
@@ -34,10 +39,27 @@ const METADATA_QUEUE_INTER_BOOK_DELAY_MAX_MS = 1_000;
 const REQUEUE_BATCH_SIZE = 500;
 const PROCESSABLE_METADATA_STATUSES = new Set(['pending', 'extracting', 'fetching']);
 
+/** A file found in a library's dock: it starts out headed for that library and folder. */
+export interface BookDockArrival {
+  dockId: number;
+  libraryId: number;
+  /** Null when the dock's folder was removed from the library; the file then waits for one. */
+  folderId: number | null;
+}
+
+/** A library dock an upload goes into, already checked against the uploader and the file (D26). */
+export interface BookDockUploadDock extends BookDockArrival {
+  folderName: string;
+}
+
+type ArrivalColumns = (fileName: string) => Pick<NewBookDockFileRow, 'dockId' | 'targetLibraryId' | 'targetFolderId' | 'holdReason' | 'holdDetail'>;
+
 @Injectable()
 export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BookDockIngestService.name);
   private bookDockPath: string;
+  /** Outside the dock, so the folder people drop books into only ever holds their own files. */
+  private readonly coversPath: string;
   private readonly metadataQueue: BookDockWorkQueue;
   private readonly forcedAutoFetchFileIds = new Set<number>();
 
@@ -52,9 +74,12 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     private readonly metadataFetchPipeline: MetadataFetchPipeline,
     private readonly processingState: BookDockProcessingStateService,
     private readonly gateway: BookDockGateway,
+    private readonly dockRegistry: LibraryDockRegistry,
+    private readonly keptFiles: BookDockKeptFilesService,
   ) {
     const appDataPath = this.config.get<string>('storage.appDataPath') ?? '/data';
     this.bookDockPath = this.config.get<string>('storage.bookDockPath') ?? join(appDataPath, 'book-dock');
+    this.coversPath = join(appDataPath, 'book-dock-covers');
     this.metadataQueue = new BookDockWorkQueue(
       METADATA_QUEUE_CONCURRENCY,
       (fileId) => this.processMetadataJob(fileId),
@@ -79,7 +104,8 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     this.metadataQueue.stop();
   }
 
-  async ingestUpload(rawFilename: string, fileStream: Readable, uploadedBy?: number): Promise<number> {
+  /** Without `dock` the upload lands in Unsorted, the Book Dock root. */
+  async ingestUpload(rawFilename: string, fileStream: Readable, uploadedBy?: number, dock?: BookDockUploadDock): Promise<number> {
     const filename = this.validator.sanitizeFilename(rawFilename);
     const ext = extname(filename).toLowerCase().slice(1);
 
@@ -91,10 +117,12 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     let destPath: string | null = null;
 
     try {
-      destPath = await this.resolveUniquePath(join(this.bookDockPath, filename));
+      const directory = dock ? await this.uploadDockDirectory(dock.folderName) : this.bookDockPath;
+      destPath = await this.resolveUniquePath(join(directory, filename));
 
       await this.storage.moveToPath(tempPath, destPath);
 
+      const arrival = await this.arrivalColumns(dock);
       const row = await this.repo.create({
         fileName: basename(destPath),
         absolutePath: destPath,
@@ -102,6 +130,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
         format: ext,
         status: 'pending',
         uploadedBy: uploadedBy ?? null,
+        ...arrival(filename),
       });
 
       this.extractMetadataAsync(row.id, ext, metadataQueuePriority(row));
@@ -142,7 +171,8 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     return queued;
   }
 
-  async ingestFromWatchedFolder(absolutePath: string): Promise<number | null> {
+  async ingestFromWatchedFolder(absolutePath: string, arrival?: BookDockArrival): Promise<number | null> {
+    if (isIgnoredDockPath(this.bookDockPath, absolutePath)) return null;
     const existing = await this.repo.findByAbsolutePath(absolutePath);
     if (existing) {
       this.requeueExistingIfProcessable(existing);
@@ -159,13 +189,17 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     } catch {
       return null;
     }
+    // Filed or discarded from a keep-original dock and still seeding: not a new arrival (D36).
+    if ((await this.keptFiles.unchangedKept([absolutePath])).has(absolutePath)) return null;
 
+    const arrivalColumns = await this.arrivalColumns(arrival);
     const row = await this.repo.create({
       fileName: basename(absolutePath),
       absolutePath,
       fileSize,
       format: ext,
       status: 'pending',
+      ...arrivalColumns(basename(absolutePath)),
     });
 
     this.extractMetadataAsync(row.id, ext, metadataQueuePriority(row));
@@ -174,7 +208,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   }
 
   /** Group a settled book folder, retaining the child directories absorbed by disc/stem folding. */
-  async ingestUnitDirectory(unitDirectory: string): Promise<{ created: number; consumedDirectories: Set<string> }> {
+  async ingestUnitDirectory(unitDirectory: string, arrival?: BookDockArrival): Promise<{ created: number; consumedDirectories: Set<string> }> {
     const startedAt = Date.now();
     const result = { created: 0, consumedDirectories: new Set<string>() };
     if (await this.processingState.isPaused()) return result;
@@ -208,6 +242,10 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       return result;
     }
     const claimedPaths = await this.repo.findClaimedPaths([...byPath.keys()]);
+    // Files left behind by a keep-original dock count as claimed, so the book they made is not
+    // found again; one that changed since is forgotten and arrives again.
+    for (const path of await this.keptFiles.unchangedKept([...byPath.keys()])) claimedPaths.add(path);
+    const arrivalColumns = await this.arrivalColumns(arrival);
     for (const unit of plan.units) {
       if (await this.processingState.isPaused()) break;
       // A parent candidate may already include these tracks via disc or stem folding. Do not
@@ -230,6 +268,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
           format: primary.format,
           unitDirectory: owned ? unitDirectory : null,
           status: 'pending',
+          ...arrivalColumns(basename(primaryPath)),
         },
         unit.files
           .filter((file) => !claimedPaths.has(join(unitDirectory, file.path)))
@@ -257,6 +296,26 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       );
     }
     return result;
+  }
+
+  /**
+   * The columns a file arriving in a library's dock starts with: that library and folder as its
+   * destination, and the reason it waits when it cannot be filed there as it stands. A library
+   * deleted since the dock was read leaves the file in Unsorted.
+   */
+  private async arrivalColumns(arrival: BookDockArrival | undefined): Promise<ArrivalColumns> {
+    if (!arrival) return () => ({});
+    const library = await this.repo.findLibraryFormats(arrival.libraryId);
+    if (!library) return () => ({});
+    const destination = { dockId: arrival.dockId, targetLibraryId: arrival.libraryId, targetFolderId: arrival.folderId };
+    const detail = { libraryId: arrival.libraryId, libraryName: library.name };
+    return (fileName) => {
+      if (!this.validator.isAllowedByLibrary(fileName, library.allowedFormats)) {
+        return { ...destination, holdReason: 'not_allowed_in_library', holdDetail: detail };
+      }
+      if (arrival.folderId === null) return { ...destination, holdReason: 'no_folder', holdDetail: detail };
+      return destination;
+    };
   }
 
   private extractMetadataAsync(fileId: number, format: string, priority?: BookDockWorkPriority): boolean {
@@ -320,10 +379,10 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       const format = resolveSupportedFormat(row);
       if (!format) return;
 
-      const coversDir = join(this.bookDockPath, 'covers');
-      await this.repo.update(fileId, { status: 'extracting' });
+      // What it waited on is worked out again once its metadata is in.
+      await this.repo.update(fileId, { status: 'extracting', holdReason: null });
       this.emitChange();
-      await this.metadataService.extractAndSave(fileId, row.absolutePath, format, coversDir);
+      await this.metadataService.extractAndSave(fileId, row.absolutePath, format, this.coversPath);
       await this.autoFetchMetadataAsync(fileId, forceAutoFetch);
       this.emitChange();
       this.events.emit(BOOK_DOCK_FILE_INGESTED, fileId);
@@ -351,6 +410,12 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     return (await this.repo.bookLibraryExists(libraryId)) ? libraryId : null;
   }
 
+  /** A library dock's own auto-fetch choice, or the global one when it inherits. */
+  private async isAutoFetchEnabledFor(row: Pick<BookDockFileRow, 'dockId'>): Promise<boolean> {
+    const dock = row.dockId == null ? undefined : await this.dockRegistry.findById(row.dockId);
+    return dock?.autoFetchMetadata ?? (await this.appSettings.isBookDockAutoFetchEnabled());
+  }
+
   private async isReadAlong(absolutePath: string, format: string | null): Promise<boolean> {
     const startedAt = Date.now();
     const fields = await inspectEpubMediaOverlayFields(absolutePath, format, (err) => {
@@ -362,13 +427,9 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   }
 
   private async autoFetchMetadataAsync(fileId: number, force = false): Promise<void> {
-    if (!force) {
-      const enabled = await this.appSettings.isBookDockAutoFetchEnabled();
-      if (!enabled) return;
-    }
-
     const row = await this.repo.findById(fileId);
     if (!row || row.status === 'error') return;
+    if (!force && !(await this.isAutoFetchEnabledFor(row))) return;
 
     const meta = row.embeddedMetadata;
     const params = {
@@ -449,6 +510,14 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
       this.logger.warn(`Auto-fetch metadata failed for Book Dock file ${fileId}: ${err instanceof Error ? err.message : String(err)}`);
       await this.repo.update(fileId, { status: 'ready' });
     }
+  }
+
+  /** The dock's folder under `_libraries`, made again if someone removed it. */
+  private async uploadDockDirectory(folderName: string): Promise<string> {
+    const librariesPath = (await findLibrariesDir(this.bookDockPath)) ?? join(this.bookDockPath, LIBRARIES_DIR);
+    const directory = join(librariesPath, folderName);
+    await mkdir(directory, { recursive: true });
+    return directory;
   }
 
   private async resolveUniquePath(desiredPath: string): Promise<string> {

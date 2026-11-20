@@ -21,6 +21,8 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   remove: [payload: { request: BookRequestItem; downloadId: number; deleteFiles: boolean }]
+  /** Whether the client still seeds this download, once read; null while unknown. */
+  seeding: [value: boolean | null]
 }>()
 
 const { t } = useI18n()
@@ -41,39 +43,37 @@ const confirmDescription = computed(() => {
   return t(deleteFiles.value ? 'bookRequests.seed.confirm.descriptionWithFiles' : 'bookRequests.seed.confirm.description')
 })
 
+/** Whether it is still seeding is the whole question, so it leads, as a word and not only a dot. */
 const clientActivity = computed(() => {
   if (!status.value) return null
-  if (status.value.seeding) {
-    return { label: t('bookRequests.seed.seeding'), className: 'border-success/40 bg-success/10 text-success' }
-  }
-  if (download.value?.status === 'queued' || download.value?.status === 'downloading') {
-    return { label: t(`bookRequests.download.status.${download.value.status}`), className: 'border-info/40 bg-info/10 text-info' }
-  }
-  return { label: t('bookRequests.seed.stopped'), className: 'border-border bg-muted text-muted-foreground' }
+  if (status.value.seeding) return { label: t('bookRequests.seed.seeding'), on: true }
+  return { label: t('bookRequests.seed.stopped'), on: false }
 })
 
+/** A transfer still running is the card's to show; the seed is what is left once it finishes. */
+const transferActive = computed(() => download.value?.status === 'queued' || download.value?.status === 'downloading')
+
+watch(
+  () => (status.value ? status.value.seeding : null),
+  (value) => emit('seeding', value),
+  { immediate: true },
+)
+
 /**
- * Ratio and seeding time are not two more figures: they are the two goals the client stops on, so
- * whichever of them the client actually reported a target for is drawn as a fraction of it. A goal
- * the client did not state leaves the number to stand on its own, because there is nothing to be a
- * fraction of.
+ * Ratio and seeding time are the two goals the client stops on, so each is stated against the
+ * target the client reported for it. A goal the client did not state leaves the figure alone.
  */
-interface SeedMeter {
-  key: 'ratio' | 'time'
+interface SeedStat {
+  key: 'ratio' | 'time' | 'uploaded'
   label: string
   value: string
-  percent: number | null
 }
 
-function meterPercent(current: number, goal: number): number {
-  return Math.max(0, Math.min(100, (current / goal) * 100))
-}
-
-const meters = computed<SeedMeter[]>(() => {
+const stats = computed<SeedStat[]>(() => {
   const current = status.value
   if (!current) return []
 
-  const rows: SeedMeter[] = []
+  const rows: SeedStat[] = []
 
   if (current.ratio !== null) {
     const ratio = formatNumber(current.ratio, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -82,7 +82,6 @@ const meters = computed<SeedMeter[]>(() => {
       key: 'ratio',
       label: t('bookRequests.seed.ratio'),
       value: goal === null ? ratio : t('bookRequests.seed.ofGoal', { value: ratio, goal: formatNumber(goal, { maximumFractionDigits: 2 }) }),
-      percent: goal === null ? null : meterPercent(current.ratio, goal),
     })
   }
 
@@ -99,8 +98,11 @@ const meters = computed<SeedMeter[]>(() => {
               value: hours,
               goal: t('bookRequests.seed.hours', { value: formatNumber(goalMinutes / 60, { maximumFractionDigits: 1 }) }),
             }),
-      percent: goalMinutes === null ? null : meterPercent(current.seedingTimeSeconds / 60, goalMinutes),
     })
+  }
+
+  if (current.uploadedBytes !== null) {
+    rows.push({ key: 'uploaded', label: t('bookRequests.seed.uploaded'), value: formatBytes(current.uploadedBytes) })
   }
 
   return rows
@@ -150,6 +152,7 @@ function handleRemove() {
 
 function cancelRemove() {
   confirming.value = false
+  deleteFiles.value = false
 }
 
 function confirmRemove() {
@@ -158,63 +161,31 @@ function confirmRemove() {
     emit('remove', { request: props.request, downloadId: download.value.id, deleteFiles: alwaysDeletesRemote.value || deleteFiles.value })
   }
   confirming.value = false
+  deleteFiles.value = false
 }
 </script>
 
 <template>
-  <section v-if="isTorrentDownload" class="space-y-3 rounded-lg border border-border bg-card p-4">
-    <h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{{ t('bookRequests.seed.title') }}</h3>
-
-    <p v-if="download?.automated" class="text-sm text-muted-foreground">{{ t('bookRequests.seed.automated') }}</p>
-
-    <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t('bookRequests.seed.loading') }}</p>
-    <p v-else-if="failed" role="status" class="text-sm text-muted-foreground">{{ t('bookRequests.seed.loadFailed') }}</p>
-    <p v-else-if="!status" role="status" class="text-sm text-muted-foreground">{{ t('bookRequests.seed.notInClient') }}</p>
+  <div
+    v-if="isTorrentDownload && !transferActive"
+    class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 rounded-sm bg-muted py-1.5 ps-2.5 pe-1.5"
+  >
+    <p v-if="loading" role="status" class="text-xs text-muted-foreground">{{ t('bookRequests.seed.loading') }}</p>
+    <p v-else-if="failed" role="status" class="text-xs text-muted-foreground">{{ t('bookRequests.seed.loadFailed') }}</p>
+    <p v-else-if="!status" role="status" class="text-xs text-muted-foreground">{{ t('bookRequests.seed.notInClient') }}</p>
 
     <template v-else>
-      <!-- Whether it is still seeding is the whole question, so it leads and never rides on colour alone. -->
-      <div class="flex flex-wrap items-center justify-between gap-2">
-        <span class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs font-medium" :class="clientActivity?.className">
-          <span class="size-1.5 rounded-full bg-current" aria-hidden="true" />
-          {{ clientActivity?.label }}
-        </span>
-        <span v-if="status.downloadClientName" class="truncate text-xs text-muted-foreground">{{ status.downloadClientName }}</span>
-      </div>
-
-      <dl class="space-y-2.5">
-        <div v-for="meter in meters" :key="meter.key">
-          <div class="flex items-baseline justify-between gap-4">
-            <dt class="text-sm text-muted-foreground">{{ meter.label }}</dt>
-            <dd class="text-end text-sm text-foreground tabular-nums">{{ meter.value }}</dd>
-          </div>
-          <!-- Redundant to the figures beside it, which is exactly why it is hidden rather than labelled. -->
-          <div v-if="meter.percent !== null" data-testid="seed-meter" class="mt-1.5 h-1 overflow-hidden rounded-full bg-muted" aria-hidden="true">
-            <div
-              class="h-full rounded-full bg-primary transition-[width] duration-500 motion-reduce:transition-none"
-              :style="{ width: `${meter.percent}%` }"
-            />
-          </div>
-        </div>
-
-        <div v-if="status.uploadedBytes !== null" class="flex items-baseline justify-between gap-4">
-          <dt class="text-sm text-muted-foreground">{{ t('bookRequests.seed.uploaded') }}</dt>
-          <dd class="text-end text-sm text-foreground tabular-nums">{{ formatBytes(status.uploadedBytes) }}</dd>
-        </div>
-      </dl>
-
-      <!-- Separated, because a destructive control reading as one more row of the readout is how it gets clicked. -->
-      <div v-if="canManage" class="space-y-2.5 border-t border-border pt-3.5">
-        <p class="text-xs text-muted-foreground">{{ t('bookRequests.seed.removeHint') }}</p>
-
-        <label v-if="!alwaysDeletesRemote" class="flex items-center gap-2 text-sm text-foreground">
-          <input v-model="deleteFiles" type="checkbox" class="h-3.5 w-3.5 rounded-xs border-border accent-primary" />
-          {{ t('bookRequests.seed.deleteFiles') }}
-        </label>
-
-        <Button variant="destructive-outline" size="sm" :disabled="busy" @click="handleRemove">
-          {{ t('bookRequests.seed.remove') }}
-        </Button>
-      </div>
+      <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
+        <span class="size-[7px] rounded-full" :class="clientActivity?.on ? 'bg-success' : 'bg-muted-foreground'" aria-hidden="true" />
+        {{ clientActivity?.label }}
+      </span>
+      <span v-for="stat in stats" :key="stat.key" class="inline-flex items-baseline gap-[5px] text-xs text-muted-foreground">
+        {{ stat.label }}
+        <b class="font-semibold text-foreground tabular-nums">{{ stat.value }}</b>
+      </span>
+      <Button v-if="canManage" variant="ghost" size="sm" class="ms-auto h-7 gap-1 px-2 text-xs" :disabled="busy" @click="handleRemove">
+        {{ t('bookRequests.seed.removeEllipsis') }}
+      </Button>
     </template>
 
     <ConfirmDialog
@@ -222,9 +193,16 @@ function confirmRemove() {
       :title="t('bookRequests.seed.confirm.title')"
       :description="confirmDescription"
       :confirm-label="t('bookRequests.seed.remove')"
+      :cancel-label="t('bookRequests.seed.keepSeeding')"
       :busy="busy"
       @confirm="confirmRemove"
       @cancel="cancelRemove"
-    />
-  </section>
+    >
+      <label v-if="!alwaysDeletesRemote" class="mt-3.5 flex cursor-pointer items-center gap-2 text-sm text-foreground">
+        <input v-model="deleteFiles" type="checkbox" class="size-3.5 shrink-0 accent-primary" />
+        {{ t('bookRequests.seed.deleteFiles') }}
+      </label>
+      <p class="mt-2 text-xs text-muted-foreground">{{ t('bookRequests.seed.removeHint') }}</p>
+    </ConfirmDialog>
+  </div>
 </template>

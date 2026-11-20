@@ -1,6 +1,6 @@
 # Debian trixie for ffmpeg 7: STAlign's audiobook probe passes `ffprobe -output_format`, which the
 # ffmpeg 5.1 in bookworm rejects, failing every job in its first stage.
-ARG NODE_IMAGE=node:26.12.1-trixie-slim
+ARG NODE_IMAGE=node:26.13.1-trixie-slim
 
 FROM ${NODE_IMAGE} AS builder
 WORKDIR /app

@@ -57,6 +57,7 @@ function joined(overrides: Partial<BookRequestRow> = {}) {
     requesterUsername: 'bob',
     requesterName: 'Bob',
     decidedByUsername: null,
+    decidedByName: null,
     targetLibraryName: 'Books',
   };
 }

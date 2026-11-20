@@ -61,6 +61,14 @@ describe('PathMappingService.toLocalPath', () => {
     await expect(service.toLocalPath(1, '/elsewhere/dune.epub')).rejects.toThrow(BadRequestException);
   });
 
+  it('keeps a trailing space in the reported folder name', async () => {
+    const { service } = makeService([{ remotePath: '/downloads', localPath: '/data/torrents' }]);
+    await expect(service.toLocalPath(1, '/downloads/Some Author - Some Title ')).resolves.toMatchObject({
+      localPath: '/data/torrents/Some Author - Some Title ',
+      containmentRoot: '/data/torrents',
+    });
+  });
+
   it('rejects an empty content path', async () => {
     const { service } = makeService([{ remotePath: '/downloads', localPath: '/data/torrents' }]);
     await expect(service.toLocalPath(1, '   ')).rejects.toThrow(BadRequestException);

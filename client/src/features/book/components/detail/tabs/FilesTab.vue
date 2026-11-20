@@ -287,6 +287,10 @@ function retryReadAloud() {
   void readAloud.retry()
 }
 
+function resumeReadAloud() {
+  void readAloud.resume()
+}
+
 function resyncReadAloud(decisions: ReadAloudDecisions) {
   void readAloud.resync(decisions)
 }
@@ -415,6 +419,7 @@ async function confirmDelete() {
       @cancel="cancelReadAloud"
       @publish="publishReadAloud"
       @retry="retryReadAloud"
+      @resume="resumeReadAloud"
       @resync="resyncReadAloud"
       @dismiss="dismissReadAloud"
       @start-over="startOverReadAloud"

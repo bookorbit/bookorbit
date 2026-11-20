@@ -7,6 +7,10 @@ export const NotificationType = {
   MetadataFetchFailed: "metadata_fetch_failed",
   BookDockFinalized: "book_dock_finalized",
   BookDockFinalizedWithErrors: "book_dock_finalized_with_errors",
+  /** What auto-file did in one dock once it went quiet; `meta` holds `{ dockId, libraryId, libraryName, filed, held }`. */
+  BookDockDigest: "book_dock_digest",
+  /** The same, when some files are left waiting for a person. */
+  BookDockDigestNeedsReview: "book_dock_digest_needs_review",
   BookRequestSubmitted: "book_request_submitted",
   BookRequestApproved: "book_request_approved",
   BookRequestRejected: "book_request_rejected",
@@ -31,6 +35,12 @@ export const NotificationType = {
   ReadAloudNeedsReview: "read_aloud_needs_review",
   ReadAloudFailed: "read_aloud_failed",
   ReadAloudReviewExpiring: "read_aloud_review_expiring",
+  StoryGuideReady: "story_guide_ready",
+  StoryGuideFailed: "story_guide_failed",
+  BulkRunCompleted: "bulk_run_completed",
+  BulkRunCompletedWithErrors: "bulk_run_completed_with_errors",
+  BulkRunFailed: "bulk_run_failed",
+  BulkRunInterrupted: "bulk_run_interrupted",
 } as const;
 
 export type NotificationType = (typeof NotificationType)[keyof typeof NotificationType];
@@ -61,6 +71,8 @@ export const NOTIFICATION_CATEGORY_IDS = [
   "bulkRename",
   "achievements",
   "readAloud",
+  "storyGuides",
+  "bulkActions",
 ] as const;
 
 export type NotificationCategory = (typeof NOTIFICATION_CATEGORY_IDS)[number];
@@ -84,6 +96,8 @@ export const NOTIFICATION_TYPE_META: Record<NotificationType, NotificationTypeMe
   [NotificationType.MetadataFetchFailed]: { category: "metadata", severity: "warning" },
   [NotificationType.BookDockFinalized]: { category: "bookDock", severity: "success" },
   [NotificationType.BookDockFinalizedWithErrors]: { category: "bookDock", severity: "warning" },
+  [NotificationType.BookDockDigest]: { category: "bookDock", severity: "success" },
+  [NotificationType.BookDockDigestNeedsReview]: { category: "bookDock", severity: "warning" },
   [NotificationType.BookRequestSubmitted]: { category: "bookRequests", severity: "success" },
   [NotificationType.BookRequestApproved]: { category: "bookRequests", severity: "success" },
   [NotificationType.BookRequestRejected]: { category: "bookRequests", severity: "warning" },
@@ -108,6 +122,12 @@ export const NOTIFICATION_TYPE_META: Record<NotificationType, NotificationTypeMe
   [NotificationType.ReadAloudNeedsReview]: { category: "readAloud", severity: "warning" },
   [NotificationType.ReadAloudFailed]: { category: "readAloud", severity: "error" },
   [NotificationType.ReadAloudReviewExpiring]: { category: "readAloud", severity: "warning" },
+  [NotificationType.StoryGuideReady]: { category: "storyGuides", severity: "success" },
+  [NotificationType.StoryGuideFailed]: { category: "storyGuides", severity: "error" },
+  [NotificationType.BulkRunCompleted]: { category: "bulkActions", severity: "success" },
+  [NotificationType.BulkRunCompletedWithErrors]: { category: "bulkActions", severity: "warning" },
+  [NotificationType.BulkRunFailed]: { category: "bulkActions", severity: "error" },
+  [NotificationType.BulkRunInterrupted]: { category: "bulkActions", severity: "warning" },
 };
 
 export const NOTIFICATION_CATEGORIES: Record<NotificationCategory, readonly NotificationType[]> = NOTIFICATION_CATEGORY_IDS.reduce(

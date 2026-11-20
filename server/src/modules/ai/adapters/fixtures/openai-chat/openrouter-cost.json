@@ -1,0 +1,32 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "id": "chatcmpl-abc123",
+    "object": "chat.completion",
+    "created": 1794200000,
+    "model": "openai/gpt-6-luna",
+    "choices": [
+      {
+        "index": 0,
+        "message": {
+          "role": "assistant",
+          "content": "{\"names\":[{\"name\":\"Elizabeth Bennet\",\"kind\":\"person\"}]}"
+        },
+        "logprobs": null,
+        "finish_reason": "stop"
+      }
+    ],
+    "usage": {
+      "prompt_tokens": 500,
+      "completion_tokens": 60,
+      "total_tokens": 560,
+      "cost": 8e-5,
+      "completion_tokens_details": {
+        "reasoning_tokens": 10
+      }
+    }
+  }
+}

@@ -22,6 +22,7 @@ export function makeJob(overrides: Partial<ReadAloudJob> = {}): ReadAloudJob {
     progress: status === 'queued' ? 0 : finished ? 100 : 42,
     stageDetail: null,
     queuePosition: status === 'queued' ? 0 : null,
+    pausedAt: null,
     input: { epubFileId: 101, audioFileIds: [102, 103, 104], language: 'en', granularity: 'sentence', sourceBytes: 600, replaceFileId: null },
     decisions: { chapters: {}, audio: [] },
     outputFileId: status === 'completed' || status === 'completed_with_warnings' ? 105 : null,

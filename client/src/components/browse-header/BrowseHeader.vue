@@ -66,13 +66,19 @@ onBeforeUnmount(detach)
     :class="folded ? 'mt-0' : 'mt-2'"
   >
     <div
-      class="grid transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none"
+      class="grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none"
       :class="folded ? 'mb-0 grid-rows-[0fr] opacity-0' : 'mb-3 grid-rows-[1fr] opacity-100'"
       :inert="folded || undefined"
     >
       <div class="min-h-0 overflow-hidden">
         <PageTitleRow :eyebrow="eyebrow" :title="title" :icon="icon" :fallback-icon="fallbackIcon">
-          <template v-if="switcher" #title>
+          <template v-if="$slots.eyebrow" #eyebrow>
+            <slot name="eyebrow" />
+          </template>
+          <template v-if="$slots.title" #title>
+            <slot name="title" />
+          </template>
+          <template v-else-if="switcher" #title>
             <BrowseTitleSwitcher :place="switcher" :title="title" />
           </template>
           <template v-if="$slots.facts" #facts>
@@ -82,6 +88,19 @@ onBeforeUnmount(detach)
             <slot name="actions" />
           </template>
         </PageTitleRow>
+      </div>
+    </div>
+
+    <!-- A strip that belongs with the title, folding away with it. It clips only vertically, so a
+         phone strip can bleed into the page gutter while it scrolls sideways. -->
+    <div
+      v-if="$slots.below"
+      class="grid grid-cols-[minmax(0,1fr)] transition-[grid-template-rows,opacity,margin] duration-200 ease-out motion-reduce:transition-none"
+      :class="folded ? 'mb-0 grid-rows-[0fr] opacity-0' : '-mt-0.5 mb-3 grid-rows-[1fr] opacity-100'"
+      :inert="folded || undefined"
+    >
+      <div class="min-h-0 min-w-0 [overflow-y:clip]">
+        <slot name="below" />
       </div>
     </div>
 

@@ -1,12 +1,42 @@
 import { computed, reactive, ref } from 'vue'
 import { api } from '@/lib/api'
-import type { BookDockFile, BookDockFilesPage, BookDockFileStatus } from '@bookorbit/types'
+import type { BookDockFile, BookDockFilesPage, BookDockHoldFilter, BookDockHoldReason } from '@bookorbit/types'
 
 export type SortField = 'createdAt' | 'fileName' | 'format' | 'status' | 'fileSize' | 'attention'
 export type SortOrder = 'asc' | 'desc'
 
-/** The chip set above the list. Review and filing readiness are predicates, not processing statuses. */
-export type BookDockView = 'all' | 'needsReview' | 'readyToFile' | BookDockFileStatus
+/** The chip set above the list. A held file is ready but waits, so On hold and Ready never overlap. */
+export type BookDockView = 'all' | 'onHold' | 'working' | 'ready' | 'error'
+
+/** The dock switcher: every dock, Unsorted, or one library dock by id. */
+export type BookDockKey = 'all' | 'unsorted' | number
+
+/** What a bulk action or finalize applies to: picked ids, or everything the page's filters match. */
+export interface BookDockSelectionPayload {
+  fileIds?: number[]
+  selectAll?: boolean
+  excludedIds?: number[]
+  status?: string
+  search?: string
+  dock?: string
+  hold?: BookDockHoldFilter
+}
+
+/** The request's status and hold filters for a view; Working covers every unsettled status. */
+function viewFilters(view: BookDockView, reason: BookDockHoldReason | null): Pick<BookDockSelectionPayload, 'status' | 'hold'> {
+  switch (view) {
+    case 'onHold':
+      return { hold: reason ?? 'held' }
+    case 'working':
+      return { status: 'pending' }
+    case 'ready':
+      return { hold: 'clear' }
+    case 'error':
+      return { status: 'error' }
+    default:
+      return {}
+  }
+}
 
 export function useBookDockFiles() {
   const items = ref<BookDockFile[]>([])
@@ -15,9 +45,9 @@ export function useBookDockFiles() {
   const initialized = ref(false)
 
   const filters = reactive({
-    status: undefined as BookDockFileStatus | undefined,
-    needsReview: false,
-    readyToFile: false,
+    dock: 'all' as BookDockKey,
+    view: 'all' as BookDockView,
+    reason: null as BookDockHoldReason | null,
     search: '',
     page: 1,
     limit: 20,
@@ -38,9 +68,7 @@ export function useBookDockFiles() {
     loading.value = true
     try {
       const params = new URLSearchParams()
-      if (filters.status) params.set('status', filters.status)
-      if (filters.needsReview) params.set('needsReview', 'true')
-      if (filters.readyToFile) params.set('readyToFile', 'true')
+      for (const [key, value] of Object.entries(scopeFilters())) if (value) params.set(key, value)
       if (filters.search) params.set('search', filters.search)
       params.set('page', String(filters.page))
       params.set('limit', String(filters.limit))
@@ -64,26 +92,39 @@ export function useBookDockFiles() {
     }
   }
 
-  function setStatus(status: BookDockFileStatus | undefined) {
+  /** The dock and view filters as the server reads them, shared by the list and select-all. */
+  function scopeFilters(): Pick<BookDockSelectionPayload, 'dock' | 'status' | 'hold'> {
+    return {
+      ...(filters.dock === 'all' ? {} : { dock: String(filters.dock) }),
+      ...viewFilters(filters.view, filters.reason),
+    }
+  }
+
+  const activeView = computed<BookDockView>(() => filters.view)
+
+  function setView(view: BookDockView) {
     clearSelection()
-    filters.status = status
-    filters.needsReview = false
-    filters.readyToFile = false
+    filters.view = view
+    filters.reason = null
     filters.page = 1
     fetchFiles()
   }
 
-  const activeView = computed<BookDockView>(() => {
-    if (filters.needsReview) return 'needsReview'
-    if (filters.readyToFile) return 'readyToFile'
-    return filters.status ?? 'all'
-  })
-
-  function setView(view: BookDockView) {
+  /** Narrows On hold to one reason; null shows every reason. */
+  function setHoldReason(reason: BookDockHoldReason | null) {
     clearSelection()
-    filters.needsReview = view === 'needsReview'
-    filters.readyToFile = view === 'readyToFile'
-    filters.status = view === 'all' || view === 'needsReview' || view === 'readyToFile' ? undefined : view
+    filters.view = 'onHold'
+    filters.reason = reason
+    filters.page = 1
+    fetchFiles()
+  }
+
+  /** Switches dock; `view` keeps the chip when the new dock still has files under it. */
+  function setDock(dock: BookDockKey, view: BookDockView = 'all') {
+    clearSelection()
+    filters.dock = dock
+    filters.view = view
+    filters.reason = null
     filters.page = 1
     fetchFiles()
   }
@@ -178,22 +219,12 @@ export function useBookDockFiles() {
 
   const hasSelection = computed(() => selectionCount.value > 0)
 
-  function getSelectionPayload(): {
-    fileIds?: number[]
-    selectAll?: boolean
-    excludedIds?: number[]
-    status?: BookDockFileStatus
-    needsReview?: boolean
-    readyToFile?: boolean
-    search?: string
-  } {
+  function getSelectionPayload(): BookDockSelectionPayload {
     if (selectAll.value) {
       return {
         selectAll: true,
         excludedIds: [...excludedIds.value],
-        ...(filters.status ? { status: filters.status } : {}),
-        ...(filters.needsReview ? { needsReview: true } : {}),
-        ...(filters.readyToFile ? { readyToFile: true } : {}),
+        ...scopeFilters(),
         ...(filters.search ? { search: filters.search } : {}),
       }
     }
@@ -208,9 +239,10 @@ export function useBookDockFiles() {
     filters,
     pageCount,
     fetchFiles,
-    setStatus,
     activeView,
     setView,
+    setHoldReason,
+    setDock,
     setSearch,
     setSort,
     setPage,

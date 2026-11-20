@@ -1,4 +1,4 @@
-import { IsBoolean, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { ArrayMaxSize, ArrayUnique, IsArray, IsBoolean, IsIn, IsInt, IsNotEmpty, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class UpsertStorygraphSettingsDto {
   @IsOptional()
@@ -26,6 +26,14 @@ export class UpsertStorygraphSettingsDto {
   @IsOptional()
   @IsBoolean()
   autoSyncOnProgressUpdate?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayUnique()
+  @ArrayMaxSize(1000)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  excludedLibraryIds?: number[];
 }
 
 export class ValidateStorygraphCookiesDto {

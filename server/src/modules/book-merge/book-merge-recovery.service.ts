@@ -5,6 +5,7 @@ import type { BookMergeSourceOutcome } from '@bookorbit/types';
 import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { BookMergeJobMove } from '../../db/schema';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { BookMergeEffectsService } from './book-merge-effects.service';
 import { BookMergeExecutor, storedReadersOf } from './book-merge.executor';
 import { libraryIdsOf, type MergeExecutionPlan } from './book-merge.planner';
@@ -26,6 +27,7 @@ export class BookMergeRecoveryService implements OnModuleInit {
     private readonly executor: BookMergeExecutor,
     private readonly effects: BookMergeEffectsService,
     private readonly libraryGate: LibraryOperationGate,
+    private readonly jobChanges: JobChangesService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -53,6 +55,7 @@ export class BookMergeRecoveryService implements OnModuleInit {
       }));
       if (job.status === 'planned') {
         await this.repository.updateJob(job.id, { status: 'failed', errorCode: 'INTERRUPTED', finishedAt: new Date() });
+        this.jobChanges.notify({ type: 'book-merge', ownerId: job.requestedByUserId, state: true });
         this.logger.warn(`[${MERGE_EVENT}] [fail] jobId=${job.id} phase=recovery status=planned - interrupted before it started`);
         return;
       }
@@ -90,6 +93,7 @@ export class BookMergeRecoveryService implements OnModuleInit {
         error: unresolved.length > 0 ? sanitizeLogValue(unresolved.map((move) => `${move.to} -> ${move.from}`).join('; ')) : null,
         finishedAt: new Date(),
       });
+      this.jobChanges.notify({ type: 'book-merge', ownerId: job.requestedByUserId, state: true });
       this.logger.log(
         `[${MERGE_EVENT}] [end] jobId=${job.id} phase=recovery status=${status} mergedCount=${mergedSourceIds.length} unresolvedMoves=${unresolved.length} - interrupted merge recovered`,
       );

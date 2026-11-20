@@ -68,6 +68,7 @@ import { usePersonalNote, PERSONAL_NOTE_MAX_LENGTH } from '@/features/book/compo
 import { useResetReadingState } from '@/features/book/composables/useResetReadingState'
 import DeleteBookDialog from '@/features/book/components/DeleteBookDialog.vue'
 import BookLinkedChips from '@/features/book/components/link/BookLinkedChips.vue'
+import BookTaxonomyPill from '@/features/book/components/detail/details/BookTaxonomyPill.vue'
 import { useBookLinkActions } from '@/features/book/composables/useBookLinkActions'
 import type { LinkSeedBook } from '@/features/book/lib/book-link'
 import MoveToLibrarySheet from '@/features/book/components/MoveToLibrarySheet.vue'
@@ -89,6 +90,7 @@ import StorygraphBookSyncGridItem from '@/features/storygraph/components/Storygr
 import BookEditionsCard, { type EditionProgress } from '@/features/book/components/detail/details/BookEditionsCard.vue'
 import BookReadingActivityCard from '@/features/book/components/detail/details/BookReadingActivityCard.vue'
 import ReadAloudSyncMeter from '@/features/book/components/detail/details/ReadAloudSyncMeter.vue'
+import StoryGuideCard from '@/features/story-guide/components/StoryGuideCard.vue'
 import BookMissingFormatRequest from '@/features/book-requests/components/BookMissingFormatRequest.vue'
 import { useBookReadingLog } from '@/features/book/composables/useBookReadingLog'
 import { useProviderLinkSettings } from '@/features/book/composables/useProviderLinkSettings'
@@ -174,7 +176,6 @@ const {
 
 onMounted(() => {
   void fetchWeights()
-  void reloadReadingLog()
   void loadProviderLinkSettings()
 })
 
@@ -203,7 +204,14 @@ const safeDescription = useSafeHtml(() => props.book.description)
 const filledCustomMetadata = computed(() => (props.book.customMetadata ?? []).filter((field) => field.value !== null && field.value !== ''))
 const displayedGenres = computed(() => props.book.genres.slice(0, visibleGenreCount.value))
 const hiddenGenres = computed(() => props.book.genres.slice(visibleGenreCount.value))
+const genreIds = computed(() => new Map((props.book.genreRefs ?? []).map((ref) => [ref.name, ref.id])))
+const tagIds = computed(() => new Map((props.book.tagRefs ?? []).map((ref) => [ref.name, ref.id])))
+const hiddenGenresOpen = ref(false)
 const GENRE_GAP_PX = 6
+
+function closeHiddenGenres() {
+  hiddenGenresOpen.value = false
+}
 
 function resetGenreFoldState() {
   visibleGenreCount.value = props.book.genres.length
@@ -344,7 +352,7 @@ const hasCover = computed(() => props.book.coverSource !== null)
 const showCoverStack = computed(() => hasCoverPair(props.book))
 const coverLightboxMedium = ref<CoverMedium | undefined>(undefined)
 const { coverUrl } = useCoverVersions()
-const coverSrc = computed(() => coverUrl(props.book.id, 'cover', props.book.coverVersion))
+const coverSrc = computed(() => coverUrl(props.book.id, 'display', props.book.coverVersion))
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -405,6 +413,38 @@ watch([coverColumnEl, coverActionsEl], ([column, actions]) => {
   if (column) coverLayoutObserver?.observe(column)
   if (actions) coverLayoutObserver?.observe(actions)
   measureCoverLayout()
+})
+
+/**
+ * From 46rem of pane width, Story Guide sits under the cover's actions instead of in the rail. The
+ * width is measured rather than left to a container query because the card must mount in one
+ * place only: it loads the guide's status when it mounts and polls while a build runs.
+ */
+const WIDE_DETAIL_LAYOUT_REM = 46
+const detailsLayoutEl = ref<HTMLElement | null>(null)
+const detailsLayoutWidth = ref<number | null>(null)
+let detailsLayoutObserver: ResizeObserver | null = null
+
+function measureDetailsLayout() {
+  detailsLayoutWidth.value = detailsLayoutEl.value?.getBoundingClientRect().width ?? 0
+}
+
+const storyGuideBesideCover = computed<boolean | null>(() => {
+  const width = detailsLayoutWidth.value
+  if (width === null) return null
+  const rootFontSize = Number.parseFloat(getComputedStyle(document.documentElement).fontSize) || 16
+  return width >= WIDE_DETAIL_LAYOUT_REM * rootFontSize
+})
+
+onMounted(() => {
+  measureDetailsLayout()
+  detailsLayoutObserver = new ResizeObserver(measureDetailsLayout)
+  if (detailsLayoutEl.value) detailsLayoutObserver.observe(detailsLayoutEl.value)
+})
+
+onBeforeUnmount(() => {
+  detailsLayoutObserver?.disconnect()
+  detailsLayoutObserver = null
 })
 
 const coverAspectRatio = useBookCoverAspectRatio(() => props.book)
@@ -618,7 +658,7 @@ async function savePersonalNote() {
 }
 
 const bookIdRef = computed(() => props.book.id)
-const { sessions: readingSessions, stats: readingStats, loading: readingLogLoading, reload: reloadReadingLog } = useBookReadingLog(bookIdRef)
+const { sessions: readingSessions, stats: readingStats, loading: readingLogLoading } = useBookReadingLog(bookIdRef)
 
 const { setStatus, updateStatus } = useBookStatus()
 
@@ -954,10 +994,6 @@ const editionProgress = computed<EditionProgress[]>(() => {
     byKey.set(audioEntry.key, { key: audioEntry.key, percentage: audioPercentage, finished: audioPercentage >= 100, resetFileId: -props.book.id })
   }
   return [...byKey.values()]
-})
-
-watch(bookIdRef, () => {
-  void reloadReadingLog()
 })
 
 function handleEditionReset(key: string) {
@@ -1379,6 +1415,7 @@ watch(
   <!-- Below 46rem of pane width the page is a single column. Above it, the shelf follows the
        natural height of the three-column content instead of being pinned to the viewport bottom. -->
   <div
+    ref="detailsLayoutEl"
     data-test="details-layout"
     class="flex flex-col gap-5 @min-[46rem]/book-detail:grid @min-[46rem]/book-detail:content-start @min-[46rem]/book-detail:grid-cols-[clamp(12rem,23cqi,17rem)_minmax(16rem,1fr)_clamp(15rem,26cqi,19.25rem)] @min-[46rem]/book-detail:gap-x-6 @min-[46rem]/book-detail:gap-y-5"
   >
@@ -1386,7 +1423,7 @@ watch(
     <div
       ref="coverColumnEl"
       data-test="cover-column"
-      class="flex min-w-0 flex-col gap-4 @min-[46rem]/book-detail:col-start-1 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0"
+      class="flex min-w-0 flex-col gap-4 @min-[46rem]/book-detail:col-start-1 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:self-start"
     >
       <div class="flex items-start gap-4 sm:gap-5 @min-[46rem]/book-detail:block @min-[46rem]/book-detail:min-h-0">
         <div
@@ -1469,8 +1506,7 @@ watch(
                 <RouterLink
                   :to="{ name: 'author-detail', params: { id: author.id } }"
                   class="transition-colors hover:text-primary hover:underline underline-offset-2"
-                  >{{ author.name }}</RouterLink
-                ><span v-if="index < authorLinks.length - 1">, </span>
+                  >{{ author.name }}</RouterLink><span v-if="index < authorLinks.length - 1">, </span>
               </template>
             </span>
           </p>
@@ -1699,11 +1735,13 @@ watch(
           <TooltipContent>{{ koboAnomaly.tooltip }}</TooltipContent>
         </Tooltip>
       </div>
+
+      <StoryGuideCard v-if="storyGuideBesideCover === true" :book-id="book.id" />
     </div>
 
     <!-- Main column -->
     <div
-      class="flex min-w-0 flex-col gap-2.5 @min-[46rem]/book-detail:col-start-2 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:overflow-y-auto"
+      class="flex min-w-0 flex-col gap-2.5 @min-[46rem]/book-detail:col-start-2 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:self-start @min-[46rem]/book-detail:overflow-y-auto"
     >
       <div class="hidden @min-[46rem]/book-detail:block">
         <!-- Identity block -->
@@ -1730,8 +1768,7 @@ watch(
                 <RouterLink
                   :to="{ name: 'author-detail', params: { id: author.id } }"
                   class="hover:text-primary hover:underline underline-offset-2 transition-colors"
-                  >{{ author.name }}</RouterLink
-                ><span v-if="index < authorLinks.length - 1">, </span>
+                  >{{ author.name }}</RouterLink><span v-if="index < authorLinks.length - 1">, </span>
               </template>
             </span>
           </p>
@@ -1956,16 +1993,16 @@ watch(
       <!-- Genres + Tags -->
       <div v-if="book.genres.length || book.tags.length" class="space-y-1">
         <div v-if="book.genres.length" class="relative">
-          <div data-test="genre-row" class="flex min-w-0 items-center gap-1.5 overflow-hidden whitespace-nowrap">
-            <span
+          <div data-test="genre-row" class="-m-1 flex min-w-0 items-center gap-1.5 overflow-hidden p-1 whitespace-nowrap">
+            <BookTaxonomyPill
               v-for="(genre, index) in displayedGenres"
               :key="`${genre}-${index}`"
               data-test="visible-genre"
-              class="chip-genre shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
-            >
-              {{ genre }}
-            </span>
-            <Popover v-if="genreHiddenCount > 0">
+              kind="genre"
+              :name="genre"
+              :id="genreIds.get(genre)"
+            />
+            <Popover v-if="genreHiddenCount > 0" v-model:open="hiddenGenresOpen">
               <PopoverTrigger as-child>
                 <button
                   type="button"
@@ -1978,13 +2015,14 @@ watch(
               </PopoverTrigger>
               <PopoverContent align="start" class="w-80 max-w-[calc(100vw-2rem)] p-3">
                 <div data-test="hidden-genres" class="flex flex-wrap gap-1.5">
-                  <span
+                  <BookTaxonomyPill
                     v-for="(genre, index) in hiddenGenres"
                     :key="`hidden-${genre}-${index}`"
-                    class="chip-genre rounded-md px-2 py-0.5 text-[11px] font-medium"
-                  >
-                    {{ genre }}
-                  </span>
+                    kind="genre"
+                    :name="genre"
+                    :id="genreIds.get(genre)"
+                    @navigate="closeHiddenGenres"
+                  />
                 </div>
               </PopoverContent>
             </Popover>
@@ -1994,14 +2032,13 @@ watch(
             aria-hidden="true"
             class="pointer-events-none invisible absolute left-0 top-0 -z-10 flex w-full items-center gap-1.5 overflow-hidden whitespace-nowrap"
           >
-            <span
+            <BookTaxonomyPill
               v-for="(genre, index) in book.genres"
               :key="`measure-${genre}-${index}`"
               data-genre-pill="true"
-              class="chip-genre shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium"
-            >
-              {{ genre }}
-            </span>
+              kind="genre"
+              :name="genre"
+            />
             <button
               type="button"
               tabindex="-1"
@@ -2014,7 +2051,7 @@ watch(
         </div>
 
         <div v-if="book.tags.length" class="flex flex-wrap gap-1.5">
-          <span v-for="tag in book.tags" :key="tag" class="chip-tag rounded-md border px-2 py-0.5 text-[11px] font-medium"> #{{ tag }} </span>
+          <BookTaxonomyPill v-for="tag in book.tags" :key="tag" kind="tag" :name="tag" :id="tagIds.get(tag)" />
         </div>
       </div>
 
@@ -2155,20 +2192,15 @@ watch(
         </div>
       </section>
 
-      <BookReadingActivityCard
-        class="@min-[46rem]/book-detail:flex-1"
-        :stats="readingStats"
-        :sessions="readingSessions"
-        :loading="readingLogLoading"
-      />
+      <BookReadingActivityCard :stats="readingStats" :sessions="readingSessions" :loading="readingLogLoading" />
     </div>
 
     <!-- Detail rail -->
     <div
-      class="flex min-w-0 flex-col gap-3 @min-[46rem]/book-detail:col-start-3 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:overflow-y-auto"
+      class="flex min-w-0 flex-col gap-3 @min-[46rem]/book-detail:col-start-3 @min-[46rem]/book-detail:row-start-1 @min-[46rem]/book-detail:min-h-0 @min-[46rem]/book-detail:self-start @min-[46rem]/book-detail:overflow-y-auto"
     >
       <section
-        class="flex min-h-0 flex-col rounded-xl border border-border bg-card px-4 pt-3 pb-2 @min-[46rem]/book-detail:flex-1"
+        class="flex min-h-0 flex-col rounded-xl border border-border bg-card px-4 pt-3 pb-2"
         :aria-label="t('book.detail.details.detailsHeading')"
       >
         <h3 class="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -2387,6 +2419,8 @@ watch(
           <BookMissingFormatRequest :book="book" />
         </template>
       </BookEditionsCard>
+
+      <StoryGuideCard v-if="storyGuideBesideCover === false" :book-id="book.id" />
 
       <div v-if="filledCustomMetadata.length > 0" class="mt-6 pt-5 border-t border-border">
         <p class="text-[11px] font-semibold uppercase tracking-widest text-muted-foreground mb-3">{{ t('book.detail.details.customMetadata') }}</p>

@@ -26,6 +26,9 @@ import type {
   BookDockFinalizePreviewResult,
   BookDockFinalizePreviewStatus,
   BookDockFinalizeResult,
+  BookDockHoldDetail,
+  BookDockHoldReason,
+  BookDockEffectiveSettings,
   BookDockJoinBook,
   BookDockJoinErrorCode,
   BookDockJoinSuggestion,
@@ -64,13 +67,17 @@ import { bookMetadata, bookNarrators, libraries, libraryFolders } from '../../db
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { LibraryService } from '../library/library.service';
+import { UserService } from '../user/user.service';
 import { MetadataService } from '../metadata/metadata.service';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
 import { UploadProcessorService, type UnitBookFileInput, type UnitBookRecords } from '../upload/upload-processor.service';
 import { UploadStorageService } from '../upload/upload-storage.service';
 import { UploadValidatorService } from '../upload/upload-validator.service';
 import { inspectEpubMediaOverlayFields } from '../reader/epub/epub-media-overlay-capability';
-import { BookDockRepository } from './book-dock.repository';
+import { BookDockRepository, type BookDockFilter } from './book-dock.repository';
+import { BookDockDuplicateService, IDENTIFIER_MATCH_REASONS, type DuplicateMatch } from './book-dock-duplicate.service';
+import { BookDockKeptFilesService } from './book-dock-kept-files.service';
+import { BookDockDigestService } from './book-dock-digest.service';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
 import {
@@ -84,6 +91,8 @@ import {
 import { normalizeBookDockMetadata } from './book-dock-metadata.utils';
 import { BookDockProcessingStateService } from './book-dock-processing-state.service';
 import { BookDockWorkQueue } from './book-dock-work-queue';
+import { LibraryDockRegistry } from './library-dock-registry.service';
+import { resolveDockSettings } from './library-dock-settings';
 import type { BookDockFileRow, BookDockUnitFileRow } from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -124,6 +133,26 @@ type FinalizeOverrideEntry = {
 };
 
 type PreviewJoinInfo = { canJoinBook: boolean; suggestedJoinBook?: BookDockJoinSuggestion };
+
+type AutoFileHold = { reason: BookDockHoldReason; detail: BookDockHoldDetail | null };
+
+/** What the auto-file check concluded for one file: wait (with the reason, when there is one), or file it as prepared. */
+type AutoFileDecision =
+  | { kind: 'wait'; hold: AutoFileHold | null }
+  | { kind: 'file'; analysis: FinalizeCandidateAnalysis; existingDestinations: Map<string, number>; join: DuplicateMatch | null };
+
+const NO_DEFAULT_DESTINATION = { libraryId: null, folderId: null };
+
+/** The hold a finalize preview status stands for. `error` has none: it is logged where it happens. */
+const HOLD_FOR_PREVIEW_STATUS: Partial<Record<BookDockFinalizePreviewStatus, BookDockHoldReason>> = {
+  missing_destination: 'no_destination',
+  invalid_target: 'no_folder',
+  invalid_format: 'not_allowed_in_library',
+  unsupported_layout: 'unsupported_layout',
+  access_denied: 'waiting_for_manager',
+  duplicate: 'duplicate',
+  destination_conflict: 'destination_conflict',
+};
 
 const BATCH_SIZE = 100;
 const PREVIEW_ITEM_LIMIT = 200;
@@ -271,6 +300,8 @@ function unitDestinationFolder(destPath: string, folderPath: string): string {
 export class BookDockFinalizeService implements OnModuleInit, OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BookDockFinalizeService.name);
   private readonly autoFinalizeQueue: BookDockWorkQueue;
+  /** Works out again why files wait, after an edit. Never files anything. */
+  private readonly holdReviewQueue: BookDockWorkQueue;
 
   constructor(
     @Inject(DB) private readonly db: Db,
@@ -288,6 +319,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     private readonly notificationService: NotificationService,
     private readonly processingState: BookDockProcessingStateService,
     private readonly fileWriteService: FileWriteService,
+    private readonly dockRegistry: LibraryDockRegistry,
+    private readonly duplicates: BookDockDuplicateService,
+    private readonly users: UserService,
+    private readonly keptFiles: BookDockKeptFilesService,
+    private readonly digest: BookDockDigestService,
     @Optional() private readonly seriesIdentity?: SeriesIdentityService,
     @Optional() private readonly seriesMemberships?: SeriesMembershipService,
     @Optional() private readonly providerIdStore?: ProviderIdStore,
@@ -296,6 +332,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     this.autoFinalizeQueue = new BookDockWorkQueue(
       AUTO_FINALIZE_QUEUE_CONCURRENCY,
       (fileId) => this.triggerAutoFinalize(fileId),
+      (fileId, error) => this.logAutoFinalizeQueueFailure(fileId, error),
+    );
+    this.holdReviewQueue = new BookDockWorkQueue(
+      AUTO_FINALIZE_QUEUE_CONCURRENCY,
+      (fileId) => this.reviewHold(fileId),
       (fileId, error) => this.logAutoFinalizeQueueFailure(fileId, error),
     );
   }
@@ -309,11 +350,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
   async onApplicationBootstrap(): Promise<void> {
     if (await this.processingState.isPaused()) {
       this.autoFinalizeQueue.pause();
+      this.holdReviewQueue.pause();
     }
   }
 
   onModuleDestroy(): void {
     this.autoFinalizeQueue.stop();
+    this.holdReviewQueue.stop();
   }
 
   async finalize(
@@ -331,6 +374,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     needsReview?: boolean,
     readyToFile?: boolean,
     requester?: RequestUser,
+    filter?: BookDockFilter,
   ): Promise<BookDockFinalizeResult> {
     const ids = selectAll ? [] : dedupeIds(fileIds ?? []);
     const overrideMap = toOverrideMap(overrides);
@@ -350,6 +394,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
           search,
           needsReview,
           readyToFile,
+          filter,
           userId,
           canManageAll,
         });
@@ -380,7 +425,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
               fileId,
               fileName: `book-dock-file-${fileId}`,
               success: false,
-              message: 'Book Dock file not found',
+              message: 'Library Dock file not found',
             });
             continue;
           }
@@ -398,7 +443,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     this.notificationService
       .notify({
         type: failed > 0 ? NotificationType.BookDockFinalizedWithErrors : NotificationType.BookDockFinalized,
-        title: failed > 0 ? 'Book Dock finalization completed with errors' : 'Book Dock finalization completed',
+        title: failed > 0 ? 'Library Dock finalization completed with errors' : 'Library Dock finalization completed',
         message: `${succeeded} succeeded, ${failed} failed`,
         scope: { kind: 'user', userId },
         meta: { total: results.length, succeeded, failed },
@@ -438,14 +483,23 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         return { fileId: row.id, fileName: row.fileName, success: false, message: 'Finalization target could not be resolved' };
       }
 
-      // Every file of the unit, or the single file that is the whole unit. Moved one at a time and
-      // remembered as they land, so a failure part-way can put back exactly what was moved.
-      const moved: Array<{ from: string; to: string }> = [];
+      // Every file of the unit, or the single file that is the whole unit. Placed one at a time and
+      // remembered as they land, so a failure part-way can undo exactly what was placed. A
+      // keep-original dock links or copies instead of moving, and undoing that only ever removes
+      // the library's copy: the original is never touched (D34).
+      const keepOriginal = await this.keptFiles.keepsOriginals(row);
+      const undo: Array<() => Promise<unknown>> = [];
+      let copied = 0;
       const placeAndRecord = async () => {
         try {
           for (const file of placement) {
-            await this.storage.moveToPath(file.sourcePath, file.destPath);
-            moved.push({ from: file.destPath, to: file.sourcePath });
+            if (keepOriginal) {
+              if ((await this.storage.linkToPath(file.sourcePath, file.destPath)) === 'copied') copied++;
+              undo.push(() => unlink(file.destPath));
+            } else {
+              await this.storage.moveToPath(file.sourcePath, file.destPath);
+              undo.push(() => this.storage.moveToPath(file.destPath, file.sourcePath));
+            }
           }
           const persistedPath = (await resolveExistingPathSpelling(destPath, folder.path)) ?? destPath;
           // The primary is first and the siblings after, because the book row that carries
@@ -455,7 +509,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
           const records = await this.createUnitBookRecord(library, folder, placement, persistedPath, format, preparedAnalysis.bookFolderPath);
           return { persistedPath, records };
         } catch (err) {
-          await this.undoMoves(moved);
+          await this.undoPlacement(undo);
           throw err;
         }
       };
@@ -485,13 +539,22 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         // join that transaction, so the compensation is explicit: take back exactly what this unit
         // wrote, then put the files back where they came from.
         await this.undoUnitBookRecords(written, row.id);
-        await this.undoMoves(moved);
+        await this.undoPlacement(undo);
         throw err;
       }
 
       // After the metadata, whose duration it supersedes, and before any write-back touches the files.
       await this.measureAudioDurations(written.bookIds, row.id);
       this.processor.reconcileCoversAsync(written.bookIds);
+      if (keepOriginal) {
+        // Before the row goes: its unit membership is what says which files stay behind.
+        await this.keptFiles.remember(row, { bookId });
+        if (copied > 0) {
+          this.logger.warn(
+            `[book_dock.keep_original] [end] fileId=${row.id} bookId=${bookId} files=${placement.length} copied=${copied} - hardlink unavailable, copied instead; the file now uses disk space twice`,
+          );
+        }
+      }
       await this.cleanupBookDockRecord(row);
       if (library.fileWriteEnabled) {
         for (const created of written.bookIds) {
@@ -530,6 +593,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     needsReview?: boolean,
     readyToFile?: boolean,
     requester?: RequestUser,
+    filter?: BookDockFilter,
   ): Promise<BookDockFinalizePreviewResult> {
     const summary = createFinalizePreviewSummary();
     const overrideMap = toOverrideMap(overrides);
@@ -545,6 +609,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       search,
       needsReview,
       readyToFile,
+      filter,
       async (rows, missingIds) => {
         const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
         const analyses: FinalizeCandidateAnalysis[] = [];
@@ -560,7 +625,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
             fileId,
             fileName: `book-dock-file-${fileId}`,
             status: 'error',
-            message: 'Book Dock file not found',
+            message: 'Library Dock file not found',
           });
         }
       },
@@ -584,6 +649,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     needsReview?: boolean,
     readyToFile?: boolean,
     requester?: RequestUser,
+    filter?: BookDockFilter,
   ): Promise<BookDockDiscardDuplicatesResult> {
     const startedAt = Date.now();
     this.logger.log(`[book_dock.discard_duplicates] [start] userId=${userId} selectAll=${selectAll === true} - duplicate discard started`);
@@ -604,6 +670,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         search,
         needsReview,
         readyToFile,
+        filter,
         async (rows, missingIds) => {
           total += rows.length + missingIds.length;
           const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
@@ -616,8 +683,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
           if (duplicateRows.length === 0) return;
 
+          const keepsOriginals = await this.keptFiles.keepOriginalCheck();
           for (const row of duplicateRows) {
-            await this.cleanupDiscardedBookDockFile(row);
+            await this.cleanupDiscardedBookDockFile(row, await keepsOriginals(row));
             discardedFileIds.push(row.id);
           }
           await this.repo.deleteByIds(duplicateRows.map((row) => row.id));
@@ -786,9 +854,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         fileId: analysis.fileId,
         libraryId: analysis.library.id,
         metadata: normalizeBookDockMetadata(analysis.row.selectedMetadata ?? analysis.row.embeddedMetadata),
-        formats: (analysis.placement ?? [])
-          .filter((file) => file.role === 'content')
-          .map((file) => (file.format ?? extname(file.destPath).slice(1)).toLowerCase()),
+        formats: placedContentFormats(analysis),
       });
     }
 
@@ -928,9 +994,9 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
   }
 
   /** Undoes a part-placed unit. Never throws: it runs while another error is on its way up. */
-  private async undoMoves(moved: Array<{ from: string; to: string }>): Promise<void> {
-    for (const move of moved) {
-      await this.storage.moveToPath(move.from, move.to).catch(() => {});
+  private async undoPlacement(undo: Array<() => Promise<unknown>>): Promise<void> {
+    for (const step of undo) {
+      await step().catch(() => {});
     }
   }
 
@@ -1081,6 +1147,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     search: string | undefined,
     needsReview: boolean | undefined,
     readyToFile: boolean | undefined,
+    filter: BookDockFilter | undefined,
     processBatch: (rows: BookDockFileRow[], missingIds: number[]) => Promise<void>,
   ): Promise<void> {
     if (selectAll) {
@@ -1094,6 +1161,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
           search,
           needsReview,
           readyToFile,
+          filter,
           userId,
           canManageAll,
         });
@@ -1120,46 +1188,209 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       this.autoFinalizeQueue.pause();
       return;
     }
+    await this.evaluateAutoFile(fileId, true);
+  }
 
-    const settings = await this.appSettings.getAutoFinalizeSettings();
-    if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return;
+  private async reviewHold(fileId: number): Promise<void> {
+    if (await this.processingState.isPaused()) {
+      this.holdReviewQueue.pause();
+      return;
+    }
+    await this.evaluateAutoFile(fileId, false);
+  }
 
+  /**
+   * Works out again why each file waits, after an edit changed what it would be filed as or where.
+   * Never files anything: a file someone is working on does not leave the dock under them.
+   */
+  reviewHolds(fileIds: number[]): void {
+    if (this.processingState.getCachedPaused()) this.holdReviewQueue.pause();
+    for (const fileId of fileIds) this.holdReviewQueue.enqueue(fileId);
+  }
+
+  /**
+   * Whether a ready file can file itself under its dock's settings (D15). When it cannot, the reason
+   * is recorded on the row (D31); when it can and `fileIfClear`, it is filed. A row another module
+   * owns is left alone: that module runs its own checks before filing it, and racing it would file
+   * the wrong book or file it too soon.
+   */
+  private async evaluateAutoFile(fileId: number, fileIfClear: boolean): Promise<void> {
     const row = await this.repo.findById(fileId);
-    if (!row) return;
-    // Another module put this row here and runs its own checks before filing it. Racing it would
-    // either file the wrong book into the right library or file it before those checks ran.
-    if (row.autoFinalizeSuppressed) return;
-    if (!shouldAutoFinalize(row, settings.metadataMode, settings.threshold)) return;
+    if (!row || row.status !== 'ready' || row.autoFinalizeSuppressed) return;
 
-    const { metadata: autoFinalizeMetadata, lookedUpCoverUrl } = separateLookedUpCover(
-      resolveAutoFinalizeMetadata(settings.metadataMode, row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata),
+    const global = await this.appSettings.getBookDockSettings();
+    const dock = row.dockId == null ? undefined : await this.dockRegistry.findById(row.dockId);
+    const settings = resolveDockSettings(dock ?? null, global);
+    // Only Unsorted falls back to the global destination, and only when auto-file would use it.
+    const fallback =
+      row.dockId == null && settings.autoFinalizeEnabled
+        ? { libraryId: global.autoFinalizeLibraryId, folderId: global.autoFinalizeFolderId }
+        : NO_DEFAULT_DESTINATION;
+
+    const decision = await this.decideAutoFile(row, settings, fallback);
+    const newlyHeld = await this.recordHold(row, decision.kind === 'wait' ? decision.hold : null);
+    // The digest reports what auto-file did, so a hold counts only where auto-file looked (D32).
+    if (newlyHeld && fileIfClear && settings.autoFinalizeEnabled) this.digest.recordHeld(row);
+    if (decision.kind !== 'file' || !fileIfClear) return;
+
+    const startedAt = Date.now();
+    const result = await this.finalizePreparedCandidate(decision.analysis, decision.existingDestinations);
+    if (result.success) {
+      this.logger.log(
+        `[book_dock.auto_file] [end] fileId=${fileId} dockId=${row.dockId ?? 'none'} bookId=${result.bookId} joined=${decision.join !== null} confidence=${row.confidence ?? 'none'} durationMs=${Date.now() - startedAt} - Book Dock file filed itself`,
+      );
+      this.emitChange();
+      this.digest.recordFiled(row, result.bookId);
+      return;
+    }
+    this.digest.recordHeld(row);
+
+    // A book that could not take this file as another format is still the same book.
+    if (decision.join) {
+      const fresh = await this.repo.findById(fileId);
+      if (fresh) await this.recordHold(fresh, this.duplicateHold(decision.join, decision.analysis.library!));
+    }
+    this.logger.warn(
+      `[book_dock.auto_file] [fail] fileId=${fileId} dockId=${row.dockId ?? 'none'} durationMs=${Date.now() - startedAt} errorClass=FinalizeFailed error="${sanitizeLogValue(result.message ?? 'unknown')}" - Book Dock file could not file itself`,
+    );
+  }
+
+  /**
+   * The checks, in the order a person would want the reason: where it goes, whether the library takes
+   * it, whether the library already holds it, whether auto-file may act (confidence, uploader), and
+   * whether its path is free. Steps that only matter to auto-file are skipped when it is off, so a
+   * file waiting for a person still says what would stop "File" from working.
+   */
+  private async decideAutoFile(
+    row: BookDockFileRow,
+    settings: BookDockEffectiveSettings,
+    fallback: { libraryId: number | null; folderId: number | null },
+  ): Promise<AutoFileDecision> {
+    const autoFile = settings.autoFinalizeEnabled;
+    const destination = resolveAutoFinalizeDestination(row, fallback);
+    if (!destination) {
+      if (row.targetLibraryId !== null) return this.wait('no_folder', await this.libraryDetail(row.targetLibraryId));
+      return autoFile ? this.wait('no_destination', null) : { kind: 'wait', hold: null };
+    }
+
+    const { metadata, lookedUpCoverUrl } = separateLookedUpCover(
+      resolveAutoFinalizeMetadata(settings.autoFinalizeMetadataMode, row.embeddedMetadata, row.fetchedMetadata, row.selectedMetadata),
       row.selectedMetadata,
     );
-    const rowForFinalize = autoFinalizeMetadata
-      ? {
-          ...row,
-          selectedMetadata: autoFinalizeMetadata,
-        }
-      : row;
+    const candidate = metadata ? { ...row, selectedMetadata: metadata } : row;
+    const baseOverride: FinalizeOverrideEntry = lookedUpCoverUrl ? { lookedUpCoverUrl } : {};
+    // Prepared as the system: whether the uploader may add it is its own check below, with its own reason.
+    const prepare = (override: FinalizeOverrideEntry) =>
+      this.prepareFinalizeBatch([candidate], destination.libraryId, destination.folderId, new Map([[row.id, override]]), 0, true);
 
-    const overrideMap = new Map<number, FinalizeOverrideEntry>(lookedUpCoverUrl ? [[row.id, { lookedUpCoverUrl }]] : []);
-    const result = await this.finalizeFile(rowForFinalize, settings.libraryId, settings.folderId, overrideMap, 0, true);
-    if (result.success) {
-      this.logger.log(`Auto-finalized Book Dock file ${fileId} -> book ${result.bookId} (confidence ${row.confidence}%)`);
-      this.emitChange();
-
-      this.notificationService
-        .notify({
-          type: NotificationType.BookDockFinalized,
-          title: 'Book auto-finalized',
-          message: `"${row.fileName}" was added to your library`,
-          scope: row.uploadedBy ? { kind: 'user', userId: row.uploadedBy } : { kind: 'permission', permission: Permission.ManageBookDock },
-          meta: { fileId, bookId: result.bookId },
-        })
-        .catch(() => {});
-    } else {
-      this.logger.warn(`Auto-finalize skipped for Book Dock file ${fileId}: ${result.message}`);
+    let prepared = await prepare(baseOverride);
+    let analysis = prepared.analyses[0];
+    if (!analysis) return { kind: 'wait', hold: null };
+    if (analysis.status !== 'ready' || !analysis.library) {
+      const reason = HOLD_FOR_PREVIEW_STATUS[analysis.status];
+      return { kind: 'wait', hold: reason ? { reason, detail: await this.libraryDetail(destination.libraryId) } : null };
     }
+    const library = analysis.library;
+    const libraryDetail = { libraryId: library.id, libraryName: library.name };
+
+    // Only a match in the library it is headed for holds the file (D29); "Keep both" waives it.
+    const keepBoth = row.holdDetail?.keepBoth === true;
+    let join: DuplicateMatch | null = null;
+    if (!keepBoth) {
+      const matches = await this.duplicates.findMatches([{ fileId: row.id, metadata, formats: placedContentFormats(analysis) }], [library.id]);
+      const match = matches.get(row.id)?.[0];
+      if (match) {
+        // Auto-join (D30) needs an identifier: a title and author alone also match an abridged
+        // edition or a translation.
+        const joinable =
+          autoFile &&
+          settings.autoJoin &&
+          IDENTIFIER_MATCH_REASONS.has(match.reason) &&
+          match.canTakeFormat &&
+          library.organizationMode === 'book_per_folder';
+        if (!joinable) return { kind: 'wait', hold: this.duplicateHold(match, library) };
+        join = match;
+      }
+    }
+
+    if (autoFile) {
+      if (!shouldAutoFinalize(row, settings.autoFinalizeMetadataMode, settings.autoFinalizeThreshold)) {
+        return this.wait('low_confidence', {
+          ...(row.confidence !== null ? { confidence: row.confidence } : {}),
+          threshold: settings.autoFinalizeThreshold,
+        });
+      }
+      const uploader = await this.uploaderAllowedToFile(row, library.id);
+      if (uploader === false) return this.wait('waiting_for_manager', libraryDetail);
+      if (join && uploader && !(await this.joinService?.canJoinIn(library, uploader, new Map()))) {
+        return { kind: 'wait', hold: this.duplicateHold(join, library) };
+      }
+    }
+
+    if (join) {
+      prepared = await prepare({
+        ...baseOverride,
+        folderId: join.libraryFolderId,
+        joinBook: { bookId: join.bookId, folderPath: join.folderPath, storedAsFile: join.storedAsFile },
+      });
+      analysis = prepared.analyses[0];
+      if (!analysis || analysis.status !== 'ready' || !analysis.joinBook) return { kind: 'wait', hold: this.duplicateHold(join, library) };
+    }
+
+    const classified = await this.classifyDestination(analysis, prepared.existingDestinations);
+    if (classified.status === 'duplicate') {
+      // The same path already belongs to a book. "Keep both" cannot put a second file there.
+      if (keepBoth) return this.wait('destination_conflict', libraryDetail);
+      return this.wait('duplicate', { ...libraryDetail, ...(classified.existingBookId !== undefined ? { bookId: classified.existingBookId } : {}) });
+    }
+    if (classified.status === 'destination_conflict') return this.wait('destination_conflict', libraryDetail);
+    if (classified.status !== 'ready' || !autoFile) return { kind: 'wait', hold: null };
+    return { kind: 'file', analysis, existingDestinations: prepared.existingDestinations, join };
+  }
+
+  private wait(reason: BookDockHoldReason, detail: BookDockHoldDetail | null): AutoFileDecision {
+    return { kind: 'wait', hold: { reason, detail } };
+  }
+
+  private duplicateHold(match: DuplicateMatch, library: Pick<LibraryRow, 'id' | 'name'>): AutoFileHold {
+    return { reason: 'duplicate', detail: { libraryId: library.id, libraryName: library.name, bookId: match.bookId } };
+  }
+
+  private async libraryDetail(libraryId: number): Promise<BookDockHoldDetail> {
+    const name = (await this.repo.findLibraryNames([libraryId])).get(libraryId);
+    return name === undefined ? { libraryId } : { libraryId, libraryName: name };
+  }
+
+  /**
+   * Who a file is filed for (D24). A file dropped on disk has no uploader and files as the system
+   * (null). An upload files only while its uploader is active, may upload books, and can see the
+   * library; otherwise `false`, and a dock manager files it.
+   */
+  private async uploaderAllowedToFile(row: BookDockFileRow, libraryId: number): Promise<RequestUser | null | false> {
+    if (row.uploadedBy == null) return null;
+    const uploader = await this.users.findByIdWithPermissions(row.uploadedBy);
+    if (!uploader?.active) return false;
+    if (!uploader.isSuperuser && !uploader.permissions.includes(Permission.LibraryUpload)) return false;
+    try {
+      await this.libraryService.verifyAccess(uploader, libraryId);
+      return uploader;
+    } catch (error) {
+      if (error instanceof ForbiddenException || error instanceof NotFoundException) return false;
+      throw error;
+    }
+  }
+
+  /** Writes only on a change. A "Keep both" survives every reason, until the destination changes. */
+  /** Writes the reason only when it changed. True when a file that was not waiting now is. */
+  private async recordHold(row: BookDockFileRow, hold: AutoFileHold | null): Promise<boolean> {
+    const keepBoth = row.holdDetail?.keepBoth === true;
+    const reason = hold?.reason ?? null;
+    const merged: BookDockHoldDetail = { ...(hold?.detail ?? {}), ...(keepBoth ? { keepBoth: true } : {}) };
+    const detail = Object.keys(merged).length > 0 ? merged : null;
+    if ((row.holdReason ?? null) === reason && sameHoldDetail(row.holdDetail ?? null, detail)) return false;
+    await this.repo.update(row.id, { holdReason: reason, holdDetail: detail });
+    this.emitChange();
+    return (row.holdReason ?? null) === null && reason !== null;
   }
 
   /**
@@ -1178,7 +1409,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
   ): Promise<BookDockFinalizeFileResult> {
     const row = await this.repo.findById(fileId);
     if (!row) {
-      return { fileId, fileName: `book-dock-file-${fileId}`, success: false, message: 'Book Dock file not found' };
+      return { fileId, fileName: `book-dock-file-${fileId}`, success: false, message: 'Library Dock file not found' };
     }
 
     const { metadata: merged, lookedUpCoverUrl } = separateLookedUpCover(
@@ -1196,43 +1427,71 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     return result;
   }
 
-  private enqueueAutoFinalize(fileId: number): void {
+  /** Checks a file for auto-file, and files it when it may. Also how "Keep both" files a duplicate. */
+  enqueueAutoFinalize(fileId: number): void {
     if (this.processingState.getCachedPaused()) this.autoFinalizeQueue.pause();
     this.autoFinalizeQueue.enqueue(fileId);
   }
 
   pauseProcessing(): void {
     this.autoFinalizeQueue.pause();
+    this.holdReviewQueue.pause();
   }
 
   async resumeProcessing(): Promise<void> {
     if (await this.processingState.isPaused()) return;
     this.autoFinalizeQueue.resume();
+    this.holdReviewQueue.resume();
   }
 
+  /** On resume: every ready file, when any dock files by itself. Nothing to do when none does. */
   async requeueAutoFinalizeCandidates(): Promise<number> {
     if (await this.processingState.isPaused()) return 0;
+    const global = await this.appSettings.getBookDockSettings();
+    const docks = await this.dockRegistry.all();
+    if (!global.autoFinalizeEnabled && !docks.some((dock) => dock.autoFinalizeEnabled === true)) return 0;
+    return this.requeueReadyFiles(undefined);
+  }
 
-    const settings = await this.appSettings.getAutoFinalizeSettings();
-    if (!settings.enabled || settings.libraryId === null || settings.folderId === null) return 0;
+  /**
+   * After the dock settings change, every ready file they reach is checked again: a lower threshold
+   * files what it held, and auto-file turned off drops the reasons only it gave. `dockId` names one
+   * dock; without it, the global settings changed and every file is checked. Runs in the
+   * background and queues while paused, so a resume runs it.
+   */
+  recheckAfterSettingsChange(dockId?: number): void {
+    const startedAt = Date.now();
+    const scope = dockId ?? 'all';
+    this.requeueReadyFiles(dockId).then(
+      (queued) =>
+        this.logger.log(
+          `[book_dock.settings_recheck] [end] dockId=${scope} queued=${queued} durationMs=${Date.now() - startedAt} - ready files queued for another auto-file check`,
+        ),
+      (error: unknown) =>
+        this.logger.warn(
+          `[book_dock.settings_recheck] [fail] dockId=${scope} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - ready files could not be queued for another auto-file check`,
+        ),
+    );
+  }
 
+  private async requeueReadyFiles(dockId: number | undefined): Promise<number> {
     let queued = 0;
     let afterId: number | undefined;
-    while (!(await this.processingState.isPaused())) {
+    while (true) {
       const rows = await this.repo.findSelectionBatch({
         limit: BATCH_SIZE,
         afterId,
         status: 'ready',
         userId: 0,
         canManageAll: true,
+        ...(dockId !== undefined ? { dockId } : {}),
       });
       if (rows.length === 0) break;
 
       for (const row of rows) {
         if (row.autoFinalizeSuppressed) continue;
-        if (shouldAutoFinalize(row, settings.metadataMode, settings.threshold) && this.autoFinalizeQueue.enqueue(row.id)) {
-          queued++;
-        }
+        if (this.processingState.getCachedPaused()) this.autoFinalizeQueue.pause();
+        if (this.autoFinalizeQueue.enqueue(row.id)) queued++;
       }
       afterId = rows[rows.length - 1]?.id;
     }
@@ -1259,8 +1518,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     search?: string,
     needsReview?: boolean,
     readyToFile?: boolean,
+    filter?: BookDockFilter,
   ): Promise<{ fileId: number; fileName: string; newName: string }[]> {
-    const ids = selectAll ? await this.repo.findAllIds(excludedIds, status, search, userId, canManageAll, needsReview, readyToFile) : (fileIds ?? []);
+    const ids = selectAll
+      ? await this.repo.findAllIds(excludedIds, status, search, userId, canManageAll, needsReview, readyToFile, filter)
+      : (fileIds ?? []);
     if (!ids.length) return [];
 
     const rows = await this.repo.findByIds(ids, userId, canManageAll);
@@ -1576,13 +1838,20 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     await this.repo.deleteById(row.id);
   }
 
-  /** Discarding a unit throws away every file in it. Discarding track 1 of 31 is not a thing. */
-  private async cleanupDiscardedBookDockFile(row: BookDockFileRow): Promise<void> {
-    for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
-    if (row.unitDirectory) {
-      await removeEmptyDirectory(row.unitDirectory);
+  /**
+   * Discarding a unit throws away every file in it. Discarding track 1 of 31 is not a thing. In a
+   * keep-original dock nothing is deleted: the files are remembered and skipped from then on (D35).
+   */
+  private async cleanupDiscardedBookDockFile(row: BookDockFileRow, keepOriginal: boolean): Promise<void> {
+    if (keepOriginal) {
+      await this.keptFiles.remember(row, { discarded: true });
+    } else {
+      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
+      if (row.unitDirectory) {
+        await removeEmptyDirectory(row.unitDirectory);
+      }
+      await safeUnlink(row.absolutePath);
     }
-    await safeUnlink(row.absolutePath);
     if (row.coverPath) {
       await safeUnlink(row.coverPath);
       const thumbPath = row.coverPath.replace(/\.\w+$/, '_thumb.jpg');
@@ -1737,6 +2006,8 @@ function normalizeStringArray(value: unknown, maxLength: number): string[] {
 function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): NormalizedFinalizeMetadata {
   const normalizedMeta = normalizeBookDockMetadata(meta);
   const publishedDate = normalizePublishedDate(normalizedMeta?.publishedDate) ?? null;
+  const seriesName = normalizeText(normalizedMeta?.seriesName, 500);
+  const seriesIndex = parseSeriesIndex(normalizedMeta?.seriesIndex);
   return {
     title: normalizeText(normalizedMeta?.title, 1000),
     subtitle: normalizeText(normalizedMeta?.subtitle, 1000),
@@ -1748,8 +2019,8 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(normalizedMeta?.publishedYear),
     language: normalizeLanguage(normalizedMeta?.language),
     pageCount: normalizeInteger(normalizedMeta?.pageCount),
-    seriesName: normalizeText(normalizedMeta?.seriesName, 500),
-    seriesIndex: parseSeriesIndex(normalizedMeta?.seriesIndex),
+    seriesName,
+    seriesIndex,
     authors: normalizeStringArray(normalizedMeta?.authors, 500),
     genres: normalizeStringArray(normalizedMeta?.genres, 200),
     coverUrl: normalizeText(normalizedMeta?.coverUrl),
@@ -1767,7 +2038,7 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     ranobedbId: normalizeText(normalizedMeta?.ranobedbId, 50),
     lubimyczytacId: normalizeText(normalizedMeta?.lubimyczytacId, 512),
     aladinId: normalizeText(normalizedMeta?.aladinId, 20),
-    seriesMemberships: normalizeSeriesMemberships(normalizedMeta?.seriesMemberships),
+    seriesMemberships: withPrimarySeries(normalizeSeriesMemberships(normalizedMeta?.seriesMemberships), seriesName, seriesIndex),
     communityRatings: normalizeCommunityRatings(normalizedMeta?.communityRatings),
     externalProviderIds: normalizedMeta?.externalProviderIds ?? undefined,
     comicMetadata: normalizeComicMetadata(normalizedMeta?.comicMetadata),
@@ -1789,6 +2060,22 @@ function normalizeSeriesMemberships(value: BookDockMetadata['seriesMemberships']
     memberships.push({ seriesName, seriesIndex: parseSeriesIndex(item.seriesIndex) });
   }
   return memberships;
+}
+
+/**
+ * A provider match stores its whole series list, but the Book Dock form edits only the first entry as
+ * the series name and number. The form's values replace that entry, so a corrected series is filed
+ * instead of the provider's spelling.
+ */
+function withPrimarySeries(
+  memberships: MetadataSeriesMembership[] | undefined,
+  seriesName: string | null,
+  seriesIndex: string | null,
+): MetadataSeriesMembership[] | undefined {
+  if (memberships === undefined || !seriesName) return memberships;
+  const key = seriesName.toLowerCase();
+  const others = memberships.slice(1).filter((membership) => membership.seriesName.toLowerCase() !== key);
+  return [{ seriesName, seriesIndex }, ...others];
 }
 
 function normalizeCommunityRatings(
@@ -1975,7 +2262,7 @@ function asString(value: unknown): string {
   return typeof value === 'string' ? value : '';
 }
 
-function mergeBookDockMetadata(
+export function mergeBookDockMetadata(
   embedded: BookDockMetadata | null | undefined,
   fetched: BookDockMetadata | null | undefined,
   selected: BookDockMetadata | null | undefined,
@@ -2013,11 +2300,40 @@ function resolveAutoFinalizeMetadata(
   return mergeBookDockMetadata(embedded, fetched, selected);
 }
 
+/**
+ * Where auto-finalize files a row: its own destination first, the configured default otherwise.
+ * The default folder only stands in for a missing folder when it belongs to the row's library;
+ * a folder from another library would fail the placement after the work of preparing it.
+ */
+function resolveAutoFinalizeDestination(
+  row: BookDockFileRow,
+  settings: { libraryId: number | null; folderId: number | null },
+): { libraryId: number; folderId: number } | null {
+  const libraryId = row.targetLibraryId ?? settings.libraryId;
+  if (libraryId === null) return null;
+  const folderId = row.targetFolderId ?? (libraryId === settings.libraryId ? settings.folderId : null);
+  if (folderId === null) return null;
+  return { libraryId, folderId };
+}
+
 function shouldAutoFinalize(row: BookDockFileRow, mode: BookDockAutoFinalizeMetadataMode, threshold: number): boolean {
   if (mode === 'embedded_only') {
     return row.status === 'ready';
   }
   return row.confidence !== null && row.confidence >= threshold;
+}
+
+/** The content formats a prepared file would place, lowercased. */
+function placedContentFormats(analysis: FinalizeCandidateAnalysis): string[] {
+  return (analysis.placement ?? [])
+    .filter((file) => file.role === 'content')
+    .map((file) => (file.format ?? extname(file.destPath).slice(1)).toLowerCase());
+}
+
+function sameHoldDetail(a: BookDockHoldDetail | null, b: BookDockHoldDetail | null): boolean {
+  if (!a || !b) return a === b;
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)] as Array<keyof BookDockHoldDetail>);
+  return [...keys].every((key) => a[key] === b[key]);
 }
 
 function toOverrideMap(overrides: FinalizeRequestOverride[] | undefined): Map<number, FinalizeOverrideEntry> {

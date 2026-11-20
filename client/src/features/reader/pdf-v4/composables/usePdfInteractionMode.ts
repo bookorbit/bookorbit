@@ -1,20 +1,28 @@
-import type { MaybeRefOrGetter } from 'vue'
-import { useInteractionManager } from '@embedpdf/plugin-interaction-manager/vue'
-import { usePan } from '@embedpdf/plugin-pan/vue'
+import { computed } from 'vue'
+import { useInteraction, useInteractionState } from '@embedpdf/vue/interaction'
 
-const TEXT_SELECTION_MODE = 'pointerMode'
+const PAN_TOOL = 'pan'
+const TEXT_SELECTION_TOOL = 'pointer'
 
-export function usePdfInteractionMode(documentId: MaybeRefOrGetter<string>) {
-  const { isPanning, provides: pan } = usePan(documentId)
-  const { provides: interactionManager } = useInteractionManager(documentId)
+export function usePdfInteractionMode() {
+  const interaction = useInteraction()
+  const activeToolId = useInteractionState((state) => state.activeToolId)
+  const isPanning = computed(() => activeToolId.value === PAN_TOOL)
+
+  function activate(toolId: string) {
+    try {
+      interaction.activateTool(toolId)
+    } catch {
+      // No document is open yet, so there is no tool to switch.
+    }
+  }
 
   function togglePan() {
-    pan.value?.togglePan()
+    activate(isPanning.value ? TEXT_SELECTION_TOOL : PAN_TOOL)
   }
 
   function activateTextSelection() {
-    // EmbedPDF makes pan the default on touch devices, so disablePan() would reactivate pan.
-    interactionManager.value?.activate(TEXT_SELECTION_MODE)
+    activate(TEXT_SELECTION_TOOL)
   }
 
   return { isPanning, togglePan, activateTextSelection }

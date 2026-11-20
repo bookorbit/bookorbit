@@ -5,6 +5,7 @@ import { AchievementModule } from '../achievement/achievement.module';
 import { AppSettingsModule } from '../app-settings/app-settings.module';
 import { AudiobookChaptersModule } from '../audiobook-chapters/audiobook-chapters.module';
 import { BookAliasModule } from '../book-alias/book-alias.module';
+import { BulkRunsModule } from '../bulk-runs/bulk-runs.module';
 import { EmbeddingModule } from '../embedding/embedding.module';
 import { FileWriteModule } from '../file-write/file-write.module';
 import { LibraryModule } from '../library/library.module';
@@ -28,8 +29,11 @@ import { BookReadService } from './book-read.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { BookSortBuilder } from './book-sort-builder.service';
 import { BookController } from './book.controller';
+import { BookEmbedAudioCoverBulkHandler, BookReExtractCoverBulkHandler, BookRefreshMetadataBulkHandler } from './book-bulk-run-handlers';
 import { BookLinkMembersRepository } from './book-link-members.repository';
 import { BookRepository } from './book.repository';
+import { BookJobSubjects } from './book-job-subjects.service';
+import { BookJobSubjectsRepository } from './book-job-subjects.repository';
 import { BookService } from './book.service';
 import { BookAuthorSortKeyBackfillService } from './book-author-sort-key-backfill.service';
 import { ReadingAttemptController } from './reading-attempt.controller';
@@ -41,6 +45,7 @@ import { ReadingProgressService } from './reading-progress.service';
     forwardRef(() => LibraryModule),
     AudiobookChaptersModule,
     BookAliasModule,
+    BulkRunsModule,
     BookMetadataLockModule,
     BookCoverStoreModule,
     CustomMetadataModule,
@@ -60,7 +65,12 @@ import { ReadingProgressService } from './reading-progress.service';
   controllers: [BookController, ReadingAttemptController, ReadingProgressController],
   providers: [
     BookService,
+    BookRefreshMetadataBulkHandler,
+    BookReExtractCoverBulkHandler,
+    BookEmbedAudioCoverBulkHandler,
     BookRepository,
+    BookJobSubjects,
+    BookJobSubjectsRepository,
     BookLinkMembersRepository,
     BookReadService,
     BookSortBuilder,
@@ -74,6 +84,6 @@ import { ReadingProgressService } from './reading-progress.service';
     DeliveryHashRegistrationService,
     ReadingProgressService,
   ],
-  exports: [BookService, BookReadService, BookQueryBuilder, AudiolessEpubService, DeliveryArtifactService, DeliverySelectionService],
+  exports: [BookService, BookJobSubjects, BookReadService, BookQueryBuilder, AudiolessEpubService, DeliveryArtifactService, DeliverySelectionService],
 })
 export class BookModule {}

@@ -4,9 +4,11 @@ import {
   FileCog,
   FolderSync,
   HardDriveDownload,
+  Layers,
   Mail,
   RefreshCw,
   ScanLine,
+  Sparkles,
   Tags,
   Trophy,
   Users,
@@ -15,8 +17,8 @@ import {
 import type { NotificationCategory } from '@bookorbit/types'
 
 export const NOTIFICATION_CATEGORY_GROUPS = [
-  { id: 'library', categories: ['scanning', 'metadata', 'authorEnrichment'] },
-  { id: 'files', categories: ['fileWriteBack', 'fileRename', 'bulkRename', 'readAloud', 'migration'] },
+  { id: 'library', categories: ['scanning', 'metadata', 'authorEnrichment', 'bulkActions'] },
+  { id: 'files', categories: ['fileWriteBack', 'fileRename', 'bulkRename', 'readAloud', 'storyGuides', 'migration'] },
   { id: 'integrations', categories: ['bookDock', 'bookRequests', 'email'] },
   { id: 'personal', categories: ['achievements'] },
 ] as const satisfies ReadonlyArray<{ id: string; categories: readonly NotificationCategory[] }>
@@ -28,10 +30,12 @@ export const NOTIFICATION_CATEGORY_ICONS: Record<NotificationCategory, LucideIco
   fileWriteBack: HardDriveDownload,
   fileRename: FileCog,
   bulkRename: FileCog,
+  bulkActions: Layers,
   migration: RefreshCw,
   bookDock: FolderSync,
   bookRequests: BookPlus,
   email: Mail,
   readAloud: AudioLines,
+  storyGuides: Sparkles,
   achievements: Trophy,
 }

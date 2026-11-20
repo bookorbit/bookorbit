@@ -1,0 +1,1 @@
+CREATE INDEX "kps_user_file_page_start_idx" ON "koreader_page_stats" USING btree ("user_id","book_file_id","page","start_time");

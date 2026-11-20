@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Copy, FileText, Highlighter, Trash2 } from '@lucide/vue'
 import { ANNOTATION_HIGHLIGHT_COLORS } from '@bookorbit/types'
@@ -10,8 +10,6 @@ const { t } = useI18n()
 
 const props = defineProps<{
   visible: boolean
-  position: { x: number; y: number }
-  showBelow: boolean
   selectedText: string
   overlappingAnnotationId: number | null
   disabled?: boolean
@@ -23,7 +21,6 @@ const emit = defineEmits<{
   note: []
   deleteAnnotation: [id: number]
   dismiss: []
-  resize: []
 }>()
 
 const colors = ANNOTATION_HIGHLIGHT_COLORS
@@ -38,18 +35,6 @@ const showColorPicker = ref(false)
 const copied = ref(false)
 const selectedColor = ref<string>(ANNOTATION_HIGHLIGHT_COLORS[0].hex)
 const selectedStyle = ref('highlight')
-const rootElement = ref<HTMLElement | null>(null)
-
-defineExpose({ getElement: () => rootElement.value })
-
-watch(
-  [() => props.visible, showColorPicker],
-  () => {
-    void nextTick(() => emit('resize'))
-  },
-  { flush: 'post' },
-)
-
 function handleHighlightClick() {
   if (showColorPicker.value) {
     emit('highlight', selectedColor.value, selectedStyle.value)
@@ -97,17 +82,7 @@ async function handleCopy() {
 </script>
 
 <template>
-  <div
-    v-if="visible"
-    ref="rootElement"
-    class="absolute z-[60] select-none"
-    :style="{
-      left: `${position.x}px`,
-      top: `${position.y}px`,
-    }"
-    @mousedown.stop
-    @pointerdown.stop
-  >
+  <div v-if="visible" class="pointer-events-auto select-none" @mousedown.stop @pointerdown.stop>
     <div class="flex flex-col gap-1 rounded-lg border border-border bg-card p-1.5 text-card-foreground shadow-xl">
       <div class="flex gap-1">
         <Tooltip v-if="props.selectedText">

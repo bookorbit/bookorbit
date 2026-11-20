@@ -1,12 +1,14 @@
 import type { Mock } from 'vitest';
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 
-import type { AccessLevel } from '@bookorbit/types';
+import type { AccessLevel, BookMoveProgressEvent, BookMoveSummary } from '@bookorbit/types';
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { LibraryOperationGate } from '../../common/services/library-operation-gate.service';
 import type { RequestUser } from '../../common/types/request-user';
+import type { BulkRunRow } from '../../db/schema';
+import type { BulkRunEnd } from '../bulk-runs/bulk-run-handler';
 import { BookMovePlannerService } from './book-move-planner.service';
-import { BookMoveService } from './book-move.service';
+import { BookMoveService, bookMoveDoneEvent, type BookMoveRunPlan, type BookMoveRunState } from './book-move.service';
 import type { MoveBookData, MoveTargetLibrary } from './book-move.repository';
 import type { MoveBooksDto } from './dto/move-books.dto';
 
@@ -107,12 +109,104 @@ function buildService(): BookMoveService {
   );
 }
 
-function collectProgress() {
-  const events: unknown[] = [];
+function makeRun(plan: BookMoveRunPlan, overrides: Partial<BulkRunRow> = {}): BulkRunRow {
+  const now = new Date();
   return {
-    events,
-    options: { onProgress: (event: unknown) => events.push(event), isCancelled: () => false },
+    id: '11111111-1111-4111-8111-111111111111',
+    kind: 'book-move',
+    requestedBy: USER.id,
+    credentialKind: 'session',
+    apiKeyId: null,
+    status: 'running',
+    subjectIds: plan.subjectIds,
+    options: plan.options,
+    total: plan.subjectIds.length,
+    processed: 0,
+    succeeded: 0,
+    failed: 0,
+    skipped: 0,
+    stats: {},
+    failures: [],
+    errorCode: null,
+    error: null,
+    cancelRequested: false,
+    actorUsername: USER.username,
+    actorIp: null,
+    createdAt: now,
+    startedAt: now,
+    finishedAt: null,
+    dismissedAt: null,
+    ...overrides,
   };
+}
+
+interface RunMoveResult {
+  run: BulkRunRow;
+  state: BookMoveRunState | null;
+  events: BookMoveProgressEvent[];
+  summary: BookMoveSummary;
+}
+
+/** Drives a move the way the bulk-run dispatcher does: plan at creation, prepare, one book at a time, finish. */
+async function runMove(
+  dto: MoveBooksDto = makeDto(),
+  user: RequestUser = USER,
+  options: { cancelWhen?: () => boolean; end?: BulkRunEnd; error?: string } = {},
+): Promise<RunMoveResult> {
+  const plan = await service.planRun(dto, user);
+  const run = makeRun(plan, { requestedBy: user.id });
+  const events: BookMoveProgressEvent[] = [];
+  let state: BookMoveRunState | null = null;
+  if (plan.subjectIds.length > 0) {
+    const prepared = await service.prepareRun(run, user);
+    if (prepared === 'busy') throw new Error('busy');
+    state = prepared.state;
+    let end: BulkRunEnd = options.end ?? 'completed';
+    for (const bookId of run.subjectIds.slice(run.processed)) {
+      if (options.cancelWhen?.()) {
+        end = 'cancelled';
+        break;
+      }
+      const outcome = await service.moveOne(bookId, state, user);
+      run.processed++;
+      if (outcome.outcome === 'succeeded') run.succeeded++;
+      else if (outcome.outcome === 'failed') run.failed++;
+      else run.skipped++;
+      for (const [key, amount] of Object.entries(outcome.stats ?? {})) run.stats = { ...run.stats, [key]: (run.stats[key] ?? 0) + amount };
+      if (outcome.event) events.push(outcome.event as BookMoveProgressEvent);
+    }
+    run.status = end;
+    if (end === 'failed') run.error = options.error ?? 'failed';
+    await service.finishRun(run, state, end);
+  } else {
+    run.status = 'completed';
+  }
+  const done = bookMoveDoneEvent(run) as { done: true } & BookMoveSummary;
+  const summary: BookMoveSummary = {
+    processed: done.processed,
+    succeeded: done.succeeded,
+    merged: done.merged,
+    failed: done.failed,
+    skipped: done.skipped,
+    cancelled: done.cancelled,
+  };
+  return { run, state, events, summary };
+}
+
+function twoBooks(): MoveBookData[] {
+  return [
+    makeBook({
+      bookId: 1,
+      folderPath: '/libA/One',
+      files: [{ id: 10, absolutePath: '/libA/One/a.epub', relPath: null, role: 'content', format: 'epub', fileHash: null, sortOrder: null }],
+    }),
+    makeBook({
+      bookId: 2,
+      folderPath: '/libA/Two',
+      metadata: { ...makeBook().metadata, title: 'Two' },
+      files: [{ id: 20, absolutePath: '/libA/Two/b.epub', relPath: null, role: 'content', format: 'epub', fileHash: null, sortOrder: null }],
+    }),
+  ];
 }
 
 beforeEach(() => {
@@ -297,11 +391,11 @@ describe('preview', () => {
   });
 });
 
-describe('execute guards', () => {
+describe('creating a run', () => {
   it('refuses when a scan is running on any involved library', async () => {
     const releaseScan = libraryGate.tryAcquire(1, 'scan');
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toThrow(/scan is running/);
+    await expect(service.planRun(makeDto(), USER)).rejects.toThrow(/scan is running/);
     expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
     expect(libraryGate.current(2)).toBeNull();
 
@@ -311,24 +405,116 @@ describe('execute guards', () => {
   it('refuses while a merge or bulk rename holds a library and leaves the other library free', async () => {
     const releaseMerge = libraryGate.tryAcquire(2, 'book_merge');
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.planRun(makeDto(), USER)).rejects.toBeInstanceOf(ConflictException);
     expect(libraryGate.current(1)).toBeNull();
 
     releaseMerge?.();
   });
 
+  it('only checks the gate, leaving every library free for the run to take', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+
+    expect(plan).toEqual({
+      subjectIds: [1],
+      options: { targetLibraryId: 2, targetFolderId: 22, collisionPolicy: 'keep_both', overrides: [], sourceLibraryIds: [1] },
+    });
+    expect(libraryGate.current(1)).toBeNull();
+    expect(libraryGate.current(2)).toBeNull();
+    expect(moveRepo.createJob).not.toHaveBeenCalled();
+  });
+
+  it('keeps only the overrides for books the run will move', async () => {
+    const plan = await service.planRun(
+      makeDto({
+        overrides: [
+          { bookId: 1, policy: 'skip' },
+          { bookId: 9, policy: 'merge' },
+        ],
+      }),
+      USER,
+    );
+
+    expect(plan.subjectIds).toEqual([1]);
+    expect(plan.options.overrides).toEqual([{ bookId: 1, policy: 'skip' }]);
+  });
+
+  it('leaves out books already in the target folder and ineligible ones', async () => {
+    bookService.resolveSelectionToIds.mockResolvedValue([1, 2, 3]);
+    moveRepo.findMoveBookData.mockResolvedValue([
+      makeBook({ bookId: 1 }),
+      makeBook({ bookId: 2, libraryId: 2, libraryFolderId: 22 }),
+      makeBook({ bookId: 3, status: 'missing' }),
+    ]);
+
+    const plan = await service.planRun(makeDto(), USER);
+
+    expect(plan.subjectIds).toEqual([1]);
+  });
+});
+
+describe('starting a run', () => {
+  it('waits in line without planning while a library is held', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    const releaseScan = libraryGate.tryAcquire(1, 'scan');
+    moveRepo.findMoveBookData.mockClear();
+
+    await expect(service.prepareRun(makeRun(plan), USER)).resolves.toBe('busy');
+    expect(moveRepo.findMoveBookData).not.toHaveBeenCalled();
+    expect(moveRepo.createJob).not.toHaveBeenCalled();
+    expect(libraryGate.current(2)).toBeNull();
+
+    releaseScan?.();
+  });
+
+  it('waits in line when a book moved meanwhile into a library another operation holds', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    moveRepo.findMoveBookData.mockResolvedValue([
+      makeBook({ libraryId: 3, libraryFolderId: 33, libraryFolderPath: '/libC', folderPath: '/libC/Dune' }),
+    ]);
+    moveRepo.findLibraryAccess.mockResolvedValue([
+      { libraryId: 1, userId: 7, accessLevel: 'editor' },
+      { libraryId: 2, userId: 7, accessLevel: 'editor' },
+      { libraryId: 3, userId: 7, accessLevel: 'editor' },
+    ]);
+    const releaseScan = libraryGate.tryAcquire(3, 'scan');
+
+    await expect(service.prepareRun(makeRun(plan), USER)).resolves.toBe('busy');
+    expect(libraryGate.current(1)).toBeNull();
+    expect(libraryGate.current(2)).toBeNull();
+    expect(moveRepo.createJob).not.toHaveBeenCalled();
+
+    releaseScan?.();
+  });
+
+  it('holds every library from the start until the run finishes', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+
+    expect(service.isBusy(1)).toBe(true);
+    expect(service.isBusy(2)).toBe(true);
+    await expect(service.planRun(makeDto(), USER)).rejects.toBeInstanceOf(ConflictException);
+    await expect(service.prepareRun(makeRun(plan), USER)).resolves.toBe('busy');
+
+    await service.finishRun(makeRun(plan, { status: 'completed' }), prepared.state, 'completed');
+    expect(service.isBusy(1)).toBe(false);
+    expect(service.isBusy(2)).toBe(false);
+  });
+
   it('frees the libraries when the job row cannot be created', async () => {
+    const plan = await service.planRun(makeDto(), USER);
     moveRepo.createJob.mockRejectedValueOnce(new Error('db down'));
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toThrow('db down');
+    await expect(service.prepareRun(makeRun(plan), USER)).rejects.toThrow('db down');
     expect(libraryGate.current(1)).toBeNull();
     expect(libraryGate.current(2)).toBeNull();
   });
 
   it('frees the libraries and closes the job when the watchers cannot be stopped', async () => {
+    const plan = await service.planRun(makeDto(), USER);
     moveRepo.findWatchedLibraryIds.mockRejectedValueOnce(new Error('db down'));
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toThrow('db down');
+    await expect(service.prepareRun(makeRun(plan), USER)).rejects.toThrow('db down');
     expect(libraryGate.current(1)).toBeNull();
     expect(libraryGate.current(2)).toBeNull();
     expect(moveRepo.finishJob).toHaveBeenCalledWith(101, 'failed', { succeeded: 0, merged: 0, failed: 0, skipped: 0 }, 'db down');
@@ -336,60 +522,57 @@ describe('execute guards', () => {
   });
 
   it('restarts a watcher it stopped before another one failed to stop', async () => {
+    const plan = await service.planRun(makeDto(), USER);
     fileWatcherService.stopWatcher.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error('close failed'));
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toThrow('close failed');
+    await expect(service.prepareRun(makeRun(plan), USER)).rejects.toThrow('close failed');
     expect(libraryGate.current(1)).toBeNull();
     expect(libraryGate.current(2)).toBeNull();
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA']);
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB']);
   });
 
-  it('refuses a second concurrent move touching the same library', async () => {
-    let releaseFirst: () => void = () => {};
-    executor.execute.mockImplementation(
-      () =>
-        new Promise((resolve) => {
-          releaseFirst = () => resolve({ status: 'success', crossDevice: false });
-        }),
-    );
+  it('fails the run when the account lost editor access to the target', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    moveRepo.findLibraryAccess.mockResolvedValue([{ libraryId: 1, userId: 7, accessLevel: 'editor' }]);
 
-    const first = service.execute(makeDto(), USER, collectProgress().options);
-    await vi.waitFor(() => expect(executor.execute).toHaveBeenCalled());
+    await expect(service.prepareRun(makeRun(plan), USER)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(libraryGate.current(1)).toBeNull();
+    expect(libraryGate.current(2)).toBeNull();
+  });
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toBeInstanceOf(ConflictException);
+  it('fails the run when the target folder is gone', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    moveRepo.findTargetLibrary.mockResolvedValue(null);
 
-    releaseFirst();
-    await first;
-
-    // The guard is released once the job finishes.
-    expect(service.isBusy(1)).toBe(false);
-    expect(service.isBusy(2)).toBe(false);
+    await expect(service.prepareRun(makeRun(plan), USER)).rejects.toBeInstanceOf(NotFoundException);
+    expect(libraryGate.current(1)).toBeNull();
   });
 });
 
-describe('execute', () => {
+describe('a run', () => {
   it('stops and restarts watchers for every involved library', async () => {
-    await service.execute(makeDto(), USER, collectProgress().options);
+    await runMove();
 
     expect(fileWatcherService.stopWatcher.mock.calls.map((call) => call[0]).sort()).toEqual([1, 2]);
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA']);
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB']);
   });
 
-  it('restarts watchers even when the job throws', async () => {
+  it('restarts watchers and frees the libraries even when closing the job throws', async () => {
     moveRepo.finishJob.mockRejectedValueOnce(new Error('db gone'));
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toThrow('db gone');
+    await expect(runMove()).rejects.toThrow('db gone');
 
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA']);
     expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB']);
+    expect(service.isBusy(1)).toBe(false);
   });
 
   it('only stops watchers for libraries that are actually watched', async () => {
     moveRepo.findWatchedLibraryIds.mockResolvedValue([2]);
 
-    await service.execute(makeDto(), USER, collectProgress().options);
+    await runMove();
 
     expect(fileWatcherService.stopWatcher).toHaveBeenCalledTimes(1);
     expect(fileWatcherService.stopWatcher).toHaveBeenCalledWith(2);
@@ -420,7 +603,7 @@ describe('execute', () => {
       { libraryId: 3, userId: 7, accessLevel: 'editor' },
     ]);
 
-    await service.execute(makeDto(), USER, collectProgress().options);
+    await runMove();
 
     expect(scanGateway.emitBookTransferred).toHaveBeenCalledTimes(2);
     expect(scanGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 2, bookIds: [1] });
@@ -428,87 +611,82 @@ describe('execute', () => {
   });
 
   it('reports per-book progress and a final summary', async () => {
-    const progress = collectProgress();
+    const { events, summary } = await runMove();
 
-    const summary = await service.execute(makeDto(), USER, progress.options);
-
-    expect(progress.events).toEqual([{ bookId: 1, status: 'success' }]);
-    expect(summary).toMatchObject({ processed: 1, succeeded: 1, merged: 0, failed: 0, skipped: 0, cancelled: false });
+    expect(events).toEqual([{ bookId: 1, status: 'success' }]);
+    expect(summary).toEqual({ processed: 1, succeeded: 1, merged: 0, failed: 0, skipped: 0, cancelled: false });
   });
 
-  it('records a failure without aborting the rest of the job', async () => {
+  it('records a failure without aborting the rest of the run', async () => {
     bookService.resolveSelectionToIds.mockResolvedValue([1, 2]);
-    moveRepo.findMoveBookData.mockResolvedValue([
-      makeBook({
-        bookId: 1,
-        folderPath: '/libA/One',
-        files: [{ id: 10, absolutePath: '/libA/One/a.epub', relPath: null, role: 'content', format: 'epub', fileHash: null, sortOrder: null }],
-      }),
-      makeBook({
-        bookId: 2,
-        folderPath: '/libA/Two',
-        metadata: { ...makeBook().metadata, title: 'Two' },
-        files: [{ id: 20, absolutePath: '/libA/Two/b.epub', relPath: null, role: 'content', format: 'epub', fileHash: null, sortOrder: null }],
-      }),
-    ]);
+    moveRepo.findMoveBookData.mockResolvedValue(twoBooks());
     executor.execute
       .mockResolvedValueOnce({ status: 'failed', reason: 'disk full' })
       .mockResolvedValueOnce({ status: 'success', crossDevice: false });
 
-    const progress = collectProgress();
-    const summary = await service.execute(makeDto(), USER, progress.options);
+    const { events, summary } = await runMove();
 
-    expect(progress.events).toEqual([
+    expect(events).toEqual([
       { bookId: 1, status: 'failed', reason: 'disk full' },
       { bookId: 2, status: 'success' },
     ]);
     expect(summary).toMatchObject({ succeeded: 1, failed: 1 });
   });
 
-  it('turns an executor throw into a failed book rather than a dead job', async () => {
+  it('turns an executor throw into a failed book rather than a dead run', async () => {
     executor.execute.mockRejectedValue(new Error('unexpected'));
 
-    const progress = collectProgress();
-    const summary = await service.execute(makeDto(), USER, progress.options);
+    const plan = await service.planRun(makeDto(), USER);
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+    const outcome = await service.moveOne(1, prepared.state, USER);
 
-    expect(progress.events).toEqual([{ bookId: 1, status: 'failed', reason: 'unexpected' }]);
-    expect(summary.failed).toBe(1);
+    expect(outcome).toEqual({
+      outcome: 'failed',
+      code: 'move-failed',
+      message: 'unexpected',
+      event: { bookId: 1, status: 'failed', reason: 'unexpected' },
+    });
+    await service.finishRun(makeRun(plan, { status: 'completed', processed: 1, failed: 1 }), prepared.state, 'completed');
   });
 
-  it('stops early when the client disconnects', async () => {
-    bookService.resolveSelectionToIds.mockResolvedValue([1, 2]);
+  it('counts a merge as a success with a merged stat', async () => {
+    moveRepo.findFolderPathOwners.mockResolvedValue(new Map([['/libB/Dune', 55]]));
     moveRepo.findMoveBookData.mockResolvedValue([
       makeBook({
-        bookId: 1,
-        folderPath: '/libA/One',
-        files: [{ id: 10, absolutePath: '/libA/One/a.epub', relPath: null, role: 'content', format: 'epub', fileHash: null, sortOrder: null }],
-      }),
-      makeBook({
-        bookId: 2,
-        folderPath: '/libA/Two',
-        metadata: { ...makeBook().metadata, title: 'Two' },
-        files: [{ id: 20, absolutePath: '/libA/Two/b.epub', relPath: null, role: 'content', format: 'epub', fileHash: null, sortOrder: null }],
+        files: [{ id: 10, absolutePath: '/libA/Dune/Dune.epub', relPath: null, role: 'content', format: 'epub', fileHash: 'abc', sortOrder: null }],
       }),
     ]);
+    moveRepo.findHashOwnersInLibrary.mockResolvedValue(new Map([['abc', 55]]));
+    executor.execute.mockResolvedValue({ status: 'merged', crossDevice: false, mergedBookId: 55 });
 
-    let cancelled = false;
-    const events: unknown[] = [];
-    executor.execute.mockImplementation(() => {
-      cancelled = true;
-      return Promise.resolve({ status: 'success', crossDevice: false });
-    });
+    const plan = await service.planRun(makeDto({ collisionPolicy: 'merge' }), USER);
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
 
-    const summary = await service.execute(makeDto(), USER, {
-      onProgress: (event) => events.push(event),
-      isCancelled: () => cancelled,
+    await expect(service.moveOne(1, prepared.state, USER)).resolves.toEqual({
+      outcome: 'succeeded',
+      stats: { merged: 1 },
+      event: { bookId: 1, status: 'merged' },
     });
+    await service.finishRun(makeRun(plan, { status: 'completed' }), prepared.state, 'completed');
+  });
+
+  it('stops before the next book once cancelled and closes the job as completed', async () => {
+    bookService.resolveSelectionToIds.mockResolvedValue([1, 2]);
+    moveRepo.findMoveBookData.mockResolvedValue(twoBooks());
+
+    const { summary } = await runMove(makeDto(), USER, { cancelWhen: () => executor.execute.mock.calls.length > 0 });
 
     expect(executor.execute).toHaveBeenCalledTimes(1);
-    expect(summary).toMatchObject({ succeeded: 1, cancelled: true });
+    expect(summary).toEqual({ processed: 1, succeeded: 1, merged: 0, failed: 0, skipped: 0, cancelled: true });
+    expect(moveRepo.finishJob).toHaveBeenCalledWith(101, 'completed', { succeeded: 1, merged: 0, failed: 0, skipped: 0 });
+    expect(notificationService.notify).toHaveBeenCalledTimes(1);
+    expect(service.isBusy(1)).toBe(false);
   });
 
   it('records the job and closes it out', async () => {
-    await service.execute(makeDto(), USER, collectProgress().options);
+    await runMove();
 
     expect(moveRepo.createJob).toHaveBeenCalledWith({
       startedBy: 7,
@@ -520,12 +698,192 @@ describe('execute', () => {
     expect(moveRepo.finishJob).toHaveBeenCalledWith(101, 'completed', { succeeded: 1, merged: 0, failed: 0, skipped: 0 });
   });
 
-  it('marks the job failed when the run throws', async () => {
-    moveRepo.finishJob.mockRejectedValueOnce(new Error('db gone'));
+  it('marks the job failed, without a completion notice, when the run fails', async () => {
+    await runMove(makeDto(), USER, { end: 'failed', error: 'credential-revoked' });
 
-    await expect(service.execute(makeDto(), USER, collectProgress().options)).rejects.toThrow('db gone');
+    expect(moveRepo.finishJob).toHaveBeenLastCalledWith(101, 'failed', { succeeded: 1, merged: 0, failed: 0, skipped: 0 }, 'credential-revoked');
+    expect(notificationService.notify).not.toHaveBeenCalled();
+    expect(scanGateway.emitBookTransferred).toHaveBeenCalledWith({ fromLibraryId: 1, toLibraryId: 2, bookIds: [1] });
+    expect(service.isBusy(1)).toBe(false);
+  });
 
-    expect(moveRepo.finishJob).toHaveBeenLastCalledWith(101, 'failed', { succeeded: 1, merged: 0, failed: 0, skipped: 0 }, 'db gone');
+  it('notifies the requester with the run totals, including books moved before a restart', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+    await service.moveOne(1, prepared.state, USER);
+
+    await service.finishRun(makeRun(plan, { status: 'completed', processed: 40, succeeded: 37, failed: 3 }), prepared.state, 'completed');
+
+    expect(notificationService.notify).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Book move completed with errors',
+        message: '37 moved to Manga, 3 failed',
+        scope: { kind: 'user', userId: 7 },
+      }),
+    );
+  });
+
+  it('does nothing at the end of a run that never started', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+
+    await service.finishRun(makeRun(plan, { status: 'cancelled' }), null, 'cancelled');
+
+    expect(moveRepo.finishJob).not.toHaveBeenCalled();
+    expect(fileWatcherService.startWatcher).not.toHaveBeenCalled();
+    expect(notificationService.notify).not.toHaveBeenCalled();
+  });
+});
+
+describe('books that changed while the run waited', () => {
+  it('skips a book deleted meanwhile instead of failing the run', async () => {
+    bookService.resolveSelectionToIds.mockResolvedValue([1, 2]);
+    moveRepo.findMoveBookData.mockResolvedValue(twoBooks());
+    const plan = await service.planRun(makeDto(), USER);
+    moveRepo.findMoveBookData.mockResolvedValue([twoBooks()[1]!]);
+
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+
+    await expect(service.moveOne(1, prepared.state, USER)).resolves.toEqual({
+      outcome: 'skipped',
+      code: 'not-found',
+      event: { bookId: 1, status: 'skipped', reason: 'book no longer exists' },
+    });
+    await expect(service.moveOne(2, prepared.state, USER)).resolves.toMatchObject({ outcome: 'succeeded' });
+    await service.finishRun(makeRun(plan, { status: 'completed' }), prepared.state, 'completed');
+    expect(moveRepo.finishJob).toHaveBeenCalledWith(101, 'completed', { succeeded: 1, merged: 0, failed: 0, skipped: 1 });
+  });
+
+  it('skips a book whose library the account can no longer edit', async () => {
+    bookService.resolveSelectionToIds.mockResolvedValue([1, 2]);
+    moveRepo.findMoveBookData.mockResolvedValue(twoBooks());
+    const plan = await service.planRun(makeDto(), USER);
+    moveRepo.findMoveBookData.mockResolvedValue([twoBooks()[0]!, { ...twoBooks()[1]!, libraryId: 3, libraryFolderId: 33 }]);
+
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+
+    await expect(service.moveOne(2, prepared.state, USER)).resolves.toMatchObject({
+      outcome: 'skipped',
+      code: 'no-access',
+      event: { bookId: 2, status: 'skipped', reason: 'no editor access to the source library' },
+    });
+    expect(service.isBusy(3)).toBe(false);
+    await service.finishRun(makeRun(plan, { status: 'completed' }), prepared.state, 'completed');
+  });
+
+  it('reads library access again when the run refreshes its account', async () => {
+    const plan = await service.planRun(makeDto(), USER);
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+    moveRepo.findLibraryAccess.mockResolvedValue([{ libraryId: 2, userId: 7, accessLevel: 'editor' }]);
+
+    await expect(service.moveOne(1, prepared.state, { ...USER })).resolves.toMatchObject({ outcome: 'skipped', code: 'no-access' });
+    expect(executor.execute).not.toHaveBeenCalled();
+    await service.finishRun(makeRun(plan, { status: 'completed' }), prepared.state, 'completed');
+  });
+
+  it('continues after a restart from the first book not yet done, skipping one already moved', async () => {
+    bookService.resolveSelectionToIds.mockResolvedValue([1, 2]);
+    moveRepo.findMoveBookData.mockResolvedValue(twoBooks());
+    const plan = await service.planRun(makeDto(), USER);
+    // The book in flight when the server stopped had reached the target already.
+    moveRepo.findMoveBookData.mockImplementation((...args: unknown[]) =>
+      Promise.resolve(
+        (args[0] as number[]).map((bookId) => (bookId === 2 ? { ...twoBooks()[1]!, libraryId: 2, libraryFolderId: 22 } : twoBooks()[0]!)),
+      ),
+    );
+
+    const run = makeRun(plan, { processed: 1, succeeded: 1 });
+    const prepared = await service.prepareRun(run, USER);
+    if (prepared === 'busy') throw new Error('busy');
+
+    expect(moveRepo.findMoveBookData).toHaveBeenLastCalledWith([2]);
+    expect(moveRepo.createJob).toHaveBeenCalledWith(expect.objectContaining({ totalBooks: 1 }));
+    await expect(service.moveOne(2, prepared.state, USER)).resolves.toMatchObject({
+      outcome: 'skipped',
+      code: 'already-in-target',
+    });
+    expect(executor.execute).not.toHaveBeenCalled();
+    await service.finishRun(run, prepared.state, 'completed');
+  });
+
+  it('skips a book that now collides under the skip policy', async () => {
+    const plan = await service.planRun(makeDto({ collisionPolicy: 'skip' }), USER);
+    expect(plan.subjectIds).toEqual([1]);
+    moveRepo.findFolderPathOwners.mockResolvedValue(new Map([['/libB/Dune', 99]]));
+
+    const prepared = await service.prepareRun(makeRun(plan), USER);
+    if (prepared === 'busy') throw new Error('busy');
+
+    await expect(service.moveOne(1, prepared.state, USER)).resolves.toMatchObject({ outcome: 'skipped', code: 'collision-skipped' });
+    await service.finishRun(makeRun(plan, { status: 'completed' }), prepared.state, 'completed');
+  });
+});
+
+describe('continuing after a restart', () => {
+  function interruptedRun(options: Record<string, unknown> = { targetLibraryId: 2, sourceLibraryIds: [1] }): Pick<BulkRunRow, 'options'> {
+    return { options };
+  }
+
+  it('waits for the boot check before offering Continue', () => {
+    expect(service.isContinuable(interruptedRun())).toBe(false);
+  });
+
+  it('allows Continue once the boot check found nothing to rescan', async () => {
+    await service.onApplicationBootstrap();
+
+    expect(service.isContinuable(interruptedRun())).toBe(true);
+  });
+
+  it('waits while a library of the run is still being rescanned, then allows it', async () => {
+    moveRepo.markInterruptedJobs.mockResolvedValue([{ id: 5, libraryIds: [1, 2] }]);
+    const releaseScan = libraryGate.tryAcquire(1, 'scan');
+    await service.onApplicationBootstrap();
+
+    expect(service.isContinuable(interruptedRun())).toBe(false);
+    expect(service.isContinuable(interruptedRun({ targetLibraryId: 3, sourceLibraryIds: [4] }))).toBe(true);
+
+    releaseScan?.();
+    expect(service.isContinuable(interruptedRun())).toBe(true);
+    // Once the boot scan ended, a later operation on the library no longer holds Continue back.
+    const releaseLater = libraryGate.tryAcquire(1, 'scan');
+    expect(service.isContinuable(interruptedRun())).toBe(true);
+    releaseLater?.();
+  });
+
+  it('checks every boot rescan for a run that kept no libraries', async () => {
+    moveRepo.markInterruptedJobs.mockResolvedValue([{ id: 5, libraryIds: [1] }]);
+    scannerService.isScanRunning.mockReturnValue(true);
+    await service.onApplicationBootstrap();
+
+    expect(service.isContinuable(interruptedRun({}))).toBe(false);
+    scannerService.isScanRunning.mockReturnValue(false);
+    expect(service.isContinuable(interruptedRun({}))).toBe(true);
+  });
+});
+
+describe('the final event', () => {
+  it('rebuilds the route summary from the run, leaving merges out of succeeded', () => {
+    expect(bookMoveDoneEvent({ status: 'cancelled', processed: 9, succeeded: 5, failed: 1, skipped: 3, stats: { merged: 2 } })).toEqual({
+      done: true,
+      processed: 9,
+      succeeded: 3,
+      merged: 2,
+      failed: 1,
+      skipped: 3,
+      cancelled: true,
+    });
+    expect(bookMoveDoneEvent({ status: 'completed', processed: 0, succeeded: 0, failed: 0, skipped: 0, stats: {} })).toEqual({
+      done: true,
+      processed: 0,
+      succeeded: 0,
+      merged: 0,
+      failed: 0,
+      skipped: 0,
+      cancelled: false,
+    });
   });
 });
 
@@ -584,7 +942,7 @@ describe('collision policies', () => {
       ]),
     );
 
-    await service.execute(makeDto({ collisionPolicy: 'suggested' }), USER, collectProgress().options);
+    await runMove(makeDto({ collisionPolicy: 'suggested' }));
 
     const byBook = new Map(executor.execute.mock.calls.map((call) => [call[0].plan.bookId, call[0]]));
     expect(byBook.get(1)?.mergeDuplicateBookId).toBe(55);
@@ -601,7 +959,7 @@ describe('collision policies', () => {
     ]);
     moveRepo.findHashOwnersInLibrary.mockResolvedValue(new Map([['abc', 55]]));
 
-    await service.execute(makeDto({ collisionPolicy: 'keep_both' }), USER, collectProgress().options);
+    await runMove(makeDto({ collisionPolicy: 'keep_both' }));
 
     // Suggested would have merged this one; the user asked for keep_both instead.
     expect(executor.execute.mock.calls[0][0].mergeDuplicateBookId).toBeNull();
@@ -615,25 +973,21 @@ describe('collision policies', () => {
     ]);
     moveRepo.findHashOwnersInLibrary.mockResolvedValue(new Map([['abc', 55]]));
 
-    const summary = await service.execute(
-      makeDto({ collisionPolicy: 'suggested', overrides: [{ bookId: 1, policy: 'skip' }] }),
-      USER,
-      collectProgress().options,
-    );
+    const { summary } = await runMove(makeDto({ collisionPolicy: 'suggested', overrides: [{ bookId: 1, policy: 'skip' }] }));
 
     expect(executor.execute).not.toHaveBeenCalled();
     expect(summary.processed).toBe(0);
   });
 
   it('moves to a suffixed destination under keep_both', async () => {
-    await service.execute(makeDto({ collisionPolicy: 'keep_both' }), USER, collectProgress().options);
+    await runMove(makeDto({ collisionPolicy: 'keep_both' }));
 
     expect(executor.execute).toHaveBeenCalledTimes(1);
     expect(executor.execute.mock.calls[0][0].plan.targetFolderPathKey).toBe('/libB/Dune (2)');
   });
 
   it('leaves colliding books untouched under skip', async () => {
-    const summary = await service.execute(makeDto({ collisionPolicy: 'skip' }), USER, collectProgress().options);
+    const { summary } = await runMove(makeDto({ collisionPolicy: 'skip' }));
 
     expect(executor.execute).not.toHaveBeenCalled();
     expect(summary.processed).toBe(0);
@@ -648,24 +1002,23 @@ describe('collision policies', () => {
     moveRepo.findHashOwnersInLibrary.mockResolvedValue(new Map([['abc', 55]]));
     executor.execute.mockResolvedValue({ status: 'merged', crossDevice: false, mergedBookId: 55 });
 
-    const summary = await service.execute(makeDto({ collisionPolicy: 'merge' }), USER, collectProgress().options);
+    const { summary, run } = await runMove(makeDto({ collisionPolicy: 'merge' }));
 
     expect(executor.execute.mock.calls[0][0].mergeDuplicateBookId).toBe(55);
+    expect(run.stats).toEqual({ merged: 1 });
     expect(summary).toMatchObject({ merged: 1, succeeded: 0 });
   });
 
   it('refuses to merge a name-only collision instead of deleting an unrelated book', async () => {
-    const progress = collectProgress();
-
-    const summary = await service.execute(makeDto({ collisionPolicy: 'merge' }), USER, progress.options);
+    const { events, summary } = await runMove(makeDto({ collisionPolicy: 'merge' }));
 
     expect(executor.execute).not.toHaveBeenCalled();
-    expect(progress.events).toEqual([{ bookId: 1, status: 'skipped', reason: 'merge only applies to identical copies' }]);
+    expect(events).toEqual([{ bookId: 1, status: 'skipped', reason: 'merge only applies to identical copies' }]);
     expect(summary.skipped).toBe(1);
   });
 
   it('lets a per-book override beat the job policy', async () => {
-    await service.execute(makeDto({ collisionPolicy: 'skip', overrides: [{ bookId: 1, policy: 'keep_both' }] }), USER, collectProgress().options);
+    await runMove(makeDto({ collisionPolicy: 'skip', overrides: [{ bookId: 1, policy: 'keep_both' }] }));
 
     expect(executor.execute).toHaveBeenCalledTimes(1);
     expect(executor.execute.mock.calls[0][0].plan.targetFolderPathKey).toBe('/libB/Dune (2)');
@@ -674,7 +1027,7 @@ describe('collision policies', () => {
   it('never moves an ineligible book even when a policy is set', async () => {
     moveRepo.findMoveBookData.mockResolvedValue([makeBook({ status: 'missing' })]);
 
-    const summary = await service.execute(makeDto(), USER, collectProgress().options);
+    const { summary } = await runMove();
 
     expect(executor.execute).not.toHaveBeenCalled();
     expect(summary.processed).toBe(0);

@@ -27,6 +27,8 @@ export const BOOK_FILE_RETIRE_RULES: Readonly<Record<string, BookFileRetireRuleK
   'koreader_progress_resets.book_file_id': 'newer-wins',
   'koreader_session_tombstones.book_file_id': 'survivor-wins',
   'book_file_chapters.book_file_id': 'drop',
+  'book_file_texts.file_id': 'drop',
+  'book_file_audio_timelines.file_id': 'drop',
   'book_file_hash_history.book_file_id': 'repoint',
   'delivery_artifacts.book_file_id': 'drop',
   'delivery_inspections.book_file_id': 'drop',

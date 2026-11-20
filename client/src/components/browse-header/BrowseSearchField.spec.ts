@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it } from 'vitest'
 import BrowseSearchField from './BrowseSearchField.vue'
 
@@ -8,11 +8,17 @@ const stubs = {
   DropdownMenuTrigger: passthrough,
   DropdownMenuContent: passthrough,
   DropdownMenuItem: { template: '<button type="button" class="menu-item" @click="$emit(\'click\')"><slot /></button>', emits: ['click'] },
+  DropdownMenuRadioGroup: {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: '<div class="radio-group" :data-value="modelValue" @click="$emit(\'update:modelValue\', $event.target.dataset.value)"><slot /></div>',
+  },
+  DropdownMenuRadioItem: { props: ['value'], template: '<button type="button" class="radio-item" :data-value="value"><slot /></button>' },
 }
 
 const tokens = [
-  { index: 0, field: 'Read Status', operator: 'is', value: 'Unread' },
-  { index: 2, field: 'Language', operator: 'is', value: 'en' },
+  { index: 0, kind: 'rule' as const, field: 'Read Status', operator: 'is', value: 'Unread' },
+  { index: 2, kind: 'rule' as const, field: 'Language', operator: 'is', value: 'en' },
 ]
 
 function mountField(props: Record<string, unknown> = {}) {
@@ -39,6 +45,52 @@ describe('BrowseSearchField', () => {
 
     await remove[1]!.trigger('click')
     expect(wrapper.emitted('remove-token')).toEqual([[2]])
+    wrapper.unmount()
+  })
+
+  it('opens a token for editing and hands over the token itself to anchor the panel', async () => {
+    const wrapper = mountField({ tokens, active: true })
+
+    await wrapper.get('button[aria-label="Language is en. Edit"]').trigger('click')
+
+    const [index, element] = wrapper.emitted<[number, HTMLElement]>('edit-token')![0]!
+    expect(index).toBe(2)
+    expect(element.hasAttribute('data-token')).toBe(true)
+    expect(element.textContent).toContain('Language')
+    expect(wrapper.emitted('remove-token')).toBeUndefined()
+    wrapper.unmount()
+  })
+
+  it('shows how the filters combine once there are two, and reports a switch to any', async () => {
+    expect(
+      mountField({ tokens: [tokens[0]] })
+        .find('[data-testid="filter-join-chip"]')
+        .exists(),
+    ).toBe(false)
+
+    const wrapper = mountField({ tokens, join: 'AND' })
+    const chip = wrapper.get('[data-testid="filter-join-chip"]')
+    expect(chip.text()).toBe('All')
+    expect(chip.attributes('aria-label')).toBe('Matching all filters. Change')
+
+    await wrapper.get('.radio-item[data-value="OR"]').trigger('click')
+    expect(wrapper.emitted('set-join')).toEqual([['OR']])
+
+    await wrapper.setProps({ join: 'OR' })
+    expect(wrapper.get('[data-testid="filter-join-chip"]').text()).toBe('Any')
+  })
+
+  it('moves focus to the summary when the focused token folds away', async () => {
+    const wrapper = mountField({ tokens, join: 'AND' })
+    const chip = wrapper.get<HTMLButtonElement>('[data-testid="filter-join-chip"]').element
+    chip.focus()
+
+    // jsdom has no layout, so the next measure finds no room and folds the tokens.
+    await wrapper.setProps({ tokens: tokens.map((token) => ({ ...token })), join: 'OR' })
+    await flushPromises()
+
+    const summary = wrapper.findAll('button').find((button) => button.text().includes('2 filters'))
+    expect(summary?.element).toBe(document.activeElement)
     wrapper.unmount()
   })
 

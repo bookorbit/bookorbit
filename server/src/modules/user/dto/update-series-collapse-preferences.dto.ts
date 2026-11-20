@@ -41,4 +41,9 @@ export class UpdateSeriesCollapsePreferencesDto {
   @IsOptional()
   @IsBoolean()
   authorPages?: boolean;
+
+  /** One flag for every genre and tag page. */
+  @IsOptional()
+  @IsBoolean()
+  taxonomyPages?: boolean;
 }

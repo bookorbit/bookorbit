@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { z } from 'zod';
 
 import {
+  AUTHOR_GENDERS,
   isMetadataProviderKeySyntax,
   CUSTOM_FIELD_OPERATORS,
   FIELD_OPERATORS,
@@ -17,6 +18,7 @@ import {
 import { isDateKey } from '../../../common/utils/timezone.utils';
 
 const DATE_VALUE_FIELDS = new Set<StaticRuleField>(['addedAt', 'startedAt', 'finishedAt', 'publishedDate']);
+const AUTHOR_GENDER_SET = new Set<string>(AUTHOR_GENDERS);
 const DATE_VALUE_OPERATORS = new Set<RuleOperator>(['before', 'after', 'between']);
 const RELATIVE_DATE_OPERATORS = new Set<RuleOperator>(['moreThanAgo']);
 const CUSTOM_NUMERIC_OPERATORS = new Set<RuleOperator>(['gt', 'gte', 'lt', 'lte']);
@@ -118,6 +120,11 @@ const ruleSchema: z.ZodType<Rule> = z
     if (custom) {
       checkCustomFieldValue(rule, ctx);
       return;
+    }
+    if (rule.field === 'authorGender' && (rule.operator === 'includesAny' || rule.operator === 'excludesAll')) {
+      if (!Array.isArray(rule.value) || rule.value.some((value) => typeof value !== 'string' || !AUTHOR_GENDER_SET.has(value))) {
+        ctx.addIssue({ code: 'custom', message: 'Unknown author gender', path: ['value'] });
+      }
     }
     if (DATE_VALUE_FIELDS.has(rule.field as StaticRuleField) && DATE_VALUE_OPERATORS.has(rule.operator as RuleOperator)) {
       if (!isValidRuleDateValue(rule.value)) {

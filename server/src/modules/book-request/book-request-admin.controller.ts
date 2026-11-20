@@ -61,6 +61,18 @@ export class BookRequestAdminController {
     return this.service.listAll(query, user);
   }
 
+  /** The approver queue's per-view row counts, under the same filters `listAll` takes. */
+  @Get('view-counts')
+  getViewCounts(@Query() query: ListAllBookRequestsDto, @CurrentUser() user: RequestUser) {
+    return this.service.getAllViewCounts(query, user);
+  }
+
+  /** Every request the approver queue's filters match, in list order and bounded. */
+  @Get('selection')
+  getSelection(@Query() query: ListAllBookRequestsDto, @CurrentUser() user: RequestUser) {
+    return this.service.selectAll(query, user);
+  }
+
   @Get('requesters')
   listRequesters(@Query() query: ListRequesterOptionsDto) {
     return this.service.listRequesterOptions(query);
@@ -159,6 +171,25 @@ export class BookRequestAdminController {
   })
   reject(@Param('id', ParseIntPipe) id: number, @Body() dto: DecideBookRequestDto, @CurrentUser() user: RequestUser) {
     return this.service.reject(id, dto, user);
+  }
+
+  /**
+   * Bulk deletion under the same rules as deleting one row, including which files go with it.
+   * POST rather than DELETE because the selection is a body, and `DELETE :id` never collides.
+   */
+  @Post('delete')
+  @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.BookRequestDelete,
+    resource: AuditResource.BookRequest,
+    getMeta: (_req, body) => {
+      const result = body as { removed?: unknown[]; failed?: unknown[] } | null;
+      return { deleted: result?.removed?.length ?? 0, failed: result?.failed?.length ?? 0 };
+    },
+    description: 'Deleted a selection of book requests',
+  })
+  removeMany(@Body() dto: BulkBookRequestsDto, @CurrentUser() user: RequestUser) {
+    return this.service.removeMany(dto, user);
   }
 
   /**

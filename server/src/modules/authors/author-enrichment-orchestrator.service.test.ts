@@ -50,6 +50,10 @@ describe('AuthorEnrichmentOrchestratorService', () => {
     notify: vi.fn(),
   };
 
+  const jobChanges = {
+    notify: vi.fn(),
+  };
+
   let session: AuthorEnrichmentSessionService;
   let service: AuthorEnrichmentOrchestratorService;
 
@@ -107,6 +111,7 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       metadataEvents as never,
       session,
       notificationService as never,
+      jobChanges as never,
       gateway as never,
     );
   });
@@ -564,6 +569,67 @@ describe('AuthorEnrichmentOrchestratorService', () => {
       currentItemName: null,
     });
     expect(gateway.emitStatus).not.toHaveBeenCalled();
+  });
+
+  it('tells the Jobs area about every tracked transition as an ownerless state change', async () => {
+    await service.pause();
+    await service.resume();
+    await service.cancelPending();
+
+    expect(jobChanges.notify).toHaveBeenCalledTimes(3);
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'author-enrichment', ownerId: null, state: true });
+  });
+
+  it('tells the Jobs area even without the status socket', async () => {
+    const headless = new AuthorEnrichmentOrchestratorService(
+      queueRepo as never,
+      executor as never,
+      enrichmentConfig as never,
+      metadataPreferences as never,
+      metadataEvents as never,
+      session,
+      notificationService as never,
+      jobChanges as never,
+    );
+
+    await headless.pause();
+
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'author-enrichment', ownerId: null, state: true });
+    expect(queueRepo.getStatusSummary).not.toHaveBeenCalled();
+  });
+
+  it('tells the Jobs area when silent work finally fails, since the failed row counts it, but not when it succeeds', async () => {
+    await (service as any).processOne(91, 0, 'Background Author', AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE);
+    expect(jobChanges.notify).not.toHaveBeenCalled();
+
+    executor.execute.mockResolvedValue({
+      kind: 'failed',
+      transient: false,
+      message: 'gone',
+      httpStatus: 404,
+      retryAfterMs: null,
+      outboundRequests: 1,
+    });
+    await (service as any).processOne(92, 0, 'Background Author', AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE);
+
+    expect(jobChanges.notify).toHaveBeenCalledTimes(1);
+    expect(gateway.emitStatus).not.toHaveBeenCalled();
+  });
+
+  it('keeps a silent retry out of the Jobs area until it gives up', async () => {
+    executor.execute.mockResolvedValue({
+      kind: 'failed',
+      transient: true,
+      message: 'busy',
+      httpStatus: 503,
+      retryAfterMs: null,
+      outboundRequests: 1,
+    });
+
+    await (service as any).processOne(93, 0, 'Background Author', AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE);
+
+    expect(queueRepo.markFailed).toHaveBeenCalledWith(expect.objectContaining({ authorId: 93, nextAttemptAt: expect.any(Date) }));
+    expect(jobChanges.notify).not.toHaveBeenCalled();
   });
 
   it('pollOnce catches unexpected errors and does not re-throw', async () => {

@@ -1,0 +1,15 @@
+{
+  "status": 429,
+  "headers": {
+    "content-type": "application/json",
+    "retry-after": "40"
+  },
+  "body": {
+    "error": {
+      "message": "Rate limit reached for gpt-6-luna on tokens per min (TPM).",
+      "type": "tokens",
+      "param": null,
+      "code": "rate_limit_exceeded"
+    }
+  }
+}

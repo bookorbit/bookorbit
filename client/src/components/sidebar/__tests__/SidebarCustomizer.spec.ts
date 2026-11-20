@@ -5,7 +5,7 @@ import type { SidebarLayout } from '@bookorbit/types'
 import type { ResolvedSidebarNavEntry } from '@/composables/useSidebarNav'
 import type { SidebarCustomizeGroup } from '../SidebarCustomizer.vue'
 
-const layout = reactive<SidebarLayout>({ hidden: [], groupOrder: [], rowOrder: {} })
+const layout = reactive<SidebarLayout>({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list', groupStyles: {} })
 
 vi.mock('vue-i18n', () => ({
   useI18n: () => ({ t: (key: string, params?: { name?: string }) => (params?.name ? `${key}:${params.name}` : key) }),
@@ -13,7 +13,7 @@ vi.mock('vue-i18n', () => ({
 
 vi.mock('@/composables/useSidebarPrefs', () => ({
   useSidebarPrefs: () => ({ layout }),
-  defaultSidebarLayout: () => ({ hidden: [], groupOrder: [], rowOrder: {} }),
+  defaultSidebarLayout: () => ({ hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list', groupStyles: {} }),
 }))
 
 vi.mock('@/composables/useSidebarSections', () => ({
@@ -48,7 +48,7 @@ const { useSidebarCustomizeMode } = await import('@/composables/useSidebarCustom
 const Icon = markRaw({ name: 'Icon', render: () => h('svg') })
 
 function entry(id: string, returnsWithWork = false): ResolvedSidebarNavEntry {
-  return { id, label: id, icon: Icon, to: { name: id }, isActive: false, badge: null, returnsWithWork }
+  return { id, label: id, icon: Icon, to: { name: id }, isActive: false, badge: null, signal: null, returnsWithWork }
 }
 
 const primaryEntries = [entry('dashboard'), entry('book-dock', true), entry('tools')]
@@ -77,7 +77,7 @@ describe('SidebarCustomizer', () => {
   beforeEach(() => {
     wrapper?.unmount()
     wrapper = null
-    Object.assign(layout, { hidden: [], groupOrder: [], rowOrder: {} })
+    Object.assign(layout, { hidden: [], groupOrder: [], rowOrder: {}, primaryStyle: 'list', groupStyles: {} })
     useSidebarCustomizeMode().startCustomizing()
   })
 
@@ -148,6 +148,47 @@ describe('SidebarCustomizer', () => {
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', cancelable: true }))
     await nextTick()
     expect(isCustomizing.value).toBe(false)
+  })
+
+  it('switches the top pages to an icon row and back', async () => {
+    mountCustomizer()
+    const toggle = wrapper!.find('button[role="switch"]')
+    const label = wrapper!.find(`label[for="${toggle.attributes('id')}"]`)
+    expect(label.text()).toBe('components.sidebar.customize.primaryIcons')
+    expect(toggle.attributes('aria-checked')).toBe('false')
+
+    await toggle.trigger('click')
+    expect(layout.primaryStyle).toBe('icons')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+
+    await toggle.trigger('click')
+    expect(layout.primaryStyle).toBe('list')
+  })
+
+  it('offers an icon switch under Reading only, and switches its style', async () => {
+    mountCustomizer()
+    const toggles = wrapper!.findAll('button[role="switch"]')
+    expect(toggles).toHaveLength(2)
+    const readingToggle = toggles[1]!
+    const label = wrapper!.find(`label[for="${readingToggle.attributes('id')}"]`)
+    expect(label.text()).toBe('components.sidebar.customize.readingIcons')
+
+    await readingToggle.trigger('click')
+    expect(layout.groupStyles).toEqual({ reading: 'icons' })
+    expect(layout.primaryStyle).toBe('list')
+    expect(readingToggle.attributes('aria-checked')).toBe('true')
+
+    await readingToggle.trigger('click')
+    expect(layout.groupStyles).toEqual({ reading: 'list' })
+  })
+
+  it('drops the Reading icon switch while Reading is hidden', async () => {
+    mountCustomizer()
+
+    await eyeFor('Reading').trigger('click')
+
+    expect(layout.hidden).toEqual(['reading'])
+    expect(wrapper!.findAll('button[role="switch"]')).toHaveLength(1)
   })
 
   it('moves focus into the editor when it opens', () => {

@@ -10,6 +10,8 @@ export type SeriesCollapsePreferences = {
    * {@link SeriesCollapsePreferences.global} is on.
    */
   authorPages?: boolean;
+  /** Genre and tag pages share one flag for the same reason author pages do. Absent means off. */
+  taxonomyPages?: boolean;
 };
 
 export type CollapsedSeriesInfo = {
@@ -25,12 +27,13 @@ export type CollapsedSeriesInfo = {
 
 export function resolveCollapsePreference(
   prefs: SeriesCollapsePreferences | undefined,
-  ctx: { libraryId?: number; collectionId?: number; smartScopeId?: number; authorPages?: boolean },
+  ctx: { libraryId?: number; collectionId?: number; smartScopeId?: number; authorPages?: boolean; taxonomyPages?: boolean },
 ): boolean {
   if (!prefs) return false;
   // Author pages resolve to their own flag and stop there - they deliberately do not inherit the
   // global default, and the library filter on an author page is a filter, not a scope to override.
   if (ctx.authorPages) return prefs.authorPages ?? false;
+  if (ctx.taxonomyPages) return prefs.taxonomyPages ?? false;
   if (ctx.smartScopeId !== undefined) {
     const override = prefs.smartScopes?.[String(ctx.smartScopeId)];
     if (override !== undefined) return override;

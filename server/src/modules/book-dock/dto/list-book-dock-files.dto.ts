@@ -1,6 +1,8 @@
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import { Transform } from 'class-transformer';
 
+import { IsBookDockFilter, IsBookDockHoldFilter } from './book-dock-filter';
+
 const VALID_STATUSES = ['pending', 'ready', 'error'] as const;
 const VALID_SORT_FIELDS = ['createdAt', 'fileName', 'format', 'status', 'fileSize', 'attention'] as const;
 const VALID_ORDERS = ['asc', 'desc'] as const;
@@ -45,4 +47,10 @@ export class ListBookDockFilesDto {
   @IsString()
   @MaxLength(500)
   search?: string;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }

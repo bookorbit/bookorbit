@@ -4,6 +4,8 @@ import { formatBytes } from '@/lib/formatting'
 
 export type BookDockUploadFailure =
   | { kind: 'unsupported'; extension: string }
+  /** The dock's library does not take this format, so the file was never sent. */
+  | { kind: 'notAllowed'; extension: string; library: string }
   | { kind: 'tooLarge'; limitBytes: number }
   | {
       kind: 'server'
@@ -21,6 +23,8 @@ export type UploadFailureReason = { key: string; params?: Record<string, string>
 const REASON_KEY_BY_ERROR_CODE: Partial<Record<string, string>> = {
   [UploadErrorCode.TooLarge]: 'bookDock.uploadFailures.reason.tooLargeServer',
   [UploadErrorCode.StorageFull]: 'bookDock.uploadFailures.reason.storageFull',
+  [UploadErrorCode.FormatNotAllowed]: 'bookDock.uploadFailures.reason.notAllowedServer',
+  [UploadErrorCode.InvalidTarget]: 'bookDock.uploadFailures.reason.dockOff',
 }
 
 const RETRYABLE_STATUSES = new Set([401, 408, 429])
@@ -38,6 +42,8 @@ export function describeUploadFailure(failure: BookDockUploadFailure): UploadFai
       return failure.extension
         ? { key: 'bookDock.uploadFailures.reason.unsupported', params: { extension: failure.extension } }
         : { key: 'bookDock.uploadFailures.reason.noExtension' }
+    case 'notAllowed':
+      return { key: 'bookDock.uploadFailures.reason.notAllowed', params: { extension: failure.extension, library: failure.library } }
     case 'tooLarge':
       return { key: 'bookDock.uploadFailures.reason.tooLarge', params: { limit: formatBytes(failure.limitBytes) } }
     case 'network':

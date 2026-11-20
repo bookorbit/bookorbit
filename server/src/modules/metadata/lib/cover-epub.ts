@@ -1,6 +1,7 @@
 import * as unzipper from 'unzipper';
 import { XMLParser } from 'fast-xml-parser';
 
+import { EPUB_AUDIO_COVER_MAX_BYTES, EPUB_AUDIO_COVER_PROPERTY } from '../../../common/epub-audio-cover';
 import { attr, findInZip, resolvePath, toRecordArray } from './epub-zip-utils';
 
 const parser = new XMLParser({ ignoreAttributes: false, attributeNamePrefix: '@_', removeNSPrefix: true });
@@ -22,6 +23,46 @@ async function imageFromHtmlCoverPage(zip: unzipper.CentralDirectory, htmlItem: 
   return imgFile.buffer();
 }
 
+type EpubPackage = {
+  zip: unzipper.CentralDirectory;
+  pkg: Record<string, unknown> | undefined;
+  opfDir: string;
+  itemList: Record<string, unknown>[];
+};
+
+/** Opens the archive and parses its OPF. Null when the container or OPF cannot be located. */
+async function readEpubPackage(absolutePath: string): Promise<EpubPackage | null> {
+  const zip = await unzipper.Open.file(absolutePath);
+
+  // Read container.xml to find OPF path
+  const containerFile = zip.files.find((f) => f.path === 'META-INF/container.xml');
+  if (!containerFile) return null;
+
+  const containerXml = (await containerFile.buffer()).toString('utf-8');
+  const container = parser.parse(containerXml) as Record<string, unknown>;
+  const rootfile = (container['container'] as Record<string, unknown>)?.['rootfiles'];
+  const rf = (rootfile as Record<string, unknown>)?.['rootfile'];
+  const opfPath = ((Array.isArray(rf) ? rf[0] : rf) as Record<string, unknown>)?.['@_full-path'];
+  if (typeof opfPath !== 'string') return null;
+
+  const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
+
+  const opfFile = zip.files.find((f) => f.path === opfPath);
+  if (!opfFile) return null;
+
+  const opfXml = (await opfFile.buffer()).toString('utf-8');
+  const opf = parser.parse(opfXml) as Record<string, unknown>;
+
+  const pkg = opf['package'] as Record<string, unknown> | undefined;
+  const manifest = pkg?.['manifest'] as Record<string, unknown> | undefined;
+  return { zip, pkg, opfDir, itemList: toRecordArray(manifest?.['item']) };
+}
+
+/** Whether the manifest item carries Storyteller's property for the square audiobook cover. */
+function isAudioCoverItem(item: Record<string, unknown>): boolean {
+  return attr(item, '@_properties').split(/\s+/).includes(EPUB_AUDIO_COVER_PROPERTY);
+}
+
 /**
  * Extract the cover image bytes from an EPUB file.
  * Tries EPUB3 cover-image property, EPUB2 meta cover, guide reference, and id-based fallbacks.
@@ -29,30 +70,9 @@ async function imageFromHtmlCoverPage(zip: unzipper.CentralDirectory, htmlItem: 
  */
 export async function extractEpubCover(absolutePath: string): Promise<Buffer | null> {
   try {
-    const zip = await unzipper.Open.file(absolutePath);
-
-    // Read container.xml to find OPF path
-    const containerFile = zip.files.find((f) => f.path === 'META-INF/container.xml');
-    if (!containerFile) return null;
-
-    const containerXml = (await containerFile.buffer()).toString('utf-8');
-    const container = parser.parse(containerXml) as Record<string, unknown>;
-    const rootfile = (container['container'] as Record<string, unknown>)?.['rootfiles'];
-    const rf = (rootfile as Record<string, unknown>)?.['rootfile'];
-    const opfPath = ((Array.isArray(rf) ? rf[0] : rf) as Record<string, unknown>)?.['@_full-path'];
-    if (typeof opfPath !== 'string') return null;
-
-    const opfDir = opfPath.includes('/') ? opfPath.substring(0, opfPath.lastIndexOf('/') + 1) : '';
-
-    const opfFile = zip.files.find((f) => f.path === opfPath);
-    if (!opfFile) return null;
-
-    const opfXml = (await opfFile.buffer()).toString('utf-8');
-    const opf = parser.parse(opfXml) as Record<string, unknown>;
-
-    const pkg = opf['package'] as Record<string, unknown> | undefined;
-    const manifest = pkg?.['manifest'] as Record<string, unknown> | undefined;
-    const itemList = toRecordArray(manifest?.['item']);
+    const loaded = await readEpubPackage(absolutePath);
+    if (!loaded) return null;
+    const { zip, pkg, opfDir, itemList } = loaded;
 
     // Try EPUB3: item with properties="cover-image"
     let coverItem = itemList.find((i) => {
@@ -107,12 +127,13 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
       }
     }
 
-    // Fallback: item whose href contains "cover" and is an image
+    // Fallback: item whose href contains "cover" and is an image. The square audiobook cover is
+    // never the book's cover, and its usual name ("audio-cover") would otherwise match here.
     if (!coverItem) {
       coverItem = itemList.find((i) => {
         const mt = attr(i, '@_media-type').toLowerCase();
         const href = attr(i, '@_href').toLowerCase();
-        return mt.startsWith('image/') && href.includes('cover');
+        return mt.startsWith('image/') && href.includes('cover') && !isAudioCoverItem(i);
       });
     }
 
@@ -125,6 +146,46 @@ export async function extractEpubCover(absolutePath: string): Promise<Buffer | n
     if (!imageFile) return null;
 
     return await imageFile.buffer();
+  } catch {
+    return null;
+  }
+}
+
+/** The item the package itself calls its cover, by the EPUB3 property or the EPUB2 meta. */
+function isBookCoverItem(pkg: Record<string, unknown> | undefined, itemList: Record<string, unknown>[], item: Record<string, unknown>): boolean {
+  if (attr(item, '@_properties').split(' ').includes('cover-image')) return true;
+  const metadata = pkg?.['metadata'] as Record<string, unknown> | undefined;
+  const coverMeta = toRecordArray(metadata?.['meta']).find((m) => attr(m, '@_name').toLowerCase() === 'cover');
+  const coverId = coverMeta ? attr(coverMeta, '@_content') : '';
+  return coverId !== '' && itemList.find((i) => attr(i, '@_id') === coverId) === item;
+}
+
+const AUDIO_COVER_MEDIA_TYPES: ReadonlySet<string> = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+
+/**
+ * The square audiobook cover a read-along EPUB declares through Storyteller's
+ * `storyteller:audio-cover-image` manifest property. Only that declaration counts: an EPUB without
+ * it has no audiobook cover, however its other images are shaped. Null when absent, unreadable or
+ * over the size bound.
+ */
+export async function extractEpubAudioCover(absolutePath: string): Promise<Buffer | null> {
+  try {
+    const loaded = await readEpubPackage(absolutePath);
+    if (!loaded) return null;
+
+    const item = loaded.itemList.find(
+      (i) =>
+        isAudioCoverItem(i) && AUDIO_COVER_MEDIA_TYPES.has(attr(i, '@_media-type').toLowerCase()) && !isBookCoverItem(loaded.pkg, loaded.itemList, i),
+    );
+    if (!item) return null;
+    const href = attr(item, '@_href');
+    if (!href) return null;
+
+    const imageFile = findInZip(loaded.zip, href, loaded.opfDir);
+    if (!imageFile) return null;
+    if (typeof imageFile.uncompressedSize === 'number' && imageFile.uncompressedSize > EPUB_AUDIO_COVER_MAX_BYTES) return null;
+    const bytes = await imageFile.buffer();
+    return bytes.length > 0 && bytes.length <= EPUB_AUDIO_COVER_MAX_BYTES ? bytes : null;
   } catch {
     return null;
   }

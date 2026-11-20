@@ -237,7 +237,7 @@ describe('SettingsNav', () => {
     })
 
     it('shows the book dock with manage_book_dock', () => {
-      expect(itemLabels(mountNav({ perms: ['manage_book_dock'] }))).toContain('Book Dock')
+      expect(itemLabels(mountNav({ perms: ['manage_book_dock'] }))).toContain('Library Dock')
     })
   })
 

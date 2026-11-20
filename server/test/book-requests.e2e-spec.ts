@@ -2,12 +2,15 @@ import { randomUUID } from 'crypto';
 
 import { and, eq } from 'drizzle-orm';
 import { Permission } from '@bookorbit/types';
+import { BOOK_REQUEST_LIST_VIEWS, BOOK_REQUEST_SEARCH_MAX_LENGTH } from '@bookorbit/types';
 import type {
   BookRequestBulkResult,
   BookRequestItem,
   BookRequestPage,
   BookRequestPairSubmitResult,
+  BookRequestSelection,
   BookRequestSubmitResult,
+  BookRequestViewCounts,
   IndexerItem,
 } from '@bookorbit/types';
 
@@ -491,6 +494,83 @@ describe('Book requests (e2e)', () => {
       },
       SCENARIO_TIMEOUT_MS,
     );
+
+    it(
+      'cancels the rows that can still be cancelled and names the ones that cannot',
+      async () => {
+        const open = await submitOk(requester);
+        const settled = await submitOk(requester);
+        expect((await inject('POST', `/book-requests/${settled.request.id}/cancel`, requester)).statusCode).toBe(200);
+
+        const response = await inject('POST', '/book-requests/cancel', requester, { ids: [open.request.id, settled.request.id] });
+
+        expect(response.statusCode).toBe(200);
+        const result = response.json() as BookRequestBulkResult;
+        expect(result.updated.map((item) => [item.id, item.status])).toEqual([[open.request.id, 'cancelled']]);
+        expect(result.failed.map((failure) => [failure.id, failure.errorCode])).toEqual([[settled.request.id, 'BOOK_REQUEST_NOT_CANCELLABLE']]);
+        expect(result).not.toHaveProperty('removed');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'brings hidden rows back as a selection',
+      async () => {
+        const { request } = await submitOk(requester);
+        expect((await inject('POST', `/book-requests/${request.id}/cancel`, requester)).statusCode).toBe(200);
+        expect((await inject('POST', `/book-requests/${request.id}/dismiss`, requester)).statusCode).toBe(200);
+
+        const response = await inject('POST', '/book-requests/restore', requester, { ids: [request.id] });
+
+        expect(response.statusCode).toBe(200);
+        const result = response.json() as BookRequestBulkResult;
+        expect(result.updated.map((item) => [item.id, item.dismissed])).toEqual([[request.id, false]]);
+        expect(result.failed).toEqual([]);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'leaves the requests the caller joined and reports them as removed, refusing their own',
+      async () => {
+        const title = `Bulk leave E2E ${randomUUID()}`;
+        const joinedRequest = await submitOk(requester, { title });
+        await submitOk(secondRequester, { title });
+        const own = await submitOk(secondRequester);
+
+        const response = await inject('POST', '/book-requests/leave', secondRequester, { ids: [joinedRequest.request.id, own.request.id] });
+
+        expect(response.statusCode).toBe(200);
+        const result = response.json() as BookRequestBulkResult;
+        expect(result.updated).toEqual([]);
+        expect(result.removed).toEqual([joinedRequest.request.id]);
+        expect(result.failed.map((failure) => failure.id)).toEqual([own.request.id]);
+        expect((await inject('GET', `/book-requests/${joinedRequest.request.id}`, secondRequester)).statusCode).toBe(403);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'deletes the settled rows of a selection for a moderator, and refuses everybody else',
+      async () => {
+        const open = await submitOk(requester);
+        const settled = await submitOk(requester);
+        expect((await inject('POST', `/book-requests/${settled.request.id}/cancel`, requester)).statusCode).toBe(200);
+
+        expect((await inject('POST', '/admin/book-requests/delete', requester, { ids: [settled.request.id] })).statusCode).toBe(403);
+
+        const response = await inject('POST', '/admin/book-requests/delete', moderator, { ids: [settled.request.id, open.request.id] });
+
+        expect(response.statusCode).toBe(200);
+        const result = response.json() as BookRequestBulkResult;
+        expect(result.updated).toEqual([]);
+        expect(result.removed).toEqual([settled.request.id]);
+        expect(result.failed.map((failure) => failure.id)).toEqual([open.request.id]);
+        expect(await statusOf(settled.request.id)).toBeUndefined();
+        expect(await statusOf(open.request.id)).toBe('pending');
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
   });
 
   describe('listing', () => {
@@ -520,6 +600,190 @@ describe('Book requests (e2e)', () => {
         const response = await inject('GET', '/admin/book-requests?selfServe=maybe', moderator);
 
         expect(response.statusCode).toBe(400);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+  });
+
+  describe('views, search, counts and selection', () => {
+    /**
+     * One fixture per case, scoped by a tag every title carries so the rows the rest of this file
+     * created never reach the figures: a single A pending and handed back with automation off, B
+     * cancelled, C cancelled and hidden by the requester, and a pair whose audiobook half was
+     * rejected while its ebook waits.
+     */
+    async function seedViews() {
+      const tag = randomUUID().slice(0, 8);
+      const a = await submitOk(requester, { title: `Views ${tag} alpha`, authors: [`Ursula ${tag}`] });
+      const b = await submitOk(requester, { title: `Views ${tag} beta` });
+      const c = await submitOk(requester, { title: `Views ${tag} gamma` });
+      const pairResponse = await inject('POST', '/book-requests/pairs', requester, {
+        title: `Views ${tag} pair`,
+        authors: ['Fixture Author'],
+        ebook: { targetLibraryId: library.libraryId },
+        audiobook: { targetLibraryId: library.libraryId },
+      });
+      expect(pairResponse.statusCode).toBe(201);
+      const pair = pairResponse.json() as BookRequestPairSubmitResult;
+
+      await ctx.db
+        .update(schema.bookRequests)
+        .set({ status: 'approved', failureCode: 'AUTOMATION_DISABLED' })
+        .where(eq(schema.bookRequests.id, a.request.id));
+      expect((await inject('POST', `/book-requests/${b.request.id}/cancel`, requester)).statusCode).toBe(200);
+      expect((await inject('POST', `/book-requests/${c.request.id}/cancel`, requester)).statusCode).toBe(200);
+      expect((await inject('POST', `/book-requests/${c.request.id}/dismiss`, requester)).statusCode).toBe(200);
+      expect((await inject('POST', `/admin/book-requests/${pair.audiobook.request.id}/reject`, moderator, {})).statusCode).toBe(200);
+
+      return { tag, a: a.request.id, b: b.request.id, c: c.request.id, ebook: pair.ebook.request.id, audiobook: pair.audiobook.request.id };
+    }
+
+    async function listIds(url: string, session: TestUserSession): Promise<{ ids: number[]; total: number }> {
+      const response = await inject('GET', url, session);
+      expect(response.statusCode, response.body).toBe(200);
+      const page = response.json() as BookRequestPage;
+      return { ids: page.items.map((item) => item.id).sort((x, y) => x - y), total: page.total };
+    }
+
+    const sorted = (ids: number[]) => [...ids].sort((x, y) => x - y);
+
+    it(
+      'narrows a list to one view, with hidden rows only in the hidden view',
+      async () => {
+        const seeded = await seedViews();
+        const q = `q=${encodeURIComponent(`Views ${seeded.tag}`)}`;
+
+        expect((await listIds(`/book-requests?${q}&groupPairs=true&view=needs_action`, requester)).ids).toEqual(sorted([seeded.a, seeded.ebook]));
+        expect((await listIds(`/book-requests?${q}&groupPairs=true&view=closed`, requester)).ids).toEqual(sorted([seeded.b, seeded.ebook]));
+        expect((await listIds(`/book-requests?${q}&view=closed`, requester)).ids).toEqual(sorted([seeded.b, seeded.audiobook]));
+        // The view decides on hidden rows, so asking for them back alongside it changes nothing.
+        expect((await listIds(`/book-requests?${q}&view=closed&includeDismissed=true`, requester)).ids).toEqual(sorted([seeded.b, seeded.audiobook]));
+        expect((await listIds(`/book-requests?${q}&view=hidden`, requester)).ids).toEqual([seeded.c]);
+        // Without a view the list is the one it always was.
+        expect((await listIds(`/book-requests?${q}`, requester)).ids).toEqual(sorted([seeded.a, seeded.b, seeded.ebook, seeded.audiobook]));
+        expect((await listIds(`/book-requests?${q}&includeDismissed=true`, requester)).ids).toEqual(
+          sorted([seeded.a, seeded.b, seeded.c, seeded.ebook, seeded.audiobook]),
+        );
+        // The single status filter still applies, alongside the view.
+        expect((await listIds(`/book-requests?${q}&view=closed&status=rejected`, requester)).ids).toEqual([seeded.audiobook]);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'searches titles and every author, case-insensitively, with typed wildcards matching only themselves',
+      async () => {
+        const seeded = await seedViews();
+        const literal = await submitOk(requester, { title: `Literal ${seeded.tag} 100%_off` });
+        const lookalike = await submitOk(requester, { title: `Literal ${seeded.tag} 100xyoff` });
+
+        expect((await listIds(`/book-requests?q=${encodeURIComponent(`ursula ${seeded.tag}`)}`, requester)).ids).toEqual([seeded.a]);
+        expect((await listIds(`/book-requests?q=${encodeURIComponent(`VIEWS ${seeded.tag} ALPHA`)}`, requester)).ids).toEqual([seeded.a]);
+        expect((await listIds(`/book-requests?q=${encodeURIComponent(`${seeded.tag} 100%_off`)}`, requester)).ids).toEqual([literal.request.id]);
+        expect((await listIds(`/admin/book-requests?q=${encodeURIComponent(`${seeded.tag} 100`)}`, moderator)).ids).toEqual(
+          sorted([literal.request.id, lookalike.request.id]),
+        );
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'treats a blank search as none, and refuses an unknown view or an overlong search',
+      async () => {
+        expect((await inject('GET', '/book-requests?q=%20%20&limit=1', requester)).statusCode).toBe(200);
+        expect((await inject('GET', '/book-requests?view=archived', requester)).statusCode).toBe(400);
+        expect((await inject('GET', `/book-requests?q=${'x'.repeat(BOOK_REQUEST_SEARCH_MAX_LENGTH + 1)}`, requester)).statusCode).toBe(400);
+        expect((await inject('GET', '/book-requests/view-counts?view=archived', requester)).statusCode).toBe(400);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'counts each view as the grouped rows its list reports, counting a pair once in every view it reaches',
+      async () => {
+        const seeded = await seedViews();
+        const q = `q=${encodeURIComponent(`Views ${seeded.tag}`)}`;
+
+        const mine = await inject('GET', `/book-requests/view-counts?${q}&page=3&sortBy=title&includeDismissed=true&groupPairs=false`, requester);
+        expect(mine.statusCode, mine.body).toBe(200);
+        expect(mine.json()).toEqual({
+          active: 3,
+          needs_action: 2,
+          in_progress: 0,
+          finished: 0,
+          closed: 2,
+          hidden: 1,
+          awaitingManualPick: 1,
+        } satisfies BookRequestViewCounts);
+
+        const counts = mine.json() as BookRequestViewCounts;
+        for (const view of BOOK_REQUEST_LIST_VIEWS) {
+          expect((await listIds(`/book-requests?${q}&groupPairs=true&view=${view}`, requester)).total, view).toBe(counts[view]);
+        }
+        expect((await listIds(`/book-requests?${q}&groupPairs=true`, requester)).total).toBe(counts.active);
+
+        // The approver hid nothing, so the requester's hidden row is an ordinary closed one here.
+        const all = await inject('GET', `/admin/book-requests/view-counts?${q}`, moderator);
+        expect(all.statusCode, all.body).toBe(200);
+        expect(all.json()).toEqual({ active: 4, needs_action: 2, in_progress: 0, finished: 0, closed: 3, hidden: 0, awaitingManualPick: 1 });
+        expect((await inject('GET', `/admin/book-requests/view-counts?${q}`, requester)).statusCode).toBe(403);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'selects every request in the matching rows, a pair as both halves under its lead row',
+      async () => {
+        const seeded = await seedViews();
+        const q = `q=${encodeURIComponent(`Views ${seeded.tag}`)}`;
+
+        const response = await inject('GET', `/book-requests/selection?${q}&view=needs_action&groupPairs=false&limit=1`, requester);
+        expect(response.statusCode, response.body).toBe(200);
+        const selection = response.json() as BookRequestSelection;
+        expect(selection.totalRows).toBe(2);
+        expect(selection.truncated).toBe(false);
+        // Newest first, like the list: the pair was filed after the single.
+        expect(selection.items.map((item) => [item.id, item.rowId])).toEqual([
+          [seeded.ebook, seeded.ebook],
+          [seeded.audiobook, seeded.ebook],
+          [seeded.a, seeded.a],
+        ]);
+        expect(selection.items.find((item) => item.id === seeded.audiobook)).toMatchObject({
+          mediaKind: 'audiobook',
+          status: 'rejected',
+          userId: requester.userId,
+          fulfillerUserId: null,
+          dismissed: false,
+          subscribed: false,
+        });
+
+        const hidden = (await inject('GET', `/book-requests/selection?${q}&view=hidden`, requester)).json() as BookRequestSelection;
+        expect(hidden.items).toEqual([expect.objectContaining({ id: seeded.c, rowId: seeded.c, dismissed: true })]);
+
+        expect((await inject('GET', `/admin/book-requests/selection?${q}`, requester)).statusCode).toBe(403);
+        const queue = (await inject('GET', `/admin/book-requests/selection?${q}&sortBy=title&sortDir=asc`, moderator)).json() as BookRequestSelection;
+        expect(queue.totalRows).toBe(4);
+        expect(queue.items.map((item) => item.id)).toEqual([seeded.a, seeded.b, seeded.c, seeded.ebook, seeded.audiobook]);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'marks a request the caller joined as followed, and their own as not',
+      async () => {
+        const title = `Views follow ${randomUUID()}`;
+        const { request } = await submitOk(requester, { title });
+        await submitOk(secondRequester, { title });
+
+        const joinedSelection = (
+          await inject('GET', `/book-requests/selection?q=${encodeURIComponent(title)}`, secondRequester)
+        ).json() as BookRequestSelection;
+        expect(joinedSelection.items).toEqual([expect.objectContaining({ id: request.id, subscribed: true, dismissed: false })]);
+
+        const ownSelection = (
+          await inject('GET', `/book-requests/selection?q=${encodeURIComponent(title)}`, requester)
+        ).json() as BookRequestSelection;
+        expect(ownSelection.items).toEqual([expect.objectContaining({ id: request.id, subscribed: false })]);
       },
       SCENARIO_TIMEOUT_MS,
     );

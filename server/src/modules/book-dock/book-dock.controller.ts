@@ -49,6 +49,8 @@ import {
   SelectionSummaryDto,
 } from './dto/index';
 import { AppSettingsService } from '../app-settings/app-settings.service';
+import { toBookDockFilter } from './dto/book-dock-filter';
+import { LibraryDockService } from './library-dock.service';
 
 @Controller('book-dock')
 @RequirePermission(Permission.BookDockAccess)
@@ -59,22 +61,27 @@ export class BookDockController {
     private readonly finalizeService: BookDockFinalizeService,
     private readonly watcherService: BookDockWatcherService,
     private readonly appSettings: AppSettingsService,
+    private readonly libraryDocks: LibraryDockService,
   ) {}
 
   @Get('files')
   listFiles(@CurrentUser() user: RequestUser, @Query() query: ListBookDockFilesDto) {
-    return this.service.listFiles({
-      status: query.status,
-      needsReview: query.needsReview,
-      readyToFile: query.readyToFile,
-      page: query.page ?? 1,
-      limit: query.limit ?? 20,
-      sort: query.sort ?? 'createdAt',
-      order: query.order ?? 'desc',
-      search: query.search,
-      userId: user.id,
-      canManageAll: this.canManageAll(user),
-    });
+    return this.service.listFiles(
+      {
+        status: query.status,
+        needsReview: query.needsReview,
+        readyToFile: query.readyToFile,
+        page: query.page ?? 1,
+        limit: query.limit ?? 20,
+        sort: query.sort ?? 'createdAt',
+        order: query.order ?? 'desc',
+        search: query.search,
+        filter: toBookDockFilter(query),
+        userId: user.id,
+        canManageAll: this.canManageAll(user),
+      },
+      user,
+    );
   }
 
   @Get('summary')
@@ -109,8 +116,10 @@ export class BookDockController {
     resource: AuditResource.AppSettings,
     description: 'Updated Book Dock settings',
   })
-  updateSettings(@Body() dto: UpdateBookDockSettingsDto) {
-    return this.appSettings.updateBookDockSettings(dto);
+  async updateSettings(@Body() dto: UpdateBookDockSettingsDto) {
+    const settings = await this.appSettings.updateBookDockSettings(dto);
+    this.finalizeService.recheckAfterSettingsChange();
+    return settings;
   }
 
   @Get('statistics')
@@ -142,12 +151,18 @@ export class BookDockController {
 
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
-  async upload(@CurrentUser() user: RequestUser, @Req() req: MultipartRequest) {
+  async upload(
+    @CurrentUser() user: RequestUser,
+    @Req() req: MultipartRequest,
+    @Query('libraryId', new ParseIntPipe({ optional: true })) libraryId?: number,
+  ) {
     const limitMb = await this.appSettings.getMaxUploadSizeMb();
     const data = await req.file({ limits: { fileSize: limitMb * 1024 * 1024 } });
     if (!data) throw new BadRequestException('No file provided');
 
-    const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable, user.id);
+    // Only the part's headers have been read, so a refused upload moves no bytes (D26).
+    const dock = libraryId === undefined ? undefined : await this.libraryDocks.resolveUploadDock(user, libraryId, data.filename);
+    const fileId = await this.ingestService.ingestUpload(data.filename, data.file as unknown as Readable, user.id, dock);
     return this.service.getFile(fileId, user.id, this.canManageAll(user));
   }
 
@@ -175,6 +190,7 @@ export class BookDockController {
       this.canManageAll(user),
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -190,6 +206,7 @@ export class BookDockController {
       this.canManageAll(user),
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -205,6 +222,7 @@ export class BookDockController {
       this.canManageAll(user),
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -212,6 +230,13 @@ export class BookDockController {
   @HttpCode(HttpStatus.ACCEPTED)
   refetchMetadata(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
     return this.service.refetchMetadata(id, user.id, this.canManageAll(user));
+  }
+
+  /** "Keep both" on a file the target library already holds (D29): it no longer waits on that book. */
+  @Post('files/:id/keep-both')
+  @HttpCode(HttpStatus.OK)
+  keepBoth(@CurrentUser() user: RequestUser, @Param('id', ParseIntPipe) id: number) {
+    return this.service.keepBoth(id, user.id, this.canManageAll(user));
   }
 
   @Post('files/set-target')
@@ -228,6 +253,7 @@ export class BookDockController {
       this.canManageAll(user),
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -243,6 +269,7 @@ export class BookDockController {
       this.canManageAll(user),
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -262,6 +289,7 @@ export class BookDockController {
       this.canManageAll(user),
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -278,6 +306,7 @@ export class BookDockController {
       dto.search,
       dto.needsReview,
       dto.readyToFile,
+      toBookDockFilter(dto),
     );
   }
 
@@ -300,6 +329,7 @@ export class BookDockController {
       dto.needsReview,
       dto.readyToFile,
       user,
+      toBookDockFilter(dto),
     );
   }
 
@@ -322,6 +352,7 @@ export class BookDockController {
       dto.needsReview,
       dto.readyToFile,
       user,
+      toBookDockFilter(dto),
     );
   }
 
@@ -332,9 +363,9 @@ export class BookDockController {
     resource: AuditResource.BookDockFile,
     description: (req) => {
       const body = req.body as { fileIds?: number[]; selectAll?: boolean };
-      if (body?.selectAll) return 'Finalized all Book Dock files into library';
+      if (body?.selectAll) return 'Finalized all Library Dock files into library';
       const count = body?.fileIds?.length ?? 0;
-      return `Finalized ${count} Book Dock file${count !== 1 ? 's' : ''} into library`;
+      return `Finalized ${count} Library Dock file${count !== 1 ? 's' : ''} into library`;
     },
   })
   finalize(@CurrentUser() user: RequestUser, @Body() dto: FinalizeBookDockDto) {
@@ -354,6 +385,7 @@ export class BookDockController {
       dto.needsReview,
       dto.readyToFile,
       user,
+      toBookDockFilter(dto),
     );
   }
 

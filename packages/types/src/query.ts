@@ -13,11 +13,13 @@ import type { CommunityRatingProviderKey } from "./metadata-fetch";
  * - `startedAt` - from `user_book_status.started_at` (per-user)
  * - `finishedAt` - from `user_book_status.finished_at` (per-user)
  * - `author` - resolved via `book_authors` join to `authors.name`
+ * - `authorGender` - resolved via `book_authors` join to `authors.gender`
  * - `genre` - resolved via `book_genres` join to `genres.name`
  * - `tag` - resolved via `book_tags` join to `tags.name`
  * - `collection` - resolved via `collection_books` join to `collections.name`
  * - `library` - resolved via `books.library_id` join to `libraries.name`
  * - `format` - matches `book_files.format` on any of the book's files, not only the primary one
+ * - `storyGuide` - whether any of the book's files has a built Story Guide artifact
  * - `fileSize` - resolved via `book_files.size_bytes` (primary file; rule values are bytes)
  * - `isbn` - matches both `isbn10` and `isbn13` in `book_metadata`
  * - `publishedDate` - uses full dates when available and falls back to published year
@@ -38,11 +40,13 @@ export type StaticRuleField =
   | "publishedYear"
   | "pageCount"
   | "author"
+  | "authorGender"
   | "genre"
   | "tag"
   | "collection"
   | "library"
   | "format"
+  | "storyGuide"
   | "fileSize"
   | "addedAt"
   | "startedAt"
@@ -112,11 +116,13 @@ export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   language: ["eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   series: ["contains", "notContains", "eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   author: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
+  authorGender: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   genre: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   tag: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   collection: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   library: ["includesAny", "excludesAll"],
   format: ["includesAny", "excludesAll"],
+  storyGuide: ["isMissing", "isPresent"],
   fileSize: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   publishedDate: ["before", "after", "between", "withinLast", "moreThanAgo", "isEmpty", "isNotEmpty"],
   publishedYear: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],

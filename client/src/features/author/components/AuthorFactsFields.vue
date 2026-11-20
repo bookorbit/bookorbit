@@ -2,6 +2,7 @@
 import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChipInput from '@/components/ui/ChipInput.vue'
+import { AUTHOR_GENDERS } from '@bookorbit/types'
 import type { AuthorFactsDraft, AuthorFactsField } from '../lib/author-facts'
 
 const props = defineProps<{ invalid: AuthorFactsField[] }>()
@@ -24,6 +25,7 @@ function field<K extends keyof AuthorFactsDraft>(key: K) {
 }
 
 const website = field('website')
+const gender = field('gender')
 const born = field('born')
 const died = field('died')
 const genres = field('genres')
@@ -32,6 +34,14 @@ const influences = field('influences')
 
 <template>
   <div class="space-y-2">
+    <label class="block text-xs text-muted-foreground">
+      {{ t('author.detail.edit.gender') }}
+      <select v-model="gender" class="mt-1 h-9 w-full rounded-md border border-input bg-background px-2.5 text-sm text-foreground">
+        <option value="">{{ t('author.gender.unknown') }}</option>
+        <option v-for="value in AUTHOR_GENDERS" :key="value" :value="value">{{ t(`author.gender.${value}`) }}</option>
+      </select>
+    </label>
+
     <label class="block text-xs text-muted-foreground">
       {{ t('author.detail.edit.website') }}
       <input

@@ -28,6 +28,7 @@ import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } f
 import { BookMetadataFetchOrchestratorService } from '../book-metadata-fetch/book-metadata-fetch-orchestrator.service';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { selectEmbeddedCoverSources } from '../book-cover-store/cover-sources';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { CoverSlotReconciler } from '../metadata/cover-slot-reconciler.service';
 import type { AudioChapterProbe } from '../metadata/extractors/audio.extractor';
 import { MetadataService } from '../metadata/metadata.service';
@@ -316,6 +317,7 @@ export class ScannerService implements OnApplicationBootstrap {
     private readonly coverStore: BookCoverStore,
     private readonly regexMetadata: RegexMetadataService,
     private readonly libraryGate: LibraryOperationGate,
+    private readonly jobChanges: JobChangesService,
     @Optional() private readonly autoFetchOrchestrator?: BookMetadataFetchOrchestratorService,
     @Optional() private readonly achievementEvents?: AchievementEventsService,
     @Optional() private readonly coverReconciler?: CoverSlotReconciler,
@@ -1830,7 +1832,7 @@ export class ScannerService implements OnApplicationBootstrap {
       this.logger.error(
         `[${event}] [fail] libraryId=${libraryId} jobId=${jobId} durationMs=${Date.now() - startedAt} errorClass=${err instanceof Error ? err.name : 'Error'} error="${sanitizeLogValue(message)}" - scan job failed`,
       );
-      this.emitFromStore(libraryId, jobId, 'failed', message);
+      this.emitFromStore(libraryId, jobId, 'failed', { errorMessage: message });
 
       this.notificationService
         .notify({
@@ -1908,7 +1910,7 @@ export class ScannerService implements OnApplicationBootstrap {
 
           const entry = this.scanJobStore.increment(libraryId, { processed: 1 });
           if (entry && this.scanJobStore.shouldEmit(entry)) {
-            this.emitFromStore(libraryId, jobId, 'running');
+            this.emitFromStore(libraryId, jobId, 'running', { progressOnly: true });
             this.scanJobStore.markEmitted(entry);
           }
         },
@@ -3540,7 +3542,13 @@ export class ScannerService implements OnApplicationBootstrap {
     return true;
   }
 
-  private emitFromStore(libraryId: number, jobId: number, status: 'running' | 'completed' | 'failed', errorMessage?: string): void {
+  /** Pushes the scan to the library page and tells the Jobs area; `progressOnly` when the scan only moved along. */
+  private emitFromStore(
+    libraryId: number,
+    jobId: number,
+    status: 'running' | 'completed' | 'failed',
+    { errorMessage, progressOnly = false }: { errorMessage?: string; progressOnly?: boolean } = {},
+  ): void {
     const entry = this.scanJobStore.get(libraryId);
     const event: ScanProgressEvent = {
       jobId,
@@ -3554,5 +3562,6 @@ export class ScannerService implements OnApplicationBootstrap {
       errorMessage,
     };
     this.scanGateway.emitProgress(event);
+    this.jobChanges.notify({ type: 'library-scan', ownerId: null, state: !progressOnly });
   }
 }

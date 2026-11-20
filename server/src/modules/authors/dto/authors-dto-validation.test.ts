@@ -125,6 +125,7 @@ describe('Authors DTO validation', () => {
     expect(
       (
         await errorsFor(UpdateAuthorDto, {
+          gender: 'female',
           website: 'https://johnreid.example/about',
           birthDate: '1965-03-14',
           birthYear: 1965,
@@ -135,11 +136,12 @@ describe('Authors DTO validation', () => {
         })
       ).length,
     ).toBe(0);
-    expect((await errorsFor(UpdateAuthorDto, { website: null, birthDate: null, genres: null, influences: null })).length).toBe(0);
+    expect((await errorsFor(UpdateAuthorDto, { gender: null, website: null, birthDate: null, genres: null, influences: null })).length).toBe(0);
     expect((await errorsFor(UpdateAuthorDto, { birthYear: -800 })).length).toBe(0);
   });
 
   it('rejects unsafe or malformed author facts', async () => {
+    expect((await errorsFor(UpdateAuthorDto, { gender: 'unknown' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateAuthorDto, { website: 'javascript:alert(1)' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateAuthorDto, { website: 'johnreid.example' })).length).toBeGreaterThan(0);
     expect((await errorsFor(UpdateAuthorDto, { website: 'ftp://johnreid.example' })).length).toBeGreaterThan(0);

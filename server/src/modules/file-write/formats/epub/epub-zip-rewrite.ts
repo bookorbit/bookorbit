@@ -56,7 +56,13 @@ class FileWriter extends Writer<void> {
   override async getData(): Promise<void> {}
 }
 
-export async function rewriteEpubZip(filePath: string, tmpPath: string, patches: ReadonlyMap<string, Buffer>): Promise<void> {
+export async function rewriteEpubZip(
+  filePath: string,
+  tmpPath: string,
+  patches: ReadonlyMap<string, Buffer>,
+  removals: ReadonlySet<string> = new Set(),
+): Promise<void> {
+  if (removals.has('mimetype')) throw new Error('Invalid EPUB ZIP removal path');
   for (const [name, content] of patches) {
     if (
       !name ||
@@ -117,7 +123,10 @@ export async function rewriteEpubZip(filePath: string, tmpPath: string, patches:
         zip64: false,
       });
       // Copy local headers, compressed bytes and descriptors verbatim; only directory offsets change.
-      await writer.appendZip(reader, { readerOptions, filter: (entry) => entry.filename !== 'mimetype' && !patches.has(entry.filename) });
+      await writer.appendZip(reader, {
+        readerOptions,
+        filter: (entry) => entry.filename !== 'mimetype' && !patches.has(entry.filename) && !removals.has(entry.filename),
+      });
       for (const [name, content] of patches) {
         if (name === 'mimetype') continue;
         const compressed = await compress(content, { level: 6 });

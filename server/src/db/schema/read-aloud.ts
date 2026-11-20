@@ -1,5 +1,20 @@
 import { sql } from 'drizzle-orm';
-import { bigserial, boolean, check, index, integer, jsonb, pgTable, smallint, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import {
+  bigint,
+  bigserial,
+  boolean,
+  check,
+  doublePrecision,
+  index,
+  integer,
+  jsonb,
+  pgTable,
+  smallint,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  varchar,
+} from 'drizzle-orm/pg-core';
 import type {
   ReadAloudChapterReport,
   ReadAloudDecisions,
@@ -47,6 +62,12 @@ export const readAloudJobs = pgTable(
     /** Someone chose to add this output despite the review warnings; survives a server restart mid-publish. */
     publishApproved: boolean('publish_approved').notNull().default(false),
     workerEventSeq: integer('worker_event_seq').notNull().default(0),
+    /** A manager's boost: higher runs before every requester's turn. */
+    priority: integer('priority').notNull().default(0),
+    /** The job's place in its requester's own lane; Move to top gives it one below their lowest. */
+    userOrder: bigserial('user_order', { mode: 'number' }).notNull(),
+    /** Held off the worker while queued. Not a status, so the active-job index, merge blocking and cancel keep working. */
+    pausedAt: timestamp('paused_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { withTimezone: true })
       .notNull()
@@ -68,6 +89,16 @@ export const readAloudJobs = pgTable(
     index('read_aloud_jobs_user_updated_idx').on(t.requestedByUserId, sql`${t.updatedAt} desc`),
     index('read_aloud_jobs_output_file_idx').on(t.outputFileId),
     index('read_aloud_jobs_replace_file_idx').on(t.replaceFileId),
+    index('read_aloud_jobs_user_started_idx').on(t.requestedByUserId, sql`${t.startedAt} desc`),
+    index('read_aloud_jobs_user_lane_idx')
+      .on(t.requestedByUserId, t.userOrder)
+      .where(sql`${t.status} = 'queued'`),
+    index('read_aloud_jobs_finish_idx')
+      .on(sql`coalesce(${t.completedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('completed', 'completed_with_warnings', 'failed', 'cancelled')`),
+    index('read_aloud_jobs_user_finish_idx')
+      .on(t.requestedByUserId, sql`coalesce(${t.completedAt}, ${t.updatedAt}) desc`, sql`${t.id} desc`)
+      .where(sql`${t.status} in ('completed', 'completed_with_warnings', 'failed', 'cancelled')`),
     check(
       'read_aloud_jobs_status_chk',
       sql`${t.status} in ('queued', 'processing', 'awaiting_review', 'completed', 'completed_with_warnings', 'failed', 'cancelled')`,
@@ -118,3 +149,26 @@ export const readAloudJobReports = pgTable('read_aloud_job_reports', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 export type NewReadAloudJobEventRow = typeof readAloudJobEvents.$inferInsert;
+
+/**
+ * The length of the audio timeline a read-along EPUB carries, as the book page compares it with
+ * the audiobook. Reading it parses every media overlay document in the file, so it is measured
+ * once per file version: a row counts only while the file still has the size and mtime it was
+ * measured at. A null total is a measured file whose overlays reach no audio.
+ */
+export const bookFileAudioTimelines = pgTable(
+  'book_file_audio_timelines',
+  {
+    fileId: integer('file_id')
+      .primaryKey()
+      .references(() => bookFiles.id, { onDelete: 'cascade' }),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    mtimeMs: doublePrecision('mtime_ms').notNull(),
+    totalSeconds: doublePrecision('total_seconds'),
+    measuredAt: timestamp('measured_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [check('book_file_audio_timelines_total_seconds_nonnegative_chk', sql`${t.totalSeconds} is null or ${t.totalSeconds} >= 0`)],
+);
+
+export type BookFileAudioTimelineRow = typeof bookFileAudioTimelines.$inferSelect;
+export type NewBookFileAudioTimelineRow = typeof bookFileAudioTimelines.$inferInsert;

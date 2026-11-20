@@ -24,6 +24,7 @@ import { SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type MetadataProviderKey
 import { IsExternalProviderMap } from '../../../common/decorators/is-external-provider-map.decorator';
 import { IsMetadataProviderKey } from '../../../common/decorators/is-metadata-provider-key.decorator';
 import { NormalizeIdentifier } from '../../../common/decorators/normalize-identifier.decorator';
+import { IsBookDockFilter, IsBookDockHoldFilter } from './book-dock-filter';
 
 @ValidatorConstraint({ name: 'hasCompleteDefaultDestination', async: false })
 class HasCompleteDefaultDestinationConstraint implements ValidatorConstraintInterface {
@@ -47,6 +48,36 @@ function HasCompleteDefaultDestination(options?: ValidationOptions) {
       options,
       constraints: [],
       validator: HasCompleteDefaultDestinationConstraint,
+    });
+  };
+}
+
+@ValidatorConstraint({ name: 'hasFinalizeSelection', async: false })
+class HasFinalizeSelectionConstraint implements ValidatorConstraintInterface {
+  validate(_: unknown, args?: ValidationArguments): boolean {
+    const dto = args?.object as FinalizeBookDockDto | undefined;
+    if (!dto) return false;
+    return dto.selectAll === true || (dto.fileIds?.length ?? 0) > 0;
+  }
+
+  defaultMessage(): string {
+    return 'fileIds must contain at least one id, or selectAll must be true';
+  }
+}
+
+/**
+ * A finalize request naming no files used to answer 200 with an empty result, which reads as
+ * "nothing was ready to file" rather than "nothing was asked for". Rejecting it keeps the two apart.
+ */
+function HasFinalizeSelection(options?: ValidationOptions) {
+  return function (constructor: new (...args: unknown[]) => unknown) {
+    registerDecorator({
+      name: 'hasFinalizeSelection',
+      target: constructor,
+      propertyName: '',
+      options,
+      constraints: [],
+      validator: HasFinalizeSelectionConstraint,
     });
   };
 }
@@ -179,6 +210,7 @@ class FinalizeOverrideDto {
 }
 
 @HasCompleteDefaultDestination()
+@HasFinalizeSelection()
 export class FinalizeBookDockDto {
   @IsOptional()
   @IsArray()
@@ -209,6 +241,12 @@ export class FinalizeBookDockDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== undefined)
@@ -257,6 +295,12 @@ export class BulkDiscardDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class PreviewNamesDto {
@@ -289,6 +333,12 @@ export class PreviewNamesDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== undefined)
@@ -326,6 +376,12 @@ export class BulkRetryFetchDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class BulkApplyFetchedDto {
@@ -358,6 +414,12 @@ export class BulkApplyFetchedDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class BulkSetTargetDto {
@@ -390,6 +452,12 @@ export class BulkSetTargetDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @IsOptional()
   @ValidateIf((_, value) => value !== null)
@@ -432,6 +500,12 @@ export class SelectionSummaryDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 }
 
 export class BulkEditBookDockDto {
@@ -464,6 +538,12 @@ export class BulkEditBookDockDto {
   @IsOptional()
   @IsBoolean()
   readyToFile?: boolean;
+
+  @IsBookDockFilter()
+  dock?: string;
+
+  @IsBookDockHoldFilter()
+  hold?: string;
 
   @ValidateNested()
   @IsObject()

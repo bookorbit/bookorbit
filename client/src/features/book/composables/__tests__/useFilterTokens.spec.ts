@@ -18,7 +18,7 @@ describe('useFilterTokens', () => {
     const { tokens, selectedFormats, ruleCount } = useFilterTokens(filter)
 
     expect(selectedFormats.value).toEqual(['epub'])
-    expect(tokens.value).toEqual([{ index: 0, field: 'Read Status', operator: 'is', value: 'Unread' }])
+    expect(tokens.value).toEqual([{ index: 0, kind: 'rule', field: 'Read Status', operator: 'is', value: 'Unread' }])
     expect(ruleCount.value).toBe(2)
   })
 
@@ -59,24 +59,44 @@ describe('useFilterTokens', () => {
     expect(filter.value).toBeUndefined()
   })
 
-  it('keeps an OR root whole and ANDs a picked format beside it', () => {
+  it('shows every rule of an OR root as its own token and ANDs a picked format beside the whole OR', () => {
     const orRoot: GroupRule = { type: 'group', join: 'OR', rules: [unread, epub] }
     const filter = ref<GroupRule | undefined>(orRoot)
-    const { tokens, selectedFormats, toggleFormat } = useFilterTokens(filter)
+    const { tokens, selectedFormats, ruleCount, join, toggleFormat } = useFilterTokens(filter)
 
     expect(selectedFormats.value).toEqual([])
-    expect(tokens.value).toEqual([{ index: -1, field: 'Any of 2 rules', operator: '', value: null }])
+    expect(join.value).toBe('OR')
+    expect(ruleCount.value).toBe(2)
+    expect(tokens.value.map((token) => [token.index, token.field, token.value])).toEqual([
+      [0, 'Read Status', 'Unread'],
+      [1, 'Format', 'EPUB'],
+    ])
 
     toggleFormat('azw3')
     expect(filter.value).toEqual(and(orRoot, { ...epub, value: ['azw3'] }))
   })
 
-  it('shows a nested group as one token', () => {
+  it('switches how the root rules combine and leaves an empty filter alone', () => {
+    const filter = ref<GroupRule | undefined>(and(unread, epub))
+    const { join, setJoin, selectedFormats } = useFilterTokens(filter)
+
+    setJoin('OR')
+    expect(filter.value).toEqual({ type: 'group', join: 'OR', rules: [unread, epub] })
+    expect(join.value).toBe('OR')
+    expect(selectedFormats.value).toEqual([])
+
+    filter.value = undefined
+    setJoin('AND')
+    expect(filter.value).toBeUndefined()
+    expect(join.value).toBe('AND')
+  })
+
+  it('shows a nested group as one token marked as a group', () => {
     const nested: GroupRule = { type: 'group', join: 'OR', rules: [unread, epub] }
     const filter = ref<GroupRule | undefined>(and(nested))
     const { tokens } = useFilterTokens(filter)
 
-    expect(tokens.value).toEqual([{ index: 0, field: 'Any of 2 rules', operator: '', value: null }])
+    expect(tokens.value).toEqual([{ index: 0, kind: 'group', field: 'Any of 2 rules', operator: '', value: null }])
   })
 
   it('turns every rule into a token when the view has no format chips', () => {

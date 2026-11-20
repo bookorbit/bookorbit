@@ -1,81 +1,68 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { defineComponent, h } from 'vue'
-import { MatchFlag, type SearchResult } from '@embedpdf/models'
+import { defineComponent, h, ref } from 'vue'
 import type { AnnotationItem } from '@bookorbit/types'
 
-const mocks = vi.hoisted(() => ({
-  searchState: {
-    __v_isRef: true,
-    value: {
-      flags: [] as MatchFlag[],
-      results: [] as SearchResult[],
-      total: 0,
-      activeResultIndex: -1,
-      query: '',
-      loading: false,
-      active: false,
-    },
-  },
-  searchScope: {
-    searchAllPages: vi.fn<(query: string) => { onProgress: (callback: (progress: { page: number }) => void) => void } | undefined>(),
-    stopSearch: vi.fn<() => void>(),
-    setFlags: vi.fn<(flags: MatchFlag[]) => void>(),
-    goToResult: vi.fn<(index: number) => void>(),
-  },
-  scrollScope: {
-    scrollToPage: vi.fn<(options: Record<string, unknown>) => void>(),
-  },
-  scrollState: {
-    __v_isRef: true,
-    value: { currentPage: 1, totalPages: 10 },
-  },
-  bookmarkCapability: {
-    __v_isRef: true,
-    value: null as unknown,
-  },
-  documentState: {
-    value: null as unknown,
-  },
+type PageRef = { kind: 'objectNumber'; objectNumber: number }
+type Hit = {
+  page: PageRef
+  pageIndex: number
+  start: number
+  count: number
+  segments: []
+  snippet?: { before: string; match: string; after: string }
+}
+type Outline = { ref: PageRef; parent: PageRef | null; title: string; target: { kind: 'goto'; destination: { kind: 'fit'; page: PageRef } } | null }
+
+const searchApi = {
+  search: vi.fn<(query: { text: string; matchCase?: boolean; wholeWord?: boolean }) => Promise<unknown>>(),
+  clear: vi.fn<() => void>(),
+  goToHit: vi.fn<(index: number) => void>(),
+}
+const searchState = {
+  query: ref<{ text: string } | null>(null),
+  status: ref('idle'),
+  hitCount: ref(0),
+  activeHitIndex: ref(-1),
+  progress: ref({ pagesSearched: 0, pageCount: 10 }),
+}
+const hits = ref<Hit[]>([])
+const outlineApi = { activate: vi.fn<(ref: PageRef) => void>() }
+const outlineState = { items: ref<Outline[]>([]), status: ref('ready') }
+const pages = ref(Array.from({ length: 100 }, (_, index) => ({ index, ref: pageRef(index), size: { width: 600, height: 800 }, rotation: 0 })))
+
+function pageRef(pageIndex: number): PageRef {
+  return { kind: 'objectNumber', objectNumber: 1000 + pageIndex }
+}
+
+vi.mock('@embedpdf/vue/search', () => ({
+  useSearch: () => searchApi,
+  useSearchState: () => searchState,
+  useSearchHits: () => hits,
 }))
 
-vi.mock('@embedpdf/plugin-search/vue', async () => {
+vi.mock('@embedpdf/vue/outline', () => ({
+  useOutline: () => outlineApi,
+  useOutlineState: () => outlineState,
+}))
+
+vi.mock('@embedpdf/vue/runtime', () => ({ usePageList: () => pages }))
+
+vi.mock('@embedpdf/vue/page-view', async () => {
   const { defineComponent: define, h: create } = await import('vue')
   return {
-    SearchLayer: define({
+    PageView: define({
       setup:
         (_, { slots }) =>
         () =>
           create('div', slots.default?.()),
     }),
-    useSearch: () => ({ state: mocks.searchState, provides: { value: mocks.searchScope } }),
   }
 })
 
-vi.mock('@embedpdf/plugin-scroll/vue', () => ({
-  useScroll: () => ({
-    state: mocks.scrollState,
-    provides: { value: mocks.scrollScope },
-  }),
-}))
-
-vi.mock('@embedpdf/plugin-bookmark/vue', () => ({
-  useBookmarkCapability: () => ({ provides: mocks.bookmarkCapability }),
-}))
-
-vi.mock('@embedpdf/plugin-annotation/vue', () => ({
-  useAnnotationCapability: () => ({ provides: { value: null } }),
-}))
-
-vi.mock('@embedpdf/core/vue', () => ({
-  useDocumentState: () => mocks.documentState,
-}))
-
-vi.mock('@embedpdf/plugin-thumbnail/vue', async () => {
+vi.mock('@embedpdf/vue/render', async () => {
   const { defineComponent: define, h: create } = await import('vue')
-  return {
-    ThumbImg: define({ setup: () => () => create('img') }),
-  }
+  return { RenderLayer: define({ setup: () => () => create('div') }) }
 })
 
 vi.mock('vue-virtual-scroller', async () => {
@@ -124,7 +111,7 @@ const sheetStub = defineComponent({
 
 function mountSidebar(props: Record<string, unknown> = {}) {
   return mount(PdfReaderSidebar, {
-    props: { documentId: 'doc-1', activeTab: 'search', annotations: [], ...props },
+    props: { activeTab: 'search', currentPage: 1, totalPages: 10, annotations: [], ...props },
     global: {
       stubs: {
         Tooltip: passthrough,
@@ -136,19 +123,30 @@ function mountSidebar(props: Record<string, unknown> = {}) {
   })
 }
 
-function makeResult(rects: SearchResult['rects'] = []): SearchResult {
+function makeHit(snippet = true): Hit {
   return {
+    page: pageRef(4),
     pageIndex: 4,
-    charIndex: 10,
-    charCount: 4,
-    rects,
-    context: {
-      before: 'before',
-      match: 'term',
-      after: 'after',
-      truncatedLeft: false,
-      truncatedRight: false,
-    },
+    start: 10,
+    count: 4,
+    segments: [],
+    ...(snippet ? { snippet: { before: 'before', match: 'term', after: 'after' } } : {}),
+  }
+}
+
+function completeWith(results: Hit[], activeHitIndex = -1) {
+  hits.value = results
+  searchState.hitCount.value = results.length
+  searchState.activeHitIndex.value = activeHitIndex
+  searchState.status.value = 'complete'
+}
+
+function outlineItem(objectNumber: number, title: string, pageIndex: number | null, parent?: number): Outline {
+  return {
+    ref: { kind: 'objectNumber', objectNumber },
+    parent: parent === undefined ? null : { kind: 'objectNumber', objectNumber: parent },
+    title,
+    target: pageIndex === null ? null : { kind: 'goto', destination: { kind: 'fit', page: pageRef(pageIndex) } },
   }
 }
 
@@ -174,86 +172,65 @@ function makeAnnotation(id: number, overrides: Partial<AnnotationItem> = {}): An
   }
 }
 
-function outlineCapability(bookmarks: unknown[]) {
-  return {
-    forDocument: () => ({
-      getBookmarks: () => ({
-        wait: (resolve: (value: { bookmarks: unknown[] }) => void) => resolve({ bookmarks }),
-      }),
-    }),
-  }
-}
-
-function destination(pageIndex: number) {
-  return { type: 'destination', destination: { pageIndex, zoom: { mode: 2 }, view: [] } }
-}
-
 describe('PdfReaderSidebar', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.clearAllMocks()
-    mocks.searchScope.searchAllPages.mockReset()
-    mocks.searchState.value = {
-      flags: [],
-      results: [],
-      total: 0,
-      activeResultIndex: -1,
-      query: '',
-      loading: false,
-      active: false,
-    }
-    mocks.scrollState.value = { currentPage: 1, totalPages: 10 }
-    mocks.bookmarkCapability.value = null
-    mocks.documentState.value = null
+    searchApi.search.mockResolvedValue({ status: 'complete', hitCount: 0 })
+    searchState.query.value = null
+    searchState.status.value = 'idle'
+    searchState.hitCount.value = 0
+    searchState.activeHitIndex.value = -1
+    searchState.progress.value = { pagesSearched: 0, pageCount: 10 }
+    hits.value = []
+    outlineState.items.value = []
+    outlineState.status.value = 'ready'
   })
 
-  it('debounces full-document searches and cancels superseded work', async () => {
+  it('debounces full-document searches and clears superseded work', async () => {
     const wrapper = mountSidebar()
     const input = wrapper.get('input[type="search"]')
-    mocks.searchScope.stopSearch.mockClear()
+    searchApi.clear.mockClear()
 
     await input.setValue('dis')
     await input.setValue('distance')
 
-    expect(mocks.searchScope.stopSearch).toHaveBeenCalledTimes(2)
-    expect(mocks.searchScope.searchAllPages).not.toHaveBeenCalled()
+    expect(searchApi.clear).toHaveBeenCalledTimes(2)
+    expect(searchApi.search).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(249)
-    expect(mocks.searchScope.searchAllPages).not.toHaveBeenCalled()
+    expect(searchApi.search).not.toHaveBeenCalled()
 
     await vi.advanceTimersByTimeAsync(1)
-    expect(mocks.searchScope.searchAllPages).toHaveBeenCalledTimes(1)
-    expect(mocks.searchScope.searchAllPages).toHaveBeenCalledWith('distance')
+    expect(searchApi.search).toHaveBeenCalledExactlyOnceWith({ text: 'distance', matchCase: false, wholeWord: false })
   })
 
   it('does not search for a single character', async () => {
     const wrapper = mountSidebar()
-    mocks.searchScope.stopSearch.mockClear()
+    searchApi.clear.mockClear()
 
     await wrapper.get('input[type="search"]').setValue('a')
     await vi.runAllTimersAsync()
 
-    expect(mocks.searchScope.stopSearch).toHaveBeenCalledOnce()
-    expect(mocks.searchScope.searchAllPages).not.toHaveBeenCalled()
+    expect(searchApi.clear).toHaveBeenCalledOnce()
+    expect(searchApi.search).not.toHaveBeenCalled()
     expect(wrapper.text()).toContain('Enter at least 2 characters')
   })
 
-  it('lets the plugin restart an active search once when flags change', async () => {
+  it('searches again with the match options when they change', async () => {
     const wrapper = mountSidebar()
+    await wrapper.get('input[type="search"]').setValue('distance')
+    await vi.advanceTimersByTimeAsync(250)
 
     await wrapper.get('button[aria-pressed="false"]').trigger('click')
+    await vi.advanceTimersByTimeAsync(250)
 
-    expect(mocks.searchScope.setFlags).toHaveBeenCalledWith([MatchFlag.MatchCase])
-    expect(mocks.searchScope.searchAllPages).not.toHaveBeenCalled()
+    expect(searchApi.search).toHaveBeenLastCalledWith({ text: 'distance', matchCase: true, wholeWord: false })
+    expect(searchApi.search).toHaveBeenCalledTimes(2)
   })
 
-  it('keeps virtual results bounded and navigates results without rectangles safely', async () => {
-    mocks.searchState.value = {
-      ...mocks.searchState.value,
-      results: [makeResult()],
-      total: 1,
-      active: true,
-    }
+  it('keeps virtual results bounded and reveals a chosen result', async () => {
+    completeWith([makeHit()])
     const wrapper = mountSidebar()
 
     expect(wrapper.get('aside').classes()).toContain('overflow-hidden')
@@ -261,17 +238,11 @@ describe('PdfReaderSidebar', () => {
 
     await wrapper.get('[data-testid="search-results"] button').trigger('click')
 
-    expect(mocks.searchScope.goToResult).toHaveBeenCalledWith(0)
-    expect(mocks.scrollScope.scrollToPage).toHaveBeenCalledWith({ pageNumber: 5 })
+    expect(searchApi.goToHit).toHaveBeenCalledWith(0)
   })
 
   it('labels a run of results with its page only once', () => {
-    mocks.searchState.value = {
-      ...mocks.searchState.value,
-      results: [makeResult(), makeResult()],
-      total: 2,
-      active: true,
-    }
+    completeWith([makeHit(), makeHit()])
     const wrapper = mountSidebar()
 
     const headings = wrapper.findAll('[data-testid="search-results"] p')
@@ -279,51 +250,49 @@ describe('PdfReaderSidebar', () => {
     expect(headings[0]!.text()).toBe('Page 5')
   })
 
-  it('reports full-document search progress', async () => {
-    mocks.searchState.value = {
-      ...mocks.searchState.value,
-      query: 'distance',
-      loading: true,
-    }
-    mocks.searchScope.searchAllPages.mockReturnValue({
-      onProgress: (callback: (progress: { page: number }) => void) => callback({ page: 4 }),
-    })
+  it('names the page for a result the document does not let it quote', () => {
+    completeWith([makeHit(false)])
+    const wrapper = mountSidebar()
+
+    expect(wrapper.get('[data-testid="search-results"] button').text()).toBe('Page 5')
+  })
+
+  it('reports full-document search progress', () => {
+    searchState.status.value = 'searching'
+    searchState.progress.value = { pagesSearched: 4, pageCount: 10 }
 
     const wrapper = mountSidebar()
-    await vi.advanceTimersByTimeAsync(250)
 
     expect(wrapper.text()).toContain('Searching page 5 of 10')
   })
 
   it('uses Enter and Shift+Enter to navigate search results', async () => {
-    mocks.searchState.value = {
-      ...mocks.searchState.value,
-      results: [makeResult(), makeResult()],
-      total: 2,
-      activeResultIndex: 0,
-      active: true,
-    }
+    completeWith([makeHit(), makeHit()], 0)
     const wrapper = mountSidebar()
     const input = wrapper.get('input[type="search"]')
 
     await input.trigger('keydown', { key: 'Enter' })
-    expect(mocks.searchScope.goToResult).toHaveBeenLastCalledWith(1)
+    expect(searchApi.goToHit).toHaveBeenLastCalledWith(1)
 
-    mocks.searchState.value.activeResultIndex = 1
+    searchState.activeHitIndex.value = 1
     await input.trigger('keydown', { key: 'Enter', shiftKey: true })
-    expect(mocks.searchScope.goToResult).toHaveBeenLastCalledWith(0)
+    expect(searchApi.goToHit).toHaveBeenLastCalledWith(0)
+
+    searchState.activeHitIndex.value = 0
+    await input.trigger('keydown', { key: 'Enter', shiftKey: true })
+    expect(searchApi.goToHit).toHaveBeenLastCalledWith(1)
   })
 
-  it('clears the query and cancels search work', async () => {
+  it('clears the query and the search', async () => {
     const wrapper = mountSidebar()
     const input = wrapper.get('input[type="search"]')
     await input.setValue('distance')
-    mocks.searchScope.stopSearch.mockClear()
+    searchApi.clear.mockClear()
 
     await wrapper.get('button[aria-label="Clear search"]').trigger('click')
 
     expect((input.element as HTMLInputElement).value).toBe('')
-    expect(mocks.searchScope.stopSearch).toHaveBeenCalled()
+    expect(searchApi.clear).toHaveBeenCalled()
     wrapper.unmount()
   })
 
@@ -438,17 +407,9 @@ describe('PdfReaderSidebar', () => {
   it('highlights and reveals the outline entry containing the current page', async () => {
     const scrollIntoView = vi.fn<() => void>()
     Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
-    mocks.scrollState.value = { currentPage: 74, totalPages: 100 }
-    mocks.bookmarkCapability.value = outlineCapability([
-      { title: 'Chapter five', target: destination(50) },
-      {
-        title: 'Chapter six',
-        target: destination(73),
-        children: [{ title: 'Aggregates', target: destination(78) }],
-      },
-    ])
+    outlineState.items.value = [outlineItem(1, 'Chapter five', 50), outlineItem(2, 'Chapter six', 73), outlineItem(3, 'Aggregates', 78, 2)]
 
-    const wrapper = mountSidebar({ activeTab: 'contents' })
+    const wrapper = mountSidebar({ activeTab: 'contents', currentPage: 74, totalPages: 100 })
     await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
@@ -462,16 +423,9 @@ describe('PdfReaderSidebar', () => {
   })
 
   it('collapses an outline branch and hides its descendants', async () => {
-    mocks.bookmarkCapability.value = outlineCapability([
-      {
-        title: 'Chapter one',
-        target: destination(4),
-        children: [{ title: 'Nested topic', target: destination(6) }],
-      },
-    ])
+    outlineState.items.value = [outlineItem(1, 'Chapter one', 4), outlineItem(2, 'Nested topic', 6, 1)]
 
     const wrapper = mountSidebar({ activeTab: 'contents' })
-    await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('Nested topic')
@@ -481,13 +435,9 @@ describe('PdfReaderSidebar', () => {
   })
 
   it('filters the outline and shows page numbers', async () => {
-    mocks.bookmarkCapability.value = outlineCapability([
-      { title: 'Installing Docker', target: destination(19) },
-      { title: 'Quick Recap', target: destination(27) },
-    ])
+    outlineState.items.value = [outlineItem(1, 'Installing Docker', 19), outlineItem(2, 'Quick Recap', 27)]
 
     const wrapper = mountSidebar({ activeTab: 'contents' })
-    await wrapper.vm.$nextTick()
     await wrapper.vm.$nextTick()
 
     expect(wrapper.text()).toContain('20')
@@ -498,10 +448,40 @@ describe('PdfReaderSidebar', () => {
     expect(wrapper.text()).not.toContain('Installing Docker')
   })
 
+  it('follows an outline entry to where it points', async () => {
+    outlineState.items.value = [outlineItem(1, 'Installing Docker', 19)]
+
+    const wrapper = mountSidebar({ activeTab: 'contents' })
+    await wrapper.vm.$nextTick()
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('Installing Docker'))!
+      .trigger('click')
+
+    expect(outlineApi.activate).toHaveBeenCalledExactlyOnceWith({ kind: 'objectNumber', objectNumber: 1 })
+  })
+
+  it('shows a loading state until the outline is read', () => {
+    outlineState.status.value = 'loading'
+
+    const wrapper = mountSidebar({ activeTab: 'contents' })
+
+    expect(wrapper.find('[role="status"]').exists()).toBe(true)
+  })
+
   it('offers a jump-to-page field on the pages destination', () => {
     const wrapper = mountSidebar({ activeTab: 'thumbnails' })
 
     expect(wrapper.find('input[aria-label="Jump to page"]').exists()).toBe(true)
+  })
+
+  it('asks the reader to go to a thumbnail page', async () => {
+    const wrapper = mountSidebar({ activeTab: 'thumbnails' })
+
+    await wrapper.get('input[aria-label="Jump to page"]').setValue('7')
+    await wrapper.get('input[aria-label="Jump to page"]').trigger('change')
+
+    expect(wrapper.emitted('selectPage')).toEqual([[6]])
   })
 
   it('prompts for a query instead of showing an empty search list', () => {

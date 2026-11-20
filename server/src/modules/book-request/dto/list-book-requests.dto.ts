@@ -1,7 +1,14 @@
 import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, Max, Min } from 'class-validator';
-import { BOOK_REQUEST_MEDIA_KINDS, BOOK_REQUEST_SORT_DIRECTIONS, BOOK_REQUEST_SORT_FIELDS, BOOK_REQUEST_STATUSES } from '@bookorbit/types';
-import type { BookRequestMediaKind, BookRequestSortDirection, BookRequestSortField, BookRequestStatus } from '@bookorbit/types';
+import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+  BOOK_REQUEST_LIST_VIEWS,
+  BOOK_REQUEST_MEDIA_KINDS,
+  BOOK_REQUEST_SEARCH_MAX_LENGTH,
+  BOOK_REQUEST_SORT_DIRECTIONS,
+  BOOK_REQUEST_SORT_FIELDS,
+  BOOK_REQUEST_STATUSES,
+} from '@bookorbit/types';
+import type { BookRequestListView, BookRequestMediaKind, BookRequestSortDirection, BookRequestSortField, BookRequestStatus } from '@bookorbit/types';
 
 export class ListBookRequestsDto {
   @IsOptional()
@@ -62,6 +69,24 @@ export class ListBookRequestsDto {
   @Transform(({ value }) => (value === true || value === 'true' ? true : value === false || value === 'false' ? false : value))
   @IsBoolean()
   groupPairs?: boolean;
+
+  /**
+   * A title or author fragment. Blank is the same as absent, so a cleared search box asks for the
+   * whole list rather than for the rows that match nothing.
+   */
+  @IsOptional()
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() || undefined : value))
+  @IsString()
+  @MaxLength(BOOK_REQUEST_SEARCH_MAX_LENGTH)
+  q?: string;
+
+  /**
+   * One section of the page. When present it decides which hidden rows are included, so
+   * `includeDismissed` is ignored alongside it.
+   */
+  @IsOptional()
+  @IsIn(BOOK_REQUEST_LIST_VIEWS)
+  view?: BookRequestListView;
 }
 
 /**

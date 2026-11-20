@@ -104,6 +104,22 @@ describe('registerAuthGuard', () => {
     await expect(guard(route)).resolves.toBe(true)
   })
 
+  it('lets in anyone holding one of a list of permissions', async () => {
+    if (!guard) throw new Error('Expected guard to be registered')
+    const route = {
+      name: 'jobs-activity',
+      path: '/jobs/activity',
+      fullPath: '/jobs/activity',
+      meta: { requiredPermission: [Permission.ManageAppSettings, Permission.LibraryGenerateStoryGuide], permissionFallback: 'home' },
+    }
+
+    mocks.user.value.permissions = [Permission.LibraryGenerateStoryGuide]
+    await expect(guard(route)).resolves.toBe(true)
+
+    mocks.user.value.permissions = [Permission.NotificationAccess]
+    await expect(guard(route)).resolves.toEqual({ name: 'home' })
+  })
+
   it('redirects demo-restricted users even when notification access would otherwise allow the route', async () => {
     if (!guard) throw new Error('Expected guard to be registered')
     mocks.user.value.isSuperuser = true

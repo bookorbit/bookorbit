@@ -97,6 +97,7 @@ function createService() {
   const effects = { apply: vi.fn().mockResolvedValue(0) };
   const libraryGate = new LibraryOperationGate();
   const gateway = { emitBookMerged: vi.fn(), emitBookMergeJob: vi.fn() };
+  const jobChanges = { notify: vi.fn() };
   const service = new BookMergeService(
     repository as unknown as BookMergeRepository,
     planner as unknown as BookMergePlanner,
@@ -104,8 +105,9 @@ function createService() {
     effects as unknown as BookMergeEffectsService,
     libraryGate,
     gateway as unknown as ScanGateway,
+    jobChanges as never,
   );
-  return { service, repository, planner, executor, effects, libraryGate, gateway };
+  return { service, repository, planner, executor, effects, libraryGate, gateway, jobChanges };
 }
 
 async function conflictOf(promise: Promise<unknown>): Promise<Record<string, unknown>> {
@@ -304,6 +306,35 @@ describe('BookMergeService across libraries', () => {
     await vi.waitFor(() =>
       expect(gateway.emitBookMergeJob).toHaveBeenCalledWith(5, 'progress', expect.objectContaining({ bytesDone: 400, bytesTotal: 1000 })),
     );
+  });
+
+  it('tells the Jobs area when a merge is created, starts, moves bytes and ends, byte ticks as progress only', async () => {
+    const { service, executor, jobChanges } = createService();
+    executor.run.mockImplementation((_job: unknown, _plan: unknown, onProgress: (change: object) => void) => {
+      onProgress({ status: 'moving', bytesDone: 0, bytesTotal: 1000 });
+      onProgress({ status: 'moving', bytesDone: 400, bytesTotal: 1000 });
+      onProgress({ status: 'committed', bytesDone: 1000, bytesTotal: 1000 });
+      return Promise.resolve(runResult());
+    });
+
+    await service.start(DTO, makeUser({ id: 5 }));
+
+    await vi.waitFor(() => expect(jobChanges.notify).toHaveBeenCalledTimes(5));
+    expect(jobChanges.notify.mock.calls.map(([change]) => (change as { state: boolean }).state)).toEqual([true, true, false, true, true]);
+    expect(jobChanges.notify).toHaveBeenCalledWith({ type: 'book-merge', ownerId: 5, state: true });
+  });
+
+  it('tells the Jobs area when a merge fails outright', async () => {
+    const { service, executor, jobChanges, repository } = createService();
+    executor.run.mockRejectedValue(new Error('disk gone'));
+
+    await service.start(DTO, makeUser({ id: 5 }));
+
+    await vi.waitFor(() =>
+      expect(repository.updateJob).toHaveBeenCalledWith(1, expect.objectContaining({ status: 'failed', finishedAt: expect.any(Date) })),
+    );
+    await vi.waitFor(() => expect(jobChanges.notify).toHaveBeenCalledTimes(2));
+    expect(jobChanges.notify).toHaveBeenLastCalledWith({ type: 'book-merge', ownerId: 5, state: true });
   });
 
   it('never lets a bulk run cut other readers off: nobody confirmed that plan', async () => {

@@ -14,6 +14,8 @@ function makeQueryChain(result: unknown) {
   chain.from = vi.fn().mockReturnValue(chain);
   chain.innerJoin = vi.fn().mockReturnValue(chain);
   chain.where = vi.fn().mockReturnValue(chain);
+  chain.groupBy = vi.fn().mockReturnValue(chain);
+  chain.having = vi.fn().mockReturnValue(chain);
   chain.orderBy = vi.fn().mockReturnValue(chain);
   chain.limit = vi.fn().mockReturnValue(chain);
   return chain;
@@ -215,6 +217,46 @@ describe('KoreaderPluginRepository', () => {
     it('issues no statement for an empty entry list', async () => {
       await repo.upsertRatings(7, [], new Date());
       expect(db.insert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('repairCopiedStatsBatch', () => {
+    it('reports no work and opens no transaction when no event reached two devices', async () => {
+      db.select.mockReturnValue(makeQueryChain([]));
+      db.transaction = vi.fn();
+
+      await expect(repo.repairCopiedStatsBatch(null, 200)).resolves.toEqual({ bookFiles: 0, removedSessions: 0, nextCursor: null });
+      expect(db.transaction).not.toHaveBeenCalled();
+    });
+
+    it('repairs each book file of a full batch once and resumes after its last group', async () => {
+      const groups = makeQueryChain([
+        { userId: 7, bookFileId: 42 },
+        { userId: 7, bookFileId: 42 },
+        { userId: 9, bookFileId: 11 },
+      ]);
+      // Book files whose row has gone leave nothing to derive, so the pass stops before the lock.
+      db.select.mockReturnValueOnce(groups).mockReturnValue(makeQueryChain([]));
+      db.transaction = vi.fn();
+
+      await expect(repo.repairCopiedStatsBatch(null, 3)).resolves.toEqual({
+        bookFiles: 2,
+        removedSessions: 0,
+        nextCursor: { userId: 9, bookFileId: 11 },
+      });
+      expect(groups.having).toHaveBeenCalledTimes(1);
+      expect(sqlChunkText(groups.having.mock.calls[0]![0])).toContain('count(*) > 1');
+      expect(db.transaction).not.toHaveBeenCalled();
+    });
+
+    it('resumes from a cursor by group order rather than an offset', async () => {
+      const groups = makeQueryChain([]);
+      db.select.mockReturnValue(groups);
+
+      await repo.repairCopiedStatsBatch({ userId: 7, bookFileId: 42 }, 200);
+
+      expect(sqlChunkText(groups.where.mock.calls[0]![0])).toContain(') > (');
+      expect(groups.limit).toHaveBeenCalledWith(200);
     });
   });
 

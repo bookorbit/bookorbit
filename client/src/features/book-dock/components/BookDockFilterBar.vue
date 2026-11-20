@@ -2,13 +2,21 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, X } from '@lucide/vue'
-import type { BookDockSummary } from '@bookorbit/types'
 import { formatNumber } from '@/i18n/formatters'
 import type { BookDockView } from '../composables/useBookDockFiles'
 
+/** The counts behind the chips, for the dock the switcher shows. */
+export interface BookDockViewCounts {
+  total: number
+  onHold: number
+  working: number
+  ready: number
+  error: number
+}
+
 const props = defineProps<{
   activeView: BookDockView
-  summary: BookDockSummary
+  counts: BookDockViewCounts
 }>()
 
 const emit = defineEmits<{
@@ -22,13 +30,17 @@ const searchQuery = ref('')
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 /** Every chip maps to something the files endpoint can answer, so counts cover the whole dock. */
-const chips = computed<{ view: BookDockView; testId: string; label: string; count: number }[]>(() => [
-  { view: 'all', testId: 'all', label: t('bookDock.layout.filter.all'), count: props.summary.total },
-  { view: 'needsReview', testId: 'needsReview', label: t('bookDock.layout.filter.needsReview'), count: props.summary.needsReview },
-  { view: 'pending', testId: 'pending', label: t('bookDock.layout.filter.pending'), count: props.summary.pending },
-  { view: 'readyToFile', testId: 'ready', label: t('bookDock.layout.filter.ready'), count: props.summary.readyToFile },
-  { view: 'error', testId: 'error', label: t('bookDock.layout.filter.error'), count: props.summary.error },
+const chips = computed<{ view: BookDockView; label: string; count: number; tone: string }[]>(() => [
+  { view: 'all', label: t('bookDock.layout.filter.all'), count: props.counts.total, tone: '' },
+  { view: 'onHold', label: t('bookDock.layout.filter.onHold'), count: props.counts.onHold, tone: 'text-amber-600 dark:text-amber-400' },
+  { view: 'working', label: t('bookDock.layout.filter.working'), count: props.counts.working, tone: '' },
+  { view: 'ready', label: t('bookDock.layout.filter.ready'), count: props.counts.ready, tone: '' },
+  { view: 'error', label: t('bookDock.layout.filter.error'), count: props.counts.error, tone: 'text-red-600 dark:text-red-400' },
 ])
+
+function countClass(chip: { view: BookDockView; count: number; tone: string }): string {
+  return props.activeView !== chip.view && chip.count > 0 ? chip.tone : ''
+}
 
 function selectView(view: BookDockView) {
   emit('view', view)
@@ -53,7 +65,7 @@ function clearSearch() {
         v-for="chip in chips"
         :key="chip.view"
         type="button"
-        :data-testid="`book-dock-chip-${chip.testId}`"
+        :data-testid="`book-dock-chip-${chip.view}`"
         :aria-pressed="props.activeView === chip.view"
         :disabled="chip.count === 0 && props.activeView !== chip.view"
         class="flex h-8 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default disabled:opacity-45"
@@ -63,7 +75,7 @@ function clearSearch() {
         @click="selectView(chip.view)"
       >
         {{ chip.label }}
-        <span class="font-semibold tabular-nums">{{ formatNumber(chip.count) }}</span>
+        <span class="font-semibold tabular-nums" :class="countClass(chip)">{{ formatNumber(chip.count) }}</span>
       </button>
     </div>
 

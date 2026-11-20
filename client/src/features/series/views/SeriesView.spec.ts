@@ -127,6 +127,7 @@ async function mountView() {
         BrowseHeader: { template: '<div><slot name="bar" /></div>' },
         BrowseInlineGroup: { template: '<div><slot /></div>' },
         Popover: { template: '<div><slot /></div>' },
+        PopoverAnchor: { template: '<div><slot /></div>' },
         PopoverTrigger: { template: '<div><slot /></div>' },
         PopoverContent: { template: '<div><slot /></div>' },
         BookCoverArtwork: true,

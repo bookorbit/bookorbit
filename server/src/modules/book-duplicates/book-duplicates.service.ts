@@ -17,6 +17,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { postgresErrorCode, queryFailureReason } from '../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { LibraryService } from '../library/library.service';
 import { canonicalSeriesIndex, canonicalizeIsbn, crossFormatPersonKey, crossFormatTitleKey, mediaFamilyForFormat } from './book-duplicate-normalize';
 import { BookDuplicatesRepository, type OtherFormatBookRow, type PreviewRow } from './book-duplicates.repository';
@@ -121,6 +122,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
   constructor(
     private readonly repo: BookDuplicatesRepository,
     private readonly libraryService: LibraryService,
+    private readonly jobChanges: JobChangesService,
   ) {}
 
   async onApplicationBootstrap(): Promise<void> {
@@ -140,6 +142,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       similarityPercent: dto.similarityPercent,
     });
     if (!scan) throw new ConflictException('A duplicate book scan is already running');
+    this.changed(user.id, true);
 
     this.queue.push({ scanId: scan.id, user });
     void this.drainQueue();
@@ -284,6 +287,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     try {
       const totalBooks = await this.repo.countScopedBooks(scan.libraryIds, user);
       await this.repo.updateScan(scanId, { status: 'running', totalBooks, processedBooks: 0, errorCode: null });
+      this.changed(user.id, true);
 
       if (totalBooks === 0) {
         await this.repo.updateScan(scanId, {
@@ -296,6 +300,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
           completedAt: new Date(),
         });
         await this.repo.deleteOlderScans(user.id, scanId);
+        this.changed(user.id, true);
         this.logger.log(
           `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=0 totalGroups=0 durationMs=${Date.now() - startedAt} - duplicate scan completed`,
         );
@@ -303,7 +308,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       }
 
       await this.repo.insertFileHashKeys(scanId, scan.libraryIds, user);
-      await this.updateProgress(scanId, totalBooks, 20);
+      await this.updateProgress(scanId, user.id, totalBooks, 20);
 
       let afterBookId = 0;
       for (;;) {
@@ -318,20 +323,20 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
         await this.repo.insertIsbnKeys(values);
         afterBookId = rows.at(-1)!.id;
       }
-      await this.updateProgress(scanId, totalBooks, 40);
+      await this.updateProgress(scanId, user.id, totalBooks, 40);
 
       await this.repo.insertExactMetadataKeys(scanId, scan.libraryIds, user);
-      await this.updateProgress(scanId, totalBooks, 55);
+      await this.updateProgress(scanId, user.id, totalBooks, 55);
       await this.repo.createExactPairs(scanId);
-      await this.updateProgress(scanId, totalBooks, 65);
+      await this.updateProgress(scanId, user.id, totalBooks, 65);
       await this.repo.createFuzzyPairs(scanId, scan.libraryIds, user, scan.similarityPercent);
-      await this.updateProgress(scanId, totalBooks, 75);
+      await this.updateProgress(scanId, user.id, totalBooks, 75);
       await this.insertOtherFormatKeys(scanId, scan.libraryIds, user);
       await this.refreshScanKeyStatistics(scanId, user.id);
       await this.repo.createOtherFormatPairs(scanId, scan.similarityPercent);
-      await this.updateProgress(scanId, totalBooks, 85);
+      await this.updateProgress(scanId, user.id, totalBooks, 85);
       const dismissedPairs = await this.repo.deleteDismissedPairs(scanId, user.id);
-      await this.updateProgress(scanId, totalBooks, 88);
+      await this.updateProgress(scanId, user.id, totalBooks, 88);
       const totalGroups = await this.repo.finalizeGroups(scanId);
       const totalOtherFormatPairs = await this.repo.finalizeOtherFormatGroups(scanId);
       const totals = await this.repo.computeScanTotals(scanId);
@@ -346,6 +351,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
         completedAt: new Date(),
       });
       await this.repo.deleteOlderScans(user.id, scanId);
+      this.changed(user.id, true);
 
       this.logger.log(
         `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} otherFormatPairs=${totalOtherFormatPairs} dismissedPairs=${dismissedPairs} reclaimableBytes=${totals.totalReclaimableBytes} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
@@ -353,6 +359,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     } catch (error) {
       await this.repo.updateScan(scanId, { status: 'failed', errorCode: 'scan_failed', completedAt: new Date() }).catch(() => undefined);
       await this.repo.deleteScanArtifacts(scanId).catch(() => undefined);
+      this.changed(user.id, true);
       this.logger.warn(
         `[${event}] [fail] scanId=${scanId} userId=${user.id} durationMs=${Date.now() - startedAt} ${failureLogFields(error)} - duplicate scan failed`,
       );
@@ -381,8 +388,14 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     }
   }
 
-  private updateProgress(scanId: number, totalBooks: number, percent: number): Promise<void> {
-    return this.repo.updateScan(scanId, { processedBooks: Math.floor((totalBooks * percent) / 100) });
+  private async updateProgress(scanId: number, ownerId: number, totalBooks: number, percent: number): Promise<void> {
+    await this.repo.updateScan(scanId, { processedBooks: Math.floor((totalBooks * percent) / 100) });
+    this.changed(ownerId, false);
+  }
+
+  /** Tells the Jobs area; `state` when a scan started, ended or was asked for, which moves every queued scan's place. */
+  private changed(ownerId: number | null, state: boolean): void {
+    this.jobChanges.notify({ type: 'duplicate-scan', ownerId, state });
   }
 
   private async findOwnedScan(scanId: number, user: RequestUser) {

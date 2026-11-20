@@ -1,13 +1,14 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { AuthorEnrichmentConditions, AuthorEnrichmentFailedItem, AuthorEnrichmentStatus } from '@bookorbit/types';
 import type { SQL } from 'drizzle-orm';
-import { and, asc, count, eq, inArray, isNull, lte, max, or, sql } from 'drizzle-orm';
+import { and, asc, count, eq, inArray, isNull, lte, max, min, ne, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { authorEnrichmentQueue, authors, bookAuthors } from '../../db/schema';
-import { AuthorEnrichmentReason } from './author-enrichment-reasons';
+import { microseconds } from '../jobs/job-keyset';
+import { AUTHOR_ENRICHMENT_REASONS, AuthorEnrichmentReason } from './author-enrichment-reasons';
 
 type Db = NodePgDatabase<typeof schema>;
 
@@ -16,6 +17,21 @@ const DEFAULT_SCHEDULE_BATCH_SIZE = 1000;
 export const AUTHOR_ENRICHMENT_ACTIVE_STATUSES = ['queued', 'rate_limited'] as const;
 
 export type AuthorEnrichmentQueueRow = typeof authorEnrichmentQueue.$inferSelect;
+
+const UNFINISHED_STATUSES = ['queued', 'processing', 'rate_limited'];
+
+/** What the Jobs area shows of the queue. Timestamps are epoch microseconds. */
+export interface AuthorEnrichmentJobCounts {
+  /** Entries the session tracks: every reason but the silent `metadata_replace`. */
+  queued: number;
+  processing: number;
+  rateLimited: number;
+  /** When the oldest tracked unfinished entry was queued; null when there is none. */
+  queueSince: number | null;
+  /** Every failure, `metadata_replace` included, as retry and the settings page count them. */
+  failed: number;
+  failedAt: number | null;
+}
 
 export type AuthorEnrichmentEnqueueOptions = {
   /** Enrich these authors without saved provider answers. Merged into rows already queued, never cleared by a later enqueue. */
@@ -205,6 +221,41 @@ export class AuthorEnrichmentRepository {
       .orderBy(asc(authorEnrichmentQueue.nextAttemptAt), asc(authorEnrichmentQueue.authorId))
       .limit(limit);
     return rows.map((r) => ({ ...r.queue, authorName: r.authorName }));
+  }
+
+  /**
+   * Counts only, for the Jobs area. The `reason` filter has no index of its own: even a full
+   * backfill queue counts in milliseconds on a sequential scan, and failures use the status index.
+   */
+  async countForJobs(): Promise<AuthorEnrichmentJobCounts> {
+    const [unfinished, failed] = await Promise.all([
+      this.db
+        .select({ status: authorEnrichmentQueue.status, cnt: count(), since: microseconds(min(authorEnrichmentQueue.createdAt)) })
+        .from(authorEnrichmentQueue)
+        .where(
+          and(
+            inArray(authorEnrichmentQueue.status, UNFINISHED_STATUSES),
+            ne(authorEnrichmentQueue.reason, AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE),
+          ),
+        )
+        .groupBy(authorEnrichmentQueue.status),
+      this.db
+        .select({ cnt: count(), latest: microseconds(max(authorEnrichmentQueue.updatedAt)) })
+        .from(authorEnrichmentQueue)
+        .where(eq(authorEnrichmentQueue.status, 'failed')),
+    ]);
+    const counts: AuthorEnrichmentJobCounts = { queued: 0, processing: 0, rateLimited: 0, queueSince: null, failed: 0, failedAt: null };
+    for (const row of unfinished) {
+      const value = Number(row.cnt);
+      if (row.status === 'queued') counts.queued = value;
+      else if (row.status === 'processing') counts.processing = value;
+      else if (row.status === 'rate_limited') counts.rateLimited = value;
+      else continue;
+      if (row.since !== null && (counts.queueSince === null || row.since < counts.queueSince)) counts.queueSince = row.since;
+    }
+    counts.failed = Number(failed[0]?.cnt ?? 0);
+    counts.failedAt = counts.failed > 0 ? (failed[0]?.latest ?? null) : null;
+    return counts;
   }
 
   async getStatusSummary(): Promise<AuthorEnrichmentStatus> {

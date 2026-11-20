@@ -1,14 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PdfAnnotationSubtype, PdfBlendMode, type PdfHighlightAnnoObject, type PdfUnderlineAnnoObject } from '@embedpdf/models'
 import type { AnnotationItem, AnnotationRect } from '@bookorbit/types'
-import {
-  boundingRect,
-  buildPdfAnnotationObject,
-  findOverlappingAnnotation,
-  fromPluginId,
-  toPdfPosition,
-  toPluginId,
-} from '../lib/pdf-annotation-render'
+import { boundingRect, buildHighlightMarks, findOverlappingAnnotation, toAnnotationRect, toPdfPosition } from '../lib/pdf-annotation-render'
 
 function makeAnnotation(overrides: Partial<AnnotationItem> = {}): AnnotationItem {
   return {
@@ -33,10 +25,9 @@ function makeAnnotation(overrides: Partial<AnnotationItem> = {}): AnnotationItem
 }
 
 describe('pdf-annotation-render', () => {
-  it('round-trips plugin ids', () => {
-    expect(toPluginId(42)).toBe('bo-42')
-    expect(fromPluginId('bo-42')).toBe(42)
-    expect(fromPluginId('other-1')).toBeNull()
+  it('copies only the persisted rect fields', () => {
+    const rect = { x: 1, y: 2, width: 3, height: 4, extra: true } as AnnotationRect & { extra: boolean }
+    expect(toAnnotationRect(rect)).toEqual({ x: 1, y: 2, width: 3, height: 4 })
   })
 
   it('computes the bounding rect enclosing every segment', () => {
@@ -47,27 +38,30 @@ describe('pdf-annotation-render', () => {
     expect(boundingRect(rects)).toEqual({ x: 5, y: 20, width: 35, height: 18 })
   })
 
-  it('builds a highlight object with multiply blend and reduced opacity', () => {
-    const built = buildPdfAnnotationObject(makeAnnotation())
-    expect(built).not.toBeNull()
-    expect(built!.pageIndex).toBe(1)
-    const object = built!.object as PdfHighlightAnnoObject
-    expect(object.type).toBe(PdfAnnotationSubtype.HIGHLIGHT)
-    expect(object.id).toBe('bo-7')
-    expect(object.strokeColor).toBe('#FACC15')
-    expect(object.opacity).toBe(0.4)
-    expect(object.blendMode).toBe(PdfBlendMode.Multiply)
-    expect(object.segmentRects).toEqual([{ origin: { x: 10, y: 20 }, size: { width: 30, height: 8 } }])
+  it('draws a highlight as one fill per segment in the stored page space', () => {
+    expect(buildHighlightMarks(makeAnnotation())).toEqual([{ kind: 'fill', key: '7-0', color: '#FACC15', x: 10, y: 20, width: 30, height: 8 }])
   })
 
-  it('maps other styles to their markup subtype at full opacity without a blend mode', () => {
-    const underline = buildPdfAnnotationObject(makeAnnotation({ style: 'underline' }))!.object as PdfUnderlineAnnoObject
-    expect(underline.type).toBe(PdfAnnotationSubtype.UNDERLINE)
-    expect(underline.opacity).toBe(1)
-    expect(underline.blendMode).toBeUndefined()
+  it('draws underline and strikethrough as lines at the bottom and middle of each segment', () => {
+    const [underline] = buildHighlightMarks(makeAnnotation({ style: 'underline' }))
+    expect(underline).toMatchObject({ kind: 'line', x1: 10, x2: 40 })
+    if (underline?.kind !== 'line') throw new Error('expected a line')
+    expect(underline.y1).toBeCloseTo(28 - underline.thickness / 2)
 
-    expect(buildPdfAnnotationObject(makeAnnotation({ style: 'strikethrough' }))!.object.type).toBe(PdfAnnotationSubtype.STRIKEOUT)
-    expect(buildPdfAnnotationObject(makeAnnotation({ style: 'squiggly' }))!.object.type).toBe(PdfAnnotationSubtype.SQUIGGLY)
+    const [strike] = buildHighlightMarks(makeAnnotation({ style: 'strikethrough' }))
+    expect(strike).toMatchObject({ kind: 'line', y1: 24, y2: 24 })
+  })
+
+  it('draws squiggly as a wave path spanning the segment', () => {
+    const [wave] = buildHighlightMarks(makeAnnotation({ style: 'squiggly' }))
+    if (wave?.kind !== 'wave') throw new Error('expected a wave')
+    expect(wave.path.startsWith('M 10 ')).toBe(true)
+    expect(wave.path).toContain('L 40 ')
+  })
+
+  it('falls back to the bounding rect when no segments were stored', () => {
+    const marks = buildHighlightMarks(makeAnnotation({ pdf: { page: 1, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [] } }))
+    expect(marks).toEqual([{ kind: 'fill', key: '7-0', color: '#FACC15', x: 1, y: 2, width: 3, height: 4 }])
   })
 
   it('ignores the empty space between segment rects of a multi-line highlight', () => {
@@ -87,8 +81,8 @@ describe('pdf-annotation-render', () => {
     expect(findOverlappingAnnotation([multiLine], 0, { x: 12, y: 11, width: 5, height: 5 })?.id).toBe(3)
   })
 
-  it('returns null when the annotation has no pdf geometry', () => {
-    expect(buildPdfAnnotationObject(makeAnnotation({ pdf: null }))).toBeNull()
+  it('draws nothing when the annotation has no pdf geometry', () => {
+    expect(buildHighlightMarks(makeAnnotation({ pdf: null }))).toEqual([])
   })
 
   it('finds an overlapping highlight only on the same page', () => {

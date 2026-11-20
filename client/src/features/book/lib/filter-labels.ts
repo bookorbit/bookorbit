@@ -1,5 +1,5 @@
-import type { Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
-import { isReadAlongFormatKey, parseCustomRuleFieldId, parseCustomSortFieldId } from '@bookorbit/types'
+import type { GroupRule, Rule, RuleField, RuleOperator, SortField } from '@bookorbit/types'
+import { isReadAlongFormatKey, parseCustomRuleFieldId, parseCustomSortFieldId, PLAIN_EPUB_FILTER_FORMAT } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCustomFields'
 import { providerShortLabel } from '@/lib/provider-colors'
@@ -18,9 +18,12 @@ export function sortFieldLabel(field: SortField): string {
   return activeCustomFieldLabel(customFieldId) ?? t('book.sort.customFieldFallback')
 }
 
+// Fields both catalogs name read the same everywhere, so the filter takes the sort catalog's label for these.
+const SHARED_SORT_LABEL_FIELDS: ReadonlySet<RuleField> = new Set<RuleField>(['seriesIndex', 'fileSize', 'addedAt', 'readProgress'])
+
 export function fieldLabel(field: RuleField): string {
   const customFieldId = parseCustomRuleFieldId(field)
-  if (customFieldId === null) return t(`book.filter.fields.${field}`)
+  if (customFieldId === null) return t(SHARED_SORT_LABEL_FIELDS.has(field) ? `book.sort.fields.${field}` : `book.filter.fields.${field}`)
   // Custom field labels are user-authored, so they are shown as-is rather than translated.
   return activeCustomFieldLabel(customFieldId) ?? t('book.filter.customFieldFallback')
 }
@@ -65,11 +68,16 @@ export function ruleToParts(rule: Rule): { field: string; operator: string; valu
     const valueTo = typeof rule.valueTo === 'number' ? formatBytes(rule.valueTo) : null
     return { field, operator, value: valueTo === null ? value : `${value} - ${valueTo}` }
   }
-  const val = Array.isArray(rule.value) ? (rule.value as string[]).join(', ') : String(rule.value ?? '')
+  const values = Array.isArray(rule.value) ? (rule.value as string[]) : null
+  const val = values
+    ? values.map((value) => (rule.field === 'authorGender' ? filterValueLabel(rule.field, value) : value)).join(', ')
+    : String(rule.value ?? '')
   return { field, operator, value: rule.valueTo !== undefined ? `${val} - ${rule.valueTo}` : val }
 }
 
-function tokenValueLabel(field: Rule['field'], value: string): string {
+/** A list value as people read it: read statuses by their translated names, formats by their codes. */
+export function filterValueLabel(field: Rule['field'], value: string): string {
+  if (field === 'authorGender') return t(`author.gender.${value}`)
   if (field === 'readStatus') {
     const key = `book.readStatus.${value.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}`
     const label = t(key)
@@ -80,7 +88,7 @@ function tokenValueLabel(field: Rule['field'], value: string): string {
 }
 
 export function formatFilterValueLabel(value: string): string {
-  return isReadAlongFormatKey(value) ? formatKeyName(value) : value.toUpperCase()
+  return isReadAlongFormatKey(value) || value === PLAIN_EPUB_FILTER_FORMAT ? formatKeyName(value) : value.toUpperCase()
 }
 
 /**
@@ -91,12 +99,30 @@ export function formatFilterValueLabel(value: string): string {
 export function ruleToTokenParts(rule: Rule): { field: string; operator: string; value: string | null } {
   const parts = ruleToParts(rule)
   if (!Array.isArray(rule.value) || (rule.field !== 'readStatus' && rule.field !== 'format')) {
-    if (rule.operator === 'includesAny' && Array.isArray(rule.value) && rule.value.length === 1) {
-      return { ...parts, operator: operatorLabel('eq') }
-    }
-    return parts
+    const operator = Array.isArray(rule.value) ? singleValueOperator(rule, rule.value.length) : null
+    return operator ? { ...parts, operator } : parts
   }
-  const values = (rule.value as string[]).map((value) => tokenValueLabel(rule.field, value))
-  const operator = rule.operator === 'includesAny' && values.length === 1 ? operatorLabel('eq') : parts.operator
-  return { field: parts.field, operator, value: values.join(', ') }
+  const values = (rule.value as string[]).map((value) => filterValueLabel(rule.field, value))
+  return { field: parts.field, operator: singleValueOperator(rule, values.length) ?? parts.operator, value: values.join(', ') }
+}
+
+/** "includes any of" one value reads as "is", and "excludes all of" one value as "is not". */
+function singleValueOperator(rule: Rule, count: number): string | null {
+  if (count !== 1) return null
+  if (rule.operator === 'includesAny') return operatorLabel('eq')
+  if (rule.operator === 'excludesAll') return operatorLabel('notEq')
+  return null
+}
+
+/** A rule as one line of words, "Read Status is Reading", for lists of active filters and accessible names. */
+export function ruleSentence(rule: Rule): string {
+  const parts = ruleToTokenParts(rule)
+  return [parts.field, parts.operator, parts.value].filter(Boolean).join(' ')
+}
+
+/** A group as the token that stands for it, "Any of 2 rules". */
+export function groupLabel(group: GroupRule): string {
+  return group.join === 'OR'
+    ? t('components.browseHeader.tokens.anyOf', { count: group.rules.length })
+    : t('components.browseHeader.tokens.allOf', { count: group.rules.length })
 }

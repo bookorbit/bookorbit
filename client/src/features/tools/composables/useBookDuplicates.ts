@@ -458,9 +458,10 @@ export function useBookDuplicates() {
     const count = (status: string) => job.outcomes.filter((outcome) => outcome.status === status).length
     const done = count('done')
     const unresolved = count('failed') + count('partial')
-    if (job.status === 'failed') toast.error(t('tools.bookDuplicates.resolution.failed'))
-    else if (unresolved > 0) toast.warning(t('tools.bookDuplicates.resolution.partial', { done, total: job.total }))
-    else toast.success(t('tools.bookDuplicates.resolution.success', { count: done }, done))
+    const options = { position: 'top-right' as const }
+    if (job.status === 'failed') toast.error(t('tools.bookDuplicates.resolution.failed'), options)
+    else if (unresolved > 0) toast.warning(t('tools.bookDuplicates.resolution.partial', { done, total: job.total }), options)
+    else toast.success(t('tools.bookDuplicates.resolution.success', { count: done }, done), options)
   }
 
   return {

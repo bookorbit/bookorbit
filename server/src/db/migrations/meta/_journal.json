@@ -1016,6 +1016,125 @@
       "when": 1794461433776,
       "tag": "0144_add_download_client_remove_completed",
       "breakpoints": true
+    },
+    {
+      "idx": 145,
+      "version": "7",
+      "when": 1794506032213,
+      "tag": "0145_add_ai",
+      "breakpoints": true
+    },
+    {
+      "idx": 146,
+      "version": "7",
+      "when": 1794550869584,
+      "tag": "0146_sync_excluded_libraries",
+      "breakpoints": true
+    },
+    {
+      "idx": 147,
+      "version": "7",
+      "when": 1794586764768,
+      "tag": "0147_add_reading_help",
+      "breakpoints": true
+    },
+    {
+      "idx": 148,
+      "version": "7",
+      "when": 1794586786626,
+      "tag": "0148_add_ai_step_timing_effort",
+      "breakpoints": true
+    },
+    {
+      "idx": 149,
+      "version": "7",
+      "when": 1794680383126,
+      "tag": "0149_add_author_gender",
+      "breakpoints": true
+    },
+    {
+      "idx": 150,
+      "version": "7",
+      "when": 1794684402120,
+      "tag": "0150_add_book_file_path_filter_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 151,
+      "version": "7",
+      "when": 1794699754181,
+      "tag": "0151_remove_book_file_path_filter_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 152,
+      "version": "7",
+      "when": 1794727686143,
+      "tag": "0152_add_ai_jobs_feature_finish_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 153,
+      "version": "7",
+      "when": 1794730172585,
+      "tag": "0153_add_read_aloud_queue_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 154,
+      "version": "7",
+      "when": 1794731935058,
+      "tag": "0154_add_jobs_owned_type_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 155,
+      "version": "7",
+      "when": 1794734476052,
+      "tag": "0155_add_jobs_scan_history_index",
+      "breakpoints": true
+    },
+    {
+      "idx": 156,
+      "version": "7",
+      "when": 1794735529136,
+      "tag": "0156_add_bulk_runs",
+      "breakpoints": true
+    },
+    {
+      "idx": 157,
+      "version": "7",
+      "when": 1794852216322,
+      "tag": "0157_add_library_docks",
+      "breakpoints": true
+    },
+    {
+      "idx": 158,
+      "version": "7",
+      "when": 1794856038964,
+      "tag": "0158_add_book_metadata_edition_id_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 159,
+      "version": "7",
+      "when": 1794899962043,
+      "tag": "0159_add_book_file_audio_timelines",
+      "breakpoints": true
+    },
+    {
+      "idx": 160,
+      "version": "7",
+      "when": 1794942724960,
+      "tag": "0160_add_normalized_name_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 161,
+      "version": "7",
+      "when": 1794947035400,
+      "tag": "0161_index_koreader_page_stats_page_start",
+      "breakpoints": true
     }
   ]
 }

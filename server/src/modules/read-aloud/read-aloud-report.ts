@@ -32,6 +32,16 @@ const ANCHOR_MIN_SENTENCES = 20;
 const ANCHOR_MIN_COVERED = 0.5;
 /** Past this share of the book, unmatched edges point at the wrong audiobook, not front and back matter. */
 const OUTSIDE_MAX_SHARE = 0.25;
+const MAX_TRACKS = 10_000;
+/**
+ * Unaligned audio small enough to publish without a review, still with its warning. Inside the
+ * narration a track this short is a spoken part heading or date line; before the first matched track
+ * or after the last it is opening or closing credits. Anything longer, or more of it, may be a
+ * chapter whose narration lost its text, so it waits for a review.
+ */
+const INSIDE_UNALIGNED_TRACK_MAX_SECONDS = 20;
+const EDGE_UNALIGNED_TRACK_MAX_SECONDS = 120;
+const UNALIGNED_TOTAL_MAX_SECONDS = 180;
 
 export class InvalidReportError extends Error {
   constructor(message: string) {
@@ -40,9 +50,18 @@ export class InvalidReportError extends Error {
   }
 }
 
+/** One audio track as the aligner measured it, in playback order. */
+export type ReadAloudTrackReport = {
+  duration: number;
+  matchedSeconds: number;
+  interpolatedSeconds: number;
+};
+
 export type ParsedReport = {
   totals: ReadAloudReportSummary;
   chapters: ReadAloudChapterReport[];
+  /** Null when the report has no usable track list, which keeps every unaligned track up for review. */
+  tracks: ReadAloudTrackReport[] | null;
 };
 
 /** Reads STAlign's report v4: totals are required, chapters are trimmed to what the review table shows. */
@@ -56,7 +75,7 @@ export function parseAlignmentReport(raw: string): ParsedReport {
   if (!isRecord(parsed)) throw new InvalidReportError('The alignment report is not an object');
   if (parsed.version !== undefined && parsed.version !== 4)
     throw new InvalidReportError(`Unsupported alignment report version ${typeof parsed.version === 'number' ? parsed.version : 'unknown'}`);
-  return { totals: parseTotals(parsed.totals), chapters: parseChapters(parsed.spine) };
+  return { totals: parseTotals(parsed.totals), chapters: parseChapters(parsed.spine), tracks: parseTracks(parsed.tracks) };
 }
 
 /**
@@ -67,6 +86,7 @@ export function parseAlignmentReport(raw: string): ParsedReport {
 export function reportWarnings(
   totals: ReadAloudReportSummary,
   coverage: ReadAloudNarrationCoverage | null,
+  tracks: ReadAloudTrackReport[] | null = null,
 ): { warnings: ReadAloudWarningCode[]; requiresReview: boolean } {
   const sentences = coverage ? coverage.storySentences : totals.sentences;
   const unmatched = coverage ? coverage.storyUnmatchedSentences : totals.unmatchedSentences;
@@ -76,15 +96,41 @@ export function reportWarnings(
   if (unmatched / base > 0.05) warnings.push('unmatched_text');
   if (totals.interpolatedSentences / base > 0.2) warnings.push('interpolated_text');
   if (totals.droppedSentences / base > 0.02) warnings.push('dropped_text');
-  const requiresReview = totals.matchedSentences === 0 || totals.unalignedTracks > 0 || unmatched / base > 0.1;
+  const requiresReview = totals.matchedSentences === 0 || unalignedTracksNeedReview(totals, tracks) || unmatched / base > 0.1;
   return { warnings, requiresReview };
+}
+
+/**
+ * Whether the audio the aligner placed no text in is worth a review. Almost every audiobook has
+ * some: opening and closing credits, and a few seconds announcing each part. Only short tracks are
+ * let through, and only when the track list agrees with the totals; anything else keeps the review.
+ */
+function unalignedTracksNeedReview(totals: ReadAloudReportSummary, tracks: ReadAloudTrackReport[] | null): boolean {
+  if (totals.unalignedTracks === 0) return false;
+  if (!tracks || tracks.length !== totals.tracks) return true;
+  // The aligner's own test: a track is unaligned when no matched or estimated span landed in it.
+  const placed = tracks.map((track) => track.matchedSeconds > 0 || track.interpolatedSeconds > 0);
+  if (placed.filter((value) => !value).length !== totals.unalignedTracks) return true;
+  const first = placed.indexOf(true);
+  const last = placed.lastIndexOf(true);
+  if (first === -1) return true;
+  let unalignedSeconds = 0;
+  for (const [position, track] of tracks.entries()) {
+    if (placed[position]) continue;
+    const atEdge = position < first || position > last;
+    if (track.duration > (atEdge ? EDGE_UNALIGNED_TRACK_MAX_SECONDS : INSIDE_UNALIGNED_TRACK_MAX_SECONDS)) return true;
+    unalignedSeconds += track.duration;
+  }
+  return unalignedSeconds > UNALIGNED_TOTAL_MAX_SECONDS;
 }
 
 /**
  * Marks the chapters outside the narration and measures the text inside it. The narration runs from
  * the first to the last chapter that clearly matched; unmatched front or back matter beyond those
- * is outside it. Unmatched text between them is a real gap and stays in the story count. Without a
- * chapter list (an older report) there is nothing to measure, and the totals stand as they are.
+ * is outside it. Unmatched text between them is a real gap and stays in the story count. A chapter
+ * is marked, and named, only when none of it has audio: a dedication read aloud but for its heading
+ * keeps its audio, so only that heading counts as outside. Without a chapter list (an older report)
+ * there is nothing to measure, and the totals stand as they are.
  */
 export function assessCoverage(
   totals: ReadAloudReportSummary,
@@ -112,7 +158,8 @@ export function assessCoverage(
     outside = new Set();
     outsideSentences = 0;
   }
-  const marked = chapters.map((chapter, position) => ({ ...chapter, outsideNarration: outside.has(position) }));
+  const silent = new Set([...outside].filter((position) => covered(chapters[position]!) === 0));
+  const marked = chapters.map((chapter, position) => ({ ...chapter, outsideNarration: silent.has(position) }));
   const outsideChapters = marked.filter((chapter) => chapter.outsideNarration);
   return {
     chapters: marked,
@@ -137,6 +184,23 @@ function parseTotals(value: unknown): ReadAloudReportSummary {
     totals[key] = number;
   }
   return totals;
+}
+
+/** All or nothing: a review decision made from part of the track list could miss the track that matters. */
+function parseTracks(value: unknown): ReadAloudTrackReport[] | null {
+  if (!Array.isArray(value) || value.length > MAX_TRACKS) return null;
+  const tracks: ReadAloudTrackReport[] = [];
+  for (const item of value) {
+    if (!isRecord(item)) return null;
+    const { duration, matchedSeconds, interpolatedSeconds } = item;
+    if (!isSeconds(duration) || !isSeconds(matchedSeconds) || !isSeconds(interpolatedSeconds)) return null;
+    tracks.push({ duration, matchedSeconds, interpolatedSeconds });
+  }
+  return tracks;
+}
+
+function isSeconds(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0;
 }
 
 function parseChapters(value: unknown): ReadAloudChapterReport[] {

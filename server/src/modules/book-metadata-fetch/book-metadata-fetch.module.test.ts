@@ -18,6 +18,7 @@ import { BookMetadataFetchModule } from './book-metadata-fetch.module';
 import { BookMetadataFetchOrchestratorService } from './book-metadata-fetch-orchestrator.service';
 import { BookMetadataFetchQueueRepository } from './book-metadata-fetch-queue.repository';
 import { BookMetadataFetchSessionService } from './book-metadata-fetch-session.service';
+import { MetadataFetchJobSource } from './metadata-fetch-job-source';
 
 describe('BookMetadataFetchModule', () => {
   it('registers expected controller and provider graph', () => {
@@ -34,6 +35,7 @@ describe('BookMetadataFetchModule', () => {
         BookMetadataFetchConfigService,
         BookMetadataFetchOrchestratorService,
         BookMetadataFetchGateway,
+        MetadataFetchJobSource,
       ]),
     );
     expect(exports).toEqual([BookMetadataFetchOrchestratorService]);

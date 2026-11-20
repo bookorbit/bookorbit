@@ -41,6 +41,7 @@ function isExternalIdConflict(error: unknown): boolean {
 
 export interface BookSyncData {
   bookId: number;
+  libraryId: number;
   isbn13: string | null;
   isbn10: string | null;
   title: string | null;
@@ -296,6 +297,7 @@ export class HardcoverRepository {
     const query = this.db
       .select({
         bookId: schema.books.id,
+        libraryId: schema.books.libraryId,
         isbn13: schema.bookMetadata.isbn13,
         isbn10: schema.bookMetadata.isbn10,
         title: schema.bookMetadata.title,

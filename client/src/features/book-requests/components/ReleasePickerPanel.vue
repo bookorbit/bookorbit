@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
@@ -9,8 +9,8 @@ import {
   ChevronUp,
   CircleAlert,
   CircleCheck,
-  CircleMinus,
-  Download,
+  CircleX,
+  Ellipsis,
   Eye,
   EyeOff,
   Globe,
@@ -23,6 +23,7 @@ import {
   Search,
   SearchX,
   TriangleAlert,
+  X,
   Zap,
 } from '@lucide/vue'
 import { isBookRequestFulfiller, isGrabbableBookRequestStatus, Permission, releaseInspectionBlocksGrab } from '@bookorbit/types'
@@ -37,21 +38,24 @@ import type {
   ReleaseSearchCriteria,
 } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
-import { formatColorVar } from '@/features/book/lib/format-colors'
-import { formatDate, formatLanguageName, formatList } from '@/i18n/formatters'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
+import { formatChipStyle } from '@/features/book/lib/format-colors'
+import { formatDate, formatLanguageName, formatList, formatNumber } from '@/i18n/formatters'
 import { formatBytes } from '@/lib/formatting'
 import GrabReleaseDialog from './GrabReleaseDialog.vue'
 import ReleaseFileInspectionPanel from './ReleaseFileInspectionPanel.vue'
 import ReleasePairTabs from './ReleasePairTabs.vue'
 import type { ReleasePairTab } from './ReleasePairTabs.vue'
-import RequestCover from './RequestCover.vue'
 import RequestDrawerToolbar from './RequestDrawerToolbar.vue'
 import RequestEmptyState from './RequestEmptyState.vue'
 import EntityNotFound from '@/components/EntityNotFound.vue'
 import { formatKey, formatKeys, languageKey } from '../releaseFacets'
-import { requestBookCoverSources } from '../requestBookCover'
+import { REQUEST_DRAWER } from '../requestDrawerContext'
 import { requestFailureText } from '../requestOutcome'
-import { protocolChipClass, sourceChipClass } from '../sourceColors'
+import { protocolChipClass, sourceChipClass, sourceDotClass } from '../sourceColors'
+import type { FacetGroup } from '../composables/useReleaseFacetGroups'
 import { useBookRequestActions } from '../composables/useBookRequests'
 import { useBookRequestDetail } from '../composables/useBookRequestDetail'
 import { useDownloadClientSummaries } from '../composables/useDownloadClients'
@@ -107,6 +111,21 @@ const actions = useBookRequestActions(canManage)
 const COMMON_SAMPLING_RATE_HZ = 44100
 /** How many clean sources are listed one by one before they collapse into their total. */
 const MAX_LISTED_SOURCES = 4
+/** Seeders from which a swarm reads as healthy rather than thin. */
+const HEALTHY_SWARM = 20
+
+/**
+ * Every chip on a release box: one height, one shape, the colour carried by the text over a faint
+ * tint of itself. The tones are written out because Tailwind only generates literal classes.
+ */
+const CHIP = 'inline-flex h-5 items-center gap-1 rounded-full border px-[7px] text-xs leading-none font-medium whitespace-nowrap'
+const TONE_CHIPS = {
+  primary: 'border-primary/40 bg-primary/10 text-primary',
+  info: 'border-[var(--pill-info)]/40 bg-[var(--pill-info)]/10 text-[var(--pill-info)]',
+  success: 'border-success/40 bg-success/10 text-success',
+  warning: 'border-warning/40 bg-warning/10 text-warning',
+  destructive: 'border-destructive/40 bg-destructive/10 text-destructive',
+} as const
 
 const requestId = computed(() => Number(route.params.id))
 
@@ -228,7 +247,6 @@ const clientProblemHint = computed(() => {
 const isRetry = computed(() => request.value?.status === 'failed')
 const failureText = computed(() => (request.value ? requestFailureText(request.value, (key, named) => t(key, named)) : null))
 const authorLine = computed(() => request.value?.authors.join(', ') ?? '')
-const bookCoverSources = computed(() => (request.value ? requestBookCoverSources(request.value) : []))
 const localOnlyCriteriaFacts = computed(() => (criteria.value ? localOnlyFacts(criteria.value) : []))
 /**
  * Adding a source or switching one back on happens under Settings > System > Requests, which is
@@ -262,6 +280,7 @@ const sourceRows = computed<SourceRow[]>(() =>
       ? indexer.query.value === searchHeadline.value.value && (indexer.query.kind === 'isbn') === searchHeadline.value.isbn
       : false,
     isbnQuery: indexer.query?.kind === 'isbn',
+    dotClass: sourceDotClass(indexer.color),
     ok: indexer.ok,
     count: indexer.count,
     filtered: indexer.filtered,
@@ -326,6 +345,7 @@ type SourceRow = {
   /** Whether it was handed the key stated above the list, so the row can say so in words. */
   echoesKey: boolean
   isbnQuery: boolean
+  dotClass: string
   ok: boolean
   count: number
   filtered: number
@@ -380,7 +400,7 @@ const sharedLanguage = computed(() => sharedValue((release) => languageKey(relea
 const sharedFormat = computed(() => sharedValue((release) => (release.formats.length === 1 ? formatKey(release.format) : null)))
 const sharedIndexerId = computed(() => sharedValue((release) => release.indexerId))
 const sharedIndexer = computed(() => sharedValue((release) => release.indexerName))
-const sharedIndexerClass = computed(() => sourceChipClass(colorByIndexer.value.get(sharedIndexerId.value ?? -1)))
+const sharedIndexerDot = computed(() => (sharedIndexerId.value === null ? '' : sourceDotClass(colorByIndexer.value.get(sharedIndexerId.value))))
 const allFreeleech = computed(() => releases.value.length > 0 && releases.value.every((release) => release.freeleech))
 
 const summaryFacts = computed(() => {
@@ -388,6 +408,8 @@ const summaryFacts = computed(() => {
   if (allFreeleech.value) facts.push(t('bookRequests.releases.allFreeleech'))
   if (sharedLanguage.value) facts.push(t('bookRequests.releases.allLanguage', { language: sharedLanguage.value }))
   if (sharedFormat.value) facts.push(t('bookRequests.releases.allFormat', { format: sharedFormat.value }))
+  // A single source already implies its protocol; several that share one would otherwise never say it.
+  if (sharedDelivery.value && !sharedIndexer.value) facts.push(t(`bookRequests.releases.allProtocol.${sharedDelivery.value}`))
   return facts
 })
 
@@ -399,21 +421,86 @@ const summaryFacts = computed(() => {
  */
 const swarmByIndexer = computed(() => new Map(indexers.value.map((indexer) => [indexer.indexerId, indexer.seedsBack])))
 const deliveryByIndexer = computed(() => new Map(indexers.value.map((indexer) => [indexer.indexerId, indexer.delivery])))
+const sharedDelivery = computed(() => sharedValue((release) => deliveryFor(release)))
 
 const { facetGroups } = useReleaseFacetGroups(filters, colorByIndexer, allFreeleech)
+
+/** Sort leads the bar; the facets that narrow the list sit behind it, the two toggles last. */
+const sortGroup = computed(() => facetGroups.value.find((group) => group.key === 'sort') ?? null)
+const FACET_ORDER = ['format', 'language', 'files', 'audio', 'source'] as const
+const facetMenus = computed(() => FACET_ORDER.flatMap((key) => facetGroups.value.filter((group) => group.key === key)))
+const flagToggles = computed(() => facetGroups.value.find((group) => group.key === 'flags')?.options ?? [])
+/** Which filter's menu is open, so choosing an option can close it. */
+const openFacet = ref<string | null>(null)
+
+function activeLabel(group: FacetGroup): string | null {
+  const active = group.options.filter((option) => option.active).map((option) => option.label)
+  return active.length ? formatList(active) : null
+}
+
+function setFacetOpen(key: string, open: boolean): void {
+  openFacet.value = open ? key : openFacet.value === key ? null : openFacet.value
+}
+
+function chooseFacet(option: FacetGroup['options'][number]): void {
+  option.select()
+  openFacet.value = null
+}
+
+/** Every choice in the group goes, which for Audio can be a channel count and a bitrate floor. */
+function clearFacet(group: FacetGroup): void {
+  for (const option of group.options) if (option.active) option.select()
+}
+
+function toggleFlag(option: FacetGroup['options'][number]): void {
+  option.select()
+}
+
+/**
+ * Rows by profile tier, best first, then everything no tier took. A list with no profile, or one
+ * where no release reached any tier, has nothing to group by and is one run.
+ */
+interface ReleaseGroup {
+  key: string
+  title: string | null
+  outside: boolean
+  rows: { release: ReleaseCandidateItem; index: number }[]
+}
+
+const grouped = computed(() => releases.value.some((release) => release.tier !== null))
+
+const releaseGroups = computed<ReleaseGroup[]>(() => {
+  const rows = visibleReleases.value.map((release, index) => ({ release, index }))
+  if (!grouped.value) return [{ key: 'all', title: null, outside: false, rows }]
+  const out: ReleaseGroup[] = []
+  for (const row of rows) {
+    const key = row.release.tier === null ? 'outside' : `tier-${row.release.tier}`
+    let group = out.at(-1)
+    if (!group || group.key !== key) {
+      const outside = row.release.tier === null
+      group = { key, title: outside ? t('bookRequests.releases.group.outside') : (row.release.tierName ?? ''), outside, rows: [] }
+      out.push(group)
+    }
+    group.rows.push(row)
+  }
+  return out
+})
+
+const mediumLabel = computed(() => t(`bookRequests.mediaKind.${criteria.value?.mediaKind ?? 'ebook'}`))
 
 /** Only what separates this release from the others; the rest is already in the summary line. */
 const expandedScores = ref(new Set<string>())
 
-/**
- * One fact in a row's metadata run. `parts` because a format fact is several values at once and
- * the requested one among them is emphasised, while every other fact is a single string.
- */
-interface MetaFact {
+/** One fact on a box's line of facts, after the format pills that lead it. */
+interface RowFact {
   key: string
-  parts: Array<{ text: string; emphasis: boolean }>
-  /** Aligns digits between rows, for the facts that are numbers rather than names. */
+  text: string
+  /** Aligns digits between boxes, for the facts that are numbers rather than names. */
   numeric?: boolean
+  /** Where the fact's colour says something of its own, such as how healthy the swarm is. */
+  tone?: string
+  /** Left to the score details on a phone, where the line has no room for it. */
+  wideOnly?: boolean
 }
 
 onMounted(async () => {
@@ -472,6 +559,8 @@ function afterGrab(item: BookRequestItem): void {
     void router.push({ name: 'book-request-releases', params: { id: partner.id }, query: listQuery.value })
     return
   }
+  // Picking releases for a selection: this request is done, so the run moves on to the next one.
+  if (pickRunActive.value && drawer?.pickRun?.advance()) return
   if (partner && SETTLED_STATUSES.includes(partner.status)) {
     finished.value = true
     return
@@ -483,24 +572,27 @@ function closeDrawer(): void {
   void router.push({ name: 'book-requests', query: listQuery.value })
 }
 
+const drawer = inject(REQUEST_DRAWER, null)
+const pickRunActive = computed(() => (drawer?.pickRun?.position.value ?? 0) > 0)
+
+function skipInRun(): void {
+  drawer?.pickRun?.skip()
+}
+
 function releaseKey(release: ReleaseCandidateItem): string {
   return `${release.indexerId}:${release.guid}`
 }
 
-/** Rank has to be legible before the number is read, so the score carries a band. */
+/** The band has to read before the number does, so the score square is tinted in it. */
 function scoreClass(score: number): string {
-  if (score >= 70) return 'text-success'
-  if (score >= 55) return 'text-info'
-  if (score >= 40) return 'text-warning'
-  return 'text-muted-foreground'
-}
-
-/** The band has to read before the number does, so the score carries a tinted surface too. */
-function scoreSurfaceClass(score: number): string {
-  if (score >= 70) return 'border-success/45 bg-success/10'
-  if (score >= 55) return 'border-info/45 bg-info/10'
-  if (score >= 40) return 'border-warning/45 bg-warning/10'
-  return 'border-border bg-muted'
+  if (score >= 70) {
+    return 'border-[color-mix(in_oklab,var(--success)_45%,transparent)] bg-[color-mix(in_oklab,var(--success)_10%,transparent)] text-success'
+  }
+  if (score >= 55) return 'border-[color-mix(in_oklab,var(--info)_45%,transparent)] bg-[color-mix(in_oklab,var(--info)_10%,transparent)] text-info'
+  if (score >= 40) {
+    return 'border-[color-mix(in_oklab,var(--warning)_45%,transparent)] bg-[color-mix(in_oklab,var(--warning)_10%,transparent)] text-warning'
+  }
+  return 'border-[color-mix(in_oklab,var(--muted-foreground)_45%,transparent)] bg-[color-mix(in_oklab,var(--muted-foreground)_10%,transparent)] text-muted-foreground'
 }
 
 function isBest(index: number): boolean {
@@ -583,30 +675,92 @@ function protocolText(release: ReleaseCandidateItem): string {
   return t(`bookRequests.releases.protocol.${deliveryFor(release) === 'file' ? 'directPill' : deliveryFor(release)}`)
 }
 
-function fileToggleText(release: ReleaseCandidateItem): string {
+/** The eye button is an icon, so its name says what it opens and for which release. */
+function fileToggleLabel(release: ReleaseCandidateItem): string {
+  const open = filesAreExpanded(release)
   if (deliveryFor(release) === 'usenet') {
-    return t(filesAreExpanded(release) ? 'bookRequests.releases.hideDetails' : 'bookRequests.releases.viewDetails')
+    return t(open ? 'bookRequests.releases.hideDetailsOf' : 'bookRequests.releases.viewDetailsOf', { title: release.title })
   }
-  return t(filesAreExpanded(release) ? 'bookRequests.releases.hideFiles' : 'bookRequests.releases.viewFiles')
+  return t(open ? 'bookRequests.releases.hideFilesOf' : 'bookRequests.releases.viewFilesOf', { title: release.title })
 }
 
 function indexerChipClass(release: ReleaseCandidateItem): string {
   return sourceChipClass(colorByIndexer.value.get(release.indexerId))
 }
 
+/** The full reason the profile skipped a release, with the tier it came closest to. */
+function skipText(release: ReleaseCandidateItem): string | null {
+  const mismatch = release.profileMismatch
+  if (!mismatch) return null
+  return t('bookRequests.releases.profileMismatch.closest', {
+    tier: mismatch.tierName,
+    reasons: mismatch.failures.map((failure) => profileFailureText(release, failure)).join(' '),
+  })
+}
+
 /**
- * The chip's own colour, from a per-theme token rather than a fixed hex: the palette this replaced
- * was one set of values for both themes, and the brightest of them was around 1.9:1 on a light
- * surface. The tint and the border are mixed toward transparent, which is alpha on a fill and a
- * border rather than on the text.
+ * The same reason cut to what fits beside the row's facts: the first condition it failed, and how
+ * many more. The heading above already says the profile skipped it; the full text is the tooltip.
  */
-function formatFacetStyle(value: string, active: boolean): Record<string, string> {
-  const color = formatColorVar(value)
-  return {
-    color,
-    borderColor: active ? color : `color-mix(in oklch, ${color} 40%, transparent)`,
-    backgroundColor: `color-mix(in oklch, ${color} ${active ? '20%' : '10%'}, transparent)`,
+function skipShortText(release: ReleaseCandidateItem): string | null {
+  const failures = release.profileMismatch?.failures ?? []
+  const first = failures[0]
+  if (!first) return null
+  const reason = shortFailureText(first)
+  return failures.length > 1 ? t('bookRequests.releases.profileMismatch.short.more', { reason, count: failures.length - 1 }) : reason
+}
+
+function shortFailureText(failure: ReleaseProfileMismatchFailure): string {
+  const key = 'bookRequests.releases.profileMismatch.short'
+  const formats = (values: string[]) => formatList(values.map((format) => format.toUpperCase()))
+  switch (failure.code) {
+    case 'formatUnknown':
+      return t(`${key}.formatUnknown`, { expected: formats(failure.expected) })
+    case 'format':
+      return t(`${key}.format`, { actual: formats(failure.actual), expected: formats(failure.expected) })
+    case 'fileLayoutUnknown':
+      return t(`${key}.${failure.expected === 'single' ? 'fileLayoutUnknownSingle' : 'fileLayoutUnknownMulti'}`)
+    case 'fileLayout':
+      return t(`${key}.${failure.expected === 'single' ? 'fileLayoutSingle' : 'fileLayoutMulti'}`)
+    case 'bitrate':
+      return t(`${key}.bitrate`, { actual: failure.actual, expected: failure.expected })
+    case 'channels':
+      return t(`${key}.${failure.expected === 1 ? 'channelsMono' : 'channelsStereo'}`)
+    case 'languageUnknown':
+      return t(`${key}.languageUnknown`, { expected: formatList(failure.expected.map(formatLanguageName)) })
+    case 'language':
+      return t(`${key}.language`, { actual: formatLanguageName(failure.actual), expected: formatList(failure.expected.map(formatLanguageName)) })
+    case 'seeders':
+      return t(`${key}.seeders`, { actual: failure.actual, expected: failure.expected })
+    case 'sizeUnknown':
+      return t(`${key}.sizeUnknown`, { expected: formatBytes(failure.expected) })
+    case 'size':
+      return t(`${key}.size`, { actual: formatBytes(failure.actual), expected: formatBytes(failure.expected) })
+    case 'source':
+    case 'freeleech':
+    case 'vipOnly':
+      return t(`${key}.${failure.code}`)
   }
+}
+
+function hasBreakdown(release: ReleaseCandidateItem): boolean {
+  return release.reasons.length > 0 || release.profileMismatch !== null
+}
+
+/** Whether the score square has anything to open: how it scored, when it was added, its ties. */
+function hasDetails(release: ReleaseCandidateItem, index: number): boolean {
+  return hasBreakdown(release) || release.publishedAt !== null || (isBest(index) && tiedWithBest.value > 0)
+}
+
+function addedDate(release: ReleaseCandidateItem): string | null {
+  return release.publishedAt ? formatDate(new Date(release.publishedAt), { dateStyle: 'medium' }) : null
+}
+
+/** A swarm's health in its colour: enough seeders to rely on, a thin swarm, or none at all. */
+function seederTone(release: ReleaseCandidateItem): string | undefined {
+  if (release.seeders === null) return undefined
+  if (release.seeders >= HEALTHY_SWARM) return 'font-medium text-success'
+  return release.seeders > 0 ? 'font-medium text-warning' : 'font-medium text-destructive'
 }
 
 /**
@@ -696,51 +850,28 @@ function profileFailureText(release: ReleaseCandidateItem, failure: ReleaseProfi
   }
 }
 
-function profileMismatchText(release: ReleaseCandidateItem): string | null {
-  if (!release.profileMismatch) return null
-  return t('bookRequests.releases.profileMismatch.row', {
-    tier: release.profileMismatch.tierName,
-    reasons: release.profileMismatch.failures.map((failure) => profileFailureText(release, failure)).join(' '),
-  })
-}
-
 /**
- * The row's facts as one ordered run, so the template can separate them instead of relying on a
- * gap between six spans of identical muted text to say where one fact ends and the next begins.
+ * A box's facts as one ordered run, so the template can separate them instead of relying on a gap
+ * between spans of identical text to say where one fact ends and the next begins. Where the
+ * release comes from is not here: the protocol and source chips above the line say it in colour.
  *
- * Facts already stated once above the list are dropped here rather than repeated per row.
+ * Facts already stated once above the list are dropped here rather than repeated per box.
  */
-function metaFacts(release: ReleaseCandidateItem): MetaFact[] {
-  const facts: MetaFact[] = []
+function rowFacts(release: ReleaseCandidateItem): RowFact[] {
+  const facts: RowFact[] = []
   if (release.language && !sharedLanguage.value) {
-    facts.push({ key: 'language', parts: [{ text: formatLanguageName(release.language), emphasis: true }] })
+    facts.push({ key: 'language', text: formatLanguageName(release.language), tone: 'text-foreground' })
   }
-  if (release.formats.length > 0 && !sharedFormat.value) {
-    facts.push({ key: 'format', parts: formatKeys(release).map((value) => ({ text: value, emphasis: isPreferredFormat(value) })) })
-  }
-  if (release.sizeBytes) facts.push({ key: 'size', numeric: true, parts: [{ text: formatBytes(release.sizeBytes), emphasis: false }] })
   if (release.fileCount !== null) {
-    facts.push({
-      key: 'files',
-      numeric: true,
-      // A single file is the shape an approver hunting an audiobook is usually after, so it carries
-      // the emphasis rather than being one more grey number in the run.
-      parts: [{ text: t('bookRequests.releases.fileCount', { count: release.fileCount }), emphasis: release.fileCount === 1 }],
-    })
+    facts.push({ key: 'files', numeric: true, text: t('bookRequests.releases.fileCount', { count: release.fileCount }), tone: 'text-foreground' })
   }
-  if (showsSeeders(release)) facts.push({ key: 'seeders', numeric: true, parts: [{ text: seederText(release), emphasis: false }] })
-  if (release.publishedAt) {
-    facts.push({ key: 'added', numeric: true, parts: [{ text: formatDate(new Date(release.publishedAt)), emphasis: false }] })
-  }
+  if (release.sizeBytes) facts.push({ key: 'size', numeric: true, text: formatBytes(release.sizeBytes), tone: 'text-foreground' })
+  if (showsSeeders(release)) facts.push({ key: 'seeders', numeric: true, text: seederText(release), tone: seederTone(release) })
+  const audio = audioParts(release)
+  if (audio.length) facts.push({ key: 'audio', numeric: true, text: audio.join(' · ') })
+  const added = addedDate(release)
+  if (added) facts.push({ key: 'added', numeric: true, wideOnly: true, text: added })
   return facts
-}
-
-/**
- * A release carrying three formats is labelled with all three, so the one the request asked for
- * has to be findable among them. It leads the list already; this is what says why it leads.
- */
-function isPreferredFormat(value: string): boolean {
-  return (criteria.value?.preferredFormats ?? []).some((preferred) => preferred.toUpperCase() === value)
 }
 
 function seederText(release: ReleaseCandidateItem): string {
@@ -794,25 +925,175 @@ function showEverySource(): void {
 </script>
 
 <template>
-  <div class="@container flex h-full min-h-0 flex-col">
+  <div class="@container flex h-full min-h-0 flex-col text-sm leading-[1.45] text-foreground">
     <RequestDrawerToolbar leading="back" @back="goBack">
       <template #title>
-        <p class="truncate text-sm font-medium text-foreground">
-          {{ isRetry ? t('bookRequests.releases.retryTitle') : pairTabs ? t('bookRequests.releases.pairTitle') : t('bookRequests.releases.title') }}
-        </p>
+        <div class="min-w-0 px-1">
+          <p class="text-sm leading-[1.3] font-medium [overflow-wrap:anywhere] text-foreground">
+            {{ isRetry ? t('bookRequests.releases.retryTitle') : pairTabs ? t('bookRequests.releases.pairTitle') : t('bookRequests.releases.title') }}
+          </p>
+          <p v-if="pickRunActive && drawer?.pickRun" class="text-xs leading-[1.3] text-muted-foreground tabular-nums">
+            {{ t('bookRequests.pickRun.progress', { position: drawer.pickRun.position.value, total: drawer.pickRun.total.value }) }}
+          </p>
+          <p v-else-if="request" class="text-xs leading-[1.3] [overflow-wrap:anywhere] text-muted-foreground">
+            {{ request.title }}
+            <template v-if="authorLine">
+              <span aria-hidden="true"> · </span>
+              {{ authorLine }}
+            </template>
+          </p>
+        </div>
       </template>
       <template v-if="!finished" #actions>
-        <Button variant="ghost" size="sm" :disabled="loading" @click="handleRefresh">
+        <Button v-if="pickRunActive" variant="outline" size="sm" @click="skipInRun">{{ t('bookRequests.pickRun.skip') }}</Button>
+        <Button variant="ghost" size="sm" :disabled="loading" :aria-label="t('bookRequests.releases.refresh')" @click="handleRefresh">
           <RefreshCw :size="14" aria-hidden="true" />
-          {{ t('bookRequests.releases.refresh') }}
+          <span class="hidden @min-[30rem]:inline">{{ t('bookRequests.releases.refresh') }}</span>
         </Button>
-        <Button variant="ghost" size="sm" @click="openManual">{{ t('bookRequests.releases.manualTorrent') }}</Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button variant="ghost" size="icon-sm" :aria-label="t('bookRequests.releases.moreOptions')">
+              <Ellipsis :size="16" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" class="min-w-[220px]">
+            <DropdownMenuItem @click="openManual">{{ t('bookRequests.releases.manualTorrent') }}</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </template>
     </RequestDrawerToolbar>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+    <!--
+      What was searched and what each source gave back, in one band under the toolbar. Hidden while
+      no source is enabled: every part of it describes a search, and none ran.
+    -->
+    <div
+      v-if="request && criteria && !noSourcesEnabled && !finished"
+      class="flex min-h-[42px] shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border bg-[color-mix(in_oklab,var(--muted)_55%,var(--background))] py-1.5 ps-3 pe-2 text-[13px] @min-[35rem]:ps-4"
+      role="group"
+      :aria-label="t('bookRequests.releases.criteria.label')"
+    >
+      <i18n-t
+        v-if="searchFoundNothing"
+        keypath="bookRequests.releases.criteria.nothingFound"
+        tag="p"
+        scope="global"
+        class="min-w-0 flex-1 font-medium text-foreground @min-[35rem]:flex-initial"
+      >
+        <template #key>
+          <span class="[overflow-wrap:anywhere] text-foreground tabular-nums">{{ searchHeadline.value }}</span>
+        </template>
+      </i18n-t>
+      <p v-else-if="searchHeadline.isbn" class="min-w-0 flex-1 text-muted-foreground @min-[35rem]:flex-initial">
+        <Search :size="14" class="me-1.5 inline-block align-[-2px]" aria-hidden="true" />
+        <i18n-t keypath="bookRequests.releases.criteria.searchedIsbn" scope="global">
+          <template #isbn>
+            <b class="font-medium [overflow-wrap:anywhere] text-foreground tabular-nums">{{ searchHeadline.value }}</b>
+          </template>
+        </i18n-t>
+      </p>
+      <p v-else class="min-w-0 flex-1 text-muted-foreground @min-[35rem]:flex-initial">
+        <Search :size="14" class="me-1.5 inline-block align-[-2px]" aria-hidden="true" />
+        {{ t('bookRequests.releases.criteria.searchedTitleAuthor') }}
+        <b class="font-medium [overflow-wrap:anywhere] text-foreground">{{ searchHeadline.value }}</b>
+      </p>
+
+      <!--
+        Kept visible rather than folded away: this is the only place that separates a source that
+        found nothing from one whose session expired, and those need opposite fixes.
+      -->
+      <ul v-if="sourceRows.length" class="contents" :aria-label="t('bookRequests.releases.criteria.sources')">
+        <li
+          v-if="sourcesCondensed"
+          class="order-2 inline-flex flex-wrap items-center gap-1.5 @min-[35rem]:order-none @min-[35rem]:border-s @min-[35rem]:border-border @min-[35rem]:ps-3"
+        >
+          <CircleCheck :size="13" class="flex-none text-success" aria-hidden="true" />
+          <span class="text-foreground">{{ t('bookRequests.releases.criteria.sourcesSearched', { count: cleanSourceRows.length }) }}</span>
+          <span class="font-semibold text-foreground tabular-nums">
+            {{ t('bookRequests.releases.criteria.sourceReleases', { count: condensedReleaseCount }) }}
+          </span>
+          <button
+            type="button"
+            class="rounded-xs text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            @click="showEverySource"
+          >
+            {{ t('bookRequests.releases.criteria.showEachSource') }}
+          </button>
+        </li>
+
+        <li
+          v-for="row in listedSourceRows"
+          :key="row.id"
+          class="order-2 inline-flex min-w-0 flex-wrap items-center gap-1.5 @min-[35rem]:order-none @min-[35rem]:border-s @min-[35rem]:border-border @min-[35rem]:ps-3"
+        >
+          <Loader2 v-if="loading" class="size-3 flex-none animate-spin text-muted-foreground motion-reduce:animate-none" aria-hidden="true" />
+          <TriangleAlert v-else-if="!row.ok" :size="13" class="flex-none text-warning" aria-hidden="true" />
+          <span v-else class="size-2 flex-none rounded-full" :class="row.dotClass" aria-hidden="true" />
+          <span class="text-foreground">{{ row.name }}</span>
+          <!--
+            Silent where it was handed the key stated above. A source that could not take the ISBN
+            says it searched the title and author, with the exact string it was sent on hover.
+          -->
+          <span v-if="row.query && searchHeadline.isbn && !row.isbnQuery" class="order-last text-muted-foreground" :title="row.query">
+            {{ t('bookRequests.releases.criteria.byTitleAuthor') }}
+          </span>
+          <code v-else-if="row.query && !row.echoesKey" class="max-w-[16rem] truncate font-mono text-xs text-muted-foreground" :title="row.query">
+            {{ row.query }}
+          </code>
+          <span v-else-if="!row.query" class="text-muted-foreground">{{ t('bookRequests.releases.criteria.sourceNoAdapter') }}</span>
+          <template v-if="loading" />
+          <template v-else-if="!row.ok">
+            <span class="text-warning">{{ t(`bookRequests.releases.failures.${row.failure ?? 'error'}`) }}</span>
+            <!-- The one failure with a specific fix, rather than a re-run of the same search. -->
+            <RouterLink
+              v-if="row.failure === 'unauthorized' && canFixSources"
+              :to="{ name: 'settings-admin-requests' }"
+              class="inline-flex items-center gap-0.5 rounded-xs text-foreground underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              {{ t('bookRequests.releases.criteria.fixSource') }}
+              <ArrowUpRight :size="12" aria-hidden="true" />
+            </RouterLink>
+          </template>
+          <template v-else>
+            <template v-if="row.count > 0">
+              <b class="font-semibold text-foreground tabular-nums" aria-hidden="true">{{ formatNumber(row.count) }}</b>
+              <span class="sr-only">{{ t('bookRequests.releases.criteria.sourceReleases', { count: row.count }) }}</span>
+            </template>
+            <span v-else class="text-muted-foreground">{{ t('bookRequests.releases.criteria.sourceNone') }}</span>
+            <span v-if="row.filtered" class="text-muted-foreground">{{
+              t('bookRequests.releases.criteria.sourceFiltered', { count: row.filtered })
+            }}</span>
+          </template>
+        </li>
+
+        <li
+          v-if="uncoveredIndexerCount"
+          class="order-2 text-muted-foreground @min-[35rem]:order-none @min-[35rem]:border-s @min-[35rem]:border-border @min-[35rem]:ps-3"
+        >
+          {{ t('bookRequests.releases.criteria.uncovered', { count: uncoveredIndexerCount }) }}
+        </li>
+      </ul>
+
+      <Button
+        type="button"
+        variant="ghost"
+        size="sm"
+        class="order-1 ms-auto h-7 gap-1 px-2 text-[13px] @min-[35rem]:order-none"
+        :aria-expanded="searchPanelOpen"
+        aria-controls="release-search-options"
+        @click="toggleSearchPanel"
+      >
+        {{ searchPanelOpen ? t('bookRequests.releases.criteria.closeSearch') : t('bookRequests.releases.criteria.changeSearch') }}
+        <ChevronUp v-if="searchPanelOpen" :size="14" aria-hidden="true" />
+        <ChevronDown v-else :size="14" aria-hidden="true" />
+      </Button>
+      <!-- A phone keeps the search and its Change button on one line, with the sources under it. -->
+      <span class="order-1 h-0 basis-full @min-[35rem]:hidden" aria-hidden="true" />
+    </div>
+
+    <div class="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-5">
       <div v-if="requestLoading" role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+        <Loader2 class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         {{ t('bookRequests.detail.loading') }}
       </div>
 
@@ -821,351 +1102,223 @@ function showEverySource(): void {
       <p v-else-if="requestError" role="alert" class="text-sm text-destructive">{{ t(`bookRequests.detail.errors.${requestError}`) }}</p>
 
       <template v-else-if="request">
-        <!-- The stage is named in the toolbar, so what is left here is the book being grabbed for. -->
-        <header class="flex items-center gap-3.5">
-          <RequestCover
-            :src="request.coverUrl"
-            :fallback-sources="bookCoverSources"
-            :media-kind="request.mediaKind"
-            class="h-[72px] w-12 shadow-sm"
-            :icon-size="20"
-          />
+        <ReleasePairTabs v-if="pairTabs" :tabs="pairTabs" :query="listQuery" class="mb-3.5" />
 
-          <div class="min-w-0 flex-1">
-            <h2 class="truncate text-base font-semibold tracking-tight text-foreground">{{ request.title }}</h2>
-            <p class="mt-0.5 truncate text-sm text-muted-foreground">
-              {{ authorLine || t('bookRequests.detail.unknownAuthor') }}
-              <template v-if="request.publishedYear">
-                &middot; <span class="tabular-nums">{{ request.publishedYear }}</span>
-              </template>
-            </p>
-          </div>
-        </header>
-
-        <ReleasePairTabs v-if="pairTabs" :tabs="pairTabs" :query="listQuery" />
-
-        <p v-if="isRetry && failureText" class="mt-3 text-sm text-muted-foreground">
-          {{ t('bookRequests.releases.previousFailure', { reason: failureText }) }}
-        </p>
-
-        <!--
-          Hidden entirely while no source is enabled, rather than headed with a different sentence.
-          Every part of it - the key, the local filters, the alternate keys to try next - describes
-          a search, and offering to change the terms of one that will not run is the same lie in a
-          quieter voice. The empty state below says what actually happened.
-        -->
         <section
-          v-if="criteria && !noSourcesEnabled && !finished"
-          class="mt-3 rounded-lg border border-border bg-muted/40 p-3"
-          :aria-label="t('bookRequests.releases.criteria.label')"
+          v-if="criteria && !noSourcesEnabled && !finished && searchPanelOpen"
+          id="release-search-options"
+          class="mb-3.5 rounded-sm border border-border bg-card p-3"
+          :aria-label="t('bookRequests.releases.criteria.changeSearch')"
         >
-          <div class="flex items-start justify-between gap-3">
-            <!--
-              One key, stated once. The old panel said it three times: in the hint sentence, in a
-              chip, and again in every per-indexer card underneath.
-            -->
-            <i18n-t
-              v-if="searchFoundNothing"
-              keypath="bookRequests.releases.criteria.nothingFound"
-              tag="p"
-              scope="global"
-              class="min-w-0 text-sm font-medium text-foreground"
-            >
-              <template #key>
-                <span :class="searchHeadline.isbn && 'font-mono tabular-nums'">{{ searchHeadline.value }}</span>
-              </template>
-            </i18n-t>
-            <p v-else class="flex min-w-0 items-center gap-2 text-sm">
-              <Search :size="14" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-              <span class="shrink-0 text-muted-foreground">
-                {{ t(searchHeadline.isbn ? 'bookRequests.releases.criteria.searched' : 'bookRequests.releases.criteria.searchedTitleAuthor') }}
-              </span>
-              <span class="truncate text-foreground" :class="searchHeadline.isbn && 'font-mono tabular-nums'" :title="searchHeadline.value">
-                {{ searchHeadline.value }}
-              </span>
-            </p>
-
+          <div class="flex items-center justify-between gap-3">
+            <h4 id="release-search-alternatives" class="text-xs font-medium text-muted-foreground">
+              {{ t('bookRequests.releases.criteria.searchInstead') }}
+            </h4>
             <Button
               type="button"
               variant="ghost"
               size="sm"
               class="h-7 shrink-0 px-2 text-xs"
-              :aria-expanded="searchPanelOpen"
-              aria-controls="release-search-options"
-              @click="toggleSearchPanel"
+              :aria-expanded="searchEditing"
+              @click="toggleSearchEditor"
             >
-              {{ searchPanelOpen ? t('bookRequests.releases.criteria.closeSearch') : t('bookRequests.releases.criteria.changeSearch') }}
-              <ChevronUp v-if="searchPanelOpen" :size="13" aria-hidden="true" />
-              <ChevronDown v-else :size="13" aria-hidden="true" />
+              <Pencil :size="13" aria-hidden="true" />
+              {{ searchEditing ? t('bookRequests.releases.criteria.closeEditor') : t('bookRequests.releases.criteria.editFields') }}
             </Button>
           </div>
 
           <!--
-            Kept visible rather than folded away: this is the only place that separates a source
-            that found nothing from one whose session expired, and those need opposite fixes.
+            One axis, not two lists: the key the search ran under is stated above, and these are
+            the other keys it could run under. A key already spent this visit says what it
+            returned, because four alternates from one provider are otherwise indistinguishable.
           -->
-          <ul v-if="sourceRows.length" class="mt-2.5 space-y-1" :aria-label="t('bookRequests.releases.criteria.sources')">
-            <li v-if="sourcesCondensed" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-              <CircleCheck :size="13" class="shrink-0 text-success" aria-hidden="true" />
-              <span class="font-medium text-foreground">
-                {{ t('bookRequests.releases.criteria.sourcesSearched', { count: cleanSourceRows.length }) }}
-              </span>
-              <Button type="button" variant="ghost" size="sm" class="h-5 px-1.5 text-xs" @click="showEverySource">
-                {{ t('bookRequests.releases.criteria.showEachSource') }}
-              </Button>
-              <span class="ms-auto tabular-nums text-foreground">
-                {{ t('bookRequests.releases.criteria.sourceReleases', { count: condensedReleaseCount }) }}
-              </span>
-            </li>
-
-            <li v-for="row in listedSourceRows" :key="row.id" class="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-              <TriangleAlert v-if="!row.ok" :size="13" class="shrink-0 text-warning" aria-hidden="true" />
-              <CircleCheck v-else-if="row.count > 0" :size="13" class="shrink-0 text-success" aria-hidden="true" />
-              <CircleMinus v-else :size="13" class="shrink-0 text-muted-foreground" aria-hidden="true" />
-
-              <span class="shrink-0 font-medium text-foreground">{{ row.name }}</span>
-              <span v-if="row.echoesKey" class="text-muted-foreground">
-                {{
-                  t(row.isbnQuery ? 'bookRequests.releases.criteria.sourceSearchedIsbn' : 'bookRequests.releases.criteria.sourceSearchedTitleAuthor')
-                }}
-              </span>
-              <span v-else-if="row.query" class="min-w-0 truncate font-mono text-muted-foreground" :title="row.query">{{ row.query }}</span>
-              <span v-else class="text-muted-foreground">{{ t('bookRequests.releases.criteria.sourceNoAdapter') }}</span>
-
-              <span class="ms-auto flex shrink-0 items-center gap-2">
-                <Loader2 v-if="loading" class="size-3 animate-spin text-muted-foreground" aria-hidden="true" />
-                <template v-else-if="!row.ok">
-                  <span class="text-warning">{{ t(`bookRequests.releases.failures.${row.failure ?? 'error'}`) }}</span>
-                  <!-- The one failure with a specific fix, rather than a re-run of the same search. -->
-                  <RouterLink
-                    v-if="row.failure === 'unauthorized' && canFixSources"
-                    :to="{ name: 'settings-admin-requests' }"
-                    class="inline-flex items-center gap-0.5 text-foreground underline-offset-2 hover:underline"
-                  >
-                    {{ t('bookRequests.releases.criteria.fixSource') }}
-                    <ArrowUpRight :size="12" aria-hidden="true" />
-                  </RouterLink>
-                </template>
-                <template v-else>
-                  <span v-if="row.filtered" class="text-muted-foreground">
-                    {{ t('bookRequests.releases.criteria.sourceFiltered', { count: row.filtered }) }}
-                  </span>
-                  <span v-if="row.count > 0" class="tabular-nums text-foreground">
-                    {{ t('bookRequests.releases.criteria.sourceReleases', { count: row.count }) }}
-                  </span>
-                  <span v-else class="text-muted-foreground">{{ t('bookRequests.releases.criteria.sourceNone') }}</span>
-                </template>
-              </span>
-            </li>
-
-            <li v-if="uncoveredIndexerCount" class="ps-5 text-xs text-muted-foreground">
-              {{ t('bookRequests.releases.criteria.uncovered', { count: uncoveredIndexerCount }) }}
-            </li>
-          </ul>
-
-          <div v-if="searchPanelOpen" id="release-search-options" class="mt-2.5 border-t border-border pt-2.5">
-            <div class="flex items-center justify-between gap-3">
-              <h4 id="release-search-alternatives" class="text-xs font-medium text-muted-foreground">
-                {{ t('bookRequests.releases.criteria.searchInstead') }}
-              </h4>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                class="h-7 shrink-0 px-2 text-xs"
-                :aria-expanded="searchEditing"
-                @click="toggleSearchEditor"
-              >
-                <Pencil :size="13" aria-hidden="true" />
-                {{ searchEditing ? t('bookRequests.releases.criteria.closeEditor') : t('bookRequests.releases.criteria.editFields') }}
-              </Button>
-            </div>
-
-            <!--
-              One axis, not two lists: the key the search ran under is stated above, and these are
-              the other keys it could run under. A key already spent this visit says what it
-              returned, because four alternates from one provider are otherwise indistinguishable.
-            -->
-            <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-labelledby="release-search-alternatives">
-              <Button
-                v-for="isbn in alternativeIsbns"
-                :key="isbn"
-                type="button"
-                variant="outline"
-                size="sm"
-                class="h-auto min-w-0 flex-col items-start gap-0 px-2.5 py-1.5"
-                :disabled="loading"
-                @click="runAlternativeIsbnSearch(isbn)"
-              >
-                <span class="font-mono text-xs tabular-nums">{{ isbn }}</span>
-                <span class="max-w-48 truncate text-[10px] font-normal text-muted-foreground">{{ isbnKeyLabel(isbn) }}</span>
-              </Button>
-              <Button
-                v-if="criteria.activeIsbn"
-                type="button"
-                variant="outline"
-                size="sm"
-                class="h-auto flex-col items-start gap-0 px-2.5 py-1.5"
-                :disabled="loading"
-                @click="runTitleAuthorSearch"
-              >
-                <span class="text-xs">{{ t('bookRequests.releases.criteria.searchWithoutIsbn') }}</span>
-                <span v-if="titleAuthorAttempt" class="text-[10px] font-normal text-muted-foreground">{{ titleAuthorAttempt }}</span>
-              </Button>
-            </div>
-
-            <!-- Never sent to a source, so changing one of these cannot surface a new release. -->
-            <div
-              v-if="localOnlyCriteriaFacts.length"
-              class="mt-2.5 flex flex-wrap items-center gap-1.5"
-              role="group"
-              aria-labelledby="release-search-local-criteria"
+          <div class="mt-1.5 flex flex-wrap gap-1.5" role="group" aria-labelledby="release-search-alternatives">
+            <Button
+              v-for="isbn in alternativeIsbns"
+              :key="isbn"
+              type="button"
+              variant="outline"
+              size="sm"
+              class="h-auto min-w-0 flex-col items-start gap-0 px-2.5 py-1.5"
+              :disabled="loading"
+              @click="runAlternativeIsbnSearch(isbn)"
             >
-              <h4 id="release-search-local-criteria" class="me-0.5 text-xs font-medium text-muted-foreground">
-                {{ t('bookRequests.releases.criteria.filteredLocally') }}
-              </h4>
-              <dl class="flex flex-wrap gap-1.5 text-xs">
-                <div
-                  v-for="fact in localOnlyCriteriaFacts"
-                  :key="fact.key"
-                  class="inline-flex min-w-0 rounded-full border border-border bg-background px-2 py-1"
-                >
-                  <dt class="font-medium text-muted-foreground">{{ fact.label }}:</dt>
-                  <dd class="ms-1 max-w-72 truncate text-foreground" :title="fact.value">{{ fact.value }}</dd>
-                </div>
-              </dl>
-            </div>
+              <span class="font-mono text-xs tabular-nums">{{ isbn }}</span>
+              <span class="max-w-48 truncate text-[10px] font-normal text-muted-foreground">{{ isbnKeyLabel(isbn) }}</span>
+            </Button>
+            <Button
+              v-if="criteria.activeIsbn"
+              type="button"
+              variant="outline"
+              size="sm"
+              class="h-auto flex-col items-start gap-0 px-2.5 py-1.5"
+              :disabled="loading"
+              @click="runTitleAuthorSearch"
+            >
+              <span class="text-xs">{{ t('bookRequests.releases.criteria.searchWithoutIsbn') }}</span>
+              <span v-if="titleAuthorAttempt" class="text-[10px] font-normal text-muted-foreground">{{ titleAuthorAttempt }}</span>
+            </Button>
+          </div>
 
-            <form v-if="searchEditing" class="mt-3 space-y-3 border-t border-border pt-3" @submit="handleCustomSearchSubmit">
-              <div class="grid gap-3 sm:grid-cols-2">
-                <div class="space-y-1.5">
-                  <label for="release-search-title" class="text-xs font-medium text-foreground">
-                    {{ t('bookRequests.releases.criteria.title') }}
-                  </label>
-                  <input
-                    id="release-search-title"
-                    v-model="searchTitle"
-                    type="text"
-                    maxlength="500"
-                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
-                  />
-                </div>
+          <!-- Never sent to a source, so changing one of these cannot surface a new release. -->
+          <div
+            v-if="localOnlyCriteriaFacts.length"
+            class="mt-2.5 flex flex-wrap items-center gap-1.5"
+            role="group"
+            aria-labelledby="release-search-local-criteria"
+          >
+            <h4 id="release-search-local-criteria" class="me-0.5 text-xs font-medium text-muted-foreground">
+              {{ t('bookRequests.releases.criteria.filteredLocally') }}
+            </h4>
+            <dl class="flex flex-wrap gap-1.5 text-xs">
+              <div
+                v-for="fact in localOnlyCriteriaFacts"
+                :key="fact.key"
+                class="inline-flex min-w-0 rounded-full border border-border bg-background px-2 py-1"
+              >
+                <dt class="font-medium text-muted-foreground">{{ fact.label }}:</dt>
+                <dd class="ms-1 max-w-72 truncate text-foreground" :title="fact.value">{{ fact.value }}</dd>
+              </div>
+            </dl>
+          </div>
 
-                <div class="space-y-1.5">
-                  <label for="release-search-language" class="text-xs font-medium text-foreground">
-                    {{ t('bookRequests.releases.criteria.language') }}
-                  </label>
-                  <input
-                    id="release-search-language"
-                    v-model="searchLanguage"
-                    type="text"
-                    maxlength="20"
-                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
-                    :placeholder="t('bookRequests.releases.criteria.languagePlaceholder')"
-                  />
-                </div>
-
-                <div class="space-y-1.5">
-                  <label for="release-search-authors" class="text-xs font-medium text-foreground">
-                    {{ t('bookRequests.releases.criteria.authorsEditor') }}
-                  </label>
-                  <textarea
-                    id="release-search-authors"
-                    v-model="searchAuthors"
-                    rows="3"
-                    maxlength="13000"
-                    class="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
-                    :placeholder="t('bookRequests.releases.criteria.authorsPlaceholder')"
-                  ></textarea>
-                </div>
-
-                <div class="space-y-1.5">
-                  <label for="release-search-formats" class="text-xs font-medium text-foreground">
-                    {{ t('bookRequests.releases.criteria.formats') }}
-                  </label>
-                  <input
-                    id="release-search-formats"
-                    v-model="searchFormats"
-                    type="text"
-                    maxlength="419"
-                    class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
-                    :placeholder="t('bookRequests.releases.criteria.formatsPlaceholder')"
-                  />
-                </div>
+          <form v-if="searchEditing" class="mt-3 space-y-3 border-t border-border pt-3" @submit="handleCustomSearchSubmit">
+            <div class="grid gap-3 sm:grid-cols-2">
+              <div class="space-y-1.5">
+                <label for="release-search-title" class="text-xs font-medium text-foreground">
+                  {{ t('bookRequests.releases.criteria.title') }}
+                </label>
+                <input
+                  id="release-search-title"
+                  v-model="searchTitle"
+                  type="text"
+                  maxlength="500"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                />
               </div>
 
-              <fieldset class="space-y-2">
-                <legend class="text-xs font-medium text-foreground">{{ t('bookRequests.releases.criteria.isbnSelection') }}</legend>
-                <p class="text-xs text-muted-foreground">{{ t('bookRequests.releases.criteria.isbnSelectionHint') }}</p>
-                <div v-if="searchIsbnOptions.length" class="flex flex-wrap gap-2">
-                  <label
-                    v-for="(isbn, index) in searchIsbnOptions"
-                    :key="isbn"
-                    :for="`release-search-isbn-${index}`"
-                    class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40"
-                  >
-                    <input
-                      :id="`release-search-isbn-${index}`"
-                      type="radio"
-                      name="release-search-isbn"
-                      class="size-3.5 accent-primary"
-                      :checked="selectedSearchIsbn === isbn"
-                      @change="selectSearchIsbn(isbn)"
-                    />
-                    <span class="font-mono">{{ isbn }}</span>
-                  </label>
-                </div>
+              <div class="space-y-1.5">
+                <label for="release-search-language" class="text-xs font-medium text-foreground">
+                  {{ t('bookRequests.releases.criteria.language') }}
+                </label>
+                <input
+                  id="release-search-language"
+                  v-model="searchLanguage"
+                  type="text"
+                  maxlength="20"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                  :placeholder="t('bookRequests.releases.criteria.languagePlaceholder')"
+                />
+              </div>
+
+              <div class="space-y-1.5">
+                <label for="release-search-authors" class="text-xs font-medium text-foreground">
+                  {{ t('bookRequests.releases.criteria.authorsEditor') }}
+                </label>
+                <textarea
+                  id="release-search-authors"
+                  v-model="searchAuthors"
+                  rows="3"
+                  maxlength="13000"
+                  class="w-full resize-y rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                  :placeholder="t('bookRequests.releases.criteria.authorsPlaceholder')"
+                ></textarea>
+              </div>
+
+              <div class="space-y-1.5">
+                <label for="release-search-formats" class="text-xs font-medium text-foreground">
+                  {{ t('bookRequests.releases.criteria.formats') }}
+                </label>
+                <input
+                  id="release-search-formats"
+                  v-model="searchFormats"
+                  type="text"
+                  maxlength="419"
+                  class="h-9 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                  :placeholder="t('bookRequests.releases.criteria.formatsPlaceholder')"
+                />
+              </div>
+            </div>
+
+            <fieldset class="space-y-2">
+              <legend class="text-xs font-medium text-foreground">{{ t('bookRequests.releases.criteria.isbnSelection') }}</legend>
+              <p class="text-xs text-muted-foreground">{{ t('bookRequests.releases.criteria.isbnSelectionHint') }}</p>
+              <div v-if="searchIsbnOptions.length" class="flex flex-wrap gap-2">
                 <label
-                  for="release-search-without-isbn"
+                  v-for="(isbn, index) in searchIsbnOptions"
+                  :key="isbn"
+                  :for="`release-search-isbn-${index}`"
                   class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40"
                 >
                   <input
-                    id="release-search-without-isbn"
+                    :id="`release-search-isbn-${index}`"
                     type="radio"
                     name="release-search-isbn"
                     class="size-3.5 accent-primary"
-                    :checked="selectedSearchIsbn === null"
-                    @change="selectTitleAuthorSearch"
+                    :checked="selectedSearchIsbn === isbn"
+                    @change="selectSearchIsbn(isbn)"
                   />
-                  <span>{{ t('bookRequests.releases.criteria.noIsbnSelected') }}</span>
+                  <span class="font-mono">{{ isbn }}</span>
                 </label>
-                <div class="flex flex-col gap-2 sm:flex-row">
-                  <label for="release-search-custom-isbn" class="sr-only">{{ t('bookRequests.releases.criteria.customIsbn') }}</label>
-                  <input
-                    id="release-search-custom-isbn"
-                    v-model="customSearchIsbn"
-                    type="text"
-                    maxlength="20"
-                    class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
-                    :placeholder="t('bookRequests.releases.criteria.customIsbnPlaceholder')"
-                  />
-                  <Button type="button" variant="outline" size="sm" @click="addCustomSearchIsbn">
-                    <Plus :size="14" aria-hidden="true" />
-                    {{ t('bookRequests.releases.criteria.addIsbn') }}
-                  </Button>
-                </div>
-              </fieldset>
-
-              <p class="text-xs text-muted-foreground">
-                {{ t('bookRequests.releases.criteria.fixedMedia', { media: t(`bookRequests.mediaKind.${criteria.mediaKind}`) }) }}
-              </p>
-              <p v-if="searchEditError" role="alert" class="text-xs text-destructive">{{ searchEditError }}</p>
-
-              <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-                <Button type="button" variant="ghost" size="sm" @click="resetSearchEditor">
-                  {{ t('bookRequests.releases.criteria.useRequestFields') }}
-                </Button>
-                <Button type="submit" size="sm" :disabled="loading">
-                  <Loader2 v-if="loading" class="animate-spin" aria-hidden="true" />
-                  {{ t('bookRequests.releases.criteria.runSearch') }}
+              </div>
+              <label
+                for="release-search-without-isbn"
+                class="inline-flex cursor-pointer items-center gap-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-foreground focus-within:border-ring focus-within:ring-[3px] focus-within:ring-ring/40"
+              >
+                <input
+                  id="release-search-without-isbn"
+                  type="radio"
+                  name="release-search-isbn"
+                  class="size-3.5 accent-primary"
+                  :checked="selectedSearchIsbn === null"
+                  @change="selectTitleAuthorSearch"
+                />
+                <span>{{ t('bookRequests.releases.criteria.noIsbnSelected') }}</span>
+              </label>
+              <div class="flex flex-col gap-2 sm:flex-row">
+                <label for="release-search-custom-isbn" class="sr-only">{{ t('bookRequests.releases.criteria.customIsbn') }}</label>
+                <input
+                  id="release-search-custom-isbn"
+                  v-model="customSearchIsbn"
+                  type="text"
+                  maxlength="20"
+                  class="h-9 min-w-0 flex-1 rounded-md border border-input bg-background px-3 font-mono text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/40 focus-visible:outline-none"
+                  :placeholder="t('bookRequests.releases.criteria.customIsbnPlaceholder')"
+                />
+                <Button type="button" variant="outline" size="sm" @click="addCustomSearchIsbn">
+                  <Plus :size="14" aria-hidden="true" />
+                  {{ t('bookRequests.releases.criteria.addIsbn') }}
                 </Button>
               </div>
-            </form>
-          </div>
+            </fieldset>
+
+            <p class="text-xs text-muted-foreground">
+              {{ t('bookRequests.releases.criteria.fixedMedia', { media: t(`bookRequests.mediaKind.${criteria.mediaKind}`) }) }}
+            </p>
+            <p v-if="searchEditError" role="alert" class="text-xs text-destructive">{{ searchEditError }}</p>
+
+            <div class="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button type="button" variant="ghost" size="sm" @click="resetSearchEditor">
+                {{ t('bookRequests.releases.criteria.useRequestFields') }}
+              </Button>
+              <Button type="submit" size="sm" :disabled="loading">
+                <Loader2 v-if="loading" class="animate-spin" aria-hidden="true" />
+                {{ t('bookRequests.releases.criteria.runSearch') }}
+              </Button>
+            </div>
+          </form>
         </section>
 
+        <p
+          v-if="isRetry && failureText && !finished"
+          class="mb-3.5 flex items-start gap-2 rounded-sm border border-[color-mix(in_oklab,var(--destructive)_35%,var(--border))] bg-[color-mix(in_oklab,var(--destructive)_7%,var(--card))] px-2.5 py-2 text-[13px] text-foreground"
+        >
+          <CircleX :size="14" class="mt-0.5 flex-none text-destructive" aria-hidden="true" />
+          <span>{{ t('bookRequests.releases.previousFailure', { reason: failureText }) }}</span>
+        </p>
+
         <!-- Not while nothing was searched: "showing the last search" is the same claim again. -->
-        <p v-if="cached && !loading && !noSourcesEnabled && !finished" class="mt-3 text-xs text-muted-foreground">
+        <p v-if="cached && !loading && !noSourcesEnabled && !finished" class="mb-3 text-xs text-muted-foreground">
           {{ t('bookRequests.releases.cached') }}
         </p>
 
@@ -1176,7 +1329,7 @@ function showEverySource(): void {
         <div
           v-if="clientProblem && !finished"
           role="alert"
-          class="mt-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm"
+          class="mb-3.5 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-sm border border-[color-mix(in_oklab,var(--destructive)_35%,var(--border))] bg-[color-mix(in_oklab,var(--destructive)_7%,var(--card))] p-3 text-sm"
         >
           <CircleAlert :size="16" class="mt-0.5 shrink-0 text-destructive" aria-hidden="true" />
           <div class="min-w-0 flex-1 basis-56">
@@ -1202,13 +1355,13 @@ function showEverySource(): void {
           </div>
         </div>
 
-        <p v-else-if="loading" role="status" class="mt-5 flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 class="size-4 animate-spin" aria-hidden="true" />
+        <p v-else-if="loading" role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
           {{ t('bookRequests.releases.searching') }}
         </p>
 
         <!-- Otherwise a search that failed once leaves closing and reopening the picker as the fix. -->
-        <div v-else-if="loadFailed" role="alert" class="mt-5 flex flex-wrap items-center gap-3">
+        <div v-else-if="loadFailed" role="alert" class="flex flex-wrap items-center gap-3">
           <p class="text-sm text-destructive">{{ t('bookRequests.releases.errors.loadFailed') }}</p>
           <Button variant="outline" size="sm" @click="handleRefresh">{{ t('common.retry') }}</Button>
         </div>
@@ -1230,9 +1383,8 @@ function showEverySource(): void {
           </RequestEmptyState>
 
           <!--
-            A medium nothing carries is the one empty state the panel above cannot explain: no
-            source was searched, so its list is empty too, and the fix is to add a source that
-            covers this kind of book rather than to try another key.
+            A medium nothing carries is the one empty state the band above cannot explain: no source
+            was searched, so the fix is a source that covers this kind of book, not another key.
           -->
           <RequestEmptyState
             v-else-if="releases.length === 0 && searched && nothingCoversMedium"
@@ -1248,343 +1400,372 @@ function showEverySource(): void {
           </RequestEmptyState>
 
           <template v-else-if="releases.length > 0">
-            <!--
-              Everything true of every release, said once. Four of the old nine columns were
-              constant on a single-indexer search, and dropping them gives the two that actually
-              differ the width the release title was being squeezed out of.
-            -->
-            <div class="mt-3.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span class="font-medium text-foreground">{{ t('bookRequests.releases.summaryCount', { count: releases.length }) }}</span>
-                <template v-for="fact in summaryFacts" :key="fact">
-                  <span aria-hidden="true" class="opacity-50">&middot;</span>
-                  <span>{{ fact }}</span>
-                </template>
-                <template v-if="sharedIndexer">
-                  <span aria-hidden="true" class="opacity-50">&middot;</span>
-                  <span class="rounded-full border px-1.5 py-px font-medium" :class="sharedIndexerClass">
-                    {{ t('bookRequests.releases.allIndexer', { name: sharedIndexer }) }}
-                  </span>
-                </template>
-              </p>
+            <!-- Sort first, then whatever narrows the list; a group appears only where it can change it. -->
+            <div v-if="showFacets" class="flex flex-wrap items-center gap-1.5" role="group" :aria-label="t('bookRequests.releases.filtersLabel')">
+              <Popover v-if="sortGroup" :open="openFacet === 'sort'" @update:open="(open: boolean) => setFacetOpen('sort', open)">
+                <PopoverTrigger as-child>
+                  <button
+                    type="button"
+                    class="inline-flex h-[30px] items-center gap-1.5 rounded-sm border border-input bg-background px-2.5 text-xs whitespace-nowrap text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    <span class="text-muted-foreground">{{ sortGroup.label }}</span>
+                    <span>{{ activeLabel(sortGroup) }}</span>
+                    <ChevronDown :size="12" class="text-muted-foreground" aria-hidden="true" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent align="start" class="w-52 p-1" :aria-label="sortGroup.label">
+                  <button
+                    v-for="option in sortGroup.options"
+                    :key="option.id"
+                    type="button"
+                    class="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-start text-[13px] text-foreground hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                    :aria-pressed="option.active"
+                    @click="chooseFacet(option)"
+                  >
+                    <Check :size="14" class="flex-none text-primary" :class="option.active ? 'visible' : 'invisible'" aria-hidden="true" />
+                    {{ option.label }}
+                  </button>
+                </PopoverContent>
+              </Popover>
 
-              <!--
-                Beside the list it governs rather than on each row: it answers a doubt about the
-                request, and it applies to a magnet pasted by hand as much as to a ranked release.
-              -->
-              <label class="flex cursor-pointer items-center gap-2 text-xs text-foreground">
-                <input v-model="holdForReview" type="checkbox" class="size-3.5 shrink-0 rounded-xs border-border accent-primary" />
-                {{ t('bookRequests.releases.holdForReview') }}
-              </label>
+              <span v-if="sortGroup && (facetMenus.length || flagToggles.length)" class="mx-0.5 h-[18px] w-px bg-border" aria-hidden="true" />
+
+              <template v-for="group in facetMenus" :key="group.key">
+                <span
+                  class="inline-flex h-[30px] items-stretch rounded-sm border text-xs whitespace-nowrap text-foreground"
+                  :class="
+                    activeLabel(group)
+                      ? 'border-[color-mix(in_oklab,var(--primary)_55%,var(--border))] bg-[color-mix(in_oklab,var(--primary)_12%,var(--background))]'
+                      : 'border-input bg-background'
+                  "
+                >
+                  <Popover :open="openFacet === group.key" @update:open="(open: boolean) => setFacetOpen(group.key, open)">
+                    <PopoverTrigger as-child>
+                      <button
+                        type="button"
+                        class="inline-flex items-center gap-1.5 rounded-sm px-2.5 hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                        :class="activeLabel(group) ? 'pe-1' : ''"
+                      >
+                        <span :class="activeLabel(group) ? 'text-muted-foreground' : undefined">{{ group.label }}</span>
+                        <span v-if="activeLabel(group)">{{ activeLabel(group) }}</span>
+                        <ChevronDown v-if="!activeLabel(group)" :size="12" class="text-muted-foreground" aria-hidden="true" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent align="start" class="w-60 p-1" :aria-label="group.label">
+                      <button
+                        v-for="option in group.options"
+                        :key="option.id"
+                        type="button"
+                        class="flex h-8 w-full items-center gap-2 rounded-sm px-2 text-start text-[13px] text-foreground hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                        :aria-pressed="option.active"
+                        @click="chooseFacet(option)"
+                      >
+                        <Check :size="14" class="flex-none text-primary" :class="option.active ? 'visible' : 'invisible'" aria-hidden="true" />
+                        <span v-if="option.dotClass" class="size-2 flex-none rounded-full" :class="option.dotClass" aria-hidden="true" />
+                        <span class="min-w-0 flex-1 [overflow-wrap:anywhere]">{{ option.label }}</span>
+                        <span v-if="option.count !== null" class="text-xs text-muted-foreground tabular-nums">{{ option.count }}</span>
+                      </button>
+                    </PopoverContent>
+                  </Popover>
+                  <button
+                    v-if="activeLabel(group)"
+                    type="button"
+                    class="inline-flex items-center rounded-sm px-1.5 text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                    :aria-label="t('bookRequests.releases.clearFilter', { filter: group.label })"
+                    @click="clearFacet(group)"
+                  >
+                    <X :size="12" aria-hidden="true" />
+                  </button>
+                </span>
+              </template>
+
+              <button
+                v-for="option in flagToggles"
+                :key="option.id"
+                type="button"
+                class="inline-flex h-[30px] items-center gap-1.5 rounded-sm border px-2.5 text-xs whitespace-nowrap text-foreground hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                :class="
+                  option.active
+                    ? 'border-[color-mix(in_oklab,var(--primary)_55%,var(--border))] bg-[color-mix(in_oklab,var(--primary)_12%,var(--background))]'
+                    : 'border-input bg-background'
+                "
+                :aria-pressed="option.active"
+                @click="toggleFlag(option)"
+              >
+                {{ option.label }}
+                <span v-if="option.count !== null" class="text-muted-foreground tabular-nums">{{ option.count }}</span>
+              </button>
             </div>
+
+            <!-- Everything true of every release, said once, so the rows carry only what differs. -->
+            <p class="mt-3 mb-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+              <b class="font-semibold text-foreground tabular-nums">
+                {{
+                  hasFilter
+                    ? t('bookRequests.releases.summaryFiltered', { shown: visibleReleases.length, count: releases.length })
+                    : t('bookRequests.releases.summaryCount', { count: releases.length })
+                }}
+              </b>
+              <template v-for="fact in summaryFacts" :key="fact">
+                <span aria-hidden="true">·</span>
+                <span>{{ fact }}</span>
+              </template>
+              <template v-if="sharedIndexer">
+                <span aria-hidden="true">·</span>
+                <span class="inline-flex items-center gap-1.5">
+                  <span class="size-2 flex-none rounded-full" :class="sharedIndexerDot" aria-hidden="true" />
+                  {{ t('bookRequests.releases.allIndexer', { name: sharedIndexer }) }}
+                </span>
+              </template>
+              <button
+                v-if="hasFilter"
+                type="button"
+                class="ms-auto rounded-xs text-xs text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                @click="clearFilters"
+              >
+                {{ t('bookRequests.releases.clearFilters') }}
+              </button>
+            </p>
 
             <div
               v-if="nothingMatchedProfile"
               role="status"
-              class="mt-3 flex items-start gap-2 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-foreground"
+              class="mt-3 flex items-start gap-2 rounded-sm border border-[color-mix(in_oklab,var(--warning)_40%,var(--border))] bg-[color-mix(in_oklab,var(--warning)_8%,var(--card))] px-2.5 py-2 text-xs text-foreground"
             >
               <TriangleAlert :size="14" class="mt-px shrink-0 text-warning" aria-hidden="true" />
               <div class="min-w-0 flex-1">
-                <p>
-                  {{
-                    t('bookRequests.releases.profileMismatch.summary', {
-                      count: releases.length,
-                      medium: t(`bookRequests.mediaKind.${criteria?.mediaKind ?? 'ebook'}`),
-                    })
-                  }}
-                </p>
+                <p>{{ t('bookRequests.releases.profileMismatch.summary', { count: releases.length, medium: mediumLabel }) }}</p>
                 <RouterLink
                   v-if="canFixSources"
                   :to="profileSettingsLink"
-                  class="mt-1.5 inline-flex items-center gap-1 font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  class="mt-1 inline-flex items-center gap-[3px] font-medium text-foreground underline underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
-                  {{ t('bookRequests.releases.profileMismatch.review', { medium: t(`bookRequests.mediaKind.${criteria?.mediaKind ?? 'ebook'}`) }) }}
+                  {{ t('bookRequests.releases.profileMismatch.review', { medium: mediumLabel }) }}
                   <ArrowUpRight :size="12" aria-hidden="true" />
                 </RouterLink>
               </div>
             </div>
 
-            <!--
-              Sort is one choice among a few, so it reads as a segmented control; the facets are
-              independent toggles, so they read as chips. Rendered flat rather than as the old
-              left rail, because the cards below need no column budget defended.
-            -->
-            <div v-if="showFacets" class="mt-3.5 flex flex-wrap items-center gap-x-4 gap-y-2.5">
-              <div v-for="group in facetGroups" :key="group.key" role="group" :aria-label="group.label" class="flex flex-wrap items-center gap-1.5">
-                <span class="text-[11px] font-semibold tracking-wide text-muted-foreground uppercase">{{ group.label }}</span>
-
-                <div v-if="group.key === 'sort'" class="flex rounded-lg bg-muted p-0.5">
-                  <button
-                    v-for="option in group.options"
-                    :key="option.id"
-                    type="button"
-                    class="rounded-md px-2.5 py-1 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-                    :class="option.active ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'"
-                    :aria-pressed="option.active"
-                    @click="option.select"
-                  >
-                    {{ option.label }}
-                  </button>
-                </div>
-
-                <template v-else>
-                  <button
-                    v-for="option in group.options"
-                    :key="option.id"
-                    type="button"
-                    class="flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
-                    :class="[
-                      option.className ??
-                        (option.active
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border text-muted-foreground hover:border-ring hover:text-foreground'),
-                      option.className && option.active && 'ring-2 ring-current ring-offset-1 ring-offset-background',
-                      group.key === 'format' && 'uppercase',
-                    ]"
-                    :style="group.key === 'format' ? formatFacetStyle(option.label, option.active) : undefined"
-                    :aria-pressed="option.active"
-                    @click="option.select"
-                  >
-                    <span class="min-w-0 truncate">{{ option.label }}</span>
-                    <span v-if="option.count !== null" class="tabular-nums opacity-75">{{ option.count }}</span>
-                  </button>
-                </template>
-              </div>
-
-              <Button v-if="hasFilter" variant="ghost" size="sm" @click="clearFilters">
-                {{ t('bookRequests.releases.clearFilters') }}
-              </Button>
-            </div>
-
             <p
               v-if="visibleReleases.length === 0"
               role="status"
-              class="mt-4 rounded-lg border border-border bg-card p-4 text-sm text-muted-foreground"
+              class="mt-4 rounded-sm border border-border bg-card p-4 text-sm text-muted-foreground"
             >
               {{ t('bookRequests.releases.filteredEmpty') }}
             </p>
 
             <!--
-              One shape for every release, including the best one. The old layout drew the winner
-              as a bordered box and its nearest rival as a bare numeral in a table cell, which
-              made two releases tied at the same score impossible to compare at a glance.
+              One box per release, grouped by the profile tier that would take it. Every box has the
+              same lines in the same places, so a scan down the list reads one kind of fact at a
+              time: the title, then chips for where the release comes from and what sets it apart,
+              then its facts. A phone has no room for every chip on one line, so its box has four:
+              the title beside Send, the source, the facts, then the chips that set it apart.
             -->
-            <ul v-else class="mt-4 space-y-2" :aria-label="t('bookRequests.releases.tableCaption')">
-              <li
-                v-for="(release, index) in visibleReleases"
-                :key="releaseKey(release)"
-                class="rounded-xl border p-3 transition-colors motion-reduce:transition-none"
-                :class="isBest(index) ? 'border-primary/50 bg-primary/6 hover:bg-primary/10' : 'border-border bg-card hover:bg-accent/50'"
-              >
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-3">
-                  <!--
-                    A basis, not just `flex-1`: growing from zero never exceeds the row, so the
-                    send button stayed on the line and squeezed the title down to one word per
-                    line on a phone. Given a real basis the button wraps under it instead.
-                  -->
-                  <div class="flex min-w-0 flex-1 basis-72 items-center gap-3">
-                    <!--
-                      The label is sr-only text rather than `aria-label`: a plain span is not a
-                      role that takes a name, so most screen reader and browser pairs ignore one
-                      there and announce the bare number with nothing saying what it counts.
-                    -->
-                    <span
-                      class="flex size-11 shrink-0 items-center justify-center rounded-lg border text-[15px] font-semibold tabular-nums"
-                      :class="[scoreClass(release.score), scoreSurfaceClass(release.score)]"
-                    >
-                      <span aria-hidden="true">{{ release.score }}</span>
-                      <span class="sr-only">{{ t('bookRequests.releases.scoreLabel', { score: release.score }) }}</span>
+            <div v-else class="mt-2 grid gap-2">
+              <template v-for="group in releaseGroups" :key="group.key">
+                <div
+                  v-if="group.title !== null"
+                  data-release-group
+                  class="mt-1.5 flex min-h-9 items-start gap-2 pt-1 @min-[35rem]:items-center @min-[35rem]:pt-0"
+                >
+                  <CircleCheck v-if="!group.outside" :size="15" class="mt-0.5 flex-none text-success @min-[35rem]:mt-0" aria-hidden="true" />
+                  <TriangleAlert v-else :size="15" class="mt-0.5 flex-none text-warning @min-[35rem]:mt-0" aria-hidden="true" />
+                  <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 text-[13px]">
+                    <h3 class="font-semibold text-foreground">{{ group.title }}</h3>
+                    <span class="text-muted-foreground tabular-nums">{{ group.rows.length }}</span>
+                    <span class="order-3 basis-full text-muted-foreground @min-[35rem]:order-none @min-[35rem]:basis-auto">
+                      {{ group.outside ? t('bookRequests.releases.group.outsideHint') : t('bookRequests.releases.group.inTierHint') }}
                     </span>
-
-                    <div class="min-w-0 flex-1">
-                      <p v-if="isBest(index)" class="mb-0.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                        <span class="inline-flex items-center gap-1 text-[11px] font-semibold tracking-wide text-primary uppercase">
-                          <Zap :size="12" aria-hidden="true" />
-                          {{ t('bookRequests.releases.bestMatch') }}
-                        </span>
-                        <span v-if="tiedWithBest > 0" class="rounded-full border border-border px-2 py-px text-[11px] text-muted-foreground">
-                          {{ t('bookRequests.releases.tiedWithBest', { count: tiedWithBest }) }}
-                        </span>
-                      </p>
-
-                      <!--
-                        The title is the link because it is what the source page describes, and a
-                        separate button would be a third control competing with Send on every row.
-                        `noreferrer` keeps a private tracker from learning this instance's address.
-                      -->
-                      <p class="line-clamp-2 text-sm font-medium text-foreground">
-                        <a
-                          v-if="release.infoUrl"
-                          :href="release.infoUrl"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          :aria-label="t('bookRequests.releases.releasePageLabel', { title: release.title, indexer: release.indexerName })"
-                          class="rounded-xs underline-offset-2 hover:underline focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                        >
-                          {{ release.title }}
-                          <ArrowUpRight :size="13" class="inline-block align-[-2px] text-muted-foreground" aria-hidden="true" />
-                        </a>
-                        <template v-else>{{ release.title }}</template>
-                      </p>
-
-                      <!--
-                        Two runs, not one. The chips say where the release comes from and what
-                        grabbing it will do, which is categorical and the same on every row from
-                        one source; the text run below states this release's own numbers. Run
-                        together they were six spans of identical muted text with nothing but a
-                        gap to say where one fact ended and the next began.
-                      -->
-                      <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs">
-                        <span
-                          class="inline-flex items-center gap-1 rounded-full border px-1.5 py-px font-medium"
-                          :class="protocolChipClass(deliveryFor(release))"
-                        >
-                          <Magnet v-if="deliveryFor(release) === 'torrent'" :size="11" aria-hidden="true" />
-                          <Newspaper v-else-if="deliveryFor(release) === 'usenet'" :size="11" aria-hidden="true" />
-                          <Globe v-else :size="11" aria-hidden="true" />
-                          {{ protocolText(release) }}
-                        </span>
-                        <!--
-                          Neutral until an operator says otherwise. There is no closed set of
-                          indexers to build a palette from, so no hue could be derived that stood
-                          for "MyAnonaMouse" in a way a reader could decode; one assigned in
-                          settings is decodable precisely because somebody chose it. The name still
-                          carries the identity on its own, so an uncoloured source loses nothing.
-                        -->
-                        <span v-if="!sharedIndexer" class="rounded-full border px-1.5 py-px font-medium" :class="indexerChipClass(release)">
-                          {{ release.indexerName }}
-                        </span>
-                        <!--
-                          The operator's own words for why this release ranks where it does. It
-                          leads the flags because it is the axis the list is ordered on, and a row
-                          whose position the score alone cannot explain needs it said.
-                        -->
-                        <span
-                          v-if="release.tierName"
-                          class="rounded-full border border-primary/45 bg-primary/10 px-1.5 py-px font-medium text-primary"
-                        >
-                          {{ release.tierName }}
-                        </span>
-                        <span
-                          v-if="release.alreadyGrabbed"
-                          class="rounded-full border border-border bg-muted px-1.5 py-px font-medium text-muted-foreground"
-                        >
-                          {{ t('bookRequests.releases.alreadyGrabbed') }}
-                        </span>
-                        <span
-                          v-if="release.vipOnly"
-                          class="rounded-full border border-warning/40 bg-warning/10 px-1.5 py-px font-medium text-warning"
-                        >
-                          {{ t('bookRequests.releases.vipOnly') }}
-                        </span>
-                        <span
-                          v-if="refusalText(release)"
-                          class="rounded-full border border-destructive/40 bg-destructive/10 px-1.5 py-px font-medium text-destructive"
-                        >
-                          {{ refusalText(release) }}
-                        </span>
-                        <span
-                          v-if="release.freeleech && !allFreeleech"
-                          class="rounded-full border border-success/40 bg-success/10 px-1.5 py-px font-medium text-success"
-                        >
-                          {{ t('bookRequests.releases.freeleech') }}
-                        </span>
-                      </div>
-
-                      <div class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-                        <template v-for="(fact, factIndex) in metaFacts(release)" :key="fact.key">
-                          <span v-if="factIndex > 0" aria-hidden="true">·</span>
-                          <span :class="fact.numeric && 'tabular-nums'">
-                            <template v-for="(part, partIndex) in fact.parts" :key="part.text">
-                              <span v-if="partIndex > 0" aria-hidden="true"> + </span>
-                              <span :class="part.emphasis && 'font-medium text-foreground'">{{ part.text }}</span>
-                            </template>
-                          </span>
-                        </template>
-
-                        <!--
-                          The credits are mostly signals every release shares, so shown inline
-                          they were the loudest thing on screen and the least decisive. Penalties
-                          stay out; the rest is one click away for whoever wants to audit it.
-                        -->
-                        <button
-                          v-if="credits(release).length"
-                          type="button"
-                          class="ms-1 rounded-xs text-xs text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          :aria-expanded="isExpanded(release)"
-                          @click="toggleWhy(release)"
-                        >
-                          {{ t('bookRequests.releases.whyThisScore') }}
-                        </button>
-                      </div>
-
-                      <p v-if="audioParts(release).length" class="mt-0.5 text-xs text-muted-foreground">
-                        <span class="sr-only">{{ t('bookRequests.releases.audio') }}: </span>
-                        {{ audioParts(release).join(' · ') }}
-                      </p>
-
-                      <p v-if="profileMismatchText(release)" class="mt-1 flex items-start gap-1.5 text-xs text-warning">
-                        <TriangleAlert :size="12" class="mt-px shrink-0" aria-hidden="true" />
-                        <span>{{ profileMismatchText(release) }}</span>
-                      </p>
-
-                      <span
-                        v-for="penalty in penalties(release)"
-                        :key="penalty.code"
-                        class="mt-0.5 flex items-center gap-1.5 text-xs text-destructive"
-                      >
-                        <TriangleAlert :size="12" class="shrink-0" aria-hidden="true" />
-                        {{ reasonText(penalty) }} <span class="tabular-nums">{{ reasonPoints(penalty.points) }}</span>
-                      </span>
-
-                      <ul v-if="isExpanded(release)" class="mt-1.5 flex flex-wrap gap-1" :aria-label="t('bookRequests.releases.scoreBreakdown')">
-                        <li
-                          v-for="reason in credits(release)"
-                          :key="reason.code"
-                          class="rounded-xs border border-border bg-muted px-1.5 py-0.5 text-xs text-muted-foreground"
-                        >
-                          {{ reasonText(reason) }} <span class="tabular-nums text-foreground">{{ reasonPoints(reason.points) }}</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-
-                  <div class="ms-auto flex items-center gap-1.5">
-                    <Button variant="ghost" size="sm" :aria-expanded="filesAreExpanded(release)" @click="toggleFiles(release)">
-                      <EyeOff v-if="filesAreExpanded(release)" :size="14" aria-hidden="true" />
-                      <Eye v-else :size="14" aria-hidden="true" />
-                      {{ fileToggleText(release) }}
-                    </Button>
-                    <Button
-                      :variant="isBest(index) ? 'default' : 'outline'"
-                      size="sm"
-                      :disabled="busy || isInspecting(release) || inspectionBlocksSend(release) || isRefused(release)"
-                      @click="handleGrab(release)"
+                    <RouterLink
+                      v-if="group.outside && canFixSources"
+                      :to="profileSettingsLink"
+                      class="ms-auto inline-flex items-center gap-1 rounded-xs text-foreground hover:underline hover:underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                     >
-                      <Loader2 v-if="isInspecting(release)" class="size-3.5 animate-spin" aria-hidden="true" />
-                      <Download v-else-if="isBest(index)" :size="14" aria-hidden="true" />
-                      {{
-                        isInspecting(release)
-                          ? t('bookRequests.releases.inspectingShort')
-                          : isBest(index)
-                            ? t('bookRequests.releases.grab')
-                            : t('bookRequests.releases.send')
-                      }}
-                    </Button>
+                      {{ t('bookRequests.releases.profileMismatch.review', { medium: mediumLabel }) }}
+                      <ArrowUpRight :size="13" aria-hidden="true" />
+                    </RouterLink>
                   </div>
                 </div>
 
-                <ReleaseFileInspectionPanel
-                  v-if="filesAreExpanded(release)"
-                  :inspection="inspectionFor(release)"
-                  :delivery="deliveryFor(release)"
-                  :loading="isInspecting(release)"
-                  :failed="inspectionHasFailed(release)"
-                  :failure-reason="inspectionFailureReason(release)"
-                />
-              </li>
-            </ul>
-            <p class="mt-3 text-xs text-muted-foreground">{{ t('bookRequests.releases.singleFileNote') }}</p>
+                <ul class="grid gap-2" :aria-label="group.title ?? t('bookRequests.releases.tableCaption')">
+                  <li
+                    v-for="{ release, index } in group.rows"
+                    :key="releaseKey(release)"
+                    data-release
+                    class="grid grid-cols-[44px_minmax(0,1fr)_auto] content-center items-center gap-x-3 gap-y-1.5 rounded-lg border border-border bg-card px-3 @min-[35rem]:gap-x-3.5 @min-[35rem]:px-3.5"
+                    :class="isExpanded(release) || filesAreExpanded(release) ? 'py-3' : 'h-[122px] @min-[35rem]:h-[92px]'"
+                  >
+                    <div class="row-[1/span_4] self-center @min-[35rem]:row-[1/span_3]">
+                      <button
+                        v-if="hasDetails(release, index)"
+                        type="button"
+                        class="grid size-11 place-items-center rounded-[calc(var(--radius)+2px)] border text-[15px] font-semibold tabular-nums focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none aria-expanded:shadow-[0_0_0_2px_var(--background),0_0_0_3px_currentColor]"
+                        :class="scoreClass(release.score)"
+                        :aria-expanded="isExpanded(release)"
+                        :aria-label="`${t('bookRequests.releases.scoreLabel', { score: release.score })}. ${t('bookRequests.releases.whyThisScore')}`"
+                        @click="toggleWhy(release)"
+                      >
+                        {{ release.score }}
+                      </button>
+                      <span
+                        v-else
+                        class="grid size-11 place-items-center rounded-[calc(var(--radius)+2px)] border text-[15px] font-semibold tabular-nums"
+                        :class="scoreClass(release.score)"
+                      >
+                        <span aria-hidden="true">{{ release.score }}</span>
+                        <span class="sr-only">{{ t('bookRequests.releases.scoreLabel', { score: release.score }) }}</span>
+                      </span>
+                    </div>
+
+                    <!--
+                      The title is the link because it is what the source page describes.
+                      `noreferrer` keeps a private tracker from learning this instance's address.
+                    -->
+                    <p class="col-start-2 row-start-1 min-w-0 truncate text-sm leading-5 font-medium text-foreground" :title="release.title">
+                      <a
+                        v-if="release.infoUrl"
+                        :href="release.infoUrl"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        :aria-label="t('bookRequests.releases.releasePageLabel', { title: release.title, indexer: release.indexerName })"
+                        class="rounded-xs hover:underline hover:underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                      >
+                        {{ release.title }}
+                      </a>
+                      <template v-else>{{ release.title }}</template>
+                    </p>
+
+                    <div class="col-start-3 row-start-1 flex items-center gap-1.5 @min-[35rem]:row-[1/span_3]">
+                      <Button
+                        variant="ghost"
+                        size="icon-sm"
+                        class="size-7"
+                        :aria-label="fileToggleLabel(release)"
+                        :aria-expanded="filesAreExpanded(release)"
+                        @click="toggleFiles(release)"
+                      >
+                        <EyeOff v-if="filesAreExpanded(release)" :size="16" aria-hidden="true" />
+                        <Eye v-else :size="16" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        :variant="isBest(index) ? 'default' : 'outline'"
+                        size="sm"
+                        class="h-7 min-w-[52px] gap-1 px-2.5 text-[13px]"
+                        :disabled="busy || isInspecting(release) || inspectionBlocksSend(release) || isRefused(release)"
+                        @click="handleGrab(release)"
+                      >
+                        <template v-if="isInspecting(release)">
+                          <Loader2 class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+                          <span class="sr-only">{{ t('bookRequests.releases.inspectingShort') }}</span>
+                        </template>
+                        <template v-else>{{ t('bookRequests.releases.send') }}</template>
+                      </Button>
+                    </div>
+
+                    <!--
+                      One line of chips on a wide box, Best match first. On a phone the line comes
+                      apart: where the release comes from takes the second line and what sets it
+                      apart the fourth, each a fixed height whether or not it has anything to say.
+                    -->
+                    <div
+                      class="contents @min-[35rem]:col-start-2 @min-[35rem]:row-start-2 @min-[35rem]:flex @min-[35rem]:h-5 @min-[35rem]:min-w-0 @min-[35rem]:items-center @min-[35rem]:gap-1.5 @min-[35rem]:overflow-hidden"
+                    >
+                      <div class="col-[2/-1] row-start-2 flex h-5 min-w-0 items-center gap-1.5 overflow-hidden @min-[35rem]:contents">
+                        <span :class="[CHIP, protocolChipClass(deliveryFor(release))]">
+                          <Magnet v-if="deliveryFor(release) === 'torrent'" :size="12" class="flex-none" aria-hidden="true" />
+                          <Newspaper v-else-if="deliveryFor(release) === 'usenet'" :size="12" class="flex-none" aria-hidden="true" />
+                          <Globe v-else :size="12" class="flex-none" aria-hidden="true" />
+                          <span class="sr-only @min-[35rem]:not-sr-only">{{ protocolText(release) }}</span>
+                        </span>
+                        <span v-if="!sharedIndexer" :class="[CHIP, indexerChipClass(release)]">{{ release.indexerName }}</span>
+                      </div>
+                      <div class="col-[2/-1] row-start-4 flex h-5 min-w-0 items-center gap-1.5 overflow-hidden @min-[35rem]:contents">
+                        <span v-if="isBest(index)" :class="[CHIP, TONE_CHIPS.primary, '@min-[35rem]:order-first']">
+                          <Zap :size="12" class="flex-none" aria-hidden="true" />
+                          {{ t('bookRequests.releases.bestMatch') }}
+                        </span>
+                        <span v-if="release.alreadyGrabbed" :class="[CHIP, TONE_CHIPS.info]">{{ t('bookRequests.releases.alreadyGrabbed') }}</span>
+                        <span v-if="release.vipOnly" :class="[CHIP, TONE_CHIPS.warning]">{{ t('bookRequests.releases.vipOnly') }}</span>
+                        <span v-if="release.freeleech && !allFreeleech" :class="[CHIP, TONE_CHIPS.success]">{{
+                          t('bookRequests.releases.freeleech')
+                        }}</span>
+                        <span v-if="refusalText(release)" :class="[CHIP, TONE_CHIPS.destructive]">{{ refusalText(release) }}</span>
+                        <span v-if="skipShortText(release)" :class="[CHIP, TONE_CHIPS.warning, 'min-w-0']" :title="skipText(release) ?? undefined">
+                          <TriangleAlert :size="12" class="flex-none" aria-hidden="true" />
+                          <span class="truncate">{{ skipShortText(release) }}</span>
+                        </span>
+                      </div>
+                    </div>
+
+                    <p class="col-[2/-1] row-start-3 h-5 truncate text-[12.5px] leading-5 text-muted-foreground @min-[35rem]:col-[2/3]">
+                      <span v-if="release.formats.length" class="inline-flex gap-1 align-[1px]">
+                        <span
+                          v-for="format in formatKeys(release)"
+                          :key="format"
+                          data-format
+                          class="rounded-[4px] border px-1.5 text-[11.5px] leading-[17px] font-semibold tracking-[0.02em]"
+                          :style="formatChipStyle(format)"
+                        >
+                          {{ format }}
+                        </span>
+                      </span>
+                      <span
+                        v-for="(fact, factIndex) in rowFacts(release)"
+                        :key="fact.key"
+                        :class="[fact.wideOnly && 'hidden @min-[35rem]:inline', fact.numeric && 'tabular-nums']"
+                      >
+                        <span v-if="factIndex > 0 || release.formats.length" class="mx-1.5" aria-hidden="true">·</span>
+                        <span :class="fact.tone">{{ fact.text }}</span>
+                      </span>
+                    </p>
+
+                    <div
+                      v-if="isExpanded(release) || filesAreExpanded(release)"
+                      class="col-[1/-1] row-start-5 grid gap-3 pt-1.5 @min-[35rem]:col-[2/-1] @min-[35rem]:row-start-4"
+                    >
+                      <div v-if="isExpanded(release)" class="grid gap-1.5 text-[12.5px] text-muted-foreground">
+                        <p v-if="skipText(release)" class="max-w-[70ch]">{{ skipText(release) }}</p>
+                        <template v-if="release.reasons.length">
+                          <p class="text-[13px] font-medium text-foreground">{{ t('bookRequests.releases.scoreBreakdown') }}</p>
+                          <ul class="flex flex-wrap gap-1.5" :aria-label="t('bookRequests.releases.scoreBreakdown')">
+                            <li
+                              v-for="reason in credits(release)"
+                              :key="reason.code"
+                              class="inline-flex items-baseline gap-1.5 rounded-full border border-border px-2 py-px text-xs text-foreground"
+                            >
+                              {{ reasonText(reason) }}
+                              <b class="font-semibold text-success tabular-nums">{{ reasonPoints(reason.points) }}</b>
+                            </li>
+                            <li
+                              v-for="reason in penalties(release)"
+                              :key="reason.code"
+                              class="inline-flex items-baseline gap-1.5 rounded-full border border-border px-2 py-px text-xs text-foreground"
+                            >
+                              {{ reasonText(reason) }}
+                              <b class="font-semibold text-destructive tabular-nums">{{ reasonPoints(reason.points) }}</b>
+                            </li>
+                          </ul>
+                        </template>
+                        <p v-if="addedDate(release) || (isBest(index) && tiedWithBest > 0)" class="flex flex-wrap gap-x-1.5">
+                          <span v-if="addedDate(release)">{{ t('bookRequests.releases.addedOn', { date: addedDate(release) }) }}</span>
+                          <span v-if="addedDate(release) && isBest(index) && tiedWithBest > 0" aria-hidden="true">·</span>
+                          <span v-if="isBest(index) && tiedWithBest > 0">{{ t('bookRequests.releases.tiedWithBest', { count: tiedWithBest }) }}</span>
+                        </p>
+                      </div>
+                      <ReleaseFileInspectionPanel
+                        v-if="filesAreExpanded(release)"
+                        :inspection="inspectionFor(release)"
+                        :delivery="deliveryFor(release)"
+                        :loading="isInspecting(release)"
+                        :failed="inspectionHasFailed(release)"
+                        :failure-reason="inspectionFailureReason(release)"
+                      />
+                    </div>
+                  </li>
+                </ul>
+              </template>
+            </div>
+            <p class="mt-3.5 max-w-[70ch] text-xs text-muted-foreground">{{ t('bookRequests.releases.singleFileNote') }}</p>
           </template>
         </template>
 
@@ -1597,5 +1778,16 @@ function showEverySource(): void {
         />
       </template>
     </div>
+
+    <!--
+      Beside the list it governs rather than on each row: it answers a doubt about the request, and
+      applies to a magnet pasted by hand as much as to a ranked release.
+    -->
+    <footer v-if="request && !finished" class="flex shrink-0 items-center gap-2 border-t border-border bg-background px-4 py-2.5">
+      <label class="inline-flex cursor-pointer items-center gap-2 text-[13px] text-foreground">
+        <ToggleSwitch v-model="holdForReview" />
+        {{ t('bookRequests.releases.holdForReview') }}
+      </label>
+    </footer>
   </div>
 </template>

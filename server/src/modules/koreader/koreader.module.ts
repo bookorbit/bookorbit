@@ -26,6 +26,7 @@ import { KoreaderPackageService } from './koreader-package.service';
 import { KoreaderChapterExtractorService } from './koreader-chapter-extractor.service';
 import { KoreaderChapterService } from './koreader-chapter.service';
 import { KoreaderController } from './koreader.controller';
+import { KoreaderCopiedStatsRepairService } from './koreader-copied-stats-repair.service';
 import { KoreaderHashLinkService } from './koreader-hash-link.service';
 import { KoreaderPluginAnnotationService } from './koreader-plugin-annotation.service';
 import { KoreaderPluginController } from './koreader-plugin.controller';
@@ -76,6 +77,7 @@ import { KoreaderSyncEstimateCleanupService } from './koreader-sync-estimate-cle
     KoreaderBookmarkRepository,
     KoreaderStatsService,
     KoreaderSyncEstimateCleanupService,
+    KoreaderCopiedStatsRepairService,
   ],
   exports: [KoreaderService, KoreaderRepository],
 })

@@ -32,6 +32,7 @@ import { ForbidPermission } from '../../common/decorators/forbid-permission.deco
 import { ResolvesMergedBook } from '../../common/decorators/resolves-merged-book.decorator';
 import { imageContentTypeFromPath } from '../../common/image-content-type';
 import type { RequestUser } from '../../common/types/request-user';
+import { BulkRunsService } from '../bulk-runs/bulk-runs.service';
 import { FileWriteService } from '../file-write/file-write.service';
 import { BookService } from './book.service';
 import { openDeliveryStream } from './delivery-stream';
@@ -52,7 +53,7 @@ import { UpsertAudioProgressDto } from './dto/upsert-audio-progress.dto';
 import { UpdateBookMetadataAndLocksDto } from './dto/update-book-metadata-and-locks.dto';
 import { UpdateBookMetadataDto } from './dto/update-book-metadata.dto';
 import { UpdateBookAddedAtDto } from './dto/update-book-added-at.dto';
-import { CoverReadQueryDto } from './dto/cover-read-query.dto';
+import { CoverImageQueryDto, CoverReadQueryDto } from './dto/cover-read-query.dto';
 import { CoverMediumQueryDto } from '../cover/dto/cover-medium-query.dto';
 import { UpdatePersonalNoteDto } from './dto/update-personal-note.dto';
 import { SearchBooksDto } from './dto/search-books.dto';
@@ -106,6 +107,7 @@ export class BookController {
   constructor(
     private readonly bookService: BookService,
     private readonly fileWriteService: FileWriteService,
+    private readonly bulkRuns: BulkRunsService,
   ) {}
 
   @Post('embed-all')
@@ -161,63 +163,53 @@ export class BookController {
   @Post('bulk-refresh-metadata')
   @RequirePermission(Permission.LibraryEditMetadata)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
-  @Auditable({
-    action: AuditAction.BookBulkMetadataRefresh,
-    resource: AuditResource.Book,
-    description: (req) => {
-      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
-      return `Bulk refreshed metadata for ${count} book${count !== 1 ? 's' : ''}`;
-    },
-  })
   async bulkRefreshMetadata(@Body() dto: BulkRefreshMetadataDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user, 'editor');
-    const stream = this.createSseStream(reply);
-    try {
-      const result = await this.bookService.bulkRefreshMetadata(
-        ids,
-        user,
-        (event) => {
-          stream.send(event);
-        },
-        { isCancelled: stream.isClosed, ignoreCache: dto.ignoreCache === true },
-      );
-      if (!stream.isClosed()) {
-        stream.send({ done: true, ...result });
-      }
-    } finally {
-      stream.close();
-    }
+    await this.bulkRuns.startAndStream(reply, {
+      kind: 'book-refresh-metadata',
+      subjectIds: ids,
+      options: dto.ignoreCache === true ? { ignoreCache: true } : {},
+      actor: user,
+      audit: {
+        action: AuditAction.BookBulkMetadataRefresh,
+        resource: AuditResource.Book,
+        description: (count) => `Bulk refreshed metadata for ${count} book${count !== 1 ? 's' : ''}`,
+      },
+    });
   }
 
   @Post('bulk-re-extract-cover')
   @RequirePermission(Permission.LibraryEditMetadata)
   @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
-  @Auditable({
-    action: AuditAction.BookBulkCoverReextract,
-    resource: AuditResource.Book,
-    description: (req) => {
-      const count = (req.body as { bookIds?: number[] })?.bookIds?.length ?? 0;
-      return `Bulk re-extracted covers for ${count} book${count !== 1 ? 's' : ''}`;
-    },
-  })
   async bulkReExtractCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
     const ids = await this.bookService.resolveSelectionToIds(dto, user, 'editor');
-    const stream = this.createSseStream(reply);
-    try {
-      const result = await this.bookService.bulkReExtractCover(
-        ids,
-        user,
-        (bookId) => {
-          stream.send({ bookId });
-        },
-        { isCancelled: stream.isClosed },
-      );
-      if (!stream.isClosed()) {
-        stream.send({ done: true, ...result });
-      }
-    } finally {
-      stream.close();
-    }
+    await this.bulkRuns.startAndStream(reply, {
+      kind: 'book-re-extract-cover',
+      subjectIds: ids,
+      actor: user,
+      audit: {
+        action: AuditAction.BookBulkCoverReextract,
+        resource: AuditResource.Book,
+        description: (count) => `Bulk re-extracted covers for ${count} book${count !== 1 ? 's' : ''}`,
+      },
+    });
+  }
+
+  @Post('bulk-embed-audio-cover')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @ForbidPermission(Permission.DemoRestricted, 'Demo-restricted account cannot perform bulk edits')
+  async bulkEmbedAudioCover(@Body() dto: BulkBookIdsDto, @CurrentUser() user: RequestUser, @Res() reply: FastifyReply) {
+    const ids = await this.bookService.resolveSelectionToIds(dto, user, 'editor');
+    await this.bulkRuns.startAndStream(reply, {
+      kind: 'book-embed-audio-cover',
+      subjectIds: ids,
+      actor: user,
+      audit: {
+        action: AuditAction.BookBulkEmbedAudioCover,
+        resource: AuditResource.Book,
+        description: (count) => `Bulk embedded audiobook covers for ${count} book${count !== 1 ? 's' : ''}`,
+      },
+    });
   }
 
   @Post(':id/re-extract-cover')
@@ -353,10 +345,10 @@ export class BookController {
     @Param('id', ParseIntPipe) id: number,
     @CurrentUser() user: RequestUser,
     @Res() reply: FastifyReply,
-    @Query() query: CoverReadQueryDto = {},
+    @Query() query: CoverImageQueryDto = {},
     @Headers('if-none-match') ifNoneMatch?: string,
   ) {
-    const coverPath = await this.bookService.getCoverPath(id, user, { medium: query.medium, strict: query.strict });
+    const coverPath = await this.bookService.getCoverPath(id, user, { medium: query.medium, strict: query.strict, size: query.size });
     if (!coverPath) throw new NotFoundException(`No cover for book ${id}`);
 
     const { mtimeMs } = await stat(coverPath);
@@ -698,6 +690,18 @@ export class BookController {
     return this.bookService.writeAndRename(id, user);
   }
 
+  @Post(':id/embed-audio-cover')
+  @RequirePermission(Permission.LibraryEditMetadata)
+  @Auditable({
+    action: AuditAction.BookEmbedAudioCover,
+    resource: AuditResource.Book,
+    getResourceId: (req) => parseInt(req.params['id'], 10),
+    description: (req) => `Embedded audiobook cover in read-along EPUB of book #${req.params['id']}`,
+  })
+  embedAudioCover(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    return this.bookService.embedAudioCover(id, user);
+  }
+
   @Get(':id/write-log')
   @RequirePermission(Permission.LibraryEditMetadata)
   async getWriteLog(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
@@ -870,43 +874,6 @@ export class BookController {
         reply.send(createReadStream(file.path));
         return;
     }
-  }
-
-  private createSseStream(reply: FastifyReply): {
-    send: (event: object) => void;
-    isClosed: () => boolean;
-    close: () => void;
-  } {
-    let disconnected = false;
-    const markDisconnected = () => {
-      disconnected = true;
-    };
-
-    reply.raw.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      Connection: 'keep-alive',
-    });
-    reply.raw.on('close', markDisconnected);
-    reply.raw.on('aborted', markDisconnected);
-
-    const isClosed = () => disconnected || reply.raw.destroyed || reply.raw.writableEnded;
-    const send = (event: object) => {
-      if (isClosed()) {
-        throw new Error('SSE stream closed');
-      }
-      reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
-    };
-
-    const close = () => {
-      reply.raw.off('close', markDisconnected);
-      reply.raw.off('aborted', markDisconnected);
-      if (!isClosed()) {
-        reply.raw.end();
-      }
-    };
-
-    return { send, isClosed, close };
   }
 
   private parseBookIdsQuery(raw: string | undefined): number[] {

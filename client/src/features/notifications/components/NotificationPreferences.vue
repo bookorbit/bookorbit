@@ -24,6 +24,10 @@ const { showBookRequests } = useBookRequestVisibility()
 const { hasPermission, isDemoRestrictedAccount } = usePermissions()
 /** Only someone who can start a read-aloud ever receives one of its notifications. */
 const showReadAloud = computed(() => hasPermission(Permission.LibraryGenerateReadAloud) && !isDemoRestrictedAccount.value)
+/** Only someone who can build a story guide ever receives one of its notifications. */
+const showStoryGuides = computed(() => hasPermission(Permission.LibraryGenerateStoryGuide) && !isDemoRestrictedAccount.value)
+/** Every bulk action needs metadata editing, and demo accounts may start none. */
+const showBulkActions = computed(() => hasPermission(Permission.LibraryEditMetadata) && !isDemoRestrictedAccount.value)
 const { popupEnabled, setPopupEnabled, loadPrefs } = useWhatsNew()
 
 const saving = ref(false)
@@ -63,6 +67,8 @@ const hasChanges = computed(() => {
 function isCategoryVisible(category: NotificationCategory): boolean {
   if (category === 'bookRequests') return showBookRequests.value
   if (category === 'readAloud') return showReadAloud.value
+  if (category === 'storyGuides') return showStoryGuides.value
+  if (category === 'bulkActions') return showBulkActions.value
   return true
 }
 

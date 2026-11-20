@@ -14,6 +14,8 @@ function resolveReasonLabel(reason: HardcoverBookSyncEffectiveReason | null | un
     case 'excluded':
     case 'not_selected':
       return 'Excluded'
+    case 'library_excluded':
+      return 'Library excluded'
     case 'unread':
       return null
     case 'unsupported_status':

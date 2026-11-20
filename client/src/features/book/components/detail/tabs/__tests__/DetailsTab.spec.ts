@@ -147,6 +147,7 @@ function mountDetails(book: BookDetail) {
         BookCoverArtwork: false,
         BookCoverSurface: false,
         BookReadingActivityCard: false,
+        BookTaxonomyPill: false,
         RouterLink: RouterLinkStub,
         Popover: { template: '<div><slot /><slot name="content" /></div>' },
         PopoverTrigger: { template: '<div><slot /></div>' },
@@ -273,7 +274,7 @@ describe('DetailsTab cover surface', () => {
     Object.defineProperty(column.element, 'clientHeight', { configurable: true, value: 320 })
     vi.spyOn(actions.element, 'getBoundingClientRect').mockReturnValue({ height: 84 } as DOMRect)
 
-    resizeObserverCallbacks.at(-1)?.([], {} as ResizeObserver)
+    for (const callback of resizeObserverCallbacks) callback([], {} as ResizeObserver)
     await flushPromises()
 
     expect(frame.style.maxWidth).toBe('')
@@ -412,6 +413,37 @@ describe('DetailsTab cover surface', () => {
     expect(wrapper.get('[data-test="hidden-genres"]').text()).toContain('Mystery')
   })
 
+  it('links genres and tags to their pages and leaves a name without an id as text', async () => {
+    const wrapper = mountDetails(
+      makeBook({
+        genres: ['Fantasy', 'Unlisted'],
+        genreRefs: [{ id: 31, name: 'Fantasy' }],
+        tags: ['favorites'],
+        tagRefs: [{ id: 4, name: 'favorites' }],
+      }),
+    )
+    await flushPromises()
+
+    const links = wrapper.findAllComponents(RouterLinkStub).filter((link) => ['Fantasy', '#favorites', 'Unlisted'].includes(link.text()))
+    expect(links.map((link) => [link.text(), link.props('to')])).toEqual([
+      ['Fantasy', { name: 'genre-detail', params: { id: 31 } }],
+      ['#favorites', { name: 'tag-detail', params: { id: 4 } }],
+    ])
+    expect(wrapper.findAll('[data-test="visible-genre"]').map((pill) => [pill.element.tagName, pill.text()])).toEqual([
+      ['A', 'Fantasy'],
+      ['SPAN', 'Unlisted'],
+    ])
+    expect(wrapper.findAll('[data-genre-pill="true"]').every((pill) => pill.element.tagName === 'SPAN')).toBe(true)
+  })
+
+  it('keeps genres and tags as text for a server that sends no ids', async () => {
+    const wrapper = mountDetails(makeBook({ genres: ['Fantasy'], tags: ['favorites'] }))
+    await flushPromises()
+
+    expect(wrapper.findAllComponents(RouterLinkStub).filter((link) => ['Fantasy', '#favorites'].includes(link.text()))).toHaveLength(0)
+    expect(wrapper.text()).toContain('#favorites')
+  })
+
   it('fully expands the synopsis without creating a nested scroll area', async () => {
     const wrapper = mountDetails(
       makeBook({
@@ -443,13 +475,43 @@ describe('DetailsTab cover surface', () => {
     expect(toggle!.attributes('aria-expanded')).toBe('false')
   })
 
-  it('keeps the reading activity card tall enough for its content', async () => {
+  it('keeps each wide-layout column at its own height instead of stretching the cards to the tallest', async () => {
     const wrapper = mountDetails(makeBook())
     await flushPromises()
 
+    const layout = wrapper.get<HTMLElement>('[data-test="details-layout"]')
+    const columns = [...layout.element.children].slice(0, 3)
+    for (const column of columns) expect(column.classList).toContain('@min-[46rem]/book-detail:self-start')
+
     const activityCard = wrapper.getComponent(BookReadingActivityCard)
-    expect(activityCard.classes()).toContain('@min-[46rem]/book-detail:flex-1')
+    expect(activityCard.classes().some((className) => className.includes('flex-1'))).toBe(false)
     expect(activityCard.classes().some((className) => className.includes('min-h-0'))).toBe(false)
+  })
+
+  it('places Story Guide in the rail on a narrow pane and under the cover actions on a wide one, mounted once', async () => {
+    const wrapper = mountDetails(makeBook())
+    await flushPromises()
+
+    const layout = wrapper.get<HTMLElement>('[data-test="details-layout"]')
+    const column = wrapper.get<HTMLElement>('[data-test="cover-column"]')
+    const storyGuide = () => wrapper.findAllComponents({ name: 'StoryGuideCard' })
+    const editions = () => wrapper.findAllComponents({ name: 'BookEditionsCard' })
+
+    expect(storyGuide()).toHaveLength(1)
+    expect(column.element.contains(storyGuide()[0]!.element)).toBe(false)
+    expect(storyGuide()[0]!.element.previousElementSibling).toBe(editions()[0]!.element)
+
+    vi.spyOn(layout.element, 'getBoundingClientRect').mockReturnValue({ width: 1000 } as DOMRect)
+    for (const callback of resizeObserverCallbacks) callback([], {} as ResizeObserver)
+    await flushPromises()
+
+    expect(storyGuide()).toHaveLength(1)
+    const cardInColumn = storyGuide()[0]!.element as HTMLElement
+    expect(column.element.contains(cardInColumn)).toBe(true)
+    expect(cardInColumn.previousElementSibling).toBe(wrapper.get('[data-test="cover-actions"]').element)
+
+    expect(editions()).toHaveLength(1)
+    expect(column.element.contains(editions()[0]!.element)).toBe(false)
   })
 
   it('lists the three most recent reading sessions', () => {

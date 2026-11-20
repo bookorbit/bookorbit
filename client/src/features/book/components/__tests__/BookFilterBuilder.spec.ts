@@ -1,15 +1,16 @@
-import { mount } from '@vue/test-utils'
+import { mount, type VueWrapper } from '@vue/test-utils'
 import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { CustomMetadataFieldSummary, GroupRule } from '@bookorbit/types'
+import { CUSTOM_FIELD_TYPE_OPERATORS, type CustomMetadataFieldSummary, type GroupRule, type Rule } from '@bookorbit/types'
+import { providerShortLabel } from '@/lib/provider-colors'
 import BookFilterBuilder from '../BookFilterBuilder.vue'
 
 vi.mock('@/features/library/composables/useLibraries', () => ({
-  useLibraries: () => ({
-    libraries: ref([]),
-    loading: ref(false),
-    fetchLibraries: vi.fn<() => Promise<void>>(),
-  }),
+  useLibraries: () => ({ libraries: ref([]), loading: ref(false), fetchLibraries: vi.fn<() => Promise<void>>() }),
+}))
+
+vi.mock('@/features/book/composables/useMetadataProviderLabels', () => ({
+  useMetadataProviderLabels: () => ({ labels: ref({}) }),
 }))
 
 const customFields = ref<CustomMetadataFieldSummary[]>([])
@@ -23,21 +24,78 @@ function makeCustomField(overrides: Partial<CustomMetadataFieldSummary> = {}): C
   return { id: 7, label: 'Shelf Location', type: 'text', displayOrder: 0, archivedAt: null, enabledLibraryIds: [], ...overrides }
 }
 
-const titleFilter: GroupRule = {
-  type: 'group',
-  join: 'AND',
-  rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }],
+interface StubOption {
+  value: string
+  label: string
 }
 
-const incompleteFilter: GroupRule = {
-  type: 'group',
-  join: 'AND',
-  rules: [{ type: 'rule', field: 'title', operator: 'contains' }],
+const passthrough = { template: '<div><slot /></div>' }
+
+// reka's popovers and menus are replaced by plain markup that is always rendered, so a row's value
+// panel, its menus and every field picker can be reached in one click.
+const stubs = {
+  FieldPickerPopover: {
+    props: ['open', 'groups', 'selected', 'exclude', 'title'],
+    emits: ['pick', 'update:open'],
+    computed: {
+      options(this: { groups: { options: StubOption[] }[] }) {
+        return this.groups.flatMap((group) => group.options)
+      },
+    },
+    template: `<div class="picker" :data-title="title"><slot name="trigger" /><button v-for="option in options" :key="option.value" type="button" class="pick" :data-value="option.value" @click="$emit('pick', option.value)">{{ option.label }}</button></div>`,
+  },
+  FilterListValues: { props: ['field', 'modelValue'], template: '<div class="list-values" />' },
+  Popover: passthrough,
+  PopoverTrigger: passthrough,
+  PopoverContent: passthrough,
+  DropdownMenu: passthrough,
+  DropdownMenuTrigger: passthrough,
+  DropdownMenuContent: passthrough,
+  DropdownMenuSeparator: { template: '<hr />' },
+  DropdownMenuItem: { emits: ['select'], template: '<button type="button" class="menu-item" @click="$emit(\'select\')"><slot /></button>' },
+  DropdownMenuRadioGroup: {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: `<div class="radio-group" :data-current="modelValue" @click="$emit('update:modelValue', $event.target.closest('[data-value]').dataset.value)"><slot /></div>`,
+  },
+  DropdownMenuRadioItem: { props: ['value'], template: '<button type="button" class="radio-item" :data-value="value"><slot /></button>' },
 }
 
-function lastUpdate(wrapper: ReturnType<typeof mount<typeof BookFilterBuilder>>) {
-  const events = wrapper.emitted('update:modelValue')
+function group(...rules: (Rule | GroupRule)[]): GroupRule {
+  return { type: 'group', join: 'AND', rules }
+}
+
+const dune: Rule = { type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }
+const unread: Rule = { type: 'rule', field: 'readStatus', operator: 'includesAny', value: ['unread'] }
+
+function mountBuilder(props: Record<string, unknown> = {}) {
+  return mount(BookFilterBuilder, { props: { modelValue: undefined, ...props }, global: { stubs } })
+}
+
+function lastUpdate(wrapper: VueWrapper) {
+  const events = wrapper.emitted<[GroupRule | undefined]>('update:modelValue')
   return events?.[events.length - 1]?.[0]
+}
+
+function rows(wrapper: VueWrapper) {
+  return wrapper.findAll('[data-testid="filter-builder-rule"]')
+}
+
+async function addField(wrapper: VueWrapper, field: string) {
+  await wrapper.findAll('.picker[data-title="Add filter"]').at(-1)!.get(`.pick[data-value="${field}"]`).trigger('click')
+}
+
+async function menuAction(scope: Pick<VueWrapper, 'findAll'>, label: string) {
+  const item = scope.findAll('.menu-item').find((button) => button.text() === label)
+  if (!item) throw new Error(`No menu item "${label}"`)
+  await item.trigger('click')
+}
+
+function rowOperators(row: ReturnType<VueWrapper['find']>) {
+  return row
+    .findAll('.radio-group')[0]!
+    .findAll('.radio-item')
+    .map((item) => item.attributes('data-value'))
 }
 
 describe('BookFilterBuilder', () => {
@@ -45,269 +103,218 @@ describe('BookFilterBuilder', () => {
     customFields.value = []
   })
 
-  it('emits undefined for an incomplete root filter by default', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: incompleteFilter,
-      },
+  it('starts empty with a way to add the first filter', () => {
+    const wrapper = mountBuilder()
+
+    expect(wrapper.get('[data-testid="filter-builder-empty"]').text()).toContain('No filters yet')
+    expect(wrapper.find('.picker[data-title="Add filter"]').exists()).toBe(true)
+  })
+
+  it('keeps a new row out of the filter until it has a value, then sends it', async () => {
+    const wrapper = mountBuilder()
+
+    await addField(wrapper, 'title')
+    expect(rows(wrapper)).toHaveLength(1)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+
+    await rows(wrapper)[0]!.get('input[aria-label="Title value"]').setValue('Dune')
+
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }))
+  })
+
+  it('leaves a row without a value on screen but out of what it sends', async () => {
+    const wrapper = mountBuilder({ modelValue: group(dune) })
+
+    await addField(wrapper, 'author')
+
+    expect(rows(wrapper)).toHaveLength(2)
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(rows(wrapper)[1]!.get('[data-testid="filter-builder-value"]').text()).toBe('Choose values')
+  })
+
+  it('does not rebuild its rows from its own echo, so a half-made row survives', async () => {
+    const wrapper = mountBuilder({ modelValue: group(dune) })
+    await addField(wrapper, 'author')
+    await rows(wrapper)[0]!.get('input[aria-label="Title value"]').setValue('Dune Messiah')
+
+    await wrapper.setProps({ modelValue: lastUpdate(wrapper) })
+
+    expect(rows(wrapper)).toHaveLength(2)
+  })
+
+  it('clears to no filter by default and to an empty group when the editor asks to keep one', async () => {
+    const incomplete = group({ type: 'rule', field: 'title', operator: 'contains' })
+
+    const plain = mountBuilder({ modelValue: incomplete })
+    await plain
+      .findAll('button')
+      .find((button) => button.text() === 'Clear all')!
+      .trigger('click')
+    expect(lastUpdate(plain)).toBeUndefined()
+
+    const kept = mountBuilder({ modelValue: incomplete, preserveIncompleteRoot: true })
+    await kept
+      .findAll('button')
+      .find((button) => button.text() === 'Clear all')!
+      .trigger('click')
+    expect(lastUpdate(kept)).toEqual({ type: 'group', join: 'AND', rules: [] })
+  })
+
+  it('switches the root between matching all and any of its filters', async () => {
+    const wrapper = mountBuilder({ modelValue: group(dune, unread) })
+    expect(wrapper.text()).toContain('Match')
+
+    await wrapper.findAll('.radio-group')[0]!.get('.radio-item[data-value="OR"]').trigger('click')
+
+    expect(lastUpdate(wrapper)).toEqual({ type: 'group', join: 'OR', rules: [dune, unread] })
+  })
+
+  it('shows list values as chips and a scalar value as one chip', () => {
+    const wrapper = mountBuilder({
+      modelValue: group(
+        { ...unread, value: ['unread', 'reading', 'read', 'abandoned', 'skimmed'] },
+        { type: 'rule', field: 'rating', operator: 'gte', value: 4 },
+      ),
     })
 
-    await wrapper.get('select').setValue('collection')
+    const [list, rating] = rows(wrapper)
+    expect(list!.findAll('[data-testid="filter-builder-value"] > span').map((chip) => chip.text())).toEqual([
+      'Unread',
+      'Reading',
+      'Read',
+      'Abandoned',
+      '+1',
+    ])
+    expect(rating!.get('[data-testid="filter-builder-value"]').text()).toBe('4 stars')
+  })
 
+  it('duplicates, wraps in a group and removes a row from its menu', async () => {
+    const wrapper = mountBuilder({ modelValue: group(dune) })
+
+    await menuAction(rows(wrapper)[0]!, 'Duplicate')
+    expect(lastUpdate(wrapper)).toEqual(group(dune, dune))
+
+    await menuAction(rows(wrapper)[1]!, 'Wrap in a group')
+    expect(lastUpdate(wrapper)).toEqual(group(dune, { type: 'group', join: 'OR', rules: [dune] }))
+
+    await menuAction(rows(wrapper)[0]!, 'Remove')
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'group', join: 'OR', rules: [dune] }))
+  })
+
+  it('draws a group as "Any of these" and can ungroup or remove it', async () => {
+    const nested: GroupRule = { type: 'group', join: 'OR', rules: [dune, unread] }
+    const wrapper = mountBuilder({ modelValue: group(nested) })
+    const block = wrapper.get('[data-testid="filter-builder-group"]')
+    expect(block.text()).toContain('Any')
+    expect(block.text()).toContain('of these')
+
+    await menuAction(block, 'Ungroup')
+    expect(lastUpdate(wrapper)).toEqual(group(dune, unread))
+
+    await wrapper.setProps({ modelValue: group(nested) })
+    await menuAction(wrapper.get('[data-testid="filter-builder-group"]'), 'Remove group')
     expect(lastUpdate(wrapper)).toBeUndefined()
   })
 
-  it('preserves an incomplete root group when requested', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: incompleteFilter,
-        preserveIncompleteRoot: true,
-      },
-    })
+  it('adds a group that matches any of its rules', async () => {
+    const wrapper = mountBuilder({ modelValue: group(dune) })
 
-    await wrapper.get('select').setValue('collection')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add group')!
+      .trigger('click')
+    const block = wrapper.get('[data-testid="filter-builder-group"]')
+    await block.get('.picker[data-title="Add filter"] .pick[data-value="isbn"]').trigger('click')
+    await wrapper.get('input[aria-label="ISBN value"]').setValue('978')
 
-    expect(lastUpdate(wrapper)).toEqual({ type: 'group', join: 'AND', rules: [] })
+    expect(lastUpdate(wrapper)).toEqual(
+      group(dune, { type: 'group', join: 'OR', rules: [{ type: 'rule', field: 'isbn', operator: 'eq', value: '978' }] }),
+    )
   })
 
-  it('includes Date Started and Date Finished in field options', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('offers no new groups at the deepest level allowed', () => {
+    const wrapper = mountBuilder({ modelValue: group(dune), maxDepth: 0 })
 
-    const [fieldSelect] = wrapper.findAll('select')
-    const optionText = fieldSelect!.findAll('option').map((opt) => opt.text())
-    expect(optionText).toContain('Date Started')
-    expect(optionText).toContain('Date Finished')
+    expect(wrapper.findAll('button').some((button) => button.text() === 'Add group')).toBe(false)
+    expect(
+      rows(wrapper)[0]!
+        .findAll('.menu-item')
+        .map((item) => item.text()),
+    ).toEqual(['Duplicate', 'Remove'])
   })
 
-  it('serializes primary file size input from megabytes to bytes', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('changes a row to another field and starts that field afresh', async () => {
+    const wrapper = mountBuilder({ modelValue: group(dune, unread) })
 
-    await wrapper.findAll('select')[0]!.setValue('fileSize')
-    await wrapper.findAll('select')[1]!.setValue('gte')
-    await wrapper.get('input[aria-label="Primary file size in megabytes"]').setValue('10.5')
+    await rows(wrapper)[0]!.get('.picker[data-title="Change field"] .pick[data-value="rating"]').trigger('click')
 
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'fileSize', operator: 'gte', value: 11_010_048, valueTo: undefined }],
-    })
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'rating', operator: 'gte', value: 4 }, unread))
   })
 
-  it('hydrates saved primary file size bytes as megabytes', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'fileSize', operator: 'lte', value: 26_214_400 }] },
-      },
-    })
-
-    expect((wrapper.get('input[aria-label="Primary file size in megabytes"]').element as HTMLInputElement).value).toBe('25')
+  it('shows the live count of matching books', () => {
+    expect(mountBuilder({ modelValue: group(dune), matchCount: 1234 }).text()).toContain('1,234 books match')
+    expect(mountBuilder({ modelValue: group(dune) }).text()).not.toContain('match')
   })
 
-  it('offers date and empty/not-empty operators for Date Started', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('reads a file size in megabytes and sends it in bytes', async () => {
+    const wrapper = mountBuilder({ modelValue: group({ type: 'rule', field: 'fileSize', operator: 'lte', value: 26_214_400 }) })
+    const input = wrapper.get('input[aria-label="File Size value"]')
+    expect((input.element as HTMLInputElement).value).toBe('25')
 
-    const [fieldSelect] = wrapper.findAll('select')
-    await fieldSelect!.setValue('startedAt')
+    await input.setValue('10.5')
 
-    const operatorSelect = wrapper.findAll('select')[1]
-    const operatorOptions = operatorSelect!.findAll('option').map((opt) => opt.text())
-    expect(operatorOptions).toEqual(expect.arrayContaining(['before', 'after', 'between', 'within last', 'more than', 'is empty', 'is not empty']))
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'fileSize', operator: 'lte', value: 11_010_048 }))
   })
 
-  it('emits a more-than-ago date rule as an unconverted day count', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('offers date and empty/not-empty operators for Date Started', () => {
+    const wrapper = mountBuilder({ modelValue: group({ type: 'rule', field: 'startedAt', operator: 'withinLast', value: 30 }) })
 
-    await wrapper.findAll('select')[0]!.setValue('finishedAt')
-    await wrapper.findAll('select')[1]!.setValue('moreThanAgo')
-    await wrapper.get('input[type="number"]').setValue('30')
-
-    expect(wrapper.text()).toContain('days ago')
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'finishedAt', operator: 'moreThanAgo', value: 30, valueTo: undefined }],
-    })
+    expect(rowOperators(rows(wrapper)[0]!)).toEqual(expect.arrayContaining(['withinLast', 'moreThanAgo', 'between', 'isEmpty', 'isNotEmpty']))
   })
 
-  it('includes Lock Status in field options', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('sends a more-than-ago date as a plain day count', async () => {
+    const wrapper = mountBuilder({ modelValue: group({ type: 'rule', field: 'finishedAt', operator: 'moreThanAgo', value: 200 }) })
 
-    const [fieldSelect] = wrapper.findAll('select')
-    const optionText = fieldSelect!.findAll('option').map((opt) => opt.text())
-    expect(optionText).toContain('Lock Status')
+    await wrapper.get('[data-testid="filter-rule-editor"] input[type="number"]').setValue('90')
+
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'finishedAt', operator: 'moreThanAgo', value: 90 }))
   })
 
-  it('offers only is locked / is unlocked operators and no value input for Lock Status', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
+  it('treats lock status, series status and audiobook cover as states with no value to set', async () => {
+    const wrapper = mountBuilder({
+      modelValue: group(
+        { type: 'rule', field: 'lockStatus', operator: 'isLocked' },
+        { type: 'rule', field: 'seriesStatus', operator: 'isUpNext' },
+        { type: 'rule', field: 'audioCover', operator: 'isMissing' },
+      ),
     })
 
-    const [fieldSelect] = wrapper.findAll('select')
-    await fieldSelect!.setValue('lockStatus')
-
-    const operatorSelect = wrapper.findAll('select')[1]
-    const operatorOptions = operatorSelect!.findAll('option').map((opt) => opt.text())
-    expect(operatorOptions).toEqual(['is locked', 'is unlocked'])
-
-    expect(wrapper.find('input').exists()).toBe(false)
+    const [lock, series, cover] = rows(wrapper)
+    for (const row of [lock!, series!, cover!]) expect(row.find('[data-testid="filter-builder-value"]').exists()).toBe(false)
+    expect(new Set(rowOperators(lock!))).toEqual(new Set(['isLocked', 'isUnlocked']))
+    expect(series!.find('.radio-group').exists()).toBe(false)
+    expect(rowOperators(cover!)).toEqual(expect.arrayContaining(['isMissing', 'isPresent']))
   })
 
-  it('offers Audiobook Cover as a missing or present rule with no value input', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('sends community rating rules with their provider and reads a saved one back', async () => {
+    const wrapper = mountBuilder({ modelValue: group({ type: 'rule', field: 'communityRating', operator: 'lt', value: 3, provider: 'goodreads' }) })
+    const providers = wrapper.get('[role="radiogroup"][aria-label="Provider"]')
+    expect(providers.get('[aria-checked="true"]').text()).toBe(providerShortLabel('goodreads'))
+    expect(rows(wrapper)[0]!.get('[data-testid="filter-builder-value"]').text()).toContain(providerShortLabel('goodreads'))
 
-    const [fieldSelect] = wrapper.findAll('select')
-    expect(fieldSelect!.findAll('option').map((opt) => opt.text())).toEqual(expect.arrayContaining(['Cover', 'Audiobook Cover']))
-    await fieldSelect!.setValue('audioCover')
+    await providers
+      .findAll('[role="radio"]')
+      .find((radio) => radio.text() === providerShortLabel('hardcover'))!
+      .trigger('click')
 
-    const operatorSelect = wrapper.findAll('select')[1]
-    expect(operatorSelect!.findAll('option').map((opt) => opt.text())).toEqual(['is missing', 'is present'])
-    expect(wrapper.find('input').exists()).toBe(false)
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'communityRating', operator: 'lt', value: 3, provider: 'hardcover' }))
   })
 
-  it('includes Series Status in field options', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
+  it('reads a community rating without a provider as any provider', () => {
+    const wrapper = mountBuilder({ modelValue: group({ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 25 }) })
 
-    const [fieldSelect] = wrapper.findAll('select')
-    const optionText = fieldSelect!.findAll('option').map((opt) => opt.text())
-    expect(optionText).toContain('Series Status')
-  })
-
-  it('offers only is up next and no value input for Series Status', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
-
-    const [fieldSelect] = wrapper.findAll('select')
-    await fieldSelect!.setValue('seriesStatus')
-
-    const operatorSelect = wrapper.findAll('select')[1]
-    const operatorOptions = operatorSelect!.findAll('option').map((opt) => opt.text())
-    expect(operatorOptions).toEqual(['is up next'])
-
-    expect(wrapper.find('input').exists()).toBe(false)
-  })
-
-  it('emits community rating rules with provider context', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
-
-    const [fieldSelect] = wrapper.findAll('select')
-    await fieldSelect!.setValue('communityRating')
-
-    const operatorSelect = wrapper.findAll('select')[1]
-    await operatorSelect!.setValue('gte')
-
-    await wrapper.get('select[aria-label="Community rating provider"]').setValue('amazon')
-    await wrapper.get('input[type="number"]').setValue('4.5')
-
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'communityRating', operator: 'gte', value: 4.5, valueTo: undefined, provider: 'amazon' }],
-    })
-  })
-
-  it('hydrates the saved community rating provider', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: {
-          type: 'group',
-          join: 'AND',
-          rules: [{ type: 'rule', field: 'communityRating', operator: 'lt', value: 3, provider: 'goodreads' }],
-        },
-      },
-    })
-
-    expect((wrapper.get('select[aria-label="Community rating provider"]').element as HTMLSelectElement).value).toBe('goodreads')
-  })
-
-  it('hydrates missing community rating provider as any provider', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: {
-          type: 'group',
-          join: 'AND',
-          rules: [{ type: 'rule', field: 'communityRating', operator: 'gte', value: 4.5 }],
-        },
-      },
-    })
-
-    expect((wrapper.get('select[aria-label="Community rating provider"]').element as HTMLSelectElement).value).toBe('any')
-  })
-
-  it('serializes a provider-aware community review count rule', async () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }] },
-      },
-    })
-
-    const [fieldSelect] = wrapper.findAll('select')
-    await fieldSelect!.setValue('communityRatingCount')
-    await wrapper.findAll('select')[1]!.setValue('gte')
-    await wrapper.get('select[aria-label="Community rating provider"]').setValue('hardcover')
-
-    const input = wrapper.get('input[type="number"]')
-    expect(input.attributes('min')).toBe('0')
-    expect(input.attributes('max')).toBeUndefined()
-    expect(input.attributes('step')).toBe('1')
-    await input.setValue('1000')
-
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'gte', value: 1000, valueTo: undefined, provider: 'hardcover' }],
-    })
-  })
-
-  it('hydrates a saved community review count provider', () => {
-    const wrapper = mount(BookFilterBuilder, {
-      props: {
-        modelValue: {
-          type: 'group',
-          join: 'AND',
-          rules: [{ type: 'rule', field: 'communityRatingCount', operator: 'lt', value: 25, provider: 'goodreads' }],
-        },
-      },
-    })
-
-    expect((wrapper.get('select[aria-label="Community rating provider"]').element as HTMLSelectElement).value).toBe('goodreads')
-    expect((wrapper.get('input[type="number"]').element as HTMLInputElement).value).toBe('25')
+    expect(wrapper.get('[role="radiogroup"][aria-label="Provider"] [aria-checked="true"]').text()).toBe('Any provider')
+    expect((wrapper.get('[data-testid="filter-rule-editor"] input[type="number"]').element as HTMLInputElement).value).toBe('25')
   })
 })
 
@@ -316,185 +323,67 @@ describe('BookFilterBuilder custom metadata fields', () => {
     customFields.value = []
   })
 
-  function mountWithCustomFields(fields: CustomMetadataFieldSummary[], modelValue: GroupRule = titleFilter) {
+  function mountWith(fields: CustomMetadataFieldSummary[], modelValue: GroupRule = group(dune)) {
     customFields.value = fields
-    return mount(BookFilterBuilder, { props: { modelValue } })
+    return mountBuilder({ modelValue })
   }
 
-  function fieldOptions(wrapper: ReturnType<typeof mount>) {
-    return wrapper.findAll('select')[0]!
-  }
-
-  function operatorOptions(wrapper: ReturnType<typeof mount>) {
-    return wrapper
-      .findAll('select')[1]!
-      .findAll('option')
-      .map((option) => option.text())
-  }
-
-  it('offers no custom field group when none are active', () => {
-    const wrapper = mountWithCustomFields([])
-
-    expect(wrapper.find('optgroup').exists()).toBe(false)
-  })
-
-  it('lists active custom fields in their own group, ordered and labelled verbatim', () => {
-    const wrapper = mountWithCustomFields([
+  it('lists active custom fields last, ordered and labelled verbatim', () => {
+    const wrapper = mountWith([
       makeCustomField({ id: 7, label: 'Shelf Location', displayOrder: 1 }),
       makeCustomField({ id: 3, label: 'Condition', displayOrder: 0 }),
+      makeCustomField({ id: 9, label: 'Old', archivedAt: '2026-01-01T00:00:00.000Z' }),
     ])
 
-    const group = wrapper.get('optgroup')
-    expect(group.attributes('label')).toBe('Custom fields')
-    expect(group.findAll('option').map((option) => [option.attributes('value'), option.text()])).toEqual([
+    const picks = wrapper.findAll('.picker[data-title="Add filter"] .pick')
+    expect(picks.slice(-2).map((pick) => [pick.attributes('data-value'), pick.text()])).toEqual([
       ['custom:3', 'Condition'],
       ['custom:7', 'Shelf Location'],
     ])
   })
 
-  it('omits archived custom fields', () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ archivedAt: '2026-01-01T00:00:00.000Z' })])
+  it('keeps a rule pointing at a since-archived field', () => {
+    const wrapper = mountWith(
+      [makeCustomField({ id: 7, archivedAt: '2026-01-01T00:00:00.000Z' })],
+      group({ type: 'rule', field: 'custom:7', operator: 'contains', value: 'A' }),
+    )
 
-    expect(wrapper.find('optgroup').exists()).toBe(false)
+    expect(rows(wrapper)).toHaveLength(1)
+    expect(rows(wrapper)[0]!.get('[data-testid="filter-builder-value"]').text()).toBe('A')
   })
 
-  it('keeps a rule pointing at a since-archived field selectable', () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ id: 3, label: 'Condition' })], {
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'contains', value: 'A3' }],
-    })
+  it.each(['text', 'url', 'number', 'date'] as const)('offers only the operators a %s custom field supports', async (type) => {
+    const wrapper = mountWith([makeCustomField({ type })])
 
-    const values = wrapper
-      .get('optgroup')
-      .findAll('option')
-      .map((option) => option.attributes('value'))
-    expect(values).toEqual(['custom:3', 'custom:7'])
-    expect((fieldOptions(wrapper).element as HTMLSelectElement).value).toBe('custom:7')
+    await rows(wrapper)[0]!.get('.picker[data-title="Change field"] .pick[data-value="custom:7"]').trigger('click')
+
+    expect(new Set(rowOperators(rows(wrapper)[0]!))).toEqual(new Set(CUSTOM_FIELD_TYPE_OPERATORS[type]))
   })
 
-  it.each([
-    ['text', ['contains', 'does not contain', 'starts with', 'ends with', 'is', 'is not', 'is empty', 'is not empty']],
-    ['url', ['contains', 'does not contain', 'starts with', 'ends with', 'is', 'is not', 'is empty', 'is not empty']],
-    ['number', ['is', 'is not', 'greater than', 'at least', 'less than', 'at most', 'between', 'is empty', 'is not empty']],
-    ['date', ['before', 'after', 'between', 'within last', 'more than', 'is empty', 'is not empty']],
-    ['boolean', ['is yes', 'is no', 'is empty', 'is not empty']],
-  ] as const)('offers only the operators a %s custom field supports', async (type, expected) => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type })])
+  it('sends a number custom field rule with a numeric value', async () => {
+    const wrapper = mountWith([makeCustomField({ type: 'number' })], group({ type: 'rule', field: 'custom:7', operator: 'gte', value: 1 }))
 
-    await fieldOptions(wrapper).setValue('custom:7')
+    await wrapper.get('[data-testid="filter-rule-editor"] input[type="number"]').setValue('12')
 
-    expect(operatorOptions(wrapper)).toEqual(expected)
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'custom:7', operator: 'gte', value: 12 }))
   })
 
-  it('emits a text custom field rule with its string value', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'text' })])
+  it('sends a boolean custom field rule the moment it is added, with no value to set', async () => {
+    const wrapper = mountWith([makeCustomField({ type: 'boolean' })])
 
-    await fieldOptions(wrapper).setValue('custom:7')
-    await wrapper.get('input').setValue('A3')
+    await addField(wrapper, 'custom:7')
 
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'contains', value: 'A3', valueTo: undefined }],
-    })
-  })
-
-  it('emits a number custom field rule with numeric bounds', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'number' })])
-
-    await fieldOptions(wrapper).setValue('custom:7')
-    await wrapper.findAll('select')[1]!.setValue('between')
-    const inputs = wrapper.findAll('input[type="number"]')
-    await inputs[0]!.setValue('2')
-    await inputs[1]!.setValue('9')
-
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'between', value: 2, valueTo: 9 }],
-    })
-  })
-
-  it('emits a date custom field rule with a date value', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'date' })])
-
-    await fieldOptions(wrapper).setValue('custom:7')
-    const valueInput = wrapper.get('input')
-    expect(valueInput.attributes('type')).toBe('date')
-    await valueInput.setValue('2024-05-01')
-
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'before', value: '2024-05-01', valueTo: undefined }],
-    })
-  })
-
-  it('converts a within last unit to days for a date custom field', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'date' })])
-
-    await fieldOptions(wrapper).setValue('custom:7')
-    await wrapper.findAll('select')[1]!.setValue('withinLast')
-    await wrapper.get('input[type="number"]').setValue('2')
-    await wrapper.findAll('select')[2]!.setValue('weeks')
-
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'withinLast', value: 14, valueTo: undefined }],
-    })
-  })
-
-  it('emits a more-than-ago day count for a date custom field', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'date' })])
-
-    await fieldOptions(wrapper).setValue('custom:7')
-    await wrapper.findAll('select')[1]!.setValue('moreThanAgo')
-    await wrapper.get('input[type="number"]').setValue('45')
-
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'moreThanAgo', value: 45, valueTo: undefined }],
-    })
-  })
-
-  it('emits a boolean custom field rule with no value input at all', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'boolean' })])
-
-    await fieldOptions(wrapper).setValue('custom:7')
-
-    expect(wrapper.find('input').exists()).toBe(false)
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'isTrue', value: undefined, valueTo: undefined }],
-    })
-  })
-
-  it('resets an operator that does not carry over when switching to a custom field', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'number' })])
-
-    await fieldOptions(wrapper).setValue('custom:7')
-
-    expect((wrapper.findAll('select')[1]!.element as HTMLSelectElement).value).toBe('eq')
+    const sent = lastUpdate(wrapper)!
+    expect(sent.rules[1]).toEqual({ type: 'rule', field: 'custom:7', operator: 'isTrue' })
+    expect(rows(wrapper)[1]!.find('[data-testid="filter-builder-value"]').exists()).toBe(false)
   })
 
   it('never sends a provider on a custom field rule', async () => {
-    const wrapper = mountWithCustomFields([makeCustomField({ type: 'text' })], {
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'communityRating', operator: 'gte', value: 4, provider: 'amazon' }],
-    })
+    const wrapper = mountWith([makeCustomField({ type: 'text' })])
 
-    await fieldOptions(wrapper).setValue('custom:7')
-    await wrapper.get('input').setValue('A3')
+    await addField(wrapper, 'custom:7')
+    await rows(wrapper)[1]!.get('[data-testid="filter-rule-editor"] input').setValue('Shelf 3')
 
-    expect(lastUpdate(wrapper)).toEqual({
-      type: 'group',
-      join: 'AND',
-      rules: [{ type: 'rule', field: 'custom:7', operator: 'contains', value: 'A3', valueTo: undefined }],
-    })
+    expect(lastUpdate(wrapper)!.rules[1]).not.toHaveProperty('provider')
   })
 })

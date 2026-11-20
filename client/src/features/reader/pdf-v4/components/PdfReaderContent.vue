@@ -2,15 +2,9 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, ExternalLink, LoaderCircle } from '@lucide/vue'
-import type { DocumentState } from '@embedpdf/core'
-import { PdfErrorCode } from '@embedpdf/models'
-import { useAnnotationCapability } from '@embedpdf/plugin-annotation/vue'
-import { DocumentContent } from '@embedpdf/plugin-document-manager/vue'
-import { useRotate } from '@embedpdf/plugin-rotate/vue'
-import { ScrollStrategy, useScroll, useScrollCapability } from '@embedpdf/plugin-scroll/vue'
-import { useSelectionCapability } from '@embedpdf/plugin-selection/vue'
-import { SpreadMode, useSpread } from '@embedpdf/plugin-spread/vue'
-import { ZoomMode, useZoom, type ZoomLevel } from '@embedpdf/plugin-zoom/vue'
+import { DocumentGate, useDocument } from '@embedpdf/vue/runtime'
+import { SelectionMenu } from '@embedpdf/vue/selection'
+import { useStage, useStageEvent, useStageState, type StageCapability, type StageSettings, type StageSettingsChangedEvent } from '@embedpdf/vue/stage'
 import type { AnnotationItem, PdfReaderSettings } from '@bookorbit/types'
 import { useFullscreen } from '../../shared/composables/useFullscreen'
 import PdfDocumentViewport from './PdfDocumentViewport.vue'
@@ -18,18 +12,16 @@ import PdfPasswordPrompt from './PdfPasswordPrompt.vue'
 import PdfReaderSettingsPanel from './PdfReaderSettingsPanel.vue'
 import PdfReaderSidebar from './PdfReaderSidebar.vue'
 import PdfReaderToolbar from './PdfReaderToolbar.vue'
-import { fromRotation, safeExternalPdfUrl } from '../pdf-viewer-utils'
+import { toPageRange } from '../pdf-pagination'
+import { fromStageZoom, fromStageZoomMode, pdfStageRules, toStageFlow, toStageSpread } from '../pdf-viewer-utils'
 import { usePdfFullscreenChrome } from '../composables/usePdfFullscreenChrome'
 import { usePdfHighlights } from '../composables/usePdfHighlights'
 import { usePdfInteractionMode } from '../composables/usePdfInteractionMode'
-import { usePdfPagination } from '../composables/usePdfPagination'
-import { usePdfResponsiveSpread } from '../composables/usePdfResponsiveSpread'
 import { usePdfSidebarLayout, type PdfSidebarTab } from '../composables/usePdfSidebarLayout'
 import NoteDialog from '../../shared/components/NoteDialog.vue'
 import PdfSelectionPopup from './PdfSelectionPopup.vue'
 
 const props = defineProps<{
-  documentId: string
   bookId: number
   fileId: number
   initialPage: number | null
@@ -48,34 +40,26 @@ const emit = defineEmits<{
   startReading: []
 }>()
 
-const { state: scrollState, provides: scroll } = useScroll(() => props.documentId)
-const { provides: scrollCapability } = useScrollCapability()
-const { state: zoomState, provides: zoom } = useZoom(() => props.documentId)
-const { provides: spread } = useSpread(() => props.documentId)
-const { rotation, provides: rotate } = useRotate(() => props.documentId)
-const { isPanning, togglePan, activateTextSelection } = usePdfInteractionMode(() => props.documentId)
-const { provides: selectionCapability } = useSelectionCapability()
-const { provides: annotationCapability } = useAnnotationCapability()
+const stage = useStage()
+const { zoomLevel, zoomMode, currentPageIndex, pageCount, viewRotation } = useStageState()
+const documentStatus = useDocument((document) => document.status)
+const documentPageCount = useDocument((document) => document.pageCount)
+const { isPanning, togglePan, activateTextSelection } = usePdfInteractionMode()
 const { isFullscreen, isFullscreenSupported, toggleFullscreen } = useFullscreen()
 
 const sidebar = usePdfSidebarLayout()
 const settingsOpen = ref(false)
 const pendingExternalUrl = ref<URL | null>(null)
-const restoredInitialPage = ref(false)
-let restoringPage: number | null = null
-const viewerSurface = ref<HTMLElement | null>(null)
-const selectionPopup = ref<{ getElement: () => HTMLElement | null } | null>(null)
 const currentScrollMode = ref<PdfReaderSettings['scrollMode']>(props.settings.scrollMode)
 const currentSpreadPreference = ref<PdfReaderSettings['spread']>(props.settings.spread)
+const currentPageIndexes = ref<number[]>([])
+let initialPageRestored = false
+let restoringPage: number | null = null
 let previewingZoom = false
-const zoomPercent = computed(() => Math.round(zoomState.value.currentZoomLevel * 100))
-const currentZoomMode = computed<PdfReaderSettings['zoomMode']>(() => {
-  if (zoomState.value.zoomLevel === ZoomMode.FitPage) return 'fit-page'
-  if (zoomState.value.zoomLevel === ZoomMode.FitWidth) return 'fit-width'
-  if (zoomState.value.zoomLevel === ZoomMode.Automatic) return 'automatic'
-  return 'custom'
-})
-const currentRotation = computed(() => fromRotation(rotation.value))
+
+const pageRange = computed(() => toPageRange(currentPageIndexes.value, currentPageIndex.value + 1, pageCount.value))
+const zoomPercent = computed(() => Math.round(zoomLevel.value * 100))
+const currentZoomMode = computed(() => fromStageZoomMode(zoomMode.value))
 const externalHost = computed(() => pendingExternalUrl.value?.hostname ?? '')
 const hasOpenUi = computed(() => sidebar.open.value || settingsOpen.value || pendingExternalUrl.value !== null)
 const {
@@ -84,42 +68,54 @@ const {
   reveal: revealHeader,
   togglePinned: toggleHeaderPinned,
 } = usePdfFullscreenChrome(isFullscreen, hasOpenUi)
-const {
-  pageRange,
-  getPageRange,
-  goToPage: handleGoToPage,
-  previousPage: handlePreviousPage,
-  nextPage: handleNextPage,
-  handleWheel: handleViewportWheel,
-  handleTouchStart,
-  handleTouchEnd,
-  handleTouchCancel,
-} = usePdfPagination({
-  mode: currentScrollMode,
-  scrollState,
-  scroll,
-  touchPageTurningEnabled: isPanning,
-  onActivity: revealHeader,
-})
-const { apply: applyResponsiveSpread } = usePdfResponsiveSpread(viewerSurface, currentSpreadPreference, spread)
-const highlights = usePdfHighlights({
-  bookId: props.bookId,
-  fileId: props.fileId,
-  documentId: () => props.documentId,
-  getSurface: () => viewerSurface.value,
-  getPopup: () => selectionPopup.value?.getElement() ?? null,
-})
+const highlights = usePdfHighlights({ bookId: props.bookId, fileId: props.fileId })
+
+// Every Stage call throws while no document is open: a button pressed during opening does nothing.
+function withStage(action: (capability: StageCapability) => void) {
+  try {
+    action(stage)
+  } catch {
+    return
+  }
+}
+
+function refreshPageRange() {
+  try {
+    currentPageIndexes.value = stage.listCurrentPages().map((page) => page.index)
+  } catch {
+    currentPageIndexes.value = []
+  }
+}
 
 function handleBack() {
   emit('back')
 }
 
+function handlePreviousPage() {
+  revealHeader()
+  withStage((capability) => capability.previousPage())
+}
+
+function handleNextPage() {
+  revealHeader()
+  withStage((capability) => capability.nextPage())
+}
+
+function handleGoToPage(page: number) {
+  const clamped = Math.min(Math.max(page, 1), pageCount.value || 1)
+  withStage((capability) => capability.goToPage(clamped - 1))
+}
+
+function handleSelectPage(pageIndex: number) {
+  handleGoToPage(pageIndex + 1)
+}
+
 function handleZoomOut() {
-  zoom.value?.zoomOut()
+  withStage((capability) => capability.zoomOut())
 }
 
 function handleZoomIn() {
-  zoom.value?.zoomIn()
+  withStage((capability) => capability.zoomIn())
 }
 
 function handleToggleSidebar() {
@@ -195,47 +191,58 @@ function handleLoadMoreHighlights() {
   void highlights.loadMore()
 }
 
-function handleSelectionPopupResize() {
-  highlights.repositionPopup()
-}
-
 function handleScrollMode(mode: PdfReaderSettings['scrollMode']) {
   currentScrollMode.value = mode
-  scroll.value?.setScrollStrategy(mode === 'horizontal' ? ScrollStrategy.Horizontal : ScrollStrategy.Vertical)
+  withStage((capability) => capability.updateSettings(toStageFlow(mode)))
   emit('settingsChange', { scrollMode: mode })
-  handleGoToPage(pageRange.value.start)
 }
 
 function handleSpread(mode: PdfReaderSettings['spread']) {
   currentSpreadPreference.value = mode
+  withStage((capability) => {
+    capability.setResponsiveRules(pdfStageRules(mode))
+    capability.updateSettings({ spread: toStageSpread(mode) })
+  })
   emit('settingsChange', { spread: mode })
-  if (mode === 'auto') applyResponsiveSpread()
-  else spread.value?.setSpreadMode(mode === 'odd' ? SpreadMode.Odd : mode === 'even' ? SpreadMode.Even : SpreadMode.None)
 }
 
 function handleZoom(mode: PdfReaderSettings['zoomMode'], scale?: number) {
-  let value: ZoomLevel = ZoomMode.FitPage
-  if (mode === 'fit-width') value = ZoomMode.FitWidth
-  if (mode === 'automatic') value = ZoomMode.Automatic
-  if (mode === 'custom') value = scale ?? zoomState.value.currentZoomLevel
-  zoom.value?.requestZoom(value)
+  withStage((capability) => {
+    if (mode === 'fit-width') capability.fitWidth()
+    else if (mode === 'automatic') capability.fitAutomatic()
+    else if (mode === 'custom') capability.zoomTo(scale ?? zoomLevel.value)
+    else capability.fitPage()
+    // A slider commit lands on the level its preview already set, which changes no setting.
+    saveZoom(capability.getSettings().zoom)
+  })
 }
 
 function handleZoomPreview(scale: number) {
   previewingZoom = true
   try {
-    zoom.value?.requestZoom(scale)
+    withStage((capability) => capability.zoomTo(scale))
   } finally {
     previewingZoom = false
   }
 }
 
+function rotateView(delta: 90 | -90) {
+  withStage((capability) => {
+    capability.rotateViewBy(delta)
+    emit('settingsChange', { rotation: capability.getViewRotation() })
+  })
+}
+
 function handleRotateBackward() {
-  rotate.value?.rotateBackward()
+  rotateView(-90)
 }
 
 function handleRotateForward() {
-  rotate.value?.rotateForward()
+  rotateView(90)
+}
+
+function handleExternalLink(url: URL) {
+  pendingExternalUrl.value = url
 }
 
 function handleCancelExternalLink() {
@@ -263,8 +270,39 @@ function resolveInitialPage(totalPages: number) {
   return Math.min(Math.max(page, 1), total)
 }
 
-function hasDocumentPages(documentState: DocumentState) {
-  return (documentState.document?.pageCount ?? 0) > 0
+// The Stage opens wherever the last navigation before it showed asked for, without scrolling
+// there, so the saved page is requested as soon as the document is ready.
+function restoreInitialPage() {
+  if (initialPageRestored) return
+  initialPageRestored = true
+  const page = resolveInitialPage(documentPageCount.value)
+  restoringPage = page
+  if (page > 1) withStage((capability) => capability.goToPage(page - 1, { behavior: 'instant' }))
+  refreshPageRange()
+}
+
+function handlePageChanged() {
+  refreshPageRange()
+  if (!initialPageRestored) return
+  const range = pageRange.value
+  const restored = restoringPage !== null && range.start <= restoringPage && restoringPage <= range.end
+  restoringPage = null
+  emit('pageChange', range.end, pageCount.value, restored)
+}
+
+function saveZoom(zoom: StageSettings['zoom']) {
+  const patch = fromStageZoom(zoom)
+  if (!patch) return
+  const { zoomMode, customScale } = props.settings
+  if (patch.zoomMode === zoomMode && (zoomMode !== 'custom' || patch.customScale === customScale)) return
+  emit('settingsChange', patch)
+}
+
+// The zoom setting, not onZoomChanged: a step zoom moves the camera before it turns a fit mode
+// into a level, so the zoom event still names the fit mode.
+function handleStageSettingsChanged(event: StageSettingsChangedEvent) {
+  refreshPageRange()
+  if (!previewingZoom && event.changedKeys.includes('zoom')) saveZoom(event.settings.zoom)
 }
 
 function handleReaderActivity() {
@@ -279,10 +317,6 @@ function handleKeydown(event: KeyboardEvent) {
   if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') {
     event.preventDefault()
     sidebar.selectTab('search')
-    return
-  }
-  if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'c' && !editing) {
-    selectionCapability.value?.forDocument(props.documentId).copyToClipboard()
     return
   }
   if (editing) return
@@ -303,7 +337,7 @@ function handleKeydown(event: KeyboardEvent) {
     handleGoToPage(1)
   } else if (event.key === 'End') {
     event.preventDefault()
-    handleGoToPage(scrollState.value.totalPages)
+    handleGoToPage(pageCount.value)
   } else if (event.key === '+' || event.key === '=') {
     event.preventDefault()
     handleZoomIn()
@@ -316,6 +350,18 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+useStageEvent((capability) => capability.onPageChanged, handlePageChanged)
+useStageEvent((capability) => capability.onZoomChanged, refreshPageRange)
+useStageEvent((capability) => capability.onSettingsChanged, handleStageSettingsChanged)
+
+watch(
+  documentStatus,
+  (status) => {
+    if (status === 'ready') restoreInitialPage()
+  },
+  { immediate: true },
+)
+
 watch(
   () => props.settings.scrollMode,
   (mode) => {
@@ -327,93 +373,7 @@ watch(
   () => props.settings.spread,
   (mode) => {
     currentSpreadPreference.value = mode
-    if (mode === 'auto') applyResponsiveSpread()
   },
-)
-
-watch(
-  scrollCapability,
-  (capability, _previous, onCleanup) => {
-    if (!capability) return
-    const unsubscribeLayout = capability.onLayoutReady((event) => {
-      if (event.documentId !== props.documentId || !event.isInitial) return
-      highlights.renderAll()
-      if (restoredInitialPage.value) return
-      const page = resolveInitialPage(event.totalPages)
-      restoredInitialPage.value = true
-      if (page > 1) {
-        restoringPage = page
-        // Instant, because a fit zoom refits on the first viewport resize (a classic scrollbar
-        // appearing) from the current offset, which cancels a smooth scroll that has not started
-        // and strands the reader on page 1, so the next scroll saves page 1 over the position.
-        scroll.value?.scrollToPage({ pageNumber: page, behavior: 'instant' })
-      }
-    })
-    const unsubscribePage = capability.onPageChange((event) => {
-      if (event.documentId !== props.documentId || !restoredInitialPage.value) return
-      const restored = event.pageNumber === restoringPage
-      restoringPage = null
-      const range = getPageRange(event.pageNumber, event.totalPages)
-      emit('pageChange', range.end, event.totalPages, restored)
-    })
-    onCleanup(() => {
-      unsubscribeLayout()
-      unsubscribePage()
-    })
-  },
-  { immediate: true },
-)
-
-watch(
-  zoom,
-  (scope, _previous, onCleanup) => {
-    if (!scope) return
-    const unsubscribe = scope.onZoomChange((event) => {
-      if (previewingZoom) return
-      if (event.level === ZoomMode.FitPage) emit('settingsChange', { zoomMode: 'fit-page' })
-      else if (event.level === ZoomMode.FitWidth) emit('settingsChange', { zoomMode: 'fit-width' })
-      else if (event.level === ZoomMode.Automatic) emit('settingsChange', { zoomMode: 'automatic' })
-      else emit('settingsChange', { zoomMode: 'custom', customScale: event.newZoom })
-    })
-    onCleanup(unsubscribe)
-  },
-  { immediate: true },
-)
-
-watch(
-  spread,
-  (scope, _previous, onCleanup) => {
-    if (!scope) return
-    const unsubscribe = scope.onSpreadChange((mode) => {
-      if (currentSpreadPreference.value === 'auto') return
-      emit('settingsChange', { spread: mode === SpreadMode.Odd ? 'odd' : mode === SpreadMode.Even ? 'even' : 'none' })
-    })
-    onCleanup(unsubscribe)
-  },
-  { immediate: true },
-)
-
-watch(
-  rotate,
-  (scope, _previous, onCleanup) => {
-    if (!scope) return
-    const unsubscribe = scope.onRotateChange((value) => emit('settingsChange', { rotation: fromRotation(value) }))
-    onCleanup(unsubscribe)
-  },
-  { immediate: true },
-)
-
-watch(
-  annotationCapability,
-  (capability, _previous, onCleanup) => {
-    if (!capability) return
-    const unsubscribe = capability.forDocument(props.documentId).onNavigate((event) => {
-      if (event.result.outcome !== 'uri') return
-      pendingExternalUrl.value = safeExternalPdfUrl(event.result.uri)
-    })
-    onCleanup(unsubscribe)
-  },
-  { immediate: true },
 )
 
 onMounted(() => {
@@ -430,7 +390,7 @@ onUnmounted(() => {
       v-show="headerVisible"
       :current-page-start="pageRange.start"
       :current-page-end="pageRange.end"
-      :total-pages="scrollState.totalPages"
+      :total-pages="pageCount"
       :zoom-percent="zoomPercent"
       :sidebar-open="sidebar.open.value"
       :show-sidebar-toggle="sidebar.layout.value === 'sheet'"
@@ -458,9 +418,9 @@ onUnmounted(() => {
         <PdfReaderSettingsPanel
           :scroll-mode="currentScrollMode"
           :spread="currentSpreadPreference"
-          :rotation="currentRotation"
+          :rotation="viewRotation"
           :zoom-mode="currentZoomMode"
-          :custom-scale="zoomState.currentZoomLevel"
+          :custom-scale="zoomLevel"
           @preview-zoom="handleZoomPreview"
           @set-scroll-mode="handleScrollMode"
           @set-spread="handleSpread"
@@ -473,11 +433,12 @@ onUnmounted(() => {
 
     <div class="relative flex min-h-0 flex-1 overflow-hidden">
       <PdfReaderSidebar
-        :document-id="props.documentId"
         :active-tab="sidebar.activeTab.value"
         :open="sidebar.open.value"
         :layout="sidebar.layout.value"
         :width="sidebar.width.value"
+        :current-page="currentPageIndex + 1"
+        :total-pages="pageCount"
         :annotations="highlights.annotations.value"
         :load-error="highlights.loadError.value"
         :loading="highlights.loading.value"
@@ -486,38 +447,32 @@ onUnmounted(() => {
         @close="handleSidebarClose"
         @update:active-tab="handleSidebarTab"
         @update:width="handleSidebarWidth"
+        @select-page="handleSelectPage"
         @navigate-highlight="handleNavigateHighlight"
         @delete-highlight="handleDeleteHighlight"
         @retry-highlights="handleRetryHighlights"
         @load-more-highlights="handleLoadMoreHighlights"
       />
 
-      <div
-        ref="viewerSurface"
-        class="relative min-w-0 flex-1 overflow-hidden"
-        @wheel="handleViewportWheel"
-        @touchstart="handleTouchStart"
-        @touchend="handleTouchEnd"
-        @touchcancel="handleTouchCancel"
-      >
-        <DocumentContent :document-id="props.documentId">
-          <template #default="{ documentState, isLoading, isError, isLoaded }">
-            <div v-if="isLoading" class="absolute inset-0 flex items-center justify-center bg-background">
+      <div class="relative min-w-0 flex-1 overflow-hidden" @wheel.passive="handleReaderActivity">
+        <DocumentGate>
+          <template #fallback>
+            <div class="absolute inset-0 flex items-center justify-center bg-background">
               <div class="flex flex-col items-center gap-3 text-muted-foreground" role="status" aria-live="polite">
                 <LoaderCircle :size="28" class="animate-spin text-primary" />
                 <span class="text-sm">{{ t('reader.pdf.loading') }}</span>
               </div>
             </div>
-            <PdfPasswordPrompt
-              v-else-if="isError && documentState.errorCode === PdfErrorCode.Password"
-              :document-state="documentState"
-              @back="handleBack"
-            />
-            <div v-else-if="isError" class="absolute inset-0 flex items-center justify-center p-6">
+          </template>
+          <template #locked="{ document }">
+            <PdfPasswordPrompt :document="document" @back="handleBack" />
+          </template>
+          <template #error="{ document }">
+            <div class="absolute inset-0 flex items-center justify-center p-6">
               <div class="max-w-sm text-center">
                 <AlertTriangle :size="30" class="mx-auto mb-3 text-destructive" />
                 <p class="mb-2 text-sm font-medium text-foreground">{{ t('reader.pdf.openError') }}</p>
-                <p class="text-xs text-muted-foreground">{{ documentState.error || t('reader.pdf.loadFallback') }}</p>
+                <p class="text-xs text-muted-foreground">{{ document.error.message || t('reader.pdf.loadFallback') }}</p>
                 <div class="mt-4 flex justify-center gap-2">
                   <button
                     class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
@@ -531,41 +486,42 @@ onUnmounted(() => {
                 </div>
               </div>
             </div>
-            <div v-else-if="isLoaded && !hasDocumentPages(documentState)" class="absolute inset-0 flex items-center justify-center p-6">
-              <div class="max-w-sm text-center">
-                <AlertTriangle :size="30" class="mx-auto mb-3 text-destructive" />
-                <p class="mb-2 text-sm font-medium text-foreground">{{ t('reader.pdf.noPages') }}</p>
-                <p class="text-xs text-muted-foreground">{{ t('reader.pdf.noPagesHint') }}</p>
-                <div class="mt-4 flex justify-center gap-2">
-                  <button
-                    class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
-                    @click="handleBack"
-                  >
-                    {{ t('reader.header.goBack') }}
-                  </button>
-                  <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetryDocument">
-                    {{ t('reader.retry') }}
-                  </button>
-                </div>
-              </div>
-            </div>
-            <PdfDocumentViewport v-else-if="isLoaded" :document-id="props.documentId" />
           </template>
-        </DocumentContent>
-        <PdfSelectionPopup
-          ref="selectionPopup"
-          :visible="highlights.popupVisible.value"
-          :position="highlights.popupPosition.value"
-          :show-below="highlights.popupShowBelow.value"
-          :selected-text="highlights.selectedText.value"
-          :overlapping-annotation-id="highlights.overlappingAnnotationId.value"
-          :disabled="highlights.isSaving.value"
-          @highlight="handleHighlightAction"
-          @note="handleHighlightNote"
-          @delete-annotation="handleDeleteHighlight"
-          @dismiss="handleHighlightDismiss"
-          @resize="handleSelectionPopupResize"
-        />
+          <div v-if="documentPageCount === 0" class="absolute inset-0 flex items-center justify-center p-6">
+            <div class="max-w-sm text-center">
+              <AlertTriangle :size="30" class="mx-auto mb-3 text-destructive" />
+              <p class="mb-2 text-sm font-medium text-foreground">{{ t('reader.pdf.noPages') }}</p>
+              <p class="text-xs text-muted-foreground">{{ t('reader.pdf.noPagesHint') }}</p>
+              <div class="mt-4 flex justify-center gap-2">
+                <button
+                  class="rounded-md border border-border px-3 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground"
+                  @click="handleBack"
+                >
+                  {{ t('reader.header.goBack') }}
+                </button>
+                <button class="rounded-md bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground" @click="handleRetryDocument">
+                  {{ t('reader.retry') }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <PdfDocumentViewport v-else :annotations="highlights.annotations.value" @external-link="handleExternalLink">
+            <template #overlay>
+              <SelectionMenu placement="top" :gap="8">
+                <PdfSelectionPopup
+                  :visible="highlights.popupVisible.value"
+                  :selected-text="highlights.selectedText.value"
+                  :overlapping-annotation-id="highlights.overlappingAnnotationId.value"
+                  :disabled="highlights.isSaving.value"
+                  @highlight="handleHighlightAction"
+                  @note="handleHighlightNote"
+                  @delete-annotation="handleDeleteHighlight"
+                  @dismiss="handleHighlightDismiss"
+                />
+              </SelectionMenu>
+            </template>
+          </PdfDocumentViewport>
+        </DocumentGate>
       </div>
     </div>
 

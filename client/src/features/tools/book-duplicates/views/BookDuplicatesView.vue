@@ -345,8 +345,13 @@ function handleKeydown(event: KeyboardEvent): void {
         <div
           class="duplicates-head flex h-[34px] shrink-0 items-center gap-2.5 border-b border-border bg-surface-2 px-3 text-[10.5px] font-bold tracking-wide uppercase text-muted-foreground"
         >
-          <label class="grid size-8 cursor-pointer place-items-center">
-            <input type="checkbox" class="peer sr-only" :checked="duplicates.allVisibleSelected.value" @change="handleToggleAll" />
+          <label class="relative grid size-8 cursor-pointer place-items-center">
+            <input
+              type="checkbox"
+              class="peer absolute inset-0 z-10 size-full cursor-pointer opacity-0"
+              :checked="duplicates.allVisibleSelected.value"
+              @change="handleToggleAll"
+            />
             <span class="sr-only">{{ t('tools.bookDuplicates.selectAll') }}</span>
             <span
               class="grid size-4 place-items-center rounded-xs border peer-focus-visible:ring-2 peer-focus-visible:ring-ring"

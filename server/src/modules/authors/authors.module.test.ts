@@ -8,7 +8,11 @@ vi.mock('../metadata/metadata.module', () => ({ MetadataModule: class MetadataMo
 
 import { MODULE_METADATA } from '@nestjs/common/constants';
 
+import { BulkRunsModule } from '../bulk-runs/bulk-runs.module';
+import { JobsModule } from '../jobs/jobs.module';
 import { MetadataCacheModule } from '../metadata-cache/metadata-cache.module';
+import { AuthorBulkRefreshHandler } from './author-bulk-refresh.handler';
+import { AuthorEnrichmentJobSource } from './author-enrichment-job-source';
 import { AuthorsController } from './authors.controller';
 import { AuthorsModule } from './authors.module';
 import { AuthorsRepository } from './authors.repository';
@@ -21,8 +25,10 @@ describe('AuthorsModule', () => {
     const providers = Reflect.getMetadata(MODULE_METADATA.PROVIDERS, AuthorsModule) as Array<unknown>;
 
     expect(controllers).toEqual([AuthorsController]);
-    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, AuthorsModule)).toEqual(expect.arrayContaining([MetadataCacheModule]));
-    expect(providers).toEqual(expect.arrayContaining([AuthorsService, AuthorsRepository]));
+    expect(Reflect.getMetadata(MODULE_METADATA.IMPORTS, AuthorsModule)).toEqual(
+      expect.arrayContaining([MetadataCacheModule, JobsModule, BulkRunsModule]),
+    );
+    expect(providers).toEqual(expect.arrayContaining([AuthorsService, AuthorsRepository, AuthorEnrichmentJobSource, AuthorBulkRefreshHandler]));
     expect(providers).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

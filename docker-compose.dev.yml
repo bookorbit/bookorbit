@@ -27,7 +27,7 @@ services:
   # working on text-to-speech; the image carries the model and is a large first pull.
   kokoro:
     container_name: bookorbit-dev-kokoro
-    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.8.0
+    image: ghcr.io/remsky/kokoro-fastapi-cpu:v0.10.0
     profiles: ["tts"]
     restart: unless-stopped
     ports:

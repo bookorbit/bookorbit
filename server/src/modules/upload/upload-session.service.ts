@@ -25,6 +25,7 @@ import {
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { LibraryService } from '../library/library.service';
 import { BookDockIngestService } from '../book-dock/book-dock-ingest.service';
+import { LibraryDockService } from '../book-dock/library-dock.service';
 import type { CreateUploadSessionDto } from './dto/create-upload-session.dto';
 import { UploadProcessorService } from './upload-processor.service';
 import { UploadService } from './upload.service';
@@ -123,7 +124,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
         userId: user.id,
         idempotencyKey: dto.idempotencyKey,
         targetKind: target.kind,
-        targetLibraryId: target.kind === 'library' ? target.libraryId : null,
+        targetLibraryId: targetLibraryId(target),
         targetFolderId: target.kind === 'library' ? (target.folderId ?? null) : null,
         targetBookId: target.kind === 'existing_book' ? target.bookId : null,
         filename,
@@ -237,7 +238,9 @@ export class UploadSessionService implements OnApplicationBootstrap {
           void result;
         } else {
           const ingest = this.moduleRef.get(BookDockIngestService, { strict: false });
-          const fileId = await ingest.ingestUpload(row.filename, createReadStream(row.stagingPath), user.id);
+          // Checked again: the dock may have been turned off while the bytes were arriving.
+          const dock = row.targetLibraryId ? await this.libraryDocks().resolveUploadDock(user, row.targetLibraryId, row.filename) : undefined;
+          const fileId = await ingest.ingestUpload(row.filename, createReadStream(row.stagingPath), user.id, dock);
           row = (await this.repo.update(row.id, {
             status: 'completed',
             resultBookDockFileId: fileId,
@@ -301,8 +304,9 @@ export class UploadSessionService implements OnApplicationBootstrap {
 
   private async validateTarget(target: UploadTarget, filename: string, user: RequestUser): Promise<void> {
     if (target.kind === 'book_dock') {
-      if (!this.hasPermission(user, Permission.BookDockAccess)) throw new ForbiddenException('Book Dock access is required');
-      this.validator.validateFormat(filename, []);
+      if (!this.hasPermission(user, Permission.BookDockAccess)) throw new ForbiddenException('Library Dock access is required');
+      if (target.libraryId) await this.libraryDocks().resolveUploadDock(user, target.libraryId, filename);
+      else this.validator.validateFormat(filename, []);
       return;
     }
     if (!this.hasPermission(user, Permission.LibraryUpload)) throw new ForbiddenException('Library upload permission is required');
@@ -357,12 +361,12 @@ export class UploadSessionService implements OnApplicationBootstrap {
       return { kind: 'library', libraryId: dto.target.libraryId, folderId: dto.target.folderId };
     }
     if (dto.target.kind === 'existing_book' && dto.target.bookId) return { kind: 'existing_book', bookId: dto.target.bookId };
-    if (dto.target.kind === 'book_dock') return { kind: 'book_dock' };
+    if (dto.target.kind === 'book_dock') return dto.target.libraryId ? { kind: 'book_dock', libraryId: dto.target.libraryId } : { kind: 'book_dock' };
     throw uploadError.invalidTarget('Upload target fields are invalid');
   }
 
   private async allowedFormats(row: UploadSessionRow): Promise<string[]> {
-    if (row.targetKind === 'book_dock') return [];
+    if (row.targetKind === 'book_dock' && !row.targetLibraryId) return [];
     const libraryId = row.targetLibraryId ?? (await this.repo.findBookLibraryId(row.targetBookId!));
     if (!libraryId) throw uploadError.invalidTarget('Target library no longer exists');
     const allowedFormats = await this.repo.findLibraryAllowedFormats(libraryId);
@@ -376,7 +380,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
       row.filename === this.validator.sanitizeFilename(dto.filename) &&
       row.sizeBytes === dto.sizeBytes &&
       row.targetKind === target.kind &&
-      row.targetLibraryId === (target.kind === 'library' ? target.libraryId : null) &&
+      row.targetLibraryId === targetLibraryId(target) &&
       row.targetFolderId === (target.kind === 'library' ? (target.folderId ?? null) : null) &&
       row.targetBookId === (target.kind === 'existing_book' ? target.bookId : null);
     if (!matches) throw uploadError.invalidSessionState('Idempotency key is already used by a different upload');
@@ -404,6 +408,11 @@ export class UploadSessionService implements OnApplicationBootstrap {
     const row = await this.repo.findById(id);
     if (!row || row.userId !== user.id) throw new NotFoundException('Upload session not found');
     return row;
+  }
+
+  /** Resolved lazily, like the ingest service: the Book Dock module imports this one. */
+  private libraryDocks(): LibraryDockService {
+    return this.moduleRef.get(LibraryDockService, { strict: false });
   }
 
   private hasPermission(user: RequestUser, permission: Permission): boolean {
@@ -467,7 +476,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
           ? { kind: 'library', libraryId: row.targetLibraryId!, ...(row.targetFolderId ? { folderId: row.targetFolderId } : {}) }
           : row.targetKind === 'existing_book'
             ? { kind: 'existing_book', bookId: row.targetBookId! }
-            : { kind: 'book_dock' },
+            : { kind: 'book_dock', ...(row.targetLibraryId ? { libraryId: row.targetLibraryId } : {}) },
       errorCode: (row.errorCode as UploadSessionResponse['errorCode']) ?? null,
       errorMessage: row.errorMessage,
       bookId: row.resultBookId,
@@ -498,6 +507,13 @@ export class UploadSessionService implements OnApplicationBootstrap {
 }
 
 /** A session a repeated create may hand back: still able to take bytes, importing, or added. */
+/** The library a session is for: a library upload's, or a library dock's. */
+function targetLibraryId(target: UploadTarget): number | null {
+  if (target.kind === 'library') return target.libraryId;
+  if (target.kind === 'book_dock') return target.libraryId ?? null;
+  return null;
+}
+
 function isResumable(row: UploadSessionRow): boolean {
   if (row.status === 'processing' || row.status === 'completed') return true;
   return row.status === 'receiving' && row.expiresAt.getTime() > Date.now();

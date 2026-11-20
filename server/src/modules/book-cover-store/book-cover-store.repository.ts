@@ -97,6 +97,8 @@ export type BookCoverFaceRow = {
   bookId: number;
   libraryCoverAspectRatio: string;
   primaryFormat: string | null;
+  /** The primary file is an EPUB with synced narration, which plays as audio and reads as an ebook. */
+  primaryReadAlong: boolean;
   media: CoverMedia;
   legacyVersion: string;
 };
@@ -227,6 +229,13 @@ export class BookCoverStoreRepository {
             where first_content.book_id = ${outer} and first_content.role in ('content', 'primary')
             order by first_content.id limit 1)
         )`,
+        primaryReadAlong: sql<boolean>`coalesce(
+          case when ${bookFiles.format} is not null then ${bookFiles.mediaOverlayAvailable} end,
+          (select first_content.media_overlay_available from ${bookFiles} as first_content
+            where first_content.book_id = ${outer} and first_content.role in ('content', 'primary')
+            order by first_content.id limit 1),
+          false
+        )`,
         updatedAt: books.updatedAt,
         addedAt: books.addedAt,
         ...coverMediaSql(books.id),
@@ -239,6 +248,7 @@ export class BookCoverStoreRepository {
       bookId: row.bookId,
       libraryCoverAspectRatio: row.coverAspectRatio,
       primaryFormat: row.primaryFormat,
+      primaryReadAlong: row.primaryReadAlong,
       media: { hasEbook: row.hasEbook, hasAudio: row.hasAudio },
       legacyVersion: (row.updatedAt ?? row.addedAt).toISOString(),
     }));

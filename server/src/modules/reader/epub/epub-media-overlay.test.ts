@@ -4,9 +4,15 @@ import { join } from 'path';
 import { ZipArchive } from 'archiver';
 
 import type { EpubBookInfo } from '@bookorbit/types';
+import type { File as ZipEntry } from 'unzipper';
 
 import { inspectEpubMediaOverlayFields } from './epub-media-overlay-capability';
-import { buildEpubMediaOverlayPlaylist, buildEpubMediaOverlayPlaylistFromFile, inspectEpubMediaOverlayFile } from './epub-media-overlay';
+import {
+  buildEpubMediaOverlayPlaylist,
+  buildEpubMediaOverlayPlaylistFromFile,
+  findEpubZipEntry,
+  inspectEpubMediaOverlayFile,
+} from './epub-media-overlay';
 
 type Clip = { begin?: string; end?: string };
 
@@ -374,5 +380,48 @@ describe('EPUB media overlay duration', () => {
     expect(chapterOne.map((item) => item.clipBeginSeconds)).toEqual([0, 1, 2, 3, 4, 5]);
     expect(playlist.items.map((item) => item.index)).toEqual(playlist.items.map((_, index) => index));
     expect(playlist.sections[0]?.durationSeconds).toBe(6);
+  });
+});
+
+describe('findEpubZipEntry', () => {
+  const entry = (path: string) => ({ path }) as ZipEntry;
+
+  it('prefers the entry named exactly over an earlier one whose literal escape decodes to it', () => {
+    const files = [entry('OPS/audio/track%201.mp3'), entry('OPS/audio/track 1.mp3')];
+
+    expect(findEpubZipEntry(files, 'OPS/audio/track 1.mp3')).toBe(files[1]);
+    expect(findEpubZipEntry(files, 'OPS/audio/track%201.mp3')).toBe(files[0]);
+  });
+
+  it('falls back to a decoded name before a case-insensitive one', () => {
+    const files = [entry('OPS/Text/Ch 1.xhtml'), entry('OPS/text/ch%201.xhtml')];
+
+    expect(findEpubZipEntry(files, 'OPS/text/ch 1.xhtml')).toBe(files[1]);
+    expect(findEpubZipEntry(files, 'ops/TEXT/ch 1.xhtml')).toBe(files[0]);
+    expect(findEpubZipEntry(files, 'OPS/text/ch 2.xhtml')).toBeUndefined();
+  });
+
+  it('takes the first of entries whose names clean to the same path', () => {
+    const files = [entry('OEBPS\\text\\a.xhtml'), entry('OEBPS/./text//a.xhtml'), entry('OEBPS/text/a.xhtml')];
+
+    expect(findEpubZipEntry(files, '/OEBPS/text/a.xhtml')).toBe(files[0]);
+  });
+
+  it('reads each entry name a bounded number of times however many lookups are made', () => {
+    const count = 2000;
+    let reads = 0;
+    const files = Array.from({ length: count }, (_, i) => {
+      const path = `OEBPS/p${i}.xhtml`;
+      return {
+        get path() {
+          reads += 1;
+          return path;
+        },
+      } as ZipEntry;
+    });
+
+    for (let i = 0; i < count; i += 1) expect(findEpubZipEntry(files, `OEBPS/p${i}.xhtml`)).toBe(files[i]);
+
+    expect(reads).toBeLessThanOrEqual(2 * count);
   });
 });

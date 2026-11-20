@@ -12,6 +12,12 @@ import { extractPdfCover } from './pdf-cover';
 
 const THUMBNAIL_WIDTH = 400;
 const THUMBNAIL_HEIGHT = 600;
+const THUMBNAIL_JPEG_QUALITY = 82;
+/** Twice the largest the book page draws the cover, for high-density screens. */
+const DISPLAY_COVER_WIDTH = 600;
+const DISPLAY_COVER_HEIGHT = 900;
+/** A cover already inside the display box and this light is served as it is. */
+const DISPLAY_COVER_PASSTHROUGH_BYTES = 256 * 1024;
 
 /** Returns extension based on magic bytes, defaulting to 'jpg'. */
 export function imageExt(bytes: Buffer): string {
@@ -35,8 +41,30 @@ export function imageExt(bytes: Buffer): string {
   return 'jpg';
 }
 
+/**
+ * mozjpeg at 82 is about 40% smaller than libjpeg at 90 with no visible difference at grid sizes, and
+ * stays JPEG for the Kobo, OPDS and iOS clients that read thumbnails directly.
+ */
 export async function generateThumbnail(bytes: Buffer): Promise<Buffer> {
-  return sharp(bytes).resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'inside', withoutEnlargement: true }).jpeg({ quality: 90 }).toBuffer();
+  return sharp(bytes)
+    .resize(THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: THUMBNAIL_JPEG_QUALITY, mozjpeg: true })
+    .toBuffer();
+}
+
+/**
+ * A screen-sized copy of a cover for pages that show it large, or null when the cover is already
+ * small enough to serve as it is. Oriented first, since the copy carries no EXIF to rotate by.
+ */
+export async function generateDisplayCover(bytes: Buffer): Promise<Buffer | null> {
+  const image = sharp(bytes, { failOn: 'error' });
+  const { width = 0, height = 0 } = await image.metadata();
+  if (width <= DISPLAY_COVER_WIDTH && height <= DISPLAY_COVER_HEIGHT && bytes.length <= DISPLAY_COVER_PASSTHROUGH_BYTES) return null;
+  return image
+    .rotate()
+    .resize(DISPLAY_COVER_WIDTH, DISPLAY_COVER_HEIGHT, { fit: 'inside', withoutEnlargement: true })
+    .jpeg({ quality: THUMBNAIL_JPEG_QUALITY, mozjpeg: true })
+    .toBuffer();
 }
 
 export async function normalizeProgressiveJpeg(bytes: Buffer): Promise<Buffer> {

@@ -64,9 +64,9 @@ vi.mock('@/features/scanner/composables/useScanProgress', () => ({
 
 vi.mock('vue-sonner', () => ({
   toast: {
-    success: vi.fn<(message: string) => void>(),
-    warning: vi.fn<(message: string) => void>(),
-    error: vi.fn<(message: string) => void>(),
+    success: vi.fn<(message: string, options?: { position?: string }) => void>(),
+    warning: vi.fn<(message: string, options?: { position?: string }) => void>(),
+    error: vi.fn<(message: string, options?: { position?: string }) => void>(),
   },
 }))
 
@@ -494,7 +494,7 @@ describe('useBookDuplicates', () => {
       order: 'desc',
       kind: 'duplicate',
     })
-    expect(toast.success).toHaveBeenCalledOnce()
+    expect(toast.success).toHaveBeenCalledWith(expect.any(String), { position: 'top-right' })
   })
 
   it('reads the run over HTTP when the socket goes quiet, and warns about groups left unresolved', async () => {
@@ -523,7 +523,7 @@ describe('useBookDuplicates', () => {
 
     expect(getBookDuplicateResolution).toHaveBeenCalledWith(5)
     expect(duplicates.resolution.finished.value).toBe(true)
-    expect(toast.warning).toHaveBeenCalledOnce()
+    expect(toast.warning).toHaveBeenCalledWith(expect.any(String), { position: 'top-right' })
   })
 
   it('reports a resolution that could not start and keeps the selection', async () => {

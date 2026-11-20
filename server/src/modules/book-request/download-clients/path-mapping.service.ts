@@ -42,8 +42,10 @@ export class PathMappingService {
    * importer at any readable path on the host.
    */
   async toLocalPath(clientId: number, remotePath: string): Promise<ResolvedDownloadPath> {
-    const reported = remotePath?.trim() ?? '';
-    if (!reported) throw new BadRequestException('The download client did not report a content path');
+    // Never trim the value used for mapping: a release folder can legitimately end in a space, and
+    // the trimmed path then names a directory that does not exist.
+    const reported = remotePath ?? '';
+    if (!reported.trim()) throw new BadRequestException('The download client did not report a content path');
     if (reported.length > MAX_PATH_LENGTH) throw new BadRequestException('The download client reported a path that is too long');
 
     const mappings = await this.repo.findPathMappings(clientId);

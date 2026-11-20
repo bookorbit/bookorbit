@@ -7,6 +7,7 @@ import {
   isContentBookFile,
   isReadAlongFormatKey,
   normalizeFormatPriority,
+  PLAIN_EPUB_FILTER_FORMAT,
   type BookFileRef,
 } from '@bookorbit/types'
 
@@ -87,14 +88,15 @@ export function bookFormatCodes(files: readonly FormatFile[]): string[] {
   return [...new Set(bookFormatEntries(files).map((entry) => formatKeyCode(entry.key)))]
 }
 
-/** The short code a chip shows. A read-along EPUB is `EPUB`; its headphones tell it apart. */
+/** The short code a chip shows. Read-along and plain EPUB filter keys are `EPUB`; their glyphs tell them apart. */
 export function formatKeyCode(key: string): string {
-  return formatOfKey(key).toUpperCase()
+  return (key === PLAIN_EPUB_FILTER_FORMAT ? 'epub' : formatOfKey(key)).toUpperCase()
 }
 
 /** The translated name of a format, such as "EPUB e-book" or "Read-along EPUB". */
 export function formatKeyName(key: string): string {
   if (isReadAlongFormatKey(key)) return i18n.global.t('book.formats.readAlong')
+  if (key === PLAIN_EPUB_FILTER_FORMAT) return i18n.global.t('book.formats.plainEpub')
   const format = key.toLowerCase()
   return isBookFormat(format) ? i18n.global.t(`book.formats.${format}`) : formatKeyCode(key)
 }

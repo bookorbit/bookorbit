@@ -62,6 +62,18 @@ export class ReadAloudController {
     return this.readAloud.dismiss(jobId, user);
   }
 
+  @Post('read-aloud-jobs/:jobId/pause')
+  @HttpCode(HttpStatus.OK)
+  pause(@Param('jobId', JOB_ID) jobId: string, @CurrentUser() user: RequestUser) {
+    return this.readAloud.pause(jobId, user);
+  }
+
+  @Post('read-aloud-jobs/:jobId/resume')
+  @HttpCode(HttpStatus.OK)
+  resume(@Param('jobId', JOB_ID) jobId: string, @CurrentUser() user: RequestUser) {
+    return this.readAloud.resume(jobId, user);
+  }
+
   @Get('read-aloud-jobs/:jobId/report')
   report(@Param('jobId', JOB_ID) jobId: string, @CurrentUser() user: RequestUser) {
     return this.readAloud.report(jobId, user);

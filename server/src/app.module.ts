@@ -6,6 +6,7 @@ import { ThrottlerModule } from '@nestjs/throttler';
 import { LoggerModule } from 'nestjs-pino';
 
 import {
+  aiConfig,
   appConfig,
   audiolessEpubConfig,
   audioToolsConfig,
@@ -19,6 +20,7 @@ import {
   migrationConfig,
   oidcRuntimeConfig,
   readAloudConfig,
+  bulkRunsConfig,
   storageConfig,
 } from './config/config';
 import { validateEnv } from './config/env.validation';
@@ -80,6 +82,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { MigrationModule } from './modules/migration/migration.module';
 import { NotificationModule } from './modules/notification/notification.module';
 import { SeriesModule } from './modules/series/series.module';
+import { TaxonomyModule } from './modules/taxonomy/taxonomy.module';
 import { EntityManagerModule } from './modules/entity-manager/entity-manager.module';
 import { FontModule } from './modules/font/font.module';
 import { ServerFontModule } from './modules/server-font/server-font.module';
@@ -103,6 +106,7 @@ import { AudiobookModule } from './modules/audiobook/audiobook.module';
 import { ChapterEditorModule } from './modules/chapter-editor/chapter-editor.module';
 import { ChapterHealthModule } from './modules/chapter-health/chapter-health.module';
 import { TtsModule } from './modules/tts/tts.module';
+import { AiModule } from './modules/ai/ai.module';
 import { SearchModule } from './modules/search/search.module';
 import { WatchDownloadModule } from './modules/watch-download/watch-download.module';
 import { AppAttestModule } from './modules/app-attest/app-attest.module';
@@ -110,7 +114,13 @@ import { ReadAloudModule } from './modules/read-aloud/read-aloud.module';
 import { PageLocatorModule } from './modules/page-locator/page-locator.module';
 import { YearReviewModule } from './modules/year-review/year-review.module';
 import { VisualMatchModule } from './modules/visual-match/visual-match.module';
+import { VisionScanModule } from './modules/vision-scan/vision-scan.module';
+import { ReadingHelpModule } from './modules/reading-help/reading-help.module';
 import { StoryEditsModule } from './modules/story-edits/story-edits.module';
+import { StoryGuidesModule } from './modules/story-guides/story-guides.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { SetupOverviewModule } from './modules/setup-overview/setup-overview.module';
+import { BulkRunsModule } from './modules/bulk-runs/bulk-runs.module';
 
 @Module({
   imports: [
@@ -128,10 +138,12 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
         emailConfig,
         migrationConfig,
         bookRequestConfig,
+        aiConfig,
         oidcRuntimeConfig,
         audiolessEpubConfig,
         djvuConfig,
         readAloudConfig,
+        bulkRunsConfig,
         audioToolsConfig,
       ],
     }),
@@ -204,6 +216,7 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
     MigrationModule,
     NotificationModule,
     SeriesModule,
+    TaxonomyModule,
     EntityManagerModule,
     FontModule,
     ServerFontModule,
@@ -223,6 +236,7 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
     BookLinkModule,
     BrowseCountsModule,
     TtsModule,
+    AiModule,
     SearchModule,
     WatchDownloadModule,
     AppAttestModule,
@@ -230,7 +244,13 @@ import { StoryEditsModule } from './modules/story-edits/story-edits.module';
     PageLocatorModule,
     YearReviewModule,
     VisualMatchModule,
+    VisionScanModule,
+    ReadingHelpModule,
     StoryEditsModule,
+    StoryGuidesModule,
+    JobsModule,
+    SetupOverviewModule,
+    BulkRunsModule,
   ],
   providers: [
     // Before the audit interceptor, so an audited route records the book the request now lands on.

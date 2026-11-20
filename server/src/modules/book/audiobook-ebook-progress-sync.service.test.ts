@@ -112,6 +112,20 @@ function makePlaylistWithZeroLengthClip() {
   };
 }
 
+/** A narration that clips three sentences out of a 1000 second track, leaving long stretches of music and silence between them. */
+function makeGappedPlaylist() {
+  const playlist = makePlaylist();
+  const clip = (index: number, fragment: string, begin: number, end: number) => ({
+    ...playlist.items[0]!,
+    index,
+    textFragment: fragment,
+    clipBeginSeconds: begin,
+    clipEndSeconds: end,
+    durationSeconds: end - begin,
+  });
+  return { ...playlist, durationSeconds: 300, items: [clip(0, 'a', 0, 100), clip(1, 'b', 500, 600), clip(2, 'c', 900, 1000)] };
+}
+
 /** A Storyteller read-along EPUB beside the original, with the audiobook never imported. */
 function makeFilesWithoutAudio() {
   const files = makeFiles();
@@ -272,6 +286,42 @@ describe('AudiobookEbookProgressSyncService', () => {
       expect.objectContaining({ fileId: 30, percentage: 50, positionSeconds: 50, sourceUpdatedAt: SOURCE_TIME }),
     );
     expect(positionConverter.nearestFragmentForPosition).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 20, sourceBookFileId: 30 }));
+  });
+
+  it('places audiobook progress on the sentence being spoken when the narration leaves gaps in the audio', async () => {
+    mockBuildPlaylist.mockResolvedValue(makeGappedPlaylist());
+    const { service, bookRepo } = makeFixture(1000);
+
+    await expect(
+      service.syncFromAudioProgress({ userId: 7, bookId: 5, currentFileId: 10, positionSeconds: 550, percentage: 55, syncKobo: false }),
+    ).resolves.toBe(true);
+
+    expect(bookRepo.upsertSyncedEpubProgressIfNewer).toHaveBeenCalledWith(
+      expect.objectContaining({ fileId: 30, positionSeconds: 150, mediaOverlayFragment: 'OPS/chapter.xhtml#b', percentage: 50 }),
+    );
+  });
+
+  it('moves to the sentence about to be spoken while the audiobook plays through a gap', async () => {
+    mockBuildPlaylist.mockResolvedValue(makeGappedPlaylist());
+    const { service, bookRepo } = makeFixture(1000);
+
+    await service.syncFromAudioProgress({ userId: 7, bookId: 5, currentFileId: 10, positionSeconds: 800, percentage: 80, syncKobo: false });
+
+    expect(bookRepo.upsertSyncedEpubProgressIfNewer).toHaveBeenCalledWith(
+      expect.objectContaining({ fileId: 30, positionSeconds: 200, mediaOverlayFragment: 'OPS/chapter.xhtml#c' }),
+    );
+  });
+
+  it('maps an EPUB position to the audiobook second its sentence starts at when the narration leaves gaps', async () => {
+    mockBuildPlaylist.mockResolvedValue(makeGappedPlaylist());
+    const { service, bookRepo, positionConverter } = makeFixture(1000);
+    positionConverter.nearestFragmentForPosition.mockResolvedValue({ status: 'exact', fragment: 'b', chapterIndex: 0 });
+
+    await expect(
+      service.syncFromEbookProgress({ userId: 7, bookId: 5, bookFileId: 20, percentage: 40, cfi: 'epubcfi(/6/4)', sourceUpdatedAt: SOURCE_TIME }),
+    ).resolves.toBe(true);
+
+    expect(bookRepo.upsertAudioProgress).toHaveBeenCalledWith(7, 5, 10, 500, 50, SOURCE_TIME);
   });
 
   it('skips a zero-length clip when propagating an EPUB narration position to a sibling', async () => {

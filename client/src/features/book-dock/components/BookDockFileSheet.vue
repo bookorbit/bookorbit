@@ -18,12 +18,14 @@ import {
 } from '@bookorbit/types'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
 import IdentifierInput from '@/components/ui/IdentifierInput.vue'
+import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import MetadataMatchWorkspace from '@/features/book/components/metadata-match/MetadataMatchWorkspace.vue'
 import type { MetadataQuery } from '@/features/book/components/metadata-match/MetadataMatchQuery.vue'
 import { useBookDockDetail } from '../composables/useBookDockDetail'
 import { useBookDestination } from '@/features/library/composables/useBookDestination'
 import BookDestinationFields from '@/features/library/components/BookDestinationFields.vue'
 import { useMetadataSearch } from '@/features/book/composables/useMetadataSearch'
+import { useSeriesNameSearch } from '@/features/book/composables/useMetadataFieldSearch'
 import type { MetadataDiffApply } from '@/features/book/composables/useMetadataDiff'
 import { formatBytes } from '@/lib/formatting'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
@@ -40,6 +42,7 @@ const emit = defineEmits<{
 
 const { saved, saveError, saveMetadata, setTarget, coverUrl, fetchReadAlong } = useBookDockDetail()
 const destination = useBookDestination({ defaultToFirstLibrary: true })
+const { search: searchSeries } = useSeriesNameSearch()
 const { libraryId: targetLibraryId, folderId: targetFolderId, hasDestination, fetchLibraries: fetchLibs } = destination
 
 const meta = computed(() => props.file.selectedMetadata ?? props.file.embeddedMetadata ?? ({} as BookDockMetadata))
@@ -133,6 +136,8 @@ function buildMetadataPatchFromForm(): Partial<BookDockMetadata> {
     isbn10: form.isbn10 || undefined,
     seriesName: form.seriesName || undefined,
     seriesIndex: normalizedSeriesIndex() ?? undefined,
+    // A provider match keeps its whole series list; with the series cleared it would still be filed.
+    seriesMemberships: form.seriesName.trim() ? passthroughMetadata.value.seriesMemberships : undefined,
     genres: form.genres
       ? form.genres
           .split(',')
@@ -150,6 +155,11 @@ function onFieldChange() {
     const updated = await saveMetadata(props.file.id, buildMetadataPatchFromForm())
     if (updated) emit('updated', updated)
   }, 1000)
+}
+
+function onSeriesNameChange(value: string | null) {
+  form.seriesName = value ?? ''
+  onFieldChange()
 }
 
 function onPublishedDateChange() {
@@ -593,10 +603,11 @@ onMounted(() => {
             </label>
             <label>
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.series') }}</span>
-              <input
-                v-model="form.seriesName"
+              <InputWithSuggestions
+                :model-value="form.seriesName"
+                :search-fn="searchSeries"
                 class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                @input="onFieldChange"
+                @update:model-value="onSeriesNameChange"
               />
             </label>
             <label>

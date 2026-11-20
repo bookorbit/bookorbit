@@ -1,0 +1,1 @@
+DROP INDEX "book_files_absolute_path_unaccent_trgm_idx";

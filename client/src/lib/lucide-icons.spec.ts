@@ -38,7 +38,7 @@ describe('resolveLucideIconFile', () => {
   })
 
   it('maps the old name of a renamed icon to the current file', () => {
-    expect(resolveLucideIconFile('AlertTriangle')).toBe('triangle-alert')
+    expect(resolveLucideIconFile('AlertTriangle')).toBe('triangle-exclamation-point')
   })
 
   it('accepts the Icon-suffixed and Lucide-prefixed export forms', () => {

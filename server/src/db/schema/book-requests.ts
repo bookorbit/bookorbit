@@ -150,6 +150,8 @@ export const bookRequests = pgTable(
     index('book_requests_user_status_idx').on(t.userId, t.status),
     index('book_requests_status_created_at_idx').on(t.status, t.createdAt),
     index('book_requests_target_library_id_idx').on(t.targetLibraryId),
+    // The Jobs area reads a fulfiller's downloads by it.
+    index('book_requests_fulfiller_user_id_idx').on(t.fulfillerUserId),
     // The two orders the queue can be sorted into. `created_at` alone rather than only alongside
     // status, because the default list has no status filter on it.
     index('book_requests_created_at_idx').on(t.createdAt),

@@ -117,19 +117,22 @@ jobs:
 
           tree=$(git write-tree)
 
-          if [ -n "$parent" ]; then
-            if [ "$tree" = "$(git rev-parse "$parent^{tree}")" ]; then
-              echo "Charts are unchanged"
-              exit 0
-            fi
-            commit=$(printf '%s\n' "chore: update repository charts" | \
-              TZ=UTC git commit-tree "$tree" -p "$parent")
-          else
-            commit=$(printf '%s\n' "chore: initialize repository charts" | \
-              TZ=UTC git commit-tree "$tree")
+          if [ -n "$parent" ] && [ "$tree" = "$(git rev-parse "$parent^{tree}")" ]; then
+            echo "Charts are unchanged"
+            exit 0
           fi
 
-          git push origin "$commit:refs/heads/$CHARTS_BRANCH"
+          # Parentless on purpose: the branch holds a single commit so daily
+          # refreshes do not accumulate history.
+          commit=$(printf '%s\n' "chore: update repository charts" | \
+            TZ=UTC git commit-tree "$tree")
+
+          if [ -n "$parent" ]; then
+            git push --force-with-lease="refs/heads/$CHARTS_BRANCH:$parent" \
+              origin "$commit:refs/heads/$CHARTS_BRANCH"
+          else
+            git push origin "$commit:refs/heads/$CHARTS_BRANCH"
+          fi
 
       - name: Fail on generator errors
         if: steps.star-history.outcome == 'failure' || steps.translation-progress.outcome == 'failure'

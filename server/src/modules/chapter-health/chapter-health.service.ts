@@ -9,8 +9,9 @@ import {
 } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { JobChangesService } from '../jobs/job-changes.service';
 import { LibraryService } from '../library/library.service';
-import { ChapterHealthRepository } from './chapter-health.repository';
+import { ChapterHealthRepository, type ChapterLookupOwnerFilter, type ChapterLookupSummary } from './chapter-health.repository';
 import type { ChapterHealthListDto, EnqueueChapterLookupDto } from './dto/chapter-health.dto';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -24,6 +25,7 @@ export class ChapterHealthService {
   constructor(
     private readonly repo: ChapterHealthRepository,
     private readonly libraryService: LibraryService,
+    private readonly jobChanges: JobChangesService,
   ) {}
 
   async summary(user: RequestUser, libraryId?: number): Promise<ChapterHealthSummary> {
@@ -90,6 +92,7 @@ export class ChapterHealthService {
       throw new BadRequestException('Choose books or a category to look up');
     }
     const queued = await this.repo.enqueue(bookIds, user.id);
+    if (queued > 0) this.changed(user.id);
     return { queued, skipped: requested - queued };
   }
 
@@ -109,16 +112,59 @@ export class ChapterHealthService {
   }
 
   async cancel(user: RequestUser): Promise<{ removed: number }> {
-    return { removed: await this.repo.removeQueued(user.id) };
+    const removed = await this.repo.removeQueued(user.id);
+    if (removed > 0) this.changed(user.id);
+    return { removed };
   }
 
   async clearFinished(user: RequestUser): Promise<{ removed: number }> {
-    return { removed: await this.repo.removeFinished(user.id) };
+    const removed = await this.repo.removeFinished(user.id);
+    if (removed > 0) this.changed(user.id);
+    return { removed };
   }
 
   async dismissReview(user: RequestUser, bookId: number): Promise<void> {
     const removed = await this.repo.dismissReview(bookId, await this.libraryIds(user), user.isSuperuser ? undefined : user.contentFilters);
     if (!removed) throw new NotFoundException('No review waits for that book');
+    this.changed(user.id);
+  }
+
+  /** Each requester's waiting, running, review-waiting and failed lookups, counted within the viewer's reach. */
+  async jobSummaries(viewer: RequestUser, owner: ChapterLookupOwnerFilter): Promise<ChapterLookupSummary[]> {
+    return await this.repo.summarizeForJobs(owner, await this.libraryIds(viewer), this.filtersOf(viewer));
+  }
+
+  /**
+   * The Jobs area's bulk actions on one requester's lookups (null for those of a deleted account),
+   * each limited to the books the acting viewer can edit. Each returns how many books it changed.
+   */
+  async clearQueuedFor(viewer: RequestUser, ownerId: number | null): Promise<number> {
+    return this.changedBy(ownerId, await this.repo.clearQueuedFor(ownerId, await this.libraryIds(viewer), this.filtersOf(viewer)));
+  }
+
+  async dismissReviewsFor(viewer: RequestUser, ownerId: number | null): Promise<number> {
+    return this.changedBy(ownerId, await this.repo.dismissReviewsFor(ownerId, await this.libraryIds(viewer), this.filtersOf(viewer)));
+  }
+
+  async clearFailedFor(viewer: RequestUser, ownerId: number | null): Promise<number> {
+    return this.changedBy(ownerId, await this.repo.clearFailedFor(ownerId, await this.libraryIds(viewer), this.filtersOf(viewer)));
+  }
+
+  async retryFailedFor(viewer: RequestUser, ownerId: number | null): Promise<number> {
+    return this.changedBy(ownerId, await this.repo.retryFailedFor(ownerId, await this.libraryIds(viewer), this.filtersOf(viewer)));
+  }
+
+  private filtersOf(user: RequestUser) {
+    return user.isSuperuser ? undefined : user.contentFilters;
+  }
+
+  private changedBy(ownerId: number | null, count: number): number {
+    if (count > 0) this.changed(ownerId);
+    return count;
+  }
+
+  private changed(ownerId: number | null): void {
+    this.jobChanges.notify({ type: 'chapter-lookup', ownerId, state: true });
   }
 
   /** The tool changes chapters, so it only covers libraries the user may edit. */

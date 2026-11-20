@@ -40,6 +40,59 @@ describe('ReadAloudWorkerClientService', () => {
     await expect(new ReadAloudWorkerClientService(CONFIG as never).healthState()).resolves.toEqual({ state: 'unreachable' });
   });
 
+  it('shares one health probe between callers asking at the same time, and probes anew when forced', async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(JSON.stringify(okHealth().health), { status: 200 })));
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new ReadAloudWorkerClientService(CONFIG as never);
+
+    const answers = await Promise.all([client.healthState(), client.healthState(), client.healthState()]);
+    expect(answers.map((answer) => answer.state)).toEqual(['ok', 'ok', 'ok']);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    await client.healthState();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await client.healthState(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers display callers with the last known state and refreshes a stale one behind them', async () => {
+    vi.useFakeTimers();
+    try {
+      let answerProbe: (response: Response) => void = () => undefined;
+      const fetchMock = vi
+        .fn()
+        .mockRejectedValueOnce(new TypeError('fetch failed'))
+        .mockImplementationOnce(() => new Promise<Response>((resolve) => (answerProbe = resolve)));
+      vi.stubGlobal('fetch', fetchMock);
+      const client = new ReadAloudWorkerClientService(CONFIG as never);
+
+      await expect(client.lastKnownHealthState()).resolves.toEqual({ state: 'unreachable' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      await expect(client.lastKnownHealthState()).resolves.toEqual({ state: 'unreachable' });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+
+      vi.advanceTimersByTime(60_000);
+      await expect(client.lastKnownHealthState()).resolves.toEqual({ state: 'unreachable' });
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+
+      answerProbe(new Response(JSON.stringify(okHealth().health), { status: 200 }));
+      await vi.waitFor(async () => expect(await client.lastKnownHealthState()).toMatchObject({ state: 'ok' }));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('gives a health probe less time than a job request', async () => {
+    const fetchMock = respond(200, okHealth().health);
+    vi.stubGlobal('fetch', fetchMock);
+    const timeout = vi.spyOn(AbortSignal, 'timeout');
+    await new ReadAloudWorkerClientService({ ...CONFIG, requestTimeoutMs: 30_000 } as never).healthState();
+    expect(timeout).toHaveBeenCalledWith(5_000);
+    timeout.mockRestore();
+  });
+
   it('sends the bearer token and asks only for new events', async () => {
     const fetchMock = respond(200, { jobId: JOB_ID, status: 'running', events: [] });
     vi.stubGlobal('fetch', fetchMock);

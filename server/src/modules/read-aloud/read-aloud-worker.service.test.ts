@@ -511,7 +511,8 @@ describe('ReadAloudWorkerService', () => {
       t.jobs.claimQueued.mockResolvedValue(null);
       await t.service.tick();
 
-      expect(t.jobs.claimQueued).toHaveBeenCalledWith(RUNNING);
+      // Adopting ignores a pause: the worker is already running the job.
+      expect(t.jobs.claimQueued).toHaveBeenCalledWith(RUNNING, { adopt: true });
       expect(t.jobs.claimNext).not.toHaveBeenCalled();
     });
 

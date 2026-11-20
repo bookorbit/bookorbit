@@ -1,13 +1,26 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRoute, useRouter } from 'vue-router'
 import { PackageOpen, CheckCircle2, AlertCircle } from '@lucide/vue'
-import type { BookDockFile } from '@bookorbit/types'
+import type { BookDockDockCounts, BookDockFile, BookDockHoldReason, BookDockSummary } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatBytes } from '@/lib/formatting'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { Permission } from '@bookorbit/types'
-import { useBookDockFiles, type SortField } from '@/features/book-dock/composables/useBookDockFiles'
+import {
+  useBookDockFiles,
+  type BookDockKey,
+  type BookDockSelectionPayload,
+  type BookDockView,
+  type SortField,
+} from '@/features/book-dock/composables/useBookDockFiles'
+import { useLibraryDocks } from '@/features/book-dock/composables/useLibraryDocks'
+import BookDockSwitcher, { type BookDockSwitcherTab } from '@/features/book-dock/components/BookDockSwitcher.vue'
+import BookDockFacts from '@/features/book-dock/components/BookDockFacts.vue'
+import BookDockAttention from '@/features/book-dock/components/BookDockAttention.vue'
+import BookDockReasonRow from '@/features/book-dock/components/BookDockReasonRow.vue'
+import type { BookDockViewCounts } from '@/features/book-dock/components/BookDockFilterBar.vue'
 import { useBookDockSummary } from '@/features/book-dock/composables/useBookDockSummary'
 import { useBookDockStatistics } from '@/features/book-dock/composables/useBookDockStatistics'
 import { useBookDockUpload, SUPPORTED_FORMATS, SUPPORTED_FORMATS_ACCEPT } from '@/features/book-dock/composables/useBookDockUpload'
@@ -33,16 +46,6 @@ type ApplyFetchedResult = {
   skippedEdited: number
 }
 
-type BookDockSelectionPayload = {
-  fileIds?: number[]
-  selectAll?: boolean
-  excludedIds?: number[]
-  status?: string
-  needsReview?: boolean
-  readyToFile?: boolean
-  search?: string
-}
-
 type PendingDiscard = {
   selectionPayload: BookDockSelectionPayload
   selectionCount: number
@@ -61,6 +64,8 @@ const {
   fetchFiles,
   activeView,
   setView,
+  setHoldReason,
+  setDock,
   setSearch,
   setSort,
   setPage,
@@ -81,6 +86,134 @@ const { statistics, fetchStatistics } = useBookDockStatistics()
 const { addFiles, isUploading } = useBookDockUpload()
 const { isDemoRestrictedAccount, hasPermission } = usePermissions()
 const { conflicts, scheduleConflicts, cancelConflicts } = useBookDockConflicts()
+const { docks, admin, filing, refreshDocks, refreshFiling, dockById, uploadTargetFor } = useLibraryDocks()
+const route = useRoute()
+const router = useRouter()
+
+const canManage = computed(() => hasPermission(Permission.ManageBookDock))
+
+/** `?dock=` holds `unsorted` or a dock id; anything else is every dock. */
+function parseDockKey(value: unknown): BookDockKey {
+  if (value === 'unsorted') return 'unsorted'
+  if (typeof value === 'string' && /^[1-9]\d{0,8}$/.test(value)) return Number(value)
+  return 'all'
+}
+
+const EMPTY_COUNTS: BookDockDockCounts = { dockId: null, total: 0, working: 0, onHold: 0, ready: 0, error: 0, keptForSeeding: 0 }
+
+function countsFor(key: BookDockKey, source: BookDockSummary): BookDockDockCounts {
+  const perDock = source.docks ?? []
+  if (key === 'all') {
+    return perDock.reduce<BookDockDockCounts>(
+      (sum, counts) => ({
+        dockId: null,
+        total: sum.total + counts.total,
+        working: sum.working + counts.working,
+        onHold: sum.onHold + counts.onHold,
+        ready: sum.ready + counts.ready,
+        error: sum.error + counts.error,
+        keptForSeeding: sum.keptForSeeding + counts.keptForSeeding,
+        onHoldByReason: mergeReasons(sum.onHoldByReason, counts.onHoldByReason),
+      }),
+      { ...EMPTY_COUNTS, onHoldByReason: {} },
+    )
+  }
+  const dockId = key === 'unsorted' ? null : key
+  return perDock.find((counts) => counts.dockId === dockId) ?? { ...EMPTY_COUNTS, dockId }
+}
+
+function mergeReasons(
+  a: Partial<Record<BookDockHoldReason, number>> | undefined,
+  b: Partial<Record<BookDockHoldReason, number>> | undefined,
+): Partial<Record<BookDockHoldReason, number>> {
+  const merged = { ...a }
+  for (const [reason, count] of Object.entries(b ?? {}) as [BookDockHoldReason, number][]) merged[reason] = (merged[reason] ?? 0) + count
+  return merged
+}
+
+const currentCounts = computed(() => countsFor(filters.dock, summary.value))
+const viewCounts = computed<BookDockViewCounts>(() => currentCounts.value)
+const currentDock = computed(() => (typeof filters.dock === 'number' ? (dockById(filters.dock) ?? null) : null))
+const uploadTarget = computed(() => (typeof filters.dock === 'number' ? (uploadTargetFor(filters.dock) ?? null) : null))
+const uploadAccept = computed(() =>
+  uploadTarget.value?.allowedFormats.length ? uploadTarget.value.allowedFormats.map((format) => `.${format}`).join(',') : SUPPORTED_FORMATS_ACCEPT,
+)
+
+const switcherTabs = computed<BookDockSwitcherTab[]>(() => {
+  const tab = (key: BookDockKey, label: string, off = false): BookDockSwitcherTab => {
+    const counts = countsFor(key, summary.value)
+    return { key, label, total: counts.total, onHold: counts.onHold, error: counts.error, off }
+  }
+  const known = new Set(docks.value.map((dock) => dock.dockId))
+  // A dock this person cannot list still shows when files they uploaded sit in it.
+  const unlisted = (summary.value.docks ?? []).filter((counts) => counts.dockId !== null && !known.has(counts.dockId) && counts.total > 0)
+  return [
+    tab('all', t('bookDock.switcher.all')),
+    tab('unsorted', t('bookDock.switcher.unsorted')),
+    ...docks.value.map((dock) => tab(dock.dockId, dock.libraryName, !dock.enabled)),
+    ...unlisted.map((counts) => tab(counts.dockId as number, t('bookDock.switcher.otherDock'))),
+  ]
+})
+
+/** With no library docks there is nothing to switch between, except for someone who can add one. */
+const showSwitcher = computed(() => canManage.value || switcherTabs.value.length > 2)
+
+const currentDockName = computed(() => switcherTabs.value.find((tab) => tab.key === filters.dock)?.label ?? t('bookDock.switcher.unsorted'))
+
+/** The chip to keep when switching dock: the same one, if the new dock has files under it. */
+function viewFor(key: BookDockKey): BookDockView {
+  const view = activeView.value
+  if (view === 'all') return 'all'
+  const counts = countsFor(key, summary.value)
+  const count = { onHold: counts.onHold, working: counts.working, ready: counts.ready, error: counts.error }[view]
+  return count > 0 ? view : 'all'
+}
+
+function selectDock(key: BookDockKey) {
+  if (key === filters.dock) return
+  setDock(key, viewFor(key))
+  const query = { ...route.query }
+  if (key === 'all') delete query.dock
+  else query.dock = String(key)
+  void router.replace({ query })
+}
+
+watch(
+  () => route.query.dock,
+  (value) => {
+    const key = parseDockKey(value)
+    if (key !== filters.dock) setDock(key, viewFor(key))
+  },
+)
+
+function handleHoldReason(reason: BookDockHoldReason | null) {
+  setHoldReason(reason)
+}
+
+async function handleDocksChanged() {
+  await refreshDocks(canManage.value)
+  refresh()
+}
+
+function handleRowChanged() {
+  refresh()
+}
+
+const rootPath = computed(() => {
+  const path = admin.value?.librariesPath
+  return path ? path.replace(/[\\/]_libraries[\\/]?$/, '') : null
+})
+
+/** The list bar's working and ready counts follow the dock being shown. */
+const scopedSummary = computed<BookDockSummary>(() => {
+  if (filters.dock === 'all') return summary.value
+  const counts = currentCounts.value
+  return { ...summary.value, pending: counts.working, working: counts.working, readyToFile: counts.ready }
+})
+
+const showAttention = computed(
+  () => canManage.value && admin.value !== null && (filters.dock === 'all' || filters.dock === 'unsorted') && activeView.value === 'all',
+)
 
 const selectedFile = ref<BookDockFile | null>(null)
 const showFinalizeDialog = ref(false)
@@ -159,11 +292,21 @@ const errorCount = computed(() => {
 
 const emptyMessage = computed(() => {
   if (filters.search) return t('views.bookDock.empty.noSearchMatch', { query: filters.search })
-  if (filters.needsReview) return t('bookDock.layout.empty.nothingToReview')
-  if (filters.readyToFile) return t('bookDock.layout.empty.nothingReadyToFile')
-  if (filters.status) return t('views.bookDock.empty.noStatusFiles', { status: filters.status })
+  if (activeView.value === 'onHold') return t('bookDock.layout.empty.nothingOnHold')
+  if (activeView.value === 'ready') return t('bookDock.layout.empty.nothingReadyToFile')
+  if (activeView.value === 'working') return t('bookDock.layout.empty.nothingWorking')
+  if (activeView.value === 'error') return t('bookDock.layout.empty.nothingFailed')
+  if (currentDock.value?.entry?.dock) {
+    return t('bookDock.layout.empty.dockPrompt', {
+      folder: `_libraries/${currentDock.value.entry.dock.folderName}`,
+      library: currentDock.value.libraryName,
+    })
+  }
   return t('views.bookDock.empty.uploadPrompt')
 })
+
+const emptyTitle = computed(() => (filters.dock === 'all' ? undefined : t('bookDock.layout.empty.dockTitle', { dock: currentDockName.value })))
+const emptyUploadLabel = computed(() => t('bookDock.uploadTo', { dock: uploadTarget.value?.libraryName ?? t('bookDock.switcher.unsorted') }))
 
 const canPreviewConflicts = computed(() => hasPermission(Permission.LibraryUpload))
 
@@ -182,7 +325,7 @@ function triggerUpload() {
 function onEmptyUploadSelected(event: Event) {
   const input = event.target as HTMLInputElement
   if (input.files?.length) {
-    addFiles(input.files)
+    addFiles(input.files, uploadTarget.value)
     input.value = ''
   }
 }
@@ -439,7 +582,7 @@ function onDrop(e: DragEvent) {
   dragOver.value = false
   // Unsupported files go through too, so the upload failures panel can say why they were refused.
   const files = e.dataTransfer?.files
-  if (files?.length) addFiles(files)
+  if (files?.length) addFiles(files, uploadTarget.value)
 }
 
 watch(isUploading, (uploading, was) => {
@@ -457,10 +600,13 @@ watch(
 )
 
 onMounted(() => {
+  filters.dock = parseDockKey(route.query.dock)
   fetchFiles()
   fetchSummary(true)
   fetchStatistics()
   subscribe()
+  void refreshDocks(canManage.value)
+  if (canManage.value) void refreshFiling()
 })
 
 onUnmounted(() => {
@@ -478,11 +624,11 @@ onUnmounted(() => {
 <template>
   <div>
     <main class="flex-1" @dragover="onDragOver" @dragenter="onDragEnter" @dragleave="onDragLeave" @drop="onDrop">
-      <input ref="emptyUploadInput" type="file" :accept="SUPPORTED_FORMATS_ACCEPT" multiple class="hidden" @change="onEmptyUploadSelected" />
+      <input ref="emptyUploadInput" type="file" :accept="uploadAccept" multiple class="hidden" @change="onEmptyUploadSelected" />
       <div class="flex w-full max-w-420 flex-col gap-4 pt-2 pb-4">
         <PageTitleRow :title="t('views.bookDock.title')" :icon="PackageOpen" inline-grow>
           <template #inline>
-            <BookDockFilterBar class="w-full" :active-view="activeView" :summary="summary" @view="setView" @search="setSearch" />
+            <BookDockFilterBar class="w-full" :active-view="activeView" :counts="viewCounts" @view="setView" @search="setSearch" />
           </template>
           <template #facts>
             <span
@@ -550,6 +696,7 @@ onUnmounted(() => {
           <template #actions>
             <BookDockActionCluster
               :paused="summary.paused"
+              :upload-target="uploadTarget"
               @pause="handleProcessingStateChanged"
               @resume="handleProcessingStateChanged"
               @pause-error="handleProcessingStateError"
@@ -559,6 +706,20 @@ onUnmounted(() => {
             />
           </template>
         </PageTitleRow>
+
+        <div v-if="showSwitcher" class="flex flex-col gap-2.5">
+          <BookDockSwitcher :tabs="switcherTabs" :current="filters.dock" :can-manage="canManage" @select="selectDock" />
+          <BookDockFacts
+            v-if="canManage && filters.dock !== 'all'"
+            :dock="currentDock"
+            :root-path="rootPath"
+            :filing="currentDock ? filing.get(currentDock.libraryId) : undefined"
+            :kept-for-seeding="currentCounts.keptForSeeding"
+            @changed="handleDocksChanged"
+          />
+        </div>
+
+        <BookDockAttention v-if="showAttention && admin" :admin="admin" @changed="handleDocksChanged" />
 
         <BookDockUploadFailures />
 
@@ -605,7 +766,7 @@ onUnmounted(() => {
             :selection-count="selectionCount"
             :fetched-count="fetchedCount"
             :error-count="errorCount"
-            :summary="summary"
+            :summary="scopedSummary"
             :sort="filters.sort"
             :keyboard-active="keyboardActive"
             @toggle-select-all="handleToggleSelectAll"
@@ -619,6 +780,12 @@ onUnmounted(() => {
             @apply-fetched="handleApplyFetched"
             @retry-fetch="handleRetryFetch"
           />
+          <BookDockReasonRow
+            v-if="activeView === 'onHold'"
+            :counts="currentCounts.onHoldByReason ?? {}"
+            :current="filters.reason"
+            @select="handleHoldReason"
+          />
           <BookDockFileListView
             :items="items"
             :loading="loading"
@@ -627,6 +794,9 @@ onUnmounted(() => {
             :conflicts="conflicts"
             :name-preview-by-file-id="namePreviewByFileId"
             :empty-message="emptyMessage"
+            :empty-title="emptyTitle"
+            :upload-label="emptyUploadLabel"
+            :can-manage="canManage"
             @select="handleSelect"
             @set-destination="openDestinationForFile"
             @file="openFinalizeForFile"
@@ -636,6 +806,7 @@ onUnmounted(() => {
             @retry="handleRowRetry"
             @upload="triggerUpload"
             @keyboard-active="onKeyboardActive"
+            @changed="handleRowChanged"
           />
         </div>
 

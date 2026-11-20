@@ -1,10 +1,11 @@
 import { BadRequestException, HttpStatus } from '@nestjs/common';
 
 import { encodeSyncToken } from './services/kobo-sync-token';
-import { KoboSyncController } from './kobo-sync.controller';
+import { KoboDeviceDisconnectedError, KoboSyncController } from './kobo-sync.controller';
 
-function makeReply() {
+function makeReply({ deviceGone = false } = {}) {
   return {
+    raw: { destroyed: deviceGone },
     status: vi.fn().mockReturnThis(),
     header: vi.fn().mockReturnThis(),
     send: vi.fn().mockReturnThis(),
@@ -30,6 +31,7 @@ describe('KoboSyncController', () => {
   };
   const syncService = {
     getDelta: vi.fn(),
+    commitPage: vi.fn(),
     getBookMetadata: vi.fn(),
     removeBookFromSync: vi.fn(),
   };
@@ -63,6 +65,7 @@ describe('KoboSyncController', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    syncService.commitPage.mockResolvedValue(undefined);
     bookIdentityService.resolveBookIdByEntitlementId.mockImplementation((_userId: number, id: string) => (/^\d+$/.test(id) ? Number(id) : null));
     historyService.countsForBook.mockImplementation((_userId: number, bookId: number, counts: Record<string, unknown>) => ({
       ...counts,
@@ -355,6 +358,82 @@ describe('KoboSyncController', () => {
     expect(reply.header).toHaveBeenCalledWith('x-kobo-sync', 'continue');
     expect(reply.header).toHaveBeenCalledWith('x-kobo-synctoken', 'SYNC-2');
     expect(reply.send).toHaveBeenCalledWith([{ NewEntitlement: { BookEntitlement: { Id: '12' } } }]);
+  });
+
+  describe('a page the device may not receive (#2250)', () => {
+    const commit = {
+      userId: 21,
+      deviceId: 9,
+      snapshotId: 4,
+      offeredBookIds: [12],
+      removedBookIds: [],
+      servedRemovalIds: [],
+      legacyRemovalCompletedBookIds: [],
+    };
+    const req = { headers: { host: 'kobo.local' }, protocol: 'http', hostname: 'kobo.local', socket: { localPort: 3000 } };
+
+    async function runSync(reply: ReturnType<typeof makeReply>) {
+      await controller.librarySync({ deviceId: 9, deviceToken: 'token-9' } as never, { id: 21 } as never, req as never, reply as never);
+    }
+
+    beforeEach(() => {
+      syncService.getDelta.mockResolvedValue({
+        entitlements: [{ NewEntitlement: { BookEntitlement: { Id: '12' } } }],
+        hasMore: true,
+        syncToken: 'SYNC-2',
+        commit,
+      });
+    });
+
+    it('records the page as delivered before sending it to a device that is still waiting', async () => {
+      const reply = makeReply();
+
+      await runSync(reply);
+
+      expect(syncService.commitPage).toHaveBeenCalledWith(commit);
+      expect(syncService.commitPage.mock.invocationCallOrder[0]).toBeLessThan(reply.send.mock.invocationCallOrder[0]!);
+      expect(historyService.recordSuccess).toHaveBeenCalledWith(expect.objectContaining({ event: 'library_sync' }));
+      expect(historyService.recordFailure).not.toHaveBeenCalled();
+    });
+
+    it('leaves the page pending and records a failure when the device has stopped waiting', async () => {
+      const reply = makeReply({ deviceGone: true });
+
+      await runSync(reply);
+
+      expect(syncService.commitPage).not.toHaveBeenCalled();
+      expect(historyService.recordSuccess).not.toHaveBeenCalled();
+      expect(historyService.recordFailure).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 21, deviceId: 9, event: 'library_sync', counts: { entitlements: 1, hasMore: true } }),
+        expect.any(KoboDeviceDisconnectedError),
+      );
+    });
+
+    it('notices a device that left while the store page was being fetched', async () => {
+      syncService.getDelta.mockResolvedValue({ entitlements: [], hasMore: false, syncToken: 'SYNC-2', commit });
+      settingsService.getSettings.mockResolvedValue({ storeSync: true });
+      const reply = makeReply();
+      proxyService.request.mockImplementationOnce(() => {
+        reply.raw.destroyed = true;
+        return Promise.resolve({ status: 200, headers: {}, body: Buffer.from('[]') });
+      });
+
+      await runSync(reply);
+
+      expect(syncService.commitPage).not.toHaveBeenCalled();
+      expect(historyService.recordFailure).toHaveBeenCalledWith(expect.anything(), expect.any(KoboDeviceDisconnectedError));
+    });
+
+    it('answers with an error, sending nothing, when the page cannot be recorded', async () => {
+      syncService.commitPage.mockRejectedValueOnce(new Error('disk full'));
+      const reply = makeReply();
+
+      await expect(runSync(reply)).rejects.toThrow('disk full');
+
+      expect(reply.send).not.toHaveBeenCalled();
+      expect(historyService.recordSuccess).not.toHaveBeenCalled();
+      expect(historyService.recordFailure).toHaveBeenCalledWith(expect.objectContaining({ event: 'library_sync' }), expect.any(Error));
+    });
   });
 
   describe('store sync', () => {

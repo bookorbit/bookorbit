@@ -1,0 +1,45 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "id": "resp_abc",
+    "object": "response",
+    "created_at": 1794200000,
+    "status": "completed",
+    "incomplete_details": null,
+    "model": "gpt-6-luna-2026-10-01",
+    "output": [
+      {
+        "id": "rs_1",
+        "type": "reasoning",
+        "summary": []
+      },
+      {
+        "id": "msg_1",
+        "type": "message",
+        "status": "completed",
+        "role": "assistant",
+        "content": [
+          {
+            "type": "output_text",
+            "text": "Elizabeth Bennet is the second of five daughters.",
+            "annotations": []
+          }
+        ]
+      }
+    ],
+    "usage": {
+      "input_tokens": 430,
+      "input_tokens_details": {
+        "cached_tokens": 0
+      },
+      "output_tokens": 96,
+      "output_tokens_details": {
+        "reasoning_tokens": 58
+      },
+      "total_tokens": 526
+    }
+  }
+}

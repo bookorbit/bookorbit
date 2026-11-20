@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import type { BookIsbnCandidates } from '@bookorbit/types';
+import type { BookIsbnCandidates, CoverMedium } from '@bookorbit/types';
 import { DjvuDocumentService } from '../djvu/djvu-document.service';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -13,6 +13,7 @@ import { MobiFormatExtractor } from './extractors/mobi-format.extractor';
 import { OpfFormatExtractor } from './extractors/opf-format.extractor';
 import { PdfFormatExtractor } from './extractors/pdf-format.extractor';
 import { extractCover } from './lib/cover';
+import { extractEpubAudioCover } from './lib/cover-epub';
 import { extractEpubFixedLayout, readEpubIsbnHits } from './lib/epub';
 import { readFb2IsbnHits } from './lib/fb2-parser';
 import { parseBookFilename } from './lib/filename-parser';
@@ -105,9 +106,13 @@ export class MetadataExtractionService {
     return { metadata: null, cover };
   }
 
-  /** Reads only a file's embedded cover. KEPUB is an EPUB container, and audio art comes from ffmpeg. */
-  async extractEmbeddedCover(absolutePath: string, format: string): Promise<Buffer | null> {
+  /**
+   * Reads only a file's embedded cover. KEPUB is an EPUB container, and audio art comes from
+   * ffmpeg. An EPUB's audio medium is its declared audiobook cover, not its book cover.
+   */
+  async extractEmbeddedCover(absolutePath: string, format: string, medium?: CoverMedium): Promise<Buffer | null> {
     const normalized = format.toLowerCase();
+    if (medium === 'audio' && normalized === 'epub') return extractEpubAudioCover(absolutePath);
     if (normalized === 'djvu') return this.djvu.extractCover(absolutePath);
     if ((METADATA_AUDIO_FORMATS as readonly string[]).includes(normalized)) return extractAudioCover(absolutePath);
     return extractCover(absolutePath, normalized === 'kepub' ? 'epub' : normalized);

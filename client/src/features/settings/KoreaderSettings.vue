@@ -1867,18 +1867,28 @@ async function handleDownloadPlugin() {
         @keydown.esc="handleCloseLink"
       >
         <button class="absolute inset-0 bg-scrim" @click="handleCloseLink" />
-        <div class="relative w-full rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-w-2xl md:rounded-lg md:p-5">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="koreader-link-dialog-title"
+          data-testid="koreader-link-dialog"
+          class="relative max-h-[calc(100svh-1rem)] w-full overflow-y-auto overscroll-contain rounded-t-lg border border-border bg-card p-4 shadow-xl md:max-h-[calc(100svh-2rem)] md:max-w-2xl md:rounded-lg md:p-5"
+        >
           <div class="flex items-start justify-between gap-3">
             <div class="min-w-0">
-              <p class="text-base font-semibold text-foreground">
+              <p id="koreader-link-dialog-title" class="text-base font-semibold text-foreground">
                 {{ linkDialogTitle }}
               </p>
               <p class="mt-1 text-sm text-muted-foreground truncate">
                 {{ selectedLinkLabel }}
               </p>
             </div>
-            <button class="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground" @click="handleCloseLink">
-              <X :size="16" />
+            <button
+              class="rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              :aria-label="t('common.close')"
+              @click="handleCloseLink"
+            >
+              <X :size="16" aria-hidden="true" />
             </button>
           </div>
           <div v-if="selectedSuggestion" class="mt-4">

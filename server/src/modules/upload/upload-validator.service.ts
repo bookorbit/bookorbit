@@ -18,17 +18,23 @@ export class UploadValidatorService {
    */
   validateFormat(filename: string, libraryAllowedFormats: string[]): string {
     const ext = extname(filename).toLowerCase().slice(1);
-    const normalizedAllowed = libraryAllowedFormats.map((f) => f.trim().toLowerCase()).filter(Boolean);
 
     if (!SUPPORTED_BOOK_FORMATS.has(ext)) {
       throw uploadError.unsupportedFormat(`Unsupported file type .${ext}. Allowed types: ${[...SUPPORTED_BOOK_FORMATS].join(', ')}`);
     }
 
-    if (normalizedAllowed.length > 0 && !normalizedAllowed.includes(ext)) {
+    if (!this.isAllowedByLibrary(filename, libraryAllowedFormats)) {
       throw uploadError.formatNotAllowed(`This library does not allow .${ext} files`);
     }
 
     return ext;
+  }
+
+  /** Whether a library's own format list lets this file in. An empty list allows every supported format. */
+  isAllowedByLibrary(filename: string, libraryAllowedFormats: string[]): boolean {
+    const ext = extname(filename).toLowerCase().slice(1);
+    const normalizedAllowed = libraryAllowedFormats.map((f) => f.trim().toLowerCase()).filter(Boolean);
+    return normalizedAllowed.length === 0 || normalizedAllowed.includes(ext);
   }
 
   /**

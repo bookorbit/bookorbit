@@ -800,6 +800,12 @@ describe('Authorization matrix (e2e)', () => {
           params: { bookId: String(bookA.bookId) },
           token: 'readAloudUser',
         },
+        [Permission.LibraryGenerateStoryGuide]: {
+          method: 'POST',
+          path: '/books/:bookId/story-guide/cancel',
+          params: { bookId: String(bookA.bookId) },
+          token: 'allPerms',
+        },
         [Permission.LibraryEditMetadata]: {
           method: 'GET',
           path: '/books/:id/write-log',
@@ -1717,7 +1723,7 @@ describe('Authorization matrix (e2e)', () => {
           headers: authHeader(personas.bookDockUser.accessToken),
           payload: request.payload,
         });
-        expectError(response, 403, 'You do not have access to this Book Dock file');
+        expectError(response, 403, 'You do not have access to this Library Dock file');
       }
     });
 

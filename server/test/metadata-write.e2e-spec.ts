@@ -1684,7 +1684,7 @@ describe('Metadata write operations (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, ()
         expect(metadata?.title).toBe('Original');
         expect(metadata?.lockedFields).toEqual([]);
       }
-      for (const route of ['bulk-refresh-metadata', 'bulk-re-extract-cover']) {
+      for (const route of ['bulk-refresh-metadata', 'bulk-re-extract-cover', 'bulk-embed-audio-cover']) {
         const response = await context.app.inject({
           method: 'POST',
           url: `/api/v1/books/${route}`,

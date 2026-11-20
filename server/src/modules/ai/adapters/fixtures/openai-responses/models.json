@@ -1,0 +1,21 @@
+{
+  "status": 200,
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": {
+    "object": "list",
+    "data": [
+      {
+        "id": "gpt-6-luna",
+        "object": "model",
+        "owned_by": "openai"
+      },
+      {
+        "id": "gpt-6.1-terra",
+        "object": "model",
+        "owned_by": "openai"
+      }
+    ]
+  }
+}

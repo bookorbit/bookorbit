@@ -48,6 +48,18 @@ import { AuthorMetadataFetchService } from './metadata/author-metadata-fetch.ser
 /** A refreshed author, plus the providers that failed live and were answered from saved results. */
 export type AuthorRefreshResult = AuthorDetail & { metadataCache?: MetadataCacheUsage };
 
+/** The libraries a bulk refresh's actor may see, and the ones it may edit. */
+export interface AuthorBulkRefreshScope {
+  libraryIds: number[];
+  editableLibraryIds: ReadonlySet<number>;
+}
+
+/** How one author of a bulk refresh went; `outboundRequests` paces the pause before the next. */
+export type AuthorBulkRefreshItem =
+  | { kind: 'refreshed'; updated: boolean; imageUpdated: boolean; imageUrl: string | null | undefined; outboundRequests: number }
+  | { kind: 'failed'; error: string }
+  | { kind: 'not-found' };
+
 type EnrichmentRefreshOutcome = {
   descriptionUpdated: boolean;
   imageUpdated: boolean;
@@ -379,6 +391,10 @@ export class AuthorsService {
         values.description = dto.description?.trim() || null;
       }
 
+      if ('gender' in dto) {
+        values.gender = dto.gender ?? null;
+      }
+
       if ('website' in dto) {
         values.website = dto.website?.trim() || null;
       }
@@ -659,90 +675,62 @@ export class AuthorsService {
     }
   }
 
-  async bulkRefreshMetadata(
-    authorIds: number[],
-    user: RequestUser,
-    onProgress?: (event: { authorId: number; updated: boolean; imageUpdated?: boolean; imageUrl?: string | null; error?: string }) => void,
-    options?: { ignoreCache?: boolean },
-  ): Promise<{ processed: number; failed: number; updated: number }> {
+  /**
+   * Checks a bulk refresh selection before its run is created: every author must be visible to
+   * `user`, and every library holding their books editable. Answers the ids without duplicates.
+   */
+  async authorizeBulkRefresh(user: RequestUser, authorIds: readonly number[]): Promise<number[]> {
+    const uniqueAuthorIds = [...new Set(authorIds)];
+    if (uniqueAuthorIds.length > 0) await this.assertMutationAccess(user, uniqueAuthorIds);
+    return uniqueAuthorIds;
+  }
+
+  /** The libraries a bulk run's actor may see and edit; worked out once per actor, not per author. */
+  async bulkRefreshScope(user: RequestUser): Promise<AuthorBulkRefreshScope> {
+    const [libraryIds, editableLibraryIds] = await Promise.all([this.resolveLibraryIds(user), this.libraryService.findEditableLibraryIds(user)]);
+    return { libraryIds, editableLibraryIds: new Set(editableLibraryIds) };
+  }
+
+  /** The selection check for one author as a run reaches it: its books may have moved, or it may be gone. */
+  async bulkRefreshItemAccess(authorId: number, scope: AuthorBulkRefreshScope): Promise<'ok' | 'not-found' | 'no-access'> {
+    const [visible, relatedLibraryIds] = await Promise.all([
+      this.authorsRepo.findVisibleAuthorIds([authorId], scope.libraryIds),
+      this.authorsRepo.findRelatedLibraryIds([authorId]),
+    ]);
+    if (visible.length === 0) return 'not-found';
+    return relatedLibraryIds.every((libraryId) => scope.editableLibraryIds.has(libraryId)) ? 'ok' : 'no-access';
+  }
+
+  /** Refreshes one author of a bulk run; the caller has already checked access. A failure is reported, never thrown. */
+  async refreshAuthorForBulk(authorId: number, ignoreCache: boolean, userId: number): Promise<AuthorBulkRefreshItem> {
     const event = 'author.bulk_refresh_metadata';
     const startedAt = Date.now();
-    const ignoreCache = options?.ignoreCache === true;
-    const directive = bulkRefreshCacheDirective(ignoreCache);
-    this.logger.log(
-      `[${event}] [start] userId=${user.id} count=${authorIds.length} ignoreCache=${ignoreCache} - bulk author metadata refresh started`,
-    );
     try {
-      const uniqueAuthorIds = [...new Set(authorIds)];
-      if (uniqueAuthorIds.length === 0) {
-        this.logger.log(
-          `[${event}] [end] userId=${user.id} count=0 durationMs=${Date.now() - startedAt} processed=0 updated=0 failed=0 - bulk author metadata refresh completed`,
-        );
-        return { processed: 0, failed: 0, updated: 0 };
-      }
-
-      await this.assertMutationAccess(user, uniqueAuthorIds);
-
-      let processed = 0;
-      let failed = 0;
-      let updated = 0;
-      let callbackInterrupted = false;
-
-      for (let index = 0; index < uniqueAuthorIds.length; index += 1) {
-        const authorId = uniqueAuthorIds[index]!;
-        let didUpdate = false;
-        let imageUpdated = false;
-        let imageUrl: string | null | undefined;
-        let errorMessage: string | undefined;
-        let outboundRequests: number | undefined;
-
-        try {
-          const result = await this.refreshEnrichmentInternal(authorId, directive);
-          outboundRequests = result.outboundRequests;
-          didUpdate = result.descriptionUpdated || result.imageUpdated;
-          imageUpdated = result.imageUpdated;
-          if (imageUpdated) {
-            imageUrl = await this.authorImageStorage.getThumbnailUrlIfExists(authorId);
-          }
-          if (didUpdate) {
-            updated += 1;
-          }
-        } catch (error) {
-          failed += 1;
-          const itemErrorClass = error instanceof Error ? error.name : 'Error';
-          errorMessage = error instanceof Error ? error.message : 'Failed to refresh metadata';
-          const itemError = sanitizeLogValue(errorMessage);
-          this.logger.warn(
-            `[${event}] [fail] userId=${user.id} authorId=${authorId} durationMs=${Date.now() - startedAt} errorClass=${itemErrorClass} error="${itemError}" - author metadata refresh item failed`,
-          );
-        }
-
-        processed += 1;
-        try {
-          onProgress?.({ authorId, updated: didUpdate, imageUpdated, imageUrl, error: errorMessage });
-        } catch {
-          // callback threw (e.g. client disconnected) - stop the loop
-          callbackInterrupted = true;
-          break;
-        }
-
-        if (index < uniqueAuthorIds.length - 1) {
-          await this.sleep(outboundRequests === 0 ? CACHE_ONLY_ITEM_YIELD_MS : this.getBulkAudnexusDelayMs());
-        }
-      }
-
-      this.logger.log(
-        `[${event}] [end] userId=${user.id} count=${uniqueAuthorIds.length} durationMs=${Date.now() - startedAt} processed=${processed} updated=${updated} failed=${failed} callbackInterrupted=${callbackInterrupted} - bulk author metadata refresh completed`,
-      );
-      return { processed, failed, updated };
-    } catch (err) {
-      const errorClass = err instanceof Error ? err.name : 'Error';
-      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      const result = await this.refreshEnrichmentInternal(authorId, bulkRefreshCacheDirective(ignoreCache));
+      const imageUrl = result.imageUpdated ? await this.authorImageStorage.getThumbnailUrlIfExists(authorId) : undefined;
+      return {
+        kind: 'refreshed',
+        updated: result.descriptionUpdated || result.imageUpdated,
+        imageUpdated: result.imageUpdated,
+        imageUrl,
+        outboundRequests: result.outboundRequests,
+      };
+    } catch (error) {
+      if (error instanceof NotFoundException) return { kind: 'not-found' };
+      const errorMessage = error instanceof Error ? error.message : 'Failed to refresh metadata';
       this.logger.warn(
-        `[${event}] [fail] userId=${user.id} count=${authorIds.length} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - bulk author metadata refresh failed`,
+        `[${event}] [fail] userId=${userId} authorId=${authorId} durationMs=${Date.now() - startedAt} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(errorMessage)}" - author metadata refresh item failed`,
       );
-      throw err;
+      return { kind: 'failed', error: errorMessage };
     }
+  }
+
+  /**
+   * The pause before a bulk run's next author: a short yield after one served from the cache, and
+   * the provider delay otherwise, a failed author included.
+   */
+  async pauseBetweenBulkAuthors(previousOutboundRequests: number | undefined): Promise<void> {
+    await this.sleep(previousOutboundRequests === 0 ? CACHE_ONLY_ITEM_YIELD_MS : this.getBulkAudnexusDelayMs());
   }
 
   private async resolveLibraryIds(user: RequestUser, scopedLibraryId?: number): Promise<number[]> {
@@ -784,6 +772,7 @@ export class AuthorsService {
     return {
       ...this.mapAuthorSummary(row),
       description: row.description,
+      gender: row.gender,
       birthDate: row.birthDate,
       birthYear: row.birthYear,
       deathDate: row.deathDate,

@@ -11,7 +11,7 @@ function setup() {
     findReviewsToRemind: vi.fn().mockResolvedValue([]),
     markReminded: vi.fn().mockResolvedValue(undefined),
     expireReviews: vi.fn().mockResolvedValue([]),
-    clearExpiredWorkWindows: vi.fn().mockResolvedValue(undefined),
+    clearExpiredWorkWindows: vi.fn().mockResolvedValue(0),
     findJobIdsKeepingWork: vi.fn().mockResolvedValue(new Set([KEEP])),
   };
   const workspace = {
@@ -21,7 +21,7 @@ function setup() {
   };
   const worker = { cancel: vi.fn().mockResolvedValue(undefined) };
   const activity = { record: vi.fn().mockResolvedValue(undefined) };
-  const notifier = { notify: vi.fn().mockResolvedValue(undefined), pushUpdate: vi.fn().mockResolvedValue(undefined) };
+  const notifier = { notify: vi.fn().mockResolvedValue(undefined), pushUpdate: vi.fn().mockResolvedValue(undefined), jobsChanged: vi.fn() };
   const service = new ReadAloudLifecycleService(jobs as never, workspace as never, worker as never, activity as never, notifier as never);
   return { service, jobs, workspace, worker, activity, notifier };
 }
@@ -35,6 +35,16 @@ describe('ReadAloudLifecycleService', () => {
     expect(t.workspace.remove).toHaveBeenCalledWith(ORPHAN);
     expect(t.workspace.remove).not.toHaveBeenCalledWith(KEEP);
     expect(t.activity.record).toHaveBeenCalledWith(KEEP, 'warn', 'queued', 'recovered', expect.any(String));
+    expect(t.notifier.jobsChanged).toHaveBeenCalledWith(null);
+  });
+
+  it('tells the Jobs area when failed jobs lose their retry window, and stays quiet otherwise', async () => {
+    const t = setup();
+    await t.service.sweep();
+    expect(t.notifier.jobsChanged).not.toHaveBeenCalled();
+    t.jobs.clearExpiredWorkWindows.mockResolvedValue(2);
+    await t.service.sweep();
+    expect(t.notifier.jobsChanged).toHaveBeenCalledWith(null);
   });
 
   it('fails a job that keeps losing its server, keeping its work for Retry', async () => {

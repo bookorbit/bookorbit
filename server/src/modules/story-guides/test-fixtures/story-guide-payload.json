@@ -1,0 +1,293 @@
+{
+  "format": 1,
+  "textKey": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+  "pipeline": "x1.te1.na1.me1.re1.ti1.li1.as1",
+  "builtAt": "2026-11-09T10:00:00.000Z",
+  "language": "en",
+  "models": {
+    "fast": "fast-model",
+    "careful": "careful-model"
+  },
+  "coverage": 1,
+  "fixesRevision": 0,
+  "sections": [
+    {
+      "s": 3,
+      "title": "Chapter 1",
+      "chars": 112,
+      "h": "2cf20119"
+    },
+    {
+      "s": 4,
+      "title": "Chapter 2",
+      "chars": 96,
+      "h": "51de6b8e"
+    }
+  ],
+  "entities": [
+    {
+      "key": "violetta",
+      "name": "Violetta",
+      "kind": "character",
+      "names": [
+        {
+          "text": "Violetta",
+          "at": {
+            "s": 3,
+            "o": 61,
+            "q": "Violetta"
+          }
+        }
+      ],
+      "joins": [
+        {
+          "key": "the-masked-girl",
+          "name": "the masked girl",
+          "names": [
+            {
+              "text": "the masked girl",
+              "at": {
+                "s": 3,
+                "o": 11,
+                "q": "The masked girl"
+              }
+            }
+          ],
+          "lines": [
+            {
+              "through": {
+                "s": 3,
+                "end": true
+              },
+              "text": "Thief who takes the egg"
+            }
+          ],
+          "profiles": [
+            {
+              "through": {
+                "s": 3,
+                "end": true
+              },
+              "text": "A thief in a mask who takes the egg from Lord Leverance."
+            }
+          ],
+          "at": {
+            "s": 4,
+            "o": 11,
+            "q": "The masked girl was Violetta"
+          }
+        }
+      ],
+      "lines": [
+        {
+          "through": {
+            "s": 3,
+            "end": true
+          },
+          "text": "Daughter of Lord Leverance"
+        },
+        {
+          "through": {
+            "s": 4,
+            "end": true
+          },
+          "text": "Daughter of Lord Leverance who stole the egg"
+        }
+      ],
+      "profiles": [
+        {
+          "through": {
+            "s": 3,
+            "end": true
+          },
+          "text": "The daughter of Lord Leverance."
+        },
+        {
+          "through": {
+            "s": 4,
+            "end": true
+          },
+          "text": "The daughter of Lord Leverance, and the masked thief who stole his egg."
+        }
+      ],
+      "fixed": false
+    },
+    {
+      "key": "lord-leverance",
+      "name": "Lord Leverance",
+      "kind": "character",
+      "names": [
+        {
+          "text": "Lord Leverance",
+          "at": {
+            "s": 3,
+            "o": 45,
+            "q": "Lord  Leverance"
+          }
+        }
+      ],
+      "joins": [],
+      "lines": [],
+      "profiles": [],
+      "fixed": false
+    },
+    {
+      "key": "tom",
+      "name": "Tom",
+      "kind": "character",
+      "names": [
+        {
+          "text": "Tom",
+          "at": {
+            "s": 3,
+            "o": 97,
+            "q": "Tom"
+          }
+        }
+      ],
+      "joins": [],
+      "lines": [],
+      "profiles": [],
+      "fixed": false
+    },
+    {
+      "key": "tom-2",
+      "name": "TOM",
+      "kind": "character",
+      "names": [
+        {
+          "text": "TOM",
+          "at": {
+            "s": 4,
+            "o": 74,
+            "q": "TOM"
+          }
+        }
+      ],
+      "joins": [],
+      "lines": [
+        {
+          "through": {
+            "s": 4,
+            "end": true
+          },
+          "text": "A sleeping dragon"
+        }
+      ],
+      "profiles": [],
+      "fixed": false
+    }
+  ],
+  "ties": [
+    {
+      "key": "lord-leverance|enemy_of|the-masked-girl",
+      "a": "lord-leverance",
+      "type": "enemy_of",
+      "b": "the-masked-girl",
+      "label": "enemy of",
+      "at": {
+        "s": 3,
+        "o": 11,
+        "q": "The masked girl took the egg from Lord"
+      },
+      "quotes": [
+        {
+          "s": 3,
+          "o": 11,
+          "q": "The masked girl took the egg from Lord"
+        }
+      ],
+      "count": 1,
+      "fixed": false
+    },
+    {
+      "key": "lord-leverance|parent_of|violetta",
+      "a": "lord-leverance",
+      "type": "parent_of",
+      "b": "violetta",
+      "label": "parent of",
+      "at": {
+        "s": 3,
+        "o": 61,
+        "q": "Violetta, his daughter"
+      },
+      "quotes": [
+        {
+          "s": 3,
+          "o": 61,
+          "q": "Violetta, his daughter"
+        }
+      ],
+      "count": 1,
+      "fixed": false
+    },
+    {
+      "key": "tom|friend_of|tom-2",
+      "a": "tom",
+      "type": "friend_of",
+      "b": "tom-2",
+      "label": "friend of",
+      "at": {
+        "s": 3,
+        "o": 97,
+        "q": "Tom kept watch"
+      },
+      "quotes": [
+        {
+          "s": 3,
+          "o": 97,
+          "q": "Tom kept watch"
+        },
+        {
+          "s": 4,
+          "o": 65,
+          "q": "Tom, and TOM"
+        }
+      ],
+      "count": 2,
+      "fixed": false
+    },
+    {
+      "key": "violetta|loves|tom",
+      "a": "violetta",
+      "type": "loves",
+      "b": "tom",
+      "label": "loves",
+      "at": {
+        "s": 4,
+        "o": 11,
+        "q": "The masked girl was Violetta all along"
+      },
+      "quotes": [
+        {
+          "s": 4,
+          "o": 11,
+          "q": "The masked girl was Violetta all along"
+        },
+        {
+          "s": 4,
+          "o": 50,
+          "q": "Violetta loves Tom"
+        }
+      ],
+      "count": 2,
+      "fixed": false
+    }
+  ],
+  "summaries": [
+    {
+      "through": {
+        "s": 3,
+        "end": true
+      },
+      "text": "A masked girl takes the egg from Lord Leverance while his daughter Violetta sleeps."
+    },
+    {
+      "through": {
+        "s": 4,
+        "end": true
+      },
+      "text": "The masked girl turns out to be Violetta, who loves Tom."
+    }
+  ]
+}
