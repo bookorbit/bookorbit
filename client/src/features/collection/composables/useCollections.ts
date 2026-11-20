@@ -1,4 +1,5 @@
 import { ref } from 'vue'
+import { createEventHook } from '@vueuse/core'
 import { api } from '@/lib/api'
 import { createCoalescedFetch, createRequestGeneration } from '@/lib/async'
 import type { BookSelectionPayload, Collection, CoverAspectRatio, CreateCollectionPayload } from '@bookorbit/types'
@@ -8,6 +9,7 @@ const loaded = ref(false)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const listGeneration = createRequestGeneration()
+const bookMembershipChanged = createEventHook<number>()
 
 const loadCollectionList = createCoalescedFetch(async (): Promise<void> => {
   loading.value = true
@@ -110,6 +112,7 @@ export function useCollections() {
     if (!res.ok) throw new Error('Failed to add books to collection')
     const updated: Collection = await res.json()
     collections.value = collections.value.map((c) => (c.id === collectionId ? updated : c))
+    void bookMembershipChanged.trigger(collectionId)
     return updated
   }
 
@@ -122,6 +125,7 @@ export function useCollections() {
     if (!res.ok) throw new Error('Failed to remove books from collection')
     const updated: Collection = await res.json()
     collections.value = collections.value.map((c) => (c.id === collectionId ? updated : c))
+    void bookMembershipChanged.trigger(collectionId)
     return updated
   }
 
@@ -154,6 +158,7 @@ export function useCollections() {
     updateCollection,
     addBooksToCollection,
     removeBooksFromCollection,
+    onBookMembershipChanged: bookMembershipChanged.on,
     reorderCollections,
     deleteCollection,
   }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, ref, shallowRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
@@ -34,6 +34,7 @@ const {
   error: collectionsError,
   fetchCollections,
   removeBooksFromCollection,
+  onBookMembershipChanged,
   deleteCollection,
 } = useCollections()
 const collectionNotFound = ref(false)
@@ -53,6 +54,26 @@ const page = useBookListPage({
   backupFilePrefix: 'collection',
 })
 
+let active = true
+let booksNeedReload = false
+
+onBookMembershipChanged((id) => {
+  if (id !== collectionId.value) return
+  if (active) page.reload()
+  else booksNeedReload = true
+})
+
+onActivated(() => {
+  active = true
+  if (!booksNeedReload) return
+  booksNeedReload = false
+  page.reload()
+})
+
+onDeactivated(() => {
+  active = false
+})
+
 const pageTitle = computed(() => {
   if (collection.value?.name) return t('views.collection.pageTitle', { name: collection.value.name })
   return Number.isFinite(collectionId.value) ? t('views.collection.pageTitleWithId', { id: collectionId.value }) : t('views.collection.title')
@@ -70,7 +91,6 @@ async function handleRemoveFromCollection() {
   try {
     const ids = [...page.selectedIds]
     await removeBooksFromCollection(collectionId.value, { bookIds: ids })
-    page.reload()
     page.exitSelectionMode()
     toast.success(t('views.collection.toast.removed', { count: ids.length }))
   } catch {
