@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 
+import { IdlePoll } from '../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { appConfig } from '../../config/config';
 import { ChapterEditorService } from '../chapter-editor/chapter-editor.service';
@@ -14,6 +15,8 @@ const BOOKS_PER_TICK = 10;
 const MAX_ATTEMPTS = 3;
 /** Wait before the second and third tries, so a brief outage on Audible's side does not end the book's chances. */
 const RETRY_DELAYS_MS = [60_000, 5 * 60_000];
+/** A lookup counts as abandoned after a quarter hour, so looking for one every five minutes finds it nearly as soon. */
+const STALE_CHECK_INTERVAL_MS = 5 * 60_000;
 
 /**
  * Works through the bulk chapter lookup queue. The queue lives in the database, so a restart picks
@@ -22,9 +25,11 @@ const RETRY_DELAYS_MS = [60_000, 5 * 60_000];
 @Injectable()
 export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ChapterLookupWorker.name);
+  private readonly idlePoll = new IdlePoll();
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private stopped = false;
+  private lastStaleCheckAt = 0;
   /** Whose book was claimed last, until the queue is found empty and that is announced. */
   private unannouncedDrain: { ownerId: number | null } | null = null;
 
@@ -48,17 +53,25 @@ export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
     if (this.timer) clearInterval(this.timer);
   }
 
+  wake(): void {
+    this.idlePoll.wake();
+  }
+
   async tick(): Promise<void> {
     if (this.running || this.stopped) return;
+    const deferIfIdle = this.idlePoll.begin();
+    if (!deferIfIdle) return;
     this.running = true;
     try {
-      if ((await this.repo.requeueProcessing(true)) > 0) this.changed(null);
+      await this.requeueAbandoned();
       for (let done = 0; done < BOOKS_PER_TICK && !this.stopped; done += 1) {
         const job = await this.repo.claimNext();
         if (!job) {
           // The queue ran dry, possibly in an earlier tick: the last batch no longer has a running row.
           if (this.unannouncedDrain) this.changed(this.unannouncedDrain.ownerId);
           this.unannouncedDrain = null;
+          // A lookup waiting to retry is picked up by the idle poll after its time comes.
+          deferIfIdle();
           break;
         }
         this.unannouncedDrain = { ownerId: job.userId };
@@ -75,6 +88,12 @@ export class ChapterLookupWorker implements OnModuleInit, OnModuleDestroy {
     } finally {
       this.running = false;
     }
+  }
+
+  private async requeueAbandoned(): Promise<void> {
+    if (Date.now() - this.lastStaleCheckAt < STALE_CHECK_INTERVAL_MS) return;
+    this.lastStaleCheckAt = Date.now();
+    if ((await this.repo.requeueProcessing(true)) > 0) this.changed(null);
   }
 
   private async process(job: { bookId: number; userId: number | null; attemptCount: number; claimToken: string }): Promise<void> {

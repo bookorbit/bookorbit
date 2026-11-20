@@ -71,7 +71,7 @@ export function createAiJobsEngine(db: AiJobsDb) {
   const pauses = new AiJobPauses(ports);
   const lifecycle = new AiJobLifecycle(registry, jobs, steps, pauses, activity, notifier, ports);
   // The service's own worker: the one a cancel on "this server" stops at once.
-  const local = new AiJobWorker(registry, jobs, runner, activity, notifier, rates, ports);
+  const local = new AiJobWorker(registry, jobs, runner, activity, notifier, rates, ports, changes);
   const audits: AuditEventPayload[] = [];
   const audit = {
     record: (payload: AuditEventPayload) => {
@@ -110,7 +110,7 @@ export function createAiJobsEngine(db: AiJobsDb) {
     local,
 
     worker(): AiJobWorker {
-      const worker = new AiJobWorker(registry, jobs, runner, activity, notifier, rates, ports);
+      const worker = new AiJobWorker(registry, jobs, runner, activity, notifier, rates, ports, changes);
       workers.push(worker);
       return worker;
     },

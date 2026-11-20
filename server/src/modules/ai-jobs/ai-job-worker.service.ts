@@ -3,10 +3,12 @@ import { hostname } from 'os';
 import { Inject, Injectable, Logger, OnApplicationShutdown } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 
+import { IdlePoll } from '../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import type { AiJobRow } from '../../db/schema';
 import { AiFeatureRegistry } from './ai-feature.registry';
 import { AiJobActivityService } from './ai-job-activity.service';
+import { AI_JOB_CHANGED, AiJobChanges, type AiJobChange } from './ai-job-changes.service';
 import { AiJobNotifier } from './ai-job-notifier.service';
 import { AiJobRepository } from './ai-job.repository';
 import { AiJobRunner, type AiRunOutcome, type AiStepTiming } from './ai-job-runner.service';
@@ -26,6 +28,11 @@ export class AiJobWorker implements OnApplicationShutdown {
   private readonly logger = new Logger(AiJobWorker.name);
   private readonly instance = `${hostname().slice(0, 30)}:${process.pid}:${randomUUID().slice(0, 8)}`;
   private readonly running = new Map<string, { owner: string; controller: AbortController; done: Promise<void> }>();
+  private readonly idlePoll = new IdlePoll();
+  /** Every status change can make a job claimable: one queued, retried or resumed, or a slot freed by one ending. */
+  private readonly onJobChanged = (change: AiJobChange) => {
+    if (change.kind === 'state') this.idlePoll.wake();
+  };
   private dispatching = false;
   private stopped = false;
 
@@ -37,7 +44,10 @@ export class AiJobWorker implements OnApplicationShutdown {
     private readonly notifier: AiJobNotifier,
     private readonly rates: AiStepRates,
     @Inject(AI_JOBS_PORTS) private readonly ports: AiJobsPorts,
-  ) {}
+    private readonly changes: AiJobChanges,
+  ) {
+    this.changes.on(AI_JOB_CHANGED, this.onJobChanged);
+  }
 
   /** Jobs this server is running now. */
   get runningJobIds(): string[] {
@@ -47,9 +57,14 @@ export class AiJobWorker implements OnApplicationShutdown {
   @Interval(AI_JOBS_DISPATCH_INTERVAL_MS)
   async tick(): Promise<void> {
     if (this.dispatching || this.stopped) return;
+    const deferIfIdle = this.idlePoll.begin();
+    if (!deferIfIdle) return;
     this.dispatching = true;
     try {
+      let due = false;
       for (const feature of this.registry.list()) {
+        if (!(await this.jobs.hasDueJob(feature.id))) continue;
+        due = true;
         const settings = await this.ports.settings.get(feature.id);
         const limit = Math.min(MAX_BUILDS_AT_ONCE, Math.max(1, Math.floor(settings.buildsAtOnce)));
         for (;;) {
@@ -59,6 +74,8 @@ export class AiJobWorker implements OnApplicationShutdown {
           this.start(row, owner);
         }
       }
+      // A due job left waiting for a slot keeps the dispatch cadence, so a raised builds-at-once setting is heard.
+      if (!due) deferIfIdle();
     } catch (error) {
       this.logger.warn(
         `[ai_jobs.dispatch] [fail] errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - AI jobs dispatch tick failed`,
@@ -80,6 +97,7 @@ export class AiJobWorker implements OnApplicationShutdown {
 
   async onApplicationShutdown(): Promise<void> {
     this.stopped = true;
+    this.changes.off(AI_JOB_CHANGED, this.onJobChanged);
     for (const run of this.running.values()) run.controller.abort();
     await this.idle();
   }

@@ -1,4 +1,6 @@
+import { IDLE_POLL_INTERVAL_MS } from '../../common/utils/idle-poll';
 import type { AiJobRow } from '../../db/schema';
+import { AI_JOB_CHANGED, AiJobChanges, type AiJobChangeKind } from './ai-job-changes.service';
 import type { AiArtifactValues, AiRunOutcome, AiStepTiming } from './ai-job-runner.service';
 import { AiJobWorker } from './ai-job-worker.service';
 import { AI_JOBS_LEASE_MS, AI_JOBS_RENEW_MS } from './ai-jobs.constants';
@@ -22,6 +24,7 @@ function makeWorker(
   const h = createRunnerHarness();
   const queue: AiJobRow[] = [];
   const jobs = {
+    hasDueJob: vi.fn<(feature: string) => Promise<boolean>>().mockResolvedValue(true),
     claimNext: vi.fn<(feature: string, owner: string, leaseMs: number, limit: number) => Promise<AiJobRow | null>>(() =>
       Promise.resolve(queue.shift() ?? null),
     ),
@@ -39,8 +42,13 @@ function makeWorker(
   const notifier = { notify: vi.fn(() => Promise.resolve()) };
   const rates = { learn: vi.fn<(rows: readonly AiStepTiming[]) => Promise<void>>(() => Promise.resolve()) };
   const release = vi.spyOn(h.ports.budget, 'release');
-  const worker = new AiJobWorker(h.registry, jobs as never, runner as never, activity as never, notifier as never, rates as never, h.ports);
-  return { h, queue, jobs, runner, activity, notifier, rates, release, worker };
+  const changes = new AiJobChanges();
+  const worker = new AiJobWorker(h.registry, jobs as never, runner as never, activity as never, notifier as never, rates as never, h.ports, changes);
+  return { h, queue, jobs, runner, activity, notifier, rates, release, changes, worker };
+}
+
+function announce(changes: AiJobChanges, row: AiJobRow, kind: AiJobChangeKind): void {
+  changes.changed({ id: row.id, feature: row.feature, subjectRef: row.subjectRef, requestedBy: row.requestedBy, kind });
 }
 
 function untilAborted(signal: AbortSignal): Promise<AiRunOutcome> {
@@ -49,6 +57,60 @@ function untilAborted(signal: AbortSignal): Promise<AiRunOutcome> {
 
 describe('AiJobWorker', () => {
   afterEach(() => vi.useRealTimers());
+
+  it('backs off while nothing is due, skipping settings and claims, until a job changes state', async () => {
+    const w = makeWorker();
+    const settings = vi.spyOn(w.h.ports.settings, 'get');
+    w.jobs.hasDueJob.mockResolvedValueOnce(false);
+
+    await w.worker.tick();
+    await w.worker.tick();
+    expect(w.jobs.hasDueJob).toHaveBeenCalledOnce();
+    expect(w.jobs.hasDueJob).toHaveBeenCalledWith(w.h.feature.id);
+    expect(settings).not.toHaveBeenCalled();
+    expect(w.jobs.claimNext).not.toHaveBeenCalled();
+
+    const job = w.h.job();
+    w.queue.push(job);
+    announce(w.changes, job, 'progress');
+    await w.worker.tick();
+    expect(w.jobs.hasDueJob).toHaveBeenCalledOnce();
+
+    announce(w.changes, job, 'state');
+    await w.worker.tick();
+    await w.worker.idle();
+    expect(w.runner.run).toHaveBeenCalledOnce();
+  });
+
+  it('looks again unwoken once the idle wait has passed', async () => {
+    vi.useFakeTimers();
+    const w = makeWorker();
+    w.jobs.hasDueJob.mockResolvedValueOnce(false);
+    await w.worker.tick();
+
+    await vi.advanceTimersByTimeAsync(IDLE_POLL_INTERVAL_MS - 1);
+    await w.worker.tick();
+    expect(w.jobs.hasDueJob).toHaveBeenCalledOnce();
+
+    await vi.advanceTimersByTimeAsync(1);
+    await w.worker.tick();
+    expect(w.jobs.hasDueJob).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the dispatch cadence while a due job waits for a free slot', async () => {
+    const w = makeWorker();
+    await w.worker.tick();
+    await w.worker.tick();
+    expect(w.jobs.hasDueJob).toHaveBeenCalledTimes(2);
+    expect(w.jobs.claimNext).toHaveBeenCalledTimes(2);
+  });
+
+  it('stops listening for job changes on shutdown', async () => {
+    const w = makeWorker();
+    expect(w.changes.listenerCount(AI_JOB_CHANGED)).toBe(1);
+    await w.worker.onApplicationShutdown();
+    expect(w.changes.listenerCount(AI_JOB_CHANGED)).toBe(0);
+  });
 
   it('claims until nothing is due, each claim under its own lease owner', async () => {
     const w = makeWorker();

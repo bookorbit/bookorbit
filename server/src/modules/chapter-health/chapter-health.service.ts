@@ -12,6 +12,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { JobChangesService } from '../jobs/job-changes.service';
 import { LibraryService } from '../library/library.service';
 import { ChapterHealthRepository, type ChapterLookupOwnerFilter, type ChapterLookupSummary } from './chapter-health.repository';
+import { ChapterLookupWorker } from './chapter-lookup.worker';
 import type { ChapterHealthListDto, EnqueueChapterLookupDto } from './dto/chapter-health.dto';
 
 const DEFAULT_PAGE_SIZE = 50;
@@ -26,6 +27,7 @@ export class ChapterHealthService {
     private readonly repo: ChapterHealthRepository,
     private readonly libraryService: LibraryService,
     private readonly jobChanges: JobChangesService,
+    private readonly worker: ChapterLookupWorker,
   ) {}
 
   async summary(user: RequestUser, libraryId?: number): Promise<ChapterHealthSummary> {
@@ -92,7 +94,10 @@ export class ChapterHealthService {
       throw new BadRequestException('Choose books or a category to look up');
     }
     const queued = await this.repo.enqueue(bookIds, user.id);
-    if (queued > 0) this.changed(user.id);
+    if (queued > 0) {
+      this.worker.wake();
+      this.changed(user.id);
+    }
     return { queued, skipped: requested - queued };
   }
 
@@ -151,7 +156,9 @@ export class ChapterHealthService {
   }
 
   async retryFailedFor(viewer: RequestUser, ownerId: number | null): Promise<number> {
-    return this.changedBy(ownerId, await this.repo.retryFailedFor(ownerId, await this.libraryIds(viewer), this.filtersOf(viewer)));
+    const retried = await this.repo.retryFailedFor(ownerId, await this.libraryIds(viewer), this.filtersOf(viewer));
+    if (retried > 0) this.worker.wake();
+    return this.changedBy(ownerId, retried);
   }
 
   private filtersOf(user: RequestUser) {

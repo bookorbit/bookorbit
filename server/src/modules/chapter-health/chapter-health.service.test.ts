@@ -55,7 +55,9 @@ function setup(editableLibraryIds = [2, 3]) {
   };
   const libraryService = { findEditableLibraryIds: vi.fn().mockResolvedValue(editableLibraryIds) };
   const jobChanges = { notify: vi.fn() };
-  return { service: new ChapterHealthService(repo as never, libraryService as never, jobChanges as never), repo, libraryService, jobChanges };
+  const worker = { wake: vi.fn() };
+  const service = new ChapterHealthService(repo as never, libraryService as never, jobChanges as never, worker as never);
+  return { service, repo, libraryService, jobChanges, worker };
 }
 
 describe('ChapterHealthService.summary', () => {
@@ -155,13 +157,22 @@ describe('ChapterHealthService.list', () => {
 
 describe('ChapterHealthService.enqueue', () => {
   it('queues the chosen books that can be looked up, counting the rest as skipped', async () => {
-    const { service, repo } = setup();
+    const { service, repo, worker } = setup();
     repo.filterLookupCandidates.mockResolvedValue([11, 13]);
 
     await expect(service.enqueue(USER, { bookIds: [11, 12, 13, 11, 14] })).resolves.toEqual({ queued: 2, skipped: 2 });
     expect(repo.filterLookupCandidates).toHaveBeenCalledWith([2, 3], [11, 12, 13, 14], USER.contentFilters);
     expect(repo.enqueue).toHaveBeenCalledWith([11, 13], USER.id);
+    expect(worker.wake).toHaveBeenCalledOnce();
     expect(repo.findLookupCandidates).not.toHaveBeenCalled();
+  });
+
+  it('wakes the worker when failed lookups are queued again', async () => {
+    const { service, repo, worker } = setup();
+    repo.retryFailedFor.mockResolvedValue(2);
+
+    await expect(service.retryFailedFor(USER, USER.id)).resolves.toBe(2);
+    expect(worker.wake).toHaveBeenCalledOnce();
   });
 
   it('queues every book with an ASIN in a category, capped per request', async () => {

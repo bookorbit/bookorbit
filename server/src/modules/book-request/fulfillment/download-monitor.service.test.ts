@@ -1,6 +1,8 @@
 import { ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
 
+import { IDLE_POLL_INTERVAL_MS } from '../../../common/utils/idle-poll';
 import type { BookRequestDownloadRow } from '../../../db/schema';
+import { BOOK_REQUEST_DOWNLOAD_QUEUED, BookRequestEventsService } from '../book-request-events.service';
 import type { DownloadStatus } from '../download-clients/download-client-adapter';
 import { DownloadMonitorService } from './download-monitor.service';
 
@@ -96,6 +98,7 @@ function makeService(
   const fulfillment = { failDownload: vi.fn().mockResolvedValue(undefined) };
   const removal = { cleanupStagedClientDownload: vi.fn().mockResolvedValue(undefined) };
   const gateway = { emitProgress: vi.fn(), emitChanged: vi.fn() };
+  const events = new BookRequestEventsService();
 
   const service = new DownloadMonitorService(
     downloads as never,
@@ -107,9 +110,10 @@ function makeService(
     fulfillment as never,
     removal as never,
     gateway as never,
+    events,
   );
 
-  return { service, downloads, requests, clients, adapter, direct, imports, fulfillment, removal, gateway };
+  return { service, downloads, requests, clients, adapter, direct, imports, fulfillment, removal, gateway, events };
 }
 
 /**
@@ -132,6 +136,51 @@ function flush(): Promise<void> {
 }
 
 describe('DownloadMonitorService.tick', () => {
+  it('backs off idle reads, the resume sweep with them, and finds work another process wrote at its next idle poll', async () => {
+    vi.useFakeTimers();
+    try {
+      const { service, downloads, direct } = makeService({ active: [] });
+      await service.tick();
+      downloads.findActive.mockResolvedValue([row({ downloadClientId: null, source: 'direct_url' })]);
+      await vi.advanceTimersByTimeAsync(IDLE_POLL_INTERVAL_MS - 1_000);
+      await service.tick();
+      expect(downloads.findActive).toHaveBeenCalledTimes(1);
+      expect(downloads.findCompletedAwaitingImport).toHaveBeenCalledTimes(1);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await polled(service);
+      expect(direct.status).toHaveBeenCalledTimes(1);
+      expect(downloads.findCompletedAwaitingImport).toHaveBeenCalledTimes(2);
+
+      await vi.advanceTimersByTimeAsync(1_000);
+      await polled(service);
+      expect(direct.status).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('hears a new download even when an in-flight read returns an older empty result', async () => {
+    const { service, downloads, events, adapter } = makeService({ active: [] });
+    service.onModuleInit();
+    try {
+      const emptyRead = Promise.withResolvers<BookRequestDownloadRow[]>();
+      downloads.findActive.mockReturnValueOnce(emptyRead.promise).mockResolvedValue([row()]);
+      const firstTick = service.tick();
+      await flush();
+      expect(downloads.findActive).toHaveBeenCalledTimes(1);
+      events.emit(BOOK_REQUEST_DOWNLOAD_QUEUED);
+      emptyRead.resolve([]);
+      await firstTick;
+
+      await polled(service);
+      expect(adapter.status).toHaveBeenCalledTimes(1);
+    } finally {
+      service.onModuleDestroy();
+    }
+    expect(events.listenerCount(BOOK_REQUEST_DOWNLOAD_QUEUED)).toBe(0);
+  });
+
   it('makes no HTTP call at all when nothing is in flight', async () => {
     const { service, clients, adapter } = makeService({ active: [] });
     await polled(service);
@@ -609,8 +658,11 @@ describe('DownloadMonitorService.tick', () => {
       await polled(context.service);
       await flush();
       now.mockReturnValue(120_000);
+      // Nothing is in flight, so the monitor backed off; waking stands in for its idle poll.
+      (context.service as unknown as { activePoll: { wake(): void } }).activePoll.wake();
       await polled(context.service);
       await flush();
+      expect(context.downloads.findCompletedAwaitingImport).toHaveBeenCalledTimes(2);
 
       expect(context.imports.importDownload).toHaveBeenCalledTimes(1);
       finishImport();

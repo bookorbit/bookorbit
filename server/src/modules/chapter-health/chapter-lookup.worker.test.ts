@@ -1,3 +1,4 @@
+import { IDLE_POLL_INTERVAL_MS } from '../../common/utils/idle-poll';
 import type { BulkLookupOutcome } from '../chapter-editor/chapter-editor.service';
 import { ChapterLookupWorker } from './chapter-lookup.worker';
 
@@ -62,6 +63,39 @@ describe('ChapterLookupWorker', () => {
     worker.onModuleDestroy();
     await vi.advanceTimersByTimeAsync(30_000);
     expect(repo.claimNext).toHaveBeenCalledTimes(1);
+  });
+
+  it('backs off an empty queue, even with a lookup waiting to retry, and wakes when work arrives', async () => {
+    const { worker, repo, editor } = setup({ nodeEnv: 'production' });
+    await worker.onModuleInit();
+    try {
+      await vi.advanceTimersByTimeAsync(9_000);
+      expect(repo.claimNext).toHaveBeenCalledTimes(1);
+
+      repo.claimNext.mockResolvedValueOnce({ bookId: 41, userId: 7, attemptCount: 1, claimToken: 'claim' });
+      worker.wake();
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(editor.bulkLookup).toHaveBeenCalledWith(41, 7);
+    } finally {
+      worker.onModuleDestroy();
+    }
+  });
+
+  it('finds a retry that came due at the idle poll, and looks for abandoned lookups only every few minutes', async () => {
+    const { worker, repo } = setup({ nodeEnv: 'production' });
+    await worker.onModuleInit();
+    try {
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(repo.claimNext).toHaveBeenCalledTimes(1);
+      expect(repo.requeueProcessing).toHaveBeenLastCalledWith(true);
+
+      await vi.advanceTimersByTimeAsync(IDLE_POLL_INTERVAL_MS);
+      expect(repo.claimNext).toHaveBeenCalledTimes(2);
+      // Once at boot and once on the first tick; the next look is due five minutes after that.
+      expect(repo.requeueProcessing).toHaveBeenCalledTimes(2);
+    } finally {
+      worker.onModuleDestroy();
+    }
   });
 
   it('records each outcome in queue order on behalf of whoever queued the book', async () => {

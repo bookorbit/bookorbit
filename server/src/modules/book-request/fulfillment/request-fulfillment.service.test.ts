@@ -141,7 +141,7 @@ function makeService(
 
 describe('RequestFulfillmentService.grab', () => {
   it('records the attempt before calling the client, so an add never outlives its row', async () => {
-    const { service, downloads, adapter } = makeService();
+    const { service, downloads, adapter, events } = makeService();
 
     await service.grab(7, { magnet: MAGNET }, user());
 
@@ -149,6 +149,8 @@ describe('RequestFulfillmentService.grab', () => {
       expect.objectContaining({ requestId: 7, source: 'magnet', clientKey: INFO_HASH, status: 'queued', releaseTitle: 'Dune' }),
     );
     expect(downloads.create.mock.invocationCallOrder[0]).toBeLessThan(adapter.add.mock.invocationCallOrder[0]);
+    expect(events.emit).toHaveBeenCalledWith('book-request.download.queued');
+    expect(events.emit.mock.invocationCallOrder[0]).toBeGreaterThan(downloads.create.mock.invocationCallOrder[0]);
   });
 
   it('marks who grabbed it, because only an unattended attempt may be retried unattended', async () => {

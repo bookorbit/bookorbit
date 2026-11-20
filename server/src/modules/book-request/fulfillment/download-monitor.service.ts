@@ -1,10 +1,12 @@
-import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
 import type { BookRequestDownloadStatus, BookRequestStatus } from '@bookorbit/types';
 
 import { SystemCron } from '../../../common/decorators/system-cron.decorator';
+import { IdlePoll } from '../../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
+import { BOOK_REQUEST_DOWNLOAD_QUEUED, BookRequestEventsService } from '../book-request-events.service';
 import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestRepository } from '../book-request.repository';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
@@ -73,8 +75,10 @@ const DIRECT = 'direct' as const;
 type PollTarget = number | typeof DIRECT;
 
 @Injectable()
-export class DownloadMonitorService implements OnModuleDestroy {
+export class DownloadMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DownloadMonitorService.name);
+  private readonly activePoll = new IdlePoll();
+  private readonly onDownloadQueued = () => this.activePoll.wake();
   private running = false;
   private lastResumeAt = 0;
   private lastHeartbeatAt = 0;
@@ -105,9 +109,15 @@ export class DownloadMonitorService implements OnModuleDestroy {
     private readonly fulfillment: RequestFulfillmentService,
     private readonly removal: DownloadRemovalService,
     private readonly gateway: BookRequestGateway,
+    private readonly events: BookRequestEventsService,
   ) {}
 
+  onModuleInit(): void {
+    this.events.on(BOOK_REQUEST_DOWNLOAD_QUEUED, this.onDownloadQueued);
+  }
+
   onModuleDestroy(): void {
+    this.events.off(BOOK_REQUEST_DOWNLOAD_QUEUED, this.onDownloadQueued);
     this.importQueue.stop();
     this.stageQueue.stop();
   }
@@ -129,19 +139,25 @@ export class DownloadMonitorService implements OnModuleDestroy {
 
   private async poll(): Promise<void> {
     const now = Date.now();
-    if (now - this.lastResumeAt >= RESUME_SWEEP_INTERVAL_MS) {
-      this.lastResumeAt = now;
-      await this.resumeUnimported();
-    }
-
     if (now - this.lastHeartbeatAt >= IMPORT_HEARTBEAT_INTERVAL_MS) {
       this.lastHeartbeatAt = now;
       await this.heartbeatImports();
     }
 
+    const deferIfIdle = this.activePoll.begin();
+    if (!deferIfIdle) return;
+    // Behind the idle gate: with nothing in flight, an import that never ran waits for the idle poll.
+    if (now - this.lastResumeAt >= RESUME_SWEEP_INTERVAL_MS) {
+      this.lastResumeAt = now;
+      await this.resumeUnimported();
+    }
+
     const active = await this.downloads.findActive();
     this.pruneStageRetryState(active);
-    if (active.length === 0) return;
+    if (active.length === 0) {
+      deferIfIdle();
+      return;
+    }
 
     const byTarget = new Map<PollTarget, BookRequestDownloadRow[]>();
     for (const row of active) {

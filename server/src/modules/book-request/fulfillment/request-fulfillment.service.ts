@@ -48,7 +48,7 @@ import { isUniqueViolation } from '../../../common/utils/db-error.utils';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { RequestUser } from '../../../common/types/request-user';
 import type { BookRequestDownloadRow, BookRequestRow, NewBookRequestRow } from '../../../db/schema';
-import { BOOK_REQUEST_DOWNLOAD_FAILED, BookRequestEventsService } from '../book-request-events.service';
+import { BOOK_REQUEST_DOWNLOAD_FAILED, BOOK_REQUEST_DOWNLOAD_QUEUED, BookRequestEventsService } from '../book-request-events.service';
 import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestNotifier } from '../book-request-notifier.service';
 import { mapBookRequestDownload, mapBookRequestRow } from '../book-request.mapper';
@@ -290,6 +290,7 @@ export class RequestFulfillmentService {
       throw error;
     }
 
+    this.events.emit(BOOK_REQUEST_DOWNLOAD_QUEUED);
     try {
       if (client === null) {
         await this.direct.add({

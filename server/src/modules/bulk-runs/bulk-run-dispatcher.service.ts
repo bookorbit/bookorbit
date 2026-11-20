@@ -3,6 +3,7 @@ import type { ConfigType } from '@nestjs/config';
 import { Interval } from '@nestjs/schedule';
 
 import type { RequestUser } from '../../common/types/request-user';
+import { IdlePoll } from '../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { bulkRunsConfig } from '../../config/config';
 import type { BulkRunRow } from '../../db/schema';
@@ -52,6 +53,7 @@ function messageOf(error: unknown): string {
 @Injectable()
 export class BulkRunDispatcher implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BulkRunDispatcher.name);
+  private readonly idlePoll = new IdlePoll();
   private readonly active = new Map<string, ActiveRun>();
   /** Runs whose end could not be saved; each tick tries again, since an unsaved run blocks its account's line. */
   private readonly unsettled = new Map<string, PendingSettle>();
@@ -114,6 +116,7 @@ export class BulkRunDispatcher implements OnApplicationBootstrap, OnModuleDestro
 
   /** Looks for work now instead of at the next tick. */
   wake(): void {
+    this.idlePoll.wake();
     if (this.wakeQueued) return;
     this.wakeQueued = true;
     setImmediate(() => {
@@ -125,13 +128,18 @@ export class BulkRunDispatcher implements OnApplicationBootstrap, OnModuleDestro
   @Interval(BULK_RUN_TICK_MS)
   async tick(): Promise<void> {
     if (!this.ready || this.ticking || this.stopping) return;
+    const deferIfIdle = this.idlePoll.begin();
+    if (!deferIfIdle) return;
     this.ticking = true;
     try {
       await this.retryUnsettled();
       const busy: string[] = [];
       while (!this.stopping && this.active.size < this.config.maxConcurrent) {
         const claim = await this.repo.claimNext([...busy, ...this.active.keys()]);
-        if (!claim) break;
+        if (!claim) {
+          if (this.active.size === 0 && this.unsettled.size === 0 && busy.length === 0) deferIfIdle();
+          break;
+        }
         if ((await this.start(claim.run, claim.firstStart)) === 'busy') busy.push(claim.run.id);
       }
     } catch (error) {

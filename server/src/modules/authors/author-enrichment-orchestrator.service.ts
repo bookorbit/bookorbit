@@ -5,6 +5,7 @@ import { NotificationType, Permission } from '@bookorbit/types';
 import { JobChangesService } from '../jobs/job-changes.service';
 import { NotificationService } from '../notification/notification.service';
 import { METADATA_AUTHORS_REPLACED, MetadataAuthorsReplacedEvent, MetadataEventsService } from '../metadata/metadata-events.service';
+import { IdlePoll } from '../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { backgroundEnrichmentCacheDirective, CACHE_ONLY_ITEM_YIELD_MS } from './author-cache-directives';
 import { AuthorEnrichmentConfigService } from './author-enrichment-config.service';
@@ -22,13 +23,17 @@ const BASE_RETRY_DELAY_MS = 30_000;
 const MAX_RETRY_DELAY_MS = 60 * 60 * 1000;
 const MAX_RETRY_AFTER_MS = 6 * 60 * 60 * 1000;
 const PROCESSING_STALE_AFTER_MS = 10 * 60 * 1000;
+/** A row only goes stale after ten minutes, so looking for one every few polls finds it nearly as soon. */
+const STALE_RECOVERY_INTERVAL_MS = 5 * 60 * 1000;
 
 @Injectable()
 export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstrap, OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AuthorEnrichmentOrchestratorService.name);
+  private readonly idlePoll = new IdlePoll();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private paused = false;
+  private lastRecoveryAt = 0;
 
   private readonly handleMetadataAuthorsReplaced = (event: MetadataAuthorsReplacedEvent) => {
     void this.scheduleMany(event.authorIds, AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE);
@@ -86,6 +91,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     if (reason !== AUTHOR_ENRICHMENT_REASONS.METADATA_REPLACE) await this.finalizeCompletedSession();
     const queued = await this.queueRepo.upsertSchedule(authorIds, reason);
     if (queued > 0) {
+      this.idlePoll.wake();
       this.logger.debug(`[author.enrichment.queue] [end] reason=${reason} queued=${queued} - queued author enrichment jobs`);
       // metadata_replace is a background side-effect of book metadata fetch. Don't update
       // the session or emit status — these authors are enriched silently so the widget
@@ -103,6 +109,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     await this.finalizeCompletedSession();
     const queued = await this.queueRepo.enqueueEligibleLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL, config.conditions, options);
     if (queued > 0) {
+      this.idlePoll.wake();
       this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
       await this.emitStatusSnapshot();
@@ -115,6 +122,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     await this.finalizeCompletedSession();
     const queued = await this.queueRepo.enqueueAllLinkedAuthors(AUTHOR_ENRICHMENT_REASONS.MANUAL_BACKFILL_ALL, options);
     if (queued > 0) {
+      this.idlePoll.wake();
       this.session.addToTotal(queued);
       await this.unpauseIfNeeded();
       await this.emitStatusSnapshot();
@@ -132,6 +140,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   async resume(): Promise<void> {
     this.paused = false;
     await this.enrichmentConfig.setPaused(false);
+    this.idlePoll.wake();
     await this.emitStatusSnapshot();
     void this.pollOnce();
   }
@@ -148,6 +157,7 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     await this.finalizeCompletedSession();
     const requeued = await this.queueRepo.requeueFailed();
     if (requeued > 0) {
+      this.idlePoll.wake();
       this.session.addToTotal(requeued);
       await this.emitStatusSnapshot();
     }
@@ -161,14 +171,22 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
 
   private async pollOnce(): Promise<void> {
     if (this.running) return;
+    const deferIfIdle = this.idlePoll.begin();
+    if (!deferIfIdle) return;
     this.running = true;
     try {
       await this.recoverStuckProcessingRows();
       await this.checkAndResetSession();
 
-      if (this.paused) return;
+      // Resuming wakes the poll, so a paused queue backs off like an empty one.
+      if (this.paused) {
+        deferIfIdle();
+        return;
+      }
 
+      // A rate-limited author waiting to retry is picked up by the idle poll after its time comes.
       const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
+      if (dueRows.length === 0) deferIfIdle();
       for (const row of dueRows) {
         const outboundRequests = await this.processOne(
           row.authorId,
@@ -192,9 +210,12 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
     if (!this.paused) return;
     this.paused = false;
     await this.enrichmentConfig.setPaused(false);
+    this.idlePoll.wake();
   }
 
   private async checkAndResetSession(): Promise<void> {
+    // With no session there is nothing to finish, so an idle poll skips the count.
+    if (this.session.getSnapshot().sessionTotal <= 0) return;
     const revision = this.session.getRevision();
     const summary = await this.queueRepo.getStatusSummary();
     if (summary.queued > 0 || summary.processing > 0 || summary.rateLimited > 0) return;
@@ -341,6 +362,8 @@ export class AuthorEnrichmentOrchestratorService implements OnApplicationBootstr
   }
 
   private async recoverStuckProcessingRows(): Promise<void> {
+    if (Date.now() - this.lastRecoveryAt < STALE_RECOVERY_INTERVAL_MS) return;
+    this.lastRecoveryAt = Date.now();
     const staleBefore = new Date(Date.now() - PROCESSING_STALE_AFTER_MS);
     const recovered = await this.queueRepo.recoverStuckProcessing(staleBefore);
     if (recovered > 0) {

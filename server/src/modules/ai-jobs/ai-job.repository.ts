@@ -47,6 +47,10 @@ const UNFINISHED = [...AI_JOB_UNFINISHED_STATUSES];
  */
 const DB_NOW = sql`now()`;
 
+function dueForFeature(feature: string) {
+  return and(eq(aiJobs.feature, feature), eq(aiJobs.status, 'queued'), lte(aiJobs.nextAttemptAt, DB_NOW));
+}
+
 /** Clears what only a running job carries. */
 const LEASE_CLEARED = { leaseOwner: null, leaseUntil: null } as const;
 
@@ -215,6 +219,15 @@ export class AiJobRepository {
     return row?.value ?? 0;
   }
 
+  async hasDueJob(feature: string): Promise<boolean> {
+    const [candidate] = await this.db
+      .select({ due: sql<number>`1` })
+      .from(aiJobs)
+      .where(dueForFeature(feature))
+      .limit(1);
+    return candidate !== undefined;
+  }
+
   /**
    * Claims the first due job of a feature (highest priority, then oldest), unless that feature already runs as many jobs as it may.
    * The count and the claim happen under one lock per feature, so two servers cannot both pass it.
@@ -231,7 +244,7 @@ export class AiJobRepository {
       const [candidate] = await tx
         .select({ id: aiJobs.id })
         .from(aiJobs)
-        .where(and(eq(aiJobs.feature, feature), eq(aiJobs.status, 'queued'), lte(aiJobs.nextAttemptAt, DB_NOW)))
+        .where(dueForFeature(feature))
         .orderBy(...QUEUE_ORDER)
         .limit(1)
         .for('update', { skipLocked: true });

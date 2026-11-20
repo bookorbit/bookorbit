@@ -485,6 +485,8 @@ describe('Chapter health (e2e)', { timeout: 60_000 }, () => {
           .update(schema.chapterLookupQueue)
           .set({ availableAt: new Date(Date.now() - 1_000) })
           .where(eq(schema.chapterLookupQueue.bookId, flaky));
+        // The empty tick backed off; waking stands in for the idle poll that would find the retry.
+        worker.wake();
         await worker.tick();
       }
 

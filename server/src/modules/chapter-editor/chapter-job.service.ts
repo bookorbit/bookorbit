@@ -13,6 +13,7 @@ import { Interval } from '@nestjs/schedule';
 import { appConfig } from '../../config/config';
 import { Permission, type BookChapterJobKind } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
+import { IdlePoll } from '../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookService } from '../book/book.service';
 import { JobChangesService } from '../jobs/job-changes.service';
@@ -25,6 +26,7 @@ const PURGE_INTERVAL_MS = 60 * 60_000;
 @Injectable()
 export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(ChapterJobService.name);
+  private readonly idlePoll = new IdlePoll();
   private timer: NodeJS.Timeout | null = null;
   private running = false;
   private stopped = false;
@@ -42,6 +44,7 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
   async start(bookId: number, kind: BookChapterJobKind, baseRevision: string, user: RequestUser, retry = false) {
     await this.books.verifyBookAccess(bookId, user, 'editor');
     const job = await this.repo.enqueue(bookId, user.id, kind, baseRevision, retry);
+    if (job.status === 'queued') this.idlePoll.wake();
     this.changed(user.id);
     return job;
   }
@@ -73,6 +76,8 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
 
   async tick(): Promise<void> {
     if (this.running || this.stopped) return;
+    const deferIfIdle = this.idlePoll.begin();
+    if (!deferIfIdle) return;
     this.running = true;
     const startedAt = Date.now();
     try {
@@ -81,7 +86,10 @@ export class ChapterJobService implements OnModuleInit, OnModuleDestroy {
         this.needsRecovery = false;
       }
       const job = await this.repo.claim();
-      if (!job) return;
+      if (!job) {
+        deferIfIdle();
+        return;
+      }
       this.changed(job.userId);
       try {
         const user = await this.users.findByIdWithPermissions(job.userId);

@@ -4,6 +4,7 @@ import { MetadataProviderKey, NotificationType, Permission, parseSeriesIndex } f
 import { NotificationService } from '../notification/notification.service';
 import { chapterProvenance, normalizeAudiobookChapters } from '../../common/utils/audiobook-chapters.utils';
 import { coverFetchInputs, resolveIsAudiobook, resolveSearchMediaKind, type CoverFetchState } from '../../common/utils/book-media.utils';
+import { IdlePoll } from '../../common/utils/idle-poll';
 import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapters.service';
 import { JobChangesService } from '../jobs/job-changes.service';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
@@ -35,6 +36,8 @@ const CACHED_CHAIN_MAX_ITEMS = 50;
 const CACHED_CHAIN_MAX_MS = 30_000;
 const CACHED_ITEM_YIELD_MS = 100;
 const STATUS_EMIT_MIN_INTERVAL_MS = 500;
+/** The queue calls a row stuck after ten minutes, so looking for one every few polls finds it nearly as soon. */
+const STALE_RECOVERY_INTERVAL_MS = 5 * 60 * 1000;
 
 interface ProcessOutcome {
   /** Provider requests and cover downloads the book caused; 0 when everything came from the cache. */
@@ -50,9 +53,11 @@ type BookReadResult = NonNullable<Awaited<ReturnType<BookReadService['findById']
 @Injectable()
 export class BookMetadataFetchOrchestratorService implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly logger = new Logger(BookMetadataFetchOrchestratorService.name);
+  private readonly idlePoll = new IdlePoll();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private paused = false;
+  private lastRecoveryAt = 0;
   private lastStatusEmitAt = 0;
   private pendingStatusEmit: ReturnType<typeof setTimeout> | null = null;
   /** Set by a pause, resume, cancel or retry until the next emit tells the Jobs area. */
@@ -105,6 +110,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
 
     const queued = await this.queueRepo.scheduleEligibleBookIdsInBatches(config, 'event_import', libraryId, bookIds, SCHEDULE_BATCH_SIZE);
     if (queued > 0) {
+      this.idlePoll.wake();
       this.session.addToTotal(queued);
       await this.emitStatus();
     }
@@ -128,6 +134,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         SCHEDULE_BATCH_SIZE,
         ignoreCache,
       );
+      if (libraryQueued > 0) this.idlePoll.wake();
       await this.configService.recordLibraryRun(libraryId, libraryQueued);
       queued += libraryQueued;
     }
@@ -146,6 +153,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   async triggerForLibrary(libraryId: number, ignoreCache = false): Promise<number> {
     const config = await this.configService.getEffectiveConfig(libraryId);
     const queued = await this.queueRepo.scheduleEligibleBooksInBatches(config, 'manual_trigger', libraryId, SCHEDULE_BATCH_SIZE, ignoreCache);
+    if (queued > 0) this.idlePoll.wake();
     await this.configService.recordLibraryRun(libraryId, queued);
     await this.unpauseIfNeeded();
     if (queued > 0) {
@@ -165,6 +173,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   async resume(): Promise<void> {
     this.paused = false;
     await this.configService.setPaused(false);
+    this.idlePoll.wake();
     await this.emitStatus(true);
     void this.pollOnce();
   }
@@ -180,6 +189,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
   async requeueFailed(): Promise<number> {
     const requeued = await this.queueRepo.requeueFailed();
     if (requeued > 0) {
+      this.idlePoll.wake();
       this.session.addToTotal(requeued);
       await this.emitStatus(true);
     }
@@ -188,17 +198,26 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
 
   private async pollOnce(): Promise<void> {
     if (this.running) return;
+    const deferIfIdle = this.idlePoll.begin();
+    if (!deferIfIdle) return;
     this.running = true;
     const startedAt = Date.now();
     try {
-      await this.queueRepo.recoverStuckProcessing();
+      await this.recoverStuckProcessing();
       await this.checkAndResetSession();
 
       const chainStartedAt = Date.now();
       for (let processed = 0; ; processed++) {
-        if (this.paused) return;
+        // Resuming wakes the poll, so a paused queue backs off like an empty one.
+        if (this.paused) {
+          deferIfIdle();
+          return;
+        }
         const dueRows = await this.queueRepo.fetchDue(BATCH_SIZE);
-        if (dueRows.length === 0) return;
+        if (dueRows.length === 0) {
+          deferIfIdle();
+          return;
+        }
         const row = dueRows[0];
         const outcome = await this.processOne(row.bookId, row.title, row.reason, row.ignoreCache);
         if (outcome.outboundRequests > 0 || outcome.deferred) {
@@ -598,9 +617,19 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
     if (!this.paused) return;
     this.paused = false;
     await this.configService.setPaused(false);
+    this.idlePoll.wake();
+  }
+
+  private async recoverStuckProcessing(): Promise<void> {
+    if (Date.now() - this.lastRecoveryAt < STALE_RECOVERY_INTERVAL_MS) return;
+    this.lastRecoveryAt = Date.now();
+    await this.queueRepo.recoverStuckProcessing();
   }
 
   private async checkAndResetSession(): Promise<void> {
+    const current = this.session.getSnapshot();
+    // An empty session has nothing to finish or clear, so an idle poll skips the count.
+    if (current.sessionTotal <= 0 && current.currentItemName === null) return;
     const summary = await this.queueRepo.getStatusSummary();
     if (summary.queued === 0 && summary.processing === 0) {
       const snapshot = this.session.getSnapshot();

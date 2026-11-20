@@ -75,6 +75,20 @@ describe('ChapterJobService', () => {
     expect(repo.finish).toHaveBeenCalledWith('job', { chapters: [] });
   });
 
+  it('claims work at the next tick after a local enqueue wakes an idle worker', async () => {
+    const { service, repo, editor } = await setup();
+    repo.claim.mockResolvedValueOnce(null);
+    repo.enqueue.mockResolvedValue({ id: 'job', kind: 'read', status: 'queued', filesWritten: 0, filesTotal: 0 });
+
+    await service.tick();
+    await service.tick();
+    expect(repo.claim).toHaveBeenCalledTimes(1);
+
+    await service.start(9, 'read', queued.baseRevision, user);
+    await service.tick();
+    expect(editor.readEmbedded).toHaveBeenCalledOnce();
+  });
+
   it('retains the stable error code when a queued revision is stale', async () => {
     const { service, repo, editor } = await setup();
     editor.readEmbedded.mockRejectedValueOnce(new ConflictException({ errorCode: BOOK_CHAPTERS_ERROR_CODES.stale }));

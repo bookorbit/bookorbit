@@ -10,6 +10,7 @@ import { EventEmitter } from 'events';
  * `BookDockEventsService`, which the module already consumes for the same reason.
  */
 export const BOOK_REQUEST_DOWNLOAD_FAILED = 'book-request.download.failed';
+export const BOOK_REQUEST_DOWNLOAD_QUEUED = 'book-request.download.queued';
 
 @Injectable()
 export class BookRequestEventsService extends EventEmitter {}

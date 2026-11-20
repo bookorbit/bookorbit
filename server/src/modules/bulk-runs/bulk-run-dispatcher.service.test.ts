@@ -100,6 +100,22 @@ async function boot(dispatcher: BulkRunDispatcher) {
 }
 
 describe('BulkRunDispatcher', () => {
+  it('skips idle claim attempts and wakes for a newly queued run', async () => {
+    const { dispatcher, registry, repo } = setup();
+    const kind = handler();
+    registry.register(kind);
+    await dispatcher.onApplicationBootstrap();
+    await vi.waitFor(() => expect(repo.claimNext).toHaveBeenCalledOnce());
+
+    await dispatcher.tick();
+    expect(repo.claimNext).toHaveBeenCalledOnce();
+
+    repo.claimNext.mockResolvedValueOnce({ run: run(), firstStart: true });
+    dispatcher.wake();
+    await vi.waitFor(() => expect(repo.settle).toHaveBeenCalledWith(run().id, 'completed', undefined));
+    await dispatcher.onModuleDestroy();
+  });
+
   it('starts nothing before boot has marked interrupted runs', async () => {
     const { dispatcher, repo } = setup();
     await dispatcher.tick();
