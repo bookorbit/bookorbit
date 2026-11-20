@@ -8,7 +8,7 @@ one tap down as Technical details.
 
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local Activity = require("bookorbit_activity")

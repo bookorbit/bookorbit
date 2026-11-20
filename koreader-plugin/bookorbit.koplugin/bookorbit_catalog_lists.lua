@@ -17,7 +17,7 @@ local UIManager = require("ui/uimanager")
 local datetime = require("datetime")
 local logger = require("logger")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardData = require("bookorbit_board_data")
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -1219,8 +1219,9 @@ function CatalogLists:listHeader(kind, context)
     if kind == "authors" or kind == "series" then
         local sort = context.sort or "name"
         local order = sort == "books" and _("most books first") or sort == "name_desc" and _("Z–A") or _("A–Z")
-        local count = context.total and (kind == "authors" and ListData.plural(context.total, _("%1 author"), _("%1 authors"))
-            or ListData.plural(context.total, _("%1 series"), _("%1 series")))
+        local count = context.total and T(kind == "authors"
+            and _.ngettext("%1 author", "%1 authors", context.total)
+            or _.ngettext("%1 series", "%1 series", context.total), context.total)
         if context.dashboard_source_index then
             return { title = kind == "authors" and _("Pick an author") or _("Pick a series"), sub = _("Their books become a shelf on Home"), clock = clock }
         end

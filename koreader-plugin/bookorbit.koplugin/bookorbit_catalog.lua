@@ -35,7 +35,7 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitApi = require("bookorbit_api")
 local BoardMetrics = require("bookorbit_board_metrics")

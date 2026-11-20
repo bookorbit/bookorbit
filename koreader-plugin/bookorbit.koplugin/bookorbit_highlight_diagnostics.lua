@@ -1,5 +1,5 @@
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local HighlightDiagnostics = {}
 
