@@ -100,7 +100,7 @@ describe('BookMissingFormatRequest', () => {
     expect(JSON.parse(init!.body as string).items[0]).toMatchObject({ mediaKind: 'audiobook' })
   })
 
-  it('asks for the format against this book, so it joins it rather than becoming another', async () => {
+  it('requests the format for this book and confirms submission before the filing destination is known', async () => {
     const wrapper = await render(['epub'])
     state.api.mockResolvedValueOnce(json({ request: { id: 77, status: 'pending', targetBookId: 42 }, subscribed: false }))
 
@@ -110,12 +110,12 @@ describe('BookMissingFormatRequest', () => {
     const [path, init] = state.api.mock.calls[1]!
     expect(path).toBe('/api/v1/book-requests')
     expect(JSON.parse(init!.body as string)).toMatchObject({ mediaKind: 'audiobook', targetBookId: 42, title: 'Dune', language: 'en' })
-    expect(state.toastSuccess).toHaveBeenCalledWith('Requested. The audiobook will join this book when it arrives')
+    expect(state.toastSuccess).toHaveBeenCalledWith('Request submitted')
     expect(wrapper.text()).toContain('Requested')
     expect(wrapper.findComponent(RouterLinkStub).props('to')).toMatchObject({ name: 'book-request-detail', params: { id: 77 } })
   })
 
-  it('does not promise the book a join the server did not make, as when its library keeps that format out', async () => {
+  it('confirms submission when the library excludes the requested medium', async () => {
     const wrapper = await render(['m4b'])
     state.api.mockResolvedValueOnce(json({ request: { id: 78, status: 'pending', targetBookId: null }, subscribed: false }))
 

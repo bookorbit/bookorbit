@@ -9,7 +9,12 @@ import {
 } from '@nestjs/common';
 import { access } from 'fs/promises';
 import { basename } from 'path';
-import { DEFAULT_BOOK_REQUEST_AUTOMATION_SETTINGS, NotificationType, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES } from '@bookorbit/types';
+import {
+  DEFAULT_BOOK_REQUEST_AUTOMATION_SETTINGS,
+  isBookRequestMediaKind,
+  NotificationType,
+  UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES,
+} from '@bookorbit/types';
 import type {
   BookDockMetadata,
   BookRequestStatus,
@@ -19,6 +24,7 @@ import type {
   BookRequestVerificationReason,
   BookRequestVerificationRow,
   BookRequestVerificationVerdict,
+  RequestDestination,
 } from '@bookorbit/types';
 
 import { normalizeMetadataIsbn } from '../../../common/text-match/isbn-normalize';
@@ -31,11 +37,13 @@ import {
 import { mainTitlePart, symmetricTitleSimilarity } from '../../../common/text-match/title-match';
 import type { RequestUser } from '../../../common/types/request-user';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
-import type { BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
+import type { BookDockFileRow, BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from '../../book-dock/book-dock-events.service';
 import { BookDockFinalizeService } from '../../book-dock/book-dock-finalize.service';
 import { BookDockRepository } from '../../book-dock/book-dock.repository';
 import { BookDockService } from '../../book-dock/book-dock.service';
+import { LibraryService } from '../../library/library.service';
+import { UploadValidatorService } from '../../upload/upload-validator.service';
 import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestNotifier } from '../book-request-notifier.service';
 import { BookRequestRepository } from '../book-request.repository';
@@ -104,6 +112,8 @@ export class RequestVerificationService implements OnModuleInit {
     private readonly gateway: BookRequestGateway,
     private readonly settings: RequestAutomationSettingsService,
     private readonly companions: RequestCompanionService,
+    private readonly libraryService: LibraryService,
+    private readonly validator: UploadValidatorService,
   ) {}
 
   onModuleInit(): void {
@@ -144,7 +154,7 @@ export class RequestVerificationService implements OnModuleInit {
       this.logger.log(
         `[book_request.verify] [end] requestId=${joined.request.id} dockFileId=${fileId} enabled=false - verification is off, filing the import as grabbed`,
       );
-      await this.finalize(download, joined.request, fileId);
+      await this.finalize(download, joined.request, row);
       return;
     }
 
@@ -164,7 +174,7 @@ export class RequestVerificationService implements OnModuleInit {
       return;
     }
 
-    await this.finalize(download, joined.request, fileId);
+    await this.finalize(download, joined.request, row);
   }
 
   /** The sender's own request to look first outranks a passing score and verification being off. */
@@ -175,8 +185,8 @@ export class RequestVerificationService implements OnModuleInit {
     await this.fulfillment.holdForReview(download, request, HELD_ON_REQUEST_REASON);
   }
 
-  private async finalize(download: BookRequestDownloadRow, request: BookRequestRow, fileId: number): Promise<void> {
-    const filed = await this.fileIntoLibrary(download, request, fileId);
+  private async finalize(download: BookRequestDownloadRow, request: BookRequestRow, file: BookDockFileRow): Promise<void> {
+    const filed = await this.fileIntoLibrary(download, request, file);
     if (!filed.ok) await this.fulfillment.holdForReview(download, request, filed.reason);
   }
 
@@ -188,7 +198,7 @@ export class RequestVerificationService implements OnModuleInit {
   private async fileIntoLibrary(
     download: BookRequestDownloadRow,
     request: BookRequestRow,
-    fileId: number,
+    file: BookDockFileRow,
   ): Promise<{ ok: true; bookId: number | null } | { ok: false; reason: string }> {
     // The two halves of a pair can finish within moments of each other. Filed side by side, each
     // would find the other not yet landed and both would become books of their own; one after the
@@ -196,24 +206,26 @@ export class RequestVerificationService implements OnModuleInit {
     return this.serializeByPair(request, async () => {
       // Read again inside the turn: the half that filed first may have just pointed this one at its book.
       const current = (await this.requests.findById(request.id))?.request ?? request;
-      return this.fileIntoLibraryNow(download, current, fileId);
+      return this.fileIntoLibraryNow(download, current, file);
     });
   }
 
   private async fileIntoLibraryNow(
     download: BookRequestDownloadRow,
     request: BookRequestRow,
-    fileId: number,
+    file: BookDockFileRow,
   ): Promise<{ ok: true; bookId: number | null } | { ok: false; reason: string }> {
-    const join = await this.companions.resolveJoin(request);
+    const join = await this.companions.resolveJoin(request, file.fileName);
+    const fallback = join ? null : await this.resolvePinnedFormatFallback(request, file.fileName);
+    const libraryId = join?.libraryId ?? fallback?.libraryId ?? request.targetLibraryId;
 
     // A request with no folder still has a library; take its first folder rather than falling
     // through to the Book Dock's global default, which is usually unset and never the point here.
-    const folderId = join?.folderId ?? request.targetFolderId ?? (await this.resolveFolder(request.targetLibraryId));
+    const folderId = join?.folderId ?? fallback?.folderId ?? request.targetFolderId ?? (await this.resolveFolder(libraryId));
     if (folderId === null) return { ok: false, reason: 'the destination library has no folder to file the book into' };
 
-    const result = await this.finalizeService.finalizeManagedFile(fileId, {
-      libraryId: join?.libraryId ?? request.targetLibraryId ?? undefined,
+    const result = await this.finalizeService.finalizeManagedFile(file.id, {
+      libraryId: libraryId ?? undefined,
       folderId,
       ...(join ? { joinBook: join.joinBook } : {}),
     });
@@ -234,13 +246,14 @@ export class RequestVerificationService implements OnModuleInit {
       matchedBookId: result.bookId ?? null,
       bookDockFileId: null,
       statusReason: null,
+      ...(fallback && { targetBookId: null, targetLibraryId: fallback.libraryId, targetFolderId: fallback.folderId }),
     });
     if (!filed) {
       // The bytes did become a book, so the attempt is settled either way rather than left for the
       // resume sweep to offer up again every fifteen seconds.
       await this.downloads.updateIf(download.id, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, { status: 'imported', importedAt: new Date() });
       this.logger.warn(
-        `[book_request.verify] [fail] requestId=${request.id} downloadId=${download.id} dockFileId=${fileId} bookId=${result.bookId ?? 'none'} - the request was settled while this import was being filed, so the book was filed but the request was left alone`,
+        `[book_request.verify] [fail] requestId=${request.id} downloadId=${download.id} dockFileId=${file.id} bookId=${result.bookId ?? 'none'} - the request was settled while this import was being filed, so the book was filed but the request was left alone`,
       );
       this.gateway.emitChanged();
       return { ok: false, reason: 'the request was settled while this import was being filed' };
@@ -261,6 +274,28 @@ export class RequestVerificationService implements OnModuleInit {
     this.gateway.emitChanged();
 
     return { ok: true, bookId: result.bookId ?? null };
+  }
+
+  private async resolvePinnedFormatFallback(request: BookRequestRow, fileName: string): Promise<RequestDestination | null> {
+    const { targetBookId, companionRequestId, targetLibraryId, mediaKind } = request;
+    if (targetBookId === null || companionRequestId !== null || targetLibraryId === null || !isBookRequestMediaKind(mediaKind)) return null;
+
+    // A book-page request stores the source library as its destination before the file is known.
+    // Dropping the join alone would still file there. An approved destination that accepts the file stays in effect.
+    const target = await this.dockRepo.findLibraryFormats(targetLibraryId);
+    if (!target || this.validator.isAllowedByLibrary(fileName, target.allowedFormats)) return null;
+
+    const fallback = await this.settings.resolveDestinationFor(mediaKind);
+    if (fallback.libraryId === null || fallback.folderId === null || fallback.libraryId === targetLibraryId) return null;
+    const library = await this.dockRepo.findLibraryFormats(fallback.libraryId);
+    if (!library || !this.validator.isAllowedByLibrary(fileName, library.allowedFormats)) return null;
+
+    if (request.selfServe) {
+      const fulfiller = request.fulfillerUserId ?? request.userId;
+      const reachable = await this.libraryService.findUserIdsWithAccess(fallback.libraryId, [fulfiller]);
+      if (!reachable.has(fulfiller)) return null;
+    }
+    return fallback;
   }
 
   /**
@@ -385,11 +420,12 @@ export class RequestVerificationService implements OnModuleInit {
    */
   async fileHeldImport(requestId: number, user: RequestUser): Promise<void> {
     const { request, download, fileId } = await this.loadHeld(requestId);
-    if (fileId === null || download === null) {
+    const file = fileId === null ? undefined : await this.dockRepo.findById(fileId);
+    if (!file || download === null) {
       throw new BadRequestException('The Library Dock entry this request was held over is gone, so there is nothing left to file');
     }
 
-    const filed = await this.fileIntoLibrary(download, request, fileId);
+    const filed = await this.fileIntoLibrary(download, request, file);
     if (!filed.ok) {
       this.logger.warn(
         `[book_request.force_file] [fail] requestId=${requestId} dockFileId=${fileId} userId=${user.id} error="${sanitizeLogValue(filed.reason)}" - approver could not file the held import`,

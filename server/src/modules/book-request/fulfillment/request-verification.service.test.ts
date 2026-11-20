@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { NotificationType, type BookDockMetadata } from '@bookorbit/types';
 
 import type { BookRequestDownloadRow } from '../../../db/schema';
+import { UploadValidatorService } from '../../upload/upload-validator.service';
 import { RequestVerificationService, verifyAgainstRequest } from './request-verification.service';
 
 type RequestSnapshot = Parameters<typeof verifyAgainstRequest>[0];
@@ -165,7 +166,9 @@ describe('RequestVerificationService against the configured threshold', () => {
   function makeService(threshold: number, verificationEnabled = true, overrides: { requestSettled?: boolean; holdForReview?: boolean } = {}) {
     const events = { on: vi.fn() };
     const dockRepo = {
-      findById: vi.fn().mockResolvedValue({ id: 100, fetchedMetadata: metadata({ authors: ['F. Herbert'] }), embeddedMetadata: null }),
+      findById: vi
+        .fn()
+        .mockResolvedValue({ id: 100, fileName: 'dune.epub', fetchedMetadata: metadata({ authors: ['F. Herbert'] }), embeddedMetadata: null }),
     };
     const dock = { discardFile: vi.fn().mockResolvedValue(undefined) };
     const finalizeService = { finalizeManagedFile: vi.fn().mockResolvedValue({ success: true, bookId: 55 }) };
@@ -213,6 +216,8 @@ describe('RequestVerificationService against the configured threshold', () => {
       gateway as never,
       settings as never,
       companions as never,
+      {} as never,
+      new UploadValidatorService(),
     );
 
     service.onModuleInit();
@@ -369,7 +374,17 @@ describe('verifyAgainstRequest comparison rows', () => {
 });
 
 describe('RequestVerificationService review surface', () => {
-  const heldRequest = { ...request(), id: 7, status: 'needs_review', bookDockFileId: 100, targetLibraryId: 2, targetFolderId: 3 };
+  const heldRequest = {
+    ...request(),
+    id: 7,
+    status: 'needs_review',
+    bookDockFileId: 100,
+    targetLibraryId: 2,
+    targetFolderId: 3,
+    targetBookId: null,
+    companionRequestId: null,
+    selfServe: false,
+  };
 
   function makeService(
     overrides: {
@@ -396,6 +411,7 @@ describe('RequestVerificationService review surface', () => {
         },
       ),
       findUnitFiles: vi.fn().mockResolvedValue(overrides.unitFiles ?? []),
+      findLibraryFormats: vi.fn(),
     };
     const dock = { discardFile: vi.fn().mockResolvedValue(undefined) };
     const finalizeService = {
@@ -427,8 +443,10 @@ describe('RequestVerificationService review surface', () => {
         verificationEnabled: overrides.verificationEnabled ?? true,
         verificationThreshold: overrides.threshold ?? 70,
       }),
+      resolveDestinationFor: vi.fn(),
     };
     const companions = { resolveJoin: vi.fn().mockResolvedValue(null), handOn: vi.fn().mockResolvedValue(false) };
+    const libraryService = { findUserIdsWithAccess: vi.fn().mockResolvedValue(new Set()) };
 
     const service = new RequestVerificationService(
       { on: vi.fn() } as never,
@@ -442,9 +460,11 @@ describe('RequestVerificationService review surface', () => {
       gateway as never,
       settings as never,
       companions as never,
+      libraryService as never,
+      new UploadValidatorService(),
     );
 
-    return { service, dock, dockRepo, finalizeService, downloads, requests, notifier, gateway, fulfillment, companions };
+    return { service, dock, dockRepo, finalizeService, downloads, requests, notifier, gateway, fulfillment, companions, settings, libraryService };
   }
 
   it('describes a loose single file from the anchor row, which already describes it fully', async () => {
@@ -671,6 +691,60 @@ describe('RequestVerificationService review surface', () => {
     expect(finalizeService.finalizeManagedFile).toHaveBeenCalledWith(100, { libraryId: 8, folderId: 9, joinBook: join.joinBook });
   });
 
+  describe('a held audiobook pinned to an ebook', () => {
+    function pinnedImport(requestRow: Record<string, unknown> = {}) {
+      const fixture = makeService({
+        requestRow: { mediaKind: 'audiobook', targetBookId: 42, ...requestRow },
+        dockRow: { id: 100, fileName: 'dune.mp3' },
+      });
+      fixture.dockRepo.findLibraryFormats.mockImplementation((id: number) =>
+        Promise.resolve({ allowedFormats: id === 2 ? ['epub', 'm4b'] : ['mp3'] }),
+      );
+      fixture.settings.resolveDestinationFor.mockResolvedValue({ libraryId: 8, folderId: 9 });
+      return fixture;
+    }
+
+    it('files to the audiobook default and clears the obsolete join after a successful retry', async () => {
+      const { service, finalizeService, requests, settings } = pinnedImport();
+
+      await service.fileHeldImport(7, { id: 9 } as never);
+
+      expect(settings.resolveDestinationFor).toHaveBeenCalledWith('audiobook');
+      expect(finalizeService.finalizeManagedFile).toHaveBeenCalledWith(100, { libraryId: 8, folderId: 9 });
+      expect(requests.updateIf).toHaveBeenCalledWith(
+        7,
+        expect.any(Array),
+        expect.objectContaining({ status: 'available', targetBookId: null, targetLibraryId: 8, targetFolderId: 9 }),
+      );
+    });
+
+    it('keeps a compatible destination already chosen at approval', async () => {
+      const { service, finalizeService, settings } = pinnedImport({ targetLibraryId: 5, targetFolderId: 6 });
+
+      await service.fileHeldImport(7, { id: 9 } as never);
+
+      expect(finalizeService.finalizeManagedFile).toHaveBeenCalledWith(100, { libraryId: 5, folderId: 6 });
+      expect(settings.resolveDestinationFor).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      { name: 'the default also excludes MP3', defaultFormats: ['m4b'], selfServe: false },
+      { name: 'the self-fulfiller cannot reach the default', defaultFormats: ['mp3'], selfServe: true },
+    ])('keeps the original filing error when $name', async ({ defaultFormats, selfServe }) => {
+      const { service, dockRepo, finalizeService, libraryService, requests } = pinnedImport({ selfServe, userId: 4, fulfillerUserId: 12 });
+      dockRepo.findLibraryFormats.mockImplementation((id: number) =>
+        Promise.resolve({ allowedFormats: id === 2 ? ['epub', 'm4b'] : defaultFormats }),
+      );
+      finalizeService.finalizeManagedFile.mockResolvedValue({ success: false, message: 'This library does not allow .mp3 files' });
+
+      await expect(service.fileHeldImport(7, { id: 9 } as never)).rejects.toThrow('This library does not allow .mp3 files');
+
+      expect(finalizeService.finalizeManagedFile).toHaveBeenCalledWith(100, { libraryId: 2, folderId: 3 });
+      expect(requests.updateIf).not.toHaveBeenCalled();
+      if (selfServe) expect(libraryService.findUserIdsWithAccess).toHaveBeenCalledWith(8, [12]);
+    });
+  });
+
   it('hands the book that landed on to the other half of the pair', async () => {
     const { service, companions } = makeService();
 
@@ -684,7 +758,8 @@ describe('RequestVerificationService review surface', () => {
    * of their own. The second has to start only once the first has finished.
    */
   it('files the two halves of a pair one after the other rather than side by side', async () => {
-    const { service, finalizeService, requests, downloads } = makeService();
+    const { service, dockRepo, finalizeService, requests, downloads } = makeService();
+    dockRepo.findById.mockImplementation((id: number) => Promise.resolve({ id, fileName: id === 100 ? 'dune.epub' : 'dune.mp3' }));
     const halves = new Map([
       [7, { ...heldRequest, id: 7, companionRequestId: 8, bookDockFileId: 100 }],
       [8, { ...heldRequest, id: 8, mediaKind: 'audiobook', companionRequestId: 7, bookDockFileId: 101 }],

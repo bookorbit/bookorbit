@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import type { BookRequestMediaKind, BookRequestStatus } from '@bookorbit/types';
 
 import type { BookRequestRow } from '../../../db/schema';
+import { UploadValidatorService } from '../../upload/upload-validator.service';
 import { BookRequestNotifier } from '../book-request-notifier.service';
 import { BookRequestRepository } from '../book-request.repository';
 import { libraryTakesMedium } from '../library-takes-medium';
@@ -34,6 +35,7 @@ export class RequestCompanionService {
   constructor(
     private readonly requests: BookRequestRepository,
     private readonly notifier: BookRequestNotifier,
+    private readonly validator: UploadValidatorService,
   ) {}
 
   /**
@@ -45,7 +47,7 @@ export class RequestCompanionService {
    * never in a library where a book is a single file, because there is no folder to share, and never
    * in a library that keeps this format out, because the files would be refused on arrival.
    */
-  async resolveJoin(request: BookRequestRow): Promise<BookJoin | null> {
+  async resolveJoin(request: BookRequestRow, fileName: string): Promise<BookJoin | null> {
     let bookId = request.targetBookId;
     const followsBook = bookId !== null;
 
@@ -58,6 +60,7 @@ export class RequestCompanionService {
     const placement = await this.requests.findBookPlacement(bookId);
     if (!placement || placement.status !== 'present' || placement.organizationMode !== 'book_per_folder') return null;
     if (!libraryTakesMedium(placement.allowedFormats, request.mediaKind)) return null;
+    if (!this.validator.isAllowedByLibrary(fileName, placement.allowedFormats)) return null;
     if (!followsBook && placement.libraryId !== request.targetLibraryId) return null;
     if ((await this.requests.findBookMediaKinds(bookId)).has(request.mediaKind as BookRequestMediaKind)) return null;
 

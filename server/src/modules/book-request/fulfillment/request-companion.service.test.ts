@@ -1,3 +1,4 @@
+import { UploadValidatorService } from '../../upload/upload-validator.service';
 import { RequestCompanionService } from './request-companion.service';
 
 function request(overrides: Record<string, unknown> = {}) {
@@ -34,14 +35,14 @@ function makeService(repoOverrides: Record<string, unknown> = {}) {
     ...repoOverrides,
   };
   const notifier = { notifyBookAvailable: vi.fn().mockResolvedValue(undefined) };
-  return { service: new RequestCompanionService(repo as never, notifier as never), repo, notifier };
+  return { service: new RequestCompanionService(repo as never, notifier as never, new UploadValidatorService()), repo, notifier };
 }
 
 describe('RequestCompanionService.resolveJoin', () => {
   it('joins the book a request names, following that book into whatever library it now lives in', async () => {
     const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, libraryId: 8, libraryFolderId: 9 }) });
 
-    await expect(service.resolveJoin(request({ targetBookId: 42, coverUrl: 'https://covers.example/square.jpg' }))).resolves.toEqual({
+    await expect(service.resolveJoin(request({ targetBookId: 42, coverUrl: 'https://covers.example/square.jpg' }), 'dune.mp3')).resolves.toEqual({
       libraryId: 8,
       folderId: 9,
       // The art the request chose travels with it, for when the arriving files carry none.
@@ -54,7 +55,7 @@ describe('RequestCompanionService.resolveJoin', () => {
       findById: vi.fn().mockResolvedValue({ request: { id: 11, companionRequestId: 10, status: 'available', matchedBookId: 42 } }),
     });
 
-    const join = await service.resolveJoin(request({ companionRequestId: 11 }));
+    const join = await service.resolveJoin(request({ companionRequestId: 11 }), 'dune.mp3');
 
     expect(join?.joinBook.bookId).toBe(42);
   });
@@ -65,7 +66,7 @@ describe('RequestCompanionService.resolveJoin', () => {
       findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, libraryId: 5 }),
     });
 
-    await expect(service.resolveJoin(request({ companionRequestId: 11 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ companionRequestId: 11 }), 'dune.mp3')).resolves.toBeNull();
   });
 
   it('ignores a companion that has not landed yet', async () => {
@@ -73,7 +74,7 @@ describe('RequestCompanionService.resolveJoin', () => {
       findById: vi.fn().mockResolvedValue({ request: { id: 11, companionRequestId: 10, status: 'downloading', matchedBookId: null } }),
     });
 
-    await expect(service.resolveJoin(request({ companionRequestId: 11 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ companionRequestId: 11 }), 'dune.mp3')).resolves.toBeNull();
     expect(repo.findBookPlacement).not.toHaveBeenCalled();
   });
 
@@ -82,31 +83,38 @@ describe('RequestCompanionService.resolveJoin', () => {
       findById: vi.fn().mockResolvedValue({ request: { id: 11, companionRequestId: 99, status: 'available', matchedBookId: 42 } }),
     });
 
-    await expect(service.resolveJoin(request({ companionRequestId: 11 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ companionRequestId: 11 }), 'dune.mp3')).resolves.toBeNull();
   });
 
   it('refuses a library where a book is one file, because there is no folder to share', async () => {
     const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, organizationMode: 'book_per_file' }) });
 
-    await expect(service.resolveJoin(request({ targetBookId: 42 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ targetBookId: 42 }), 'dune.mp3')).resolves.toBeNull();
   });
 
   it('refuses a library that keeps this format out, so the request files wherever it is headed instead', async () => {
     const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, allowedFormats: ['epub', 'pdf'] }) });
 
-    await expect(service.resolveJoin(request({ targetBookId: 42 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ targetBookId: 42 }), 'dune.mp3')).resolves.toBeNull();
+  });
+
+  it('checks the delivered format when only some audiobook formats are allowed', async () => {
+    const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, allowedFormats: ['epub', 'm4b'] }) });
+
+    await expect(service.resolveJoin(request({ targetBookId: 42 }), 'dune.mp3')).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ targetBookId: 42 }), 'dune.M4B')).resolves.toMatchObject({ joinBook: { bookId: 42 } });
   });
 
   it('refuses a book that already has this format, which would be a second copy rather than a second format', async () => {
     const { service } = makeService({ findBookMediaKinds: vi.fn().mockResolvedValue(new Set(['ebook', 'audiobook'])) });
 
-    await expect(service.resolveJoin(request({ targetBookId: 42 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ targetBookId: 42 }), 'dune.mp3')).resolves.toBeNull();
   });
 
   it('refuses a book that is no longer present', async () => {
     const { service } = makeService({ findBookPlacement: vi.fn().mockResolvedValue({ ...folderBook, status: 'missing' }) });
 
-    await expect(service.resolveJoin(request({ targetBookId: 42 }))).resolves.toBeNull();
+    await expect(service.resolveJoin(request({ targetBookId: 42 }), 'dune.mp3')).resolves.toBeNull();
   });
 });
 
