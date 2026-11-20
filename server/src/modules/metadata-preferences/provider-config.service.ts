@@ -582,7 +582,7 @@ export class ProviderConfigService implements OnModuleInit {
     const url = new URL('/gp/aw/s', amazonOrigin(domain));
     url.searchParams.set('k', AMAZON_TEST_QUERY);
     url.searchParams.set('i', 'stripbooks');
-    const headers = amazonRequestHeaders(url, cookie);
+    const headers = amazonRequestHeaders(cookie);
     const response = await fetch(url, { method: 'GET', headers, signal: AbortSignal.timeout(PROVIDER_TEST_TIMEOUT_MS) });
 
     if (!response.ok) {

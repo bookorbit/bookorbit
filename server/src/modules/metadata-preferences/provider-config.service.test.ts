@@ -566,6 +566,7 @@ describe('ProviderConfigService', () => {
     expect(result.ok).toBe(false);
     expect(result.status).toBe('warning');
     expect(result.message).toContain('bot-check');
+    expect(fetchMock.mock.calls[0][1]?.headers).not.toHaveProperty('referer');
   });
 
   it('returns warning for Amazon interstitial challenge responses', async () => {

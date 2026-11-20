@@ -127,7 +127,7 @@ export class AmazonProvider implements IdentifiableProvider {
     providerId?: string,
     signal?: AbortSignal,
   ): Promise<string | null> {
-    const headers = amazonRequestHeaders(url, cookie);
+    const headers = amazonRequestHeaders(cookie);
     const startedAt = Date.now();
     const safeQuery = query ? sanitizeLogValue(query) : undefined;
     const safeProviderId = providerId ? sanitizeLogValue(providerId) : undefined;

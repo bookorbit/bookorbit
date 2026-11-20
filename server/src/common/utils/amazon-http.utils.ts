@@ -21,11 +21,10 @@ const AMAZON_BROWSER_HEADERS: HeadersInit = {
   'sec-fetch-site': 'same-origin',
 };
 
-export function amazonRequestHeaders(url: string | URL, cookie = ''): HeadersInit {
-  const origin = new URL(url).origin;
+// No Referer: Amazon answers a Node client that sends one pointing back at Amazon with a 503 or a bot check.
+export function amazonRequestHeaders(cookie = ''): HeadersInit {
   return {
     ...AMAZON_BROWSER_HEADERS,
-    referer: `${origin}/`,
     ...(cookie ? { cookie } : {}),
   };
 }

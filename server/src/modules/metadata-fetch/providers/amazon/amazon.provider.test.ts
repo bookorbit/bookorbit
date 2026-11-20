@@ -118,6 +118,9 @@ describe('AmazonProvider', () => {
         }),
       );
       expect(global.fetch).not.toHaveBeenCalledWith(expect.stringContaining('https://www.amazon.com/dp/9781250165343'), expect.any(Object));
+      for (const [, init] of vi.mocked(global.fetch).mock.calls) {
+        expect(init?.headers).not.toHaveProperty('referer');
+      }
       expect(result).toHaveLength(1);
       expect(result[0].providerId).toBe('B123456789');
     });
