@@ -16,7 +16,7 @@ import { AiSettingsService } from '../ai/ai-settings.service';
 import { AiStepRates } from '../ai-jobs/ai-step-rates.service';
 import { estimateStoryGuide, STORY_GUIDE_STEP_COSTS, storyGuideMinutesLeft, type StoryGuideStepRates } from './story-guide-estimate';
 
-type Sections = { sections: readonly { words: number }[] };
+type Sections = { sections: readonly { words: number }[]; language?: string | null };
 
 export interface StoryGuideRunProgress {
   /** Every step of the pipeline, in order. */
@@ -46,6 +46,7 @@ export class StoryGuideEstimator {
     const [slots, rates] = await Promise.all([this.settings.slots(), this.ratesFor(steps, models)]);
     return estimateStoryGuide({
       sections: text.sections,
+      language: text.language,
       steps,
       prices: { fast: slots.fast.prices, careful: slots.careful.prices },
       rates,
@@ -56,6 +57,7 @@ export class StoryGuideEstimator {
   async minutesLeft(text: Sections, steps: readonly string[], models: AiJobModels, progress: StoryGuideRunProgress): Promise<number | null> {
     return storyGuideMinutesLeft({
       sections: text.sections,
+      language: text.language,
       order: progress.order,
       steps,
       rates: await this.ratesFor(progress.order, models),

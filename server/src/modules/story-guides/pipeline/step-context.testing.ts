@@ -1,6 +1,7 @@
 import type { StoryGuideEntityKind } from '@bookorbit/types';
 
 import type { AiStepContext, AiStepRequest } from '../../ai-jobs/ai-feature';
+import type { BookFileTextRow } from '../../../db/schema';
 import { locateName } from './name-text';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type { PassageSpan, StoryNamesResult } from './story-guide.types';
@@ -24,7 +25,7 @@ export function fakeStepContext(
   return {
     requests,
     job: { id: 'job', feature: 'story-guide', kind: 'build', subjectKey: 'key', subjectRef: { type: 'book-file', id: 1 }, generation: 1, models: {} },
-    subject: { key: 'key', title: 'A Book', authors: ['Some Author'], ...subject } as StoryGuideSubject,
+    subject: { key: 'key', title: 'A Book', authors: ['Some Author'], text: { language: 'en' } as BookFileTextRow, ...subject } as StoryGuideSubject,
     results: (step) => new Map(Object.entries(results[step] ?? {})),
     skipped: () => new Map(),
     signal: new AbortController().signal,

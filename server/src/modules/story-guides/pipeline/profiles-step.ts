@@ -2,8 +2,9 @@ import type { AiStep, AiStepContext, AiStepRequest } from '../../ai-jobs/ai-feat
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson, parseJsonReply } from './json-reply';
 import { isPlaceholder, laterNames, linesRows, linesUnits, namedLater, type LineNames, type LinesUnit } from './lines-step';
-import { WORD_EDGE, nameKey, splitWords } from './name-text';
+import { nameKey, splitWords } from './name-text';
 import { mergeResult, reviewResult, textResult } from './step-context';
+import { ENGLISH_STORY_LEXICON, storyLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type {
   StoryDroppedProfile,
@@ -68,8 +69,6 @@ export const PROFILES_SCHEMA: NonNullable<AiStepRequest['schema']> = {
   required: ['profiles'],
   additionalProperties: false,
 };
-
-const NARRATOR = new RegExp(`${WORD_EDGE}the narrator${WORD_EDGE}`, 'iu');
 
 /** One character as the profiles step sends it. */
 export interface ProfilesRow {
@@ -168,7 +167,7 @@ export function profileProblem(profile: string, names: LineNames): { reason: Sto
   const named = namedLater(profile, names);
   if (named.length > 0) return { reason: 'names-later-entity', detail: `names ${named.join(', ')}, who has not been introduced yet` };
   if (splitWords(profile).length > PROFILE_MAX_WORDS) return { reason: 'too-long', detail: `is longer than ${PROFILE_WORDS} words` };
-  if (NARRATOR.test(profile)) return { reason: 'narrator', detail: 'says "the narrator" instead of a name' };
+  if ((names.lexicon ?? ENGLISH_STORY_LEXICON).narrator.test(profile)) return { reason: 'narrator', detail: 'says "the narrator" instead of a name' };
   return null;
 }
 
@@ -209,7 +208,7 @@ export async function writeProfiles(
   };
   for (const row of rows) {
     const profile = answer.get(nameKey(row.name))?.trim();
-    if (!profile || isPlaceholder(profile)) continue;
+    if (!profile || isPlaceholder(profile, later.lexicon)) continue;
     const problem = profileProblem(profile, later);
     if (problem) failed.push({ row, profile, ...problem });
     else accept(row, profile);
@@ -222,8 +221,8 @@ export async function writeProfiles(
     const rewritten = (parsed && readProfilesAnswer(parsed)) ?? new Map<string, string>();
     for (const item of failed) {
       const profile = rewritten.get(nameKey(item.row.name))?.trim();
-      const problem = profile && !isPlaceholder(profile) ? profileProblem(profile, later) : null;
-      if (profile && !isPlaceholder(profile) && !problem) accept(item.row, profile);
+      const problem = profile && !isPlaceholder(profile, later.lexicon) ? profileProblem(profile, later) : null;
+      if (profile && !isPlaceholder(profile, later.lexicon) && !problem) accept(item.row, profile);
       else {
         const drop: StoryDroppedProfile = {
           entity: item.row.entity,
@@ -273,7 +272,13 @@ export function profilesAiStep(): AiStep<StoryGuideSubject> {
     },
     async run(ctx, unit) {
       const { unit: profilesUnit, text, merge, rows, chapter } = prepare(ctx, unit.id);
-      return writeProfiles(ctx, profilesUnit.through, chapter, rows, laterNames(profilesUnit.index, text, merge));
+      return writeProfiles(
+        ctx,
+        profilesUnit.through,
+        chapter,
+        rows,
+        laterNames(profilesUnit.index, text, merge, storyLexicon(ctx.subject.text.language)),
+      );
     },
   };
 }

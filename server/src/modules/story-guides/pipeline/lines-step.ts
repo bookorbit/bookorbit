@@ -2,20 +2,9 @@ import type { AiStep, AiStepContext, AiStepRequest } from '../../ai-jobs/ai-feat
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson, parseJsonReply } from './json-reply';
 import { entityKind } from './merge-step';
-import {
-  FAMILY_AND_ROLE_WORDS,
-  HONORIFIC_ONLY,
-  NAME_PREFIX_WORDS,
-  TITLES,
-  WORD_CHAR,
-  WORD_EDGE,
-  escapeRegExp,
-  isNumberOnly,
-  nameKey,
-  splitWords,
-  stripChars,
-} from './name-text';
+import { WORD_CHAR, escapeRegExp, isNumberOnly, nameKey, splitWords, stripChars } from './name-text';
 import { mergeResult, passageOrder, reviewResult, textResult } from './step-context';
+import { ENGLISH_STORY_LEXICON, storyLexicon, writingIn, type StoryLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type {
   StoryDroppedLine,
@@ -136,8 +125,12 @@ export function linesUser(rows: readonly LinesRow[]): string {
   return rows.map((row) => `- ${row.name} | current: ${row.current ?? 'none'} | notes: ${row.notes.join('; ')}`).join('\n');
 }
 
-export function linesRequest(rows: readonly LinesRow[]): AiStepRequest {
-  return { system: LINES_SYSTEM, user: linesUser(rows), maxOutputTokens: LINES_MAX_OUTPUT_TOKENS, effort: 'medium' };
+function linesSystem(lexicon: StoryLexicon): string {
+  return writingIn(LINES_SYSTEM, lexicon, 'every identity line');
+}
+
+export function linesRequest(rows: readonly LinesRow[], lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): AiStepRequest {
+  return { system: linesSystem(lexicon), user: linesUser(rows), maxOutputTokens: LINES_MAX_OUTPUT_TOKENS, effort: 'medium' };
 }
 
 /** The answer's lines by name key, or null when it has no `lines` object. */
@@ -149,13 +142,9 @@ export function readLinesAnswer(answer: Record<string, unknown>): Map<string, st
   );
 }
 
-const PLACEHOLDER = /^(?:none|unknown|n\/?a|no (?:identity )?line|not (?:stated|known))$/iu;
-const HEDGE = new RegExp(`${WORD_EDGE}or${WORD_EDGE}`, 'iu');
-const NARRATOR = new RegExp(`${WORD_EDGE}the narrator${WORD_EDGE}`, 'iu');
-
 /** "none", "unknown" and the like are not lines. */
-export function isPlaceholder(line: string): boolean {
-  return PLACEHOLDER.test(stripChars(line.trim(), ' .,\'’"()-'));
+export function isPlaceholder(line: string, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): boolean {
+  return lexicon.placeholder.test(stripChars(line.trim(), ' .,\'’"()-'));
 }
 
 /** A name and the pattern that finds it in a line, apostrophes folded. */
@@ -170,6 +159,8 @@ export interface LineNames {
   later: LineName[];
   /** Every name seen by the end of the unit: a later name inside one of these ("John" in "John Ferrier") is that name. */
   visible: LineName[];
+  /** The book's lexicon, for the checks on what is written; English when absent. */
+  lexicon?: StoryLexicon;
 }
 
 function lineName(name: string): LineName {
@@ -181,7 +172,12 @@ function lineName(name: string): LineName {
  * after it. A name some entity has shown by then is not one of them, and names made only of titles,
  * role words or numbers say nothing on their own and are left out.
  */
-export function laterNames(index: number, text: Pick<TextStepResult, 'chapters' | 'passages'>, merge: StoryMergeResult): LineNames {
+export function laterNames(
+  index: number,
+  text: Pick<TextStepResult, 'chapters' | 'passages'>,
+  merge: StoryMergeResult,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): LineNames {
   const { unitOf } = linesUnits(text);
   const firstUnit = new Map<string, { unit: number; text: string }>();
   for (const entity of merge.entities) {
@@ -191,12 +187,12 @@ export function laterNames(index: number, text: Pick<TextStepResult, 'chapters' 
       if (!known || unit < known.unit) firstUnit.set(name.key, { unit, text: name.text });
     }
   }
-  const generic = new Set([...TITLES, ...NAME_PREFIX_WORDS, ...HONORIFIC_ONLY, ...FAMILY_AND_ROLE_WORDS]);
+  const generic = new Set([...lexicon.titles, ...lexicon.namePrefixWords, ...lexicon.honorificOnly, ...lexicon.familyAndRoleWords]);
   const later = new Map<string, string>();
   for (const entity of merge.entities) {
     if (unitOf.get(entity.first)! <= index) continue;
     for (const name of entity.names) {
-      if (firstUnit.get(name.key)!.unit <= index || isNumberOnly(name.text)) continue;
+      if (firstUnit.get(name.key)!.unit <= index || isNumberOnly(name.text, lexicon.numberOnly)) continue;
       if (name.key.split(' ').every((word) => generic.has(word))) continue;
       if (!later.has(name.key)) later.set(name.key, name.text);
     }
@@ -204,6 +200,7 @@ export function laterNames(index: number, text: Pick<TextStepResult, 'chapters' 
   return {
     later: [...later.values()].map(lineName),
     visible: [...firstUnit.values()].filter((name) => name.unit <= index).map((name) => lineName(name.text)),
+    lexicon,
   };
 }
 
@@ -230,18 +227,23 @@ export function lineProblem(line: string, names: LineNames): { reason: StoryLine
   const named = namedLater(line, names);
   if (named.length > 0) return { reason: 'names-later-entity', detail: `names ${named.join(', ')}, who the notes have not introduced yet` };
   if (splitWords(line).length > LINE_WORDS) return { reason: 'too-long', detail: 'is longer than twelve words' };
-  if (HEDGE.test(line)) return { reason: 'hedged', detail: 'hedges with "or"' };
-  if (NARRATOR.test(line)) return { reason: 'narrator', detail: 'says "the narrator" instead of a name' };
+  const lexicon = names.lexicon ?? ENGLISH_STORY_LEXICON;
+  if (lexicon.hedge.test(line)) return { reason: 'hedged', detail: 'hedges with "or"' };
+  if (lexicon.narrator.test(line)) return { reason: 'narrator', detail: 'says "the narrator" instead of a name' };
   return null;
 }
 
 /** The one rewrite of the lines that failed a check. */
-export function linesRewriteRequest(rows: readonly LinesRow[], failed: readonly { row: LinesRow; line: string; detail: string }[]): AiStepRequest {
+export function linesRewriteRequest(
+  rows: readonly LinesRow[],
+  failed: readonly { row: LinesRow; line: string; detail: string }[],
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): AiStepRequest {
   const user =
     linesUser(failed.map((item) => item.row)) +
     '\n\nThese lines broke a rule. Write each again, following every rule above:\n' +
     failed.map((item) => `- ${item.row.name}: "${item.line}" (${item.detail})`).join('\n');
-  return { system: LINES_SYSTEM, user, maxOutputTokens: LINES_MAX_OUTPUT_TOKENS, effort: 'medium' };
+  return { system: linesSystem(lexicon), user, maxOutputTokens: LINES_MAX_OUTPUT_TOKENS, effort: 'medium' };
 }
 
 /** Every line after the units so far, by entity: each unit's changes applied in order. */
@@ -263,14 +265,15 @@ export async function writeLines(
 ): Promise<StoryLinesResult> {
   const result: StoryLinesResult = { through, lines: [], dropped: [], rewritten: 0 };
   if (rows.length === 0) return result;
-  const answer = await askForJson(ctx, linesRequest(rows), readLinesAnswer);
+  const lexicon = later.lexicon ?? ENGLISH_STORY_LEXICON;
+  const answer = await askForJson(ctx, linesRequest(rows, lexicon), readLinesAnswer);
   const failed: { row: LinesRow; line: string; detail: string; reason: StoryLineDropReason }[] = [];
   const accept = (row: LinesRow, line: string) => {
     if (line !== row.current) result.lines.push({ entity: row.entity, name: row.name, text: line });
   };
   for (const row of rows) {
     const line = answer.get(nameKey(row.name))?.trim();
-    if (!line || isPlaceholder(line)) continue;
+    if (!line || isPlaceholder(line, lexicon)) continue;
     const problem = lineProblem(line, later);
     if (problem) failed.push({ row, line, ...problem });
     else accept(row, line);
@@ -278,13 +281,13 @@ export async function writeLines(
   if (failed.length === 0) return result;
 
   result.rewritten = failed.length;
-  const reply = await ctx.complete(linesRewriteRequest(rows, failed));
+  const reply = await ctx.complete(linesRewriteRequest(rows, failed, lexicon));
   const parsed = parseJsonReply(reply.text);
   const rewritten = (parsed && readLinesAnswer(parsed)) ?? new Map<string, string>();
   for (const item of failed) {
     const line = rewritten.get(nameKey(item.row.name))?.trim();
-    const problem = line && !isPlaceholder(line) ? lineProblem(line, later) : null;
-    if (line && !isPlaceholder(line) && !problem) accept(item.row, line);
+    const problem = line && !isPlaceholder(line, lexicon) ? lineProblem(line, later) : null;
+    if (line && !isPlaceholder(line, lexicon) && !problem) accept(item.row, line);
     else {
       const drop: StoryDroppedLine = {
         entity: item.row.entity,
@@ -324,12 +327,12 @@ export function linesAiStep(): AiStep<StoryGuideSubject> {
     units: (ctx) => linesUnits(textResult(ctx)).units.map((unit) => ({ id: unit.id })),
     fingerprint: (ctx, unit) => {
       const { rows } = prepare(ctx, unit.id);
-      const request = linesRequest(rows);
+      const request = linesRequest(rows, storyLexicon(ctx.subject.text.language));
       return hashOf('lines', unit.id, request.system, request.user);
     },
     async run(ctx, unit) {
       const { unit: linesUnit, text, merge, rows } = prepare(ctx, unit.id);
-      return writeLines(ctx, linesUnit.through, rows, laterNames(linesUnit.index, text, merge));
+      return writeLines(ctx, linesUnit.through, rows, laterNames(linesUnit.index, text, merge, storyLexicon(ctx.subject.text.language)));
     },
   };
 }

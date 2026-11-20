@@ -6,7 +6,7 @@ import type { BookFileTextRow, NewBookFileTextRow } from '../../db/schema';
 import { EpubFormatWriter } from '../file-write/formats/epub/epub-format-writer';
 import { extractBookText } from './text/foliate-book-text';
 import { STORY_TEXT_EXTRACTION_VERSION } from './text/extraction-version';
-import { StoryTextService, storyTextRefusal } from './story-text.service';
+import { isFresh, StoryTextService, storyTextRefusal } from './story-text.service';
 import type { StoryTextRepository } from './story-text.repository';
 import type { StoryTextFile } from './story-text.types';
 
@@ -218,6 +218,18 @@ describe('StoryTextService', () => {
   it('refuses a short book and one in another language', () => {
     const base = { outcome: 'ready', textKey: 'k', language: 'en', words: 4999 } as BookFileTextRow;
     expect(storyTextRefusal(base, 400_000)).toBe('too-short');
+    expect(storyTextRefusal({ ...base, words: 9000, language: 'es' }, 400_000)).toBeNull();
+    expect(storyTextRefusal({ ...base, words: 9000, language: 'pt' }, 400_000)).toBe('language');
+    expect(storyTextRefusal({ ...base, words: 9000, language: 'und' }, 400_000)).toBe('language');
     expect(storyTextRefusal({ ...base, words: 9000, language: null }, 400_000)).toBe('language');
+  });
+
+  it('reads a ready row saved without a language once more', () => {
+    const file = { sizeBytes: 10, mtime: new Date(1000) };
+    const row = { outcome: 'ready', textKey: 'k', language: 'en', extractionVersion: STORY_TEXT_EXTRACTION_VERSION, ...file } as BookFileTextRow;
+    expect(isFresh(row, file)).toBe(true);
+    expect(isFresh({ ...row, language: 'pt' }, file)).toBe(true);
+    expect(isFresh({ ...row, language: null }, file)).toBe(false);
+    expect(isFresh({ ...row, outcome: 'unreadable', textKey: null, language: null }, file)).toBe(true);
   });
 });

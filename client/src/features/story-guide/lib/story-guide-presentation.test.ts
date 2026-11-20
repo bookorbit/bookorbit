@@ -53,8 +53,32 @@ describe('storyGuidePresentation', () => {
     expect(result.menu).toEqual([])
   })
 
-  it.each(['no-text-file', 'language'] as const)('shows nothing at all for %s', (reason) => {
-    expect(present(status({ build: { allowed: false, reason }, estimate: undefined }))).toEqual({ rows: [], menu: [], builtNote: null })
+  it('shows nothing at all for a book with no file a guide reads', () => {
+    expect(present(status({ build: { allowed: false, reason: 'no-text-file' }, estimate: undefined }))).toEqual({
+      rows: [],
+      menu: [],
+      builtNote: null,
+    })
+  })
+
+  it('names the book language and the supported ones for a book in another language, with no actions', () => {
+    const result = present(status({ build: { allowed: false, reason: 'language', language: 'pt', languages: ['en', 'es'] }, estimate: undefined }))
+    expect(result).toEqual({
+      rows: [
+        {
+          kind: 'notice',
+          title: 'storyGuide',
+          notice: { kind: 'language', language: 'pt', languages: ['en', 'es'] },
+          actions: [],
+          settingsHint: false,
+          stillTheCase: false,
+        },
+      ],
+      menu: [],
+      builtNote: null,
+    })
+    const older = present(status({ build: { allowed: false, reason: 'language' }, estimate: undefined }), { managesSettings: true })
+    expect(older.rows[0]).toMatchObject({ notice: { kind: 'language', language: null, languages: [] }, settingsHint: false })
   })
 
   it.each([

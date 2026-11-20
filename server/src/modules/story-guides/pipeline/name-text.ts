@@ -1,3 +1,5 @@
+import type { StoryLexicon } from './story-lexicon';
+
 /**
  * Text helpers the story guide steps share. They port the reference pipeline's Python: `\w` there is
  * Unicode-aware, so word characters here are letters, digits and underscore in any script, and its
@@ -168,6 +170,8 @@ export const FAMILY_AND_ROLE_WORDS: ReadonlySet<string> = new Set([
   'sister',
 ]);
 
+const OWN_WORDS_EN = { titles: TITLES, namePrefixWords: NAME_PREFIX_WORDS };
+
 /** Python's `str.split()`: whitespace runs, no empty pieces. */
 export function splitWords(text: string): string[] {
   return text.split(/\s+/u).filter((word) => word.length > 0);
@@ -199,10 +203,14 @@ export function nameKey(name: string): string {
 }
 
 /** A name's own words, without titles and role words ("Inspector Gregson" is "gregson"). */
-export function ownWords(name: string): string[] {
-  return nameKey(name)
+export function ownWords(
+  name: string,
+  lexicon: Pick<StoryLexicon, 'titles' | 'namePrefixWords'> & Partial<Pick<StoryLexicon, 'nameFold'>> = OWN_WORDS_EN,
+): string[] {
+  const words = nameKey(name)
     .split(' ')
-    .filter((word) => word.length > 0 && !TITLES.has(word) && !NAME_PREFIX_WORDS.has(word));
+    .filter((word) => word.length > 0 && !lexicon.titles.has(word) && !lexicon.namePrefixWords.has(word));
+  return lexicon.nameFold ? words.map(lexicon.nameFold) : words;
 }
 
 /**
@@ -222,11 +230,11 @@ export function namesConflict(a: readonly string[], b: readonly string[]): boole
 
 const NUMBER_WORDS =
   'zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred';
-const NUMBER_ONLY = new RegExp(`^(?:\\d+|(?:${NUMBER_WORDS})(?:[- ](?:${NUMBER_WORDS}))*)$`, 'iu');
+export const NUMBER_ONLY = new RegExp(`^(?:\\d+|(?:${NUMBER_WORDS})(?:[- ](?:${NUMBER_WORDS}))*)$`, 'iu');
 
 /** A name made only of numbers ("One", "12") would mark every "one" in the text. */
-export function isNumberOnly(name: string): boolean {
-  return NUMBER_ONLY.test(stripChars(name, " .,'’"));
+export function isNumberOnly(name: string, numberOnly: RegExp = NUMBER_ONLY): boolean {
+  return numberOnly.test(stripChars(name, " .,'’"));
 }
 
 export function escapeRegExp(text: string): string {

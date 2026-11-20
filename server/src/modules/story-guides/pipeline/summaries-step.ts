@@ -2,6 +2,7 @@ import type { AiRunContext, AiStep, AiStepContext, AiStepRequest } from '../../a
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson, parseJsonReply } from './json-reply';
 import { isPlaceholder, laterNames, linesUnits, namedLater, type LineNames, type LinesUnit } from './lines-step';
+import { storyLexicon } from './story-lexicon';
 import { splitWords } from './name-text';
 import { unitText } from './profiles-step';
 import { mergeResult, textResult } from './step-context';
@@ -97,7 +98,7 @@ export async function writeSummary(
   const result: StorySummaryResult = { through, text: null, dropped: null, rewritten: false };
   if (!chapter.trim()) return result;
   const summary = await askForJson(ctx, summariesRequest(chapter, previous), readSummaryAnswer);
-  if (!summary || isPlaceholder(summary)) return result;
+  if (!summary || isPlaceholder(summary, later.lexicon)) return result;
   const problem = summaryProblem(summary, later);
   if (!problem) return { ...result, text: summary };
 
@@ -105,7 +106,7 @@ export async function writeSummary(
   const reply = await ctx.complete(summariesRewriteRequest(summary, problem.detail));
   const parsed = parseJsonReply(reply.text);
   const rewritten = parsed ? readSummaryAnswer(parsed) : null;
-  const usable = rewritten && !isPlaceholder(rewritten) ? rewritten : null;
+  const usable = rewritten && !isPlaceholder(rewritten, later.lexicon) ? rewritten : null;
   const again = usable ? summaryProblem(usable, later) : null;
   if (usable && !again) return { ...result, text: usable };
   result.dropped = { text: usable ?? summary, reason: again?.reason ?? problem.reason };
@@ -150,7 +151,13 @@ export function summariesAiStep(): AiStep<StoryGuideSubject> {
     },
     async run(ctx, unit) {
       const { unit: summaryUnit, text, chapter, previous } = prepare(ctx, unit.id);
-      return writeSummary(ctx, summaryUnit.through, chapter, previous, laterNames(summaryUnit.index, text, mergeResult(ctx)));
+      return writeSummary(
+        ctx,
+        summaryUnit.through,
+        chapter,
+        previous,
+        laterNames(summaryUnit.index, text, mergeResult(ctx), storyLexicon(ctx.subject.text.language)),
+      );
     },
   };
 }

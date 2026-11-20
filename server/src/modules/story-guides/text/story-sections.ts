@@ -11,7 +11,8 @@ export const STORY_MIN_WORDS = 5000;
 
 /**
  * The app index's matter titles (`StoryLexicon.matterSections`), plus Dune's appendices, which
- * end its story range: "appendix", "terminology of" and "cartographic notes".
+ * end its story range: "appendix", "terminology of" and "cartographic notes", and the Spanish
+ * titles of the same pages. Titles are compared folded, so they are written without accents.
  */
 const MATTER_TITLES = new Set([
   'contents',
@@ -50,6 +51,31 @@ const MATTER_TITLES = new Set([
   'list of characters',
   'index of characters',
   'characters',
+  'contenido',
+  'contenidos',
+  'tabla de contenido',
+  'tabla de contenidos',
+  'indice',
+  'indice general',
+  'dedicatoria',
+  'epigrafe',
+  'creditos',
+  'colofon',
+  'portada',
+  'portadilla',
+  'cubierta',
+  'contraportada',
+  'contracubierta',
+  'derechos de autor',
+  'mapa',
+  'mapas',
+  'notas',
+  'bibliografia',
+  'fuentes',
+  'glosario',
+  'personajes',
+  'lista de personajes',
+  'indice de personajes',
 ]);
 
 const MATTER_PHRASES = [
@@ -87,6 +113,20 @@ const MATTER_PHRASES = [
   "translator's note",
   'project gutenberg',
   'suggestions for further reading',
+  'sobre el autor',
+  'sobre la autora',
+  'sobre los autores',
+  'acerca del autor',
+  'acerca de la autora',
+  'nota del traductor',
+  'nota de la traductora',
+  'del mismo autor',
+  'de la misma autora',
+  'otros titulos',
+  'otras obras de',
+  'otros libros de',
+  'guia de lectura',
+  'indice onomastico',
   'appendix',
   'terminology of',
   'cartographic notes',

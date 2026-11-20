@@ -4,9 +4,10 @@ import type { AiStep, AiStepRequest } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { splitWhileTooLong } from '../../ai-jobs/ai-split';
 import { askForJson } from './json-reply';
-import { FAMILY_AND_ROLE_WORDS, HONORIFICS, WORD_CHAR, WORD_EDGE, escapeRegExp, nameKey, splitWords, straight, stripChars } from './name-text';
+import { WORD_EDGE, escapeRegExp, nameKey, splitWords, straight, stripChars } from './name-text';
 import { toldInFirstPerson } from './names-step';
 import { mergeResult, namesResults, passageById, reviewResult, textResult } from './step-context';
+import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type {
   PassageSpan,
@@ -80,9 +81,16 @@ export interface TiesCast {
   narrator: string | null;
   /** The entity of a narrator filled in from the cast, which the passage's placement does not hold. */
   filled: FilledNarrator | null;
+  /** The book's lexicon; English when absent. */
+  lexicon?: StoryLexicon;
 }
 
-export function tiesCast(names: StoryNamesResult, passageText: string, fill: FilledNarrator | undefined): TiesCast {
+export function tiesCast(
+  names: StoryNamesResult,
+  passageText: string,
+  fill: FilledNarrator | undefined,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): TiesCast {
   const lookup = new Map<string, string>();
   const namesOf = new Map<string, string[]>();
   const lines: string[] = [];
@@ -92,7 +100,7 @@ export function tiesCast(names: StoryNamesResult, passageText: string, fill: Fil
     for (const name of all) if (!lookup.has(nameKey(name))) lookup.set(nameKey(name), entry.name);
     lines.push(`${entry.name} (${entry.kind})` + (entry.aliases.length > 0 ? `, also ${entry.aliases.join(', ')}` : ''));
   }
-  let narrator = names.narrator && toldInFirstPerson(passageText) ? names.narrator : null;
+  let narrator = names.narrator && toldInFirstPerson(passageText, lexicon) ? names.narrator : null;
   let filled: FilledNarrator | null = null;
   if (!narrator && fill) {
     narrator = fill.name;
@@ -103,7 +111,7 @@ export function tiesCast(names: StoryNamesResult, passageText: string, fill: Fil
       lines.push(`${fill.name} (character)`);
     }
   }
-  return { lookup, namesOf, lines, narrator, filled };
+  return { lookup, namesOf, lines, narrator, filled, lexicon };
 }
 
 export function tiesRequest(passageText: string, cast: Pick<TiesCast, 'lines' | 'narrator'>): AiStepRequest {
@@ -131,6 +139,7 @@ export function narratorFill(
   names: ReadonlyMap<string, StoryNamesResult>,
   merge: StoryMergeResult,
   review: StoryReviewResult,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
 ): Map<string, FilledNarrator> {
   const entityOf = new Map<string, number>();
   const namesOfCast = new Map<number, string[]>();
@@ -157,7 +166,7 @@ export function narratorFill(
   const bookWide = new Set(named.values());
   const fill = new Map<string, FilledNarrator>();
   for (const passage of passages) {
-    if (names.get(passage.id)?.narrator || !toldInFirstPerson(passage.text)) continue;
+    if (names.get(passage.id)?.narrator || !toldInFirstPerson(passage.text, lexicon)) continue;
     const chapter = byChapter.get(passage.chapter);
     const pick = chapter && chapter.size > 0 ? chapter : bookWide;
     if (pick.size !== 1) continue;
@@ -167,44 +176,13 @@ export function narratorFill(
   return fill;
 }
 
-const KIN_WORDS = ['aunt', 'aunty', 'auntie', 'uncle', 'cousin', 'gran', 'granny', 'grandma', 'grandpa', 'nan', 'nana'];
-/** "Aunty Minda": a kin word as a title before a name, the kin word in any case and the name capitalised. */
-const KIN_TITLE = new RegExp(`${WORD_EDGE}(?:${KIN_WORDS.map(anyCase).join('|')})\\s+[A-Z]`, 'u');
-const FAMILY_WORDS = new RegExp(
-  `${WORD_EDGE}(?:father|mother|fathers|mothers|parents?|son|sons|daughters?|child|children|kids?|brothers?|sisters?|siblings?|` +
-    `twins?|aunt|aunts|aunty|auntie|uncles?|nieces?|nephews?|cousins?|wife|wives|husbands?|married|marry|marriage|wed|` +
-    `wedded|wedding|widow|widower|betrothed|betrothal|engaged|engagement|fianc[eé]e?|bride|groom|promised|` +
-    `grand${WORD_CHAR}*|great-${WORD_CHAR}+|step${WORD_CHAR}+|half-${WORD_CHAR}+|${WORD_CHAR}+-in-law|mum|mom|mommy|mummy|dad|daddy|da|ma|pa|papa|mama|family|` +
-    `kin|kinsman|kinswoman|related|relatives?|relation|heir|firstborn|eldest|youngest)${WORD_EDGE}`,
-  'iu',
-);
-/** A kin title after a possessive is kinship ("His Aunt Petunia", "my uncle"). */
-const POSSESSIVE_KIN = new RegExp(
-  `${WORD_EDGE}(?:his|her|my|your|their|our|${WORD_CHAR}+'s)\\s+(?:great[- ]|grand[- ]?)*(?:aunt|aunty|auntie|` +
-    `uncle|cousin|gran|granny|grandma|grandpa|grandmother|grandfather|nan|nana)${WORD_EDGE}`,
-  'iu',
-);
-/** The side named with a kin title is the elder ("Harry aunt_or_uncle_of Aunt Petunia" is reversed). */
-const ELDER_TITLE: Partial<Record<StoryGuideTieType, RegExp>> = {
-  aunt_or_uncle_of: new RegExp(`^(?:great[- ])*(?:aunt|aunty|auntie|uncle)${WORD_EDGE}`, 'iu'),
-  grandparent_of: new RegExp(`^(?:great[- ])*(?:gran|granny|grandma|grandpa|grandmother|grandfather|nan|nana)${WORD_EDGE}`, 'iu'),
-};
-const STOP = new Set([...HONORIFICS, ...FAMILY_AND_ROLE_WORDS, 'the', 'of', 'and', 'mr', 'mrs', 'ms', 'miss']);
-const FIRST_PERSON_WORDS = ['i', 'my', 'me', 'mine', 'myself', "i'm", "i've", "i'd", "i'll"];
-// Dashes as escapes: the source holds no em dash characters.
-const QUOTE_EDGE_CHARS = '"\'.,;:!?…\u2014\u2013-()';
-
-function anyCase(word: string): string {
-  return [...word].map((char) => `[${char}${char.toUpperCase()}]`).join('');
-}
-
 /** The tokens a side's names give: words of three letters or more, without titles and role words. */
-export function nameTokens(names: readonly string[]): Set<string> {
+export function nameTokens(names: readonly string[], lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): Set<string> {
   const tokens = new Set<string>();
   for (const name of names) {
-    for (const match of straight(name).matchAll(/[A-Za-z][\p{L}\p{N}_']*/gu)) {
+    for (const match of straight(name).matchAll(lexicon.nameToken)) {
       const word = match[0].toLowerCase().replace(/'s$/u, '');
-      if (word.length >= 3 && !STOP.has(word)) tokens.add(word);
+      if (word.length >= 3 && !lexicon.tieStop.has(word)) tokens.add(word);
     }
   }
   return tokens;
@@ -221,9 +199,9 @@ function textWords(text: string): Set<string> {
 }
 
 /** The quote in the passage, matched word by word whatever the punctuation and case between; null when absent. */
-export function findQuote(quote: string, passageText: string): [number, number] | null {
+export function findQuote(quote: string, passageText: string, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): [number, number] | null {
   const parts = splitWords(straight(quote))
-    .map((word) => stripChars(word, QUOTE_EDGE_CHARS))
+    .map((word) => stripChars(word, lexicon.quoteEdgeChars))
     .filter(Boolean);
   if (parts.length < 2) return null;
   const match = new RegExp(parts.map(escapeRegExp).join(`[^\\p{L}\\p{N}_]+`), 'iu').exec(straight(passageText));
@@ -264,6 +242,7 @@ export function checkTies(
   placement: Readonly<Record<string, number>>,
 ): StoryTiesResult {
   const text = passage.text;
+  const lexicon = cast.lexicon ?? ENGLISH_STORY_LEXICON;
   const kept: StoryTie[] = [];
   const dropped: StoryDroppedTie[] = [];
   for (const item of relations) {
@@ -276,7 +255,7 @@ export function checkTies(
       .trim()
       .toLowerCase();
     const quote = typeof relation.quote === 'string' ? relation.quote : '';
-    const span = findQuote(quote, text);
+    const span = findQuote(quote, text, lexicon);
     let reason: StoryTieDropReason | null = null;
     let evidence: StoryTie['evidence'] | null = null;
     if (!storyGuideTieType(type)) reason = 'type not on the list';
@@ -289,11 +268,11 @@ export function checkTies(
       const p1 = text.indexOf('\n', span[1]);
       const paragraphEnd = p1 >= 0 ? p1 : text.length;
       const paragraphWords = textWords(text.slice(p0, paragraphEnd));
-      let ta = nameTokens(cast.namesOf.get(a)!);
-      let tb = nameTokens(cast.namesOf.get(b)!);
-      const me = cast.narrator && cast.namesOf.has(cast.narrator) ? nameTokens(cast.namesOf.get(cast.narrator)!) : new Set<string>();
-      if (me.size > 0 && overlaps(me, ta)) ta = new Set([...ta, ...FIRST_PERSON_WORDS]);
-      if (me.size > 0 && overlaps(me, tb)) tb = new Set([...tb, ...FIRST_PERSON_WORDS]);
+      let ta = nameTokens(cast.namesOf.get(a)!, lexicon);
+      let tb = nameTokens(cast.namesOf.get(b)!, lexicon);
+      const me = cast.narrator && cast.namesOf.has(cast.narrator) ? nameTokens(cast.namesOf.get(cast.narrator)!, lexicon) : new Set<string>();
+      if (me.size > 0 && overlaps(me, ta)) ta = new Set([...ta, ...lexicon.firstPersonWords]);
+      if (me.size > 0 && overlaps(me, tb)) tb = new Set([...tb, ...lexicon.firstPersonWords]);
       const wideWords = textWords(text.slice(Math.max(0, span[0] - TIE_WINDOW), paragraphEnd));
       if (overlaps(ta, quoteWords) && overlaps(tb, quoteWords)) evidence = 'quote';
       else if (overlaps(ta, paragraphWords) && overlaps(tb, paragraphWords)) evidence = 'paragraph';
@@ -304,14 +283,14 @@ export function checkTies(
       if (
         !reason &&
         storyGuideTieType(type)!.group === 'family' &&
-        KIN_TITLE.test(shown) &&
-        !FAMILY_WORDS.test(withoutNames(text.slice(span[0], span[1]), [...cast.namesOf.get(a)!, ...cast.namesOf.get(b)!])) &&
-        !POSSESSIVE_KIN.test(shown)
+        lexicon.kinTitle.test(shown) &&
+        !lexicon.familyWords.test(withoutNames(text.slice(span[0], span[1]), [...cast.namesOf.get(a)!, ...cast.namesOf.get(b)!])) &&
+        !lexicon.possessiveKin.test(shown)
       ) {
         reason = 'family only by a title';
       }
     }
-    const elder = ELDER_TITLE[type as StoryGuideTieType];
+    const elder = lexicon.elderTitle[type as StoryGuideTieType];
     if (
       !reason &&
       a &&
@@ -426,9 +405,10 @@ export function tiesAiStep(): AiStep<StoryGuideSubject> {
     const merge = mergeResult(ctx);
     const review = reviewResult(ctx);
     let fill = fills.get(review);
-    if (!fill) fills.set(review, (fill = narratorFill(text.passages, names, merge, review)));
+    const lexicon = storyLexicon(ctx.subject.text.language);
+    if (!fill) fills.set(review, (fill = narratorFill(text.passages, names, merge, review, lexicon)));
     const own = names.get(id) ?? { passage: id, chapter: passage.chapter, part: passage.part, narrator: null, entries: [] };
-    return { passage, cast: tiesCast(own, passage.text, fill.get(id)), placement: merge.placement[id] ?? {} };
+    return { passage, cast: tiesCast(own, passage.text, fill.get(id), lexicon), placement: merge.placement[id] ?? {} };
   };
   return {
     id: 'ties',

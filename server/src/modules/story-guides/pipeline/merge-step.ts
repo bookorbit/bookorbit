@@ -2,7 +2,8 @@ import type { StoryGuideEntityKind } from '@bookorbit/types';
 
 import type { AiStep } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
-import { mostCommon, nameKey, namesConflict, ownWords } from './name-text';
+import { mostCommon, nameKey, namesConflict, ownWords as ownWordsIn } from './name-text';
+import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import { namesResults, textResult } from './step-context';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type { PassageSpan, StoryMergedEntity, StoryMergeResult, StoryNamesResult } from './story-guide.types';
@@ -25,7 +26,12 @@ export function entityKind(entity: Pick<StoryMergedEntity, 'kinds'>): StoryGuide
  * people share it, to the one seen last in the chapter. A full name never joins a person whose name
  * conflicts with it, and a person never collects another person's name as an alias.
  */
-export function mergeNames(passages: readonly StoryPassage[], names: ReadonlyMap<string, StoryNamesResult>): StoryMergeResult {
+export function mergeNames(
+  passages: readonly StoryPassage[],
+  names: ReadonlyMap<string, StoryNamesResult>,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): StoryMergeResult {
+  const ownWords = (name: string) => ownWordsIn(name, lexicon);
   const entities: Building[] = [];
   const byName = new Map<string, number>();
   const byAlias = new Map<string, Set<number>>();
@@ -66,7 +72,7 @@ export function mergeNames(passages: readonly StoryPassage[], names: ReadonlyMap
           if (namesConflict(own, theirs.length > 0 ? theirs : own)) target = undefined;
         }
       }
-      if (target === undefined && entry.kind === 'group') target = houseOf(nameKey(entry.name), byName, byAlias, groupOnly);
+      if (target === undefined && entry.kind === 'group') target = houseOf(nameKey(entry.name), byName, byAlias, groupOnly, lexicon.houseWords);
       if (target === undefined) {
         target = entities.length;
         entities.push({ id: target, name: entry.name, first: passage.id, names: new Map(), kinds: [], what: [], passages: [] });
@@ -120,6 +126,7 @@ function houseOf(
   byName: ReadonlyMap<string, number>,
   byAlias: ReadonlyMap<string, ReadonlySet<number>>,
   isGroup: (id: number) => boolean,
+  houseWords: readonly string[],
 ): number | undefined {
   const words = key.split(' ');
   const named = (name: string) => {
@@ -127,9 +134,11 @@ function houseOf(
     const groups = [...ids].filter(isGroup);
     return groups.length === 1 ? groups[0] : undefined;
   };
-  if (words.length === 2 && words[0] === 'house') return named(words[1]) ?? named(`${words[1]}s`);
-  if (words.length === 1 && words[0] !== 'house') {
-    return named(`house ${words[0]}`) ?? (words[0].endsWith('s') ? named(`house ${words[0].slice(0, -1)}`) : undefined);
+  const first = (find: (house: string) => number | undefined) =>
+    houseWords.reduce<number | undefined>((found, house) => found ?? find(house), undefined);
+  if (words.length === 2 && houseWords.includes(words[0])) return named(words[1]) ?? named(`${words[1]}s`);
+  if (words.length === 1 && !houseWords.includes(words[0])) {
+    return first((house) => named(`${house} ${words[0]}`) ?? (words[0].endsWith('s') ? named(`${house} ${words[0].slice(0, -1)}`) : undefined));
   }
   return undefined;
 }
@@ -149,6 +158,6 @@ export function mergeAiStep(): AiStep<StoryGuideSubject> {
     dependsOn: ['text', 'names'],
     units: () => [{ id: 'book' }],
     fingerprint: () => hashOf('merge'),
-    run: (ctx) => Promise.resolve(mergeNames(textResult(ctx).passages, namesResults(ctx))),
+    run: (ctx) => Promise.resolve(mergeNames(textResult(ctx).passages, namesResults(ctx), storyLexicon(ctx.subject.text.language))),
   };
 }

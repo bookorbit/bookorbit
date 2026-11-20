@@ -37,7 +37,7 @@ export const bookFileTexts = pgTable(
     textKey: varchar('text_key', { length: 64 }),
     /** The key under the previous extraction version, while its guide moves to this one. */
     previousKey: varchar('previous_key', { length: 64 }),
-    /** Two-letter code; null when the language was refused. */
+    /** Two-letter code, supported or not; `und` when undetermined. Null on rows read before every language was kept. */
     language: varchar('language', { length: 16 }),
     words: integer('words').notNull().default(0),
     sections: jsonb('sections').$type<BookFileTextSection[]>().notNull().default([]),

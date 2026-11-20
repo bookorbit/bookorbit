@@ -4,12 +4,25 @@ import { AI_JOBS_UNIT_CONCURRENCY } from '../ai-jobs/ai-jobs.constants';
 import { PASSAGE_CHARS } from './pipeline/text-step';
 import { LONG_SECTION_WORDS, SECTION_PART_WORDS } from './text/section-parts';
 
-/** Characters per word of English prose in the text the `text` step cuts, measured on the golden books. */
-const CHARS_PER_WORD = 5.4;
-/** Words per passage: the `text` step cuts about 9,000 characters. */
-const PASSAGE_WORDS = PASSAGE_CHARS / CHARS_PER_WORD;
-/** Tokens per word of English prose, as the providers' tokenizers count it. */
-const TOKENS_PER_WORD = 1.33;
+interface ProseShape {
+  /** Characters per word in the text the `text` step cuts. */
+  charsPerWord: number;
+  /** Tokens per word, as the providers' tokenizers count it. */
+  tokensPerWord: number;
+}
+
+/**
+ * English measured on the golden books. Spanish on Marianela and El sombrero de tres picos, whose
+ * passage calls read about 1.46 times the tokens per word of English books on the same model.
+ */
+const PROSE: Readonly<Record<string, ProseShape>> = {
+  en: { charsPerWord: 5.4, tokensPerWord: 1.33 },
+  es: { charsPerWord: 5.9, tokensPerWord: 1.9 },
+};
+
+function proseOf(language: string | null | undefined): ProseShape {
+  return (language && PROSE[language]) || PROSE.en;
+}
 
 /**
  * What a model call reads and writes, per step, measured on the six builds of the golden books
@@ -54,6 +67,8 @@ export type StoryGuideStepRates = Partial<Record<string, number | null>>;
 export interface StoryGuideEstimateInput {
   /** The story sections, with the words the key job counted in each. */
   sections: readonly { words: number }[];
+  /** The book's language; English when absent. */
+  language?: string | null;
   /** The steps that run; the others reuse cached units. */
   steps: readonly string[];
   prices: Partial<Record<AiSlot, AiModelPrices | null>>;
@@ -62,6 +77,7 @@ export interface StoryGuideEstimateInput {
 
 export interface StoryGuideProgressInput {
   sections: readonly { words: number }[];
+  language?: string | null;
   /** Every step of the pipeline, in the order the runner goes through them. */
   order: readonly string[];
   /** The steps that run; the others reuse cached units. */
@@ -73,9 +89,10 @@ export interface StoryGuideProgressInput {
   total: number;
 }
 
-/** Passages the `text` step cuts: each section ends a passage, and a passage holds about `PASSAGE_WORDS`. */
-export function estimatedPassages(sections: readonly { words: number }[]): number {
-  const passages = sections.reduce((total, section) => total + Math.max(1, Math.ceil(section.words / PASSAGE_WORDS)), 0);
+/** Passages the `text` step cuts: each section ends a passage, and a passage holds about 9,000 characters. */
+export function estimatedPassages(sections: readonly { words: number }[], language?: string | null): number {
+  const passageWords = PASSAGE_CHARS / proseOf(language).charsPerWord;
+  const passages = sections.reduce((total, section) => total + Math.max(1, Math.ceil(section.words / passageWords)), 0);
   return Math.max(1, passages);
 }
 
@@ -88,8 +105,8 @@ export function estimatedLinesUnits(sections: readonly { words: number }[]): num
   return Math.max(1, units);
 }
 
-function unitCounts(sections: readonly { words: number }[]): Record<StepCost['unit'], number> {
-  return { passage: estimatedPassages(sections), lines: estimatedLinesUnits(sections), book: 1 };
+function unitCounts(sections: readonly { words: number }[], language?: string | null): Record<StepCost['unit'], number> {
+  return { passage: estimatedPassages(sections, language), lines: estimatedLinesUnits(sections), book: 1 };
 }
 
 /**
@@ -109,8 +126,8 @@ function toMinutes(ms: number): number {
 /** Dollars and minutes for a build, from the story's sections, the slots' prices and the models' learned speed. */
 export function estimateStoryGuide(input: StoryGuideEstimateInput): AiJobEstimate {
   const words = input.sections.reduce((total, section) => total + section.words, 0);
-  const storyTokens = words * TOKENS_PER_WORD;
-  const calls = unitCounts(input.sections);
+  const storyTokens = words * proseOf(input.language).tokensPerWord;
+  const calls = unitCounts(input.sections, input.language);
 
   let cost: number | null = 0;
   let ms: number | null = 0;
@@ -139,7 +156,7 @@ export function estimateStoryGuide(input: StoryGuideEstimateInput): AiJobEstimat
  * in full. Null while a step still to run has no learned speed.
  */
 export function storyGuideMinutesLeft(input: StoryGuideProgressInput): number | null {
-  const calls = unitCounts(input.sections);
+  const calls = unitCounts(input.sections, input.language);
   const runs = new Set(input.steps);
   const current = input.phase === null ? -1 : input.order.indexOf(input.phase);
   let ms = 0;

@@ -1,5 +1,12 @@
 /** Languages a story guide can be built in. */
-export const STORY_GUIDE_LANGUAGES: readonly string[] = ['en'];
+export const STORY_GUIDE_LANGUAGES: readonly string[] = ['en', 'es'];
+
+/** Stored for a book whose language neither its metadata nor its text decides. */
+export const UNDETERMINED_LANGUAGE = 'und';
+
+export function isStoryGuideLanguage(language: string | null | undefined): boolean {
+  return !!language && STORY_GUIDE_LANGUAGES.includes(language);
+}
 
 const UNDETERMINED = new Set(['und', 'mul', 'zxx', 'mis', 'xx']);
 
@@ -118,23 +125,21 @@ export function detectLanguage(sections: readonly string[]): string | null {
   return best.code;
 }
 
-export type StoryLanguage = { language: string } | { language: null; reason: 'language' };
-
 /**
- * The book's language: its metadata, unless the text clearly reads as another language (a
- * mislabelled book), and the text alone when the metadata names none. Refused when neither
- * decides or the result is not supported.
+ * The book's language as a two-letter code: its metadata, unless the text clearly reads as another
+ * language (a mislabelled book), and the text alone when the metadata names none. `und` when
+ * neither decides. Whether a guide can be built in it is `isStoryGuideLanguage`.
  */
-export function storyLanguage(metadata: readonly string[], sections: readonly string[]): StoryLanguage {
+export function storyLanguage(metadata: readonly string[], sections: readonly string[]): string {
   const labelled = metadata.map(normaliseLanguage).find((code): code is string => code !== null) ?? null;
   const detected = detectLanguage(sections);
-  let language = detected ?? labelled;
-  if (!detected && labelled && COMMON_WORDS[labelled]) {
+  if (detected) return detected;
+  if (!labelled) return UNDETERMINED_LANGUAGE;
+  if (COMMON_WORDS[labelled]) {
     // A label the text does not bear out at all, such as English metadata on a book in Russian.
     const words = sampleWords(sections);
     const labelledShare = shares(words).find((entry) => entry.code === labelled)?.share ?? 0;
-    if (words.length >= MIN_SAMPLE_WORDS && labelledShare < FOREIGN_SHARE) language = null;
+    if (words.length >= MIN_SAMPLE_WORDS && labelledShare < FOREIGN_SHARE) return UNDETERMINED_LANGUAGE;
   }
-  if (!language || !STORY_GUIDE_LANGUAGES.includes(language)) return { language: null, reason: 'language' };
-  return { language };
+  return labelled;
 }

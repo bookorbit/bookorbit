@@ -249,6 +249,25 @@ describe('StoryGuidesService.status', () => {
     expect(status.build).toEqual({ allowed: false, reason: 'too-long', limit: 400_000 });
   });
 
+  it('names the book language and the supported ones for a book in another language', async () => {
+    const admin = user({ isSuperuser: true });
+    const portuguese = setup({ text: textRow({ language: 'pt' }) });
+    expect((await portuguese.service.status(3, undefined, admin)).status.build).toEqual({
+      allowed: false,
+      reason: 'language',
+      language: 'pt',
+      languages: ['en', 'es'],
+    });
+    const undetermined = setup({ text: textRow({ language: 'und' }) });
+    expect((await undetermined.service.status(3, undefined, admin)).status.build).toEqual({
+      allowed: false,
+      reason: 'language',
+      languages: ['en', 'es'],
+    });
+    const spanish = setup({ text: textRow({ language: 'es' }) });
+    expect((await spanish.service.status(3, undefined, admin)).status.build).toEqual({ allowed: true });
+  });
+
   it('answers 404 for a file of another book', async () => {
     const { service } = setup();
     await expect(service.status(3, 99, user())).rejects.toBeInstanceOf(NotFoundException);

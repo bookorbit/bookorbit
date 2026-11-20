@@ -4,7 +4,8 @@ import type { AiStep, AiStepRequest } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { splitWhileTooLong } from '../../ai-jobs/ai-split';
 import { askForJson } from './json-reply';
-import { FAMILY_AND_ROLE_WORDS, HONORIFICS, WORD_CHAR, WORD_EDGE, locateName, splitWords, startsUpper, stripChars } from './name-text';
+import { locateName, splitWords, startsUpper, stripChars } from './name-text';
+import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
 import { passageById, textResult } from './step-context';
 import type { PassageSpan, StoryNameEntry, StoryNamesResult } from './story-guide.types';
@@ -77,30 +78,25 @@ export interface NamesAnswer {
   entries: RawNameEntry[];
 }
 
-const SENTENCE_START = /(?:^|[.!?…]["”’]?\s+|["“]\s*)\n?$/u;
-const RUN = /(?:(?:Mr|Mrs|Ms|Dr|St)\. )?[A-Z][\p{L}\p{N}_’'-]*(?: (?:(?:Mr|Mrs|Ms|Dr|St)\. )?[A-Z][\p{L}\p{N}_’'-]*)*/gu;
-const LOWER_WORD = new RegExp(`(?<!${WORD_CHAR})[a-z][\\p{L}\\p{N}_’'-]*`, 'gu');
-const PRONOUN_RUNS = new Set(['I', 'I’m', 'I’ve', 'I’ll', 'I’d', 'Mr', 'Mrs']);
-
 /**
  * The checklist sent with a passage: capitalised runs, kept when one appears mid-sentence, or twice
  * and not as an everyday word. A run that opens a sentence with an everyday word ("The Strand") also
  * lists its tail ("Strand").
  */
-export function nameCandidates(text: string): string[] {
+export function nameCandidates(text: string, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): string[] {
   const runs = new Map<string, [number, number]>();
   for (const paragraph of text.split('\n\n')) {
-    for (const match of paragraph.matchAll(RUN)) {
+    for (const match of paragraph.matchAll(lexicon.run)) {
       const run = match[0].replace(/[’']s?$/u, '').trim();
-      if (PRONOUN_RUNS.has(run)) continue;
-      const start = SENTENCE_START.test(paragraph.slice(0, match.index));
+      if (lexicon.pronounRuns.has(run)) continue;
+      const start = lexicon.sentenceStart.test(paragraph.slice(0, match.index));
       let seen = runs.get(run);
       if (!seen) runs.set(run, (seen = [0, 0]));
       seen[0] += 1;
       seen[1] += start ? 0 : 1;
     }
   }
-  const lower = new Set(text.match(LOWER_WORD) ?? []);
+  const lower = new Set(text.match(lexicon.lowerWord) ?? []);
   for (const [run, seen] of [...runs.entries()]) {
     const [count, mid] = seen;
     const words = splitWords(run);
@@ -120,30 +116,23 @@ export function nameCandidates(text: string): string[] {
   return keep;
 }
 
-const DIALOGUE = /“[^”]*”|"[^"\n]*"/gu;
-const FIRST_PERSON = new RegExp(
-  `${WORD_EDGE}I${WORD_EDGE}|${WORD_EDGE}I[’'](?:m|d|ll|ve)${WORD_EDGE}|${WORD_EDGE}(?:[Mm]e|[Mm]y|[Mm]ine|[Mm]yself)${WORD_EDGE}`,
-  'gu',
-);
-const THIRD_PERSON = new RegExp(`${WORD_EDGE}(?:he|she|him|her|his|hers|himself|herself)${WORD_EDGE}`, 'giu');
-
 /**
  * Whether the narration, outside dialogue, is told as "I": first-person pronouns at least 30% of its
  * personal pronouns. The model names a narrator in third-person books too, and a narrator lets "I"
  * stand for a name in the ties check.
  */
-export function toldInFirstPerson(text: string): boolean {
-  const narration = text.replace(DIALOGUE, ' ');
-  const first = narration.match(FIRST_PERSON)?.length ?? 0;
-  const third = narration.match(THIRD_PERSON)?.length ?? 0;
+export function toldInFirstPerson(text: string, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): boolean {
+  const narration = text.replace(lexicon.dialogue, ' ');
+  const first = narration.match(lexicon.firstPerson)?.length ?? 0;
+  const third = narration.match(lexicon.thirdPerson)?.length ?? 0;
   return first >= 3 && first >= 0.3 * (first + third);
 }
 
 /** The request for one passage, or one piece of it after a reply was cut short. */
-export function namesRequest(book: NamesBook, text: string): AiStepRequest {
+export function namesRequest(book: NamesBook, text: string, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): AiStepRequest {
   const by = book.authors.filter((author) => author.trim()).join(' and ');
   const user =
-    `Book: ${book.title}${by ? `, by ${by}` : ''}\n\nChapter:\n` + text + '\n\nChecklist:\n' + nameCandidates(text).join('\n') + NAMES_SHAPE;
+    `Book: ${book.title}${by ? `, by ${by}` : ''}\n\nChapter:\n` + text + '\n\nChecklist:\n' + nameCandidates(text, lexicon).join('\n') + NAMES_SHAPE;
   return { system: NAMES_SYSTEM, user, maxOutputTokens: NAMES_MAX_OUTPUT_TOKENS, effort: 'medium' };
 }
 
@@ -170,7 +159,11 @@ export function readNamesAnswer(answer: Record<string, unknown>): NamesAnswer | 
  * and Mr./Mrs. forms of another surname dropped; an entry that is an alias of an earlier one folded
  * into it; an alias two entries claim given to neither.
  */
-export function validateEntries(entries: readonly RawNameEntry[], passageText: string): RawNameEntry[] {
+export function validateEntries(
+  entries: readonly RawNameEntry[],
+  passageText: string,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): RawNameEntry[] {
   const inText = passageText.replace(/’/g, "'");
   const present = (name: string) => inText.includes(name.replace(/’/g, "'"));
   const checked: RawNameEntry[] = [];
@@ -180,8 +173,8 @@ export function validateEntries(entries: readonly RawNameEntry[], passageText: s
     for (const alias of entry.aliases) {
       const parts = splitWords(alias);
       if (!startsUpper(alias) || !present(alias)) continue;
-      if (parts.every((word) => FAMILY_AND_ROLE_WORDS.has(stripChars(word.toLowerCase(), ".’'")))) continue;
-      if (parts.length === 2 && HONORIFICS.has(stripChars(parts[0].toLowerCase(), '.'))) {
+      if (parts.every((word) => lexicon.familyAndRoleWords.has(stripChars(word.toLowerCase(), ".’'")))) continue;
+      if (parts.length === 2 && lexicon.honorifics.has(stripChars(parts[0].toLowerCase(), '.'))) {
         const nameWords = new Set(splitWords(entry.name).map((word) => stripChars(word.toLowerCase(), '.')));
         const others = new Set(
           entry.aliases.filter((other) => other !== alias).flatMap((other) => splitWords(other).map((word) => stripChars(word.toLowerCase(), '.'))),
@@ -215,44 +208,7 @@ export function validateEntries(entries: readonly RawNameEntry[], passageText: s
   return merged;
 }
 
-const CALENDAR = new Set([
-  'monday',
-  'tuesday',
-  'wednesday',
-  'thursday',
-  'friday',
-  'saturday',
-  'sunday',
-  'january',
-  'february',
-  'march',
-  'april',
-  'may',
-  'june',
-  'july',
-  'august',
-  'september',
-  'october',
-  'november',
-  'december',
-]);
 const WORDS = /[\p{L}\p{N}_']+/gu;
-/** A name made only of these is never a person ("Mom", "the Doctor"), unless it has another name. */
-const ROLE_ONLY = new Set([
-  ...FAMILY_AND_ROLE_WORDS,
-  'mommy',
-  'daddy',
-  'mummy',
-  'granny',
-  'gran',
-  'nana',
-  'grandmother',
-  'grandfather',
-  'auntie',
-  'the',
-  'my',
-  'old',
-]);
 
 /** Lowercase words, straight apostrophes, single spaces: how the book's title is compared. */
 export function plainWords(text: string): string {
@@ -260,22 +216,22 @@ export function plainWords(text: string): string {
 }
 
 /** The book's author and its whole title are never entries, nor are days and months or a name the model calls none. */
-export function bookFilter(entries: readonly RawNameEntry[], book: NamesBook): RawNameEntry[] {
+export function bookFilter(entries: readonly RawNameEntry[], book: NamesBook, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): RawNameEntry[] {
   const authorWords = new Set(['by', ...book.authors.flatMap((author) => plainWords(author).split(' ').filter(Boolean))]);
   const title = plainWords(book.title);
   return entries.filter((entry) => {
     if (entry.kind === 'none') return false;
     const words = new Set(entry.name.replace(/’/g, "'").toLowerCase().match(WORDS) ?? []);
     if (words.size > 0 && [...words].every((word) => authorWords.has(word))) return false;
-    if (words.size > 0 && [...words].every((word) => word === 'the' || word === 'and') && entry.kind !== 'character') return false;
-    if (words.size > 0 && [...words].every((word) => CALENDAR.has(word))) return false;
+    if (words.size > 0 && [...words].every((word) => lexicon.connectives.has(word)) && entry.kind !== 'character') return false;
+    if (words.size > 0 && [...words].every((word) => lexicon.calendar.has(word))) return false;
     return !title || plainWords(entry.name) !== title;
   });
 }
 
 /** An entry named only by a family or role word ("Mom") takes its real alias as its name, or is dropped. */
-export function dropRoleNames(entries: readonly RawNameEntry[]): RawNameEntry[] {
-  const roleOnly = (name: string) => splitWords(name).every((word) => ROLE_ONLY.has(stripChars(word, ".’'").toLowerCase()));
+export function dropRoleNames(entries: readonly RawNameEntry[], lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): RawNameEntry[] {
+  const roleOnly = (name: string) => splitWords(name).every((word) => lexicon.roleOnly.has(stripChars(word, ".’'").toLowerCase()));
   return entries.flatMap((entry) => {
     if (!roleOnly(entry.name)) return [entry];
     const real = entry.aliases.filter((alias) => !roleOnly(alias));
@@ -294,8 +250,13 @@ export function entryKind(kind: string): StoryGuideEntityKind {
 }
 
 /** Every code check on one passage's answer, and where each kept name first occurs in it. */
-export function checkNames(answer: NamesAnswer, passage: StoryPassage, book: NamesBook): StoryNamesResult {
-  const kept = dropRoleNames(bookFilter(validateEntries(answer.entries, passage.text), book));
+export function checkNames(
+  answer: NamesAnswer,
+  passage: StoryPassage,
+  book: NamesBook,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): StoryNamesResult {
+  const kept = dropRoleNames(bookFilter(validateEntries(answer.entries, passage.text, lexicon), book, lexicon), lexicon);
   const entries = kept.flatMap((entry): StoryNameEntry[] => {
     const at: Record<string, PassageSpan> = {};
     for (const name of [entry.name, ...entry.aliases]) {
@@ -307,7 +268,7 @@ export function checkNames(answer: NamesAnswer, passage: StoryPassage, book: Nam
   });
   const byName = new Map<string, string>();
   for (const entry of entries) for (const name of [entry.name, ...entry.aliases]) byName.set(plainWords(name), entry.name);
-  const narrator = toldInFirstPerson(passage.text) ? (byName.get(plainWords(answer.narrator ?? '')) ?? null) : null;
+  const narrator = toldInFirstPerson(passage.text, lexicon) ? (byName.get(plainWords(answer.narrator ?? '')) ?? null) : null;
   return { passage: passage.id, chapter: passage.chapter, part: passage.part, narrator, entries };
 }
 
@@ -324,18 +285,19 @@ export function namesAiStep(): AiStep<StoryGuideSubject> {
     dependsOn: ['text'],
     units: (ctx) => textResult(ctx).passages.map((passage) => ({ id: passage.id })),
     fingerprint: (ctx, unit) => {
-      const request = namesRequest(bookOf(ctx.subject), passageById(textResult(ctx), unit.id).text);
+      const request = namesRequest(bookOf(ctx.subject), passageById(textResult(ctx), unit.id).text, storyLexicon(ctx.subject.text.language));
       return hashOf('names', request.system, request.user);
     },
     async run(ctx, unit) {
       const book = bookOf(ctx.subject);
+      const lexicon = storyLexicon(ctx.subject.text.language);
       const passage = passageById(textResult(ctx), unit.id);
-      const answers = await splitWhileTooLong(passage.text, (part) => askForJson(ctx, namesRequest(book, part), readNamesAnswer));
+      const answers = await splitWhileTooLong(passage.text, (part) => askForJson(ctx, namesRequest(book, part, lexicon), readNamesAnswer));
       const combined: NamesAnswer = {
         narrator: answers.find((answer) => answer.narrator)?.narrator ?? null,
         entries: answers.flatMap((answer) => answer.entries),
       };
-      return checkNames(combined, passage, book);
+      return checkNames(combined, passage, book, lexicon);
     },
   };
 }

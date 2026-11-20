@@ -249,9 +249,21 @@ describe('StoryGuideCard', () => {
       expect(wrapper.find('[data-testid="story-guide-menu"]').exists()).toBe(false)
     })
 
-    it.each(['no-text-file', 'language'] as const)('not available (%s): nothing at all', async (reason) => {
-      const wrapper = await mountCard(status({ build: { allowed: false, reason }, estimate: undefined }))
+    it('not available (no-text-file): nothing at all', async () => {
+      const wrapper = await mountCard(status({ build: { allowed: false, reason: 'no-text-file' }, estimate: undefined }))
       expect(wrapper.find('[data-testid="story-guide-card"]').exists()).toBe(false)
+    })
+
+    const languageCases: [{ language?: string; languages?: string[] }, string][] = [
+      [{ language: 'pt', languages: ['en', 'es'] }, 'This book is in Portuguese. Story guides support books in English and Spanish.'],
+      [{ languages: ['en', 'es'] }, "Story guides support books in English and Spanish. This book's language isn't one of them yet."],
+      [{}, "Story guides don't support this book's language yet."],
+    ]
+    it.each(languageCases)('not available (language %j): says which languages work, with no actions and no menu', async (detail, sentence) => {
+      const wrapper = await mountCard(status({ build: { allowed: false, reason: 'language', ...detail }, estimate: undefined }))
+      expect(wrapper.find('[data-testid="story-guide-notice"]').text()).toContain(sentence)
+      expect(wrapper.find('[data-testid="story-guide-notice"] button').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="story-guide-menu"]').exists()).toBe(false)
     })
   })
 

@@ -2,19 +2,8 @@ import type { AiStep, AiStepRequest } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson } from './json-reply';
 import { entityKind } from './merge-step';
-import {
-  HONORIFIC_ONLY,
-  NAME_PREFIX_WORDS,
-  TITLES,
-  WORD_CHAR,
-  escapeRegExp,
-  isNumberOnly,
-  mostCommon,
-  nameKey,
-  namesConflict,
-  ownWords,
-  splitWords,
-} from './name-text';
+import { WORD_CHAR, escapeRegExp, isNumberOnly, mostCommon, nameKey, namesConflict, ownWords, splitWords } from './name-text';
+import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import { mergeResult, passageOrder, textResult } from './step-context';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type {
@@ -72,13 +61,18 @@ export function reviewLine(entity: StoryMergedEntity, chapterOf: ReadonlyMap<str
  * two batches, and a word shared by more than a batch holds is cut with an overlap, so a join across
  * batches is still seen together somewhere.
  */
-export function reviewBatches(entities: readonly StoryMergedEntity[], lines: readonly string[], budgetChars: number): number[][] {
+export function reviewBatches(
+  entities: readonly StoryMergedEntity[],
+  lines: readonly string[],
+  budgetChars: number,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): number[][] {
   const size = (id: number) => lines[id].length + 1;
   if (entities.reduce((sum, entity) => sum + size(entity.id), 0) <= budgetChars) return [entities.map((entity) => entity.id)];
 
   const buckets = new Map<string, number[]>();
   for (const entity of entities) {
-    for (const word of new Set(entity.names.flatMap((name) => ownWords(name.text)).filter((word) => word.length >= 3))) {
+    for (const word of new Set(entity.names.flatMap((name) => ownWords(name.text, lexicon)).filter((word) => word.length >= 3))) {
       const bucket = buckets.get(word);
       if (bucket) bucket.push(entity.id);
       else buckets.set(word, [entity.id]);
@@ -137,11 +131,12 @@ export function reviewRequests(
   merge: StoryMergeResult,
   text: Pick<TextStepResult, 'passages'>,
   contextTokens = REVIEW_CONTEXT_TOKENS,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
 ): AiStepRequest[] {
   const chapterOf = new Map(text.passages.map((passage) => [passage.id, passage.chapter]));
   const lines = merge.entities.map((entity) => reviewLine(entity, chapterOf));
   const budget = (contextTokens - REVIEW_MAX_OUTPUT_TOKENS) * CHARS_PER_TOKEN - REVIEW_SYSTEM.length;
-  return reviewBatches(merge.entities, lines, budget).map((ids) => ({
+  return reviewBatches(merge.entities, lines, budget, lexicon).map((ids) => ({
     system: REVIEW_SYSTEM,
     user: ids.map((id) => lines[id]).join('\n'),
     maxOutputTokens: REVIEW_MAX_OUTPUT_TOKENS,
@@ -193,29 +188,34 @@ interface Link {
  * joins at the first appearance of its later member. A member joins its entity, the member with the
  * most passages, once a chain of joins reaches it; before that it is its own entry.
  */
-export function applyReview(groups: readonly StoryReviewGroup[], merge: StoryMergeResult, text: TextStepResult): StoryReviewResult {
+export function applyReview(
+  groups: readonly StoryReviewGroup[],
+  merge: StoryMergeResult,
+  text: TextStepResult,
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): StoryReviewResult {
+  const { titles, namePrefixWords, honorificOnly, nameFold } = lexicon;
   const entities = merge.entities;
   const order = passageOrder(text);
   const chapterOf = new Map(text.passages.map((passage) => [passage.id, passage.chapter]));
   const firstChapter = (id: number) => chapterOf.get(entities[id].first)!;
   const kind = (id: number) => entityKind(entities[id]);
   const fullName = (id: number) => {
-    const words = nameKey(entities[id].name)
-      .split(' ')
-      .filter((word) => word && !TITLES.has(word) && !NAME_PREFIX_WORDS.has(word));
+    const words = bareWords(id);
     return kind(id) === 'character' && words.length >= 2 ? words : null;
   };
   const bareWords = (id: number) =>
     nameKey(entities[id].name)
       .split(' ')
-      .filter((word) => word && !TITLES.has(word) && !NAME_PREFIX_WORDS.has(word));
+      .filter((word) => word && !titles.has(word) && !namePrefixWords.has(word))
+      .map(nameFold);
 
   // A one-word name that is the surname of two or more people ("Drebber") never joins anyone. People
   // are counted by review group, and only names with a personal name before the surname count.
   const personal = (entity: StoryMergedEntity) =>
     splitWords(entity.name)
       .slice(0, -1)
-      .some((word) => !TITLES.has(word.replace(/^\.+|\.+$/g, '').toLowerCase()));
+      .some((word) => !titles.has(word.replace(/^\.+|\.+$/g, '').toLowerCase()));
   const groupOf = new Map<number, number>();
   groups.forEach((group, index) => group.ids.forEach((id) => groupOf.has(id) || groupOf.set(id, index)));
   const surnamePeople = new Map<string, Set<string>>();
@@ -232,14 +232,14 @@ export function applyReview(groups: readonly StoryReviewGroup[], merge: StoryMer
     if (splitWords(entity.name).length !== 1 || (surnamePeople.get(surname)?.size ?? 0) < 2) return false;
     return entity.names.every((name) => {
       const words = nameKey(name.key).split(' ');
-      return words.at(-1) === surname && words.slice(0, -1).every((word) => TITLES.has(word));
+      return words.at(-1) === surname && words.slice(0, -1).every((word) => titles.has(word));
     });
   };
   const honorific = (id: number) =>
     splitWords(entities[id].name).every((word) => {
       const plain = word.replace(/^\.+|\.+$/g, '').toLowerCase();
-      return TITLES.has(plain) || HONORIFIC_ONLY.has(plain) || NAME_PREFIX_WORDS.has(plain);
-    }) || isNumberOnly(entities[id].name);
+      return titles.has(plain) || honorificOnly.has(plain) || namePrefixWords.has(plain);
+    }) || isNumberOnly(entities[id].name, lexicon.numberOnly);
 
   const blocked = new Map<string, { id: number; reason: StoryReviewBlockReason }>();
   const block = (id: number, reason: StoryReviewBlockReason) => blocked.set(`${id} ${reason}`, { id, reason });
@@ -432,14 +432,19 @@ export function reviewAiStep(): AiStep<StoryGuideSubject> {
     fingerprint: (ctx) =>
       hashOf(
         'review',
-        reviewRequests(mergeResult(ctx), textResult(ctx)).map((request) => [request.system, request.user]),
+        reviewRequests(mergeResult(ctx), textResult(ctx), REVIEW_CONTEXT_TOKENS, storyLexicon(ctx.subject.text.language)).map((request) => [
+          request.system,
+          request.user,
+        ]),
       ),
     async run(ctx) {
       const merge = mergeResult(ctx);
       const text = textResult(ctx);
+      const lexicon = storyLexicon(ctx.subject.text.language);
       const answered: unknown[] = [];
-      for (const request of reviewRequests(merge, text)) answered.push(...(await askForJson(ctx, request, readReviewAnswer)));
-      return applyReview(reviewGroups(answered, merge, text), merge, text);
+      for (const request of reviewRequests(merge, text, REVIEW_CONTEXT_TOKENS, lexicon))
+        answered.push(...(await askForJson(ctx, request, readReviewAnswer)));
+      return applyReview(reviewGroups(answered, merge, text), merge, text, lexicon);
     },
   };
 }

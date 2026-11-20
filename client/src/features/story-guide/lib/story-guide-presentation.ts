@@ -43,6 +43,8 @@ export type StoryGuideNotice =
         | 'couldNotBuild'
     }
   | { kind: 'tooLong'; limit: number | null }
+  /** The book's language, when the server knows it, and the languages guides are built in; empty from a server that does not say. */
+  | { kind: 'language'; language: string | null; languages: string[] }
 
 /** Whose build a row is about: a book's first, or a new one beside the guide in use. */
 export type StoryGuideProgressTitle = 'storyGuide' | 'updating' | 'rebuilding'
@@ -141,8 +143,20 @@ function failedNotice(reason: string | null | undefined): StoryGuideNotice {
   return { kind: lookup(FAILED_NOTICES, reason) ?? 'couldNotBuild' } as StoryGuideNotice
 }
 
-function refusalNotice(reason: string, limit: number | undefined): StoryGuideNotice {
+function stringsOf(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.length > 0) : []
+}
+
+function refusalNotice(reason: string, build: Extract<StoryGuideStatus['build'], { allowed: false }>): StoryGuideNotice {
+  const limit = build.limit
   if (reason === 'too-long') return { kind: 'tooLong', limit: typeof limit === 'number' ? limit : null }
+  if (reason === 'language') {
+    return {
+      kind: 'language',
+      language: typeof build.language === 'string' && build.language ? build.language : null,
+      languages: stringsOf(build.languages),
+    }
+  }
   return { kind: lookup(REFUSAL_NOTICES, reason) ?? 'couldNotBuild' } as StoryGuideNotice
 }
 
@@ -289,12 +303,12 @@ export function storyGuidePresentation({
       rows.push({ kind: 'buildCard', estimate: status.estimate ?? null })
       menu.push('build')
     } else {
-      const reason = status.build && !status.build.allowed ? status.build.reason : undefined
-      const limit = status.build && !status.build.allowed ? status.build.limit : undefined
+      const refusal = status.build && !status.build.allowed ? status.build : null
+      const reason = refusal?.reason
       if (reason === 'checking') {
         rows.push({ kind: 'checking' })
-      } else if (reason && reason !== 'no-text-file' && reason !== 'language') {
-        const notice = refusalNotice(reason, limit)
+      } else if (refusal && reason && reason !== 'no-text-file') {
+        const notice = refusalNotice(reason, refusal)
         rows.push({ kind: 'notice', title: 'storyGuide', notice, actions: [], settingsHint: hint(notice), stillTheCase: false })
       }
     }

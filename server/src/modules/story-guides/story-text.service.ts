@@ -5,7 +5,7 @@ import type { BookFileTextRow, NewBookFileTextRow } from '../../db/schema';
 import { readBookText } from './text/book-text-reader';
 import { BookTextError, type BookText } from './text/book-text.types';
 import { STORY_TEXT_EXTRACTION_VERSION } from './text/extraction-version';
-import { storyLanguage } from './text/story-language';
+import { isStoryGuideLanguage, storyLanguage } from './text/story-language';
 import { STORY_MIN_WORDS, storySections, storyTextKey, type StorySection } from './text/story-sections';
 import { StoryTextRepository } from './story-text.repository';
 import { isStoryTextFormat, STORY_TEXT_KEY_MOVES, type StoryTextFile, type StoryTextKeyMoves, type StoryTextRefusal } from './story-text.types';
@@ -34,7 +34,11 @@ function sameTime(a: Date | null, b: Date | null): boolean {
 /** Whether a cached row still describes the file as it is on disk, under the current rules. */
 export function isFresh(row: BookFileTextRow, file: Pick<StoryTextFile, 'sizeBytes' | 'mtime'>): boolean {
   return (
-    row.extractionVersion === STORY_TEXT_EXTRACTION_VERSION && (row.sizeBytes ?? null) === (file.sizeBytes ?? null) && sameTime(row.mtime, file.mtime)
+    row.extractionVersion === STORY_TEXT_EXTRACTION_VERSION &&
+    (row.sizeBytes ?? null) === (file.sizeBytes ?? null) &&
+    sameTime(row.mtime, file.mtime) &&
+    // Rows saved while only supported languages were kept have none for every other book; read those once more.
+    !(row.outcome === 'ready' && row.language === null)
   );
 }
 
@@ -42,7 +46,7 @@ export function isFresh(row: BookFileTextRow, file: Pick<StoryTextFile, 'sizeByt
 export function storyTextRefusal(row: BookFileTextRow, maxWords: number): StoryTextRefusal | null {
   if (row.outcome === 'too-large') return 'too-large';
   if (row.outcome !== 'ready' || !row.textKey) return 'unreadable';
-  if (!row.language) return 'language';
+  if (!isStoryGuideLanguage(row.language)) return 'language';
   if (row.words < STORY_MIN_WORDS) return 'too-short';
   if (row.words > maxWords) return 'too-long';
   return null;
@@ -155,12 +159,11 @@ export class StoryTextService implements OnModuleInit, OnModuleDestroy {
     };
     try {
       const { book, sections, key } = await this.read(file);
-      const language = storyLanguage(
+      row.textKey = key;
+      row.language = storyLanguage(
         book.languages,
         sections.map((section) => book.sections[section.s]?.text.slice(section.start, section.end) ?? ''),
       );
-      row.textKey = key;
-      row.language = language.language;
       row.words = sections.reduce((total, section) => total + section.words, 0);
       row.sections = sections;
     } catch (error) {

@@ -39,6 +39,7 @@ import { StoryGuideEstimator } from './story-guide-estimator.service';
 import { StoryGuidesRepository, type StoryGuideBookFile, type StoryGuideListFilter } from './story-guides.repository';
 import { StoryTextService, storyTextRefusal } from './story-text.service';
 import { isStoryTextFormat } from './story-text.types';
+import { STORY_GUIDE_LANGUAGES, UNDETERMINED_LANGUAGE } from './text/story-language';
 
 const DEFINITION = AI_FEATURE_DEFINITIONS[STORY_GUIDE_FEATURE];
 
@@ -58,6 +59,12 @@ export interface StoryGuideStatusView {
 /** Whether the caller sees dollars: app settings managers and superusers. */
 function seesCost(user: RequestUser): boolean {
   return user.isSuperuser || user.permissions.includes(Permission.ManageAppSettings);
+}
+
+/** What a `language` refusal adds: the book's language when it is known, and the languages a guide can be built in. */
+function languageRefusal(text: BookFileTextRow | null): { language?: string; languages: string[] } {
+  const language = text?.language && text.language !== UNDETERMINED_LANGUAGE ? text.language : null;
+  return { ...(language ? { language } : {}), languages: [...STORY_GUIDE_LANGUAGES] };
 }
 
 function etagOf(body: unknown): string {
@@ -286,7 +293,7 @@ export class StoryGuidesService {
     const build: StoryGuideBuild = !canManage
       ? { allowed: false }
       : reason
-        ? { allowed: false, reason, ...(reason === 'too-long' ? { limit: maxWords } : {}) }
+        ? { allowed: false, reason, ...(reason === 'too-long' ? { limit: maxWords } : {}), ...(reason === 'language' ? languageRefusal(text) : {}) }
         : { allowed: true };
 
     const status: StoryGuideStatus = { fileId: file?.id ?? null, textKey: key, canManage, build, guide, job };

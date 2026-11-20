@@ -19,6 +19,10 @@ export type StoryGuideBuild =
       reason?: StoryGuideBuildReason;
       /** For `too-long`: the longest-book setting, in words. */
       limit?: number;
+      /** For `language`: the book's language as a two-letter code, absent when it is not known. */
+      language?: string;
+      /** For `language`: the languages a guide can be built in, as two-letter codes. */
+      languages?: string[];
     };
 
 export interface StoryGuideInfo {

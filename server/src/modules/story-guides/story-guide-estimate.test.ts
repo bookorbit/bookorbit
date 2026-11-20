@@ -104,6 +104,16 @@ describe('estimateStoryGuide', () => {
     expect(summaries.minutes).toBe(estimatedLinesUnits(sections));
   });
 
+  it('cuts Spanish into more passages and more tokens than English of the same word count', () => {
+    const english = estimateStoryGuide({ sections, steps: ALL_STEPS, prices: PRICES, rates: RATES });
+    expect(estimateStoryGuide({ sections, language: 'en', steps: ALL_STEPS, prices: PRICES, rates: RATES })).toEqual(english);
+    expect(estimateStoryGuide({ sections, language: 'pt', steps: ALL_STEPS, prices: PRICES, rates: RATES })).toEqual(english);
+    const spanish = estimateStoryGuide({ sections, language: 'es', steps: ALL_STEPS, prices: PRICES, rates: RATES });
+    expect(estimatedPassages(sections, 'es')).toBeGreaterThan(passages);
+    expect(spanish.cost!).toBeGreaterThan(english.cost!);
+    expect(spanish.words).toBe(english.words);
+  });
+
   it('leaves the time unknown when a step that runs has no learned speed, and still prices it', () => {
     const unknown = estimateStoryGuide({ sections, steps: ALL_STEPS, prices: PRICES, rates: { ...RATES, ties: null } });
     expect(unknown.minutes).toBeNull();

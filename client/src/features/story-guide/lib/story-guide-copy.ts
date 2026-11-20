@@ -1,7 +1,7 @@
 import type { StoryGuideEstimate } from '@bookorbit/types'
 
 import { i18n } from '@/i18n'
-import { formatDate, formatListParts, formatNumber, formatPercent } from '@/i18n/formatters'
+import { formatDate, formatLanguageName, formatListParts, formatNumber, formatPercent } from '@/i18n/formatters'
 import type { StoryGuideAction, StoryGuideBuiltNote, StoryGuideNotice, StoryGuidePhase, StoryGuideProgressTitle } from './story-guide-presentation'
 
 const t = i18n.global.t
@@ -109,6 +109,17 @@ export function storyGuidePhaseText(phase: StoryGuidePhase): string {
 /** The server's default longest-book setting, for a `too-long` that somehow came without its limit. */
 const DEFAULT_WORD_LIMIT = 400_000
 
+/** "This book is in Portuguese. Story guides support books in English and Spanish.", less what the server did not say. */
+function languageSentence(language: string | null, languages: readonly string[]): string {
+  if (languages.length === 0) return t('book.detail.storyGuide.reasons.languageUnsupported')
+  const supported = formatListParts(languages.map(formatLanguageName))
+    .map((part) => part.value)
+    .join('')
+  const name = language ? formatLanguageName(language) : null
+  if (name && name !== language) return t('book.detail.storyGuide.reasons.languageNamed', { language: name, languages: supported })
+  return t('book.detail.storyGuide.reasons.language', { languages: supported })
+}
+
 export function storyGuideNoticeSentence(notice: StoryGuideNotice): string {
   switch (notice.kind) {
     case 'pausedBudget':
@@ -135,6 +146,8 @@ export function storyGuideNoticeSentence(notice: StoryGuideNotice): string {
       return t('book.detail.storyGuide.reasons.tooLong', { limit: formatNumber(notice.limit ?? DEFAULT_WORD_LIMIT) })
     case 'tooShort':
       return t('book.detail.storyGuide.reasons.tooShort')
+    case 'language':
+      return languageSentence(notice.language, notice.languages)
     case 'unreadable':
       return t('book.detail.storyGuide.reasons.unreadable')
     case 'lowCoverage':
