@@ -20,6 +20,7 @@ const props = withDefaults(
 const { t } = useI18n()
 
 const hasActivity = computed(() => (props.stats?.totalSessions ?? 0) > 0)
+const lastReadAt = computed(() => props.stats?.lastReadAt ?? props.stats?.lastSessionAt)
 
 /**
  * The bar strip covers the span the book was actually read over, not a fixed window: a book read
@@ -111,8 +112,8 @@ function reachedLabel(session: BookReadingSession): string {
       <h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
         {{ t('book.detail.details.yourReading') }}
       </h3>
-      <p v-if="hasActivity" class="ms-auto text-[11px] text-muted-foreground">
-        {{ t('book.detail.details.lastRead', { when: relative(stats!.lastSessionAt) }) }}
+      <p v-if="hasActivity && lastReadAt" class="ms-auto text-[11px] text-muted-foreground">
+        {{ t('book.detail.details.lastRead', { when: relative(lastReadAt) }) }}
       </p>
     </div>
 

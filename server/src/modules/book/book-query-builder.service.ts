@@ -22,6 +22,7 @@ import type {
   SortSpec,
 } from '@bookorbit/types';
 import { DB } from '../../db';
+import { bookLastReadSql } from '../../db/book-last-read';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
@@ -1207,13 +1208,13 @@ export class BookQueryBuilder {
     return node.rules.some((r) => BookQueryBuilder.hasSeriesSelectionFilter(r));
   }
 
-  static buildCollapseOrderBy(sort: SortSpec[], userId: number, customFieldTypes?: CustomMetadataFieldTypeMap, context?: BookSortContext): string {
-    if (sort.length === 0) return 'sort_title ASC NULLS LAST, r.id ASC';
+  static buildCollapseOrderBy(sort: SortSpec[], userId: number, customFieldTypes?: CustomMetadataFieldTypeMap, context?: BookSortContext): SQL {
+    if (sort.length === 0) return sql`sort_title ASC NULLS LAST, r.id ASC`;
 
     if (!Number.isSafeInteger(userId)) throw new BadRequestException('Invalid userId for collapse order');
     const safeUserId = String(Math.trunc(userId));
 
-    const parts: string[] = [];
+    const parts: (string | SQL)[] = [];
     for (const { field, dir } of sort) {
       const D = dir.toUpperCase();
       if (D !== 'ASC' && D !== 'DESC') continue;
@@ -1290,9 +1291,7 @@ export class BookQueryBuilder {
           );
           break;
         case 'lastReadAt':
-          parts.push(
-            `(SELECT max(rp.last_read_at) FROM reading_progress rp INNER JOIN book_files bf ON rp.book_file_id = bf.id WHERE bf.book_id = r.id AND rp.user_id = ${safeUserId}) ${D} NULLS LAST`,
-          );
+          parts.push(sql`${bookLastReadSql(sql`r.id`, userId)} ${sql.raw(D)} NULLS LAST`);
           break;
         case 'finishedAt':
           parts.push(`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);
@@ -1318,6 +1317,9 @@ export class BookQueryBuilder {
     }
     if (parts.length === 0) parts.push('sort_title ASC NULLS LAST');
     parts.push('r.id ASC');
-    return parts.join(', ');
+    return sql.join(
+      parts.map((part) => (typeof part === 'string' ? sql.raw(part) : part)),
+      sql`, `,
+    );
   }
 }

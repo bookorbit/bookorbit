@@ -277,6 +277,8 @@ const currentStatusOption = computed(() => STATUS_OPTIONS.find((option) => optio
 // arrives; the dash the pace and last-read rows already use says "not known yet" instead.
 const statsPending = computed(() => props.stats === null)
 
+const lastReadAt = computed(() => props.stats?.lastReadAt ?? props.stats?.lastSessionAt)
+
 const ledgerRows = computed(() => [
   {
     key: 'total',
@@ -315,7 +317,7 @@ const ledgerRows = computed(() => [
   {
     key: 'lastRead',
     label: t('book.detail.readingLog.vitals.lastRead'),
-    value: props.stats?.lastSessionAt ? formatRelativeFromNow(Date.parse(props.stats.lastSessionAt)) : '-',
+    value: lastReadAt.value ? formatRelativeFromNow(Date.parse(lastReadAt.value)) : '-',
     withMomentum: false,
   },
 ])

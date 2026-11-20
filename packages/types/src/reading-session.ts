@@ -50,12 +50,14 @@ export interface BookReadingSessionStats {
   avgDurationSeconds: number;
   firstSessionAt: string | null;
   lastSessionAt: string | null;
+  // Most recent recorded session start or saved reading progress for the book, independent of list filters.
+  lastReadAt?: string | null;
   dailySummary: { day: string; totalMinutes: number }[];
   paceProgressDelta: number;
   paceDurationSeconds: number;
   progressSummary: { day: string; endProgress: number }[];
   // endProgress of the most recently ended session that recorded one, or null when no
-  // session has. Unlike every other field here it ignores the list filters, because it
+  // session has. This ignores the list filters, because it
   // feeds the book's progress ring rather than a summary of the filtered rows.
   latestEndProgress: number | null;
   // Reading time/sessions split across the display buckets, ordered by

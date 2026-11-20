@@ -1872,6 +1872,8 @@ describe('BookRepository', () => {
       expect(query).toContain('max(rail_rp.last_read_at)');
       expect(query).not.toContain('rail_rp.updated_at');
       expect(query).toContain('GROUP BY rail_bf.book_id');
+      expect(query).toContain('rs.book_id = r.id');
+      expect(query).toContain('ORDER BY rs.started_at DESC LIMIT 1');
       expect(query).toContain('base_rows AS MATERIALIZED');
       expect(query).toContain('representatives AS');
       expect(query).not.toContain('SELECT max(rp.updated_at)');

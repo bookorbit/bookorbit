@@ -7,7 +7,15 @@ import { randomUUID } from 'crypto';
 
 import { and, eq, inArray } from 'drizzle-orm';
 
-import type { BookCard, BooksPage, GroupRule, JumpBucketsResponse, LibraryBookFacets, SortSpec } from '@bookorbit/types';
+import type {
+  BookCard,
+  BookReadingSessionListResponse,
+  BooksPage,
+  GroupRule,
+  JumpBucketsResponse,
+  LibraryBookFacets,
+  SortSpec,
+} from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import {
@@ -388,6 +396,91 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
       if (bucket.index > 0) expect(placedAt(listing.items[bucket.index - 1]!.id)).not.toBe(bucket.key);
     }
     expect(listing.items.find((item) => item.title === 'Hyperion')?.id).toBe(ids.hyperionPdf);
+  });
+
+  it('orders a Smart Scope and its date buckets by the displayed edition’s Last Read', async () => {
+    const activity = [
+      { bookId: ids.alpha, progressDay: 2, sessionDay: 10 },
+      { bookId: ids.zeta, progressDay: 7, sessionDay: 3 },
+      { bookId: ids.hyperionPdf, progressDay: 1, sessionDay: 1 },
+      { bookId: ids.hyperionEpub, progressDay: 12, sessionDay: 12 },
+    ];
+    const date = (day: number) => new Date(Date.UTC(2026, 5, day, 12));
+    const files = await ctx.db
+      .select({ id: schema.books.id, fileId: schema.books.primaryFileId })
+      .from(schema.books)
+      .where(
+        inArray(
+          schema.books.id,
+          activity.map(({ bookId }) => bookId),
+        ),
+      );
+    const fileIds = new Map(files.map(({ id, fileId }) => [id, fileId!]));
+    await ctx.db
+      .insert(schema.userBookStatus)
+      .values(activity.map(({ bookId }, index) => ({ userId: reader.userId, bookId, status: index % 2 === 0 ? 'reading' : 'rereading' })));
+    await ctx.db.insert(schema.readingProgress).values(
+      activity.map(({ bookId, progressDay }) => ({
+        userId: reader.userId,
+        bookFileId: fileIds.get(bookId)!,
+        percentage: 40,
+        lastReadAt: date(progressDay),
+      })),
+    );
+    for (const { bookId, sessionDay } of activity) {
+      await post(reader.accessToken, `/books/${bookId}/sessions`, { startedAt: date(sessionDay).toISOString(), durationMinutes: 1 });
+    }
+    await post(ebooksOnly.accessToken, `/books/${ids.hyperionPdf}/sessions`, {
+      startedAt: date(13).toISOString(),
+      durationMinutes: 1,
+    });
+
+    const scope = await post<{ id: number }>(reader.accessToken, '/smart-scopes', {
+      name: 'Last Read',
+      icon: 'Clock',
+      defaultSort: [{ field: 'lastReadAt', dir: 'desc' }],
+      filter: {
+        type: 'group',
+        join: 'AND',
+        rules: [
+          { type: 'rule', field: 'readStatus', operator: 'includesAny', value: ['reading', 'rereading'] },
+          {
+            type: 'group',
+            join: 'OR',
+            rules: ['Alpha', 'Zeta', 'Hyperion'].map((title) => ({ type: 'rule', field: 'title', operator: 'eq', value: title })),
+          },
+        ],
+      },
+    });
+    const path = `/smart-scopes/${scope.id}/books`;
+    const pagination = { page: 0, size: 20 };
+    const unfolded = await post<BooksPage>(reader.accessToken, `${path}/query`, { pagination });
+    expect(unfolded.items.map(({ id }) => id)).toEqual([ids.hyperionEpub, ids.alpha, ids.zeta, ids.hyperionPdf]);
+
+    for (const collapseSeries of [false, true]) {
+      const query = { pagination, collapseSeries, collapseLinked: true };
+      const [listing, buckets] = await Promise.all([
+        post<BooksPage>(reader.accessToken, `${path}/query`, query),
+        post<JumpBucketsResponse>(reader.accessToken, `${path}/jump-buckets`, { ...query, maxBuckets: 32 }),
+      ]);
+      expect(listing.items.map(({ id }) => id)).toEqual([ids.alpha, ids.zeta, ids.hyperionPdf]);
+      expect(listing.bookTotal).toBe(4);
+      expect(buckets.buckets.map(({ key, index }) => [key, index])).toEqual([
+        ['2026-06-10', 0],
+        ['2026-06-07', 1],
+        ['2026-06-01', 2],
+      ]);
+    }
+
+    const log = await ctx.app.inject({
+      url: `/api/v1/books/${ids.zeta}/sessions?dateTo=2026-06-02T00:00:00.000Z`,
+      headers: authHeader(reader.accessToken),
+    });
+    expect(log.statusCode).toBe(200);
+    expect(log.json<BookReadingSessionListResponse>().stats).toMatchObject({
+      lastSessionAt: null,
+      lastReadAt: date(7).toISOString(),
+    });
   });
 
   it('G18: facet counts stay book counts when the listing folds links', async () => {

@@ -248,7 +248,7 @@ export type GroupRule = {
  * - `fileSize` - fetched from `book_files.size_bytes` for the primary file (correlated subquery)
  * - `readProgress` - aggregated from `reading_progress.percentage` (per-user, correlated subquery)
  * - `readStatus` - from `user_book_status.status` (per-user, correlated subquery)
- * - `lastReadAt` - max `reading_progress.updated_at` across all files (per-user, correlated subquery)
+ * - `lastReadAt` - latest session start or saved reading progress across all files (per-user, correlated subquery)
  * - `startedAt` - from `user_book_status.started_at` (per-user, correlated subquery)
  * - `finishedAt` - from `user_book_status.finished_at` (per-user, correlated subquery)
  * - `rating` - from `user_book_ratings.rating` (per-user, correlated subquery)

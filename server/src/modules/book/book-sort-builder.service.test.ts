@@ -197,13 +197,17 @@ describe('BookSortBuilder', () => {
 
   // reading_progress.updated_at is frozen by the KOReader sync path, so ordering on it left
   // KOReader-only readers with an effectively random "Last Read" order.
-  it('orders lastReadAt on last_read_at rather than the row update timestamp', () => {
+  it('orders lastReadAt on the latest session or saved last_read_at timestamp', () => {
     const result = service.build([{ field: 'lastReadAt', dir: 'desc' }], 42);
 
-    const text = (result[0] as unknown as { text: string }).text;
+    const [lastRead] = result[0]!.values as [{ text: string; values: [{ text: string; values: unknown[] }, unknown, number] }];
+    const { text } = lastRead;
+    expect(text).toContain('greatest(');
+    expect(lastRead.values[0].text).toContain('SELECT rs.started_at');
+    expect(lastRead.values[0].values[0]).toBe(42);
     expect(text).toContain('SELECT max(rp.last_read_at)');
     expect(text).not.toContain('rp.updated_at');
-    expect(result[0]?.values[0]).toBe(42);
+    expect(lastRead.values[2]).toBe(42);
   });
 
   it('throws for finishedAt sort without userId', () => {
