@@ -1,48 +1,33 @@
 import 'reflect-metadata';
 
-import { plainToInstance } from 'class-transformer';
-import { validate } from 'class-validator';
-
-import { AuthorAutoEnrichmentWriteMode } from '@bookorbit/types';
+import { BadRequestException, ValidationPipe } from '@nestjs/common';
 
 import { AuthorAutoEnrichmentConfigDto } from './author-auto-enrichment-config.dto';
 import { PreviewAuthorEnrichmentCountDto } from './preview-author-enrichment-count.dto';
 
 describe('author enrichment DTO validation', () => {
-  it('accepts valid enrichment config payload', async () => {
-    const dto = plainToInstance(AuthorAutoEnrichmentConfigDto, {
-      enabled: true,
-      triggerOnImport: false,
-      writeMode: AuthorAutoEnrichmentWriteMode.MISSING_ONLY,
-      conditions: {
-        neverEnriched: true,
-        missingBio: false,
-        missingPhoto: true,
-      },
-    });
+  const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+  const config = {
+    enabled: true,
+    triggerOnImport: false,
+    conditions: { neverEnriched: true, missingBio: false, missingPhoto: true },
+  };
+  const configMetadata = { type: 'body', metatype: AuthorAutoEnrichmentConfigDto } as const;
 
-    await expect(validate(dto)).resolves.toHaveLength(0);
+  it('accepts a valid enrichment config payload', async () => {
+    await expect(pipe.transform(config, configMetadata)).resolves.toEqual(config);
   });
 
-  it('rejects invalid writeMode and non-boolean conditions', async () => {
-    const dto = plainToInstance(AuthorAutoEnrichmentConfigDto, {
-      enabled: true,
-      triggerOnImport: true,
-      writeMode: 'bad_mode',
-      conditions: {
-        neverEnriched: 'true',
-        missingBio: false,
-        missingPhoto: true,
-      },
-    });
+  it('rejects the retired writeMode field', async () => {
+    await expect(pipe.transform({ ...config, writeMode: 'always_refetch' }, configMetadata)).rejects.toBeInstanceOf(BadRequestException);
+  });
 
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+  it('rejects non-boolean conditions', async () => {
+    const invalid = { ...config, conditions: { ...config.conditions, neverEnriched: 'true' } };
+    await expect(pipe.transform(invalid, configMetadata)).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('rejects preview-count payload when conditions are missing', async () => {
-    const dto = plainToInstance(PreviewAuthorEnrichmentCountDto, {});
-    const errors = await validate(dto);
-    expect(errors.length).toBeGreaterThan(0);
+    await expect(pipe.transform({}, { type: 'body', metatype: PreviewAuthorEnrichmentCountDto })).rejects.toBeInstanceOf(BadRequestException);
   });
 });
