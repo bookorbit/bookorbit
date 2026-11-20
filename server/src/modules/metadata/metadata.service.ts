@@ -696,9 +696,9 @@ export class MetadataService {
 
   /**
    * Measures the audio files of a book that have no duration yet, then re-totals the book. The
-   * audiobook player derives progress only once every file has a duration, so a book left with a
-   * gap stays at 0%. A file that cannot be measured leaves the total alone: summing only the rest
-   * would shrink it.
+   * audiobook player measures progress only once every file has a duration; a book left with a gap
+   * only gets an estimate, which never finishes it. A file that cannot be measured leaves the total
+   * alone: summing only the rest would shrink it.
    */
   async measureMissingAudioDurations(bookId: number): Promise<{ measured: number; failed: number }> {
     const files = await this.db

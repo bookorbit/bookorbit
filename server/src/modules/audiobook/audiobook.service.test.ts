@@ -111,6 +111,19 @@ function makeFixture() {
   };
 }
 
+function playbackRow(fields: { percentage: number; manifestRevision: string | null }) {
+  return {
+    userId: 7,
+    bookId: 30,
+    currentFileId: 12,
+    positionSeconds: 12,
+    capturedAt: new Date('2026-01-31T00:00:00.000Z'),
+    revision: 4,
+    operationId: '77777777-7777-4777-8777-777777777777',
+    ...fields,
+  };
+}
+
 function writeFor(manifest: { assets: { assetId: string }[] }, manifestRevision: string, operationId: string) {
   return {
     assetId: manifest.assets[0]!.assetId,
@@ -272,15 +285,38 @@ describe('AudiobookService', () => {
     expect(manifest.totalDurationMs).toBe(30_125);
   });
 
-  it('does not derive false completion while any asset duration is missing', async () => {
+  it('estimates progress against the book total while a track has no measured duration', async () => {
     const { service, repo, bookService } = makeFixture();
     const files = await repo.findAudioFiles();
-    repo.findAudioFiles.mockResolvedValue(files.map((file, index) => (index === 0 ? { ...file, durationSeconds: null } : file)));
+    repo.findAudioFiles.mockResolvedValue(files.map((file) => (file.id === 12 ? { ...file, durationSeconds: null } : file)));
     const manifest = await service.getManifest(30, makeUser());
-    repo.createPlaybackState.mockResolvedValue({
-      capturedAt: new Date('2026-02-01T00:00:00.000Z'),
-      revision: 1,
-    });
+    repo.createPlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 1 });
+
+    const saved = await service.putPlaybackState(
+      30,
+      { ...writeFor(manifest, manifest.revision, '99999999-9999-4999-8999-999999999999'), positionMs: 5_000 },
+      makeUser(),
+    );
+
+    expect(saved.percentage).toBeCloseTo((5_000 / 30_125) * 100);
+    expect(saved.completed).toBe(false);
+    expect(repo.createPlaybackState).toHaveBeenCalledWith(7, 30, expect.objectContaining({ percentage: saved.percentage }));
+    expect(bookService.syncEbookProgressForAudiobookPlayback).toHaveBeenCalledWith(
+      makeUser(),
+      30,
+      11,
+      5,
+      saved.percentage,
+      new Date('2026-02-01T00:00:00.000Z'),
+    );
+  });
+
+  it('keeps an estimate short of completion and out of the read status', async () => {
+    const { service, repo, bookService } = makeFixture();
+    const files = await repo.findAudioFiles();
+    repo.findAudioFiles.mockResolvedValue(files.map((file) => (file.id === 12 ? { ...file, durationSeconds: null } : file)));
+    const manifest = await service.getManifest(30, makeUser());
+    repo.createPlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 1 });
 
     const saved = await service.putPlaybackState(
       30,
@@ -295,9 +331,80 @@ describe('AudiobookService', () => {
       makeUser(),
     );
 
-    expect(saved.percentage).toBe(0);
+    expect(saved.percentage).toBe(99);
     expect(saved.completed).toBe(false);
-    expect(bookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(7, { bookId: 30, libraryId: 4 }, 0, {});
+    expect(bookService.autoUpdateReadStatusForProgress).not.toHaveBeenCalled();
+  });
+
+  it('keeps the stored percentage while the book has no known length', async () => {
+    const { service, repo, bookService } = makeFixture();
+    const files = await repo.findAudioFiles();
+    repo.findAudioFiles.mockResolvedValue(files.map((file) => ({ ...file, durationSeconds: null })));
+    const detail = await bookService.getDetail();
+    bookService.getDetail.mockResolvedValue({ ...detail, audioMetadata: { ...detail.audioMetadata, durationSeconds: null } });
+    const manifest = await service.getManifest(30, makeUser());
+    repo.findPlaybackState.mockResolvedValue(playbackRow({ percentage: 42, manifestRevision: manifest.revision }));
+    repo.updatePlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 5 });
+
+    const saved = await service.putPlaybackState(
+      30,
+      { ...writeFor(manifest, manifest.revision, 'abababab-abab-4bab-8bab-abababababab'), baseRevision: 4 },
+      makeUser(),
+    );
+
+    expect(saved.percentage).toBe(42);
+    expect(bookService.autoUpdateReadStatusForProgress).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { savedThrough: 'the same tracks', sameTracks: true },
+    { savedThrough: 'the older progress endpoint', sameTracks: false },
+  ])('reads a fall of ten points saved through $savedThrough as a reread', async ({ sameTracks }) => {
+    const { service, repo, bookService } = makeFixture();
+    const manifest = await service.getManifest(30, makeUser());
+    repo.findPlaybackState.mockResolvedValue(playbackRow({ percentage: 80, manifestRevision: sameTracks ? manifest.revision : null }));
+    repo.updatePlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 5 });
+
+    await service.putPlaybackState(
+      30,
+      { ...writeFor(manifest, manifest.revision, 'abababab-abab-4bab-8bab-abababababab'), baseRevision: 4 },
+      makeUser(),
+    );
+
+    expect(bookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
+      7,
+      { bookId: 30, libraryId: 4 },
+      expect.closeTo((1_000 / 30_125) * 100),
+      {
+        origin: 'bookorbit',
+        strongRereadEvidence: true,
+      },
+    );
+  });
+
+  it('does not read the fall from an estimate to the measured percentage as a reread', async () => {
+    const { service, repo, bookService } = makeFixture();
+    const files = await repo.findAudioFiles();
+    repo.findAudioFiles.mockResolvedValue(files.map((file) => (file.id === 12 ? { ...file, durationSeconds: null } : file)));
+    const estimated = await service.getManifest(30, makeUser());
+    repo.findAudioFiles.mockResolvedValue(files);
+    const measured = await service.getManifest(30, makeUser());
+    repo.findPlaybackState.mockResolvedValue(playbackRow({ percentage: 80, manifestRevision: estimated.revision }));
+    repo.updatePlaybackState.mockResolvedValue({ capturedAt: new Date('2026-02-01T00:00:00.000Z'), revision: 5 });
+
+    await service.putPlaybackState(
+      30,
+      { ...writeFor(measured, measured.revision, 'abababab-abab-4bab-8bab-abababababab'), baseRevision: 4 },
+      makeUser(),
+    );
+
+    expect(estimated.revision).not.toBe(measured.revision);
+    expect(bookService.autoUpdateReadStatusForProgress).toHaveBeenCalledWith(
+      7,
+      { bookId: 30, libraryId: 4 },
+      expect.closeTo((1_000 / 30_125) * 100),
+      {},
+    );
   });
 
   it('syncs EPUB progress only after the revision-controlled write is accepted', async () => {
