@@ -395,20 +395,32 @@
           "hint": "Como o distintivo mostra um livro que tem vários formatos. Um livro com um formato sempre mostra sua pílula comum.",
           "options": {
             "primary": {
-              "label": "Formato principal"
+              "label": "Formato principal",
+              "hint": "Um miniatura com o formato que a card abre."
             },
             "bubble": {
               "label": "Bolha de contagem",
               "hint": "A pílula primária com uma pequena contagem dos outros formatos em seu canto."
             },
             "underline": {
-              "label": "Sublinhado"
+              "label": "Sublinhado",
+              "hint": "A miniatura primária com uma barra debaixo dela, um segmento colorido por outro formato."
             },
             "pips": {
-              "label": "Posição"
+              "label": "Posição",
+              "hint": "A miniatura primária com um pip colorido acima dele para um outro formato."
             },
             "seal": {
-              "label": "Proteger"
+              "label": "Proteger",
+              "hint": "Um anel com um segmento por formato e a contagem dentro."
+            },
+            "dots": {
+              "label": "Pontos",
+              "hint": "Um ponto colorido por formato. Passe o mouse sobre a capa para a lista completa."
+            },
+            "kinds": {
+              "label": "Ler e ouvir",
+              "hint": "O formato principal, e então ícones para o que o livro pode fazer."
             }
           }
         }
@@ -583,7 +595,8 @@
         "profile": "Perfil",
         "privacy": "Privacidade e Compartilhamento",
         "notifications": "Notificações",
-        "restrictions": "Restrições"
+        "restrictions": "Restrições",
+        "apiKeys": "Chave API"
       },
       "demoRestricted": {
         "cannotEdit": "A conta restrita de demonstração não pode editar as configurações da conta",
@@ -1509,7 +1522,8 @@
         "magic-links": "Links Mágicos",
         "oidc": "OIDC / SSO",
         "tts": "Texto-para-voz",
-        "server-fonts": "Fontes do Servidor"
+        "server-fonts": "Fontes do Servidor",
+        "api-keys": "Chave API"
       },
       "tts": {
         "title": "Provedores",
@@ -3699,7 +3713,18 @@
         "retireDeviceFailed": "Falha ao desativar o dispositivo",
         "restoreDeviceFailed": "Falha ao restaurar o dispositivo",
         "retiredDevices": "{count, plural, one {# dispositivo aposentado} other {# dispositivos aposentados}}",
-        "retiredOnLabel": "Desativado"
+        "retiredOnLabel": "Desativado",
+        "renameDevice": {
+          "action": "Renomear",
+          "actionLabel": "Renomear {device}",
+          "title": "Renomear dispositivo",
+          "description": "BookOrbit mostra esse nome no lugar do modelo dos relatórios do dispositivo, aqui e no plugin BookOrbit em outros dispositivos. Deixe em branco para mostrar o modelo novamente.",
+          "nameLabel": "Nome",
+          "modelHint": "Modelo reportado: {model}",
+          "saved": "Dispositivo renomeado",
+          "cleared": "Nome do dispositivo removido",
+          "failed": "Falha ao renomear dispositivo"
+        }
       },
       "opds": {
         "title": "OPDS",
@@ -3784,12 +3809,14 @@
         "clientsEmpty": {
           "title": "Nenhum cliente de download configurado",
           "body": "Um download HTTP direto não precisa de nenhum cliente. Conecte um para que o BookOrbit possa buscar o que um rastreador também oferece como torrent.",
-          "note": "qBittorrent, Transmissão e Deluge são suportados."
+          "note": "qBittorrent, Transmissão e Deluge são suportados.",
+          "noteWithTorbox": "qBitBitent, Transmission, Deluge, rTorrent, NZBGet, SABnzbd e TorBox são suportados."
         },
         "summary": "{type} - categoria {category}, prioridade {priority}",
         "disabled": "Desativado",
         "test": "Teste de conexão",
         "testSaveFirst": "Salve suas alterações antes de testar",
+        "validateKey": "Validar chave",
         "testOk": "Conectado à {client} {version}",
         "testOkNoVersion": "Conectado a {client}",
         "lastTestOk": "Último teste {time}: conectado",
@@ -3800,8 +3827,10 @@
           "qbittorrent": "qBittorrent",
           "transmission": "Transmission",
           "deluge": "Deluge",
+          "rtorrent": "rTorrent",
           "nzbget": "NZBGet",
-          "sabnzbd": "SABnzbd"
+          "sabnzbd": "SABnzbd",
+          "torbox": "TorBox"
         },
         "color": {
           "label": "Cor",
@@ -3812,6 +3841,7 @@
           "name": "Nome",
           "type": "Tipo de cliente",
           "baseUrl": "URL base",
+          "baseUrlRtorrentBrief": "O próprio endpoint XML-RPC: geralmente /RPC2, ou plugins/httprpc/action.php quando ruTorrent está na frente. O nome de usuário e senha são do servidor web, quando eles são solicitados.",
           "username": "Nome de usuário",
           "password": "Senha",
           "apiKey": "Chave API",
@@ -3830,7 +3860,10 @@
           "allowPrivateAddressHint": "Necessário quando o cliente é executado na sua rede local ou na mesma máquina.",
           "passwordBrief": "Armazenado encriptado.",
           "apiKeyBrief": "Encontrado no SABnzbd em Configuração > Geral. Criptografia armazenada.",
-          "useHardlinksBrief": "Seeds sem usar o disco duas vezes. Faz uma cópia no sistemas de arquivos."
+          "torboxApiKeyBrief": "Pode ser encontrado em https://torbox.app/settings?section=account. Armazenado criptografado.",
+          "useHardlinksBrief": "Seeds sem usar o disco duas vezes. Faz uma cópia no sistemas de arquivos.",
+          "removeCompletedDownloads": "Remover downloads concluídos",
+          "removeCompletedDownloadsBrief": "Exclui o download e seus arquivos do cliente quando o livro é importado."
         },
         "mappings": {
           "title": "Mapeamentos de caminho",
@@ -3884,7 +3917,9 @@
           "nameRequired": "Dê um nome a esse cliente.",
           "urlRequired": "Digite o endereço que o BookOrbit deve alcançar este cliente.",
           "mappingRequired": "Adicione pelo menos um mapeamento, para que o BookOrbit saiba de qual diretório ele pode importar.",
-          "apiKeyRequired": "Digite a chave de API SABnzbd de Config > Geral."
+          "apiKeyRequired": "Digite a chave de API SABnzbd de Config > Geral.",
+          "torboxApiKeyRequired": "Digite a chave API do TorBox das configurações de conta do TorBox.",
+          "removeCompletedUnsupported": "Apenas os clientes da Usenet podem remover downloads concluídos. Os clientes do Torrent os mantêm para semear."
         },
         "encryptionKeyMissing": "BOOK_REQUEST_ENCRYPTION_KEY não está definido, então uma senha do cliente não pode ser salva. Gerar uma com: openssl rand -hex 32",
         "confirmDelete": {
@@ -4313,8 +4348,10 @@
           "qbittorrent": "Seu próprio qBittorrent. Precisa de um endereço e uma conta.",
           "transmission": "Sua própria transmissão. Ela não tem categorias, então a categoria se torna uma subpasta de seu diretório de download.",
           "deluge": "Seu próprio Deluge. Faça login com a senha da interface da web; a categoria precisa do plugin de Etiqueta ligado.",
+          "rtorrent": "Seu próprio rTorrent, sobre XML-RPC. A categoria torna-se seu rótulo; as próprias configurações do rTorrent decidem para onde os arquivos vão.",
           "nzbget": "Seu próprio NZBGet. BookOrbit envia arquivos NZB sobre sua API JSON-RPC.",
-          "sabnzbd": "Seu próprio SABnzbd. BookOrbit envia arquivos NZB usando sua chave de API."
+          "sabnzbd": "Seu próprio SABnzbd. BookOrbit envia arquivos NZB usando sua chave de API.",
+          "torbox": "Sua conta na nuvem do Torbox. BookOrbit envia torrents para ele e busca os arquivos finalizados para importar."
         },
         "searchHealth": {
           "failingOnce": "A última pesquisa falhou",
@@ -4375,7 +4412,9 @@
         "auditLog": "Quem mudou o quê e quando.",
         "requests": "Fontes, downloads de clientes e o que acontece com um livro uma vez que ele baixa.",
         "readerTts": "Voz, velocidade e narração em voz alta.",
-        "adminTts": "Mecanismos de conversão de texto em fala disponíveis para todos os leitores deste servidor."
+        "adminTts": "Mecanismos de conversão de texto em fala disponíveis para todos os leitores deste servidor.",
+        "apiKeys": "Chaves que permitem que os scripts e outros aplicativos usem o BookOrbit como você.",
+        "adminApiKeys": "Permitir chaves de API neste servidor e limitar quanto tempo elas duram."
       },
       "backToApp": "Voltar para a biblioteca",
       "pageDescriptions": {
@@ -5092,6 +5131,7 @@
   },
   "annotations": {
     "unknownBook": "Livro desconhecido",
+    "textUnavailable": "Texto não disponível para este destaque",
     "styles": {
       "highlight": "Destaque",
       "underline": "Sublinhado",
@@ -5241,6 +5281,7 @@
       "whereFrom": "De onde eles vieram",
       "theShelf": "A prateleira",
       "devices": "Dispositivos",
+      "deviceWithSource": "{source} · {device}",
       "allBooks": "Todos os {count} livros",
       "behindCount": "{count, plural, one {# missing} other {# missing}}",
       "busiestWeek": "Semana de compra",
@@ -5302,6 +5343,149 @@
       "cyan": "Ciano",
       "purple": "Roxo",
       "gray": "Cinza"
+    }
+  },
+  "apiKeys": {
+    "errors": {
+      "load": "Chaves de API não puderam ser carregadas.",
+      "create": "A chave API não pôde ser criada.",
+      "rename": "A chave API não pôde ser renomeada.",
+      "regenerate": "A chave API não pôde ser regenerada.",
+      "revoke": "A chave da API não pôde ser revogada.",
+      "revokeAll": "As chaves da API não puderam ser revogadas.",
+      "nameRequired": "Digite um nome para a chave.",
+      "saveSettings": "As configurações da chave API não puderam ser salvas."
+    },
+    "expiry": {
+      "never": "Nunca",
+      "days": "{count, plural, one {# dia} other {# dias}}"
+    },
+    "access": {
+      "read": "Somente leitura",
+      "readHint": "Pode ver, mas não pode mudar nada.",
+      "write": "Leitura e escrita",
+      "writeHint": "Também pode mudar as coisas, dentro das permissões abaixo."
+    },
+    "state": {
+      "active": "Ativo",
+      "expiring": "Expira em breve",
+      "expired": "Expirado",
+      "revoked": "Revogado"
+    },
+    "create": {
+      "title": "Criar a chave da API",
+      "description": "Uma chave permite que um script ou outro aplicativo use BookOrbit como você, não tem mais acesso do que o que você escolher aqui.",
+      "issueTitle": "Chave API de emissão",
+      "issueDescription": "A chave pertence a esta pessoa e atua como ela, sem nada mais do que escolhido aqui.",
+      "name": "Nome",
+      "namePlaceholder": "Script de backup",
+      "nameHint": "Algo que diga onde a chave é usada.",
+      "expiry": "Expira após",
+      "expiryCapped": "Este servidor permite que as chaves durem no máximo {count, plural, one {# dia} other {# dias}}.",
+      "access": "Acesso",
+      "libraries": "Bibliotecas",
+      "librariesAll": "Todas as minhas bibliotecas, incluindo as adicionadas mais tarde",
+      "librariesAllTheirs": "Todas as suas bibliotecas, incluindo as adicionadas mais tarde",
+      "librariesSome": "Apenas algumas bibliotecas",
+      "librariesSelected": "{count, plural, =0 {Nenhum selecionado} one {# de {total} selecionado} other {# de {total} selecionados}}",
+      "librariesRequired": "Escolha pelo menos uma biblioteca.",
+      "admin": "Acesso administrativo",
+      "adminHint": "A chave pode fazer tudo que um administrador pode.",
+      "adminWithLibraries": "Não está disponível enquanto a chave estiver limitada a algumas bibliotecas.",
+      "adminWarning": "Qualquer um que possuir esta chave controla o servidor inteiro. Mantenha ela em algum lugar seguro e dê uma curta vida.",
+      "permissions": "Permissões extras",
+      "permissionsHint": "Ler as bibliotecas acima não precisa de permissão. Conceda apenas o que o script precisa; a chave nunca obtém mais do que seu proprietário.",
+      "noPermissions": "Não tem permissão para conceder.",
+      "creating": "Criando...",
+      "submit": "Criar chave",
+      "issueSubmit": "Chave atribuida"
+    },
+    "reveal": {
+      "title": "Copiar a chave para {name}",
+      "description": "Guarde-o no aplicativo ou no script que irá usá-lo, como uma senha.",
+      "onceOnly": "Esta é a única vez que a chave é mostrada. Se ela for perdida, regenere-a.",
+      "tokenLabel": "Chave API",
+      "copy": "Copiar",
+      "copied": "Copiada",
+      "copyFailed": "A chave não pode ser copiada. Selecione-a e copie-a à mão.",
+      "copiedAnnouncement": "Chave copiada para área de transferência.",
+      "examplesTitle": "Usando a chave",
+      "examplesHint": "Envie em qualquer cabeçalho. Nunca coloque em um link.",
+      "done": "Concluído"
+    },
+    "list": {
+      "label": "Chave API",
+      "activeCount": "{count, plural, one {# chave ativa} other {# chaves ativas}}até {max}",
+      "limitReached": "O limite de chaves {max} ativas foi atingido. Revogue uma chave para criar outra.",
+      "adminBadge": "Administrador",
+      "permissions": "Permissões",
+      "permissionsAdmin": "Todas as permissões",
+      "permissionsNone": "Nada além da leitura",
+      "permissionsCount": "{count, plural, one {# permissão} other {# permissões}}",
+      "libraries": "Bibliotecas",
+      "librariesAll": "Todos",
+      "librariesNone": "Nada restante",
+      "libraryUnknown": "Biblioteca {id}",
+      "librariesCount": "{count, plural, one {# biblioteca} other {# bibliotecas}}",
+      "created": "Criado",
+      "createdBy": "{date}, emitido por {username}",
+      "lastUsed": "Último uso",
+      "neverUsed": "Nunca",
+      "lastUsedFrom": "{time} de {ip}",
+      "expires": "Expira",
+      "noExpiry": "Nunca",
+      "revokedOn": "Revogado em {date}",
+      "renameLabel": "Nome da Chave",
+      "revokedHeading": "Revogado",
+      "revokedHint": "As chaves revogadas permanecem listadas por 90 dias, então são excluídas."
+    },
+    "actions": {
+      "create": "Criar chave",
+      "issue": "Chave do problema",
+      "rename": "Renomear",
+      "renameAria": "Renomear {name}",
+      "regenerate": "Gerar novamente",
+      "regenerateAria": "Regenerar {name}",
+      "revoke": "Revogar",
+      "revokeAria": "Revogado em {name}",
+      "revokeAll": "Revogar todos"
+    },
+    "confirm": {
+      "regenerateTitle": "Regenerar {name}?",
+      "regenerateDescription": "Uma nova chave com o mesmo acesso substitui esta. Qualquer coisa ainda usando a chave antiga para de funcionar de uma vez.",
+      "revokeTitle": "Revogado em {name}?",
+      "revokeDescription": "Qualquer uso desta chave para de funcionar de uma só vez. Isso não pode ser desfeito.",
+      "revokeAllTitle": "Revogar todas as chaves de API?",
+      "revokeAllDescription": "Cada script e o aplicativo que utiliza uma dessas chaves param de funcionar de uma vez. Isso não pode ser desfeito.",
+      "revokeAllIssuedDescription": "Cada chave que esta pessoa tem para de funcionar ao mesmo tempo, incluindo aqueles que criou. Isso não pode ser desfeito."
+    },
+    "announce": {
+      "renamed": "Chave renomeada para {name}.",
+      "revoked": "{name} revogada.",
+      "revokedAll": "{count, plural, =0 {Nenhum chave para revogar.} one {# chave revogada.} other {# chaves revogadas.}}"
+    },
+    "disabledNotice": "As chaves de API estão desativadas neste servidor. As chaves existentes não funcionam até que um administrador volte a ligar.",
+    "ownerNotPermitted": "Esta pessoa precisa da permissão de Criar chaves de API antes de uma chave poder ser emitida para elas. Chaves que já existente pararam de funcionar sem ela.",
+    "empty": {
+      "title": "Ainda não há chaves de API",
+      "hint": "Crie uma chave para deixar um script de backup, uma automação para home ou outro aplicativo acessar sua biblioteca sem sua senha.",
+      "issuedTitle": "Nenhuma chave de API",
+      "issuedHint": "As chaves que esta pessoa cria, ou que são emitidas para eles, aparecem aqui."
+    },
+    "admin": {
+      "section": "Chaves API",
+      "sectionSummary": "Chaves para scripts e aplicativos",
+      "title": "Chave API",
+      "hint": "As alterações aqui se aplicam de uma só vez e não precisam de ser salvas."
+    },
+    "server": {
+      "enabled": "Permitir chaves de API",
+      "enabledHint": "Quando desativado, nenhuma tecla funciona e nenhuma tecla pode ser criada. As chaves são mantidas e funcionam novamente quando isto é reativado.",
+      "maxLifetime": "Vida útil máxima da chave",
+      "maxLifetimeHint": "As novas chaves não podem durar mais do que isso, e chaves que nunca expiram não são oferecidas. Chaves existentes mantêm sua expiração.",
+      "noLimit": "Sem limite",
+      "saved": "Configurações de chave API salvas.",
+      "perUserHint": "Quem pode criar chaves é definido por pessoa com a permissão de criar chaves de API, em Usuários."
     }
   },
   "audit": {
@@ -5442,7 +5626,8 @@
       "Series": "Séries",
       "OidcIdentity": "Identidade OIDC",
       "MagicLinkToken": "Link mágico",
-      "ReadingInsightsProfile": "Lendo perfil de dicas"
+      "ReadingInsightsProfile": "Lendo perfil de dicas",
+      "ApiKey": "Chave API"
     },
     "actionLabels": {
       "AuthRegister": "Registrar Conta",
@@ -5501,6 +5686,8 @@
       "BookBulkEditMetadata": "Editar metadados do livro",
       "BookBulkMoveLibrary": "Mover livros para outra biblioteca",
       "BookMerge": "Mesclar livros",
+      "BookLink": "Livros vinculados",
+      "BookUnlink": "Desvincular o livro",
       "BookDuplicatesResolve": "Resolver livros duplicados",
       "BookReadingStateReset": "Redefinir estado de leitura",
       "BookWriteAndRename": "Escrever metadados e renomear arquivo",
@@ -5571,7 +5758,12 @@
       "EmailRecipientGroupMemberRemove": "Remover destinatário do grupo",
       "MaintenanceMissingBooksClean": "Livros que faltam foram limpos",
       "MaintenanceBrokenCoversClean": "Capas quebradas limpas",
-      "MaintenanceOrphanedCoversClean": "Pastas de capas órfãs limpas"
+      "MaintenanceOrphanedCoversClean": "Pastas de capas órfãs limpas",
+      "ApiKeyCreate": "Chave API criada",
+      "ApiKeyRename": "Chave API renomeada",
+      "ApiKeyRegenerate": "Chave de API regerada",
+      "ApiKeyRevoke": "Chave da API revogada",
+      "ApiKeyRevokeAll": "Revogou todas as chaves de API"
     },
     "views": {
       "label": "Apresentar",
@@ -5700,6 +5892,7 @@
       "skipped": "Ignorado",
       "remaining": "Restante",
       "sharingLevel": "Nível de compartilhamento",
+      "viaApiKey": "Através da chave API",
       "sharing": {
         "private": "Não compartilhado",
         "summary": "Summary",
@@ -6378,7 +6571,8 @@
     "deleteDialog": {
       "title": "Excluir livro?",
       "description": "Isso excluirá permanentemente o livro e todos os seus metadados, arquivos, progresso de leitura e marcadores. Isso não pode ser desfeito.",
-      "keepsHistory": "Leituras concluídas permanecem no histórico de cada leitor, sob o título e autor do livro."
+      "keepsHistory": "Leituras concluídas permanecem no histórico de cada leitor, sob o título e autor do livro.",
+      "linkedNotAffected": "Livros vinculados a este não são afectados."
     },
     "bulkEdit": {
       "title": "{count, plural, =0 {Editar metadados - # livro} one {Editar metadados - # livro} many {Editar metadados - # livros} other {Editar metadados - # livros}}",
@@ -6396,6 +6590,32 @@
         "remove": "Remover",
         "replace": "Substituir",
         "clear": "Limpar"
+      }
+    },
+    "bulkReadingState": {
+      "title": "{count, plural, =0 {Atualize o estado de leitura} one {Atualize o estado de leitura para # livros} other {Atualize o estado de leitura para # livros}}",
+      "description": "Defina um status de leitura compartilhado e escolha se as datas de leitura devem ser alteradas.",
+      "status": "Status de Leitura",
+      "startedAt": "Data de Início",
+      "finishedAt": "Finalizado em",
+      "dateAction": "Ação de data",
+      "setDate": "Ajustar data",
+      "clearDate": "Limpar data",
+      "noFinishDate": "Sem data de conclusão",
+      "clearStartedHint": "A data de início será removida de cada livro selecionado.",
+      "noFinishDateHint": "Leituras concluídas permanecem desatualizadas e não são adicionadas às estatísticas de hoje.",
+      "close": "Fechar editor de estado de leitura em massa",
+      "cancel": "Cancelar",
+      "apply": "Aplicar as alterações",
+      "updated": "{count, plural, one {Estado de leitura atualizado para o livro #} other {Estado de leitura atualizado para os # livros}}",
+      "failed": "Falha ao atualizar o estado de leitura",
+      "errors": {
+        "startRequired": "Escolha uma data de início.",
+        "finishRequired": "Selecione uma data de término.",
+        "startFuture": "A data de início não pode ser no futuro.",
+        "finishFuture": "A data de término não pode ser no futuro.",
+        "finishBeforeStart": "A data final deve ser em ou após a data inicial.",
+        "statusConflict": "As datas de leitura não podem ser definidas para este status de leitura."
       }
     },
     "export": {
@@ -6878,6 +7098,29 @@
         "pageCountLabel": "Contagem de Páginas",
         "isbn13Label": "ISBN-13",
         "isbn10Label": "ISBN-10",
+        "isbnCandidates": {
+          "trigger": "Localizar no livro",
+          "triggerLabel": "Encontre as ISBNs impressas neste livro",
+          "heading": "ISBNs impresso neste livro",
+          "description": "Leia a partir da primeira e última páginas. Os livros frequentemente listam cada edição e outros títulos, então escolha o que corresponde a este arquivo.",
+          "loading": "Lendo o livro…",
+          "current": "Atual",
+          "isbn10": "ISBN-10 {isbn}",
+          "status": {
+            "failed": "O livro não pôde ser lido. Tente novamente.",
+            "unreadable": "Este arquivo não pode ser pesquisado por ISBNs.",
+            "empty": "Nenhum ISBN foi impresso neste livro.",
+            "currentFound": "O ISBN atual está impresso neste livro.",
+            "currentMissing": "O ISBN atual não está impresso neste livro."
+          },
+          "editions": {
+            "ebook": "eBook",
+            "hardcover": "Hardcover",
+            "paperback": "Capa Comum",
+            "print": "Imprimir",
+            "audio": "Áudio"
+          }
+        },
         "durationLabel": "Duração (s)",
         "abridgedLabel": "Resumido",
         "providerIds": "IDs do Provedor",
@@ -7720,10 +7963,12 @@
           "migration": "Importado do Audiobookshelf",
           "manual": "Editado no BookOrbit",
           "manualBy": "Editado por {name} {when}",
+          "readAlong": "Da narração ao longo da leitura no EPUB, exibir apenas",
           "none": "Ainda sem capítulos"
         },
         "youAreHere": "Você está aqui",
         "playFrom": "Ouvir de {title}",
+        "openInReader": "Abrir {title} no leitor",
         "selectRow": "Selecione capítulo {index}",
         "selectedCount": "{count, plural, one {# selecionado} other {# selecionados}}",
         "selectAll": "Selecionar tudo",
@@ -8251,6 +8496,7 @@
           "colReached": "Alcançado",
           "colSource": "Fonte",
           "colFormat": "Formato",
+          "sourceWithDevice": "{source} · {device}",
           "gapDays": "{count, plural, one {# dia sem ler} other {# dias sem ler}}",
           "attemptBegan": "Tentativa {index} iniciada",
           "attemptOutsideAny": "Fora de qualquer tentativa",
@@ -8655,11 +8901,456 @@
       }
     },
     "gridShape": {
-      "tallTitle": "Células altas"
+      "title": "Formato da grade",
+      "tallTitle": "Células altas",
+      "tallHint": "Cada livro mostra a capa do seu formato principal",
+      "squareTitle": "Células quadradas",
+      "squareHint": "Livros com um audiolivro mostram sua capa e o reproduzam quando aberto"
     },
     "merge": {
+      "action": "Mesclar...",
+      "detailAction": "Juntar com outro livro...",
+      "disabled": {
+        "queryScoped": "Selecione os livros um por um para os mesclar",
+        "tooFew": "Selecione pelo menos dois livros para mesclar",
+        "tooMany": "{max, plural, one {Combine até # livro de uma vez} other {Combine até # livros de uma vez}}",
+        "notEditable": "Apenas livros em bibliotecas que você pode editar podem ser mesclados"
+      },
+      "title": "Mesclar livros",
+      "description": "Combine registros do mesmo livro em um. Seus arquivos movem para uma pasta.",
+      "continue": "Revisar mesclagem",
+      "confirm": "{count, plural, one {Mesclar # livro} other {Mesclar # livros}}",
+      "confirming": "Mesclando...",
+      "loading": "Carregando a revisão de mesclagem...",
+      "redirected": "Este livro foi mesclado em outro livro",
+      "steps": {
+        "pick": "Mesclar com quais livros?",
+        "keeper": "Manter qual livro?",
+        "review": "Revisar a mesclagem",
+        "progress": "Mesclando livros",
+        "result": "Mesclar resultado"
+      },
+      "picker": {
+        "searchPlaceholder": "Título ou autor",
+        "empty": "Nenhum livro corresponde.",
+        "failed": "A pesquisa não funcionou. Tente novamente.",
+        "selected": "{count, plural, one {# livro selecionado} other {# livros selecionados}}",
+        "limit": "{max, plural, one {Escolha até # outro livro.} other {Escolha até # outros livros.}}",
+        "remove": "Remover {title}"
+      },
       "keeper": {
-        "processing": "Processando"
+        "hint": "O livro mantido mantém os detalhes e os dados de leitura. Os outros livros se juntam e desaparecem.",
+        "label": "Livro a ser mantido",
+        "folderRoot": "Na pasta principal da biblioteca",
+        "filled": "Detalhes {filled} da {total} preenchidos",
+        "files": "{count, plural, one {# arquivo} other {# arquivos}}",
+        "added": "Adicionado em {date}",
+        "missing": "Arquivos ausentes",
+        "processing": "Processando",
+        "activity": {
+          "readers": "{count, plural, one {# leitor} other {# leitores}}",
+          "yourProgress": "Seu progresso",
+          "highlights": "{count, plural, one {destaque} other {destaques}}",
+          "shelves": "{count, plural, one {# prateleira} other {# prateleiras}}"
+        },
+        "destination": {
+          "heading": "Para onde os arquivos vão",
+          "rootLevel": "O livro mantido é um único arquivo na pasta superior da biblioteca, então todos os arquivos estão dentro da pasta de outro livro.",
+          "newFolder": "Cada livro é um único arquivo na pasta principal da biblioteca, por isso uma nova pasta é criada para o livro combinado:",
+          "summary": "Os arquivos serão armazenados na pasta do {title}.",
+          "root": "Os arquivos serão armazenados em: {root}",
+          "change": "Escolha outra pasta",
+          "label": "Pasta para os arquivos mesclados",
+          "option": "Pasta de {title}"
+        }
+      },
+      "review": {
+        "keeping": "Mantendo {title}",
+        "updating": "Atualizando a avaliação...",
+        "sections": {
+          "details": "Detalhes",
+          "files": "Arquivos",
+          "readingData": "Lendo dados",
+          "visibility": "Visibilidade"
+        },
+        "detailsEmpty": "Todos os detalhes já coincidem. Nada para escolher.",
+        "resultGenres": "Gêneros após a mesclagem",
+        "resultTags": "Tags após a mesclagem",
+        "audiobook": "Detalhes do Audiobook",
+        "added": "Adicionado",
+        "locked": "Bloqueado",
+        "lockedHint": "Trancado no livro mantido. O seu valor permanece a menos que você escolha outro.",
+        "from": "de {title}",
+        "warnings": "Antes de mesclar",
+        "fromKept": "do livro mantido",
+        "detailsCount": "{count, plural, one {# para revisar} other {# para revisar}}"
+      },
+      "stale": {
+        "heading": "Os livros mudaram desde a revisão",
+        "changed": "Verifique-os novamente: {items}",
+        "nothingVisible": "Nada visível alterado. Verifique a revisão e mesclare-o novamente."
+      },
+      "blocked": {
+        "heading": "Esta mesclagem não pode executar",
+        "chooseKeeper": "Escolha outro livro para manter",
+        "linkInstead": "Vincular esses livros ao invés"
+      },
+      "fields": {
+        "title": "Título",
+        "subtitle": "Subtítulo",
+        "authors": "Autores",
+        "description": "Descrição",
+        "publisher": "Editora",
+        "publishedYear": "Publicado",
+        "language": "Idioma",
+        "pageCount": "Número de páginas",
+        "series": "Séries",
+        "isbn": "ISBN",
+        "narrators": "Narradores",
+        "googleBooksId": "ID Google Books",
+        "goodreadsId": "ID Goodreads",
+        "amazonId": "ID da Amazon",
+        "hardcoverId": "ID do Hardcover",
+        "openLibraryId": "ID do Open Library",
+        "itunesId": "ID do iTunes",
+        "audibleId": "ID do Audible",
+        "librofmId": "ID do Libro.fm",
+        "koboId": "ID do KOBO",
+        "comicvineId": "ID da ComicVine",
+        "ranobedbId": "ID do RanobeDB",
+        "lubimyczytacId": "ID do LubimyCzytac",
+        "aladinId": "ID do Aladin"
+      },
+      "files": {
+        "summary": "{count, plural, one {# arquivo} other {# arquivos}}",
+        "from": "De {path}",
+        "to": "Para {path}",
+        "renamed": "Renomeado",
+        "stays": "Permanece na pasta antiga",
+        "hidden": "Oculto na pasta antiga",
+        "identical": "Cópia idêntica",
+        "missing": "Faltando no disco",
+        "inPlace": "Já está no lugar",
+        "crossDevice": "{size} foi copiado para outra unidade marcada, depois removida da antiga.",
+        "showMore": "{count, plural, one {Mostre mais # arquivo} other {Mostre mais # arquivos}}",
+        "removeIdentical": "Remover cópias idênticas após a mesclagem",
+        "removeIdenticalHelp": "Remove apenas arquivos confirmados por byte para o idêntico byte. O progresso da leitura em uma cópia removida move para a cópia que fica."
+      },
+      "readingData": {
+        "ownHeading": "Seus dados que se movem para o livro mantido",
+        "ownNone": "Você não tem dados de leitura sobre os livros sendo mesclados.",
+        "othersHeading": "Outros leitores",
+        "othersGeneric": "O progresso de outros leitores e os destaques também passam para o livro mantido.",
+        "othersNone": "Nenhum outro leitor tem dados sobre os livros sendo mesclados.",
+        "own": {
+          "readingProgress": "{count, plural, one {Sua leitura do progresso no arquivo #} other {Seu progresso na leitura em # arquivos}}",
+          "readingHistory": "{count, plural, one {# lê no seu histórico de leituras} other {# lê no seu histórico de leituras}}",
+          "readingSessions": "{count, plural, one {# lendo sessão} other {# lendo sessões}}",
+          "annotations": "{count, plural, one {# destaque} other {# destaques}}",
+          "bookmarks": "{count, plural, one {# favorito} other {# favoritos}}",
+          "journal": "{count, plural, one {# lançamento do diário} other {# Lançamentos do diário}}",
+          "notes": "{count, plural, one {# anotação} other {# anotações}}",
+          "ratings": "{count, plural, one {Sua avaliação} other {# avaliações}}",
+          "collections": "{count, plural, one {# prateleira} other {# prateleiras}}",
+          "kobo": "{count, plural, one {# registro de sincronização no Kobo} other {# registros de sincronização no Kobo}}",
+          "hardcover": "{count, plural, one {# registro de sincronização no Hardcover} other {# registros de sincronização no Hardcover}}",
+          "storygraph": "{count, plural, one {# registro de sincronização no StoryGraph} other {# registros de sincronização no StoryGraph}}"
+        },
+        "others": {
+          "readingProgress": "{count, plural, one {Leendo o progresso de # outro leitor} other {Lendo o progresso de # outros leitores}}",
+          "readingHistory": "{count, plural, one {Lendo histórico de # outros leitores} other {Lendo histórico de # outros leitores}}",
+          "readingSessions": "{count, plural, one {Lendo o progresso de # outro leitor} other {Lendo o progresso de # outros leitores}}",
+          "annotations": "{count, plural, one {Destaques de # outro leitor} other {Destaque de # outros leitores}}",
+          "bookmarks": "{count, plural, one {Favoritos de # outro leitor} other {Favoritos de # outros leitores}}",
+          "journal": "{count, plural, one {Lançamentos no diário de # outro leitor} other {Lançamentos no diário de # outros leitores}}",
+          "notes": "{count, plural, one {Notas de # outro leitor} other {Notas de # outros leitores}}",
+          "ratings": "{count, plural, one {Avaliações de # outros leitores} other {Avaliações de # outros leitores}}",
+          "collections": "{count, plural, one {Prateleiras de # outro leitor} other {Prateleiras de # outros leitores}}",
+          "kobo": "{count, plural, one {Estado de sincronismo do Kobo de # outro leitor} other {Estado de sincronismo do Kobo de # outros leitores}}",
+          "hardcover": "{count, plural, one {Estado se sincronismo do Hardcover de # outro leitor} other {Estado se sincronismo do Hardcover de # outros leitores}}",
+          "storygraph": "{count, plural, one {Estado de sincronismo do StoryGraph de # outro leitor} other {Estado de sincronismo do StoryGraph de # outros leitores}}"
+        }
+      },
+      "visibility": {
+        "intro": "Estes rótulos e gêneros são deixados de fora do livro mantido, porque mudariam quem o pode ver.",
+        "widens": "Mostrar o livro mantido para os leitores que não podem vê-lo agora",
+        "narrows": "Mostrar o livro mantido para os leitores que não podem vê-lo agora",
+        "includeAnyway": "Incluir mesmo assim",
+        "managersOnly": "Apenas alguém que gerencia usuários pode adicionar de volta.",
+        "tagName": "Etiqueta: {name}",
+        "genreName": "Gênero: {name}"
+      },
+      "busyReasons": {
+        "metadata_fetch": "Ocupado, buscando metadados",
+        "chapter_lookup": "Ocupado, procurando capítulos",
+        "chapter_job": "Ocupado construindo os capítulos",
+        "read_aloud": "Ocupado criando um livro de leitura em voz alta",
+        "upload": "Ocupado recebendo um upload",
+        "file_operation": "Ocupado movendo ou renomeando arquivos"
+      },
+      "blockers": {
+        "NOT_FOUND": "Um desses livros já não existe ou não é possível vê-los.",
+        "BOOK_MERGED": "Um desses livros já estava mesclado em outro livro.",
+        "SAME_BOOK": "O mesmo livro está listado mais de uma vez.",
+        "TOO_MANY_BOOKS": "{max, plural, one {Combine até # livro de uma vez.} other {Combine até # livros de uma vez.}}",
+        "DIFFERENT_LIBRARIES": "Estes livros estão em bibliotecas diferentes. Apenas livros na mesma biblioteca podem ser mesclados.",
+        "FILE_PER_BOOK_LIBRARY": "Esta biblioteca mantém um arquivo por livro, assim os livros não podem compartilhar uma pasta.",
+        "TARGET_NOT_PRESENT": "O livro a ser mantido está desaparecido no disco ou ainda em processamento.",
+        "SOURCE_PROCESSING": "Um livro ainda está sendo processado. Tente novamente quando ele terminar.",
+        "BOTH_HAVE_AUDIO": "Mais de um destes livros tem um audiolivro. Duas séries de áudio em uma pasta são reproduzidas como uma gravação longa.",
+        "NO_DESTINATION_FOLDER": "Nenhum desses livros tem uma pasta própria para armazenar os arquivos mesclados.",
+        "LEGACY_VIRTUAL_FOLDER": "Um livro utiliza um layout antigo de pastas. Reescaneie a biblioteca primeiro.",
+        "FOLDER_NOT_WRITABLE": "O BookOrbit não pode escrever em uma das pastas envolvidas.",
+        "LIBRARY_BUSY": "Um escaneamento, renomeação, movimentação ou outra mesclagem está sendo executado nesta biblioteca. Tente novamente quando terminar.",
+        "BOOK_BUSY": "Um livro está ocupado com outro trabalho, como leitura em voz alta, busca de capítulos ou de metadados. Tente novamente quando terminar.",
+        "PATH_CONFLICT": "Um arquivo chega em um caminho que outro livro já utiliza.",
+        "NESTED_BOOK_CONFLICT": "Um arquivo movido colidiria com uma subpasta e separaria parte do livro como um livro separado.",
+        "PERMISSION_DENIED": "Você não tem permissão para mesclar livros nesta biblioteca.",
+        "INSUFFICIENT_SPACE": "A unidade que recebe os arquivos não possui espaço livre suficiente. A cópia precisa de {size}.",
+        "FORMAT_NOT_ALLOWED": "{library} não permite arquivos {format}, então ele não veria o arquivo movido em seu próximo escaneamento.",
+        "PATH_EXCLUDED": "{library} ignora este caminho quando verifica, portanto o arquivo movido estaria marcado como ausente.",
+        "LEFTOVER_CONTENT": "Um arquivo de livro ficaria para trás em {library}, onde a próxima digitalização o adicionaria novamente como um livro separado.",
+        "READERS_LOSE_ACCESS": "Outros leitores perderiam acesso a este livro e seus dados de leitura. Somente alguém que gerencia usuários pode mesclá-lo desta maneira.",
+        "unknown": "Algo parou esta mesclagem. Recarregue a página e tente novamente."
+      },
+      "warnings": {
+        "CROSS_DEVICE_COPY": {
+          "message": "Alguns arquivos se movem para outra unidade, então eles são copiados, marcados, depois são removidos da antiga.",
+          "detailed": "{size} foi movida para outra unidade, então ela foi copiada, marcada, depois removida da antiga."
+        },
+        "IDENTICAL_COPIES": {
+          "message": "Alguns arquivos são cópias byte a byte de arquivos que o livro mantido já tem.",
+          "detailed": "{count, plural, one {# arquivo é uma cópia byte a byte de um arquivo que o livro preservado já possui.} other {# arquivos são uma cópia byte a byte de um arquivo que o livro preservado já possui.}}"
+        },
+        "RENAMED_ON_COLLISION": {
+          "message": "Alguns arquivos são renomeados porque o nome deles já está sendo usado na pasta de destino.",
+          "detailed": "{count, plural, one {# arquivo foi renomeado porque seu nome já está em uso na pasta de destino.} other {# arquivos foram renomeados porque seus nomes já foram tomados na pasta de destino.}}"
+        },
+        "KOBO_REDELIVERY": {
+          "message": "Dispositivos Kobo que sincronizaram um livro de entradas mescladas guardam o livro novamente na próxima sincronização."
+        },
+        "ISBN_DROPPED": {
+          "message": "Os ISBNs dos outros livros não são mantidos. O livro mantido mantém as ISBNs de sua própria edição."
+        },
+        "OTHER_READERS_AFFECTED": {
+          "message": "Outros leitores têm dados de leitura sobre esses livros. Também se movem para o livro preservado.",
+          "detailed": "{count, plural, one {# outro leitore tem dados de leitura sobre esse livro. Também se movem para o livro preservado.} other {# leitores têm dados de leitura sobre esses livros. Também se movem para o livro preservado.}}"
+        },
+        "LEFTOVER_FILES": {
+          "message": "Alguns arquivos BookOrbit não rastreiam a permanência nas pastas antigas.",
+          "detailed": "{count, plural, one {# O arquivo que o BookOrbit não rastreia permanece em uma pasta antiga.} other {# Os arquivos o BookOrbit não rastreiam ficar nas pastas antigas.}}"
+        },
+        "DESTINATION_MOVES_TARGET": {
+          "message": "Os próprios arquivos dos livros preservados também se movem, porque tudo é armazenado na pasta de outro livro."
+        },
+        "SIDECARS_LEFT_BEHIND": {
+          "message": "Arquivos de metadados dos livros da mesclagem permanecem para trás ou estão escondidos, portanto não podem substituir os detalhes do livro mantido.",
+          "detailed": "{count, plural, one {# O arquivo de metadados permanece para trás ou está oculto, então não pode substituir os detalhes do livro mantido.} other {# Os metadados ficam para trás ou estão ocultos, então eles não podem sobrescrever os detalhes do livro mantido.}}"
+        },
+        "VISIBILITY_WIDENS": {
+          "message": "Algumas tags ou gêneros são omitidos porque mostrariam o livro guardado aos leitores que não o podem ver agora.",
+          "detailed": "{count, plural, one {Algumas tags ou gêneros são omitidos porque eles mostrariam o livro mantido para # leitor que não o pode ver agora.} other {Algumas tags ou gêneros são omitidos porque eles mostrariam o livro mantido para # leitores que não podem vê-lo agora.}}"
+        },
+        "VISIBILITY_NARROWS": {
+          "message": "Alguns leitores que podem ver um livro mesclado não conseguem ver o livro mantido. Os dados de leitura deles ainda são movidos para ele.",
+          "detailed": "{count, plural, one {# leitor que pode ver um livro mesclado não consegue ver o livro preservado. Seus dados de leitura ainda se movem para ele.} other {# leitores que podem ver um livro de fusão não podem ver o livro preservado. Os dados de leitura deles ainda se movem para ele.}}"
+        },
+        "REMOTE_BOOKS_DIFFER": {
+          "message": "Hardcover ou StoryGraph vincula estes livros a diferentes livros. Os links dos livros mantidos permanecem."
+        },
+        "LIBRARY_ACCESS_NARROWS": {
+          "message": "Alguns leitores não podem abrir {library}, portanto eles perdem o acesso a este livro e aos seus dados de leitura até que tenham acesso ao mesmo.",
+          "detailed": "{count, plural, one {# leitor não pode abrir {library}, portanto perdem o acesso a este livro e aos seus dados de leitura até terem acesso ao mesmo.} other {# leitores não podem abrir {library}, então eles perdem acesso a este livro e seus dados de leitura até que tenham acesso a ele.}}"
+        },
+        "KOBO_REMOVAL": {
+          "message": "Este livro sai dos dispositivos Kobo de leitores que não podem abrir {library} na próxima sincronização.",
+          "detailed": "{count, plural, one {Este livro deixa o Kobo de # leitor em sua próxima sincronização.} other {Este livro deixa a Kobo dos # leitores em sua próxima sincronização.}}"
+        },
+        "CUSTOM_FIELDS_HIDDEN": {
+          "message": "{library} não usa alguns dos campos personalizados deste livro. Seus valores são mantidos, mas ocultos.",
+          "detailed": "{count, plural, one {{library} não usa # campo personalizado deste livro. Seu valor é mantido mas oculto.} other {{library} não usa # campos personalizados deste livro. Seus valores são mantidos mas escondidos.}}"
+        },
+        "HARDLINKED_FILES": {
+          "message": "Alguns arquivos têm outros links básicos, como a cópia de um cliente de download. Eles são copiados para outra unidade e as outras ligações continuam a utilizar o seu próprio espaço.",
+          "detailed": "{count, plural, one {# arquivo tem outros links rígidos, como uma cópia de um cliente de download. Foi copiado para outra unidade e as outras ligações continuam usando o seu próprio espaço.} other {# arquivos possuem outros links rígidos, como uma cópia de um cliente de download. Eles foram copiados para outro drive, e os outros links continuam usando seu próprio espaço.}}"
+        },
+        "TARGET_CHANGES_LIBRARY": {
+          "message": "O livro mantido se desloca para {library}."
+        },
+        "COMPANION_REQUEST_STAYS": {
+          "message": "Um outro formato solicitado deste livro chegará com {library} como um livro por conta própria em vez de se juntar ao livro de mesclagens.",
+          "detailed": "{count, plural, one {# formato solicitado de outro livro chegará em {library} como um livro próprio, em vez de se juntar ao livro mesclado.} other {# formatos solicitados de outros livros chegarão em {library} como livros próprios, em vez de se juntarem ao livro mesclado.}}"
+        },
+        "unknown": "O servidor sinalizou outra coisa para verificar antes de mesclar."
+      },
+      "progress": {
+        "count": "Livro {processed} de {total}",
+        "current": "Mesclando {title}",
+        "closeHint": "Você pode fechar isso. A mesclagem ligará e uma mensagem é exibida quando terminar.",
+        "announce": "Mesclando livro {processed} do {total}",
+        "announceDone": "A mesclagem terminou",
+        "unreachable": "O progresso não pode ser lido agora. A mesclagem continua em segundo plano.",
+        "status": {
+          "planned": "Preparando",
+          "moving": "Movendo arquivos",
+          "committing": "Salvando alterações",
+          "committed": "Concluindo",
+          "done": "Concluído",
+          "failed": "Falhou",
+          "rolled_back": "Desfeito"
+        }
+      },
+      "result": {
+        "partialHeading": "Alguns livros não foram mesclados",
+        "failedHeading": "A mesclagem não foi concluída",
+        "openBook": "Abrir o livro",
+        "failedReason": "Nada foi alterado para este livro.",
+        "movedFiles": "{count, plural, one {# arquivo foi movido} other {# arquivos foram movidos}}",
+        "leftoverFiles": "{count, plural, one {# arquivo ficou em uma pasta antiga} other {# arquivos ficaram nas pastas antigas}}",
+        "retiredFiles": "{count, plural, one {# cópia idêntica removida} other {# cópias idênticas removidas}}",
+        "reasons": {
+          "FILE_CHANGED": "Um arquivo alterado no disco enquanto a junção era feita.",
+          "PATH_CONFLICT": "Outro arquivo apareceu para onde um desses arquivos estava indo.",
+          "INTERRUPTED": "O servidor foi reiniciado durante a mesclagem.",
+          "MERGE_FAILED": "A mesclagem parou em um erro inesperado."
+        },
+        "outcome": {
+          "pending": "Não mesclado",
+          "merged": "Mesclado",
+          "rolled_back": "Desfeito, nada mudou",
+          "failed": "Falhou"
+        }
+      },
+      "toast": {
+        "success": "{count, plural, one {Mesclou # livro em {title}} other {Mesclados # livros em {title}}}",
+        "partial": "{total, plural, one {{merged} de # livro mesclado. Abra a mesclagem para ver por que o restante não foi.} other {{merged} de # livros mesclados. Abra a mesclagem para ver por que o restante não foi.}}",
+        "failed": "A mesclagem não foi concluída. Nada foi alterado.",
+        "showResult": "Mostrar detalhes"
+      },
+      "errors": {
+        "previewFailed": "A revisão da mesclagem não pôde ser preparada.",
+        "startFailed": "A mesclagem não pôde iniciar.",
+        "jobFailed": "O progresso da mesclagem não pôde ser lido."
+      },
+      "bookLabel": "{title} · {detail}",
+      "crossLibrary": {
+        "unknownLibrary": "outra biblioteca",
+        "picker": {
+          "hint": "Encontre os outros registros deste livro em qualquer biblioteca que você possa editar. O livro aberto agora é mantido a menos que você escolha outro.",
+          "searchLabel": "Pesquisar nas suas bibliotecas",
+          "prompt": "Digite para pesquisar nas bibliotecas que você pode editar.",
+          "library": "Em {library}"
+        },
+        "destination": {
+          "legend": "Onde o livro mesclado se encontra",
+          "hint": "Todos os arquivos se movem para essa pasta. As outras bibliotecas param de mostrar o livro.",
+          "formatsHere": "{formats} agora aqui",
+          "leaves": "{count, plural, one {{libraries} para de mostrar este livro} other {{libraries} stop showing this book}} -",
+          "accessCount": "{count, plural, one {# leitor de {from} não pode abrir {library}} other {# leitores de {from} não podem abrir {library}}}",
+          "accessSome": "Alguns leitores não conseguem abrir {library}",
+          "only": "O livro mesclado fica em {library}"
+        },
+        "review": {
+          "header": "{count, plural, one {Mesclou # livro {title} em {library}} other {Mesclados # livros {title} em {library}}}"
+        },
+        "files": {
+          "direction": "{count, plural, one {De {from} para {to} (# arquivo, {size})} other {De {from} até {to} (# arquivos, {size})}}",
+          "within": "{count, plural, one {Dentro de {library} (# arquivo, {size})} other {Dentro de {library} (# arquivos, {size})}}",
+          "copiedToDrive": "Copiado para outra unidade, {size}"
+        },
+        "leftBehind": {
+          "heading": "Deixado em {library}",
+          "untracked": "Estes arquivos permanecem em suas pastas antigas. BookOrbit para de monitorá-los."
+        },
+        "access": {
+          "acknowledge": "{count, plural, one {Entendo que # leitor perde acesso a este livro e seus dados de leitura até que tenham acesso a {library}} other {Entendo que # leitores perdem acesso a este livro e seus dados de leitura até que tenham acesso a {library}}}",
+          "acknowledgeSome": "Eu entendo que alguns leitores perdem o acesso a este livro e aos seus dados de leitura até que tenham acesso a {library}"
+        },
+        "devices": {
+          "heading": "Dispositivos"
+        },
+        "settings": {
+          "heading": "Configurações de biblioteca que mudam para este livro",
+          "primaryFormat": "{library} coloca {format} em primeiro lugar, então o arquivo principal torna-se o {format}",
+          "primaryFormatChanges": "{library} classifica os formatos de forma diferente, para que o arquivo principal possa mudar",
+          "fileWrite": "A {library} escreve metadados em arquivos",
+          "namingPattern": "Nomes de arquivos permanecem como estão. Renomear em massa pode aplicar o padrão de nomeação {library}."
+        },
+        "blockers": {
+          "insufficientSpace": "O drive que recebe os arquivos não tem espaço livre suficiente.",
+          "libraryBusy": "Uma verificação, movimentação, renomeação ou outra mesclage, está sendo executado em {library}. Tente novamente quando terminar."
+        },
+        "blocked": {
+          "chooseDestination": "Escolha outro lugar para o livro mesclado"
+        },
+        "progress": {
+          "bytes": "Copiando {done} de {total}"
+        },
+        "toast": {
+          "success": "Mesclado em {title} em {library}"
+        }
+      }
+    },
+    "link": {
+      "action": "Vincular...",
+      "detailAction": "Juntar com outro livro...",
+      "unlink": "Desvincular",
+      "makeMain": "Faça deste o livro principal",
+      "disabled": {
+        "queryScoped": "Selecionar os livros um por um para vinculá-los",
+        "tooFew": "Selecione pelo menos dois livros para vincular",
+        "tooMany": "{max, plural, one {Vincule até # livro de uma vez} other {Vincule até # livros de uma vez}}",
+        "notEditable": "Somente livros em bibliotecas que você pode editar podem ser vinculados"
+      },
+      "title": "Livros vinculados",
+      "description": "Mostrar livros separados como um título, mesmo nas bibliotecas. Cada um mantém seu próprio registro, arquivos e progresso de leitura.",
+      "selectedHeading": "{count, plural, one {# livro para vincular} other {# livros para vincular}}",
+      "notLoaded": "{count, plural, one {E mais # livro selecionado} other {E mais # livros selecionados}}",
+      "mainHint": "Onde os livros ligados são listados em conjunto, o primeiro é mostrado a menos que um deles já esteja ligado aos outros.",
+      "confirm": "{count, plural, one {Link # livro} other {Link # livros}}",
+      "confirmEmpty": "Livros vinculados",
+      "linking": "Vinculando...",
+      "selectionNotAffected": "Livros vinculados com a seleção não são afetados.",
+      "picker": {
+        "hint": "Encontre o mesmo título em qualquer biblioteca que você pode editar, como seu audioobook ou outra edição.",
+        "searchLabel": "Pesquisar todas as bibliotecas",
+        "searchPlaceholder": "Título ou autor",
+        "prompt": "Digite para pesquisar suas bibliotecas.",
+        "empty": "Nenhum livro corresponde.",
+        "failed": "A pesquisa não funcionou. Tente novamente.",
+        "selected": "{count, plural, one {# livro selecionado} other {# livros selecionados}}",
+        "limit": "{max, plural, one {Escolha até # outro livro.} other {Escolha até # outros livros.}}",
+        "remove": "Remover {title}",
+        "library": "Em {library}",
+        "alreadyLinked": "Já vinculado com outros livros"
+      },
+      "chips": {
+        "heading": "Também disponível como",
+        "label": "{medium} na biblioteca {library}",
+        "labelMissing": "{medium} na biblioteca {library}, faltam arquivos",
+        "missing": "Ausente"
+      },
+      "medium": {
+        "ebook": "Ebook",
+        "audiobook": "Audiobook",
+        "comic": "Quadrinhos",
+        "unknown": "Livro"
+      },
+      "badges": {
+        "summary": "Formatos: {formats}",
+        "summaryLinked": "Formatos: {formats}. Livros vinculados: {linked}",
+        "linkedFormat": "{format} em {library}",
+        "more": "+{count}"
+      },
+      "toast": {
+        "linked": "{count, plural, one {Vinculado # livro} other {Vinculados # livros}}",
+        "unlinked": "Este livro não está mais vinculado",
+        "madeMain": "Este agora é o livro principal"
+      },
+      "errors": {
+        "linkFailed": "Os livros não puderam ser vinculados.",
+        "unlinkFailed": "O livro não pôde ser desvinculado.",
+        "leadFailed": "O livro principal não pôde ser alterado."
       }
     }
   },
@@ -8877,7 +9568,43 @@
       "details": "Detalhes",
       "alreadyExistsSaveAs": "Já existe - salvar como:",
       "renamePlaceholder": "ex: {name} (2)",
-      "import": "Importar"
+      "import": "Importar",
+      "joiningCount": "{count, plural, one {# junta-se a um livro existente} other {# junte-se aos livros existentes}}",
+      "join": {
+        "joins": "Junta-se a {title}",
+        "suggested": "Parece um outro formato de {title}",
+        "reason": {
+          "isbn": "Mesmo ISBN",
+          "workId": "Mesmo trabalho em Hardcover ou Open Library",
+          "titleAuthor": "Mesmo título e autor"
+        },
+        "accept": "Adicionar a este livro",
+        "acceptLabel": "Adicionar {file} a {title}",
+        "choose": "Adicionar a um livro existente",
+        "chooseAnother": "Escolher outro livro",
+        "chooseLabel": "Escolha um livro existente para {file}",
+        "fileAsNew": "Arquivo como um novo livro",
+        "fileAsNewLabel": "Arquivo {file} como um novo livro",
+        "picker": {
+          "hint": "Escolha o livro {file} é outro formato. O arquivo entra na pasta desse livro e o livro mantém seus detalhes.",
+          "searchLabel": "Pesquisar nesta biblioteca",
+          "searchPlaceholder": "Título ou autor",
+          "prompt": "Digite para pesquisar nesta biblioteca.",
+          "empty": "Nenhum livro corresponde.",
+          "failed": "A pesquisa não funcionou. Tente novamente.",
+          "pick": "Adicionar a {title}"
+        },
+        "error": {
+          "generic": "Este arquivo não pode ser adicionado ao {title}.",
+          "BOOK_DOCK_JOIN_BOOK_NOT_FOUND": "{title} não foi encontrado. Talvez foi removido ou você não pode vê-lo.",
+          "BOOK_DOCK_JOIN_BOOK_MISSING": "Os arquivos do {title} estão ausentes do disco, portanto não há nenhuma pasta para adicionar este arquivo.",
+          "BOOK_DOCK_JOIN_FORBIDDEN": "Você não pode editar {title}, portanto esse arquivo não pode ser adicionado a ele.",
+          "BOOK_DOCK_JOIN_OTHER_LIBRARY": "{title} está em uma biblioteca diferente da qual este arquivo foi arquivado.",
+          "BOOK_DOCK_JOIN_FILE_PER_BOOK": "Esta biblioteca mantém um livro por arquivo, então este arquivo não pode ser adicionado ao {title}.",
+          "BOOK_DOCK_JOIN_ROOT_LEVEL": "O {title} está presente na pasta superior da biblioteca sem uma pasta própria, então este arquivo não pode ser adicionado.",
+          "BOOK_DOCK_JOIN_AUDIO_CONFLICT": "{title} já tem um audioobook, e um livro tem apenas um."
+        }
+      }
     },
     "layout": {
       "pause": "Pausar",
@@ -9577,7 +10304,8 @@
       "confirm": {
         "title": "Remover este torrent?",
         "description": "O torrent para de semear. Os arquivos baixados permanecem em disco.",
-        "descriptionWithFiles": "O torrent para de semear e seus arquivos baixados são excluídos. O livro importado permanece na sua biblioteca."
+        "descriptionWithFiles": "O torrent para de semear e seus arquivos baixados são excluídos. O livro importado permanece na sua biblioteca.",
+        "descriptionRemoteDelete": "O torrent para de semear e o cliente de download exclui-o e seus arquivos lá para sempre. O livro importado permanece em sua biblioteca."
       }
     },
     "pipeline": {
@@ -9633,11 +10361,14 @@
     "confirm": {
       "cancelDownloadTitle": "Cancelar este download?",
       "cancelDownloadDescription": "A transferência ativa para e a solicitação permanece aberta para que outra versão possa ser escolhida. Dados de torrent são mantidos; Algum parcial de download direto é excluído.",
+      "cancelDownloadDescriptionRemoteDelete": "A transferência ativa para e a solicitação permanece aberta para que outra versão seja escolhida. O cliente de download deleta a transferência e seus arquivos para sempre.",
       "cancelTitle": "Parar este pedido?",
       "cancelDescription": "Mover para o cancelamento. Ninguém esperando vai ter o livro.",
       "cancelDescriptionWithDownload": "A transferência ativa foi parada. Dados no cliente de download foram mantidos; parcialmente o Staging de download direto foi excluído.",
+      "cancelDescriptionWithDownloadRemoteDelete": "A transferência ativa foi interrompida e removida do cliente de download, excluindo definitivamente a mesma e seus arquivos.",
       "deleteTitle": "Excluir este pedido?",
       "deleteDescription": "O pedido e o registo de quem o pediu apontam corretamente, para todos. Qualquer torrent ainda semeamento é removido do cliente de download com seus arquivos mantidos. O staging de download direto é limpo automaticamente. Dispensar a solicitação em vez disso, esconde-a apenas de sua própria lista.",
+      "deleteDescriptionRemoteDelete": "A solicitação e o registo de quem o pediu são válidos, para todos. Qualquer torrent ainda semeamento é removido do cliente de download, o que o deleta e seus arquivos lá para sempre. Dispensar a solicitação apenas a oculta da sua própria lista.",
       "discardImportTitle": "Descartar esta importação?",
       "discardImportDescription": "Os arquivos baixados são removidos da Doca de Livros e a solicitação será marcada com sucesso. O torrent continua semeando; pare-o separadamente se você quiser que tenha ido.",
       "leaveTitle": "Deixar este pedido?",
@@ -10973,7 +11704,24 @@
       "CHAPTERS_ANALYSIS_TOO_LARGE": "Esse áudio é muito grande para ser analisado de uma vez.",
       "CHAPTERS_ANALYSIS_UNAVAILABLE": "Encontrar pausas precisa de ffmpeg no servidor.",
       "CHAPTERS_WRITE_UNAVAILABLE": "Capítulos não podem ser escritos nestes arquivos.",
-      "CHAPTERS_NOTHING_TO_WRITE": "Não há capítulos salvos para escrever."
+      "CHAPTERS_NOTHING_TO_WRITE": "Não há capítulos salvos para escrever.",
+      "BOOK_MERGED": "Este livro foi fundido em outro livro.",
+      "MERGE_PREVIEW_STALE": "Os livros mudaram desde esta revisão. A avaliação está atualizada novamente; verifique-o e mescle novamente.",
+      "MERGE_BLOCKED": "Algo agora para esta mesclagem. A avaliação mostra o porquê.",
+      "MERGE_IN_PROGRESS": "Estes livros já estão sendo mesclados.",
+      "ACCESS_LOSS_NOT_ACKNOWLEDGED": "Confirme que outros leitores perdem o acesso a este livro antes de mesclar.",
+      "LIBRARY_BUSY": "A biblioteca está ocupada com um escaneamento, mover, renomear ou mesclar. Tente novamente quando finalizar.",
+      "LINK_GROUP_NOT_EDITABLE": "Estes livros estão ligados a um livro que você não pode editar.",
+      "LINK_GROUP_FULL": "{max, plural, one {Um link contém no máximo # livro. Desvincule algum primeiro.} other {Um link contém no máximo # livros. Desvincule alguns primeiro.}}",
+      "RESOLUTION_IN_PROGRESS": "Uma resolução de duplicada já está em execução. Aguarde a conclusão dela.",
+      "API_KEYS_DISABLED": "Chaves da API estão desativadas neste servidor.",
+      "API_KEY_READ_ONLY": "Esta chave de API só permite ler.",
+      "API_KEY_ROUTE_FORBIDDEN": "Chaves de API não podem ser usadas para isto.",
+      "API_KEY_LIMIT_REACHED": "O limite de chaves {limit} ativas da API foi atingido. Revogue uma primeiro.",
+      "API_KEY_SCOPE_EXCEEDS_OWNER": "Uma chave não pode receber acesso que o seu proprietário não tem.",
+      "API_KEY_EXPIRY_EXCEEDS_CAP": "Chaves neste servidor podem durar no máximo {cap} dias.",
+      "API_KEY_ADMIN_WITH_LIBRARIES": "Uma chave com acesso de administrador não pode ser limitada a algumas bibliotecas.",
+      "API_KEY_OWNER_NOT_PERMITTED": "Essa pessoa não pode ter chaves de API. Precisa de uma conta ativa e de permissão para criar chaves de API."
     }
   },
   "hardcover": {
@@ -11285,6 +12033,7 @@
         "checkAll": "Verificar pastas novamente",
         "checkAgain": "Verifique {folder} novamente",
         "checkHint": "Cada pasta é marcada assim que você a adicionar. Uma pasta que outra biblioteca já lê é sinalizada, porque ambas as bibliotecas importam os mesmos arquivos.",
+        "checkHintOneLibrary": "Cada pasta é marcada assim que você a adicionar. Uma pasta pode pertencer a apenas uma biblioteca, por isso uma que sobrepõe uma pasta de outra biblioteca não pode ser adicionada.",
         "emptyHint": "Cole um caminho do servidor abaixo, ou procure um.",
         "pastePlaceholder": "Cole um caminho do servidor, por exemplo, /books/Sci-Fi",
         "browse": "Navegar...",
@@ -11294,6 +12043,8 @@
           "notAccessible": "Não acessível",
           "overlap": "Também em {library}",
           "overlapTitle": "A biblioteca \"{library}\" já lê essa pasta.",
+          "sharedWith": "Sobreposições {library}",
+          "sharedWithTitle": "Esta pasta sobrepõe uma pasta do {library}, e uma pasta pode pertencer a apenas uma biblioteca.",
           "files": "{count, plural, one {# arquivo} other {# arquivos}}"
         },
         "errors": {
@@ -11777,6 +12528,8 @@
         "nameRequired": "Digite o nome da biblioteca.",
         "iconRequired": "Escolha um ícone.",
         "folderRequired": "Adicione pelo menos uma pasta.",
+        "folderOverlap": "O {folder} sobrepõe uma pasta do {library}. Uma pasta pode pertencer a apenas uma biblioteca.",
+        "folderNested": "O {folder} sobrepõe o {other}. Uma biblioteca não pode ler a mesma pasta duas vezes, então mantenha-a apenas uma.",
         "cronInvalid": "Informe uma expressão cron de 5 campos válida.",
         "readingStartRange": "O início de leitura deve estar entre 0,05% e 5%.",
         "fileSizeRange": "Limites de tamanho de arquivo devem ser números inteiros de 1 a 10.000 MB.",
@@ -11912,6 +12665,10 @@
           "containsMany": "Contém pastas que {libraries} lê. Esses livros seriam em duas bibliotecas.",
           "overlapExact": "{library} já lê esta pasta. Ambas as bibliotecas importariam o mesmo {count, plural, one {# livro} other {# livros}}.",
           "overlapInside": "Esta pasta está dentro da pasta do {library}, portanto seus livros estariam em ambas as bibliotecas.",
+          "containsOneBlocked": "Contém {folder}, o que o {library} lê. Uma pasta pode pertencer a apenas uma biblioteca, então não deixe para adicionar esta.",
+          "containsManyBlocked": "Contém pastas que o {libraries} lê. Uma pasta pode pertencer a apenas uma biblioteca, então não as deixe adicionar este.",
+          "overlapExactBlocked": "A {library} já lê essa pasta e uma pasta pode pertencer a apenas uma biblioteca.",
+          "overlapInsideBlocked": "Esta pasta está dentro de uma pasta do {library}, e uma pasta pode pertencer a apenas uma biblioteca.",
           "merge": "{count, plural, one {# pasta aqui segura} other {# pastas aqui seguras}} vários livros: como pasta como livro cada uma se torna 1 livro.",
           "split": "{count, plural, one {# audioobook está aqui} other {# audiolivros estão aqui}} em partes: como arquivo, à medida que cada parte, cada parte se torna seu próprio livro.",
           "locked": "Organização é fixada uma vez que exista uma biblioteca.",
@@ -11974,6 +12731,7 @@
         "addShort": "Adicionar",
         "addShortCount": "Adicionar {count}",
         "nothingPicked": "Nada foi escolhido ainda",
+        "resolveOverlap": "{count, plural, one {# A pasta escolhida sobrepõe outra biblioteca. Saia ou remova para continuar.} other {# pastas escolhidas sobrepõem outras bibliotecas. Deixe-as ou remova-as para continuar.}}",
         "seePlan": "Veja o plano"
       },
       "divider": {
@@ -13769,7 +14527,10 @@
         "file_hash": "Conjunto de arquivos idênticos",
         "isbn": "Mesmo ISBN",
         "exact_metadata": "Título exato e autores",
-        "fuzzy_metadata": "Título semelhante e autor"
+        "fuzzy_metadata": "Título semelhante e autor",
+        "same_work": "Mesmo trabalho",
+        "title_author": "Mesmo título e autor",
+        "series_position": "Mesma posição da série"
       },
       "notDuplicates": "Não duplicados",
       "unknownAuthor": "Autor desconhecido",
@@ -13796,7 +14557,8 @@
       },
       "initial": {
         "title": "Localizar livros duplicados",
-        "description": "Escolha o escopo de uma biblioteca e nível de similaridade e, em seguida, execute uma varredura. Nenhum livro será alterado até que você confirme explicitamente uma exclusão."
+        "description": "Escolha o escopo de uma biblioteca e nível de similaridade e, em seguida, execute uma varredura. Nenhum livro será alterado até que você confirme explicitamente uma exclusão.",
+        "descriptionActions": "Escolha um escopo de biblioteca e nível de similaridade e, em seguida, execute uma verificação. Nenhum livro será alterado até que você revise e confirme o que acontece a cada grupo."
       },
       "empty": {
         "title": "Nenhum grupo duplicado encontrado",
@@ -13814,7 +14576,8 @@
         "results": "Não foi possível carregar grupos duplicados.",
         "delete": "Não foi possível excluir os livros duplicados selecionados.",
         "dismiss": "Não foi possível descartar esse grupo.",
-        "restore": "Não foi possível restaurar esse pareamento."
+        "restore": "Não foi possível restaurar esse pareamento.",
+        "resolve": "Não foi possível começar a resolver os grupos selecionados."
       },
       "pagination": {
         "label": "Páginas de grupos duplicados",
@@ -13826,6 +14589,12 @@
       "recommended": "Recomendado",
       "keeping": "Mantendo",
       "willDelete": "Apagar",
+      "copyStatus": {
+        "main": "Livro principal",
+        "merge": "Mesclar em",
+        "link": "Vincular",
+        "other": "Outra cópia"
+      },
       "keepCopy": "Manter {name}",
       "selectGroup": "Selecionar {title}",
       "selectAll": "Selecione todos os grupos nesta página",
@@ -13841,12 +14610,16 @@
         "isbn": "Mesmo ISBN",
         "exact_metadata": "Correspondência exata",
         "fuzzy_metadata": "Semelhante",
-        "withSimilarity": "{label}: {percent}"
+        "withSimilarity": "{label}: {percent}",
+        "same_work": "Mesmo trabalho",
+        "title_author": "Título e autor",
+        "series_position": "Posição da série"
       },
       "summary": {
         "groups": "{count, plural, one {grupo} other {grupos}}",
         "extraCopies": "{count, plural, one {cópia extra} other {cópias extras}}",
-        "reclaimable": "recuperável"
+        "reclaimable": "recuperável",
+        "pairs": "{count, plural, one {pagina} other {paginas}}"
       },
       "columns": {
         "match": "Correspondência",
@@ -13854,6 +14627,7 @@
         "copies": "Cópias",
         "libraries": "Bibliotecas",
         "frees": "Livres",
+        "reclaimable": "Recuperável",
         "keeping": "Mantendo"
       },
       "keepRule": {
@@ -13888,7 +14662,12 @@
         "summary": "{groups} grupos selecionados, {copies} cópias para excluir, libera {size}",
         "clear": "Limpar",
         "review": "{count, plural, one {Analise # cópia} other {Analise # cópias}}",
-        "hint": "Marque os grupos em que confia, ou abra um para comparar as cópias."
+        "hint": "Marque os grupos em que confia, ou abra um para comparar as cópias.",
+        "groups": "{count, plural, one {# grupo selecionado} other {# grupos selecionados}}",
+        "frees": "libera {size}",
+        "selectAllGroups": "{count, plural, one {Selecione o grupo # em cada página} other {Selecione todos os # grupos em cada página}}",
+        "reviewGroups": "{count, plural, one {Analise o # grupo} other {Analise os # grupos}}",
+        "capped": "Uma execução resolve no máximo {max} grupos. Executá-lo novamente depois para o restante."
       },
       "keys": {
         "move": "mover",
@@ -13900,13 +14679,59 @@
         "title": "{count, plural, one {Exclua # cópia} other {Exclua # cópias}}",
         "description": "Em todos os grupos {groups}, liberando {size}. Nada é excluído até que você confirme.",
         "riskWarning": "{count, plural, one {# grupo exclui uma cópia carregando seus dados de leitura.} other {# grupos excluem uma cópia carregando seus dados de leitura.}}",
-        "footer": "Livre {size}"
+        "footer": "Livre {size}",
+        "mergeTitle": "Mesclar com o keeper",
+        "mergeDescription": "Tudo se move para o livro mantido: arquivos, detalhes e dados de leitura de cada leitura.",
+        "resolveTitle": "{count, plural, one {Resolva o grupo #} other {Resolva # grupos}}",
+        "resolveDescription": "Cada grupo é verificado novamente antes que seja alterado. Livros que mudaram desde que a verificação é ignorada e reportada.",
+        "bookAction": "Ação para {name}",
+        "otherPages": "{count, plural, one {Mais # grupo em outras páginas. Ele é resolvido com a regra de manutenção e a sua ação por defeito, ou deixado como está, quando não tem nenhuma.} other {Além disso, mais # grupos em outras páginas. Cada uma é resolvida com a regra de manutenção e sua ação padrão, ou deixada como está quando não tem nenhum.}}",
+        "removeIdentical": "Remover cópias idênticas",
+        "removeIdenticalHint": "Um arquivo mesclado cujo conteúdo completo corresponda a um arquivo o livro mantido já foi removido em vez de manter um arquivo extra.",
+        "confirm": "{count, plural, one {Resolva o grupo #} other {Resolva # grupos}}"
       },
       "dismissed": {
         "show": "{count, plural, one {Mostre # par dispensado} other {Mostre # pares dispensados}}",
         "hide": "Ocultar pares dispensados",
         "restore": "Restaurar este par",
         "restored": "Pareamento restaurado. Ele pode coincidir novamente na próxima digitalização."
+      },
+      "kinds": {
+        "label": "Tipo de correspondência",
+        "duplicate": "Registros duplicados",
+        "other_format": "Mesmo livro, outro formato"
+      },
+      "actions": {
+        "label": "Ação",
+        "none": "Selecionar uma ação",
+        "delete": "Excluir extras",
+        "merge": "Mesclar no keeper",
+        "link": "Vincular",
+        "skip": "Manter como está"
+      },
+      "reviewMerge": "Revisar mesclagem",
+      "reviewLink": "Revisar vinculação",
+      "mergeUnavailable": {
+        "TOO_MANY_BOOKS": "Mesclagem não está disponível: o grupo possui mais livros do que uma mesclagem pode receber.",
+        "DIFFERENT_LIBRARIES": "Mesclar não está disponível: os livros estão em bibliotecas diferentes.",
+        "FILE_PER_BOOK_LIBRARY": "Mesclagem não está disponível: a biblioteca mantém um livro por arquivo.",
+        "TARGET_NOT_PRESENT": "Merge não está disponível: os arquivos dos livros mantidos estão faltando.",
+        "BOTH_HAVE_AUDIO": "Mesclagem não está disponível: mais de um livro possui uma audioobook.",
+        "linkOffered": "O link as mantém como livros separados exibidos juntos."
+      },
+      "crossLibrary": {
+        "into": "Em {library}",
+        "rowNote": "Esta mesclagem move arquivos entre bibliotecas. Espera-se que o livro mesclado apareça no {library}.",
+        "bulkHeading": "{count, plural, one {# mesclagem move arquivos entre bibliotecas} other {# mesclagem move arquivos entre bibliotecas}}",
+        "bulkHint": "Os arquivos se movem para a biblioteca nomeada e as outras bibliotecas deixam de mostrar esses livros."
+      },
+      "resolution": {
+        "success": "{count, plural, =0 {Nenhum grupo resolveu} one {Um grupo resolveu} other {# grupos resolveram}}",
+        "partial": "{done} de {total} grupos resolvidos. Abra o comentário para ver o que foi ignorado ou falhou.",
+        "failed": "Resolvendo os grupos duplicados antes de terminar.",
+        "progress": "{processed} de {total} grupos concluídos",
+        "finished": "Concluído: {processed} dos grupos {total}",
+        "progressLabel": "Progresso da resolução"
       },
       "outcomes": {
         "pending": "Aguardando",
@@ -13925,11 +14750,30 @@
       },
       "outcomeReasons": {
         "STALE": "mudou desde a verificação",
+        "KEEPER_MISSING": "o livro mantido foi removido ou seus arquivos estão faltando",
+        "NO_ACTION": "nenhuma ação escolhida",
         "NOT_SELECTED": "deixado como está",
         "ALREADY_RESOLVED": "já resolvido",
+        "DELETE_FAILED": "os arquivos não puderam ser apagados",
+        "LINK_FAILED": "os livros não puderam ser vinculados",
         "MERGE_FAILED": "a mesclagem falhou",
+        "MERGE_BLOCKED": "algo parou esta mesclagem",
         "MERGE_IN_PROGRESS": "estes livros já estão sendo mesclados",
-        "LINK_GROUP_FULL": "o link está completo"
+        "FORBIDDEN": "você não pode mudar um destes livros",
+        "LINK_GROUP_FULL": "o link está completo",
+        "LINK_GROUP_NOT_EDITABLE": "vinculado com um livro que você não pode editar",
+        "LIBRARY_BUSY": "a biblioteca está ocupada",
+        "BOTH_HAVE_AUDIO": "mais de um livro tem um audiobook",
+        "DIFFERENT_LIBRARIES": "os livros estão em bibliotecas diferentes",
+        "FILE_PER_BOOK_LIBRARY": "a biblioteca mantém um livro por arquivo",
+        "TARGET_NOT_PRESENT": "os arquivos dos livros mantidos estão ausentes",
+        "INSUFFICIENT_SPACE": "não há espaço livre suficiente no drive de recepção",
+        "FORMAT_NOT_ALLOWED": "a biblioteca de recebimento não permite um dos formatos",
+        "PATH_EXCLUDED": "um arquivo aterrissaria em um caminho que a biblioteca receptora não acessa",
+        "LEFTOVER_CONTENT": "um arquivo de livro ficaria atrás em outra biblioteca",
+        "READERS_LOSE_ACCESS": "outros leitores perderão o acesso ao livro",
+        "ACCESS_LOSS_NOT_ACKNOWLEDGED": "outros leitores perderiam acesso ao livro",
+        "other": "erro {code}"
       }
     },
     "entityManager": {
@@ -14488,7 +15332,8 @@
       "magic-links": "Links Mágicos",
       "oidc": "OIDC / SSO",
       "server-fonts": "Fontes do Servidor",
-      "tts": "Texto-para-voz"
+      "tts": "Texto-para-voz",
+      "api-keys": "Chave de API"
     },
     "system": {
       "file-naming": "Nomeação de Arquivos",
@@ -14501,7 +15346,8 @@
       "profile": "Conta",
       "privacy": "Privacidade e Compartilhamento",
       "notifications": "Notificações",
-      "restrictions": "Restrições de Conteúdo"
+      "restrictions": "Restrições de Conteúdo",
+      "apiKeys": "Chave de API"
     },
     "smartScopes": "Escopo inteligente",
     "collections": "Coleções",
