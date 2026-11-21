@@ -275,7 +275,7 @@ Questions are welcome, even if you are unsure whether something is a bug. Share 
 
 ## 🙏 Credits
 
-BookOrbit's read-aloud generation is built on the work of the [Storyteller](https://gitlab.com/storyteller-platform/storyteller) project. Its open-source libraries, `@storyteller-platform/align` and `@storyteller-platform/ghost-story`, align an ebook with its audiobook to produce the EPUB 3 read-along, and the QuartzNet alignment models come from Storyteller's model registry. Many thanks to the Storyteller team for their incredible work.
+BookOrbit's read-aloud generation is built on the work of the [Storyteller](https://gitlab.com/storyteller-platform/storyteller) project. Its open-source libraries, `@storyteller/align` and `@storyteller/ghost-story`, align an ebook with its audiobook to produce the EPUB 3 read-along, and the QuartzNet alignment models come from Storyteller's model registry. Many thanks to the Storyteller team for their incredible work.
 
 <a id="license-and-attribution"></a>
 

@@ -772,7 +772,7 @@ describe("cancellation and failures", () => {
 test("the control process never imports the pipeline", () => {
   for (const file of ["main", "server", "jobs", "config", "stages", "paths", "validation", "log", "accelerator", "protocol", "toolchain"]) {
     const source = readFileSync(new URL(`../dist/${file}.js`, import.meta.url), "utf8");
-    assert.ok(!source.includes("@storyteller-platform/align"), `${file}.js imports STAlign`);
+    assert.ok(!source.includes("@storyteller/align"), `${file}.js imports STAlign`);
     assert.ok(!/from "\.\/(runner|pipeline)\.js"/.test(source), `${file}.js imports the runner`);
   }
 });

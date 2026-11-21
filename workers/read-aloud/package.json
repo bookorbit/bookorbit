@@ -21,8 +21,8 @@
   },
   "dependencies": {
     "@bookorbit/types": "workspace:*",
-    "@storyteller-platform/align": "0.2.16",
-    "@storyteller-platform/ghost-story": "0.3.4",
+    "@storyteller/align": "0.2.17",
+    "@storyteller/ghost-story": "0.3.5",
     "onnxruntime-node": "1.31.1",
     "pino": "^10.4.0"
   },

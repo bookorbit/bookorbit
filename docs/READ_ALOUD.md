@@ -1,6 +1,6 @@
 # Read-Aloud EPUB Generation
 
-BookOrbit can combine a plain EPUB with one or more audiobook files and produce an EPUB 3 Media Overlays edition. Generation uses STAlign from `@storyteller-platform/align` with the QuartzNet15x5 CTC model.
+BookOrbit can combine a plain EPUB with one or more audiobook files and produce an EPUB 3 Media Overlays edition. Generation uses STAlign from `@storyteller/align` with the QuartzNet15x5 CTC model.
 
 The API server does not run machine learning work in its own process. It stores and authorizes jobs, validates sources and output, and publishes the generated EPUB. A separate worker performs audio preparation, QuartzNet inference, text alignment, and EPUB generation.
 

@@ -2,8 +2,8 @@ import { existsSync, readdirSync } from "node:fs";
 import { readdir, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { ctcAlign, emit, markup, processAudiobook, upgradeEpub } from "@storyteller-platform/align";
-import { getModelDir, loadCtcModel, resolveCtcRun, type CtcRun } from "@storyteller-platform/ghost-story";
+import { ctcAlign, emit, markup, processAudiobook, upgradeEpub } from "@storyteller/align";
+import { getModelDir, loadCtcModel, resolveCtcRun, type CtcRun } from "@storyteller/ghost-story";
 import type { ReadAloudStageDetail, ReadAloudStageUnit } from "@bookorbit/types";
 import { StageError, type Pipeline, type StageContext } from "./pipeline-contract.js";
 
@@ -171,7 +171,7 @@ function isInstalled(run: CtcRun): boolean {
  * ships it beside the entry point; a release that moves it fails the download stage loudly.
  */
 async function loadInstaller(): Promise<InstallModelPackage> {
-  const entry = fileURLToPath(import.meta.resolve("@storyteller-platform/ghost-story"));
+  const entry = fileURLToPath(import.meta.resolve("@storyteller/ghost-story"));
   const module = (await import(pathToFileURL(join(dirname(entry), "cli", "ctc-install.js")).href)) as { installModelPackage?: unknown };
   if (typeof module.installModelPackage !== "function") throw new Error("ghost-story no longer provides installModelPackage");
   return module.installModelPackage as InstallModelPackage;

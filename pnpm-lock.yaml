@@ -31,7 +31,7 @@ overrides:
   zod@>=4.0.0 <4.6.6: ^4.6.7
 
 patchedDependencies:
-  '@storyteller-platform/ghost-story@0.3.4': 33487017dde10116de956234017057ad5318841171b366792343543935874849
+  '@storyteller/ghost-story@0.3.5': 33487017dde10116de956234017057ad5318841171b366792343543935874849
   music-metadata@12.7.0: fa2c2139cc850302fb0d2249ee6ec5072c40f257486b8605e5ebe04b513550d4
 
 importers:
@@ -571,12 +571,12 @@ importers:
       '@bookorbit/types':
         specifier: workspace:*
         version: link:../../packages/types
-      '@storyteller-platform/align':
-        specifier: 0.2.16
-        version: 0.2.16(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)
-      '@storyteller-platform/ghost-story':
-        specifier: 0.3.4
-        version: 0.3.4(patch_hash=33487017dde10116de956234017057ad5318841171b366792343543935874849)(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)
+      '@storyteller/align':
+        specifier: 0.2.17
+        version: 0.2.17(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)
+      '@storyteller/ghost-story':
+        specifier: 0.3.5
+        version: 0.3.5(patch_hash=33487017dde10116de956234017057ad5318841171b366792343543935874849)(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)
       onnxruntime-node:
         specifier: 1.31.1
         version: 1.31.1
@@ -3714,46 +3714,43 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  '@storyteller-platform/align@0.2.16':
-    resolution: {integrity: sha512-E70/IzYckLckvLe+e+Ngmu31JsnQh8TPbY3eNP+lm6MHgLcUiu8xVA9wOt3v5tjmxdUUj+FgXNmUlJZIrj6jcw==}
+  '@storyteller/align@0.2.17':
+    resolution: {integrity: sha512-VYpon+tezFh33+4RKrvY7OjHga6KBEUQ1fOqmOgFZYvCgV6jvpL+sluEyKzsT2IlwSLXfoJHXOI1RKqy59VUuQ==}
     engines: {node: '>=24'}
     os: [win32, darwin, linux]
     hasBin: true
 
-  '@storyteller-platform/audiobook@0.7.0':
-    resolution: {integrity: sha512-2sxt44SJgoWsxyL27kvpZ1be4wPo5DzdBM7HnzqwEaoJgvElgNYPCuEw2hW2O2kSmaIGbiobIijv2f961hbQcg==}
+  '@storyteller/audiobooks@0.7.2':
+    resolution: {integrity: sha512-lLoLfIIM2p0CfQM9oI7Zncw4RpsyZRlYUj3ncv22Sivo9ioA0KyG61sZV7TozRDBQlgE6BczOGhUWiX95D8dzg==}
 
-  '@storyteller-platform/epub@1.1.0':
-    resolution: {integrity: sha512-6OStA12AfRi70FHnbjGftP1eHEI9p2SHCBuyYt0sd308JFKzNpnx8CNT7xUcyLQhplLTDI/gzgoihEDbw+EbJQ==}
+  '@storyteller/epub@1.1.1':
+    resolution: {integrity: sha512-kQJH+u8OMFC4yqhOn2kYAQzR9iDDg4ZoihOS2MZlB7E9My+Kzh7UKv3HS0013MPQ8ndCKOJR2VnWg+awwfd+tA==}
 
-  '@storyteller-platform/fs@0.3.1':
-    resolution: {integrity: sha512-tlKAM3quGCOQOMhAt1iGTeiKUXlX9DWBSEtpbfeTKWJlN+wcEDgZ8QUWs8w3M/hkRb51fCytenOUiNWgKUv92g==}
+  '@storyteller/fs@0.3.2':
+    resolution: {integrity: sha512-3su9CromwxBObsMnInnWN4Dk4wDsH1Rcix3W6I1wTaSR+XkwDHdqtpkBQRPPKG2LL06GdrrmbX3XGWOVqdNkKw==}
 
-  '@storyteller-platform/ghost-story@0.3.4':
-    resolution: {integrity: sha512-tlvgOhdVU8JhuFzm+TeHMZbKHZvMgUNguN5ERgHq84n8MFTnOoT6VSpfaE08w2OCFa/QGdJlxcS8abqlViGy2A==}
+  '@storyteller/ghost-story@0.3.5':
+    resolution: {integrity: sha512-01eGDbzpJUP/3TPXu6Pm3JlsvQRXZ6M22vf77C8hKrM5d18JI0g7tX72P5Cq/IBSfMWYk3zAWslexvkllMTsPw==}
     engines: {node: '>=20'}
     os: [win32, darwin, linux]
     hasBin: true
 
-  '@storyteller-platform/mapping@0.1.3':
-    resolution: {integrity: sha512-pqTwruIB9o8NmSrQjQVZxM7apvXcokqlGxkaZagR97tvxwffj4XLpfJKwW6Ik/k9jWwzO2YufIwpoi/R+V+j9Q==}
+  '@storyteller/mapping@0.2.1':
+    resolution: {integrity: sha512-9XtZAc99jaRWd3FMgEAediZ5heE98EQPb9xdTlwuCUrwrQxfW/sI5bbie0aEmjmOls6ZiuZTm1H3mQIuAXG+Aw==}
 
-  '@storyteller-platform/mapping@0.2.0':
-    resolution: {integrity: sha512-O6+FEZTA4CE2UpYpvMlDQ5/GYWRg+xlIr++5i2YoG8m7jiejtzpFheh2kraQGHXPJbKAw/8CEtSywFrE01Xvug==}
+  '@storyteller/media-types@0.2.3':
+    resolution: {integrity: sha512-inIu49OfnaxcVyMJwRGTENCBSTAtSfixirLaYP2x59QF3jkOvBLuhbiNHRUnmCB6rqruhDVsbUpa6EdtS+bZEQ==}
 
-  '@storyteller-platform/media-types@0.2.2':
-    resolution: {integrity: sha512-AyVGQwOH5em9Zc6pXvJjt+T4EcQWYguDjL400nQuQQR7+vNr0ZGXu2eIK4Xin6WfFEeZ/jaXbSbizcdnSStdhA==}
-
-  '@storyteller-platform/mlx-audio@0.1.2':
-    resolution: {integrity: sha512-+iCyAnNNcwRyuAGZ+hnc6oni2jtdQJpwTeWRi1nbXy//K4nfpgrq1dNr75nKxUSQFACn8DYOlTuB/I4aCv8NqA==}
+  '@storyteller/mlx-audio@0.1.3':
+    resolution: {integrity: sha512-J2mPfyuvVrdeLH5HpCfbTwdBp4WylL9Neb2NknyqdOrENex3AX3QK6KjRWBvtZYA0zJeovR+qOmaAIDbQPpjBQ==}
     engines: {node: '>=24'}
     os: [darwin]
 
-  '@storyteller-platform/path@0.3.1':
-    resolution: {integrity: sha512-4FkgqyrFDQIzcNBbWhj+2o9gG1GhRFEuDA0/lORUaLB/yKVYZ6TOFwde1IJh4xQimezZ7Axjs3kKZV5VJimZ7w==}
+  '@storyteller/path@0.3.2':
+    resolution: {integrity: sha512-bhUeZI4XyRFBx5hdqZiov5cav4J2YgOpiw1vuGKi94CqZJflV73iwKE7aU4lNquu595gFbQBiuHCiLQUEV205w==}
 
-  '@storyteller-platform/transliteration@4.0.6':
-    resolution: {integrity: sha512-h6n7MbC0MuQSJMGPJm8dQI6Ue/260ucPgvCd2ISzvjoBUM/IORhPzPjE+HUmPaX+i/0YuWcCdKB7chcBliHtAg==}
+  '@storyteller/transliteration@4.1.0':
+    resolution: {integrity: sha512-FB0L3dqV9MBThlaGwwHCDe2yXAOEmOkTYXoQEsxw/Sd/4Ue+CfHU+DJH1cRbq/X+4DqtO3tX0oLa9dS7WVGLWg==}
     engines: {node: '>=20.0.0'}
     hasBin: true
 
@@ -4229,9 +4226,6 @@ packages:
 
   '@types/node@18.19.130':
     resolution: {integrity: sha512-GRaXQx6jGfL8sKfaIDD6OupbIHBr9jv7Jnaml9tB7l4v068PAOXqfcujMMo5PhbIs6ggR1XODELqahT2R8v0fg==}
-
-  '@types/node@24.19.2':
-    resolution: {integrity: sha512-93d49wCWJkCyN87MxLpNN6KXPCwFw7bVUg79mGUV1OS40JGWwVCr8n61DXCSqz7CV6/VfPkb7xec7uP2M+QHWQ==}
 
   '@types/node@26.6.6':
     resolution: {integrity: sha512-MzQj+8Kx3XI40OmUAE6Qoh58ZMNstNNMwn2nfd3qWsfe7nDNSqJNzes4njhz6AHwrSHOffSLwXU6yb474Q4aog==}
@@ -8999,9 +8993,6 @@ packages:
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
 
-  undici-types@7.24.6:
-    resolution: {integrity: sha512-WRNW+sJgj5OBN4/0JpHFqtqzhpbnV0GuB+OozA9gCL7a993SmU+1JBZCzLNxYsbMfIeDL+lTsphD5jN5N+n0zg==}
-
   undici-types@8.12.4:
     resolution: {integrity: sha512-GNCQH3MbVGB8OAVAoTiLH8pu4wx5Ni3DWKpnBzGj3WDsi8EwmK0aOVBooNEt+g5YL1eHPxcS9XUTouwFU6j1kQ==}
 
@@ -9015,6 +9006,10 @@ packages:
   undici@7.30.2:
     resolution: {integrity: sha512-mLyPQnHwUxaM/rideoK/+KL8DaAJLRl4aBCfmX444aCSLnIaomqPLtNRe2jdCYcsk5wZzXrDIQC8ZeYNRAYyIA==}
     engines: {node: '>=20.18.1'}
+
+  undici@8.12.2:
+    resolution: {integrity: sha512-XtuDWVdqTLr3NAxm2ly9/hU6kUsJOgGh1RASzMBbsw6aWCOaQzHdW+QQDfdERjfJ2V5vL5pRPa4RetO9UfivDg==}
+    engines: {node: '>=22.19.0'}
 
   undici@8.12.4:
     resolution: {integrity: sha512-8Mx+uNKKER2bA4AdtedkqRbwUCIJFr2nJckXRe5yrDqzePqwLP7VNcctN8/XdmDSbF7mS+jJKIszlL+vbam1VA==}
@@ -12877,7 +12872,7 @@ snapshots:
 
   '@standard-schema/spec@1.1.0': {}
 
-  '@storyteller-platform/align@0.2.16(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)':
+  '@storyteller/align@0.2.17(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)':
     dependencies:
       '@echogarden/icu-segmentation-wasm': 0.2.2
       '@echogarden/text-segmentation': 0.4.1(@echogarden/icu-segmentation-wasm@0.2.2)
@@ -12885,13 +12880,13 @@ snapshots:
       '@optique/core': 1.3.7
       '@optique/run': 1.3.7
       '@readium/shared': 2.9.0
-      '@storyteller-platform/audiobook': 0.7.0
-      '@storyteller-platform/epub': 1.1.0
-      '@storyteller-platform/fs': 0.3.1
-      '@storyteller-platform/ghost-story': 0.3.4(patch_hash=33487017dde10116de956234017057ad5318841171b366792343543935874849)(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)
-      '@storyteller-platform/mapping': 0.2.0
-      '@storyteller-platform/media-types': 0.2.2
-      '@storyteller-platform/transliteration': 4.0.6
+      '@storyteller/audiobooks': 0.7.2
+      '@storyteller/epub': 1.1.1
+      '@storyteller/fs': 0.3.2
+      '@storyteller/ghost-story': 0.3.5(patch_hash=33487017dde10116de956234017057ad5318841171b366792343543935874849)(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)
+      '@storyteller/mapping': 0.2.1
+      '@storyteller/media-types': 0.2.3
+      '@storyteller/transliteration': 4.1.0
       cli-progress: 3.12.0
       esbuild: 0.28.2
       fastest-levenshtein: 1.0.16
@@ -12914,21 +12909,21 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@storyteller-platform/audiobook@0.7.0':
+  '@storyteller/audiobooks@0.7.2':
     dependencies:
-      '@storyteller-platform/fs': 0.3.1
-      '@storyteller-platform/media-types': 0.2.2
-      '@storyteller-platform/path': 0.3.1
-      '@types/node': 24.19.2
+      '@storyteller/fs': 0.3.2
+      '@storyteller/media-types': 0.2.3
+      '@storyteller/path': 0.3.2
+      '@types/node': 26.6.6
       yauzl-promise: 4.0.0
       yazl: 3.3.1
 
-  '@storyteller-platform/epub@1.1.0':
+  '@storyteller/epub@1.1.1':
     dependencies:
       '@esfx/async-readerwriterlock': 1.0.0
-      '@storyteller-platform/fs': 0.3.1
-      '@storyteller-platform/media-types': 0.2.2
-      '@storyteller-platform/path': 0.3.1
+      '@storyteller/fs': 0.3.2
+      '@storyteller/media-types': 0.2.3
+      '@storyteller/path': 0.3.2
       '@xmldom/xmldom': 0.9.12
       '@zip.js/zip.js': 2.25.0
       mem: 8.1.1
@@ -12936,9 +12931,9 @@ snapshots:
       yauzl-promise: 4.0.0
       yazl: 3.3.1
 
-  '@storyteller-platform/fs@0.3.1': {}
+  '@storyteller/fs@0.3.2': {}
 
-  '@storyteller-platform/ghost-story@0.3.4(patch_hash=33487017dde10116de956234017057ad5318841171b366792343543935874849)(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)':
+  '@storyteller/ghost-story@0.3.5(patch_hash=33487017dde10116de956234017057ad5318841171b366792343543935874849)(@types/node@26.6.6)(supports-color@10.2.2)(ws@8.23.0)':
     dependencies:
       '@aws-sdk/client-s3': 3.1172.0
       '@aws-sdk/client-transcribe': 3.1172.0
@@ -12946,8 +12941,8 @@ snapshots:
       '@hono/zod-validator': 0.7.6(hono@4.13.19)(zod@4.6.7)
       '@huggingface/transformers': 4.3.2(@types/node@26.6.6)
       '@robingenz/zli': 0.2.0(zod@4.6.7)
-      '@storyteller-platform/fs': 0.3.1
-      '@storyteller-platform/media-types': 0.2.2
+      '@storyteller/fs': 0.3.2
+      '@storyteller/media-types': 0.2.3
       chalk: 5.6.2
       cli-progress: 3.12.0
       ffmpeg-stream: 1.0.1(supports-color@10.2.2)
@@ -12960,10 +12955,10 @@ snapshots:
       openai: 4.103.0(ws@8.23.0)(zod@4.6.7)
       p-queue: 9.3.5
       tar: 7.5.23
-      undici: 7.30.2
+      undici: 8.12.2
       zod: 4.6.7
     optionalDependencies:
-      '@storyteller-platform/mlx-audio': 0.1.2
+      '@storyteller/mlx-audio': 0.1.3
     transitivePeerDependencies:
       - '@types/node'
       - bufferutil
@@ -12972,24 +12967,22 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@storyteller-platform/mapping@0.1.3': {}
+  '@storyteller/mapping@0.2.1': {}
 
-  '@storyteller-platform/mapping@0.2.0': {}
-
-  '@storyteller-platform/media-types@0.2.2':
+  '@storyteller/media-types@0.2.3':
     dependencies:
-      '@storyteller-platform/path': 0.3.1
+      '@storyteller/path': 0.3.2
 
-  '@storyteller-platform/mlx-audio@0.1.2':
+  '@storyteller/mlx-audio@0.1.3':
     dependencies:
       node-gyp-build: 4.8.4
     optional: true
 
-  '@storyteller-platform/path@0.3.1': {}
+  '@storyteller/path@0.3.2': {}
 
-  '@storyteller-platform/transliteration@4.0.6':
+  '@storyteller/transliteration@4.1.0':
     dependencies:
-      '@storyteller-platform/mapping': 0.1.3
+      '@storyteller/mapping': 0.2.1
       havarotjs: 0.25.5
       kuroshiro-analyzer-kuromoji: 1.1.0
 
@@ -13454,10 +13447,6 @@ snapshots:
   '@types/node@18.19.130':
     dependencies:
       undici-types: 5.26.5
-
-  '@types/node@24.19.2':
-    dependencies:
-      undici-types: 7.24.6
 
   '@types/node@26.6.6':
     dependencies:
@@ -18579,8 +18568,6 @@ snapshots:
 
   undici-types@5.26.5: {}
 
-  undici-types@7.24.6: {}
-
   undici-types@8.12.4: {}
 
   undici-types@8.9.0: {}
@@ -18588,6 +18575,8 @@ snapshots:
   undici@6.29.1: {}
 
   undici@7.30.2: {}
+
+  undici@8.12.2: {}
 
   undici@8.12.4: {}
 

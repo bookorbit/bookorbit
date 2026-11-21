@@ -1,4 +1,4 @@
-import { isCtcModelVariant } from "@storyteller-platform/ghost-story/constants";
+import { isCtcModelVariant } from "@storyteller/ghost-story/constants";
 import {
   READ_ALOUD_MAX_AUDIO_FILES,
   READ_ALOUD_WORKER_STAGES,
