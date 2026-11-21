@@ -209,27 +209,32 @@ describe('NewznabAdapter', () => {
     ).resolves.toEqual(NZB);
   });
 
-  it('follows a relative NZB redirect and validates the final document', async () => {
-    fetchMock
-      .mockResolvedValueOnce(new Response(null, { status: 302, headers: { location: '/download/final.nzb' } }))
-      .mockResolvedValueOnce(new Response(NZB));
+  it.each(['/download/final.nzb', 'https://tracker.example.com/getnzb/1'])(
+    'identifies BookOrbit on both hops of an NZB redirect to %s',
+    async (location) => {
+      const downloadUrl = 'https://indexer.example.com/get/1';
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 301, headers: { location } })).mockResolvedValueOnce(new Response(NZB));
 
-    await expect(
-      new NewznabAdapter().fetchNzbFile(
-        {
-          indexerId: 7,
-          guid: 'release-guid',
-          title: 'Dune',
-          downloadUrl: 'https://indexer.example.com/get/1',
-          sizeBytes: null,
-          seeders: null,
-          leechers: null,
-        },
-        config(),
-      ),
-    ).resolves.toEqual(NZB);
-    expect(new URL(fetchMock.mock.calls[1]![0].toString()).pathname).toBe('/download/final.nzb');
-  });
+      await expect(
+        new NewznabAdapter().fetchNzbFile(
+          {
+            indexerId: 7,
+            guid: 'release-guid',
+            title: 'Dune',
+            downloadUrl,
+            sizeBytes: null,
+            seeders: null,
+            leechers: null,
+          },
+          config(),
+        ),
+      ).resolves.toEqual(NZB);
+      expect(fetchMock.mock.calls.map(([url, init]) => [url, new Headers(init.headers).get('user-agent')])).toEqual([
+        [downloadUrl, 'BookOrbit'],
+        [new URL(location, downloadUrl).href, 'BookOrbit'],
+      ]);
+    },
+  );
 
   it('rejects empty and oversized NZB responses', async () => {
     const release = {

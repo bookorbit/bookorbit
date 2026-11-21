@@ -182,7 +182,7 @@ async function fetchWithRateLimitRetry(
       signal.throwIfAborted();
       response = await safeFetch(
         url,
-        { signal, redirect: 'manual', headers: { Accept: accept } },
+        { signal, redirect: 'manual', headers: { Accept: accept, 'User-Agent': 'BookOrbit' } },
         { allowPrivate: config.allowPrivateAddress, profile: config.networkProfile, pinResolvedAddress: true },
       );
     } catch (error) {
