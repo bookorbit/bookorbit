@@ -593,17 +593,6 @@ export class HardcoverSyncService {
         });
 
         if ((progressPages != null || progressSeconds != null) && hardcoverReadId != null) {
-          await this.updateAdditionalOpenReads(userId, token, {
-            reads,
-            primaryReadId: hardcoverReadId,
-            reservedReadIds: reserved,
-            startedAt: startDate,
-            finishedAt: endDate,
-            progressPages,
-            progressSeconds,
-            editionId: match.hardcoverEditionId ?? undefined,
-          });
-
           this.logger.log(
             `[hardcover.sync_progress] [end] userId=${userId} bookId=${book.bookId} hardcoverBookId=${match.hardcoverBookId} hardcoverReadId=${hardcoverReadId} durationMs=${Date.now() - startedAt} progress=${book.progress} progressPages=${progressPages ?? null} progressSeconds=${progressSeconds ?? null} - progress sent to Hardcover`,
           );
@@ -872,39 +861,6 @@ export class HardcoverSyncService {
       );
       return false;
     }
-  }
-
-  private async updateAdditionalOpenReads(
-    userId: number,
-    token: string,
-    input: {
-      reads: FindUserBookReadsResult['user_book_reads'];
-      primaryReadId: number;
-      reservedReadIds: ReadonlySet<number>;
-      startedAt?: string | null;
-      finishedAt?: string | null;
-      progressPages?: number;
-      progressSeconds?: number;
-      editionId?: number;
-    },
-  ): Promise<void> {
-    const siblingReadIds = input.reads
-      .filter((read) => read.id !== input.primaryReadId && !read.finished_at && !input.reservedReadIds.has(read.id))
-      .map((read) => read.id);
-
-    if (siblingReadIds.length === 0) return;
-
-    await Promise.all(
-      siblingReadIds.map((readId) =>
-        this.updateUserBookRead(userId, token, readId, {
-          ...(input.startedAt ? { started_at: input.startedAt } : {}),
-          ...(input.finishedAt ? { finished_at: input.finishedAt } : {}),
-          ...(input.progressPages != null ? { progress_pages: input.progressPages } : {}),
-          ...(input.progressSeconds != null ? { progress_seconds: input.progressSeconds } : {}),
-          ...(input.editionId != null ? { edition_id: input.editionId } : {}),
-        }).catch(() => undefined),
-      ),
-    );
   }
 
   private hasChanges(book: BookSyncData, state: Awaited<ReturnType<HardcoverRepository['findBookState']>>): boolean {
