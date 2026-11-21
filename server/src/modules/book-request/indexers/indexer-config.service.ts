@@ -259,7 +259,7 @@ export class IndexerConfigService {
       id: row.id,
       adapterType: row.adapterType as IndexerAdapterType,
       seedsBack: this.registry.seedsBack(row.adapterType),
-      applyTrackerSeedGoals: managed ? inheritSeedLimits : row.applyTrackerSeedGoals,
+      applyTrackerSeedGoals: !managed && row.applyTrackerSeedGoals,
       seedRatioGoal: inheritSeedLimits ? row.seedRatioGoal : null,
       seedTimeMinutes: inheritSeedLimits ? row.seedTimeMinutes : null,
     };

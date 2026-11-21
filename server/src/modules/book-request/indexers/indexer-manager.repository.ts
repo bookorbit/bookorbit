@@ -158,7 +158,7 @@ export class IndexerManagerRepository {
               allowPrivateAddress: manager.allowPrivateAddress,
               networkProfile: manager.networkProfile,
               categories: source.categories,
-              applyTrackerSeedGoals: source.protocol !== 'torrent' || manager.inheritSeedLimits,
+              applyTrackerSeedGoals: source.protocol !== 'torrent',
               seedRatioGoal: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedRatioGoal : null,
               seedTimeMinutes: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedTimeMinutes : null,
             })
@@ -180,7 +180,7 @@ export class IndexerManagerRepository {
           baseUrl,
           credentialsEnc: null,
           allowPrivateAddress: manager.allowPrivateAddress,
-          applyTrackerSeedGoals: source.protocol !== 'torrent' || manager.inheritSeedLimits,
+          applyTrackerSeedGoals: source.protocol !== 'torrent',
           seedRatioGoal: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedRatioGoal : null,
           seedTimeMinutes: manager.inheritSeedLimits && source.protocol === 'torrent' ? source.seedTimeMinutes : null,
           categories: source.categories,

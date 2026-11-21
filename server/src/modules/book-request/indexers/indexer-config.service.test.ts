@@ -303,11 +303,11 @@ describe('IndexerConfigService', () => {
       expectedTime: null,
     },
     {
-      name: 'enabled manager with a stale disabled source',
+      name: 'enabled manager with configured limits',
       managerId: 3,
       inheritSeedLimits: true,
       applyTrackerSeedGoals: false,
-      expectedTracker: true,
+      expectedTracker: false,
       expectedRatio: 1,
       expectedTime: 4320,
     },
@@ -381,11 +381,11 @@ describe('IndexerConfigService', () => {
     };
     const { service } = makeService({ repo: { findSeedPolicyById: vi.fn().mockImplementation(() => Promise.resolve({ ...row })) } });
 
-    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: true, seedRatioGoal: 1, seedTimeMinutes: 4320 });
+    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: false, seedRatioGoal: 1, seedTimeMinutes: 4320 });
     row.inheritSeedLimits = false;
     await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: false, seedRatioGoal: null, seedTimeMinutes: null });
     row.inheritSeedLimits = true;
-    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: true, seedRatioGoal: 1, seedTimeMinutes: 4320 });
+    await expect(service.resolveSeedPolicy(9)).resolves.toMatchObject({ applyTrackerSeedGoals: false, seedRatioGoal: 1, seedTimeMinutes: 4320 });
   });
 
   it('assigns a random unused color when a new indexer does not name one', async () => {

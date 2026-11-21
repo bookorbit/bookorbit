@@ -1352,7 +1352,7 @@ describe('Book requests (e2e)', () => {
   });
   describe('managed source seed policy', () => {
     it(
-      'honors the current manager toggle over unsynchronized legacy source rows',
+      'inherits only configured limits even when legacy source rows allow tracker fallback',
       async () => {
         const [manager] = await ctx.db
           .insert(schema.requestIndexerManagers)
@@ -1381,7 +1381,7 @@ describe('Book requests (e2e)', () => {
             .returning();
           const service = ctx.app.get(IndexerConfigService);
           await expect(service.resolveSeedPolicy(source.id)).resolves.toMatchObject({
-            applyTrackerSeedGoals: true,
+            applyTrackerSeedGoals: false,
             seedRatioGoal: 1,
             seedTimeMinutes: 4320,
           });
@@ -1401,12 +1401,19 @@ describe('Book requests (e2e)', () => {
           const [unchanged] = await ctx.db.select().from(schema.requestIndexers).where(eq(schema.requestIndexers.id, source.id));
           expect(unchanged).toMatchObject({ applyTrackerSeedGoals: true, seedRatioGoal: 1, seedTimeMinutes: 4320 });
 
-          await ctx.db.update(schema.requestIndexers).set({ applyTrackerSeedGoals: false }).where(eq(schema.requestIndexers.id, source.id));
           await ctx.db.update(schema.requestIndexerManagers).set({ inheritSeedLimits: true }).where(eq(schema.requestIndexerManagers.id, manager.id));
+          await ctx.db.update(schema.requestIndexers).set({ seedRatioGoal: null }).where(eq(schema.requestIndexers.id, source.id));
           await expect(service.resolveSeedPolicy(source.id)).resolves.toMatchObject({
-            applyTrackerSeedGoals: true,
-            seedRatioGoal: 1,
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: null,
             seedTimeMinutes: 4320,
+          });
+
+          await ctx.db.update(schema.requestIndexers).set({ seedTimeMinutes: null }).where(eq(schema.requestIndexers.id, source.id));
+          await expect(service.resolveSeedPolicy(source.id)).resolves.toMatchObject({
+            applyTrackerSeedGoals: false,
+            seedRatioGoal: null,
+            seedTimeMinutes: null,
           });
         } finally {
           await ctx.db.delete(schema.requestIndexerManagers).where(eq(schema.requestIndexerManagers.id, manager.id));

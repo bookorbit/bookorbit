@@ -69,7 +69,7 @@ describe('IndexerManagerRepository', () => {
   });
   it.each([
     { protocol: 'torrent' as const, inheritSeedLimits: false, expectedTracker: false, expectedRatio: null, expectedTime: null },
-    { protocol: 'torrent' as const, inheritSeedLimits: true, expectedTracker: true, expectedRatio: 1, expectedTime: 4320 },
+    { protocol: 'torrent' as const, inheritSeedLimits: true, expectedTracker: false, expectedRatio: 1, expectedTime: 4320 },
     { protocol: 'usenet' as const, inheritSeedLimits: false, expectedTracker: true, expectedRatio: null, expectedTime: null },
     { protocol: 'usenet' as const, inheritSeedLimits: true, expectedTracker: true, expectedRatio: null, expectedTime: null },
   ])(
