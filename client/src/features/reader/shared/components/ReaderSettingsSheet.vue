@@ -31,7 +31,7 @@ function closeSheet() {
     <SheetContent
       side="bottom"
       hide-close
-      class="max-h-[85dvh] gap-0 rounded-t-2xl border-border bg-card p-0"
+      class="h-[85dvh] max-h-[85dvh] gap-0 overflow-hidden rounded-t-2xl border-border bg-card p-0 pb-[env(safe-area-inset-bottom,0px)] pl-[env(safe-area-inset-left,0px)] pr-[env(safe-area-inset-right,0px)]"
       :aria-label="t('reader.settings.ariaLabel')"
     >
       <div class="relative flex h-11 shrink-0 items-center justify-center">
