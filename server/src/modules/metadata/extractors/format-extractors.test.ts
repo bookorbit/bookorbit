@@ -425,6 +425,8 @@ describe('metadata format extractors', () => {
       expect.objectContaining({
         title: 'Saga Vol 1',
         publishedYear: 2014,
+        isbn10: null,
+        isbn13: null,
         authors: [],
         genres: [],
         tags: [],
@@ -437,6 +439,8 @@ describe('metadata format extractors', () => {
     mockExtractCbrMetadata.mockResolvedValue({
       title: 'Batman',
       description: 'Issue details',
+      isbn10: '1566199093',
+      isbn13: '9781566199094',
       publisher: 'DC',
       publishedYear: 2020,
       language: 'en',
@@ -454,6 +458,8 @@ describe('metadata format extractors', () => {
     await expect(new ComicFormatExtractor('cbr').extract('/books/batman.cbr')).resolves.toEqual(
       expect.objectContaining({
         title: 'Batman',
+        isbn10: '1566199093',
+        isbn13: '9781566199094',
         genres: ['Comics'],
         tags: ['Superhero'],
         ranobedbId: 'comic-ranobe',

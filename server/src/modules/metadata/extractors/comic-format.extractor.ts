@@ -34,6 +34,8 @@ export class ComicFormatExtractor implements FormatExtractor {
     return {
       title: comicMetadata?.title ?? fb.title,
       description: comicMetadata?.description ?? null,
+      isbn10: comicMetadata?.isbn10 ?? null,
+      isbn13: comicMetadata?.isbn13 ?? null,
       publisher: comicMetadata?.publisher ?? null,
       publishedDate: comicMetadata?.publishedDate ?? null,
       publishedYear: comicMetadata?.publishedYear ?? fb.publishedYear ?? null,
