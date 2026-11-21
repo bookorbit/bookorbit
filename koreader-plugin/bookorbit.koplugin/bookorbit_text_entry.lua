@@ -180,7 +180,7 @@ end
 -- Rows under a search field: recent searches, or what pressing Search does.
 -- Taps come back as { kind = "recent", index }, "clear-recents" and "submit".
 function TextEntry.searchBelow(recents)
-    local _ = require("gettext")
+    local _ = require("bookorbit_gettext")
     return function(page, w, max_h, has_text)
         local iw = MenuUI.rowsIn(w)
         if has_text then

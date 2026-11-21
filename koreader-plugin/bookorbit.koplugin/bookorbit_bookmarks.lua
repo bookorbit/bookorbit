@@ -24,7 +24,7 @@ local DocSettings = require("docsettings")
 local Event = require("ui/event")
 local UIManager = require("ui/uimanager")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local logger = require("logger")
 local md5 = require("ffi/sha2").md5
 

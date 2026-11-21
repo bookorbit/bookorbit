@@ -19,7 +19,7 @@ Stored under catalog_board, keyed by column count plus "l" in landscape:
     custom = { ["4"] = { pages = { { items = {...} }, ... } }, ["4l"] = ... } }
 ]]
 
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardColour = require("bookorbit_board_colour")
 

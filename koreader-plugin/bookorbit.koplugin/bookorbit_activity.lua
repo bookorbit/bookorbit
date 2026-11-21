@@ -6,7 +6,7 @@ newest event within ten minutes (a periodic progress push, a retry) replaces
 it instead of filling the list, so the page shows what changed, not a log.
 ]]
 
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local Activity = {}
