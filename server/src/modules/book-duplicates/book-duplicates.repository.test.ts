@@ -244,25 +244,39 @@ describe('BookDuplicatesRepository', () => {
     expect(db.update).toHaveBeenCalledTimes(1);
   });
 
-  it('finalizes connected components and returns the persisted group count', async () => {
+  it('finalizes groups from the guarded pairs and drops a pair the grouping refused', async () => {
     const db = mockDb({
-      selectResults: [[{ count: 2 }]],
+      selectResults: [[{ count: 1 }]],
       executeResults: [
         { rowCount: 0 },
-        { rowCount: 0 },
-        { rowCount: 0 },
-        { rowCount: 1 },
-        { rowCount: 0 },
-        { rowCount: 0 },
-        { rowCount: 0 },
-        { rowCount: 0 },
+        {
+          rows: [
+            { book_id_a: 1, book_id_b: 2, reasons: ['exact_metadata', 'fuzzy_metadata'], title_similarity: 1 },
+            { book_id_a: 1, book_id_b: 3, reasons: ['fuzzy_metadata'], title_similarity: 0.91 },
+          ],
+          rowCount: 2,
+        },
+        {
+          rows: [
+            { book_id: 2, series_id: 5, series_index: '1' },
+            { book_id: 3, series_id: 5, series_index: '2' },
+          ],
+          rowCount: 2,
+        },
       ],
     });
     const repo = new BookDuplicatesRepository(db as never);
 
-    await expect(repo.finalizeGroups(9)).resolves.toBe(2);
+    await expect(repo.finalizeGroups(9)).resolves.toBe(1);
     expect(db.transaction).toHaveBeenCalledTimes(1);
-    expect(renderSql((db.execute as ReturnType<typeof vi.fn>).mock.calls[0]![0]).sql).toBe('SET LOCAL statement_timeout = 600000');
+    const queries = (db.execute as ReturnType<typeof vi.fn>).mock.calls.map(([query]) => renderSql(query));
+    expect(queries[0]!.sql).toBe('SET LOCAL statement_timeout = 600000');
+    const components = queries.find((query) => query.sql.includes('INSERT INTO tmp_book_duplicate_components'));
+    expect(components!.params).toEqual([
+      [1, 2],
+      [1, 1],
+    ]);
+    expect(queries.some((query) => query.sql.replace(/\s+/g, ' ').includes('DELETE FROM "book_duplicate_pairs" pair'))).toBe(true);
   });
 
   it('paginates only groups with at least two currently accessible members', async () => {

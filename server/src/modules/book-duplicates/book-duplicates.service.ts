@@ -334,6 +334,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       await this.insertOtherFormatKeys(scanId, scan.libraryIds, user);
       await this.refreshScanKeyStatistics(scanId, user.id);
       await this.repo.createOtherFormatPairs(scanId, scan.similarityPercent);
+      const seriesConflictPairs = await this.repo.deleteSeriesConflictPairs(scanId);
       await this.updateProgress(scanId, user.id, totalBooks, 85);
       const dismissedPairs = await this.repo.deleteDismissedPairs(scanId, user.id);
       await this.updateProgress(scanId, user.id, totalBooks, 88);
@@ -354,7 +355,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       this.changed(user.id, true);
 
       this.logger.log(
-        `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} otherFormatPairs=${totalOtherFormatPairs} dismissedPairs=${dismissedPairs} reclaimableBytes=${totals.totalReclaimableBytes} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
+        `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} otherFormatPairs=${totalOtherFormatPairs} seriesConflictPairs=${seriesConflictPairs} dismissedPairs=${dismissedPairs} reclaimableBytes=${totals.totalReclaimableBytes} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
       );
     } catch (error) {
       await this.repo.updateScan(scanId, { status: 'failed', errorCode: 'scan_failed', completedAt: new Date() }).catch(() => undefined);

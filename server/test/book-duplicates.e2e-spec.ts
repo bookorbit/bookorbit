@@ -59,12 +59,12 @@ describe('Duplicate books (e2e)', () => {
     }
   }
 
-  async function scan(token: string, libraryId: number): Promise<BookDuplicateScan> {
+  async function scan(token: string, libraryId: number, similarityPercent = 95): Promise<BookDuplicateScan> {
     const created = await ctx.app.inject({
       method: 'POST',
       url: '/api/v1/book-duplicates/scans',
       headers: authHeader(token),
-      payload: { libraryId, similarityPercent: 95 },
+      payload: { libraryId, similarityPercent },
     });
     expect(created.statusCode).toBe(201);
     const scanId = (created.json() as BookDuplicateScan).id;
@@ -439,6 +439,103 @@ describe('Duplicate books (e2e)', () => {
       expect(files.map((file) => file.id).sort((a, b) => a - b)).toEqual([kept.bookFileId, near.bookFileId].sort((a, b) => a - b));
       expect(files.some((file) => file.id === twin.bookFileId)).toBe(false);
       expect(await exists(twin.absolutePath)).toBe(false);
+    },
+    SCENARIO_TIMEOUT_MS,
+  );
+
+  it(
+    'never pairs or groups different positions of one series, and keeps copies of one position together',
+    async () => {
+      const library = await createLibraryWithFolder(ctx, { name: `dupes-series-${randomUUID()}`, mode: 'book_per_folder' });
+      const tag = randomUUID().slice(0, 8);
+      const books = {
+        first: { path: join('first', 'book.epub'), title: "Returner's Defiance", series: 'returner', index: '1' },
+        second: { path: join('second', 'book.epub'), title: "Returner's Defiance 2", series: 'returner', index: '2' },
+        unseried: { path: join('unseried', 'book.epub'), title: "Returner's Defiance" },
+        audioTwo: {
+          path: join('audio-two', 'book.m4b'),
+          title: 'Towers of Acalia',
+          subtitle: 'The Reincarnated Core Volume II',
+          series: 'towers',
+          index: '2',
+        },
+        audioThree: {
+          path: join('audio-three', 'book.m4b'),
+          title: 'Towers of Acalia',
+          subtitle: 'The Reincarnated Core Volume III',
+          series: 'towers',
+          index: '3',
+        },
+        ebookSeven: {
+          path: join('ebook-seven', 'book.epub'),
+          title: 'Towers of Acalia: The Reincarnated Core Volume VII',
+          series: 'towers',
+          index: '7',
+        },
+        copyA: { path: join('copy-a', 'book.epub'), title: 'Dungeon Crawler Carl', series: 'carl', index: '1' },
+        copyB: { path: join('copy-b', 'book.epub'), title: 'Dungeon Crawler Carl', series: 'carl', index: '1.0' },
+        hashA: { path: join('hash-a', 'book.epub'), title: 'Same File', series: 'hash', index: '1' },
+        hashB: { path: join('hash-b', 'book.epub'), title: 'Same File', series: 'hash', index: '2' },
+      } satisfies Record<string, { path: string; title: string; subtitle?: string; series?: string; index?: string }>;
+      for (const [key, book] of Object.entries(books)) {
+        if (key === 'hashB') continue;
+        if (book.path.endsWith('.m4b'))
+          await createM4bFixture(library.folderPath, book.path, { title: book.title, durationSeconds: key === 'audioTwo' ? 1 : 2 });
+        else await createEpubFixture(library.folderPath, book.path, { title: book.title });
+      }
+      await mkdir(dirname(join(library.folderPath, books.hashB.path)), { recursive: true });
+      await copyFile(join(library.folderPath, books.hashA.path), join(library.folderPath, books.hashB.path));
+      await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+
+      const [author] = await ctx.db
+        .insert(schema.authors)
+        .values({ name: `Series Author ${tag}` })
+        .returning({ id: schema.authors.id });
+      const seriesIds = new Map<string, number>();
+      const ids = {} as Record<keyof typeof books, number>;
+      for (const [key, book] of Object.entries(books) as [keyof typeof books, (typeof books)[keyof typeof books]][]) {
+        const bookId = (await locateBookFileByRelPath(ctx, library.libraryId, book.path)).bookId;
+        ids[key] = bookId;
+        await ctx.db.delete(schema.bookAuthors).where(eq(schema.bookAuthors.bookId, bookId));
+        await ctx.db.insert(schema.bookAuthors).values({ bookId, authorId: author!.id });
+        let seriesId: number | null = null;
+        if ('series' in book) {
+          seriesId = seriesIds.get(book.series) ?? null;
+          if (seriesId === null) {
+            const [row] = await ctx.db
+              .insert(schema.bookSeries)
+              .values({ name: book.series, normalizedName: `${book.series} ${tag}` })
+              .returning({ id: schema.bookSeries.id });
+            seriesId = row!.id;
+            seriesIds.set(book.series, seriesId);
+          }
+          await ctx.db.insert(schema.bookSeriesMemberships).values({ bookId, seriesId, seriesIndex: book.index });
+        }
+        await ctx.db
+          .update(schema.bookMetadata)
+          .set({
+            title: book.title,
+            subtitle: 'subtitle' in book ? book.subtitle : null,
+            seriesId,
+            seriesIndex: 'index' in book ? book.index : null,
+          })
+          .where(eq(schema.bookMetadata.bookId, bookId));
+      }
+
+      const completed = await scan(ctx.adminToken, library.libraryId, 85);
+      const memberSets = (await groups(ctx.adminToken, completed.id, 'duplicate')).map((group) =>
+        group.books.map((book) => book.id).sort((a, b) => a - b),
+      );
+      const sorted = (...bookIds: number[]) => bookIds.sort((a, b) => a - b);
+      expect(memberSets).toHaveLength(3);
+      // The series-less copy matches both volumes; it joins the one it matches exactly and never bridges the two.
+      expect(memberSets).toContainEqual(sorted(ids.first, ids.unseried));
+      expect(memberSets).toContainEqual(sorted(ids.copyA, ids.copyB));
+      expect(memberSets).toContainEqual(sorted(ids.hashA, ids.hashB));
+      expect(memberSets.flat()).not.toContain(ids.second);
+      expect(memberSets.flat()).not.toContain(ids.audioTwo);
+      expect(memberSets.flat()).not.toContain(ids.audioThree);
+      expect(await groups(ctx.adminToken, completed.id, 'other_format')).toEqual([]);
     },
     SCENARIO_TIMEOUT_MS,
   );

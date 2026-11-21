@@ -9,6 +9,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
 import { afterPosition, keysetOrder, microseconds, type JobKey, type JobPosition, type KeysetColumns } from '../jobs/job-keyset';
+import { groupDuplicatePairs } from './book-duplicate-grouping';
 import { crossFormatTitleSql, mediaFamilySql } from './book-duplicate-normalize';
 import {
   bookDuplicateDismissals,
@@ -20,6 +21,7 @@ import {
   bookFiles,
   bookMetadata,
   books,
+  bookSeriesMemberships,
   libraries,
   users,
 } from '../../db/schema';
@@ -437,41 +439,77 @@ export class BookDuplicatesRepository {
     );
   }
 
+  /**
+   * Removes pairs whose books hold different positions in one series: they are different volumes,
+   * not copies, whatever their titles, ISBNs or work ids say. A matching file hash is the one exception.
+   */
+  async deleteSeriesConflictPairs(scanId: number): Promise<number> {
+    const result = await this.withScanBudget((db) =>
+      db.execute(sql`
+      DELETE FROM ${bookDuplicatePairs} pair
+      WHERE pair.scan_id = ${scanId}
+        AND NOT ('file_hash' = ANY(pair.reasons))
+        AND EXISTS (
+          SELECT 1
+          FROM ${bookSeriesMemberships} membership_a
+          JOIN ${bookSeriesMemberships} membership_b ON membership_b.series_id = membership_a.series_id
+          WHERE membership_a.book_id = pair.book_id_a
+            AND membership_b.book_id = pair.book_id_b
+            AND membership_a.series_index IS NOT NULL
+            AND membership_b.series_index IS NOT NULL
+            AND membership_a.series_index::numeric <> membership_b.series_index::numeric
+        )
+    `),
+    );
+    return result.rowCount ?? 0;
+  }
+
   async finalizeGroups(scanId: number): Promise<number> {
     return this.db.transaction(async (tx) => {
       await tx.execute(SET_SCAN_STATEMENT_TIMEOUT);
+      const pairs = await tx.execute<{ book_id_a: number; book_id_b: number; reasons: string[]; title_similarity: number | null }>(sql`
+        SELECT book_id_a, book_id_b, reasons, title_similarity
+        FROM ${bookDuplicatePairs}
+        WHERE scan_id = ${scanId} AND kind = 'duplicate'
+      `);
+      const positions = await tx.execute<{ book_id: number; series_id: number; series_index: string | null }>(sql`
+        SELECT membership.book_id, membership.series_id, membership.series_index
+        FROM ${bookSeriesMemberships} membership
+        WHERE membership.series_index IS NOT NULL
+          AND membership.book_id IN (
+            SELECT book_id_a FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId} AND kind = 'duplicate'
+            UNION
+            SELECT book_id_b FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId} AND kind = 'duplicate'
+          )
+      `);
+      const roots = groupDuplicatePairs(
+        pairs.rows.map((row) => ({
+          bookIdA: row.book_id_a,
+          bookIdB: row.book_id_b,
+          reasons: row.reasons,
+          titleSimilarity: row.title_similarity === null ? null : Number(row.title_similarity),
+        })),
+        positions.rows.map((row) => ({ bookId: row.book_id, seriesId: row.series_id, seriesIndex: row.series_index })),
+      );
+
       await tx.execute(sql`CREATE TEMP TABLE tmp_book_duplicate_components (book_id integer PRIMARY KEY, root_id integer NOT NULL) ON COMMIT DROP`);
       await tx.execute(sql`
         INSERT INTO tmp_book_duplicate_components (book_id, root_id)
-        SELECT book_id, book_id
-        FROM (
-          SELECT book_id_a AS book_id FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId} AND kind = 'duplicate'
-          UNION
-          SELECT book_id_b AS book_id FROM ${bookDuplicatePairs} WHERE scan_id = ${scanId} AND kind = 'duplicate'
-        ) endpoints
+        SELECT * FROM unnest(${sql.param([...roots.keys()])}::int[], ${sql.param([...roots.values()])}::int[])
       `);
-
-      for (;;) {
-        const result = await tx.execute(sql`
-          WITH neighbor_roots AS (
-            SELECT component.book_id, min(neighbor.root_id) AS new_root
-            FROM tmp_book_duplicate_components component
-            JOIN ${bookDuplicatePairs} pair
-              ON pair.scan_id = ${scanId}
-              AND pair.kind = 'duplicate'
-              AND (pair.book_id_a = component.book_id OR pair.book_id_b = component.book_id)
-            JOIN tmp_book_duplicate_components neighbor
-              ON neighbor.book_id = CASE WHEN pair.book_id_a = component.book_id THEN pair.book_id_b ELSE pair.book_id_a END
-            GROUP BY component.book_id
+      // A pair the grouping refused to join, such as a series-less copy matching two volumes, would
+      // otherwise land in one endpoint's group without the other book.
+      await tx.execute(sql`
+        DELETE FROM ${bookDuplicatePairs} pair
+        WHERE pair.scan_id = ${scanId}
+          AND pair.kind = 'duplicate'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM tmp_book_duplicate_components component_a
+            JOIN tmp_book_duplicate_components component_b ON component_b.root_id = component_a.root_id
+            WHERE component_a.book_id = pair.book_id_a AND component_b.book_id = pair.book_id_b
           )
-          UPDATE tmp_book_duplicate_components component
-          SET root_id = neighbor_roots.new_root
-          FROM neighbor_roots
-          WHERE component.book_id = neighbor_roots.book_id
-            AND neighbor_roots.new_root < component.root_id
-        `);
-        if ((result.rowCount ?? 0) === 0) break;
-      }
+      `);
 
       await tx.execute(sql`
         WITH member_counts AS (

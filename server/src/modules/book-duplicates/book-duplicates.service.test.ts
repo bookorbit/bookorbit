@@ -55,6 +55,7 @@ function setup(accessibleLibraryIds = [2]) {
     insertScanKeys: vi.fn().mockResolvedValue(undefined),
     analyzeScanKeys: vi.fn().mockResolvedValue(undefined),
     createOtherFormatPairs: vi.fn().mockResolvedValue(undefined),
+    deleteSeriesConflictPairs: vi.fn().mockResolvedValue(0),
     finalizeOtherFormatGroups: vi.fn().mockResolvedValue(0),
     insertDismissals: vi.fn().mockResolvedValue(undefined),
     deleteDismissal: vi.fn().mockResolvedValue(1),
@@ -359,6 +360,8 @@ describe('BookDuplicatesService', () => {
     expect(repo.createExactPairs).toHaveBeenCalledWith(11);
     expect(repo.createFuzzyPairs).toHaveBeenCalledWith(11, [2], user, 85);
     expect(repo.createOtherFormatPairs).toHaveBeenCalledWith(11, 85);
+    expect(repo.deleteSeriesConflictPairs).toHaveBeenCalledWith(11);
+    expect(repo.deleteSeriesConflictPairs.mock.invocationCallOrder[0]).toBeLessThan(repo.finalizeGroups.mock.invocationCallOrder[0]!);
     expect(repo.finalizeOtherFormatGroups).toHaveBeenCalledWith(11);
     expect(repo.deleteDismissedPairs).toHaveBeenCalledWith(11, 7);
     expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed', totalExtraCopies: 0, totalReclaimableBytes: 0 }));
