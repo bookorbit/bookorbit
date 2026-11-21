@@ -1814,6 +1814,87 @@ describe('file identity resolution', () => {
     expect(repo.createBookFile).toHaveBeenCalledWith(expect.objectContaining({ absolutePath: newFile.absolutePath, ino: newFile.ino }));
   });
 
+  describe('a file renamed in place whose book kept its old key', () => {
+    const perFileSettings = {
+      allowedFormats: [],
+      formatPriority: DEFAULT_FORMAT_PRIORITY,
+      metadataPrecedence: ['embedded'],
+      excludePatterns: [],
+      organizationMode: 'book_per_file',
+    };
+
+    function staleKeyRepo(oldKey: string, newPath: string, settings?: typeof perFileSettings) {
+      const recorded = makeBookFile({ id: 21, bookId: 10, absolutePath: newPath, relPath: newPath.slice('/library/'.length), ino: 5001n });
+      return makeRepo({
+        ...(settings ? { findLibrarySettings: vi.fn().mockResolvedValue(settings) } : {}),
+        findBooksByLibraryFolder: vi.fn().mockResolvedValue([{ id: 10, libraryId: 1, libraryFolderId: 1, folderPath: oldKey, status: 'present' }]),
+        findBookFilesByLibraryFolder: vi.fn().mockResolvedValue([recorded]),
+      });
+    }
+
+    it('re-keys the book in a book-per-file library instead of importing the file again', async () => {
+      const newPath = '/library/Author/New Name.epub';
+      const repo = staleKeyRepo('/library/Author/Old Name.epub', newPath, perFileSettings);
+      mockFindLooseCandidates.mockResolvedValue({
+        candidates: [makeCandidate(newPath, [makeFileStat({ absolutePath: newPath, relPath: 'Author/New Name.epub', ino: 5001n })])],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(),
+        dirMtimes: new Map(),
+      });
+      mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+
+      const done = awaitScan(repo);
+      const { service } = makeService(repo);
+      await service.startScan(1, 'manual');
+      await done;
+
+      expect(repo.updateBookFolderPath).toHaveBeenCalledWith(10, newPath);
+      expect(repo.createBook).not.toHaveBeenCalled();
+      expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
+    });
+
+    it('re-keys a loose book at the root of a book-per-folder library', async () => {
+      const newPath = '/library/New Name.epub';
+      const repo = staleKeyRepo('/library/Old Name.epub', newPath);
+      mockFindCandidates.mockResolvedValue({
+        candidates: [makeCandidate(newPath, [makeFileStat({ absolutePath: newPath, relPath: 'New Name.epub', ino: 5001n })])],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(),
+        dirMtimes: new Map(),
+      });
+      mockStat.mockRejectedValue(Object.assign(new Error('not found'), { code: 'ENOENT' }));
+
+      const done = awaitScan(repo);
+      const { service } = makeService(repo);
+      await service.startScan(1, 'manual');
+      await done;
+
+      expect(repo.updateBookFolderPath).toHaveBeenCalledWith(10, newPath);
+      expect(repo.createBook).not.toHaveBeenCalled();
+      expect(repo.markBooksAsMissing).not.toHaveBeenCalled();
+    });
+
+    it('leaves the book alone while its key still exists on disk', async () => {
+      const newPath = '/library/Author/New Name.epub';
+      const repo = staleKeyRepo('/library/Author/Old Name.epub', newPath, perFileSettings);
+      mockFindLooseCandidates.mockResolvedValue({
+        candidates: [makeCandidate(newPath, [makeFileStat({ absolutePath: newPath, relPath: 'Author/New Name.epub', ino: 5001n })])],
+        skippedDirs: new Set(),
+        unchangedDirs: new Set(),
+        dirMtimes: new Map(),
+      });
+      mockStat.mockResolvedValue({ isFile: () => true } as any);
+
+      const done = awaitScan(repo);
+      const { service } = makeService(repo);
+      await service.startScan(1, 'manual');
+      await done;
+
+      expect(repo.updateBookFolderPath).not.toHaveBeenCalled();
+      expect(repo.createBook).toHaveBeenCalledWith(expect.objectContaining({ folderPath: newPath }));
+    });
+  });
+
   it('gracefully skips a file that disappears during fingerprinting (ENOENT) — scan still completes', async () => {
     const fileStat = makeFileStat({ ino: 7777n }); // different ino so inode match fails
     mockFindCandidates.mockResolvedValue({

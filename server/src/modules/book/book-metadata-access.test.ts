@@ -85,6 +85,7 @@ async function createContext(role: AccessLevel | null = 'viewer') {
     findProgress: vi.fn().mockResolvedValue(null),
     upsertProgress: vi.fn(),
     findFileById: vi.fn().mockResolvedValue({ id: 10, bookId: 1, libraryId: 7 }),
+    moveBookFilePath: vi.fn(),
     findProgressByBook: vi.fn().mockResolvedValue(0),
   };
   const metadata = { replaceAuthors: vi.fn(), replaceTags: vi.fn(), replaceGenres: vi.fn(), downloadAndSaveCover: vi.fn() };
@@ -188,6 +189,7 @@ function expectNoWrites(ctx: Context) {
     ctx.bookRepo.updateMetadataFields,
     ctx.bookRepo.updateAddedAt,
     ctx.bookRepo.bulkUpdateMetadataFields,
+    ctx.bookRepo.moveBookFilePath,
     ctx.metadata.replaceAuthors,
     ctx.metadata.replaceTags,
     ctx.metadata.replaceGenres,

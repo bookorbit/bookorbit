@@ -2,11 +2,13 @@ import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt
 import { BadRequestException, ConflictException, ForbiddenException, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import type { MockedFunction } from 'vitest';
 import { rm, stat, rename } from 'fs/promises';
+import { mkdtempSync, rmSync, writeFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
+import { FileLockService, bookOperationLockKey } from '../../common/services/file-lock.service';
 import { FileWatcherService, WATCHER_DEBOUNCE_MS } from '../scanner/file-watcher.service';
 import {
   AUDIO_BOOK_FILE_WRITE_FIELDS,
@@ -160,6 +162,9 @@ function makeService(
     findKoboSyncCollectionNamesForBook: vi.fn(),
     findFileById: vi.fn(),
     updateBookFile: vi.fn().mockResolvedValue(undefined),
+    isFilePathTaken: vi.fn().mockResolvedValue(false),
+    findBookIdAtFolderPath: vi.fn().mockResolvedValue(null),
+    moveBookFilePath: vi.fn().mockResolvedValue(undefined),
     findAudioTimeline: vi.fn().mockResolvedValue(null),
     saveAudioTimeline: vi.fn().mockResolvedValue(undefined),
     updateBookPrimaryFile: vi.fn().mockResolvedValue(undefined),
@@ -327,6 +332,7 @@ function makeService(
 
   bookRepo.withTransaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) => callback({}));
   const selfWriteRegistry = new SelfWriteRegistry();
+  const fileLocks = new FileLockService();
   const readingEvents = new ReadingAttemptEventsService();
 
   const service = new BookService(
@@ -346,6 +352,7 @@ function makeService(
     (overrides.bookMetadataLockService ?? bookMetadataLockService) as never,
     coverStore as never,
     selfWriteRegistry,
+    fileLocks,
     embedder as never,
     fileWriteService as never,
     fileRenameService as never,
@@ -384,6 +391,7 @@ function makeService(
     bookMetadataLockService,
     coverStore,
     selfWriteRegistry,
+    fileLocks,
   };
 }
 
@@ -7020,6 +7028,7 @@ describe('BookService', () => {
         bookMetadataLockService as never,
         coverStore as never,
         selfWriteRegistry,
+        new FileLockService(),
         embedder as never,
         null as never,
         fileRenameService as never,
@@ -7074,6 +7083,7 @@ describe('BookService', () => {
         bookMetadataLockService as never,
         coverStore as never,
         selfWriteRegistry,
+        new FileLockService(),
         embedder as never,
         fileWriteService as never,
         null as never,
@@ -7088,87 +7098,204 @@ describe('BookService', () => {
   });
 
   describe('renameFile', () => {
-    it('renames file on disk and updates db', async () => {
-      const { service, bookRepo, libraryService } = makeService();
-      const user = makeUser({ id: 1 });
-      const fileId = 100;
-      const file = {
-        absolutePath: '/library/Author/old.epub',
+    const user = makeUser({ id: 1 });
+    const oldPath = '/library/Author/old.epub';
+    const newPath = '/library/Author/new.epub';
+
+    function fileRow(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 100,
+        absolutePath: oldPath,
         relPath: 'Author/old.epub',
         libraryFolderPath: '/library',
-        filename: 'old.epub',
         format: 'epub',
         role: 'content',
         bookId: 10,
         libraryId: 1,
+        ...overrides,
       };
+    }
 
-      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
-      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
-
+    function setup(bookFolderPath: string, file = fileRow()) {
+      const ctx = makeService();
+      ctx.bookRepo.findFileById = vi.fn().mockResolvedValue(file);
+      ctx.bookRepo.findBookBase = vi.fn().mockResolvedValue({ id: 10, folderPath: bookFolderPath });
       vi.mocked(rename).mockResolvedValue(undefined);
-      bookRepo.updateBookFile = vi.fn().mockResolvedValue(undefined);
+      return ctx;
+    }
 
-      await service.renameFile(fileId, { filename: 'new.epub' }, user);
+    it('renames the file and moves its record, leaving a book keyed by its folder alone', async () => {
+      const { service, bookRepo } = setup('/library/Author');
 
-      expect(rename).toHaveBeenCalledWith('/library/Author/old.epub', '/library/Author/new.epub');
-      expect(bookRepo.updateBookFile).toHaveBeenCalledWith(fileId, {
-        absolutePath: '/library/Author/new.epub',
-        relPath: 'Author/new.epub',
+      await service.renameFile(100, { filename: 'new.epub' }, user);
+
+      expect(bookRepo.moveBookFilePath).toHaveBeenCalledTimes(1);
+      expect(bookRepo.moveBookFilePath).toHaveBeenCalledWith(100, { absolutePath: newPath, relPath: 'Author/new.epub' }, null);
+      expect(rename).toHaveBeenCalledWith(oldPath, newPath);
+      expect(bookRepo.findBookIdAtFolderPath).not.toHaveBeenCalled();
+    });
+
+    it('moves the book key with the file when the book is filed under that file', async () => {
+      const { service, bookRepo } = setup(oldPath);
+
+      await service.renameFile(100, { filename: 'new.epub' }, user);
+
+      expect(bookRepo.findBookIdAtFolderPath).toHaveBeenCalledWith(1, newPath);
+      expect(bookRepo.moveBookFilePath).toHaveBeenCalledWith(
+        100,
+        { absolutePath: newPath, relPath: 'Author/new.epub' },
+        { bookId: 10, folderPath: newPath },
+      );
+      expect(rename).toHaveBeenCalledWith(oldPath, newPath);
+      expect(bookRepo.moveBookFilePath.mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(rename).mock.invocationCallOrder[0]);
+    });
+
+    it('holds watcher events for both paths until the rename has finished', async () => {
+      const { service, selfWriteRegistry } = setup(oldPath);
+      const suppressedDuringRename: boolean[] = [];
+      vi.mocked(rename).mockImplementationOnce(() => {
+        suppressedDuringRename.push(selfWriteRegistry.isSuppressed(oldPath), selfWriteRegistry.isSuppressed(newPath));
+        return Promise.resolve();
       });
+
+      await service.renameFile(100, { filename: 'new.epub' }, user);
+
+      expect(suppressedDuringRename).toEqual([true, true]);
+      expect(selfWriteRegistry.isSuppressed(oldPath)).toBe(false);
+      expect(selfWriteRegistry.isSuppressed(newPath)).toBe(false);
+    });
+
+    it('refuses a name another file record already uses, before touching anything', async () => {
+      const { service, bookRepo } = setup(oldPath);
+      bookRepo.isFilePathTaken.mockResolvedValue(true);
+
+      await expect(service.renameFile(100, { filename: 'new.epub' }, user)).rejects.toThrow(ConflictException);
+
+      expect(bookRepo.isFilePathTaken).toHaveBeenCalledWith(newPath);
+      expect(bookRepo.moveBookFilePath).not.toHaveBeenCalled();
+      expect(rename).not.toHaveBeenCalled();
+    });
+
+    it('refuses a name another book is already filed under', async () => {
+      const { service, bookRepo } = setup(oldPath);
+      bookRepo.findBookIdAtFolderPath.mockResolvedValue(11);
+
+      await expect(service.renameFile(100, { filename: 'new.epub' }, user)).rejects.toThrow(ConflictException);
+
+      expect(bookRepo.moveBookFilePath).not.toHaveBeenCalled();
+      expect(rename).not.toHaveBeenCalled();
+    });
+
+    it('refuses to replace a file that already exists on disk', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'bo-rename-file-'));
+      try {
+        writeFileSync(join(dir, 'old.epub'), 'old');
+        writeFileSync(join(dir, 'taken.epub'), 'someone else');
+        const file = fileRow({ absolutePath: join(dir, 'old.epub'), relPath: 'old.epub', libraryFolderPath: dir });
+        const { service, bookRepo } = setup(join(dir, 'old.epub'), file);
+
+        await expect(service.renameFile(100, { filename: 'taken.epub' }, user)).rejects.toThrow(ConflictException);
+
+        expect(bookRepo.moveBookFilePath).not.toHaveBeenCalled();
+        expect(rename).not.toHaveBeenCalled();
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('allows a rename that only changes letter case', async () => {
+      const dir = mkdtempSync(join(tmpdir(), 'bo-rename-file-'));
+      try {
+        writeFileSync(join(dir, 'old.epub'), 'old');
+        const file = fileRow({ absolutePath: join(dir, 'old.epub'), relPath: 'old.epub', libraryFolderPath: dir });
+        const { service, bookRepo } = setup(join(dir, 'old.epub'), file);
+
+        await service.renameFile(100, { filename: 'Old.epub' }, user);
+
+        expect(bookRepo.moveBookFilePath).toHaveBeenCalledWith(
+          100,
+          { absolutePath: join(dir, 'Old.epub'), relPath: 'Old.epub' },
+          { bookId: 10, folderPath: join(dir, 'Old.epub') },
+        );
+        expect(rename).toHaveBeenCalledWith(join(dir, 'old.epub'), join(dir, 'Old.epub'));
+      } finally {
+        rmSync(dir, { recursive: true, force: true });
+      }
+    });
+
+    it('restores the records when the file cannot be renamed on disk', async () => {
+      const { service, bookRepo } = setup(oldPath);
+      vi.mocked(rename).mockRejectedValueOnce(Object.assign(new Error('permission denied'), { code: 'EACCES' }));
+
+      await expect(service.renameFile(100, { filename: 'new.epub' }, user)).rejects.toThrow(BadRequestException);
+
+      expect(bookRepo.moveBookFilePath).toHaveBeenCalledTimes(2);
+      expect(bookRepo.moveBookFilePath).toHaveBeenNthCalledWith(
+        2,
+        100,
+        { absolutePath: oldPath, relPath: 'Author/old.epub' },
+        { bookId: 10, folderPath: oldPath },
+      );
+    });
+
+    it('reports a name claimed while the records were being written as a conflict', async () => {
+      const { service, bookRepo } = setup(oldPath);
+      bookRepo.moveBookFilePath.mockRejectedValueOnce(Object.assign(new Error('duplicate key value'), { code: '23505' }));
+
+      await expect(service.renameFile(100, { filename: 'new.epub' }, user)).rejects.toThrow(ConflictException);
+
+      expect(rename).not.toHaveBeenCalled();
+    });
+
+    it('waits for another operation on the same book, then reads the file again', async () => {
+      const { service, bookRepo, fileLocks } = setup(oldPath);
+      let release!: () => void;
+      const held = fileLocks.withLock(bookOperationLockKey(10), () => new Promise<void>((resolve) => (release = resolve)));
+
+      const renaming = service.renameFile(100, { filename: 'new.epub' }, user);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(bookRepo.findFileById).toHaveBeenCalledTimes(1);
+      expect(rename).not.toHaveBeenCalled();
+
+      release();
+      await held;
+      await renaming;
+      expect(bookRepo.findFileById).toHaveBeenCalledTimes(2);
+      expect(rename).toHaveBeenCalledWith(oldPath, newPath);
+    });
+
+    it('stops when the file moved to another book while it waited', async () => {
+      const { service, bookRepo } = setup(oldPath);
+      bookRepo.findFileById = vi
+        .fn()
+        .mockResolvedValueOnce(fileRow())
+        .mockResolvedValueOnce(fileRow({ bookId: 11 }));
+
+      await expect(service.renameFile(100, { filename: 'new.epub' }, user)).rejects.toThrow(ConflictException);
+
+      expect(bookRepo.moveBookFilePath).not.toHaveBeenCalled();
+      expect(rename).not.toHaveBeenCalled();
     });
 
     it('throws BadRequestException for invalid filename', async () => {
-      const { service, bookRepo, libraryService } = makeService();
-      const user = makeUser({ id: 1 });
-      const fileId = 100;
-      const file = {
-        absolutePath: '/path/to/old.epub',
-        libraryFolderPath: '/path/to',
-        filename: 'old.epub',
-        format: 'epub',
-        role: 'content',
-        bookId: 10,
-        libraryId: 1,
-      };
+      const { service } = setup(oldPath);
 
-      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
-      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
-
-      await expect(service.renameFile(fileId, { filename: '../new.epub' }, user)).rejects.toThrow(BadRequestException);
-      await expect(service.renameFile(fileId, { filename: 'dir/new.epub' }, user)).rejects.toThrow(BadRequestException);
-      await expect(service.renameFile(fileId, { filename: 'bad\0name.epub' }, user)).rejects.toThrow(BadRequestException);
-      await expect(service.renameFile(fileId, { filename: `${'a'.repeat(256)}.epub` }, user)).rejects.toThrow(BadRequestException);
+      await expect(service.renameFile(100, { filename: '../new.epub' }, user)).rejects.toThrow(BadRequestException);
+      await expect(service.renameFile(100, { filename: 'dir/new.epub' }, user)).rejects.toThrow(BadRequestException);
+      await expect(service.renameFile(100, { filename: 'bad\0name.epub' }, user)).rejects.toThrow(BadRequestException);
+      await expect(service.renameFile(100, { filename: `${'a'.repeat(256)}.epub` }, user)).rejects.toThrow(BadRequestException);
       expect(rename).not.toHaveBeenCalled();
     });
 
-    it('only updates db if filename is not provided or unchanged', async () => {
-      const { service, bookRepo, libraryService } = makeService();
-      const user = makeUser({ id: 1 });
-      const fileId = 100;
-      const file = {
-        absolutePath: '/path/to/old.epub',
-        libraryFolderPath: '/path/to',
-        filename: 'old.epub',
-        format: 'epub',
-        role: 'content',
-        bookId: 10,
-        libraryId: 1,
-      };
+    it('leaves the file and its records alone when no new name is given', async () => {
+      const { service, bookRepo } = setup(oldPath);
 
-      bookRepo.findFileById = vi.fn().mockResolvedValue(file);
-      libraryService.checkLibraryAccess = vi.fn().mockResolvedValue(true);
-
-      vi.mocked(rename).mockResolvedValue(undefined);
-      bookRepo.updateBookFile = vi.fn().mockResolvedValue(undefined);
-
-      await service.renameFile(fileId, { filename: 'old.epub' }, user);
+      await service.renameFile(100, { filename: 'old.epub' }, user);
+      await service.renameFile(100, {}, user);
 
       expect(rename).not.toHaveBeenCalled();
-      expect(bookRepo.updateBookFile).toHaveBeenCalledWith(fileId, {
-        absolutePath: undefined,
-        relPath: undefined,
-      });
+      expect(bookRepo.moveBookFilePath).not.toHaveBeenCalled();
+      expect(bookRepo.updateBookFile).not.toHaveBeenCalled();
     });
   });
 

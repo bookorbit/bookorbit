@@ -2859,6 +2859,7 @@ export class ScannerService implements OnApplicationBootstrap {
     const isFileAsBookCandidate = contentFiles.length === 1 && candidate.folderPath === contentFiles[0].absolutePath;
 
     let sourceBookId: number | null = null;
+    let matchedBy: 'inode' | 'hash' | 'path' = 'inode';
 
     for (const file of contentFiles) {
       if (file.ino === 0n) continue;
@@ -2869,6 +2870,7 @@ export class ScannerService implements OnApplicationBootstrap {
     }
 
     if (sourceBookId == null && !isFileAsBookCandidate) {
+      matchedBy = 'hash';
       for (const file of contentFiles) {
         let fileHash: string;
         try {
@@ -2883,6 +2885,14 @@ export class ScannerService implements OnApplicationBootstrap {
         sourceBookId = byHash.bookId;
         break;
       }
+    }
+
+    // A file already recorded at this exact path belongs to a book filed under another key: its
+    // record moved without the book being re-keyed, as an in-place rename did before the key
+    // moved with the file. The checks below still leave the book alone while its key exists.
+    if (sourceBookId == null) {
+      matchedBy = 'path';
+      sourceBookId = contentFiles.map((file) => fileByPath.get(file.absolutePath)?.bookId).find((bookId) => bookId !== undefined) ?? null;
     }
 
     if (sourceBookId == null) return null;
@@ -2912,7 +2922,7 @@ export class ScannerService implements OnApplicationBootstrap {
     bookByFolderPath.delete(sourceBook.folderPath);
     bookByFolderPath.set(candidate.folderPath, moved);
     this.logger.log(
-      `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${moved.id} folder="${sanitizeLogValue(candidate.folderPath)}" action=reuse_moved_book - reused existing book for moved folder`,
+      `[scanner.upsert_book] [end] libraryId=${libraryId} bookId=${moved.id} folder="${sanitizeLogValue(candidate.folderPath)}" action=reuse_moved_book match=${matchedBy} - reused existing book for moved folder`,
     );
     return moved;
   }

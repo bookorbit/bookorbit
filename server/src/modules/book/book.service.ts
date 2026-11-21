@@ -1,6 +1,7 @@
 import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import {
   BadRequestException,
+  ConflictException,
   ForbiddenException,
   HttpException,
   HttpStatus,
@@ -11,15 +12,18 @@ import {
   Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { mkdtemp, rm, stat, rename } from 'fs/promises';
+import { lstat, mkdtemp, rm, stat, rename } from 'fs/promises';
 import { and, inArray, type SQL } from 'drizzle-orm';
 
 import { MAX_BOOK_QUERY_OFFSET_ROWS, isBookQueryOffsetWithinLimit } from '../../common/constants/pagination.constants';
 import { chapterProvenance, normalizeAudiobookChapters, resolveStoredAudiobookChapters } from '../../common/utils/audiobook-chapters.utils';
 import { coverFetchInputs, resolveIsAudiobook, resolveSearchMediaKind } from '../../common/utils/book-media.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { isUniqueViolation } from '../../common/utils/db-error.utils';
+import { pathsReferToSameEntry } from '../../common/utils/path-identity.utils';
 import { chunk, mapWithConcurrency } from '../../common/utils/batch.utils';
 import { SelfWriteRegistry } from '../../common/services/self-write-registry.service';
+import { FileLockService, bookOperationLockKey } from '../../common/services/file-lock.service';
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { compareBookFilePaths } from '../../common/utils/audio-track-order.utils';
@@ -354,6 +358,7 @@ export class BookService {
     private readonly bookMetadataLockService: BookMetadataLockService,
     private readonly coverStore: BookCoverStore,
     private readonly selfWriteRegistry: SelfWriteRegistry,
+    private readonly fileLocks: FileLockService,
     @Optional() private readonly embedder: BookEmbedderService,
     @Optional() private readonly fileWriteService: FileWriteService,
     @Optional() private readonly fileRenameService: FileRenameService,
@@ -1816,7 +1821,7 @@ export class BookService {
       const file = await this.verifyFileAccess(fileId, user);
       await this.libraryService.verifyAccessLevel(user, file.libraryId, 'editor');
 
-      let newAbsolutePath = file.absolutePath;
+      let bookKeyMoved = false;
       if (dto.filename && dto.filename !== basename(file.absolutePath)) {
         const safeFilename = basename(dto.filename);
         if (
@@ -1829,23 +1834,12 @@ export class BookService {
         ) {
           throw new BadRequestException('Filename is invalid');
         }
-        newAbsolutePath = join(dirname(file.absolutePath), safeFilename);
-        if (newAbsolutePath !== file.absolutePath) {
-          try {
-            // codeql[js/path-injection] basename constrains the user-provided value to one validated filename segment.
-            await rename(file.absolutePath, newAbsolutePath);
-          } catch (err) {
-            throw new BadRequestException(`Failed to rename file on disk: ${err instanceof Error ? err.message : String(err)}`);
-          }
-        }
+        // The same lock as every other operation that moves a book's files, so none of them
+        // interleave with this one.
+        bookKeyMoved = await this.fileLocks.withLock(bookOperationLockKey(file.bookId), () => this.renameBookFileInPlace(file, safeFilename));
       }
 
-      await this.bookRepo.updateBookFile(fileId, {
-        absolutePath: newAbsolutePath !== file.absolutePath ? newAbsolutePath : undefined,
-        relPath: newAbsolutePath !== file.absolutePath ? relative(file.libraryFolderPath, newAbsolutePath) : undefined,
-      });
-
-      this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} - rename file completed`);
+      this.logger.log(`[${event}] [end] fileId=${fileId} durationMs=${Date.now() - startedAt} bookKeyMoved=${bookKeyMoved} - rename file completed`);
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
       const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
@@ -1854,6 +1848,77 @@ export class BookService {
       );
       throw err;
     }
+  }
+
+  /**
+   * A book filed under its own file's path (every book in a book-per-file library, and loose files
+   * at a library root) is keyed by that path, so the key moves with the file. Left behind, the next
+   * scan would import the renamed file as a new book and mark this one missing.
+   * Returns whether the book's key moved.
+   */
+  private async renameBookFileInPlace(checked: Awaited<ReturnType<BookService['verifyFileAccess']>>, filename: string): Promise<boolean> {
+    // Read again under the lock: the file may have been moved, or merged into another book, while
+    // this waited, and access was checked against the book and library it had then.
+    const file = await this.bookRepo.findFileById(checked.id);
+    if (!file) throw new NotFoundException(`No file with id ${checked.id}`);
+    if (file.bookId !== checked.bookId || file.libraryId !== checked.libraryId) {
+      throw new ConflictException('The file changed while it was being renamed. Try again.');
+    }
+    const newAbsolutePath = join(dirname(file.absolutePath), filename);
+    if (newAbsolutePath === file.absolutePath) return false;
+
+    const book = await this.bookRepo.findBookBase(file.bookId);
+    if (!book) throw new NotFoundException(`No file with id ${file.id}`);
+    const oldBookKey = book.folderPath === file.absolutePath ? { bookId: book.id, folderPath: book.folderPath } : null;
+    const newBookKey = oldBookKey ? { bookId: book.id, folderPath: newAbsolutePath } : null;
+
+    if (await this.bookRepo.isFilePathTaken(newAbsolutePath)) {
+      throw new ConflictException('Another file already uses this name');
+    }
+    if (newBookKey) {
+      const keyOwner = await this.bookRepo.findBookIdAtFolderPath(file.libraryId, newBookKey.folderPath);
+      if (keyOwner !== null && keyOwner !== book.id) throw new ConflictException('Another book is already filed under this name');
+    }
+    // rename() replaces an existing target silently. A case-only rename on a case-insensitive
+    // filesystem finds the file itself here, which is not a collision.
+    // codeql[js/path-injection] basename constrains the user-provided value to one validated filename segment.
+    const existingTarget = await lstat(newAbsolutePath).catch(() => null);
+    if (existingTarget && !(await pathsReferToSameEntry(file.absolutePath, newAbsolutePath))) {
+      throw new ConflictException('A file with this name already exists');
+    }
+
+    // The records change before the file does, and the watcher holds its events for both paths
+    // until both are done, so it never sees a renamed file that no record accounts for.
+    await this.selfWriteRegistry.track([file.absolutePath, newAbsolutePath], async () => {
+      try {
+        await this.bookRepo.moveBookFilePath(
+          file.id,
+          { absolutePath: newAbsolutePath, relPath: relative(file.libraryFolderPath, newAbsolutePath) },
+          newBookKey,
+        );
+      } catch (err) {
+        if (isUniqueViolation(err)) throw new ConflictException('Another file or book already uses this name');
+        throw err;
+      }
+
+      try {
+        // codeql[js/path-injection] basename constrains the user-provided value to one validated filename segment.
+        await rename(file.absolutePath, newAbsolutePath);
+      } catch (err) {
+        await this.bookRepo
+          .moveBookFilePath(file.id, { absolutePath: file.absolutePath, relPath: file.relPath }, oldBookKey)
+          .catch((rollbackErr: unknown) => {
+            const errorClass = rollbackErr instanceof Error ? rollbackErr.name : 'Error';
+            const errorMessage = sanitizeLogValue(rollbackErr instanceof Error ? rollbackErr.message : String(rollbackErr));
+            this.logger.error(
+              `[book.rename_file.rollback] [fail] fileId=${file.id} bookId=${file.bookId} errorClass=${errorClass} error="${errorMessage}" - record rollback after failed disk rename failed`,
+            );
+          });
+        throw new BadRequestException(`Failed to rename file on disk: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    });
+
+    return newBookKey !== null;
   }
 
   async deleteFile(fileId: number, user: RequestUser): Promise<void> {

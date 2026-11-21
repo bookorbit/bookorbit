@@ -1801,6 +1801,37 @@ export class BookRepository {
       .where(eq(bookFiles.id, fileId));
   }
 
+  async isFilePathTaken(absolutePath: string): Promise<boolean> {
+    const [row] = await this.db.select({ id: bookFiles.id }).from(bookFiles).where(eq(bookFiles.absolutePath, absolutePath)).limit(1);
+    return row !== undefined;
+  }
+
+  async findBookIdAtFolderPath(libraryId: number, folderPath: string): Promise<number | null> {
+    const [row] = await this.db
+      .select({ id: books.id })
+      .from(books)
+      .where(and(eq(books.libraryId, libraryId), eq(books.folderPath, folderPath)))
+      .limit(1);
+    return row?.id ?? null;
+  }
+
+  /** Moves a file row to a new path and, when `bookKey` is given, re-keys its book in the same transaction. */
+  async moveBookFilePath(
+    fileId: number,
+    path: { absolutePath: string; relPath: string | null },
+    bookKey: { bookId: number; folderPath: string } | null,
+  ): Promise<void> {
+    await this.db.transaction(async (tx) => {
+      await tx
+        .update(bookFiles)
+        .set({ absolutePath: path.absolutePath, relPath: path.relPath, updatedAt: new Date() })
+        .where(eq(bookFiles.id, fileId));
+      if (bookKey) {
+        await tx.update(books).set({ folderPath: bookKey.folderPath }).where(eq(books.id, bookKey.bookId));
+      }
+    });
+  }
+
   async findAudioTimeline(fileId: number): Promise<BookFileAudioTimelineRow | null> {
     const [row] = await this.db.select().from(bookFileAudioTimelines).where(eq(bookFileAudioTimelines.fileId, fileId)).limit(1);
     return row ?? null;
