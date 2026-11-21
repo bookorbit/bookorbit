@@ -4,6 +4,8 @@ import {
   ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED,
   ACHIEVEMENT_EVENT_BOOK_STATUS_CHANGED,
   ACHIEVEMENT_EVENT_READING_SESSION_SAVED,
+  AUDIOBOOK_PROGRESS_CHANGED_EVENT,
+  type AudiobookProgressChangedPayload,
   AchievementEventsService,
   type BookProgressChangedPayload,
   type BookStatusChangedPayload,
@@ -30,6 +32,10 @@ export class StorygraphEventListener implements OnModuleInit {
     this.achievementEvents.on(ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED, (payload: BookProgressChangedPayload) => {
       this.handleProgressChanged(payload);
     });
+
+    this.achievementEvents.on(AUDIOBOOK_PROGRESS_CHANGED_EVENT, (payload: AudiobookProgressChangedPayload) => {
+      this.handleProgressChanged(payload);
+    });
   }
 
   private handleStatusChanged(payload: BookStatusChangedPayload): void {
@@ -40,7 +46,7 @@ export class StorygraphEventListener implements OnModuleInit {
     this.scheduler.requestSyncForBookFile({ userId: payload.userId, bookFileId: payload.bookFileId, reason: 'progress' });
   }
 
-  private handleProgressChanged(payload: BookProgressChangedPayload): void {
+  private handleProgressChanged(payload: AudiobookProgressChangedPayload): void {
     this.scheduler.requestSync({ userId: payload.userId, bookId: payload.bookId, reason: 'progress' });
   }
 }

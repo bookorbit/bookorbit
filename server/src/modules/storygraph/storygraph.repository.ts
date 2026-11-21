@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { Permission } from '@bookorbit/types';
+import { AUDIO_FORMAT_LIST, Permission } from '@bookorbit/types';
 import type { ContentFilterRules, ReadStatus, StorygraphBookSyncMode } from '@bookorbit/types';
 import { and, asc, eq, gt, inArray, isNotNull, isNull, ne, notInArray, or, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -236,12 +236,15 @@ export class StorygraphRepository {
     if (bookScopeClauses === null) return 0;
 
     const maxProgressSq = this.buildMaxProgressSubquery(userId, bookScopeClauses);
+    const progress = this.resolveSyncProgress(maxProgressSq.maxProgress);
 
     const [row] = await this.db
       .select({ count: sql<number>`count(*)::int` })
       .from(schema.books)
       .leftJoin(schema.userBookStatus, and(eq(schema.userBookStatus.bookId, schema.books.id), eq(schema.userBookStatus.userId, userId)))
       .leftJoin(maxProgressSq, eq(maxProgressSq.bookId, schema.books.id))
+      .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+      .leftJoin(schema.audiobookProgress, and(eq(schema.audiobookProgress.bookId, schema.books.id), eq(schema.audiobookProgress.userId, userId)))
       .leftJoin(
         schema.storygraphBookState,
         and(eq(schema.storygraphBookState.userId, userId), eq(schema.storygraphBookState.bookId, schema.books.id)),
@@ -254,7 +257,7 @@ export class StorygraphRepository {
           or(
             isNull(schema.storygraphBookState.lastSyncedAt),
             sql`${schema.userBookStatus.status} is distinct from ${schema.storygraphBookState.lastSyncedStatus}`,
-            sql`${maxProgressSq.maxProgress} is distinct from ${schema.storygraphBookState.lastSyncedProgress}`,
+            sql`${progress} is distinct from ${schema.storygraphBookState.lastSyncedProgress}`,
           ),
         ),
       );
@@ -285,7 +288,7 @@ export class StorygraphRepository {
         authorName: firstAuthorSq.authorName,
         format: schema.bookFiles.format,
         status: sql<string>`coalesce(${schema.userBookStatus.status}, 'unread')`,
-        progress: maxProgressSq.maxProgress,
+        progress: this.resolveSyncProgress(maxProgressSq.maxProgress),
       })
       .from(schema.books)
       .leftJoin(schema.userBookStatus, and(eq(schema.userBookStatus.bookId, schema.books.id), eq(schema.userBookStatus.userId, userId)))
@@ -293,6 +296,7 @@ export class StorygraphRepository {
       .leftJoin(maxProgressSq, eq(maxProgressSq.bookId, schema.books.id))
       .leftJoin(firstAuthorSq, eq(firstAuthorSq.bookId, schema.books.id))
       .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.books.primaryFileId))
+      .leftJoin(schema.audiobookProgress, and(eq(schema.audiobookProgress.bookId, schema.books.id), eq(schema.audiobookProgress.userId, userId)))
       .leftJoin(
         schema.storygraphBookState,
         and(eq(schema.storygraphBookState.userId, userId), eq(schema.storygraphBookState.bookId, schema.books.id)),
@@ -373,6 +377,15 @@ export class StorygraphRepository {
 
   private buildWhereClause(...clauses: Array<SQL | undefined>): SQL {
     return and(...clauses) ?? sql`true`;
+  }
+
+  private resolveSyncProgress(textProgress: SQL.Aliased<number>): SQL<number | null> {
+    const isAudio = inArray(sql`lower(${schema.bookFiles.format})`, AUDIO_FORMAT_LIST);
+    // StoryGraph accepts whole percentages. Avoid treating fractional playback saves as new journal entries.
+    return sql<number | null>`coalesce(
+      case when ${isAudio} then floor(${schema.audiobookProgress.percentage}::double precision + 0.5)::real end,
+      ${textProgress}
+    )`;
   }
 
   private buildMaxProgressSubquery(userId: number, bookScopeClauses: SQL[]) {

@@ -107,7 +107,9 @@ function makeFixture() {
     bookService,
     stored,
     chaptersRepo,
-    service: new AudiobookService(repo as never, bookService as never, new AudiobookChaptersService(chaptersRepo as never, new FileLockService())),
+    service: new AudiobookService(repo as never, bookService as never, new AudiobookChaptersService(chaptersRepo as never, new FileLockService()), {
+      emit: vi.fn(),
+    } as never),
   };
 }
 

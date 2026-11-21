@@ -16,6 +16,7 @@ import {
 import type { RequestUser } from '../../common/types/request-user';
 import { orderAudiobookTracks } from '../../common/utils/audiobook-chapters.utils';
 import type { BookmarkRow } from '../../db/schema';
+import { AchievementEventsService, AUDIOBOOK_PROGRESS_CHANGED_EVENT } from '../achievement/achievement-events.service';
 import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapters.service';
 import { BookService } from '../book/book.service';
 import type { CreateAudiobookBookmarkDto } from './dto/create-audiobook-bookmark.dto';
@@ -50,6 +51,7 @@ export class AudiobookService {
     private readonly repo: AudiobookRepository,
     private readonly bookService: BookService,
     private readonly audiobookChapters: AudiobookChaptersService,
+    private readonly achievementEvents: AchievementEventsService,
   ) {}
 
   async getManifest(bookId: number, user: RequestUser): Promise<AudiobookManifest> {
@@ -159,6 +161,9 @@ export class AudiobookService {
       percentage,
       saved.capturedAt,
     );
+    if (!previous || Math.round(previous.percentage) !== Math.round(saved.percentage)) {
+      this.achievementEvents.emit(AUDIOBOOK_PROGRESS_CHANGED_EVENT, { userId: user.id, bookId });
+    }
     return {
       assetId: dto.assetId,
       positionMs,

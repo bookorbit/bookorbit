@@ -112,6 +112,7 @@ import { UserBookStatusService, type AutoReadingActivity } from '../user-book-st
 import {
   ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED,
   ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED,
+  AUDIOBOOK_PROGRESS_CHANGED_EVENT,
   AchievementEventsService,
 } from '../achievement/achievement-events.service';
 import { BookMetadataLockService } from '../book-metadata-lock/book-metadata-lock.service';
@@ -2474,6 +2475,9 @@ export class BookService {
       timeZone: this.resolveUserTimeZone(user),
       strongRereadEvidence,
     });
+    if (!previous || Math.round(previous.percentage) !== Math.round(saved.percentage)) {
+      this.achievementEvents?.emit(AUDIOBOOK_PROGRESS_CHANGED_EVENT, { userId, bookId });
+    }
   }
 
   async syncEbookProgressForAudiobookPlayback(

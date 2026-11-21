@@ -11,6 +11,7 @@ export const ACHIEVEMENT_EVENT_BACKFILL = 'achievement.backfill';
 export const ACHIEVEMENT_EVENT_ACHIEVEMENT_AWARDED = 'achievement.awarded';
 export const ACHIEVEMENT_EVENT_BOOK_RATING_CHANGED = 'book.rating-changed';
 export const ACHIEVEMENT_EVENT_BOOK_PROGRESS_CHANGED = 'book.progress-changed';
+export const AUDIOBOOK_PROGRESS_CHANGED_EVENT = 'audiobook.progress-changed';
 export const ACHIEVEMENT_EVENT_BOOK_HARDCOVER_EDITION_CHANGED = 'book.hardcover-edition-changed';
 
 export interface ReadingSessionSavedPayload {
@@ -62,6 +63,8 @@ export interface BookProgressChangedPayload {
   progress: number;
   source: 'koreader' | 'kobo' | 'web_reader';
 }
+
+export type AudiobookProgressChangedPayload = Pick<BookProgressChangedPayload, 'userId' | 'bookId'>;
 
 export interface BookHardcoverEditionChangedPayload {
   userId: number;
