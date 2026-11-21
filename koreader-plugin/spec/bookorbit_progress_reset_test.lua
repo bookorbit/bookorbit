@@ -146,6 +146,17 @@ confirm_boxes[1].ok_callback()
 assertEqual(events[1].name, "GotoPage", "paged reset navigates by page")
 assertEqual(events[1].value, 1, "paged reset targets page one")
 
+local saved_cover = makePlugin({
+    percentage = 0,
+    progress = "/body/DocFragment[1]/body",
+    device = "Kobo Libra",
+    device_id = "this-device",
+    timestamp = 5000,
+})
+saved_cover:getProgress(false, false)
+assertEqual(#confirm_boxes, 0, "this device's saved cover is ordinary backward progress on reopen")
+assertEqual(#events, 0, "the saved cover does not rewind the reader")
+
 -- 4. The classification is what decides whether the reader is ever asked. A reset stamped
 --    behind the last page turn is read as a backward sync, and backward defaults to disabled,
 --    so it is dropped in silence. This is why the server stamps each delivery as current.

@@ -143,4 +143,22 @@ assertEqual(plugin:remoteProgressIsNewer(PHONE, 0.008), true, "the sheet shows B
 plugin:noteProgressCompared(DIGEST)
 assertEqual(plugin:remoteProgressIsNewer(PHONE, 0.008), false, "and page-turn times once weighed")
 
+-- Reopening after offline reading restores the sidecar before the first page turn (#2279).
+local previous_upload = { percentage = 0.38, progress = "/body/DocFragment[8]/body", device = "Kindle", device_id = "kindle", timestamp = 20000 }
+plugin = makePlugin(previous_upload, 0.40)
+plugin.last_page_turn_timestamp = 0
+plugin:getProgress(false, false)
+assertEqual(#prompts, 0, "the default backward strategy keeps the offline reading position")
+assertEqual(#plugin.moves, 0, "the automatic pull does not rewind the book")
+assertEqual(plugin:progressComparedSinceOpen(), true, "the completed pull weighed the two positions")
+
+plugin = makePlugin(previous_upload, 0.40)
+plugin.last_page_turn_timestamp = 0
+plugin.settings.sync_forward = plugin.SYNC_STRATEGY.SILENT
+plugin.settings.sync_backward = plugin.SYNC_STRATEGY.PROMPT
+plugin:getProgress(false, false)
+assertEqual(#prompts, 1, "Ask for backward sync offers the earlier upload")
+assertEqual(prompts[1].newer, false, "the prompt identifies the upload as behind")
+assertEqual(#plugin.moves, 0, "the forward strategy cannot move the reader backwards")
+
 print("bookorbit_fresh_device_progress_test: ok")

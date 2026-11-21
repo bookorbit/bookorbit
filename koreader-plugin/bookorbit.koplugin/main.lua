@@ -51,7 +51,7 @@ local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "2.4.0"
+local PLUGIN_VERSION = "2.4.1"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
