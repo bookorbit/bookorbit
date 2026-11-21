@@ -97,6 +97,24 @@ describe('LibraryCreatorModal', () => {
     wrapper.unmount()
   })
 
+  it('shows secondary formats in the metadata priority list without expanding it', async () => {
+    apiMock.mockImplementation(async (url) =>
+      jsonResponse(
+        String(url).endsWith('/stats')
+          ? { totalBooks: 1, totalSizeBytes: 300, formatCounts: { epub: 1 }, heldFormatCounts: { epub: 1, kepub: 1 } }
+          : null,
+      ),
+    )
+    const wrapper = await mountCreator(
+      { library: makeLibrary(), initialSection: 'metadata' },
+      { LibraryCreatorMetadata: false, LibraryCreatorCard: false },
+    )
+
+    const rows = wrapper.get('ol[aria-labelledby="primary-file-title"]').findAll('li')
+    expect(rows.find((row) => row.text().includes('KEPUB e-book'))?.text()).toMatch(/KEPUB e-book\s*1/)
+    wrapper.unmount()
+  })
+
   it('checks a folder as soon as it is added and enables create once the essentials are in', async () => {
     apiMock.mockImplementation(async (url) =>
       String(url).endsWith('/prescan')

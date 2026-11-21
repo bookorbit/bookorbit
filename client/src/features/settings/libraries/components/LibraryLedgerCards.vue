@@ -109,7 +109,7 @@ function cardAccent(libraryId: number): string {
             <span>{{ fileSummary(library) }}</span>
           </template>
         </p>
-        <LibraryFormatBar class="mt-2" show-legend :counts="entryFor(library.id)?.formatCounts ?? {}" :legend-limit="2" />
+        <LibraryFormatBar class="mt-2" show-legend :stats="entryFor(library.id)" :legend-limit="2" />
       </div>
       <LibraryProblemStrip v-if="problemFor(library)" class="px-3" :library="library" :problem="problemFor(library)!" @scan="$emit('scan', $event)" />
       <div class="flex items-center gap-3 border-t border-border px-3 py-2.5">

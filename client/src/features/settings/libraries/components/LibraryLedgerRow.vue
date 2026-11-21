@@ -167,7 +167,7 @@ function openHistory() {
           <span class="text-[12.5px] text-muted-foreground">{{ t('settings.admin.libraries.booksUnit', { count: totalBooks }) }}</span>
           <span class="text-[12.5px] tabular-nums text-muted-foreground">{{ formatBytes(entry?.totalSizeBytes ?? 0) }}</span>
         </p>
-        <LibraryFormatBar class="mt-2.5" show-legend legend-reserve :counts="entry?.formatCounts ?? {}" :legend-limit="5" />
+        <LibraryFormatBar class="mt-2.5" show-legend legend-reserve :stats="entry" :legend-limit="5" />
       </div>
 
       <LibraryAutomationList

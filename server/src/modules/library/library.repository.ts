@@ -177,49 +177,15 @@ export class LibraryRepository {
     });
   }
 
-  /**
-   * Formats count each book once, by its primary file, so they add up to the book count. The size
-   * adds up every file a book has: a multi-track audiobook or a title kept in several formats takes
-   * all of that space on disk, not just its primary file's.
-   */
   async getStats(libraryId: number) {
-    const presentInLibrary = and(eq(books.libraryId, libraryId), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT));
-    const [[countRow], formatRows, [sizeRow]] = await Promise.all([
-      this.db
-        .select({ count: sql<number>`count(*)::int` })
-        .from(books)
-        .where(presentInLibrary),
-      this.db
-        .select({ format: bookFiles.format, count: sql<number>`count(*)::int` })
-        .from(books)
-        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-        .where(presentInLibrary)
-        .groupBy(bookFiles.format),
-      this.db
-        .select({ totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint` })
-        .from(bookFiles)
-        .innerJoin(books, eq(books.id, bookFiles.bookId))
-        .where(presentInLibrary),
-    ]);
-
-    const formatCounts: Record<string, number> = {};
-    for (const row of formatRows) {
-      if (row.format) formatCounts[row.format] = row.count;
-    }
-
-    return {
-      totalBooks: countRow?.count ?? 0,
-      totalSizeBytes: toSafeNumber(toBigInt(sizeRow?.totalSize ?? 0)),
-      formatCounts,
-    };
+    const stats = await this.getStatsForLibraries([libraryId]);
+    return stats.get(libraryId)!;
   }
 
-  /**
-   * The same aggregates as getStats, for many libraries in three round trips instead of three per
-   * library. Book counts come from books alone so titles with no primary file still count.
-   */
   async getStatsForLibraries(libraryIds: number[]) {
-    if (libraryIds.length === 0) return new Map<number, LibraryStats>();
+    const stats = new Map<number, Required<LibraryStats>>();
+    for (const id of libraryIds) stats.set(id, { totalBooks: 0, totalSizeBytes: 0, formatCounts: {}, heldFormatCounts: {} });
+    if (stats.size === 0) return stats;
 
     const presentInLibraries = and(inArray(books.libraryId, libraryIds), eq(books.status, LIBRARY_BOOK_STATUS_PRESENT));
     const [countRows, formatRows, sizeRows] = await Promise.all([
@@ -229,10 +195,15 @@ export class LibraryRepository {
         .where(presentInLibraries)
         .groupBy(books.libraryId),
       this.db
-        .select({ libraryId: books.libraryId, format: bookFiles.format, count: sql<number>`count(*)::int` })
+        .select({
+          libraryId: books.libraryId,
+          format: bookFiles.format,
+          primaryCount: sql<number>`count(*) filter (where ${bookFiles.id} = ${books.primaryFileId})::int`,
+          heldCount: sql<number>`count(distinct ${books.id})::int`,
+        })
         .from(books)
-        .innerJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
-        .where(presentInLibraries)
+        .innerJoin(bookFiles, eq(bookFiles.bookId, books.id))
+        .where(and(presentInLibraries, or(eq(bookFiles.role, 'content'), eq(bookFiles.id, books.primaryFileId))))
         .groupBy(books.libraryId, bookFiles.format),
       this.db
         .select({ libraryId: books.libraryId, totalSize: sql<number>`coalesce(sum(${bookFiles.sizeBytes}), 0)::bigint` })
@@ -242,23 +213,13 @@ export class LibraryRepository {
         .groupBy(books.libraryId),
     ]);
 
-    const sizeByLibrary = new Map(sizeRows.map((row) => [row.libraryId, toBigInt(row.totalSize)]));
-    const formatsByLibrary = new Map<number, Record<string, number>>();
+    for (const row of countRows) stats.get(row.libraryId)!.totalBooks = row.count;
+    for (const row of sizeRows) stats.get(row.libraryId)!.totalSizeBytes = toSafeNumber(toBigInt(row.totalSize));
     for (const row of formatRows) {
       if (!row.format) continue;
-      const formats = formatsByLibrary.get(row.libraryId);
-      if (formats) formats[row.format] = row.count;
-      else formatsByLibrary.set(row.libraryId, { [row.format]: row.count });
-    }
-
-    const countByLibrary = new Map(countRows.map((row) => [row.libraryId, row.count]));
-    const stats = new Map<number, LibraryStats>();
-    for (const libraryId of libraryIds) {
-      stats.set(libraryId, {
-        totalBooks: countByLibrary.get(libraryId) ?? 0,
-        totalSizeBytes: toSafeNumber(sizeByLibrary.get(libraryId) ?? 0n),
-        formatCounts: formatsByLibrary.get(libraryId) ?? {},
-      });
+      const library = stats.get(row.libraryId)!;
+      if (row.primaryCount > 0) library.formatCounts[row.format] = row.primaryCount;
+      library.heldFormatCounts[row.format] = row.heldCount;
     }
     return stats;
   }

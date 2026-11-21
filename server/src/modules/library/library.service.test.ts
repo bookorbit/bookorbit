@@ -946,8 +946,8 @@ describe('LibraryService', () => {
     ]);
     libraryRepo.getStatsForLibraries.mockResolvedValue(
       new Map([
-        [1, { totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 } }],
-        [2, { totalBooks: 0, totalSizeBytes: 0, formatCounts: {} }],
+        [1, { totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 }, heldFormatCounts: { epub: 305, kepub: 1 } }],
+        [2, { totalBooks: 0, totalSizeBytes: 0, formatCounts: {}, heldFormatCounts: {} }],
       ]),
     );
     const lastScan = {
@@ -968,8 +968,8 @@ describe('LibraryService', () => {
     expect(scopeRepo.findAllIds).not.toHaveBeenCalled();
     expect(libraryRepo.getStatsForLibraries).toHaveBeenCalledWith([1, 2]);
     expect(result).toEqual([
-      { libraryId: 1, totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 }, lastScan },
-      { libraryId: 2, totalBooks: 0, totalSizeBytes: 0, formatCounts: {}, lastScan: null },
+      { libraryId: 1, totalBooks: 381, totalSizeBytes: 727, formatCounts: { epub: 305 }, heldFormatCounts: { epub: 305, kepub: 1 }, lastScan },
+      { libraryId: 2, totalBooks: 0, totalSizeBytes: 0, formatCounts: {}, heldFormatCounts: {}, lastScan: null },
     ]);
   });
 

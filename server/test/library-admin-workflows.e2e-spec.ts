@@ -1065,9 +1065,8 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
       expect(statsResponse.json()).toEqual({
         totalBooks: 2,
         totalSizeBytes: expectedTotalSize,
-        formatCounts: {
-          epub: 2,
-        },
+        formatCounts: { epub: 2 },
+        heldFormatCounts: { epub: 2 },
       });
 
       const revokeScopedAccess = await ctx.app.inject({
@@ -1085,7 +1084,7 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
       expectError(revokedStatsResponse, 403, 'No library access');
     });
 
-    it('sizes a library by every file its books hold while formats count each book once', async () => {
+    it('counts each book once per held format, groups primary formats separately, and sizes every file', async () => {
       const library = await createLibraryWithFolder(ctx, { mode: 'book_per_folder', name: `multi-file-stats-${randomUUID()}` });
       await grantLibraryAccess(ctx, manager.userId, library.libraryId, 'owner');
 
@@ -1098,6 +1097,10 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
         filePaths.push(trackPath);
       }
       filePaths.push(await createEpubFixture(library.folderPath, 'Sam Whitfield - The Long Tide/The Long Tide.epub', { title: 'The Long Tide' }));
+      filePaths.push(await createEpubFixture(library.folderPath, 'Sam Whitfield - The Long Tide/The Long Tide.kepub', { title: 'The Long Tide' }));
+      const supplement = join(trackFolder, 'notes.txt');
+      await writeFile(supplement, 'Track notes');
+      filePaths.push(supplement);
       // Older than the scanner's stability window, so the scan does not wait for the files to settle.
       const settled = new Date(Date.now() - 5 * 60_000);
       for (const filePath of filePaths) await utimes(filePath, settled, settled);
@@ -1110,7 +1113,7 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
           .from(schema.books)
           .innerJoin(schema.bookFiles, eq(schema.bookFiles.bookId, schema.books.id))
           .where(and(eq(schema.books.libraryId, library.libraryId), eq(schema.books.status, 'present')));
-        expect(row).toEqual({ books: 2, files: 4 });
+        expect(row).toEqual({ books: 2, files: 6 });
       }, 10_000);
 
       const sizesOnDisk = await Promise.all(filePaths.map(async (filePath) => (await stat(filePath)).size));
@@ -1118,6 +1121,7 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
         totalBooks: 2,
         totalSizeBytes: sizesOnDisk.reduce((sum, size) => sum + size, 0),
         formatCounts: { mp3: 1, epub: 1 },
+        heldFormatCounts: { mp3: 1, epub: 1, kepub: 1 },
       };
 
       const statsResponse = await ctx.app.inject({

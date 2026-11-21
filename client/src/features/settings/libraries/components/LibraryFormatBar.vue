@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import type { LibraryStats } from '@bookorbit/types'
 import { useI18n } from 'vue-i18n'
 import { formatNumber } from '@/i18n/formatters'
 import { toFormatSegments } from '../lib/library-formats'
 
-const props = withDefaults(defineProps<{ counts: Record<string, number>; legendLimit?: number; showLegend?: boolean; legendReserve?: boolean }>(), {
+const props = withDefaults(defineProps<{ stats?: LibraryStats | null; legendLimit?: number; showLegend?: boolean; legendReserve?: boolean }>(), {
   legendLimit: 3,
   showLegend: false,
   legendReserve: false,
@@ -12,7 +13,7 @@ const props = withDefaults(defineProps<{ counts: Record<string, number>; legendL
 
 const { t } = useI18n()
 
-const segments = computed(() => toFormatSegments(props.counts))
+const segments = computed(() => toFormatSegments(props.stats?.heldFormatCounts ?? props.stats?.formatCounts ?? {}))
 const legend = computed(() => segments.value.slice(0, props.legendLimit))
 const overflow = computed(() => segments.value.length - legend.value.length)
 

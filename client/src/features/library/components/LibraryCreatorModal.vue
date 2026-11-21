@@ -134,13 +134,14 @@ const checkedFileCount = computed(() => {
   return checked > 0 ? files : null
 })
 
+const heldFormatCounts = computed(() => stats.value?.heldFormatCounts ?? stats.value?.formatCounts ?? null)
+
 const leadFormat = computed(() => {
-  const held = stats.value ? new Set(Object.keys(stats.value.formatCounts).filter((format) => (stats.value?.formatCounts[format] ?? 0) > 0)) : null
   // Read-along EPUBs are a subset of EPUBs the counts cannot see, so the summary names the plain format.
   const lead = form.formatPriority.find((key) => {
     if (isReadAlongFormatKey(key)) return false
     const imported = form.allowedFormats.length === 0 || form.allowedFormats.includes(key)
-    return imported && (!held || held.has(key))
+    return imported && (!heldFormatCounts.value || (heldFormatCounts.value[key] ?? 0) > 0)
   })
   return lead ? lead.toUpperCase() : ''
 })
@@ -287,7 +288,7 @@ const sectionProps = computed(() => ({
     libraryId: creator.editingLibraryId.value ?? undefined,
     formatPriority: form.formatPriority,
     allowedFormats: form.allowedFormats,
-    formatCounts: stats.value?.formatCounts ?? null,
+    formatCounts: heldFormatCounts.value,
     organizationMode: form.organizationMode,
     canReapplyRules: !creating.value,
     storedRegexMetadata: creator.storedRegexMetadata.value ?? null,

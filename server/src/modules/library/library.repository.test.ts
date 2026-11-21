@@ -3,6 +3,7 @@ vi.mock('drizzle-orm', () => ({
   eq: vi.fn((left: unknown, right: unknown) => ({ op: 'eq', left, right })),
   getTableColumns: vi.fn(() => ({})),
   inArray: vi.fn((left: unknown, right: unknown[]) => ({ op: 'inArray', left, right })),
+  or: vi.fn((...clauses: unknown[]) => ({ op: 'or', clauses })),
   isNotNull: vi.fn((value: unknown) => ({ op: 'isNotNull', value })),
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({ op: 'sql', text: strings.join(''), values })),
 }));
@@ -12,7 +13,7 @@ vi.mock('../../db/kobo-entitlement-tombstones', () => ({ writeKoboTombstones: vi
 
 import { writeKoboTombstones } from '../../db/kobo-entitlement-tombstones';
 import { retainFinishedReads } from '../../db/reading-attempt-retention';
-import { bookFiles, bookLinkGroups, bookLinks, books, libraries, libraryFolders } from '../../db/schema';
+import { bookLinkGroups, bookLinks, books, libraries, libraryFolders } from '../../db/schema';
 import { LIBRARY_BOOK_STATUS_PRESENT } from './library.constants';
 import { LibraryRepository } from './library.repository';
 
@@ -184,113 +185,42 @@ describe('LibraryRepository', () => {
     expect(pathsOrderBy).toHaveBeenCalledWith(libraries.displayOrder, libraries.name, libraryFolders.createdAt, libraryFolders.id);
   });
 
-  function sizeChain(rows: unknown[], grouped = false) {
-    const where = grouped ? vi.fn().mockReturnValue({ groupBy: vi.fn().mockResolvedValue(rows) }) : vi.fn().mockResolvedValue(rows);
-    const innerJoin = vi.fn().mockReturnValue({ where });
-    return { chain: { from: vi.fn().mockReturnValue({ innerJoin }) }, innerJoin };
+  function mockStatsRows(counts: unknown[], formats: unknown[], sizes: unknown[]) {
+    const grouped = (rows: unknown[]) => ({ where: vi.fn().mockReturnValue({ groupBy: vi.fn().mockResolvedValue(rows) }) });
+    db.select.mockReturnValueOnce({ from: vi.fn().mockReturnValue(grouped(counts)) });
+    for (const rows of [formats, sizes]) {
+      db.select.mockReturnValueOnce({ from: vi.fn().mockReturnValue({ innerJoin: vi.fn().mockReturnValue(grouped(rows)) }) });
+    }
   }
 
-  it('getStats counts formats by primary file and sizes every file a book has', async () => {
-    const countChain = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ count: 3 }]),
-      }),
-    };
-
-    const formatJoin = vi.fn().mockReturnValue({
-      where: vi.fn().mockReturnValue({
-        groupBy: vi.fn().mockResolvedValue([
-          { format: 'mp3', count: 2 },
-          { format: 'pdf', count: 1 },
-        ]),
-      }),
-    });
-    const formatChain = { from: vi.fn().mockReturnValue({ innerJoin: formatJoin }) };
-
-    // Two 21-track audiobooks and a PDF: far more bytes than their three primary files hold.
-    const size = sizeChain([{ totalSize: '812000000' }]);
-
-    db.select
-      .mockReturnValueOnce(countChain as any)
-      .mockReturnValueOnce(formatChain as any)
-      .mockReturnValueOnce(size.chain as any);
-
-    const stats = await repo.getStats(9);
-
-    expect(stats).toEqual({
-      totalBooks: 3,
-      totalSizeBytes: 812_000_000,
-      formatCounts: { mp3: 2, pdf: 1 },
-    });
-    expect(formatJoin).toHaveBeenCalledWith(expect.anything(), { op: 'eq', left: bookFiles.id, right: books.primaryFileId });
-    expect(size.chain.from).toHaveBeenCalledWith(bookFiles);
-    expect(size.innerJoin).toHaveBeenCalledWith(books, { op: 'eq', left: books.id, right: bookFiles.bookId });
-  });
-
-  it('getStats reports zero bytes for a library with no files', async () => {
-    const countChain = { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ count: 0 }]) }) };
-    const formatChain = {
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({ where: vi.fn().mockReturnValue({ groupBy: vi.fn().mockResolvedValue([]) }) }),
-      }),
-    };
-
-    db.select
-      .mockReturnValueOnce(countChain as any)
-      .mockReturnValueOnce(formatChain as any)
-      .mockReturnValueOnce(sizeChain([{ totalSize: '0' }]).chain as any);
-
-    await expect(repo.getStats(9)).resolves.toEqual({ totalBooks: 0, totalSizeBytes: 0, formatCounts: {} });
-  });
-
-  it('getStatsForLibraries aggregates every library in three queries', async () => {
-    const countChain = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          groupBy: vi.fn().mockResolvedValue([
-            { libraryId: 1, count: 3 },
-            { libraryId: 2, count: 1 },
-          ]),
-        }),
-      }),
-    };
-
-    const formatChain = {
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            groupBy: vi.fn().mockResolvedValue([
-              { libraryId: 1, format: 'epub', count: 2 },
-              { libraryId: 1, format: 'pdf', count: 1 },
-              { libraryId: 2, format: 'mp3', count: 1 },
-            ]),
-          }),
-        }),
-      }),
-    };
-
-    const size = sizeChain(
+  it('getStatsForLibraries reports primary and held formats for each requested library in three queries', async () => {
+    mockStatsRows(
+      [
+        { libraryId: 1, count: 3 },
+        { libraryId: 2, count: 1 },
+      ],
+      [
+        { libraryId: 1, format: 'epub', primaryCount: 2, heldCount: 2 },
+        { libraryId: 1, format: 'kepub', primaryCount: 0, heldCount: 2 },
+        { libraryId: 1, format: 'pdf', primaryCount: 1, heldCount: 1 },
+        { libraryId: 2, format: 'mp3', primaryCount: 1, heldCount: 1 },
+      ],
       [
         { libraryId: 1, totalSize: '3700' },
         { libraryId: 2, totalSize: '406000000' },
       ],
-      true,
     );
-
-    db.select
-      .mockReturnValueOnce(countChain as any)
-      .mockReturnValueOnce(formatChain as any)
-      .mockReturnValueOnce(size.chain as any);
-
     const stats = await repo.getStatsForLibraries([1, 2, 3]);
 
     expect(db.select).toHaveBeenCalledTimes(3);
-    expect(stats.get(1)).toEqual({ totalBooks: 3, totalSizeBytes: 3700, formatCounts: { epub: 2, pdf: 1 } });
-    expect(stats.get(2)).toEqual({ totalBooks: 1, totalSizeBytes: 406_000_000, formatCounts: { mp3: 1 } });
-    // A library with no present books still gets an entry, so the caller never has to guess.
-    expect(stats.get(3)).toEqual({ totalBooks: 0, totalSizeBytes: 0, formatCounts: {} });
-    expect(size.chain.from).toHaveBeenCalledWith(bookFiles);
-    expect(size.innerJoin).toHaveBeenCalledWith(books, { op: 'eq', left: books.id, right: bookFiles.bookId });
+    expect(stats.get(1)).toEqual({
+      totalBooks: 3,
+      totalSizeBytes: 3700,
+      formatCounts: { epub: 2, pdf: 1 },
+      heldFormatCounts: { epub: 2, kepub: 2, pdf: 1 },
+    });
+    expect(stats.get(2)).toEqual({ totalBooks: 1, totalSizeBytes: 406_000_000, formatCounts: { mp3: 1 }, heldFormatCounts: { mp3: 1 } });
+    expect(stats.get(3)).toEqual({ totalBooks: 0, totalSizeBytes: 0, formatCounts: {}, heldFormatCounts: {} });
   });
 
   it('getStatsForLibraries issues no query for an empty id list', async () => {
@@ -299,27 +229,7 @@ describe('LibraryRepository', () => {
   });
 
   it('getStats throws when totalSizeBytes exceeds safe integer range', async () => {
-    const countChain = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ count: 1 }]),
-      }),
-    };
-
-    const formatChain = {
-      from: vi.fn().mockReturnValue({
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            groupBy: vi.fn().mockResolvedValue([{ format: 'epub', count: 1 }]),
-          }),
-        }),
-      }),
-    };
-
-    db.select
-      .mockReturnValueOnce(countChain as any)
-      .mockReturnValueOnce(formatChain as any)
-      .mockReturnValueOnce(sizeChain([{ totalSize: '9007199254740992' }]).chain as any);
-
+    mockStatsRows([{ libraryId: 9, count: 1 }], [], [{ libraryId: 9, totalSize: '9007199254740992' }]);
     await expect(repo.getStats(9)).rejects.toThrow('totalSizeBytes exceeds Number.MAX_SAFE_INTEGER');
   });
 });

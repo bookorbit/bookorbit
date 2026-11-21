@@ -211,7 +211,7 @@ function handleOrganizationMode(value: OrganizationMode) {
       </div>
 
       <div v-if="showStats && stats && checkedFolders.length === 0" class="border-t border-border px-4 pb-3 pt-3">
-        <LibraryFormatBar show-legend :counts="stats.formatCounts" :legend-limit="6" />
+        <LibraryFormatBar show-legend :stats="stats" :legend-limit="6" />
       </div>
 
       <form class="flex flex-wrap items-start gap-2 border-t border-border bg-background/50 px-3 py-2.5" @submit.prevent="addManualFolder">

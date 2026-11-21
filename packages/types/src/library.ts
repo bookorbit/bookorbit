@@ -102,7 +102,10 @@ export interface AddedAtRecomputeJob {
 export interface LibraryStats {
   totalBooks: number;
   totalSizeBytes: number;
+  /** Books grouped by primary file format. */
   formatCounts: Record<string, number>;
+  /** Books holding each content format, counted once per format. Older servers omit this field. */
+  heldFormatCounts?: Record<string, number>;
 }
 
 /**

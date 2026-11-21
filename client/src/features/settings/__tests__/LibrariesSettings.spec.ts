@@ -407,13 +407,13 @@ describe('LibrariesSettings ledger', () => {
   })
 
   describe('format bar', () => {
-    it('uses formatCounts the row has room for, as a labelled bar', async () => {
+    it('includes secondary formats in the library breakdown on desktop and mobile', async () => {
       librariesRef.value = [makeLibrary({ id: 7 })]
-      overviewRef.value = [makeEntry({ libraryId: 7, totalBooks: 381, formatCounts: { epub: 305, azw3: 34, mobi: 23 } })]
+      overviewRef.value = [makeEntry({ libraryId: 7, totalBooks: 1, formatCounts: { epub: 1 }, heldFormatCounts: { epub: 1, kepub: 1 } })]
       const wrapper = await mountLoaded()
       const bar = wrapper.get('[data-testid="libraries-ledger-list"] [role="img"]')
-      expect(bar.attributes('aria-label')).toBe('EPUB 305, AZW3 34, MOBI 23')
-      expect(bar.findAll('span')).toHaveLength(3)
+      expect(bar.attributes('aria-label')).toBe('EPUB 1, KEPUB 1')
+      expect(wrapper.get('[data-testid="libraries-ledger-cards"] [role="img"]').attributes('aria-label')).toBe('EPUB 1, KEPUB 1')
     })
 
     it('spells the breakdown out on mobile, where there is width for it', async () => {

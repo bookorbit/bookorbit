@@ -432,11 +432,9 @@ export class LibraryService {
     }
     const lastScans = await this.scannerService.getLatestScans(libraryIds);
 
-    return libraryIds.map((libraryId) => ({
+    return Array.from(stats, ([libraryId, libraryStats]) => ({
       libraryId,
-      totalBooks: stats.get(libraryId)?.totalBooks ?? 0,
-      totalSizeBytes: stats.get(libraryId)?.totalSizeBytes ?? 0,
-      formatCounts: stats.get(libraryId)?.formatCounts ?? {},
+      ...libraryStats,
       lastScan: lastScans.get(libraryId) ?? null,
     }));
   }
