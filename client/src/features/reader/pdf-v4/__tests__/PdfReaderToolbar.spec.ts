@@ -54,6 +54,19 @@ describe('PdfReaderToolbar', () => {
     expect((input.element as HTMLInputElement).value).toBe('240')
   })
 
+  it('shows and describes the PDF label while keeping the input a physical page jump', async () => {
+    const wrapper = mountToolbar({ pageLabel: '24', currentPageStart: 5, currentPageEnd: 5, totalPages: 6 })
+    const input = wrapper.get<HTMLInputElement>('input[aria-label="Current page"]')
+    const description = input.attributes('aria-describedby')
+
+    expect(wrapper.get('[title="24"]').text()).toBe('24')
+    expect(wrapper.get(`[id="${description}"]`).text()).toBe('PDF page label: 24')
+    expect(input.element.value).toBe('5')
+
+    await input.setValue('3')
+    expect(wrapper.emitted('goToPage')).toEqual([[3]])
+  })
+
   it('exposes responsive tools without duplicating sidebar destinations', async () => {
     const wrapper = mountToolbar()
 

@@ -2,10 +2,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AlertTriangle, ExternalLink, LoaderCircle } from '@lucide/vue'
-import { DocumentGate, useDocument } from '@embedpdf/vue/runtime'
+import { DocumentGate, useDocument, usePageList } from '@embedpdf/vue/runtime'
 import { SelectionMenu } from '@embedpdf/vue/selection'
 import { useStage, useStageEvent, useStageState, type StageCapability, type StageSettings, type StageSettingsChangedEvent } from '@embedpdf/vue/stage'
 import type { AnnotationItem, PdfReaderSettings } from '@bookorbit/types'
+import { formatNumber } from '@/i18n/formatters'
 import { useFullscreen } from '../../shared/composables/useFullscreen'
 import PdfDocumentViewport from './PdfDocumentViewport.vue'
 import PdfPasswordPrompt from './PdfPasswordPrompt.vue'
@@ -44,6 +45,7 @@ const stage = useStage()
 const { zoomLevel, zoomMode, currentPageIndex, pageCount, viewRotation } = useStageState()
 const documentStatus = useDocument((document) => document.status)
 const documentPageCount = useDocument((document) => document.pageCount)
+const pages = usePageList()
 const { isPanning, togglePan, activateTextSelection } = usePdfInteractionMode()
 const { isFullscreen, isFullscreenSupported, toggleFullscreen } = useFullscreen()
 
@@ -58,6 +60,14 @@ let restoringPage: number | null = null
 let previewingZoom = false
 
 const pageRange = computed(() => toPageRange(currentPageIndexes.value, currentPageIndex.value + 1, pageCount.value))
+const pageLabel = computed(() => {
+  const { start, end } = pageRange.value
+  const startLabel = pages.value[start - 1]?.label
+  const endLabel = pages.value[end - 1]?.label
+  if ((!startLabel || startLabel === String(start)) && (!endLabel || endLabel === String(end))) return null
+  if (start === end) return startLabel
+  return t('reader.pdf.toolbar.pageLabelRange', { start: startLabel || formatNumber(start), end: endLabel || formatNumber(end) })
+})
 const zoomPercent = computed(() => Math.round(zoomLevel.value * 100))
 const currentZoomMode = computed(() => fromStageZoomMode(zoomMode.value))
 const externalHost = computed(() => pendingExternalUrl.value?.hostname ?? '')
@@ -390,6 +400,7 @@ onUnmounted(() => {
       v-show="headerVisible"
       :current-page-start="pageRange.start"
       :current-page-end="pageRange.end"
+      :page-label="pageLabel"
       :total-pages="pageCount"
       :zoom-percent="zoomPercent"
       :sidebar-open="sidebar.open.value"

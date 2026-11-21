@@ -14891,6 +14891,8 @@
         "navigation": "Document navigation",
         "previousPage": "Previous page",
         "currentPage": "Current page",
+        "pageLabelDescription": "PDF page label: {label}",
+        "pageLabelRange": "{start}–{end}",
         "nextPage": "Next page",
         "zoomOut": "Zoom out",
         "zoomIn": "Zoom in",

@@ -15,6 +15,7 @@ import {
   Plus,
   Settings,
 } from '@lucide/vue'
+import { useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
@@ -22,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 const props = defineProps<{
   currentPageStart: number
   currentPageEnd: number
+  pageLabel?: string | null
   totalPages: number
   zoomPercent: number
   sidebarOpen: boolean
@@ -35,6 +37,7 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
+const pageLabelId = useId()
 
 const emit = defineEmits<{
   back: []
@@ -146,7 +149,7 @@ function handleStartReading() {
     </div>
 
     <div class="mx-auto flex min-w-0 items-center gap-1 sm:absolute sm:inset-x-0 sm:pointer-events-none sm:justify-center">
-      <div class="flex items-center gap-1 sm:pointer-events-auto">
+      <div class="flex min-w-0 items-center gap-1 sm:pointer-events-auto">
         <button
           class="viewer-btn hidden min-[380px]:flex"
           :disabled="props.currentPageStart <= 1"
@@ -155,19 +158,32 @@ function handleStartReading() {
         >
           <ChevronLeft :size="17" />
         </button>
-        <div class="flex items-center gap-1 text-xs tabular-nums text-muted-foreground">
+        <div class="flex min-w-0 items-center gap-1 text-xs tabular-nums text-muted-foreground">
+          <span :id="pageLabelId" aria-live="polite" class="sr-only">
+            {{ props.pageLabel ? t('reader.pdf.toolbar.pageLabelDescription', { label: props.pageLabel }) : '' }}
+          </span>
+          <span
+            v-if="props.pageLabel"
+            :title="props.pageLabel"
+            class="max-w-16 truncate font-medium text-foreground sm:max-w-28"
+            dir="auto"
+            aria-hidden="true"
+            >{{ props.pageLabel }}</span
+          >
+          <span v-if="props.pageLabel" aria-hidden="true">(</span>
           <input
             :value="props.currentPageStart"
             type="number"
             min="1"
             :max="props.totalPages"
             :aria-label="t('reader.pdf.toolbar.currentPage')"
-            class="h-7 w-11 rounded-md border border-border bg-muted/60 px-1 text-center text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            :aria-describedby="props.pageLabel ? pageLabelId : undefined"
+            class="h-7 w-11 shrink-0 rounded-md border border-border bg-muted/60 px-1 text-center text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             @change="handlePageCommit"
             @keydown.enter="handlePageCommit"
           />
           <span v-if="props.currentPageEnd > props.currentPageStart">-{{ props.currentPageEnd }}</span>
-          <span>/ {{ props.totalPages || 0 }}</span>
+          <span class="shrink-0">/ {{ props.totalPages || 0 }}<span v-if="props.pageLabel" aria-hidden="true">)</span></span>
         </div>
         <button
           class="viewer-btn hidden min-[380px]:flex"

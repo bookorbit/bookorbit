@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 const document = reactive({ status: 'loading', pageCount: 10 })
+const pages = ref<{ label: string | null }[]>([])
 const stageState = {
   zoomLevel: ref(1),
   zoomMode: ref('fit-page'),
@@ -50,6 +51,7 @@ vi.mock('@embedpdf/vue/runtime', () => ({
         h('div', slots.default?.()),
   }),
   useDocument: (select: (value: typeof document) => unknown) => computed(() => select(document)),
+  usePageList: () => pages,
 }))
 
 vi.mock('@embedpdf/vue/selection', () => ({
@@ -90,6 +92,7 @@ const settings: PdfReaderSettings = { scrollMode: 'page', spread: 'none', zoomMo
 
 const ToolbarStub = defineComponent({
   name: 'PdfReaderToolbar',
+  props: { pageLabel: String },
   setup:
     (_, { slots }) =>
     () =>
@@ -127,6 +130,7 @@ describe('PdfReaderContent', () => {
     mocks.currentPages = [0]
     document.status = 'ready'
     document.pageCount = 10
+    pages.value = []
     stageState.pageCount.value = 10
     stageState.currentPageIndex.value = 0
     stageSettings.zoom = { mode: 'fit-page' }
@@ -176,6 +180,23 @@ describe('PdfReaderContent', () => {
     turnTo(1, 2)
 
     expect(wrapper.emitted('pageChange')?.at(-1)).toEqual([3, 10, false])
+  })
+
+  it('passes PDF labels to the toolbar while emitting physical page numbers', async () => {
+    const wrapper = mountContent(1)
+    const toolbar = wrapper.findComponent(ToolbarStub)
+    pages.value = [{ label: 'i' }, { label: null }, { label: '24' }, { label: '4' }]
+    await nextTick()
+    expect(toolbar.props('pageLabel')).toBe('i')
+
+    turnTo(1, 2)
+    await nextTick()
+    expect(toolbar.props('pageLabel')).toBe('2–24')
+    expect(wrapper.emitted('pageChange')?.at(-1)).toEqual([3, 10, false])
+
+    turnTo(3)
+    await nextTick()
+    expect(toolbar.props('pageLabel')).toBeNull()
   })
 
   it('saves a level as a custom scale and a fit mode as the mode, ignoring the saved mode and other settings', () => {
