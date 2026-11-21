@@ -271,6 +271,12 @@ Questions are welcome, even if you are unsure whether something is a bug. Share 
 > [!IMPORTANT]
 > BookOrbit's API evolves alongside its official clients. Backwards compatibility is maintained for released official apps, but the API is not currently a stable public integration surface, and compatibility with third-party clients is not guaranteed. For the most reliable experience, use the official apps, OPDS, Kobo sync, or the KOReader plugin.
 
+<a id="credits"></a>
+
+## 🙏 Credits
+
+BookOrbit's read-aloud generation is built on the work of the [Storyteller](https://gitlab.com/storyteller-platform/storyteller) project. Its open-source libraries, `@storyteller-platform/align` and `@storyteller-platform/ghost-story`, align an ebook with its audiobook to produce the EPUB 3 read-along, and the QuartzNet alignment models come from Storyteller's model registry. Many thanks to the Storyteller team for their incredible work.
+
 <a id="license-and-attribution"></a>
 
 ## ⚖️ License and Attribution
