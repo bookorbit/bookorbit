@@ -93,6 +93,15 @@ describe('EditionsTable', () => {
     expect(rows[1]!.get('[data-testid="edition-row-link"]').attributes('aria-label')).toBe('Unabridged, M4B, in Audiobooks, 42% read')
   })
 
+  it('draws a plain cover in place of one that does not load', async () => {
+    const wrapper = mountTable()
+    const covers = () => wrapper.findAll('[data-testid="edition-row-cover"]')
+    expect(covers().every((cover) => cover.find('img').exists())).toBe(true)
+
+    await covers()[2]!.get('img').trigger('error')
+    expect(covers().map((cover) => cover.find('img').exists())).toEqual([true, true, false, true, true])
+  })
+
   it('names each library, with the title first when an edition has another one', () => {
     const rows = mountTable().findAll('[data-testid="edition-row"]')
     expect(rows[0]!.text()).toContain('Novels')

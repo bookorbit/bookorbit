@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink } from 'vue-router'
 import { BookOpen, Check, Crown, EllipsisVertical, TriangleAlert, Unlink } from '@lucide/vue'
@@ -86,6 +86,13 @@ const rows = computed(() =>
 
 type Row = (typeof rows.value)[number]
 
+/** Editions whose cover did not load; a book without a cover has no thumbnail to show. */
+const missingCovers = ref(new Set<number>())
+
+function handleCoverError(row: Row): void {
+  missingCovers.value = new Set(missingCovers.value).add(row.bookId)
+}
+
 function handleMakeMain(row: Row): void {
   emit('make-main', row.bookId)
 }
@@ -120,7 +127,20 @@ function handleRemove(row: Row): void {
           data-testid="edition-row"
         >
           <span v-if="row.current" class="absolute inset-y-1.5 start-0 w-[3px] rounded-e-[3px] bg-primary" aria-hidden="true"></span>
-          <img :src="row.cover" alt="" class="h-[51px] w-[34px] rounded-[3px] object-cover shadow-(--book-cover-mini-shadow)" loading="lazy" />
+          <span
+            class="flex h-[51px] w-[34px] items-center justify-center overflow-hidden rounded-[3px] bg-muted shadow-(--book-cover-mini-shadow)"
+            data-testid="edition-row-cover"
+          >
+            <img
+              v-if="!missingCovers.has(row.bookId)"
+              :src="row.cover"
+              alt=""
+              class="size-full object-cover"
+              loading="lazy"
+              @error="handleCoverError(row)"
+            />
+            <BookOpen v-else class="size-3.5 text-muted-foreground" aria-hidden="true" />
+          </span>
 
           <div class="min-w-0">
             <div class="flex min-w-0 items-center gap-1.5 text-[13px] leading-[18px] font-medium">
