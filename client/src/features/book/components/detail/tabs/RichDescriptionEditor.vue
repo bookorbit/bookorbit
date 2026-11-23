@@ -68,8 +68,7 @@ const editor = useEditor({
   ],
   editorProps: {
     attributes: {
-      class:
-        'min-h-[10rem] w-full outline-none px-3 py-2 text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5',
+      class: 'description-content min-h-[10rem] w-full outline-none px-3 py-2 text-sm leading-relaxed',
     },
   },
   onUpdate: ({ editor: instance }) => {
@@ -508,12 +507,9 @@ function isAllowedLinkUrl(value: string): boolean {
       </div>
     </div>
 
-    <div
-      v-if="previewOpen"
-      class="min-h-[10rem] px-3 py-2 text-sm leading-relaxed [&_a]:text-primary [&_a]:underline [&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-3 [&_blockquote]:text-muted-foreground [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-5"
-    >
+    <div v-if="previewOpen" class="min-h-[10rem] px-3 py-2 text-sm leading-relaxed">
       <!-- eslint-disable-next-line vue/no-v-html -- sanitized by sanitizeDescriptionHtml -->
-      <div v-if="previewHtml" v-html="previewHtml"></div>
+      <div v-if="previewHtml" class="description-content" v-html="previewHtml"></div>
       <p v-else class="italic text-muted-foreground">{{ t('book.detail.richDescription.noDescription') }}</p>
     </div>
     <EditorContent v-else-if="editor" :editor="editor" :class="{ 'pointer-events-none opacity-50': disabled }" />

@@ -2236,7 +2236,7 @@ watch(
             v-if="book.description"
             :id="`book-${book.id}-synopsis`"
             data-test="synopsis-copy"
-            class="mt-2 text-sm leading-relaxed text-foreground"
+            class="description-content mt-2 text-sm leading-relaxed text-foreground"
             :class="{ 'synopsis-copy--clamped': !descriptionExpanded }"
             v-html="safeDescription"
           />

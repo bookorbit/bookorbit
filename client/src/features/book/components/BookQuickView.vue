@@ -372,7 +372,7 @@ function handleDelete() {
               <div class="border-t pt-4">
                 <div v-if="detail.description">
                   <div
-                    class="text-sm leading-relaxed text-foreground transition-all"
+                    class="description-content text-sm leading-relaxed text-foreground transition-all"
                     :class="descriptionExpanded ? '' : 'line-clamp-4'"
                     v-html="safeDescription"
                   />

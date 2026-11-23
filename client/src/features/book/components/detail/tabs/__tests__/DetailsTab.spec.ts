@@ -320,6 +320,16 @@ describe('DetailsTab cover surface', () => {
     expect(layout.element.classList).not.toContain('@min-[46rem]/book-detail:grid-rows-[minmax(0,1fr)_clamp(11.25rem,29%,17.5rem)]')
   })
 
+  it('styles the synopsis with the same description rules as the editor', async () => {
+    const wrapper = mountDetails(makeBook({ description: '<p>First paragraph.</p><p>Second paragraph.</p>' }))
+    await flushPromises()
+
+    const synopsis = wrapper.get('[data-test="synopsis-copy"]')
+
+    expect(synopsis.classes()).toContain('description-content')
+    expect(synopsis.findAll('p').map((paragraph) => paragraph.text())).toEqual(['First paragraph.', 'Second paragraph.'])
+  })
+
   it('uses the responsive synopsis clamp until the full description is opened', async () => {
     const wrapper = mountDetails(makeBook({ description: '<p>A synopsis</p>' }))
     await flushPromises()

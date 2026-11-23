@@ -633,7 +633,7 @@ defineOptions({ name: 'SeriesDetailView' })
                     <p class="mb-2 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{{ t('series.detail.synopsis') }}</p>
                     <div v-if="leadBook.description">
                       <div
-                        class="text-sm leading-relaxed text-foreground"
+                        class="description-content text-sm leading-relaxed text-foreground"
                         :class="leadDescriptionExpanded ? '' : 'line-clamp-3'"
                         v-html="safeLeadDescription"
                       />
