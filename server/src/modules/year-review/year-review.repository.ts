@@ -5,6 +5,7 @@ import type { ContentFilterRules, YearReviewBook, YearReviewFinishedBook } from 
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 import {
   annotations,
@@ -108,10 +109,10 @@ export class YearReviewRepository {
     return rows;
   }
 
-  /** Each book finished in the window once, at its first finish there, oldest first. */
+  /** Each work finished in the window once (linked editions are one work), at its first finish there, oldest first. */
   async getFinishedBooks(scope: YearReviewScope, window: YearReviewWindow): Promise<YearReviewFinishedBook[]> {
     const result = await this.db.execute(sql`
-      select distinct on (coalesce(${readingAttempts.bookId}, -${readingAttempts.id}))
+      select distinct on (wk.work_key)
         ${readingAttempts.id} as id,
         ${readingAttempts.bookId} as book_id,
         coalesce(${bookMetadata.title}, ${readingAttempts.bookTitleSnapshot}) as title,
@@ -127,6 +128,7 @@ export class YearReviewRepository {
         coalesce(${bookMetadata.pageCount}, ${readingAttempts.bookPageCountSnapshot}) as page_count,
         coalesce(${readingAttempts.rating}, ${userBookRatings.rating}) as rating
       from ${readingAttempts}
+      cross join lateral (select coalesce(${workKeySql(readingAttempts.bookId)}, 'r' || ${readingAttempts.id}) as work_key) wk
       left join ${books} on ${books.id} = ${readingAttempts.bookId}
       left join ${bookMetadata} on ${bookMetadata.bookId} = ${readingAttempts.bookId}
       left join ${userBookRatings} on ${userBookRatings.userId} = ${scope.userId} and ${userBookRatings.bookId} = ${readingAttempts.bookId}
@@ -138,7 +140,7 @@ export class YearReviewRepository {
         sql`${readingAttempts.endedOn} < ${window.until}`,
         finishedReadScope(scope.libraryIds, this.contentClauses(scope)),
       )}
-      order by coalesce(${readingAttempts.bookId}, -${readingAttempts.id}), ${readingAttempts.endedOn}, ${readingAttempts.id}
+      order by wk.work_key, ${readingAttempts.endedOn}, ${readingAttempts.id}
     `);
     return (result.rows as Row[])
       .map((row) => ({

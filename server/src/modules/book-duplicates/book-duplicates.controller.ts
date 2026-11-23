@@ -18,8 +18,8 @@ import {
 
 /**
  * Finding duplicates is open to anyone who may delete or merge books (H11). What a resolution does
- * to each group is checked per action in the service: delete needs the delete permission, merge and
- * link the merge permission.
+ * to each group is checked per action in the service: delete needs the delete permission, merge the
+ * merge permission, and link the edit-metadata permission.
  */
 @Controller('book-duplicates')
 @RequirePermission(Permission.LibraryDeleteBooks)

@@ -17,6 +17,7 @@ import { READING_HISTORY_UNDATED_MONTH } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 import {
   annotations,
@@ -72,10 +73,11 @@ function escapeLike(value: string): string {
 /**
  * Finished reads (completed, skimmed or abandoned attempts) and the numbers built on them.
  *
- * Every query numbers a reader's finishes per book first: `read_number` says which finish of the
- * book a read was, ordered the way the apps order attempts (by the day it began, else ended, with
- * undated reads first), and `latest_completed` marks the book's most recent finish, the one the
- * book's own rating belongs to. A read whose book was deleted is its own book.
+ * Every query numbers a reader's finishes per work first, linked editions being one work:
+ * `read_number` says which finish of the work a read was, ordered the way the apps order attempts
+ * (by the day it began, else ended, with undated reads first), so finishing a second edition is a
+ * re-read. `latest_completed` stays per book: it marks the book's most recent finish, the one the
+ * book's own rating belongs to. A read whose book was deleted is its own work.
  */
 @Injectable()
 export class ReadingHistoryRepository {
@@ -83,18 +85,22 @@ export class ReadingHistoryRepository {
 
   private numbered(userId: number): SQL {
     return sql`numbered as (
-      select ra.id,
+      select ra.id, ra.work_key,
         case when ra.outcome = 'completed' then row_number() over (
-          partition by coalesce(ra.book_id, -ra.id), ra.outcome = 'completed'
+          partition by ra.work_key, ra.outcome = 'completed'
           order by coalesce(ra.started_on, ra.ended_on) nulls first, ra.id
         ) end as read_number,
-        count(*) filter (where ra.outcome = 'completed') over (partition by coalesce(ra.book_id, -ra.id)) as completed_reads,
+        count(*) filter (where ra.outcome = 'completed') over (partition by ra.work_key) as completed_reads,
         ra.outcome = 'completed' and row_number() over (
           partition by coalesce(ra.book_id, -ra.id), ra.outcome = 'completed'
           order by ra.ended_on desc nulls last, ra.id desc
         ) = 1 as latest_completed
-      from ${readingAttempts} ra
-      where ra.user_id = ${userId} and ra.outcome is not null and ra.deleted_at is null
+      from (
+        select ra.id, ra.book_id, ra.outcome, ra.started_on, ra.ended_on,
+          coalesce(${workKeySql(sql`ra.book_id`)}, 'r' || ra.id) as work_key
+        from ${readingAttempts} ra
+        where ra.user_id = ${userId} and ra.outcome is not null and ra.deleted_at is null
+      ) ra
     )`;
   }
 
@@ -306,12 +312,12 @@ export class ReadingHistoryRepository {
     return [...dated, ...rows.filter((row) => row.month === READING_HISTORY_UNDATED_MONTH)];
   }
 
-  /** Completed-read totals for a period: reads, distinct books, rereads, pages, ratings. */
+  /** Completed-read totals for a period: reads, distinct works, rereads, pages, ratings. */
   async totals(scope: ReadingHistoryScope, period: ReadingHistoryPeriod) {
     const result = await this.db.execute(sql`
       with ${this.numbered(scope.userId)}
       select count(*) filter (where ${readingAttempts.outcome} = 'completed')::int as reads,
-        count(distinct coalesce(${readingAttempts.bookId}, -${readingAttempts.id})) filter (where ${readingAttempts.outcome} = 'completed')::int as books,
+        count(distinct numbered.work_key) filter (where ${readingAttempts.outcome} = 'completed')::int as books,
         count(*) filter (where numbered.read_number > 1)::int as rereads,
         coalesce(sum(${this.pages}) filter (where ${readingAttempts.outcome} = 'completed'), 0)::int as pages,
         avg(${this.rating(scope.userId)}) filter (where ${readingAttempts.outcome} = 'completed')::float as average_rating,
@@ -451,9 +457,9 @@ export class ReadingHistoryRepository {
       this.record(
         scope,
         period,
-        sql`count(*) over (partition by coalesce(${readingAttempts.bookId}, -${readingAttempts.id}))`,
+        sql`count(*) over (partition by numbered.work_key)`,
         undefined,
-        sql`count(*) over (partition by coalesce(${readingAttempts.bookId}, -${readingAttempts.id})) desc, ${readingAttempts.endedOn} desc nulls last, ${readingAttempts.id} desc`,
+        sql`count(*) over (partition by numbered.work_key) desc, ${readingAttempts.endedOn} desc nulls last, ${readingAttempts.id} desc`,
       ),
     ]);
     return { longestBook, longestRead, fastest, mostReread: mostReread && mostReread.value > 1 ? mostReread : null };

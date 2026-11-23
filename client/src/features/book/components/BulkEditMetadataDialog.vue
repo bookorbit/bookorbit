@@ -12,7 +12,6 @@ import type { BulkEditFields, ArrayMode } from '@/features/book/composables/useB
 import { normalizeSeriesMemberships, type EditableSeriesMembership } from '@/features/book/composables/useMetadataEditor'
 import {
   BULK_EDITABLE_ARRAY_FIELDS,
-  BULK_EDITABLE_SCALAR_FIELDS,
   BULK_EDITABLE_FIELD_LABELS,
   type BulkEditableArrayField,
   type BulkEditableScalarField,
@@ -35,14 +34,22 @@ const emit = defineEmits<{
   confirm: [fields: BulkEditFields]
 }>()
 
-const ARRAY_FIELDS = BULK_EDITABLE_ARRAY_FIELDS
-const SCALAR_FIELDS = BULK_EDITABLE_SCALAR_FIELDS
-
 type ArrayFieldKey = BulkEditableArrayField
-type ScalarFieldKey = BulkEditableScalarField
-type FieldKey = BulkEditableField
+type ScalarFieldKey = BulkEditableScalarField | 'editionName' | 'originalPublishedYear'
+type FieldKey = BulkEditableField | ScalarFieldKey
+type YearFieldKey = 'publishedYear' | 'originalPublishedYear'
 
-const FIELD_LABELS = BULK_EDITABLE_FIELD_LABELS
+const ARRAY_FIELDS = BULK_EDITABLE_ARRAY_FIELDS
+const SCALAR_FIELDS: readonly ScalarFieldKey[] = ['seriesName', 'publisher', 'editionName', 'language', 'publishedYear', 'originalPublishedYear']
+const YEAR_FIELDS: readonly YearFieldKey[] = ['publishedYear', 'originalPublishedYear']
+const MIN_STORED_YEAR = 1000
+const MAX_STORED_YEAR = 2200
+
+const FIELD_LABELS = computed<Record<FieldKey, string>>(() => ({
+  ...BULK_EDITABLE_FIELD_LABELS,
+  editionName: t('book.detail.editMetadata.editionNameLabel'),
+  originalPublishedYear: t('book.detail.editMetadata.firstPublishedLabel'),
+}))
 
 const MODE_LABELS = computed<Record<UIArrayMode, string>>(() => ({
   add: t('book.bulkEdit.mode.add'),
@@ -79,8 +86,10 @@ const enabledFields = reactive<Record<FieldKey, boolean>>({
   narrators: false,
   seriesName: false,
   publisher: false,
+  editionName: false,
   language: false,
   publishedYear: false,
+  originalPublishedYear: false,
 })
 
 const arrayModes = reactive<Record<ArrayFieldKey, UIArrayMode>>({
@@ -100,24 +109,43 @@ const arrayValues = reactive<Record<ArrayFieldKey, string[]>>({
 const scalarValues = reactive<Record<ScalarFieldKey, string>>({
   seriesName: '',
   publisher: '',
+  editionName: '',
   language: '',
   publishedYear: '',
+  originalPublishedYear: '',
 })
 const seriesMembershipValues = ref<EditableSeriesMembership[]>([])
 
 const hasAnyEnabledField = computed(() => Object.values(enabledFields).some(Boolean))
 
-const yearError = computed(() => {
-  if (!enabledFields.publishedYear) return null
-  const raw = scalarValues.publishedYear.trim()
+function isYearField(key: ScalarFieldKey): key is YearFieldKey {
+  return (YEAR_FIELDS as readonly ScalarFieldKey[]).includes(key)
+}
+
+function findYearError(key: YearFieldKey): string | null {
+  if (!enabledFields[key]) return null
+  const raw = scalarValues[key].trim()
   if (!raw) return null
   if (!/^\d+$/.test(raw)) return t('book.bulkEdit.invalidYear')
+  const year = Number(raw)
+  if (key === 'originalPublishedYear' && (year < MIN_STORED_YEAR || year > MAX_STORED_YEAR)) {
+    return t('book.bulkEdit.yearOutOfRange', { min: String(MIN_STORED_YEAR), max: String(MAX_STORED_YEAR) })
+  }
   return null
-})
+}
+
+const yearErrors = computed<Record<YearFieldKey, string | null>>(() => ({
+  publishedYear: findYearError('publishedYear'),
+  originalPublishedYear: findYearError('originalPublishedYear'),
+}))
+
+function yearErrorFor(key: ScalarFieldKey): string | null {
+  return isYearField(key) ? yearErrors.value[key] : null
+}
 
 const canConfirm = computed(() => {
   if (!hasAnyEnabledField.value) return false
-  if (yearError.value) return false
+  if (YEAR_FIELDS.some((key) => yearErrors.value[key])) return false
 
   for (const key of ARRAY_FIELDS) {
     if (!enabledFields[key]) continue
@@ -146,7 +174,7 @@ function buildFields(): BulkEditFields {
       fields.seriesMemberships = normalizeSeriesMemberships(seriesMembershipValues.value)
       continue
     }
-    if (key === 'publishedYear') {
+    if (isYearField(key)) {
       const num = scalarValues[key].trim() ? parseInt(scalarValues[key], 10) : null
       fields[key] = { value: num !== null && Number.isNaN(num) ? null : num }
     } else {
@@ -324,16 +352,16 @@ watch(
                 v-else
                 v-model="scalarValues[key]"
                 type="text"
-                :inputmode="key === 'publishedYear' ? 'numeric' : undefined"
+                :inputmode="isYearField(key) ? 'numeric' : undefined"
                 :placeholder="
-                  key === 'publishedYear'
+                  isYearField(key)
                     ? t('book.bulkEdit.yearPlaceholder')
                     : t('book.bulkEdit.enterPlaceholder', { field: FIELD_LABELS[key].toLowerCase() })
                 "
                 class="w-full h-9 rounded-md border border-border bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
               />
-              <p v-if="key === 'publishedYear' && yearError" class="text-xs text-destructive mt-1">
-                {{ yearError }}
+              <p v-if="yearErrorFor(key)" class="text-xs text-destructive mt-1">
+                {{ yearErrorFor(key) }}
               </p>
               <p v-else class="text-xs text-muted-foreground mt-1">{{ t('book.bulkEdit.leaveEmptyHint') }}</p>
             </div>

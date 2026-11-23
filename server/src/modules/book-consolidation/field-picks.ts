@@ -27,6 +27,8 @@ export const BOOK_MERGE_FIELD_SPECS: Record<BookMergeField, FieldSpec> = {
   description: { columns: ['description'], locks: ['description'] },
   publisher: { columns: ['publisher'], locks: ['publisher'] },
   publishedYear: { columns: ['publishedDate', 'publishedYear'], locks: ['publishedYear'] },
+  editionName: { columns: ['editionName'], locks: ['editionName'] },
+  originalPublishedYear: { columns: ['originalPublishedYear'], locks: ['originalPublishedYear'] },
   language: { columns: ['language'], locks: ['language'] },
   pageCount: { columns: ['pageCount'], locks: ['pageCount'] },
   series: { columns: ['seriesId', 'seriesName', 'seriesIndex'], locks: ['seriesName', 'seriesIndex'] },

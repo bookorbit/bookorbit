@@ -1700,5 +1700,31 @@
     "allowDefault": false,
     "useGuards": [],
     "apiKey": "interactive"
+  },
+  {
+    "file": "server/src/modules/setup-overview/setup-overview.controller.ts",
+    "className": "SetupOverviewController",
+    "methodName": "get",
+    "httpMethod": "GET",
+    "path": "/setup-overview",
+    "permissions": ["Permission.ManageAppSettings"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "read"
+  },
+  {
+    "file": "server/src/modules/koreader/koreader-catalog.controller.ts",
+    "className": "KoreaderCatalogController",
+    "methodName": "booksQuery",
+    "httpMethod": "POST",
+    "path": "/koreader/plugin/catalog/books/query",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": true,
+    "allowDefault": false,
+    "useGuards": ["KoreaderAuthGuard"],
+    "apiKey": "public"
   }
 ]

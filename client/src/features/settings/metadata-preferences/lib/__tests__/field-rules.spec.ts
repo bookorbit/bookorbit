@@ -242,6 +242,15 @@ describe('metadata field labels and groups', () => {
     expect(messageAt('settings.metadata.fields.cover')).toBe('Cover')
   })
 
+  it('shows the first published year beside the published year, as a field only Hardcover and Open Library fill', () => {
+    const publication = FIELD_GROUPS.find((group) => group.id === 'publication')?.fields ?? []
+    expect(publication.indexOf('originalPublishedYear')).toBe(publication.indexOf('publishedYear') + 1)
+    expect(messageAt('settings.metadata.fields.originalPublishedYear')).toBe('First published')
+    expect(skipReasonFor(status('hardcover', true, true), 'originalPublishedYear')).toBeNull()
+    expect(skipReasonFor(status('openLibrary', true, true), 'originalPublishedYear')).toBeNull()
+    expect(skipReasonFor(STATUSES[1], 'originalPublishedYear')).toBe('neverSupplies')
+  })
+
   it('puts every field in exactly one group, since a field in none is never shown', () => {
     const grouped = FIELD_GROUPS.flatMap((group) => group.fields)
     expect([...grouped].sort()).toEqual([...ALL_METADATA_FIELDS].sort())

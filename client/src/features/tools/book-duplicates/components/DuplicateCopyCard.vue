@@ -2,12 +2,13 @@
 import { computed } from 'vue'
 import { BookOpen, Check, Layers, Sparkles } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import type { BookDuplicateAction, BookDuplicateCandidate } from '@bookorbit/types'
+import type { BookDuplicateAction, BookDuplicateCandidate, BookDuplicateKind } from '@bookorbit/types'
 
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { formatBytes } from '@/lib/formatting'
 import { formatCopyProgress } from '../utils/copy-progress'
 import { copyBytes, copyFolderLabel } from '../utils/duplicate-keeper'
+import { duplicateCopyStatusKey } from '../utils/duplicate-labels'
 
 const props = defineProps<{
   book: BookDuplicateCandidate
@@ -17,6 +18,8 @@ const props = defineProps<{
   recommended: boolean
   /** The group's action: what happens to the copies that are not kept. */
   action?: BookDuplicateAction | null
+  /** The group's kind: other editions are named as editions. */
+  kind?: BookDuplicateKind
 }>()
 
 const emit = defineEmits<{ keep: [bookId: number] }>()
@@ -25,19 +28,7 @@ const { t } = useI18n()
 
 const label = computed(() => copyFolderLabel(props.book) || props.book.title || t('book.untitled'))
 const bytes = computed(() => formatBytes(copyBytes(props.book)))
-const status = computed(() => {
-  if (props.keeper) return props.action === 'link' ? t('tools.bookDuplicates.copyStatus.main') : t('tools.bookDuplicates.keeping')
-  switch (props.action) {
-    case 'delete':
-      return t('tools.bookDuplicates.willDelete')
-    case 'merge':
-      return t('tools.bookDuplicates.copyStatus.merge')
-    case 'link':
-      return t('tools.bookDuplicates.copyStatus.link')
-    default:
-      return t('tools.bookDuplicates.copyStatus.other')
-  }
-})
+const status = computed(() => t(duplicateCopyStatusKey(props.kind, props.keeper, props.action)))
 
 function handleKeep(): void {
   emit('keep', props.book.id)

@@ -141,7 +141,7 @@ describe('useBulkEditMetadata', () => {
 
       await submit({ publisher: { value: 'Test' } })
 
-      expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated metadata for 2 books')
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated the metadata of 2 books')
     })
 
     it('shows singular book in toast when only 1 book updated', async () => {
@@ -154,7 +154,7 @@ describe('useBulkEditMetadata', () => {
 
       await submit({ publisher: { value: 'Test' } })
 
-      expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated metadata for 1 book')
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated the metadata of 1 book')
     })
 
     it('shows warning toast when all books had locked fields', async () => {
@@ -167,7 +167,7 @@ describe('useBulkEditMetadata', () => {
 
       await submit({ publisher: { value: 'Test' } })
 
-      expect(mocks.toastWarning).toHaveBeenCalledWith('All selected books had locked fields - no changes applied')
+      expect(mocks.toastWarning).toHaveBeenCalledWith('Every selected book has these fields locked, so nothing changed')
     })
 
     it('shows partial success toast when some books had locked fields', async () => {
@@ -180,7 +180,7 @@ describe('useBulkEditMetadata', () => {
 
       await submit({ publisher: { value: 'Test' } })
 
-      expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated 2 books (some fields skipped due to locks)')
+      expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated 2 books; some locked fields were skipped')
     })
 
     it('returns the result object on success', async () => {
@@ -233,7 +233,7 @@ describe('useBulkEditMetadata', () => {
 
       await submit({ publisher: { value: 'Test' } })
 
-      expect(mocks.toastError).toHaveBeenCalledWith('An unexpected error occurred while saving changes')
+      expect(mocks.toastError).toHaveBeenCalledWith('Something went wrong while saving the changes')
     })
 
     it('returns null when api() throws', async () => {

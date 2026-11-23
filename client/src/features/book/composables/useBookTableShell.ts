@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import type { Ref } from 'vue'
 import { useRouter } from 'vue-router'
-import type { BookCard } from '@bookorbit/types'
+import { Permission, type BookCard } from '@bookorbit/types'
 import { useTableViewControls } from './useTableViewControls'
 import { useBookViewSelection } from './useBookViewSelection'
 import { useBookSelectionPermissions } from './useBookSelectionPermissions'
@@ -9,6 +9,7 @@ import { useBookNavigation } from './useBookNavigation'
 import { useDeleteBook } from './useDeleteBook'
 import { useBookBulkActions, type QuerySelectionState } from './useBookBulkActions'
 import { hasLinkedBooks, type LinkSeedBook } from '../lib/book-link'
+import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 
 interface BookTableShellOptions {
   viewType?: 'library' | 'collection' | 'smartScope'
@@ -34,6 +35,7 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
   const {
     pendingId: deleteBookId,
     deleting: deletingBook,
+    editions: deleteEditions,
     promptDelete,
     cancelDelete,
     confirmDelete,
@@ -76,6 +78,27 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
     const selected = selection.selectedIds.value
     return books.value.some((book) => selected.has(book.id) && hasLinkedBooks(book))
   })
+  const { hasLibraryPermission } = useLibraryPermissions()
+  function canDeleteInLibrary(libraryId: number): boolean {
+    return hasLibraryPermission(Permission.LibraryDeleteBooks, libraryId)
+  }
+  /** Other editions a delete of the selection could take along: the confirmation offers them. */
+  const selectionOtherEditions = computed(() => {
+    const query = querySelection?.value
+    if (query) return query.collapseLinked && query.editionTotal != null ? Math.max(0, query.editionTotal - query.total) : 0
+    const selected = selection.selectedIds.value
+    const others = new Set<number>()
+    for (const book of books.value) {
+      if (!selected.has(book.id)) continue
+      for (const other of book.linked?.books ?? []) {
+        if (!selected.has(other.bookId) && canDeleteInLibrary(other.libraryId)) others.add(other.bookId)
+      }
+    }
+    return others.size
+  })
+  function handleDeleteSelected(includeOtherEditions = false): Promise<void> {
+    return bulk.handleDeleteSelected(includeOtherEditions, canDeleteInLibrary)
+  }
   const pendingDeleteLinked = computed(() => {
     const id = deleteBookId.value
     return id !== null && hasLinkedBooks(books.value.find((book) => book.id === id))
@@ -104,7 +127,7 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
       return
     }
 
-    promptDelete(book.id)
+    promptDelete(book.id, book)
   }
 
   function handleTableBookUpdate(updated: BookCard): void {
@@ -181,10 +204,13 @@ export function useBookTableShell({ books, selectionMode, querySelection, onMove
     pendingDeleteLinked,
     deleteBookId,
     deletingBook,
+    deleteEditions,
     promptDelete,
     cancelDelete,
     confirmDelete,
     ...bulk,
+    handleDeleteSelected,
+    selectionOtherEditions,
     addToCollectionOpen,
     bulkEditOpen,
     sendBookOpen,

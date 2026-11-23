@@ -5,9 +5,11 @@ import { BOOK_MERGE_MAX_BOOKS } from "./book-merge";
 
 /**
  * `duplicate`: copies of one book in one medium. `other_format`: an ebook and an audiobook of one
- * work. The two never share a group, so a book holding both media cannot chain unrelated groups.
+ * work. `other_edition`: two editions of one work in one medium, such as two audiobook recordings
+ * or two publishers' ebooks. Kinds never share a group, so a book holding both media cannot chain
+ * unrelated groups.
  */
-export const BOOK_DUPLICATE_KINDS = ["duplicate", "other_format"] as const;
+export const BOOK_DUPLICATE_KINDS = ["duplicate", "other_format", "other_edition"] as const;
 export type BookDuplicateKind = (typeof BOOK_DUPLICATE_KINDS)[number];
 
 export const BOOK_DUPLICATE_MATCH_REASONS = [
@@ -25,6 +27,7 @@ export type BookDuplicateMatchReason = (typeof BOOK_DUPLICATE_MATCH_REASONS)[num
 export const BOOK_DUPLICATE_REASONS_BY_KIND: Readonly<Record<BookDuplicateKind, readonly BookDuplicateMatchReason[]>> = {
   duplicate: ["file_hash", "isbn", "exact_metadata", "fuzzy_metadata"],
   other_format: ["same_work", "title_author", "series_position"],
+  other_edition: ["same_work", "title_author"],
 };
 
 export const BOOK_DUPLICATE_SCAN_STATUSES = ["queued", "running", "completed", "failed"] as const;
@@ -60,6 +63,8 @@ export type BookDuplicateScan = {
   totalReclaimableBytes: number | null;
   /** Ebook and audiobook pairs of one work, set when the scan completes. */
   totalOtherFormatPairs: number | null;
+  /** Pairs of editions of one work in one medium, set when the scan completes. */
+  totalOtherEditionPairs: number | null;
   errorCode: string | null;
   createdAt: string;
   completedAt: string | null;
@@ -120,6 +125,9 @@ export type BookDuplicateDismissal = {
   bookIdB: number;
   titleA: string | null;
   titleB: string | null;
+  /** What tells the two apart when they share a title: edition name, publisher and year, or library. Null otherwise. */
+  detailA?: string | null;
+  detailB?: string | null;
   createdAt: string;
 };
 
@@ -133,9 +141,11 @@ export type BookDuplicateGroupsResponse = {
   total: number;
   page: number;
   pageSize: number;
+  /** Groups still open in each tab, after anything grouped or dismissed since the scan. */
+  kindTotals: Record<BookDuplicateKind, number>;
 };
 
-/** What a resolution does with the copies beside the keeper. Other-format pairs are never deleted. */
+/** What a resolution does with the copies beside the keeper. Only duplicates are ever deleted. */
 export const BOOK_DUPLICATE_ACTIONS = ["delete", "merge", "link"] as const;
 export type BookDuplicateAction = (typeof BOOK_DUPLICATE_ACTIONS)[number];
 
@@ -195,14 +205,20 @@ export function duplicateLinkAvailable(books: AvailabilityBook[]): boolean {
 export type BookDuplicatePermissions = {
   canDelete: boolean;
   canMerge: boolean;
+  /** Linking books is a metadata edit, so it follows the edit-metadata permission, not the merge one. */
+  canLink: boolean;
 };
 
-/** The actions a user may choose for a group; the server enforces the same rule. */
+/**
+ * The actions a user may choose for a group; the server enforces the same rule. Only duplicates are
+ * deleted. Other editions are offered Link first; Merge stays available for them but is never a default.
+ */
 export function allowedDuplicateActions(kind: BookDuplicateKind, permissions: BookDuplicatePermissions): BookDuplicateAction[] {
-  const actions: BookDuplicateAction[] = [];
-  if (kind === "duplicate" && permissions.canDelete) actions.push("delete");
-  if (permissions.canMerge) actions.push("merge", "link");
-  return actions;
+  const merge: BookDuplicateAction[] = permissions.canMerge ? ["merge"] : [];
+  const link: BookDuplicateAction[] = permissions.canLink ? ["link"] : [];
+  if (kind === "other_edition") return [...link, ...merge];
+  const remove: BookDuplicateAction[] = kind === "duplicate" && permissions.canDelete ? ["delete"] : [];
+  return [...remove, ...merge, ...link];
 }
 
 type DefaultActionGroup = Pick<BookDuplicateGroup, "kind" | "reasons"> & {

@@ -6,6 +6,7 @@ import type { ReadingHistoryItem, ReadingHistoryMarks, ReadingHistoryPage, Readi
 import * as schema from '../src/db/schema';
 import { BookRepository } from '../src/modules/book/book.repository';
 import { DashboardWidgetRepository } from '../src/modules/dashboard/dashboard-widget.repository';
+import { YearReviewRepository } from '../src/modules/year-review/year-review.repository';
 import { closeE2EContext, createE2EContext, seedLibrary, type E2EContext } from './e2e/app-harness';
 
 const TIMEOUT = 120_000;
@@ -225,5 +226,69 @@ describe('Reading history (docker e2e)', { timeout: TIMEOUT }, () => {
     const strangerReads = await ctx.db.select().from(schema.readingAttempts).where(eq(schema.readingAttempts.userId, stranger.id));
     expect(strangerReads).toHaveLength(1);
     expect(strangerReads[0]).toMatchObject({ bookId: null, bookTitleSnapshot: 'A Novel, Unabridged' });
+  });
+
+  it('counts two linked editions as one work, the later finish a re-read, and splits them again on unlink', async () => {
+    const ebook = await createBook('Kindred', ['Octavia Example'], 300);
+    const audiobook = await createBook('Kindred (Unabridged)', ['Octavia Example'], 260);
+    const ebookRead = await addRead(reader.id, ebook, '2024-03-01', '2024-03-10');
+    const audiobookRead = await addRead(reader.id, audiobook, '2024-06-01', '2024-06-20');
+    const year = async () => ({
+      summary: (await get<ReadingHistorySummary>(reader.token, '/reading-history/summary?year=2024')).body,
+      list: (await get<ReadingHistoryPage>(reader.token, '/reading-history?year=2024')).body,
+    });
+    const finishedInYear = () =>
+      ctx.app
+        .get(YearReviewRepository)
+        .getFinishedBooks(
+          { userId: reader.id, libraryIds: null, contentFilters: undefined },
+          { start: new Date('2024-01-01T00:00:00Z'), end: new Date('2025-01-01T00:00:00Z'), from: '2024-01-01', until: '2025-01-01' },
+        );
+
+    const apart = await year();
+    expect(apart.summary).toMatchObject({ reads: 2, books: 2, rereads: 0, pages: 560 });
+
+    const linked = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/books/links',
+      headers: { authorization: `Bearer ${ctx.adminToken}` },
+      payload: { bookIds: [ebook, audiobook] },
+    });
+    expect(linked.statusCode).toBe(201);
+
+    // E10: past reads regroup at once, past the summary cache; time and pages still count every edition.
+    const together = await year();
+    expect(together.summary).toMatchObject({ reads: 2, books: 1, rereads: 1, pages: 560 });
+    expect(together.summary.months[5]).toMatchObject({ month: 6, reads: 1, rereads: 1 });
+    expect(together.list.items.map((item) => [item.id, item.readNumber, item.completedReads])).toEqual([
+      [audiobookRead, 2, 2],
+      [ebookRead, 1, 2],
+    ]);
+    expect(together.list.months?.map((month) => [month.month, month.rereads])).toEqual([
+      ['2024-06', 1],
+      ['2024-03', 0],
+    ]);
+    expect(together.summary.records.mostReread).toMatchObject({ item: { bookId: audiobook }, value: 2 });
+    // E12: the year review recomputes from live data, so the work is finished once, in March.
+    expect((await finishedInYear()).map((book) => [book.bookId, book.endedOn])).toEqual([[ebook, '2024-03-10']]);
+    // Each edition keeps its own rating: the e-book's only finish still carries the e-book's rating.
+    expect((await rate(reader.token, ebookRead, 4)).json()).toEqual({ rating: 4, bookRatingChanged: true });
+
+    const unlinked = await ctx.app.inject({
+      method: 'DELETE',
+      url: `/api/v1/books/${audiobook}/link`,
+      headers: { authorization: `Bearer ${ctx.adminToken}` },
+    });
+    expect(unlinked.statusCode).toBe(204);
+
+    // E11: unlinking splits the work back into two books, each read once.
+    const split = await year();
+    expect(split.summary).toMatchObject({ reads: 2, books: 2, rereads: 0, pages: 560 });
+    expect(split.list.items.map((item) => [item.id, item.readNumber, item.completedReads])).toEqual([
+      [audiobookRead, 1, 1],
+      [ebookRead, 1, 1],
+    ]);
+    expect(split.summary.records.mostReread).toBeNull();
+    expect((await finishedInYear()).map((book) => book.bookId)).toEqual([ebook, audiobook]);
   });
 });

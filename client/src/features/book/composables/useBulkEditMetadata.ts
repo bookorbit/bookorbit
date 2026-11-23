@@ -1,4 +1,5 @@
 import { ref, computed } from 'vue'
+import { i18n } from '@/i18n'
 import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
 import type { Ref } from 'vue'
@@ -28,8 +29,10 @@ export type BulkEditFields = {
   seriesName?: BulkEditScalarStringField
   seriesMemberships?: EditableSeriesMembership[]
   publisher?: BulkEditScalarStringField
+  editionName?: BulkEditScalarStringField
   language?: BulkEditScalarStringField
   publishedYear?: BulkEditScalarNumberField
+  originalPublishedYear?: BulkEditScalarNumberField
 }
 
 type FieldResult = { updated: number; skippedLocked: number }
@@ -83,7 +86,7 @@ export function useBulkEditMetadata(
 
       if (!res.ok) {
         const body = await res.json().catch(() => null)
-        const message = body?.message ?? 'Failed to update metadata'
+        const message = body?.message ?? i18n.global.t('book.bulkEdit.saveFailed')
         toast.error(Array.isArray(message) ? message[0] : message)
         return null
       }
@@ -94,11 +97,11 @@ export function useBulkEditMetadata(
       const totalSkipped = Object.values(result.fields).reduce((sum, f) => sum + f.skippedLocked, 0)
 
       if (totalUpdated === 0 && totalSkipped > 0) {
-        toast.warning('All selected books had locked fields - no changes applied')
+        toast.warning(i18n.global.t('book.bulkEdit.allLocked'))
       } else if (totalSkipped > 0) {
-        toast.success(`Updated ${totalUpdated} book${totalUpdated === 1 ? '' : 's'} (some fields skipped due to locks)`)
+        toast.success(i18n.global.t('book.bulkEdit.savedSomeLocked', { count: totalUpdated }))
       } else {
-        toast.success(`Updated metadata for ${totalUpdated} book${totalUpdated === 1 ? '' : 's'}`)
+        toast.success(i18n.global.t('book.bulkEdit.saved', { count: totalUpdated }))
       }
 
       const needsReload = hasAddOrRemoveMode(fields) || !!querySelection?.value
@@ -108,7 +111,7 @@ export function useBulkEditMetadata(
 
       return result
     } catch {
-      toast.error('An unexpected error occurred while saving changes')
+      toast.error(i18n.global.t('book.bulkEdit.saveError'))
       return null
     } finally {
       submitting.value = false

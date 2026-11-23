@@ -66,8 +66,13 @@ const hasActions = computed(
 <template>
   <DropdownMenu v-if="hasActions">
     <DropdownMenuTrigger as-child>
-      <Button variant="ghost" size="icon" class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground">
-        <MoreHorizontal :size="15" />
+      <Button
+        variant="ghost"
+        size="icon"
+        class="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground"
+        :aria-label="t('components.viewHeader.mobileMenu.label')"
+      >
+        <MoreHorizontal :size="15" aria-hidden="true" />
       </Button>
     </DropdownMenuTrigger>
 

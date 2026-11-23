@@ -7,7 +7,7 @@ import { join } from 'path';
 
 import { eq, inArray } from 'drizzle-orm';
 
-import type { BookDetail, BookLinkGroup } from '@bookorbit/types';
+import type { BookDetail, BookEditionSuggestions, BookLinkGroup } from '@bookorbit/types';
 import { Permission } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
@@ -155,7 +155,7 @@ describe('Book links (e2e)', () => {
       const extra = await libraryWithBooks([{ folder: 'Dawn Audio', file: 'Dawn.epub', kind: 'epub', title: 'Dawn' }]);
       expect((await link(ctx.adminToken, [shared.ids[0], hidden.ids[0]])).status).toBe(201);
 
-      const editor = await createUserAndLogin(ctx, { permissions: [Permission.LibraryMergeBooks] });
+      const editor = await createUserAndLogin(ctx, { permissions: [Permission.LibraryEditMetadata] });
       await grantLibraryAccess(ctx, editor.userId, shared.library.libraryId, 'editor');
       await grantLibraryAccess(ctx, editor.userId, extra.library.libraryId, 'editor');
 
@@ -171,12 +171,17 @@ describe('Book links (e2e)', () => {
       expect((await link(editor.accessToken, [extra.ids[0], hidden.ids[0]])).status).toBe(404);
 
       // A viewer cannot link, and the permission is required.
-      const viewer = await createUserAndLogin(ctx, { permissions: [Permission.LibraryMergeBooks] });
+      const viewer = await createUserAndLogin(ctx, { permissions: [Permission.LibraryEditMetadata] });
       await grantLibraryAccess(ctx, viewer.userId, shared.library.libraryId, 'viewer');
       await grantLibraryAccess(ctx, viewer.userId, extra.library.libraryId, 'viewer');
       expect((await link(viewer.accessToken, [extra.ids[0], shared.ids[0]])).status).toBe(403);
       const noPermission = await createUserAndLogin(ctx, { permissions: [] });
       expect((await link(noPermission.accessToken, [extra.ids[0], shared.ids[0]])).status).toBe(403);
+      // Merging is not what linking needs: editions are a metadata edit.
+      const mergeOnly = await createUserAndLogin(ctx, { permissions: [Permission.LibraryMergeBooks] });
+      await grantLibraryAccess(ctx, mergeOnly.userId, shared.library.libraryId, 'editor');
+      await grantLibraryAccess(ctx, mergeOnly.userId, extra.library.libraryId, 'editor');
+      expect((await link(mergeOnly.accessToken, [extra.ids[0], shared.ids[0]])).status).toBe(403);
     },
     SCENARIO_TIMEOUT_MS,
   );
@@ -232,6 +237,94 @@ describe('Book links (e2e)', () => {
       expect((await detail(ctx.adminToken, kept.ids[0])).linkGroupId).toBeNull();
       expect(await groupOf(kept.ids[1])).toBe(trio.body.groupId);
       expect(await groupOf(kept.ids[2])).toBe(trio.body.groupId);
+    },
+    SCENARIO_TIMEOUT_MS,
+  );
+
+  it(
+    'suggests other formats and editions of a book from its metadata, only where the user may group them',
+    async () => {
+      const suffix = randomUUID().slice(0, 8);
+      const title = `The Lantern Keeper ${suffix}`;
+      const novels = await libraryWithBooks([
+        { folder: 'First', file: 'First.epub', kind: 'epub', title },
+        { folder: 'Anniversary', file: 'Anniversary.epub', kind: 'epub', title },
+        { folder: 'Copy', file: 'Copy.pdf', kind: 'pdf', title },
+        { folder: 'Lookalike', file: 'Lookalike.epub', kind: 'epub', title },
+        { folder: 'Grouped', file: 'Grouped.epub', kind: 'epub', title },
+      ]);
+      const audio = await libraryWithBooks([
+        { folder: 'Unabridged', file: 'Unabridged.pdf', kind: 'pdf', title: `${title}: Unabridged` },
+        { folder: 'Dismissed', file: 'Dismissed.pdf', kind: 'pdf', title },
+      ]);
+      const elsewhere = await libraryWithBooks([{ folder: 'Viewed', file: 'Viewed.epub', kind: 'epub', title }]);
+      const [first, anniversary, copy, lookalike, grouped] = novels.ids;
+      const [unabridged, dismissed] = audio.ids;
+
+      const [author, stranger] = await ctx.db
+        .insert(schema.authors)
+        .values([{ name: `Sam Whitfield ${suffix}` }, { name: `Another Writer ${suffix}` }])
+        .returning({ id: schema.authors.id });
+      const bookIdsByAuthor = [[first, anniversary, copy, grouped, unabridged, dismissed, elsewhere.ids[0]], [lookalike]] as const;
+      await ctx.db
+        .insert(schema.bookAuthors)
+        .values([
+          ...bookIdsByAuthor[0].map((bookId) => ({ bookId, authorId: author.id })),
+          ...bookIdsByAuthor[1].map((bookId) => ({ bookId, authorId: stranger.id })),
+        ]);
+      const publishers: Array<[number, string]> = [
+        [first, 'Harbor & Finch Press'],
+        [anniversary, 'Northlight Books'],
+        [copy, 'Harbor & Finch Press'],
+        [lookalike, 'Quayside'],
+        [grouped, 'Brisa'],
+        [elsewhere.ids[0], 'Elsewhere'],
+      ];
+      for (const [bookId, publisher] of publishers) {
+        await ctx.db.update(schema.bookMetadata).set({ publisher }).where(eq(schema.bookMetadata.bookId, bookId));
+      }
+      await ctx.db
+        .update(schema.bookMetadata)
+        .set({ hardcoverId: `hc-${suffix}` })
+        .where(inArray(schema.bookMetadata.bookId, [first, unabridged]));
+      await ctx.db.update(schema.bookMetadata).set({ editionName: 'Tenth Anniversary Edition' }).where(eq(schema.bookMetadata.bookId, anniversary));
+      await ctx.db
+        .update(schema.bookFiles)
+        .set({ format: 'm4b' })
+        .where(inArray(schema.bookFiles.bookId, [unabridged, dismissed]));
+
+      const editor = await createUserAndLogin(ctx, { permissions: [Permission.LibraryEditMetadata] });
+      await grantLibraryAccess(ctx, editor.userId, novels.library.libraryId, 'editor');
+      await grantLibraryAccess(ctx, editor.userId, audio.library.libraryId, 'editor');
+      await grantLibraryAccess(ctx, editor.userId, elsewhere.library.libraryId, 'viewer');
+      expect((await link(editor.accessToken, [first, grouped])).status).toBe(201);
+      await ctx.db
+        .insert(schema.bookDuplicateDismissals)
+        .values({ userId: editor.userId, kind: 'other_format', bookIdA: Math.min(first, dismissed), bookIdB: Math.max(first, dismissed) });
+
+      const suggest = (token: string, bookId: number) =>
+        ctx.app.inject({ method: 'GET', url: `/api/v1/books/${bookId}/edition-suggestions`, headers: authHeader(token) });
+
+      const response = await suggest(editor.accessToken, first);
+      expect(response.statusCode).toBe(200);
+      const { items } = response.json() as BookEditionSuggestions;
+      // The copy is a duplicate, the look-alike has another author, the grouped book is already an
+      // edition, the dismissed pair was turned down, and the last one sits where this user only views.
+      expect(items.map(({ book, kind, reasons }) => [book.id, kind, reasons])).toEqual([
+        [unabridged, 'other_format', ['same_work', 'title_author']],
+        [anniversary, 'other_edition', ['title_author']],
+      ]);
+      expect(items[0].book).toMatchObject({ id: unabridged, title: `${title}: Unabridged`, libraryId: audio.library.libraryId });
+      expect(items[0].book.editionName).toBeNull();
+      expect(items[1].book.editionName).toBe('Tenth Anniversary Edition');
+
+      const viewer = await createUserAndLogin(ctx, { permissions: [Permission.LibraryEditMetadata] });
+      await grantLibraryAccess(ctx, viewer.userId, novels.library.libraryId, 'viewer');
+      expect((await suggest(viewer.accessToken, first)).statusCode).toBe(403);
+      expect((await suggest(viewer.accessToken, unabridged)).statusCode).toBe(404);
+      const noPermission = await createUserAndLogin(ctx, { permissions: [] });
+      await grantLibraryAccess(ctx, noPermission.userId, novels.library.libraryId, 'editor');
+      expect((await suggest(noPermission.accessToken, first)).statusCode).toBe(403);
     },
     SCENARIO_TIMEOUT_MS,
   );

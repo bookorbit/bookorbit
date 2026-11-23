@@ -64,6 +64,11 @@ export function formatList(values: string[]): string {
   return listFormatter({ style: 'short', type: 'unit' }).format(values)
 }
 
+/** A sentence-style list: "A, B and C" in English. */
+export function formatConjunctionList(values: string[]): string {
+  return listFormatter({ style: 'long', type: 'conjunction' }).format(values)
+}
+
 export interface ListPart {
   type: 'element' | 'literal'
   value: string

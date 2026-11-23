@@ -147,6 +147,7 @@ const USER_CTX = { accessibleLibraryIds: [1] as number[], userId: 10 };
 function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unknown; valueTo?: unknown } {
   const numericFields: RuleField[] = [
     'publishedYear',
+    'originalPublishedYear',
     'seriesIndex',
     'pageCount',
     'fileSize',
@@ -1073,6 +1074,17 @@ describe('numericRuleToSql (via pageCount and publishedYear)', () => {
     const { builder } = makeBuilder();
     const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'publishedYear', operator: 'notEq', value: 2001 }) as never, BASE_CTX) as any;
     expect(getRuleSql(where)).toMatchObject({ type: 'ne' });
+  });
+
+  it.each([
+    ['gte', 'gte'],
+    ['isEmpty', 'isNull'],
+  ] as const)('originalPublishedYear %s reads its own column, not the published year', (operator, type) => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'originalPublishedYear', operator, value: 1950 }) as never, BASE_CTX) as any;
+    const clause = getRuleSql(where);
+    expect(clause).toMatchObject({ type });
+    expect(collectColumnNames(clause)).toEqual(['original_published_year']);
   });
 
   it('filters file size through the selected primary file', () => {
@@ -2215,13 +2227,9 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
     expect(result).toContain('DESC NULLS LAST');
   });
 
-  it('generates user-scoped subquery for lastReadAt', () => {
+  it('orders lastReadAt on the joined last-read row set, not a per-row subquery', () => {
     const result = collapseOrderBy([{ field: 'lastReadAt', dir: 'asc' }], 7);
-    expect(result).toContain('rs.user_id = $1 AND rs.book_id = r.id');
-    expect(result).toContain('bf.book_id = r.id AND rp.user_id = $2');
-    expect(result).toContain('ASC NULLS LAST');
-    expect(result).toContain('SELECT max(rp.last_read_at)');
-    expect(result).not.toContain('max(rp.updated_at)');
+    expect(result).toBe('book_last_read.last_read_at ASC NULLS LAST, r.id ASC');
   });
 
   it('generates user-scoped subquery for finishedAt', () => {
@@ -2245,6 +2253,10 @@ describe('BookQueryBuilder.buildCollapseOrderBy', () => {
 
   it('generates publishedYear sort', () => {
     expect(collapseOrderBy([{ field: 'publishedYear', dir: 'asc' }], 1)).toBe('published_year ASC NULLS LAST, r.id ASC');
+  });
+
+  it('generates originalPublishedYear sort', () => {
+    expect(collapseOrderBy([{ field: 'originalPublishedYear', dir: 'desc' }], 1)).toBe('original_published_year DESC NULLS LAST, r.id ASC');
   });
 
   it('generates publishedDate sort with year fallback', () => {

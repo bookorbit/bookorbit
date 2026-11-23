@@ -303,7 +303,8 @@ describe('provider cache declarations', () => {
       const bumped: Partial<Record<MetadataProviderKey, number>> = {
         [MetadataProviderKey.AUDIBLE]: 2,
         [MetadataProviderKey.COMICVINE]: 4,
-        [MetadataProviderKey.HARDCOVER]: 2,
+        [MetadataProviderKey.HARDCOVER]: 3,
+        [MetadataProviderKey.OPEN_LIBRARY]: 2,
       };
       expect(specOf(testCase.key).version).toBe(bumped[testCase.key] ?? 1);
     });

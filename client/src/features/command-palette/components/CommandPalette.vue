@@ -8,6 +8,7 @@ import AppIcon from '@/components/AppIcon.vue'
 import AuthorPortrait from '@/features/author/components/AuthorPortrait.vue'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
+import { cardEditionCount } from '@/features/book/lib/book-editions'
 import { bookFormatEntries } from '@/features/book/lib/book-formats'
 import BookUploadModal from '@/features/library/components/BookUploadModal.vue'
 import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
@@ -200,6 +201,13 @@ function seriesLabel(item: PaletteItem) {
   return item.book.seriesIndex ? `${item.book.seriesName} #${item.book.seriesIndex}` : item.book.seriesName
 }
 
+/** A result that stands for several editions says so; its format chips show only the edition it opens. */
+function editionCountLabel(item: PaletteItem) {
+  if (item.kind !== 'book') return ''
+  const count = cardEditionCount(item.book)
+  return count > 0 ? t('book.editions.card.count', { count }) : ''
+}
+
 function progressOf(item: PaletteItem) {
   return item.kind === 'reading' ? Math.round(item.book.readingProgress ?? 0) : 0
 }
@@ -348,6 +356,7 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
                       ·
                       <i>{{ seriesLabel(item) }}</i>
                     </template>
+                    <template v-if="editionCountLabel(item)"> · {{ editionCountLabel(item) }}</template>
                   </span>
                 </span>
                 <span v-if="item.kind === 'reading'" class="flex shrink-0 items-center gap-2 text-xs text-muted-foreground tabular-nums">

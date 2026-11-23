@@ -12,6 +12,7 @@ import { formatDate, formatNumber } from '@/i18n/formatters'
 import { formatCopyProgress } from '../utils/copy-progress'
 import { formatColorVar } from '@/features/book/lib/format-colors'
 import { strongestReason } from '../utils/duplicate-diff'
+import { duplicateActionKey, duplicateDismissKey } from '../utils/duplicate-labels'
 import {
   copyFolderLabel,
   copyFormats,
@@ -66,8 +67,17 @@ const reclaimable = computed(() => (props.group.kind === 'duplicate' ? props.gro
 /** What deleting the extras frees with the chosen keeper, stated where the deletion is confirmed. */
 const freed = computed(() => reclaimableBytes(props.group, props.keeperId))
 const atRisk = computed(() => (props.action === 'delete' ? protectedDiscards(props.group, props.keeperId) : []))
-const actionText = computed(() => (props.action ? t(`tools.bookDuplicates.actions.${props.action}`) : t('tools.bookDuplicates.actions.none')))
+const actionText = computed(() => (props.action ? t(duplicateActionKey(props.group.kind, props.action)) : t('tools.bookDuplicates.actions.none')))
+const actionOptions = computed(() => props.actions.map((action) => ({ action, label: t(duplicateActionKey(props.group.kind, action)) })))
+const dismissLabel = computed(() => t(duplicateDismissKey(props.group.kind)))
 const linkOffered = computed(() => props.actions.includes('link'))
+const linkOfferedText = computed(() =>
+  t(
+    props.group.kind === 'other_edition'
+      ? 'tools.bookDuplicates.mergeUnavailable.editionsOffered'
+      : 'tools.bookDuplicates.mergeUnavailable.linkOffered',
+  ),
+)
 /** A merge across libraries moves files into one library; the row names it before anything is confirmed. */
 const crossLibraryDestination = computed(() => (props.action === 'merge' ? crossLibraryMergeLibrary(books.value, props.keeperId) : null))
 const reviewLabel = computed(() => {
@@ -75,7 +85,8 @@ const reviewLabel = computed(() => {
     return t('tools.bookDuplicates.deleteGroup', { count: books.value.length - 1, size: formatBytes(freed.value) }, books.value.length - 1)
   }
   if (props.action === 'merge') return t('tools.bookDuplicates.reviewMerge')
-  if (props.action === 'link') return t('tools.bookDuplicates.reviewLink')
+  if (props.action === 'link')
+    return t(props.group.kind === 'other_edition' ? 'tools.bookDuplicates.reviewEditions' : 'tools.bookDuplicates.reviewLink')
   return t('tools.bookDuplicates.actions.none')
 })
 const overridden = computed(() => props.keeperId !== recommendation.value.keeperId)
@@ -250,7 +261,7 @@ function handleActionChange(value: string | number): void {
         <AlertTriangle class="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
         <span>
           {{ t(`tools.bookDuplicates.mergeUnavailable.${mergeUnavailableReason}`) }}
-          <template v-if="linkOffered">{{ t('tools.bookDuplicates.mergeUnavailable.linkOffered') }}</template>
+          <template v-if="linkOffered">{{ linkOfferedText }}</template>
         </span>
       </p>
       <p v-if="crossLibraryDestination" class="mt-3 text-[12px] text-foreground" data-testid="duplicate-cross-library-merge">
@@ -259,13 +270,13 @@ function handleActionChange(value: string | number): void {
       <div class="mt-3 flex flex-wrap items-center gap-2">
         <Button variant="ghost" size="sm" @click="handleDismiss">
           <X aria-hidden="true" />
-          {{ t('tools.bookDuplicates.notDuplicates') }}
+          {{ dismissLabel }}
         </Button>
         <label v-if="actions.length > 0" class="flex items-center gap-1.5 sm:ms-auto">
           <span class="text-[12px] text-muted-foreground">{{ t('tools.bookDuplicates.actions.label') }}</span>
           <Select class="h-8 w-auto min-w-[10rem] text-[12.5px]" :model-value="action ?? ''" @update:model-value="handleActionChange">
             <option value="">{{ t('tools.bookDuplicates.actions.none') }}</option>
-            <option v-for="option in actions" :key="option" :value="option">{{ t(`tools.bookDuplicates.actions.${option}`) }}</option>
+            <option v-for="option in actionOptions" :key="option.action" :value="option.action">{{ option.label }}</option>
           </Select>
         </label>
         <Button

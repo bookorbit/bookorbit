@@ -184,6 +184,7 @@ describe('AuthorsRepository', () => {
   it('findPage maps rows and total for standard count branch', async () => {
     const { db, selectBuilder } = makeDb();
     selectBuilder.where.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ total: '3' }]);
+    selectBuilder.groupBy.mockReturnValueOnce(selectBuilder).mockResolvedValueOnce([{ authorId: 1, workCount: 1 }]);
     selectBuilder.offset.mockResolvedValueOnce([
       {
         id: 1,
@@ -214,6 +215,7 @@ describe('AuthorsRepository', () => {
           sortName: 'A',
           description: null,
           bookCount: 2,
+          workCount: 1,
           lastAddedAt: new Date('2026-01-01T00:00:00Z'),
         },
       ],
@@ -254,6 +256,10 @@ describe('AuthorsRepository', () => {
       .mockReturnValueOnce(selectBuilder)
       .mockResolvedValueOnce([{ total: '2' }]);
     selectBuilder.where.mockReturnValue(selectBuilder);
+    selectBuilder.groupBy
+      .mockReturnValueOnce(selectBuilder)
+      .mockReturnValueOnce(selectBuilder)
+      .mockResolvedValueOnce([{ authorId: 1, workCount: 1 }]);
     selectBuilder.offset.mockResolvedValueOnce([{ id: 1 }]);
     const repo = new AuthorsRepository(db as never);
 
@@ -267,7 +273,7 @@ describe('AuthorsRepository', () => {
         minBookCount: 3,
       }),
     ).resolves.toEqual({
-      items: [{ id: 1 }],
+      items: [{ id: 1, workCount: 1 }],
       total: 2,
       page: 1,
       size: 10,

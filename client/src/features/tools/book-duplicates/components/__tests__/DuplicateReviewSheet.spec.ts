@@ -193,4 +193,56 @@ describe('DuplicateReviewSheet', () => {
     expect(wrapper.text()).toContain('Finished: 2 of 2 groups')
     expect(wrapper.find('select').exists()).toBe(false)
   })
+
+  it('reports other editions that were linked as grouped, and other pairs as linked', () => {
+    const job: BookDuplicateResolutionJob = {
+      id: 6,
+      scanId: 11,
+      status: 'completed',
+      processed: 2,
+      total: 2,
+      currentGroupId: null,
+      outcomes: [
+        { groupId: 1, keeperId: 1, status: 'done', reason: null, books: [{ bookId: 2, action: 'link', status: 'linked', reason: null }] },
+        { groupId: 3, keeperId: 3, status: 'done', reason: null, books: [{ bookId: 4, action: 'link', status: 'linked', reason: null }] },
+      ],
+      errorCode: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: '2026-01-01T00:00:05.000Z',
+    }
+    const editions: BookDuplicateGroup = { ...group(1, [book(1), book(2)]), kind: 'other_edition', reasons: ['same_work'] }
+    const formats: BookDuplicateGroup = { ...group(3, [book(3), book(4)]), kind: 'other_format', reasons: ['title_author'] }
+    const wrapper = mountSheet({ groups: [editions, formats], actions: { 1: 'link', 3: 'link' }, job })
+
+    expect(wrapper.text()).toContain('Grouped')
+    expect(wrapper.text()).toContain('Linked')
+  })
+
+  it('keeps naming the main edition and the run size once the finished run clears the actions', () => {
+    const job: BookDuplicateResolutionJob = {
+      id: 7,
+      scanId: 11,
+      status: 'completed',
+      processed: 1,
+      total: 1,
+      currentGroupId: null,
+      outcomes: [{ groupId: 1, keeperId: 1, status: 'done', reason: null, books: [{ bookId: 2, action: 'link', status: 'linked', reason: null }] }],
+      errorCode: null,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      finishedAt: '2026-01-01T00:00:05.000Z',
+    }
+    const editions: BookDuplicateGroup = { ...group(1, [book(1), book(2)]), kind: 'other_edition', reasons: ['same_work'] }
+    const wrapper = mountSheet({ groups: [editions], actions: { 1: null }, job })
+
+    expect(wrapper.get('h2').text()).toBe('Resolve 1 group')
+    expect(wrapper.text()).toContain('Main edition')
+    expect(wrapper.text()).not.toContain('Keeping')
+  })
+
+  it('names the keeper of other editions being grouped as the main edition', () => {
+    const editions: BookDuplicateGroup = { ...group(1, [book(1), book(2)]), kind: 'other_edition', reasons: ['same_work'] }
+    const wrapper = mountSheet({ groups: [editions], actions: { 1: 'link' } })
+
+    expect(wrapper.text()).toContain('Main edition')
+  })
 })

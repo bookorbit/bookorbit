@@ -157,6 +157,17 @@ describe('BulkEditMetadataDto', () => {
       expect(fields.hasOnlyAllowedKeys({ unknownField: { value: 'x' } })).toBe(false);
     });
 
+    it('accepts the edition name and first published year as editable fields', async () => {
+      const raw = { editionName: { value: 'Full Cast' }, originalPublishedYear: { value: 1965 } };
+      const fields = plainToInstance(BulkEditFieldsDto, raw);
+
+      expect(
+        await validate(plainToInstance(BulkEditMetadataDto, { bookIds: [1], fields: raw }), { whitelist: true, forbidNonWhitelisted: true }),
+      ).toHaveLength(0);
+      expect(fields.hasOnlyAllowedKeys(raw)).toBe(true);
+      expect(fields.hasAtLeastOneField()).toBe(true);
+    });
+
     it('hasOnlyAllowedKeys returns true for known keys only', () => {
       const fields = plainToInstance(BulkEditFieldsDto, {});
       expect(fields.hasOnlyAllowedKeys({ authors: {}, publisher: {} })).toBe(true);

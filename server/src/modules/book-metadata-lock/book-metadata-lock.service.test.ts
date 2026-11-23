@@ -1,8 +1,64 @@
 import { ConflictException } from '@nestjs/common';
-import { MetadataProviderKey } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS, MetadataProviderKey, type BookMetadataLockField } from '@bookorbit/types';
 
 import { UpdateBookMetadataDto } from '../book/dto/update-book-metadata.dto';
 import { BookMetadataLockService } from './book-metadata-lock.service';
+
+const EVERY_COMIC_FIELD = {
+  issueNumber: '1',
+  volumeName: 'Volume',
+  pencillers: ['P'],
+  inkers: ['I'],
+  colorists: ['C'],
+  letterers: ['L'],
+  coverArtists: ['A'],
+  characters: ['Ch'],
+  teams: ['T'],
+  locations: ['Lo'],
+  storyArcs: ['S'],
+};
+
+const EVERY_UPDATE_FIELD: UpdateBookMetadataDto = {
+  title: 'T',
+  subtitle: 'S',
+  description: 'D',
+  publisher: 'P',
+  publishedDate: '2001-01-01',
+  publishedYear: 2001,
+  editionName: 'Full Cast',
+  originalPublishedYear: 1965,
+  language: 'en',
+  pageCount: 10,
+  seriesName: 'Series',
+  seriesIndex: '1',
+  isbn10: '0306406152',
+  isbn13: '9780306406157',
+  rating: 4,
+  communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4 }],
+  authors: ['A'],
+  genres: ['G'],
+  tags: ['T'],
+  googleBooksId: 'x',
+  goodreadsId: 'x',
+  amazonId: 'x',
+  hardcoverId: 'x',
+  hardcoverEditionId: 'x',
+  openLibraryId: 'x',
+  itunesId: 'x',
+  audibleId: 'x',
+  librofmId: 'x',
+  koboId: 'x',
+  comicvineId: 'x',
+  ranobedbId: 'x',
+  lubimyczytacId: 'x',
+  aladinId: 'x',
+  audioMetadata: { narrators: ['N'], durationSeconds: 1, abridged: false, chapters: [{ title: 'C', startMs: 0 }] },
+  comicMetadata: EVERY_COMIC_FIELD,
+};
+
+function lockFieldsExcept(...excluded: BookMetadataLockField[]): BookMetadataLockField[] {
+  return BOOK_METADATA_LOCK_FIELDS.filter((field) => !excluded.includes(field));
+}
 
 function makeService(lockedFields: string[] = []) {
   const lockRepo = {
@@ -23,6 +79,95 @@ describe('BookMetadataLockService', () => {
     const result = await service.filterResolvedMetadata(12, { isbn10: '0306406152', isbn13: '9780306406157' }, {});
     expect(result.resolved).toEqual({ isbn10: '0306406152' });
     expect(result.skippedFields).toEqual(['isbn13']);
+  });
+
+  describe('every lock field is honoured by each hand-written list', () => {
+    // Fields a path cannot carry: an update body has no cover slots, and a fetch resolves no
+    // personal rating, tags or edition name.
+    it('filters an automated update for every lock field', async () => {
+      const { service } = makeService([...BOOK_METADATA_LOCK_FIELDS]);
+
+      const result = await service.filterAutomatedBookUpdate(1, EVERY_UPDATE_FIELD);
+
+      expect(result.skippedFields).toEqual(lockFieldsExcept('cover', 'audioCover'));
+      expect(result.dto).toEqual({});
+    });
+
+    it('rejects a manual update for every lock field', async () => {
+      const { service } = makeService([...BOOK_METADATA_LOCK_FIELDS]);
+
+      await expect(service.assertManualUpdateAllowed(1, EVERY_UPDATE_FIELD)).rejects.toThrow(
+        `Metadata fields are locked: ${lockFieldsExcept('cover', 'audioCover').join(', ')}`,
+      );
+    });
+
+    it('filters resolved metadata for every lock field', async () => {
+      const { service } = makeService([...BOOK_METADATA_LOCK_FIELDS]);
+      const providerIds = Object.fromEntries(
+        [
+          MetadataProviderKey.GOOGLE,
+          MetadataProviderKey.GOODREADS,
+          MetadataProviderKey.AMAZON,
+          MetadataProviderKey.HARDCOVER,
+          MetadataProviderKey.OPEN_LIBRARY,
+          MetadataProviderKey.ITUNES,
+          MetadataProviderKey.AUDIBLE,
+          MetadataProviderKey.LIBROFM,
+          MetadataProviderKey.KOBO,
+          MetadataProviderKey.COMICVINE,
+          MetadataProviderKey.RANOBEDB,
+          MetadataProviderKey.LUBIMYCZYTAC,
+          MetadataProviderKey.ALADIN,
+        ].map((key) => [key, 'id']),
+      );
+
+      const result = await service.filterResolvedMetadata(
+        1,
+        {
+          title: 'T',
+          subtitle: 'S',
+          description: 'D',
+          authors: ['A'],
+          publisher: 'P',
+          publishedDate: '2001-01-01',
+          publishedYear: 2001,
+          originalPublishedYear: 1965,
+          language: 'en',
+          pageCount: 10,
+          isbn10: '0306406152',
+          isbn13: '9780306406157',
+          seriesName: 'Series',
+          seriesIndex: '1',
+          genres: ['G'],
+          narrators: ['N'],
+          duration: 1,
+          abridged: 0,
+          communityRatings: [{ provider: MetadataProviderKey.HARDCOVER, rating: 4, ratingCount: null, updatedAt: '2026-01-01T00:00:00.000Z' }],
+          hardcoverEditionId: 'x',
+          chapters: [{ title: 'C', startMs: 0 }],
+          coverUrl: 'https://example.com/a.jpg',
+          audioCoverUrl: 'https://example.com/b.jpg',
+          comicMetadata: EVERY_COMIC_FIELD,
+        },
+        providerIds,
+      );
+
+      expect(result.skippedFields).toEqual(lockFieldsExcept('rating', 'tags', 'editionName'));
+      expect(result.resolved).toEqual({});
+      expect(result.providerIds).toEqual({});
+    });
+  });
+
+  it('guards the edition name and first published year with their own locks', async () => {
+    const { service } = makeService(['editionName', 'originalPublishedYear']);
+
+    const automated = await service.filterAutomatedBookUpdate(1, { editionName: 'Full Cast', originalPublishedYear: 1965, publishedYear: 2020 });
+    const resolved = await service.filterResolvedMetadata(1, { originalPublishedYear: 1965, publishedYear: 2020 }, {});
+
+    expect(automated).toEqual({ dto: { publishedYear: 2020 }, skippedFields: ['editionName', 'originalPublishedYear'] });
+    expect(resolved).toEqual({ resolved: { publishedYear: 2020 }, providerIds: {}, skippedFields: ['originalPublishedYear'] });
+    await expect(service.assertManualUpdateAllowed(1, { editionName: 'Full Cast' })).rejects.toThrow(ConflictException);
+    await expect(service.assertManualUpdateAllowed(1, { publishedYear: 2020 })).resolves.toBeUndefined();
   });
 
   it('normalizes, deduplicates, and orders locked fields', () => {

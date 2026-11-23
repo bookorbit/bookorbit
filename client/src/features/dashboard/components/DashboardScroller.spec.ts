@@ -326,6 +326,6 @@ describe('DashboardScroller', () => {
     expect(wrapper.find('.collection-sheet').attributes('data-book-ids')).toBe('42')
 
     await wrapper.find('.delete-action').trigger('click')
-    expect(deleteMocks.promptDelete).toHaveBeenCalledWith(42)
+    expect(deleteMocks.promptDelete).toHaveBeenCalledWith(42, expect.objectContaining({ id: 42 }))
   })
 })

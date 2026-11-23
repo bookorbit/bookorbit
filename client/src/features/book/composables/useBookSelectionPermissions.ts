@@ -56,17 +56,17 @@ export function useBookSelectionPermissions(books: Ref<BookCard[]>, selectedIds:
           : hasPermissionInAnyLibrary(Permission.LibraryMergeBooks, 'editor')
       return allowed ? { disabledReason: 'queryScoped' } : null
     }
-    const { anyEditable, allEditable } = selectionEditability()
+    const { anyEditable, allEditable } = selectionEditability(Permission.LibraryMergeBooks)
     const allowed = selectedIds.value.size === 0 ? hasPermissionInAnyLibrary(Permission.LibraryMergeBooks, 'editor') : anyEditable
     if (!allowed) return null
     return { disabledReason: mergeDisabledReason({ queryScoped: false, count: selectedIds.value.size, allEditable }) }
   })
 
-  function selectionEditability(): { anyEditable: boolean; allEditable: boolean } {
+  function selectionEditability(permission: Permission): { anyEditable: boolean; allEditable: boolean } {
     let anyEditable = false
     let allEditable = true
     for (const id of selectedIds.value) {
-      const editable = hasLibraryPermission(Permission.LibraryMergeBooks, selectedLibraries.value.get(id), 'editor')
+      const editable = hasLibraryPermission(permission, selectedLibraries.value.get(id), 'editor')
       anyEditable ||= editable
       allEditable &&= editable
     }
@@ -74,22 +74,22 @@ export function useBookSelectionPermissions(books: Ref<BookCard[]>, selectedIds:
   }
 
   /**
-   * Null hides Link, on the same rule as Merge. Linking may span libraries, but the server needs
+   * Null hides Add edition. Editions are a metadata edit, and may span libraries, but the server needs
    * editor access to every selected book's library, so a selection that reaches into a library the
    * user only views, or one whose library is unknown, is offered with a reason instead.
    */
   const linkSelection = computed<LinkSelectionState | null>(() => {
-    if (!hasPermission(Permission.LibraryMergeBooks)) return null
+    if (!hasPermission(Permission.LibraryEditMetadata)) return null
     const query = querySelection?.value
     if (query) {
       const allowed =
         query.libraryId != null
-          ? hasLibraryPermission(Permission.LibraryMergeBooks, query.libraryId, 'editor')
-          : hasPermissionInAnyLibrary(Permission.LibraryMergeBooks, 'editor')
+          ? hasLibraryPermission(Permission.LibraryEditMetadata, query.libraryId, 'editor')
+          : hasPermissionInAnyLibrary(Permission.LibraryEditMetadata, 'editor')
       return allowed ? { disabledReason: 'queryScoped' } : null
     }
-    const { anyEditable, allEditable } = selectionEditability()
-    const allowed = selectedIds.value.size === 0 ? hasPermissionInAnyLibrary(Permission.LibraryMergeBooks, 'editor') : anyEditable
+    const { anyEditable, allEditable } = selectionEditability(Permission.LibraryEditMetadata)
+    const allowed = selectedIds.value.size === 0 ? hasPermissionInAnyLibrary(Permission.LibraryEditMetadata, 'editor') : anyEditable
     if (!allowed) return null
     return { disabledReason: linkDisabledReason({ queryScoped: false, count: selectedIds.value.size, allEditable }) }
   })

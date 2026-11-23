@@ -6,6 +6,7 @@ import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { BookService } from '../book/book.service';
 import { ScanGateway } from '../scanner/scan.gateway';
+import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import { BookLinkRepository } from './book-link.repository';
 import type { BookLinkDto, BookLinkLeadDto } from './dto/book-link.dto';
 
@@ -31,6 +32,7 @@ export class BookLinkService {
     private readonly repository: BookLinkRepository,
     private readonly bookService: BookService,
     private readonly gateway: ScanGateway,
+    private readonly readingAttemptEvents: ReadingAttemptEventsService,
   ) {}
 
   async link(dto: BookLinkDto, user: RequestUser): Promise<BookLinkGroup> {
@@ -74,6 +76,8 @@ export class BookLinkService {
     });
 
     await this.notify([...allMembers]);
+    // Statistics count linked editions as one work, so every reader's cached numbers may now be wrong.
+    this.readingAttemptEvents.notifyChanged(null);
     this.logger.log(
       `[${LINK_EVENT}] [end] groupId=${groupId} userId=${user.id} bookCount=${allMembers.size} mergedGroups=${groupIds.length} durationMs=${Date.now() - startedAt} - books linked`,
     );
@@ -84,6 +88,12 @@ export class BookLinkService {
     await this.bookService.verifyBookAccess(dto.leadBookId, user, 'editor');
     const [membership] = await this.repository.findMemberships([dto.leadBookId]);
     if (!membership || membership.groupId !== groupId) throw new NotFoundException('Link group not found');
+    // The main edition decides what every member's readers see in lists, so it is a change to each of them.
+    const members = await this.repository.findMemberIds([groupId]);
+    await this.verifyEditable(
+      members.filter((id) => id !== dto.leadBookId),
+      user,
+    );
     await this.repository.transaction((tx) => this.repository.setLead(tx, groupId, dto.leadBookId));
     await this.notify(await this.repository.findMemberIds([groupId]));
     return this.group(groupId, user);
@@ -104,6 +114,7 @@ export class BookLinkService {
     if (!affected) return;
 
     await this.notify(affected.members);
+    this.readingAttemptEvents.notifyChanged(null);
     this.logger.log(
       `[${LINK_EVENT}] [end] groupId=${affected.groupId} bookId=${bookId} userId=${user.id} remaining=${affected.members.length - 1} - book unlinked`,
     );

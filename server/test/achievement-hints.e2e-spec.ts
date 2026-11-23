@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 
 import { eq } from 'drizzle-orm';
-import type { AchievementHint, AchievementHintsResponse } from '@bookorbit/types';
+import type { AchievementCatalogueResponse, AchievementHint, AchievementHintsResponse } from '@bookorbit/types';
 
 import * as schema from '../src/db/schema';
 import {
@@ -80,6 +80,7 @@ describe('Achievement hints (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
   let reader!: TestUserSession;
   let stranger!: TestUserSession;
   let authorId!: number;
+  let shelf!: CreatedLibrary;
 
   const seeded: Record<string, SeededBook> = {};
 
@@ -96,7 +97,7 @@ describe('Achievement hints (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
   beforeAll(async () => {
     ctx = await createAuthorizationMatrixE2EContext();
 
-    const shelf = await createLibraryWithFolder(ctx, { name: `hints-shelf-${randomUUID()}` });
+    shelf = await createLibraryWithFolder(ctx, { name: `hints-shelf-${randomUUID()}` });
     const hidden = await createLibraryWithFolder(ctx, { name: `hints-hidden-${randomUUID()}` });
     reader = await createUserAndLogin(ctx);
     stranger = await createUserAndLogin(ctx);
@@ -265,5 +266,54 @@ describe('Achievement hints (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
     expect(hintFor(hints, 'books_finished_1')).toBeUndefined();
     expect(hintFor(hints, 'hours_read_1')).toBeUndefined();
     expect(hintFor(hints, 'author_deep_dive')).toBeUndefined();
+  });
+
+  it('counts two linked editions of one book once in finished-book progress and the author hint, and twice again once unlinked', async () => {
+    const editionReader = await createUserAndLogin(ctx);
+    await grantLibraryAccess(ctx, editionReader.userId, shelf.libraryId);
+    const editionAuthor = await createAuthor(ctx, 'Edition Author');
+    const ebook = await seedBook(ctx, shelf, { title: 'Kindred', year: 1979, pages: 264, authorId: editionAuthor });
+    const audiobook = await seedBook(ctx, shelf, { title: 'Kindred', year: 2004, pages: 264, authorId: editionAuthor });
+    const unread = await seedBook(ctx, shelf, { title: 'Dawn', year: 1987, pages: 248, authorId: editionAuthor });
+    await ctx.db.insert(schema.userBookStatus).values(
+      [ebook, audiobook].map((book) => ({
+        userId: editionReader.userId,
+        bookId: book.bookId,
+        status: 'read' as const,
+        source: 'manual' as const,
+        finishedAt: new Date(),
+      })),
+    );
+
+    async function counts() {
+      const response = await ctx.app.inject({ method: 'GET', url: '/api/v1/achievements', headers: authHeader(editionReader.accessToken) });
+      expect(response.statusCode).toBe(200);
+      const items = (response.json() as AchievementCatalogueResponse).categories.flatMap((category) => category.achievements);
+      return {
+        booksFinished: items.find((item) => item.key === 'books_finished_1')?.currentProgress,
+        booksByOneAuthor: items.find((item) => item.key === 'author_deep_dive')?.currentProgress,
+        authorHint: hintFor(await fetchHints(editionReader.accessToken), 'author_deep_dive'),
+      };
+    }
+    const expected = (finished: number) => ({
+      booksFinished: finished,
+      booksByOneAuthor: finished,
+      authorHint: { kind: 'author_unread', count: 1, bookIds: [unread.bookId], values: { authorId: editionAuthor, finished } },
+    });
+
+    expect(await counts()).toMatchObject(expected(2));
+
+    const linked = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/books/links',
+      headers: authHeader(ctx.adminToken),
+      payload: { bookIds: [ebook.bookId, audiobook.bookId] },
+    });
+    expect(linked.statusCode).toBe(201);
+    expect(await counts()).toMatchObject(expected(1));
+
+    const unlinked = await ctx.app.inject({ method: 'DELETE', url: `/api/v1/books/${audiobook.bookId}/link`, headers: authHeader(ctx.adminToken) });
+    expect(unlinked.statusCode).toBe(204);
+    expect(await counts()).toMatchObject(expected(2));
   });
 });

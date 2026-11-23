@@ -38,6 +38,7 @@ export type StaticRuleField =
   | "seriesIndex"
   | "publishedDate"
   | "publishedYear"
+  | "originalPublishedYear"
   | "pageCount"
   | "author"
   | "authorGender"
@@ -126,6 +127,7 @@ export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   fileSize: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   publishedDate: ["before", "after", "between", "withinLast", "moreThanAgo", "isEmpty", "isNotEmpty"],
   publishedYear: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
+  originalPublishedYear: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   seriesIndex: ["eq", "notEq", "gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   pageCount: ["gt", "gte", "lt", "lte", "between", "isEmpty", "isNotEmpty"],
   addedAt: ["before", "after", "between", "withinLast", "moreThanAgo"],
@@ -272,6 +274,7 @@ export type StaticSortField =
   | "updatedAt"
   | "publishedDate"
   | "publishedYear"
+  | "originalPublishedYear"
   | "pageCount"
   | "rating"
   | "publisher"
@@ -311,6 +314,7 @@ export const SORT_FIELDS: StaticSortField[] = [
   "updatedAt",
   "publishedDate",
   "publishedYear",
+  "originalPublishedYear",
   "pageCount",
   "rating",
   "publisher",

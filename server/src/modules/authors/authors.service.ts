@@ -7,6 +7,7 @@ import type {
   AuthorMetadataProviderInfo,
   AuthorMetadataSearchCandidateEvent,
   AuthorSummary,
+  BookCard,
   AuthorsPage,
   JumpBucketsResponse,
   MergeAuthorsResult,
@@ -223,6 +224,9 @@ export class AuthorsService {
     if (dto.collapseSeries === true) {
       return this.findBooksCollapsed(user, authorId, dto, libraryIds);
     }
+    if (dto.collapseLinked === true) {
+      return this.findBooksLinkCollapsed(user, authorId, dto, libraryIds);
+    }
 
     const page = await this.authorsRepo.findBookIdsPage({
       authorId,
@@ -282,6 +286,7 @@ export class AuthorsService {
       limit: size,
       offset: page * size,
       userId: user.id,
+      ...(dto.collapseLinked === true ? { collapseLinked: true } : {}),
     });
 
     const items = assembleCollapsedBookCards(
@@ -296,8 +301,52 @@ export class AuthorsService {
       collapsed.seriesMembershipRows,
     );
     await this.coverStore.enrichCardFaces(items);
+    if (dto.collapseLinked === true) await this.attachCardLinks(user, items);
 
     return { items, total: collapsed.total, bookTotal: collapsed.bookTotal, page, size };
+  }
+
+  /**
+   * {@link findBooks} with linked editions folded into the one this user read last, else the main
+   * one, placed where the sort puts its first matching edition. Only editions by this author compete.
+   */
+  private async findBooksLinkCollapsed(user: RequestUser, authorId: number, dto: ListAuthorBooksDto, libraryIds: number[]): Promise<AuthorBooksPage> {
+    const page = dto.page ?? 0;
+    const size = dto.size ?? 50;
+    const where = this.authorsRepo.buildBooksWhere({
+      authorId,
+      libraryIds,
+      contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+    });
+    const folded = await this.bookReadService.findCardsLinkCollapsed({
+      where,
+      orderBy: this.authorsRepo.buildBookOrderBy(dto.sort ?? 'addedAt', dto.order ?? 'desc'),
+      limit: size,
+      offset: page * size,
+      userId: user.id,
+    });
+    const items = assembleBookCards(
+      folded.rows,
+      folded.authorRows,
+      folded.fileRows,
+      folded.genreRows,
+      folded.progressRows,
+      folded.statusRows,
+      folded.narratorRows,
+      folded.tagRows,
+      folded.seriesMembershipRows,
+    );
+    await this.coverStore.enrichCardFaces(items);
+    await this.attachCardLinks(user, items);
+    return { items, total: folded.total, bookTotal: folded.bookTotal, page, size };
+  }
+
+  private async attachCardLinks(user: RequestUser, cards: BookCard[]): Promise<void> {
+    const visibleLibraryIds = await this.resolveLibraryIds(user);
+    await this.bookReadService.attachCardLinks(
+      cards,
+      this.authorsRepo.buildVisibleBooksWhere(visibleLibraryIds, user.isSuperuser ? undefined : user.contentFilters),
+    );
   }
 
   listMetadataProviders(): AuthorMetadataProviderInfo[] {
@@ -792,6 +841,7 @@ export class AuthorsService {
     sortName: string | null;
     description: string | null;
     bookCount: number;
+    workCount?: number;
     lastAddedAt: Date | null;
     coverBookId?: number | null;
   }): AuthorSummary {
@@ -801,6 +851,7 @@ export class AuthorsService {
       sortName: row.sortName,
       description: row.description,
       bookCount: row.bookCount,
+      ...(row.workCount !== undefined ? { workCount: row.workCount } : {}),
       lastAddedAt: row.lastAddedAt ? row.lastAddedAt.toISOString() : null,
       coverBookId: row.coverBookId ?? null,
     };

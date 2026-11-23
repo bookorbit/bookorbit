@@ -1,13 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, nextTick, onMounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { BookOpen, User, Sparkles, ChevronLeft, ChevronRight } from '@lucide/vue'
+import { BookOpen, User, Sparkles, ChevronLeft, ChevronRight, Layers, Plus } from '@lucide/vue'
 
 import type { BookRecommendation, SeriesBookRecommendation } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import BookCarousel from '@/features/book/components/detail/BookCarousel.vue'
+import EditionsTable from '@/features/book/components/link/EditionsTable.vue'
+import type { EditionEntry } from '@/features/book/lib/book-editions'
+import { formatNumber } from '@/i18n/formatters'
 
-type Section = 'series' | 'author' | 'similar'
+type FetchedSection = 'series' | 'author' | 'similar'
+type Section = 'editions' | FetchedSection
 
 const props = withDefaults(
   defineProps<{
@@ -18,9 +22,29 @@ const props = withDefaults(
     size?: 'md' | 'lg'
     /** Drops the top rule and margin when the row sits in its own grid cell. */
     flush?: boolean
+    /** Every edition of this book's work, this one included; two or more add an Editions tab, first. */
+    editions?: EditionEntry[]
+    canAddEdition?: boolean
+    canMakeMainEdition?: boolean
+    removableEditionIds?: number[]
+    editionsPending?: boolean
   }>(),
-  { size: 'md', flush: false },
+  {
+    size: 'md',
+    flush: false,
+    editions: () => [],
+    canAddEdition: false,
+    canMakeMainEdition: false,
+    removableEditionIds: () => [],
+    editionsPending: false,
+  },
 )
+
+const emit = defineEmits<{
+  'add-edition': []
+  'make-main-edition': [bookId: number]
+  'remove-edition': [bookId: number]
+}>()
 
 const { t } = useI18n()
 
@@ -28,8 +52,10 @@ const seriesBooks = ref<SeriesBookRecommendation[]>([])
 const authorBooks = ref<BookRecommendation[]>([])
 const similarBooks = ref<BookRecommendation[]>([])
 
-const loading = ref<Record<Section, boolean>>({ series: false, author: false, similar: false })
-const fetched = ref<Set<Section>>(new Set())
+const loading = ref<Record<FetchedSection, boolean>>({ series: false, author: false, similar: false })
+const fetched = ref<Set<FetchedSection>>(new Set())
+const hasEditions = computed(() => props.editions.length > 1)
+const editionsPill = ref<HTMLButtonElement | null>(null)
 
 const activeSection = ref<Section | null>(null)
 
@@ -52,7 +78,7 @@ const filteredSimilar = computed(() => {
   return similarBooks.value.filter((b) => !excluded.has(b.id))
 })
 
-function booksForSection(section: Section) {
+function booksForSection(section: FetchedSection) {
   if (section === 'series') return filteredSeriesBooks.value
   if (section === 'author') return authorBooks.value
   return filteredSimilar.value
@@ -62,6 +88,7 @@ function booksForSection(section: Section) {
 // when navigating to a book whose props suggest data that the fetch hasn't confirmed yet.
 const availablePills = computed<Section[]>(() => {
   const pills: Section[] = []
+  if (hasEditions.value) pills.push('editions')
   if (filteredSeriesBooks.value.length > 0) pills.push('series')
   if (authorBooks.value.length > 0) pills.push('author')
   if (filteredSimilar.value.length > 0) pills.push('similar')
@@ -69,24 +96,26 @@ const availablePills = computed<Section[]>(() => {
 })
 
 const pillLabels = computed<Record<Section, string>>(() => ({
+  editions: t('book.detail.discover.editions'),
   series: t('book.detail.discover.moreInSeries'),
   author: t('book.detail.discover.byAuthor'),
   similar: t('book.detail.discover.similarBooks'),
 }))
 
 const pillIcons: Record<Section, typeof BookOpen> = {
+  editions: Layers,
   series: BookOpen,
   author: User,
   similar: Sparkles,
 }
 
-async function fetchSection(section: Section) {
+async function fetchSection(section: FetchedSection) {
   if (fetched.value.has(section)) return
   fetched.value = new Set([...fetched.value, section])
   loading.value = { ...loading.value, [section]: true }
 
   try {
-    const endpointMap: Record<Section, string> = {
+    const endpointMap: Record<FetchedSection, string> = {
       series: `/api/v1/books/${props.bookId}/series-books`,
       author: `/api/v1/books/${props.bookId}/author-books`,
       similar: `/api/v1/books/${props.bookId}/recommendations`,
@@ -106,7 +135,37 @@ async function fetchSection(section: Section) {
 
 async function selectSection(section: Section) {
   activeSection.value = section
-  await fetchSection(section)
+  if (section !== 'editions') await fetchSection(section)
+}
+
+function setPillRef(section: Section, element: unknown) {
+  if (section === 'editions') editionsPill.value = (element as HTMLButtonElement | null) ?? null
+}
+
+/** Opens the Editions tab and brings it into view, for the strip's "All editions" button. */
+async function showEditions() {
+  if (!hasEditions.value) return
+  activeSection.value = 'editions'
+  await nextTick()
+  const pill = editionsPill.value
+  if (!pill) return
+  const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  pill.scrollIntoView?.({ behavior: reduce ? 'auto' : 'smooth', block: 'center' })
+  pill.focus({ preventScroll: true })
+}
+
+defineExpose({ showEditions })
+
+function handleAddEdition() {
+  emit('add-edition')
+}
+
+function handleMakeMainEdition(bookId: number) {
+  emit('make-main-edition', bookId)
+}
+
+function handleRemoveEdition(bookId: number) {
+  emit('remove-edition', bookId)
 }
 
 function handleScroll(direction: 'left' | 'right') {
@@ -114,12 +173,14 @@ function handleScroll(direction: 'left' | 'right') {
 }
 
 async function initSection() {
-  const candidates: Section[] = []
+  if (hasEditions.value) activeSection.value = 'editions'
+  const candidates: FetchedSection[] = []
   if (props.seriesName) candidates.push('series')
   if (props.authorCount > 0) candidates.push('author')
   candidates.push('similar')
   await Promise.all(candidates.map((s) => fetchSection(s)))
-  activeSection.value = candidates.find((s) => booksForSection(s).length > 0) ?? null
+  // A tab picked while the shelves loaded, or the Editions tab, stays.
+  if (activeSection.value === null) activeSection.value = candidates.find((s) => booksForSection(s).length > 0) ?? null
 }
 
 onMounted(initSection)
@@ -138,7 +199,16 @@ watch(
   },
 )
 
+// Grouping the first edition or removing the last other one, on this page.
+watch(hasEditions, (has) => {
+  if (has && activeSection.value === null) activeSection.value = 'editions'
+  if (!has && activeSection.value === 'editions') {
+    activeSection.value = (['series', 'author', 'similar'] as const).find((s) => booksForSection(s).length > 0) ?? null
+  }
+})
+
 const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.values(loading.value).some(Boolean))
+const editionCount = computed(() => formatNumber(props.editions.length))
 </script>
 
 <template>
@@ -148,20 +218,42 @@ const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.v
         <button
           v-for="pill in availablePills"
           :key="pill"
-          class="flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors"
+          :ref="(element) => setPillRef(pill, element)"
+          type="button"
+          class="flex h-7 items-center justify-center gap-1.5 rounded-md px-2.5 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           :class="
             activeSection === pill
               ? 'bg-background text-foreground shadow-sm ring-1 ring-border'
               : 'text-muted-foreground hover:text-foreground hover:bg-background/70'
           "
+          :aria-pressed="activeSection === pill"
+          :data-testid="`discover-pill-${pill}`"
           @click="selectSection(pill)"
         >
-          <component :is="pillIcons[pill]" :size="12" />
+          <component :is="pillIcons[pill]" :size="12" aria-hidden="true" />
           <span>{{ pillLabels[pill] }}</span>
+          <span
+            v-if="pill === 'editions'"
+            class="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-muted-foreground/22 px-1 text-[10px] font-semibold text-foreground tabular-nums"
+            >{{ editionCount }}</span
+          >
         </button>
       </div>
 
-      <div class="flex items-center gap-1">
+      <div v-if="activeSection === 'editions'" class="flex items-center">
+        <button
+          v-if="canAddEdition"
+          type="button"
+          class="inline-flex h-7 items-center justify-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-[12px] font-medium text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring max-sm:w-7 max-sm:px-0"
+          :aria-label="t('book.editions.table.add')"
+          data-testid="discover-add-edition"
+          @click="handleAddEdition"
+        >
+          <Plus class="size-[13px]" aria-hidden="true" />
+          <span class="max-sm:hidden">{{ t('book.editions.table.add') }}</span>
+        </button>
+      </div>
+      <div v-else class="flex items-center gap-1">
         <button
           class="h-6 w-6 flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           @click="handleScroll('left')"
@@ -184,6 +276,15 @@ const hasAnyContent = computed(() => availablePills.value.length > 0 || Object.v
             <div class="w-full rounded-sm bg-muted animate-shimmer" style="aspect-ratio: 2/3" />
           </div>
         </div>
+        <EditionsTable
+          v-else-if="activeSection === 'editions'"
+          :editions="editions"
+          :can-make-main="canMakeMainEdition"
+          :removable-book-ids="removableEditionIds"
+          :pending="editionsPending"
+          @make-main="handleMakeMainEdition"
+          @remove="handleRemoveEdition"
+        />
         <BookCarousel
           :size="size"
           v-else-if="activeSection === 'series'"

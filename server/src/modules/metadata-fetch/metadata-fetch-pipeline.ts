@@ -916,6 +916,7 @@ export class MetadataFetchPipeline {
       authors: 'authors',
       publisher: 'publisher',
       publishedYear: 'publishedYear',
+      originalPublishedYear: 'originalPublishedYear',
       language: 'language',
       pageCount: 'pageCount',
       seriesName: 'seriesName',

@@ -42,6 +42,18 @@ const ledger = ref<HTMLElement | null>(null)
 
 const canUseTool = computed(() => duplicates.canUseTool.value)
 const kinds = BOOK_DUPLICATE_KINDS
+/**
+ * The pair count beside a tab's name, less any grouped or dismissed since the scan. Duplicates
+ * states its totals in the summary band instead.
+ */
+const kindCounts = computed<Record<BookDuplicateKind, number | null>>(() => {
+  const open = duplicates.kindTotals.value
+  return {
+    duplicate: null,
+    other_format: open?.other_format ?? duplicates.scan.value?.totalOtherFormatPairs ?? null,
+    other_edition: open?.other_edition ?? duplicates.scan.value?.totalOtherEditionPairs ?? null,
+  }
+})
 /** The latest copy of each group under review, so a changed action or keeper shows at once. */
 const reviewedGroups = computed(() => reviewGroups.value.map((group) => groups.value.find((candidate) => candidate.id === group.id) ?? group))
 const groups = computed(() => duplicates.visibleGroups.value)
@@ -285,9 +297,10 @@ function handleKeydown(event: KeyboardEvent): void {
         >
           {{ t(`tools.bookDuplicates.kinds.${kind}`) }}
           <span
-            v-if="kind === 'other_format' && duplicates.scan.value?.totalOtherFormatPairs"
+            v-if="kindCounts[kind]"
             class="ms-1 rounded-full bg-muted px-1.5 text-[11px] font-bold tabular-nums text-muted-foreground"
-            >{{ formatNumber(duplicates.scan.value.totalOtherFormatPairs) }}</span
+            :data-testid="`duplicate-kind-count-${kind}`"
+            >{{ formatNumber(kindCounts[kind] ?? 0) }}</span
           >
         </button>
       </div>

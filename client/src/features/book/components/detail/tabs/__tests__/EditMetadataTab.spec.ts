@@ -668,3 +668,57 @@ describe('EditMetadataTab audiobook fields', () => {
     expect(renderedAudioFields(wrapper)).toEqual([])
   })
 })
+
+describe('EditMetadataTab edition fields', () => {
+  beforeEach(() => {
+    vi.mocked(api).mockReset()
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (init?.method === 'PATCH') return json({ book: makeBook(), write: null, libraryAutoWriteEnabled: false })
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+  })
+
+  function fieldOrder(wrapper: ReturnType<typeof mountTab>): string[] {
+    return wrapper.findAll('[data-field]').map((node) => node.attributes('data-field')!)
+  }
+
+  it('puts Edition name under Publisher and First published on its own row after Year and Page Count', async () => {
+    const wrapper = mountTab(makeBook())
+    await flushPromises()
+
+    const order = fieldOrder(wrapper)
+    expect(order[order.indexOf('publisher') + 1]).toBe('editionName')
+    expect(order.slice(order.indexOf('pageCount') - 1, order.indexOf('pageCount') + 2)).toEqual([
+      'publishedYear',
+      'pageCount',
+      'originalPublishedYear',
+    ])
+    expect(wrapper.get('[data-field="originalPublishedYear"]').classes()).toContain('col-span-2')
+    expect(wrapper.get('[data-field="editionName"] input').attributes('placeholder')).toBe('book.detail.editMetadata.editionNamePlaceholder')
+  })
+
+  it('saves a first published year without clearing the published date', async () => {
+    const wrapper = mountTab(makeBook({ publishedDate: '2019-05-01', publishedYear: 2019, editionName: null, originalPublishedYear: null }))
+    await flushPromises()
+
+    await wrapper.get('[data-field="originalPublishedYear"] input').setValue('1965')
+    await wrapper.get('[data-field="editionName"] input').setValue('Full Cast')
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+
+    const body = JSON.parse(patchCalls()[0]![1]!.body as string)
+    expect(body.metadata).toEqual({ editionName: 'Full Cast', originalPublishedYear: 1965 })
+  })
+
+  it('clears the first published year when the box is emptied', async () => {
+    const wrapper = mountTab(makeBook({ originalPublishedYear: 1965 }))
+    await flushPromises()
+
+    await wrapper.get('[data-field="originalPublishedYear"] input').setValue('')
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+
+    expect(JSON.parse(patchCalls()[0]![1]!.body as string).metadata).toEqual({ originalPublishedYear: null })
+  })
+})

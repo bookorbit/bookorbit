@@ -5,6 +5,8 @@ export const BOOK_METADATA_LOCK_FIELDS = [
   "description",
   "publisher",
   "publishedYear",
+  "editionName",
+  "originalPublishedYear",
   "language",
   "pageCount",
   "seriesName",

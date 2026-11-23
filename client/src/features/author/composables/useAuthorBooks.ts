@@ -53,6 +53,7 @@ export function useAuthorBooks(authorId: Ref<number>) {
         order: order.value,
         libraryId: libraryId.value,
         collapseSeries: collapseSeries.value,
+        collapseLinked: true,
       })
 
       // Dropped on purpose when a reset is queued: these rows answer the previous query.

@@ -97,6 +97,16 @@ describe('SelectionActionBar demo restriction', () => {
     expect(wrapper.find('[data-testid="action-bulk-unlock-metadata"]').exists()).toBe(true)
   })
 
+  it('names every icon-only control for assistive technology', async () => {
+    const wrapper = mountBar()
+    await wrapper.setProps({ inCollection: true })
+
+    const unnamed = wrapper
+      .findAll('button')
+      .filter((button) => button.find('svg').exists() && button.text().trim() === '' && !button.attributes('aria-label'))
+    expect(unnamed.map((button) => button.html().slice(0, 80))).toEqual([])
+  })
+
   it('hides edit-individually while the selection is query-scoped but keeps the bulk editor', () => {
     const wrapper = mount(SelectionActionBar, {
       props: { visible: true, count: 5000, inCollection: false, inFlight: null, queryScoped: true },
@@ -424,17 +434,17 @@ describe('SelectionActionBar link action', () => {
     const wrapper = mountWithLink({ disabledReason: null })
     const item = wrapper.get('[data-testid="action-link-books"]')
     expect(item.attributes('aria-disabled')).toBeUndefined()
-    expect(item.text()).toContain('Link...')
+    expect(item.text()).toContain('Group as editions...')
 
     await item.trigger('click')
     expect(wrapper.emitted('link')).toHaveLength(1)
   })
 
   it.each([
-    { reason: 'queryScoped', text: 'Select the books one by one to link them' },
-    { reason: 'tooFew', text: 'Select at least two books to link' },
-    { reason: 'tooMany', text: `Link up to ${BOOK_LINK_MAX_MEMBERS} books at a time` },
-    { reason: 'notEditable', text: 'Only books in libraries you can edit can be linked' },
+    { reason: 'queryScoped', text: 'Select the books one by one to group them as editions' },
+    { reason: 'tooFew', text: 'Select at least two books to group as editions' },
+    { reason: 'tooMany', text: `Group up to ${BOOK_LINK_MAX_MEMBERS} editions at a time` },
+    { reason: 'notEditable', text: 'Only books in libraries you can edit can be grouped as editions' },
   ] as const)('shows the $reason reason and does not emit', async ({ reason, text }) => {
     const wrapper = mountWithLink({ disabledReason: reason })
     const item = wrapper.get('[data-testid="action-link-books"]')
@@ -456,10 +466,10 @@ describe('SelectionActionBar link action', () => {
     expect(wrapper.get('[data-testid="action-merge-books-reason"]').text()).toBe('Only books in libraries you can edit can be merged')
   })
 
-  it('says linked books are not affected when deleting a selection that holds them', async () => {
+  it('says other editions are not affected when deleting a selection that holds them', async () => {
     const wrapper = mountWithLink(null, { linkedSelected: true })
     await wrapper.get('[data-testid="action-delete"]').trigger('click')
-    expect(wrapper.get('[data-testid="delete-linked-note"]').text()).toBe('Books linked with the selection are not affected.')
+    expect(wrapper.get('[data-testid="delete-linked-note"]').text()).toBe('Other editions of the selected books are not affected.')
   })
 
   it('leaves the delete confirmation alone for a selection without linked books', async () => {

@@ -14,6 +14,7 @@ import {
   FileType,
   HardDrive,
   Headphones,
+  History,
   Image,
   Languages,
   Layers,
@@ -74,6 +75,7 @@ export const FILTER_FIELD_KINDS: Record<StaticRuleField, FilterKind> = {
   audioCover: 'choice',
   publishedDate: 'date',
   publishedYear: 'number',
+  originalPublishedYear: 'number',
   communityRating: 'number',
   communityRatingCount: 'number',
   metadataScore: 'number',
@@ -110,6 +112,7 @@ export const FILTER_FIELD_ICONS: Record<StaticRuleField, Component> = {
   audioCover: Headphones,
   publishedDate: Calendar,
   publishedYear: CalendarDays,
+  originalPublishedYear: History,
   communityRating: Users,
   communityRatingCount: MessageSquareText,
   metadataScore: Sparkles,
@@ -128,7 +131,16 @@ export const FILTER_FIELD_GROUPS: { key: Exclude<FilterGroupKey, 'custom'>; fiel
   },
   {
     key: 'metadata',
-    fields: ['publishedDate', 'publishedYear', 'communityRating', 'communityRatingCount', 'metadataScore', 'storyGuide', 'lockStatus'],
+    fields: [
+      'publishedDate',
+      'publishedYear',
+      'originalPublishedYear',
+      'communityRating',
+      'communityRatingCount',
+      'metadataScore',
+      'storyGuide',
+      'lockStatus',
+    ],
   },
 ]
 

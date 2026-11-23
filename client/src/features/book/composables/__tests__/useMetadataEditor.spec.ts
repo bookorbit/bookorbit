@@ -218,6 +218,34 @@ describe('useMetadataEditor', () => {
     })
   })
 
+  it('loads and saves the edition name and first published year with their locks', async () => {
+    const book = makeBook({ editionName: 'Full Cast', originalPublishedYear: null, publishedYear: 2019, publishedDate: '2019-05-01' })
+    apiMock.mockResolvedValue({ ok: true, json: async () => book })
+
+    const { form, load, save } = useMetadataEditor()
+    load(book)
+    expect(form.editionName).toBe('Full Cast')
+    expect(form.originalPublishedYear).toBeNull()
+    form.editionName = '25th Anniversary'
+    form.originalPublishedYear = 1965
+    await save(book.id, ['editionName', 'originalPublishedYear'])
+
+    const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+    expect(JSON.parse(String(req.body))).toEqual({
+      metadata: { editionName: '25th Anniversary', originalPublishedYear: 1965 },
+      lockedFields: ['editionName', 'originalPublishedYear'],
+    })
+  })
+
+  it('reads a book from an older server without the edition fields as unset', () => {
+    const { form, load, isDirty } = useMetadataEditor()
+    load(makeBook())
+
+    expect(form.editionName).toBeNull()
+    expect(form.originalPublishedYear).toBeNull()
+    expect(isDirty.value).toBe(false)
+  })
+
   it('sends only changed custom metadata values in the metadata payload', async () => {
     const book = makeBook({
       customMetadata: [

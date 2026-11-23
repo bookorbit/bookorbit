@@ -373,6 +373,29 @@ describe('BookMetadataFetchOrchestratorService', () => {
     expect(metadataService.downloadAndSaveCover).toHaveBeenCalledWith([{ url: 'https://cover' }], 88, 'ebook');
   });
 
+  it('persists a fetched first published year beside the published year, and skips one outside the stored range', async () => {
+    const { service, bookMetadataLockService, bookReadService } = makeService();
+    bookMetadataLockService.filterResolvedMetadata.mockResolvedValueOnce({
+      resolved: { publishedYear: 2020, publishedDate: '2020-09-01', originalPublishedYear: 1954 },
+      providerIds: {},
+      skippedFields: [],
+    });
+    bookMetadataLockService.filterResolvedMetadata.mockResolvedValueOnce({
+      resolved: { originalPublishedYear: 54 },
+      providerIds: {},
+      skippedFields: [],
+    });
+
+    await (service as any).persistResolved(88, {}, {}, [], [], []);
+    await (service as any).persistResolved(89, {}, {}, [], [], []);
+
+    expect(bookReadService.updateMetadataFields).toHaveBeenCalledWith(
+      88,
+      expect.objectContaining({ publishedDate: '2020-09-01', publishedYear: 2020, originalPublishedYear: 1954 }),
+    );
+    expect(bookReadService.updateMetadataFields.mock.calls[1]![1]).not.toHaveProperty('originalPublishedYear');
+  });
+
   it('processOne marks failures with extracted http status', async () => {
     const { service, queueRepo, bookReadService, pipeline } = makeService();
     bookReadService.findById.mockResolvedValue({

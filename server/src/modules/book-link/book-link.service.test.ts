@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { ForbiddenException, Logger } from '@nestjs/common';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookLinkService } from './book-link.service';
@@ -23,8 +23,9 @@ function makeService() {
     findLinkGroupMembers: vi.fn().mockResolvedValue([]),
   };
   const gateway = { emitBookLinksChanged: vi.fn() };
-  const service = new BookLinkService(repository as never, bookService as never, gateway as never);
-  return { service, repository, bookService, gateway };
+  const readingAttemptEvents = { notifyChanged: vi.fn() };
+  const service = new BookLinkService(repository as never, bookService as never, gateway as never, readingAttemptEvents as never);
+  return { service, repository, bookService, gateway, readingAttemptEvents };
 }
 
 beforeEach(() => {
@@ -63,6 +64,24 @@ describe('BookLinkService change events', () => {
     expect(gateway.emitBookLinksChanged.mock.calls).toEqual([[{ libraryId: 10, bookIds: [5] }], [{ libraryId: 20, bookIds: [6] }]]);
   });
 
+  it('drops every reader cached statistics when a link or unlink regroups works', async () => {
+    const { service, repository, readingAttemptEvents } = makeService();
+
+    await service.link({ bookIds: [5, 6] }, USER);
+    expect(readingAttemptEvents.notifyChanged).toHaveBeenCalledWith(null);
+
+    readingAttemptEvents.notifyChanged.mockClear();
+    repository.findMemberships.mockResolvedValue([{ bookId: 5, groupId: 40, leadBookId: 5 }]);
+    repository.findMemberIds.mockResolvedValue([5, 6]);
+    await service.unlink(5, USER);
+    expect(readingAttemptEvents.notifyChanged).toHaveBeenCalledWith(null);
+
+    readingAttemptEvents.notifyChanged.mockClear();
+    repository.findMemberships.mockResolvedValue([]);
+    await service.unlink(9, USER);
+    expect(readingAttemptEvents.notifyChanged).not.toHaveBeenCalled();
+  });
+
   it('still answers when the broadcast fails', async () => {
     const { service, repository, gateway } = makeService();
     repository.findBookLibraries.mockRejectedValue(new Error('db down'));
@@ -92,5 +111,32 @@ describe('BookLinkService group', () => {
 
     await expect(service.link({ bookIds: [5, 6] }, USER)).resolves.toEqual({ groupId: 40, leadBookId: 5, books });
     expect(bookService.findLinkGroupMembers).toHaveBeenCalledWith(40, USER);
+  });
+});
+
+describe('BookLinkService main edition', () => {
+  it('needs editor access to every edition, not only the new main one', async () => {
+    const { service, repository, bookService } = makeService();
+    repository.findMemberships.mockResolvedValue([{ bookId: 6, groupId: 40, leadBookId: 5 }]);
+    repository.findMemberIds.mockResolvedValue([5, 6, 7]);
+    bookService.verifyBookAccess.mockImplementation((bookId: number) =>
+      bookId === 7 ? Promise.reject(new ForbiddenException('Insufficient library access level')) : Promise.resolve(),
+    );
+
+    await expect(service.setLead(40, { leadBookId: 6 }, USER)).rejects.toMatchObject({
+      response: { errorCode: 'LINK_GROUP_NOT_EDITABLE' },
+    });
+    expect(repository.setLead).not.toHaveBeenCalled();
+  });
+
+  it('changes the main edition when every edition is editable', async () => {
+    const { service, repository, bookService } = makeService();
+    repository.findMemberships.mockResolvedValue([{ bookId: 6, groupId: 40, leadBookId: 5 }]);
+    repository.findMemberIds.mockResolvedValue([5, 6]);
+
+    await service.setLead(40, { leadBookId: 6 }, USER);
+
+    expect(bookService.verifyBookAccess).toHaveBeenCalledWith(5, USER, 'editor');
+    expect(repository.setLead).toHaveBeenCalledWith({}, 40, 6);
   });
 });

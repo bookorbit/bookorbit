@@ -29,7 +29,7 @@ export class OpenLibraryProvider implements IdentifiableProvider {
   private readonly logger = new Logger(OpenLibraryProvider.name);
 
   readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
-    version: 1,
+    version: 2,
     trustEmpty: true,
     // The works endpoint answers an unknown id with 404.
     authoritativeLookupStatuses: [404],

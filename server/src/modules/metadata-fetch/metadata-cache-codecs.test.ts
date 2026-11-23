@@ -7,6 +7,7 @@ const candidate: MetadataCandidate = {
   providerId: 'g1',
   title: 'Dune',
   publishedDate: '1965-08-01',
+  originalPublishedYear: 1965,
   chapters: [{ title: 'One', startSeconds: 0, durationSeconds: 10 }] as MetadataCandidate['chapters'],
 };
 

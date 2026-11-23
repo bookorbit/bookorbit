@@ -67,6 +67,7 @@ export function useSeriesDetail(seriesId: Ref<number | null>) {
         sort: sort.value,
         order: order.value,
         libraryId: libraryId.value,
+        collapseLinked: true,
       })
 
       if (token !== requestToken) return

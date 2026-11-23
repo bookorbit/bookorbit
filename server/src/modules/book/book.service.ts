@@ -27,7 +27,7 @@ import { FileLockService, bookOperationLockKey } from '../../common/services/fil
 import { selectPrimaryFile } from '../../common/utils/primary-file-selection.utils';
 import { normalizeMetadataText, normalizeMetadataTextKey } from '../../common/utils/metadata-text-normalize.utils';
 import { compareBookFilePaths } from '../../common/utils/audio-track-order.utils';
-import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
+import { isPublishedYear, normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { buildPatternTokens } from '../../common/utils/pattern-tokens.utils';
 import { SeriesExpectedCountService } from '../../common/services/series-expected-count.service';
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
@@ -129,6 +129,7 @@ import { AudiobookEbookProgressSyncService } from './audiobook-ebook-progress-sy
 import type { DeliveryArtifact } from './delivery-artifact.service';
 import { DeliverySelectionService } from './delivery-selection.service';
 import { AudiolessEpubService } from './audioless-epub.service';
+import { attachCardLinks } from './book-card-links';
 import { BookLinkMembersRepository, toLinkedBookSummary } from './book-link-members.repository';
 import { BookRepository } from './book.repository';
 import { ComicMetadataRepository } from '../metadata/comic-metadata.repository';
@@ -210,6 +211,8 @@ const BULK_METADATA_LOCK_FIELD_BY_FIELD: Record<BulkMetadataField, BookMetadataL
   publisher: 'publisher',
   language: 'language',
   publishedYear: 'publishedYear',
+  editionName: 'editionName',
+  originalPublishedYear: 'originalPublishedYear',
   authors: 'authors',
   genres: 'genres',
   tags: 'tags',
@@ -509,6 +512,7 @@ export class BookService {
     if (r.publisher !== undefined) preview.publisher = r.publisher as string | null;
     if (r.publishedDate !== undefined) preview.publishedDate = r.publishedDate as string | null;
     if (r.publishedYear !== undefined) preview.publishedYear = r.publishedYear as number | null;
+    if (r.originalPublishedYear !== undefined) preview.originalPublishedYear = r.originalPublishedYear as number | null;
     if (r.language !== undefined) preview.language = r.language as string | null;
     if (r.pageCount !== undefined) preview.pageCount = r.pageCount as number | null;
     if (r.isbn10 !== undefined) preview.isbn10 = r.isbn10 as string;
@@ -724,7 +728,7 @@ export class BookService {
       if (required !== 'viewer' && !this.isSuperuser(user)) {
         await this.verifyLibraryAccessLevels(await this.bookRepo.findDistinctLibraryIdsByWhere(where), user, required);
       }
-      return this.bookRepo.findIdsByWhere(where);
+      return this.bookRepo.findIdsByWhere(where, dto.query.collapseLinked === true ? { collapseLinkedForUserId: user.id } : {});
     }
     throw new BadRequestException('Either bookIds or query must be provided');
   }
@@ -1431,20 +1435,9 @@ export class BookService {
     return query.collapseLinked === true && (await this.bookRepo.hasCollapsibleLinks(where));
   }
 
-  /**
-   * Fills `linked` for cards whose book shares a group with present books this user can see, in one
-   * query for the page. A series stack stands for several books, so it carries none.
-   */
   private async attachCardLinks(cards: BookCard[], viewer: RequestUser | undefined): Promise<void> {
     if (!viewer) return;
-    const bookIds = cards.filter((card) => (card.collapsedSeries?.bookCount ?? 1) <= 1).map((card) => card.id);
-    const linkedIds = await this.bookRepo.findLinkedBookIds(bookIds);
-    if (linkedIds.length === 0) return;
-    const links = await this.bookRepo.findCardLinks(linkedIds, await this.accessibleBooksWhere(viewer));
-    for (const card of cards) {
-      const info = links.get(card.id);
-      if (info) card.linked = info;
-    }
+    await attachCardLinks(this.bookRepo, cards, () => this.accessibleBooksWhere(viewer));
   }
 
   async executeBookIdsQuery(userId: number, where: SQL | undefined, query: BookQuery): Promise<number[]> {
@@ -2154,6 +2147,8 @@ export class BookService {
       scalarFields.publishedDate = null;
       scalarFields.publishedYear = dto.publishedYear ?? null;
     }
+    if (dto.editionName !== undefined) scalarFields.editionName = normalizeMetadataText(dto.editionName);
+    if (dto.originalPublishedYear !== undefined) scalarFields.originalPublishedYear = dto.originalPublishedYear ?? null;
     if (dto.language !== undefined) scalarFields.language = dto.language ?? null;
     if (dto.pageCount !== undefined) scalarFields.pageCount = dto.pageCount ?? null;
     if (dto.seriesMemberships === undefined) {
@@ -2957,6 +2952,13 @@ export class BookService {
     );
   }
 
+  private parseBulkOriginalPublishedYear(value: string | number | string[] | null | undefined): number | null {
+    if (value === null || value === undefined) return null;
+    const year = typeof value === 'number' ? value : Array.isArray(value) ? Number.NaN : Number(value);
+    if (!isPublishedYear(year)) throw new BadRequestException('originalPublishedYear must be a whole year from 1000 to 2200');
+    return year;
+  }
+
   async bulkSetMetadata(bookIds: number[], field: BulkMetadataField, value: string | number | string[] | null, user: RequestUser): Promise<void> {
     const event = 'book.bulk.set_metadata';
     const startedAt = Date.now();
@@ -2970,7 +2972,12 @@ export class BookService {
         const values = Array.isArray(raw) ? raw.map(String) : raw === null ? [] : [String(raw)];
         return collapseWhitespace ? this.normalizePersonNameListValues(values) : this.normalizeListValues(values);
       };
-      if (field === 'seriesName' || field === 'publisher' || field === 'language' || field === 'publishedYear') {
+      if (field === 'originalPublishedYear') {
+        await this.bookRepo.bulkUpdateMetadataFields(updatableIds, {
+          originalPublishedYear: this.parseBulkOriginalPublishedYear(value),
+          updatedAt: new Date(),
+        });
+      } else if (field === 'seriesName' || field === 'publisher' || field === 'language' || field === 'publishedYear' || field === 'editionName') {
         if (field === 'publishedYear') {
           const year = value === null ? null : typeof value === 'number' ? value : Number(value);
           if (year !== null && (!Number.isFinite(year) || !Number.isInteger(year))) {
@@ -3070,6 +3077,7 @@ export class BookService {
     if (!fields.hasValidArrayValues()) {
       throw new BadRequestException('array fields with add or remove mode must have a non-empty values array');
     }
+    const originalPublishedYear = fields.originalPublishedYear ? this.parseBulkOriginalPublishedYear(fields.originalPublishedYear.value) : undefined;
 
     await this.verifyLibraryAccessForBookIds(bookIds, user, 'editor');
 
@@ -3099,7 +3107,7 @@ export class BookService {
 
     try {
       await this.bookRepo.withTransaction(async (tx) => {
-        for (const fieldName of ['seriesName', 'publisher', 'language'] as const) {
+        for (const fieldName of ['seriesName', 'publisher', 'language', 'editionName'] as const) {
           if (!fields[fieldName]) continue;
           const ids = getUpdatableIds(BULK_METADATA_LOCK_FIELD_BY_FIELD[fieldName]);
           recordResult(fieldName, ids);
@@ -3126,6 +3134,14 @@ export class BookService {
               throw new BadRequestException('Invalid publishedYear value');
             }
             await this.bookRepo.bulkUpdateMetadataFields(ids, { publishedDate: null, publishedYear: val, updatedAt: new Date() }, tx);
+          }
+        }
+
+        if (originalPublishedYear !== undefined) {
+          const ids = getUpdatableIds('originalPublishedYear');
+          recordResult('originalPublishedYear', ids);
+          if (ids.length > 0) {
+            await this.bookRepo.bulkUpdateMetadataFields(ids, { originalPublishedYear, updatedAt: new Date() }, tx);
           }
         }
 
@@ -3372,6 +3388,7 @@ export class BookService {
         authors: authorRows.map((a) => a.name),
         publisher: meta?.publisher,
         publishedYear: meta?.publishedYear,
+        originalPublishedYear: meta?.originalPublishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,
         isbn10: meta?.isbn10,
@@ -3428,6 +3445,7 @@ export class BookService {
       if (r.publisher !== undefined) dto.publisher = r.publisher as string | null;
       if (r.publishedDate !== undefined) dto.publishedDate = r.publishedDate as string | null;
       if (r.publishedYear !== undefined) dto.publishedYear = r.publishedYear as number | null;
+      if (r.originalPublishedYear !== undefined) dto.originalPublishedYear = r.originalPublishedYear as number | null;
       if (r.language !== undefined) dto.language = r.language as string | null;
       if (r.pageCount !== undefined) dto.pageCount = r.pageCount as number | null;
       if (r.isbn10 !== undefined) dto.isbn10 = r.isbn10 as string;
@@ -3794,6 +3812,8 @@ export class BookService {
       publisher: meta?.publisher ?? null,
       publishedDate: meta?.publishedDate ?? null,
       publishedYear: meta?.publishedYear ?? null,
+      editionName: meta?.editionName ?? null,
+      originalPublishedYear: meta?.originalPublishedYear ?? null,
       language: meta?.language ?? null,
       pageCount: meta?.pageCount ?? null,
       seriesId: meta?.seriesId ?? null,
@@ -3868,21 +3888,25 @@ export class BookService {
       linkedBooks: linked.books,
       linkGroupId: linked.groupId,
       linkIsLead: linked.isLead,
+      linkSelf: linked.self,
     };
   }
 
   /** Other books shown as this one, only those this user may see. Empty when it is not linked. */
-  async findLinkedBooks(bookId: number, user: RequestUser): Promise<{ groupId: number | null; books: LinkedBookSummary[]; isLead: boolean }> {
-    if (!this.linkMembers) return { groupId: null, books: [], isLead: false };
+  async findLinkedBooks(
+    bookId: number,
+    user: RequestUser,
+  ): Promise<{ groupId: number | null; books: LinkedBookSummary[]; isLead: boolean; self: LinkedBookSummary | null }> {
+    if (!this.linkMembers) return { groupId: null, books: [], isLead: false, self: null };
     const groupId = await this.linkMembers.findGroupId(bookId);
-    if (groupId === null) return { groupId: null, books: [], isLead: false };
-    return this.linkMembers.findLinkedBooks(bookId, groupId, await this.accessibleBooksWhere(user));
+    if (groupId === null) return { groupId: null, books: [], isLead: false, self: null };
+    return this.linkMembers.findLinkedBooks(bookId, groupId, await this.accessibleBooksWhere(user), user.id);
   }
 
   /** The members of a link group this user may see, lead first. Empty when fewer than two remain. */
   async findLinkGroupMembers(groupId: number, user: RequestUser): Promise<LinkedBookSummary[]> {
     if (!this.linkMembers) return [];
-    const members = await this.linkMembers.findMembers([groupId], await this.accessibleBooksWhere(user));
+    const members = await this.linkMembers.findMembers([groupId], await this.accessibleBooksWhere(user), user.id);
     return members.map(toLinkedBookSummary);
   }
 

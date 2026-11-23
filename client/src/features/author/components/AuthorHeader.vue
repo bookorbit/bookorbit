@@ -266,7 +266,7 @@ watch(resolvedBio, () => {
 
           <div class="mt-4 flex gap-3">
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">
-              <p class="text-base font-semibold text-foreground">{{ formatNumber(author.bookCount) }}</p>
+              <p class="text-base font-semibold text-foreground">{{ formatNumber(author.workCount ?? author.bookCount) }}</p>
               <p class="text-xs text-muted-foreground">{{ t('author.header.booksLabel') }}</p>
             </div>
             <div class="rounded-lg border border-border/70 bg-background/40 px-4 py-2.5">

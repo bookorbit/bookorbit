@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { ArrayNotEmpty, IsArray, IsInt, IsObject, IsOptional, IsString, Min, ValidateIf, ValidateNested } from 'class-validator';
+import { ArrayNotEmpty, IsArray, IsBoolean, IsInt, IsObject, IsOptional, IsString, Min, ValidateIf, ValidateNested } from 'class-validator';
 
 import type { GroupRule, SortSpec } from '@bookorbit/types';
 
@@ -21,6 +21,14 @@ export class BulkQuerySelectionDto {
   @IsArray()
   @IsObject({ each: true })
   sort?: SortSpec[];
+
+  /**
+   * The listing folds linked editions: act on the edition each card shows, not on every matching
+   * edition. Released clients never send it.
+   */
+  @IsOptional()
+  @IsBoolean()
+  collapseLinked?: boolean;
 }
 
 /**

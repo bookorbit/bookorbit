@@ -12,7 +12,7 @@ import {
   type BookDuplicateResolutionOutcomeRow,
   type BookDuplicateResolutionRow,
 } from '../../db/schema';
-import { duplicateScopeWhere, type Db } from './book-duplicates.repository';
+import { duplicateScopeWhere, openDuplicateGroupWhere, type Db } from './book-duplicates.repository';
 
 export interface ResolutionGroupRow {
   id: number;
@@ -83,13 +83,6 @@ export class BookDuplicateResolutionRepository {
     filter: { kind: BookDuplicateKind; reason?: BookDuplicateMatchReason; excludeGroupIds: number[]; afterGroupId: number },
     limit: number,
   ): Promise<ResolutionGroupRow[]> {
-    const accessibleGroupIds = this.db
-      .select({ groupId: bookDuplicateGroupMembers.groupId })
-      .from(bookDuplicateGroupMembers)
-      .innerJoin(books, eq(books.id, bookDuplicateGroupMembers.bookId))
-      .where(and(eq(bookDuplicateGroupMembers.scanId, scanId), duplicateScopeWhere(this.db, libraryIds, user)))
-      .groupBy(bookDuplicateGroupMembers.groupId)
-      .having(sql`count(*) >= 2`);
     const rows = await this.db
       .select({ id: bookDuplicateGroups.id, kind: bookDuplicateGroups.kind, reasons: bookDuplicateGroups.reasons })
       .from(bookDuplicateGroups)
@@ -98,7 +91,7 @@ export class BookDuplicateResolutionRepository {
           eq(bookDuplicateGroups.scanId, scanId),
           eq(bookDuplicateGroups.kind, filter.kind),
           gt(bookDuplicateGroups.id, filter.afterGroupId),
-          inArray(bookDuplicateGroups.id, accessibleGroupIds),
+          openDuplicateGroupWhere(this.db, scanId, libraryIds, user),
           filter.reason ? sql`${filter.reason} = ANY(${bookDuplicateGroups.reasons})` : undefined,
           filter.excludeGroupIds.length > 0 ? notInArray(bookDuplicateGroups.id, filter.excludeGroupIds) : undefined,
         ),

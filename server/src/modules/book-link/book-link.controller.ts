@@ -14,7 +14,7 @@ export class BookLinkController {
   constructor(private readonly bookLinkService: BookLinkService) {}
 
   @Post('links')
-  @RequirePermission(Permission.LibraryMergeBooks)
+  @RequirePermission(Permission.LibraryEditMetadata)
   @Auditable({
     action: AuditAction.BookLink,
     resource: AuditResource.Book,
@@ -27,14 +27,14 @@ export class BookLinkController {
   }
 
   @Patch('links/:groupId')
-  @RequirePermission(Permission.LibraryMergeBooks)
+  @RequirePermission(Permission.LibraryEditMetadata)
   setLead(@Param('groupId', ParseIntPipe) groupId: number, @Body() dto: BookLinkLeadDto, @CurrentUser() user: RequestUser) {
     return this.bookLinkService.setLead(groupId, dto, user);
   }
 
   @Delete(':id/link')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @RequirePermission(Permission.LibraryMergeBooks)
+  @RequirePermission(Permission.LibraryEditMetadata)
   @Auditable({
     action: AuditAction.BookUnlink,
     resource: AuditResource.Book,

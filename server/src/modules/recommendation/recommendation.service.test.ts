@@ -284,6 +284,31 @@ describe('RecommendationService', () => {
     });
   });
 
+  it('shows each work once, as its best-scored edition', async () => {
+    const { service, recRepo, bookRepo } = makeService();
+
+    bookRepo.findLibraryIdByBookId.mockResolvedValue(2);
+    recRepo.getTargetBookData.mockResolvedValue({
+      embedding: [0.2],
+      seriesId: null,
+      seriesName: null,
+      rating: null,
+      authorNames: [],
+      genreTagNames: [],
+    });
+    recRepo.findAnnCandidates.mockResolvedValue([
+      { bookId: 10, workKey: 'g4', cosineSim: 0.9, seriesId: null, seriesName: null, rating: null },
+      { bookId: 11, workKey: 'g4', cosineSim: 0.85, seriesId: null, seriesName: null, rating: null },
+      { bookId: 12, workKey: 'b12', cosineSim: 0.8, seriesId: null, seriesName: null, rating: null },
+    ]);
+    recRepo.getCandidateMetadata.mockResolvedValue([]);
+    bookRepo.findRecommendationTitlesByBookIds.mockResolvedValue([]);
+
+    await service.getRecommendations(2, makeUser());
+
+    expect(bookRepo.findRecommendationTitlesByBookIds).toHaveBeenCalledWith([10, 12]);
+  });
+
   it('returns empty recommendations when user has no accessible libraries with ANN candidates', async () => {
     const { service, recRepo, bookRepo, libraryService } = makeService();
 
@@ -447,7 +472,7 @@ describe('RecommendationService', () => {
           readStatus: null,
         },
       ]);
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(42, [5, 6], EMPTY_CONTENT_FILTER_RULES);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(42, [5, 6], EMPTY_CONTENT_FILTER_RULES, { userId: expect.any(Number), openBookId: 2 });
     });
 
     it('uses findAccessibleLibraryIds instead of findAll', async () => {
@@ -523,7 +548,7 @@ describe('RecommendationService', () => {
           readStatus: null,
         },
       ]);
-      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], EMPTY_CONTENT_FILTER_RULES);
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], EMPTY_CONTENT_FILTER_RULES, { userId: expect.any(Number), openBookId: 1 });
     });
 
     it("attaches the requesting user's read status to each book", async () => {
@@ -643,7 +668,7 @@ describe('RecommendationService', () => {
 
       await service.getSeriesBooks(1, user);
 
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(17, [5], filters);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(17, [5], filters, { userId: user.id, openBookId: 1 });
     });
 
     it('passes undefined to findSeriesBooks for superuser', async () => {
@@ -658,7 +683,7 @@ describe('RecommendationService', () => {
 
       await service.getSeriesBooks(1, user);
 
-      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(17, [5], undefined);
+      expect(recRepo.findSeriesBooks).toHaveBeenCalledWith(17, [5], undefined, { userId: user.id, openBookId: 1 });
     });
 
     it('passes contentFilters to findAuthorBooks for non-superuser', async () => {
@@ -672,7 +697,7 @@ describe('RecommendationService', () => {
 
       await service.getAuthorBooks(1, user);
 
-      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], filters);
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], filters, { userId: user.id, openBookId: 1 });
     });
 
     it('passes undefined to findAuthorBooks for superuser', async () => {
@@ -686,7 +711,7 @@ describe('RecommendationService', () => {
 
       await service.getAuthorBooks(1, user);
 
-      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], undefined);
+      expect(recRepo.findAuthorBooks).toHaveBeenCalledWith(1, [5], undefined, { userId: user.id, openBookId: 1 });
     });
   });
 });

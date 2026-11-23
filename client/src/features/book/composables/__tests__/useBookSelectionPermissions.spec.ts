@@ -187,12 +187,17 @@ describe('link availability for bulk selections', () => {
   }
 
   beforeEach(() => {
-    permissions.value = [Permission.LibraryMergeBooks]
+    permissions.value = [Permission.LibraryMergeBooks, Permission.LibraryEditMetadata]
   })
 
-  it('hides Link without the merge permission it shares', () => {
-    permissions.value = [Permission.LibraryEditMetadata]
+  it('hides Link without the metadata permission editions need, whatever the merge permission', () => {
+    permissions.value = [Permission.LibraryMergeBooks]
     expect(linkContext([1, 2]).linkSelection.value).toBeNull()
+  })
+
+  it('offers Link with the metadata permission alone', () => {
+    permissions.value = [Permission.LibraryEditMetadata]
+    expect(linkContext([1, 2]).linkSelection.value).toEqual({ disabledReason: null })
   })
 
   it('hides Link when every selected book sits in a library the user only views', () => {

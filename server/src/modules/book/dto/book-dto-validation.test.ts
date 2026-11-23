@@ -39,6 +39,21 @@ async function strictErrorsFor<T extends object>(cls: new () => T, value: Record
 }
 
 describe('Book DTO validation', () => {
+  it('accepts the edition fields and their locks on the plain and the metadata-and-locks edits', async () => {
+    const metadata = { editionName: 'Full Cast', originalPublishedYear: 1965 };
+    expect(await strictErrorsFor(UpdateBookMetadataDto, metadata)).toHaveLength(0);
+    expect(await strictErrorsFor(UpdateBookMetadataDto, { editionName: null, originalPublishedYear: null })).toHaveLength(0);
+    expect(await strictErrorsFor(UpdateBookMetadataAndLocksDto, { metadata, lockedFields: ['editionName', 'originalPublishedYear'] })).toHaveLength(
+      0,
+    );
+    expect((await errorsFor(UpdateBookMetadataDto, { editionName: 'a'.repeat(501) })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { originalPublishedYear: 999 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { originalPublishedYear: 2201 })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookMetadataDto, { originalPublishedYear: 1965.5 })).length).toBeGreaterThan(0);
+    expect((await strictErrorsFor(BulkSetMetadataDto, { bookIds: [1], field: 'editionName', value: 'Full Cast' })).length).toBe(0);
+    expect((await strictErrorsFor(BulkSetMetadataDto, { bookIds: [1], field: 'originalPublishedYear', value: 1965 })).length).toBe(0);
+  });
+
   it('validates bulk selection DTOs for explicit ids and query payloads', async () => {
     expect((await errorsFor(BulkQuerySelectionDto, { libraryId: 5 })).length).toBe(0);
     expect((await errorsFor(BulkQuerySelectionDto, { filter: { type: 'group', join: 'AND', rules: [] } })).length).toBe(0);

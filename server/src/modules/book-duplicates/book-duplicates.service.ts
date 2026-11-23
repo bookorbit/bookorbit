@@ -12,6 +12,7 @@ import type {
   ReadStatus,
   ReadStatusSource,
 } from '@bookorbit/types';
+import { editionLabels } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { postgresErrorCode, queryFailureReason } from '../../common/utils/db-error.utils';
@@ -19,12 +20,14 @@ import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
 import { JobChangesService } from '../jobs/job-changes.service';
 import { LibraryService } from '../library/library.service';
+import { classifyEditionPair, toEditionFacts } from './book-duplicate-editions';
 import { canonicalSeriesIndex, canonicalizeIsbn, crossFormatPersonKey, crossFormatTitleKey, mediaFamilyForFormat } from './book-duplicate-normalize';
-import { BookDuplicatesRepository, type OtherFormatBookRow, type PreviewRow } from './book-duplicates.repository';
+import { BookDuplicatesRepository, type DismissalRow, type OtherFormatBookRow, type PreviewRow } from './book-duplicates.repository';
 import type { CreateBookDuplicateDismissalDto, CreateBookDuplicateScanDto, ListBookDuplicateGroupsDto } from './dto/book-duplicate.dto';
 
 const ISBN_BATCH_SIZE = 500;
 const OTHER_FORMAT_BATCH_SIZE = 500;
+const EDITION_PAIR_BATCH_SIZE = 500;
 
 type ScanKey = { scanId: number; bookId: number; kind: string; value: string };
 
@@ -113,6 +116,37 @@ function groupCandidates(rows: PreviewRow[]): Map<number, BookDuplicateCandidate
 
 const DISMISSAL_LIST_LIMIT = 200;
 
+/**
+ * Two books dismissed under one title read the same in the list, so each gets what sets its edition
+ * apart. A library the user can no longer open is left unnamed.
+ */
+function dismissalDetails(row: DismissalRow, reachable: ReadonlySet<number>): { detailA: string | null; detailB: string | null } {
+  const sameTitle = (row.titleA ?? '').trim().toLocaleLowerCase() === (row.titleB ?? '').trim().toLocaleLowerCase();
+  if (!sameTitle) return { detailA: null, detailB: null };
+  const library = (id: number | null, name: string | null) => (id !== null && reachable.has(id) ? (name ?? '') : '');
+  const labels = editionLabels([
+    {
+      bookId: row.bookIdA,
+      libraryName: library(row.libraryIdA, row.libraryNameA),
+      formats: [],
+      editionName: row.editionNameA,
+      publisher: row.publisherA,
+      publishedYear: row.publishedYearA,
+    },
+    {
+      bookId: row.bookIdB,
+      libraryName: library(row.libraryIdB, row.libraryNameB),
+      formats: [],
+      editionName: row.editionNameB,
+      publisher: row.publisherB,
+      publishedYear: row.publishedYearB,
+    },
+  ]);
+  const detailA = labels.get(row.bookIdA) || null;
+  const detailB = labels.get(row.bookIdB) || null;
+  return detailA && detailB && detailA !== detailB ? { detailA, detailB } : { detailA: null, detailB: null };
+}
+
 @Injectable()
 export class BookDuplicatesService implements OnApplicationBootstrap {
   private readonly logger = new Logger(BookDuplicatesService.name);
@@ -164,7 +198,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     if (scan.status !== 'completed') throw new ConflictException('Duplicate book scan is not complete');
     await this.assertScopeStillAccessible(scan.libraryIds, user);
 
-    const { groups, total } = await this.repo.findGroups(
+    const { groups, total, kindTotals } = await this.repo.findGroups(
       scanId,
       dto.page,
       dto.pageSize,
@@ -208,6 +242,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       total,
       page: dto.page,
       pageSize: dto.pageSize,
+      kindTotals,
     };
   }
 
@@ -230,13 +265,18 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
   }
 
   async listDismissals(user: RequestUser): Promise<BookDuplicateDismissal[]> {
-    const rows = await this.repo.listDismissals(user.id, DISMISSAL_LIST_LIMIT);
+    const [rows, accessible] = await Promise.all([
+      this.repo.listDismissals(user.id, DISMISSAL_LIST_LIMIT),
+      this.libraryService.findAccessibleLibraryIds(user),
+    ]);
+    const reachable = new Set(accessible);
     return rows.map((row) => ({
       kind: row.kind as BookDuplicateKind,
       bookIdA: row.bookIdA,
       bookIdB: row.bookIdB,
       titleA: row.titleA,
       titleB: row.titleB,
+      ...dismissalDetails(row, reachable),
       createdAt: row.createdAt.toISOString(),
     }));
   }
@@ -297,6 +337,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
           totalExtraCopies: 0,
           totalReclaimableBytes: 0,
           totalOtherFormatPairs: 0,
+          totalOtherEditionPairs: 0,
           completedAt: new Date(),
         });
         await this.repo.deleteOlderScans(user.id, scanId);
@@ -334,12 +375,16 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       await this.insertOtherFormatKeys(scanId, scan.libraryIds, user);
       await this.refreshScanKeyStatistics(scanId, user.id);
       await this.repo.createOtherFormatPairs(scanId, scan.similarityPercent);
+      await this.repo.createSameMediumWorkPairs(scanId);
       const seriesConflictPairs = await this.repo.deleteSeriesConflictPairs(scanId);
+      const linkedPairs = await this.repo.deleteLinkedPairs(scanId);
       await this.updateProgress(scanId, user.id, totalBooks, 85);
+      const editionPairs = await this.classifyEditionPairs(scanId);
       const dismissedPairs = await this.repo.deleteDismissedPairs(scanId, user.id);
       await this.updateProgress(scanId, user.id, totalBooks, 88);
       const totalGroups = await this.repo.finalizeGroups(scanId);
       const totalOtherFormatPairs = await this.repo.finalizeOtherFormatGroups(scanId);
+      const totalOtherEditionPairs = await this.repo.finalizeOtherEditionGroups(scanId);
       const totals = await this.repo.computeScanTotals(scanId);
       await this.repo.deleteScanKeys(scanId);
       await this.repo.updateScan(scanId, {
@@ -349,13 +394,14 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
         totalExtraCopies: totals.totalExtraCopies,
         totalReclaimableBytes: totals.totalReclaimableBytes,
         totalOtherFormatPairs,
+        totalOtherEditionPairs,
         completedAt: new Date(),
       });
       await this.repo.deleteOlderScans(user.id, scanId);
       this.changed(user.id, true);
 
       this.logger.log(
-        `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} otherFormatPairs=${totalOtherFormatPairs} seriesConflictPairs=${seriesConflictPairs} dismissedPairs=${dismissedPairs} reclaimableBytes=${totals.totalReclaimableBytes} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
+        `[${event}] [end] scanId=${scanId} userId=${user.id} totalBooks=${totalBooks} totalGroups=${totalGroups} otherFormatPairs=${totalOtherFormatPairs} otherEditionPairs=${totalOtherEditionPairs} reclassifiedEditionPairs=${editionPairs.reclassified} seriesConflictPairs=${seriesConflictPairs} linkedPairs=${linkedPairs} dismissedPairs=${dismissedPairs} reclaimableBytes=${totals.totalReclaimableBytes} durationMs=${Date.now() - startedAt} - duplicate scan completed`,
       );
     } catch (error) {
       await this.repo.updateScan(scanId, { status: 'failed', errorCode: 'scan_failed', completedAt: new Date() }).catch(() => undefined);
@@ -387,6 +433,36 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       await this.repo.insertScanKeys(rows.flatMap((row) => otherFormatKeys(scanId, row)));
       afterBookId = rows.at(-1)!.id;
     }
+  }
+
+  /**
+   * Splits editions out of the duplicates in bounded batches: same-work pairs of one medium whose
+   * editions differ move to other editions, and work-id candidates that do not differ are dropped.
+   */
+  private async classifyEditionPairs(scanId: number): Promise<{ reclassified: number; dropped: number }> {
+    let reclassifiedTotal = 0;
+    let droppedTotal = 0;
+    let after: { bookIdA: number; bookIdB: number } | null = null;
+    for (;;) {
+      const pairs = await this.repo.findEditionCandidatePairs(scanId, after, EDITION_PAIR_BATCH_SIZE);
+      if (pairs.length === 0) break;
+      const facts = await this.repo.findEditionFacts([...new Set(pairs.flatMap((pair) => [pair.book_id_a, pair.book_id_b]))]);
+      const factsById = new Map(facts.map((row) => [row.id, toEditionFacts(row)]));
+      const reclassified: { bookIdA: number; bookIdB: number; sameWork: boolean }[] = [];
+      const dropped: { bookIdA: number; bookIdB: number }[] = [];
+      for (const pair of pairs) {
+        const outcome = classifyEditionPair(pair, factsById.get(pair.book_id_a), factsById.get(pair.book_id_b));
+        if (outcome.action === 'reclassify') {
+          reclassified.push({ bookIdA: pair.book_id_a, bookIdB: pair.book_id_b, sameWork: outcome.reasons.includes('same_work') });
+        } else if (outcome.action === 'drop') dropped.push({ bookIdA: pair.book_id_a, bookIdB: pair.book_id_b });
+      }
+      await this.repo.applyEditionOutcomes(scanId, reclassified, dropped);
+      reclassifiedTotal += reclassified.length;
+      droppedTotal += dropped.length;
+      const last = pairs.at(-1)!;
+      after = { bookIdA: last.book_id_a, bookIdB: last.book_id_b };
+    }
+    return { reclassified: reclassifiedTotal, dropped: droppedTotal };
   }
 
   private async updateProgress(scanId: number, ownerId: number, totalBooks: number, percent: number): Promise<void> {
@@ -424,6 +500,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
     totalExtraCopies: number | null;
     totalReclaimableBytes: number | null;
     totalOtherFormatPairs: number | null;
+    totalOtherEditionPairs: number | null;
     errorCode: string | null;
     createdAt: Date;
     completedAt: Date | null;
@@ -449,6 +526,7 @@ export class BookDuplicatesService implements OnApplicationBootstrap {
       totalExtraCopies: scan.totalExtraCopies,
       totalReclaimableBytes: scan.totalReclaimableBytes === null ? null : Number(scan.totalReclaimableBytes),
       totalOtherFormatPairs: scan.totalOtherFormatPairs,
+      totalOtherEditionPairs: scan.totalOtherEditionPairs,
       errorCode: scan.errorCode,
       createdAt: scan.createdAt.toISOString(),
       completedAt: scan.completedAt?.toISOString() ?? null,

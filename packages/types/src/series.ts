@@ -28,6 +28,8 @@ export type SeriesSummary = {
   id: number;
   name: string;
   bookCount: number;
+  /** Books counted once per work: linked editions count as one. Absent from servers without `book-editions`. */
+  workCount?: number;
   readCount: number;
   authors: string[];
   coverBookIds: number[];
@@ -80,6 +82,8 @@ export type SeriesDetail = {
   id: number;
   name: string;
   bookCount: number;
+  /** Books counted once per work: linked editions count as one. Absent from servers without `book-editions`. */
+  workCount?: number;
   readCount: number;
   /** Logical volumes owned, collapsing book records that share a whole-numbered series position. */
   ownedVolumeCount?: number;

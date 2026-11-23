@@ -5,6 +5,7 @@ import type { ContentFilterRules, ReadStatus } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 import {
   audiobookProgress,
@@ -279,14 +280,15 @@ export class AchievementHintsRepository {
    * authors of the user's finished books.
    */
   async findAuthorToDeepen(scope: HintScope, target: number): Promise<HintAuthor | null> {
+    const finishedWorks = sql<number>`count(distinct ${workKeySql(userBookStatus.bookId)})::int`;
     const finishedByAuthor = this.db.$with('finished_by_author').as(
       this.db
-        .select({ authorId: bookAuthors.authorId, finished: sql<number>`count(*)::int`.as('finished') })
+        .select({ authorId: bookAuthors.authorId, finished: finishedWorks.as('finished') })
         .from(userBookStatus)
         .innerJoin(bookAuthors, eq(bookAuthors.bookId, userBookStatus.bookId))
         .where(and(eq(userBookStatus.userId, scope.userId), eq(userBookStatus.status, 'read')))
         .groupBy(bookAuthors.authorId)
-        .having(sql`count(*) < ${target}`),
+        .having(sql`${finishedWorks} < ${target}`),
     );
     const unread = sql<number>`count(${books.id})::int`;
     const [row] = await this.db

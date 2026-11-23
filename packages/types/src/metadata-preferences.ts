@@ -10,6 +10,7 @@ export type MetadataField =
   | "publisher"
   | "isbn"
   | "publishedYear"
+  | "originalPublishedYear"
   | "language"
   | "pageCount"
   | "communityRating"
@@ -30,6 +31,7 @@ export const ALL_METADATA_FIELDS: MetadataField[] = [
   "publisher",
   "isbn",
   "publishedYear",
+  "originalPublishedYear",
   "language",
   "pageCount",
   "communityRating",
@@ -239,6 +241,7 @@ export const METADATA_PROVIDER_SUPPORTED_FIELDS: Record<BuiltInMetadataProviderK
     "publisher",
     "isbn",
     "publishedYear",
+    "originalPublishedYear",
     "language",
     "pageCount",
     "communityRating",
@@ -254,6 +257,7 @@ export const METADATA_PROVIDER_SUPPORTED_FIELDS: Record<BuiltInMetadataProviderK
     "publisher",
     "isbn",
     "publishedYear",
+    "originalPublishedYear",
     "language",
     "pageCount",
     "communityRating",

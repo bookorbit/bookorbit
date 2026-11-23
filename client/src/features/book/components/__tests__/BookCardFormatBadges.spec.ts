@@ -130,10 +130,12 @@ describe('BookCardFormatBadges', () => {
     expect(wrapper.get('[data-testid="card-format-badges-more"]').text()).toBe('+1')
   })
 
-  it('describes the whole list in words in every style, naming the linked book library', () => {
+  it('describes the whole list in words in every style, naming the library of the other edition', () => {
     for (const style of ['primary', 'bubble', 'underline', 'pips', 'seal', 'dots', 'kinds'] as const) {
       const wrapper = mountBadges(style, ['epub'], linked)
-      expect(wrapper.get('[data-testid="card-format-badges-summary"]').text()).toBe('Formats: EPUB e-book. Linked books: M4B audiobook in Audiobooks')
+      expect(wrapper.get('[data-testid="card-format-badges-summary"]').text()).toBe(
+        'Formats: EPUB e-book. Other editions: M4B audiobook in Audiobooks',
+      )
     }
   })
 

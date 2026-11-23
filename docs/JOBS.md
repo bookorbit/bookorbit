@@ -36,10 +36,10 @@ Holding any permission in the table opens the page. Each type then decides which
 | ------------------- | --------------------------------------------- | --------------------------------- |
 | Story guide         | Build story guides, while story guides are on | App settings                      |
 | Read-aloud          | Generate read-aloud books                     | App settings                      |
-| Book merge          | Merge and link books                          | App settings                      |
+| Book merge          | Merge books                                   | App settings                      |
 | Chapters            | Edit metadata                                 | App settings                      |
 | Chapter lookup      | Edit metadata                                 | App settings                      |
-| Duplicate scan      | Delete books, or Merge and link books         | App settings                      |
+| Duplicate scan      | Delete books, or Merge books                  | App settings                      |
 | Request download    | Download books directly                       | Manage book requests              |
 | Library scan        | None                                          | Manage libraries, or App settings |
 | Metadata auto-fetch | None                                          | Metadata config, or App settings  |

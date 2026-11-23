@@ -153,6 +153,28 @@ describe('useMetadataDiff', () => {
     expect(diff.stagedByCandidate.value.get('google:g2')).toBe(1)
   })
 
+  it('offers the first published year as its own row and applies it as a number, leaving the published year alone', () => {
+    const hardcover: MetadataCandidate = { provider: 'hardcover', providerId: 'dune', originalPublishedYear: 1965, publishedYear: 2019 }
+    const diff = setup(hardcover, { current: { ...mockCurrent, originalPublishedYear: null } })
+
+    expect(field(diff, 'originalPublishedYear')).toMatchObject({ kind: 'fill', candidateDisplay: '1965', bookValue: '' })
+    diff.setField('originalPublishedYear', 'use')
+
+    const { formPatch } = diff.buildPatch()
+    expect(formPatch.originalPublishedYear).toBe(1965)
+    expect(formPatch).not.toHaveProperty('publishedYear')
+    expect(formPatch).not.toHaveProperty('publishedDate')
+  })
+
+  it('keeps a locked first published year out of the patch', () => {
+    const hardcover: MetadataCandidate = { provider: 'hardcover', providerId: 'dune', originalPublishedYear: 1965 }
+    const diff = setup(hardcover, { current: { ...mockCurrent, originalPublishedYear: 1966 }, lockedFields: ['originalPublishedYear'] })
+
+    expect(field(diff, 'originalPublishedYear')).toMatchObject({ kind: 'change', isLocked: true })
+    diff.setField('originalPublishedYear', 'use')
+    expect(diff.buildPatch().formPatch).not.toHaveProperty('originalPublishedYear')
+  })
+
   it('stages a field from another result', () => {
     const diff = setup(google, { alternatives: [google, goodreads] })
 

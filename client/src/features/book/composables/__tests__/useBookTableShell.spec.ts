@@ -220,7 +220,7 @@ describe('useBookTableShell', () => {
       handleBookAction(makeBook({ id: 5 }), 'delete')
 
       expect(quickViewOpen.value).toBe(false)
-      expect(mocks.promptDelete).toHaveBeenCalledWith(5)
+      expect(mocks.promptDelete).toHaveBeenCalledWith(5, expect.objectContaining({ id: 5 }))
     })
 
     it('delegates a single-book move to the host view', () => {

@@ -4,6 +4,7 @@ import { and, desc, eq, gte, gt, inArray, lte, sql } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -99,7 +100,7 @@ export class SharedReadingInsightsRepository {
       this.db
         .select({
           booksStarted: sql<number>`count(*) filter (where ${schema.userBookStatus.startedAt} >= ${since})::int`,
-          booksCompleted: sql<number>`count(*) filter (where ${schema.userBookStatus.finishedAt} >= ${since})::int`,
+          booksCompleted: sql<number>`count(distinct ${workKeySql(schema.userBookStatus.bookId)}) filter (where ${schema.userBookStatus.finishedAt} >= ${since})::int`,
         })
         .from(schema.userBookStatus)
         .where(eq(schema.userBookStatus.userId, userId)),

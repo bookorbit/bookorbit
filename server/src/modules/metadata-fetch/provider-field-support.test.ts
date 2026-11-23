@@ -59,6 +59,13 @@ describe('METADATA_PROVIDER_SUPPORTED_FIELDS', () => {
     expect(marked.sort()).toEqual([...COMMUNITY_RATING_PROVIDER_KEYS].sort());
   });
 
+  it('marks the first published year only for the providers that tell it apart from the edition year', () => {
+    const marked = Object.entries(METADATA_PROVIDER_SUPPORTED_FIELDS)
+      .filter(([, fields]) => fields.includes('originalPublishedYear'))
+      .map(([key]) => key);
+    expect(marked.sort()).toEqual([MetadataProviderKey.HARDCOVER, MetadataProviderKey.OPEN_LIBRARY].sort());
+  });
+
   it('has an entry for every provider and every built-in key', () => {
     expect(providers.map((provider) => provider.key).sort()).toEqual(BUILT_IN_KEYS);
     expect(Object.keys(METADATA_PROVIDER_SUPPORTED_FIELDS).sort()).toEqual(BUILT_IN_KEYS);

@@ -56,7 +56,13 @@ function setup(accessibleLibraryIds = [2]) {
     analyzeScanKeys: vi.fn().mockResolvedValue(undefined),
     createOtherFormatPairs: vi.fn().mockResolvedValue(undefined),
     deleteSeriesConflictPairs: vi.fn().mockResolvedValue(0),
+    createSameMediumWorkPairs: vi.fn().mockResolvedValue(0),
+    deleteLinkedPairs: vi.fn().mockResolvedValue(0),
+    findEditionCandidatePairs: vi.fn().mockResolvedValue([]),
+    findEditionFacts: vi.fn().mockResolvedValue([]),
+    applyEditionOutcomes: vi.fn().mockResolvedValue(undefined),
     finalizeOtherFormatGroups: vi.fn().mockResolvedValue(0),
+    finalizeOtherEditionGroups: vi.fn().mockResolvedValue(0),
     insertDismissals: vi.fn().mockResolvedValue(undefined),
     deleteDismissal: vi.fn().mockResolvedValue(1),
     listDismissals: vi.fn().mockResolvedValue([]),
@@ -194,6 +200,39 @@ describe('BookDuplicatesService', () => {
     await service.restoreDismissal(9, 4, user);
 
     expect(repo.deleteDismissal).toHaveBeenCalledWith(7, 'duplicate', 4, 9);
+  });
+
+  it('tells apart two dismissed books that share a title, naming only libraries the user can open', async () => {
+    const { service, repo } = setup();
+    const base = {
+      kind: 'other_edition',
+      titleA: 'Quiet Engines',
+      titleB: 'quiet engines',
+      editionNameA: null,
+      editionNameB: null,
+      publisherA: null,
+      publisherB: null,
+      publishedYearA: null,
+      publishedYearB: null,
+      libraryIdA: 2,
+      libraryIdB: 2,
+      libraryNameA: 'Novels',
+      libraryNameB: 'Novels',
+      createdAt: new Date('2026-11-01T00:00:00.000Z'),
+    };
+    repo.listDismissals.mockResolvedValue([
+      { ...base, bookIdA: 1, bookIdB: 2, publisherA: 'Orbit', publishedYearA: 2019, publishedYearB: 2024 },
+      { ...base, bookIdA: 3, bookIdB: 4, libraryIdB: 99, libraryNameB: 'Hidden shelf' },
+      { ...base, bookIdA: 5, bookIdB: 6, titleB: 'Loud Engines', publisherA: 'Orbit' },
+    ]);
+
+    const result = await service.listDismissals(user);
+
+    expect(result.map(({ detailA, detailB }) => [detailA, detailB])).toEqual([
+      ['Orbit · 2019', '2024'],
+      [null, null],
+      [null, null],
+    ]);
   });
 
   it('keeps an other-format dismissal apart from a duplicate one', async () => {
@@ -371,6 +410,56 @@ describe('BookDuplicatesService', () => {
     const calls = jobChanges.notify.mock.calls.map(([change]) => (change as { state: boolean }).state);
     expect(calls.slice(0, 2)).toEqual([true, true]);
     expect(calls.filter((state) => !state)).toHaveLength(7);
+  });
+
+  it('splits other editions out of duplicates in batches before dismissals and grouping', async () => {
+    const { service, repo } = setup();
+    repo.countScopedBooks.mockResolvedValue(6);
+    const facts = (id: number, overrides: Record<string, unknown> = {}) => ({
+      id,
+      isbn10: null,
+      isbn13: null,
+      hardcover_id: null,
+      hardcover_edition_id: null,
+      open_library_id: null,
+      publisher: null,
+      published_year: null,
+      formats: ['m4b'],
+      narrators: [],
+      ...overrides,
+    });
+    repo.findEditionCandidatePairs
+      .mockResolvedValueOnce([
+        { book_id_a: 1, book_id_b: 2, kind: 'duplicate', reasons: ['exact_metadata'] },
+        { book_id_a: 3, book_id_b: 4, kind: 'duplicate', reasons: ['fuzzy_metadata'] },
+      ])
+      .mockResolvedValueOnce([{ book_id_a: 5, book_id_b: 6, kind: 'other_edition', reasons: ['same_work'] }])
+      .mockResolvedValueOnce([]);
+    repo.findEditionFacts
+      .mockResolvedValueOnce([
+        facts(1, { narrators: ['Rob Inglis'], hardcover_id: 'hc-1' }),
+        facts(2, { narrators: ['Andy Serkis'], hardcover_id: 'HC-1' }),
+        facts(3, { narrators: ['Kate Reading'] }),
+        facts(4, { narrators: ['Kate Reading'] }),
+      ])
+      .mockResolvedValueOnce([facts(5, { formats: ['epub'] }), facts(6, { formats: ['epub'] })]);
+    repo.finalizeOtherEditionGroups.mockResolvedValue(1);
+
+    await service.createScan({ libraryId: 2, similarityPercent: 85 }, user);
+
+    await vi.waitFor(() =>
+      expect(repo.updateScan).toHaveBeenCalledWith(11, expect.objectContaining({ status: 'completed', totalOtherEditionPairs: 1 })),
+    );
+    expect(repo.findEditionCandidatePairs).toHaveBeenNthCalledWith(1, 11, null, 500);
+    expect(repo.findEditionCandidatePairs).toHaveBeenNthCalledWith(2, 11, { bookIdA: 3, bookIdB: 4 }, 500);
+    expect(repo.findEditionFacts).toHaveBeenNthCalledWith(1, [1, 2, 3, 4]);
+    expect(repo.applyEditionOutcomes).toHaveBeenNthCalledWith(1, 11, [{ bookIdA: 1, bookIdB: 2, sameWork: true }], []);
+    expect(repo.applyEditionOutcomes).toHaveBeenNthCalledWith(2, 11, [], [{ bookIdA: 5, bookIdB: 6 }]);
+    const order = (mock: { mock: { invocationCallOrder: number[] } }) => mock.mock.invocationCallOrder[0]!;
+    expect(order(repo.createSameMediumWorkPairs)).toBeLessThan(order(repo.deleteSeriesConflictPairs));
+    expect(order(repo.deleteLinkedPairs)).toBeLessThan(order(repo.findEditionCandidatePairs));
+    expect(order(repo.applyEditionOutcomes)).toBeLessThan(order(repo.deleteDismissedPairs));
+    expect(order(repo.deleteDismissedPairs)).toBeLessThan(order(repo.finalizeOtherEditionGroups));
   });
 
   it('rejects completed results when the saved library scope is no longer accessible', async () => {

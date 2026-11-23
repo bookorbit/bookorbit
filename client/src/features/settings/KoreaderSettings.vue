@@ -58,6 +58,7 @@ import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { copyToClipboard } from '@/lib/clipboard'
 import { useKoreaderSync } from '@/features/koreader/composables/useKoreaderSync'
 import { useGlobalSearch } from '@/features/book/composables/useGlobalSearch'
+import { cardEditionDetail } from '@/features/book/lib/book-editions'
 import { SECRET_INPUT_ATTRS } from '@/lib/secret-input'
 
 const { t } = useI18n()
@@ -848,7 +849,7 @@ function bookSearchSubtitle(book: BookCard): string {
     .map((file) => file.format)
     .filter(Boolean)
     .join(', ')
-  return formats ? `${authors} - ${formats}` : authors
+  return [authors, cardEditionDetail(book), formats].filter(Boolean).join(' - ')
 }
 
 const downloadingPlugin = ref(false)

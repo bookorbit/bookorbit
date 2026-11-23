@@ -2,6 +2,7 @@ import { ref } from 'vue'
 import { Socket } from 'socket.io-client'
 import { toast } from 'vue-sonner'
 import type { CoverRefreshedEvent, CoverRefreshProgressEvent, ScanProgressEvent } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 import { createAuthenticatedSocket } from '@/lib/socket'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 
@@ -21,7 +22,7 @@ function getSocket(): Socket {
       progressMap.value = new Map(progressMap.value)
       if (event.status !== 'running') {
         if (event.status === 'completed' && event.added > 0 && completionToastClaims === 0) {
-          toast.success(`${event.added} new ${event.added === 1 ? 'book' : 'books'} added`)
+          toast.success(i18n.global.t('scanner.booksAdded', { count: event.added }))
         }
         // Keep the final event for a short time so UI can show completion, then clear.
         setTimeout(() => {

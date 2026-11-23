@@ -126,6 +126,19 @@
     "apiKey": "read"
   },
   {
+    "file": "server/src/modules/book-duplicates/book-edition-suggestions.controller.ts",
+    "className": "BookEditionSuggestionsController",
+    "methodName": "suggest",
+    "httpMethod": "GET",
+    "path": "/books/:id/edition-suggestions",
+    "permissions": ["Permission.LibraryEditMetadata"],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "read"
+  },
+  {
     "file": "server/src/modules/chapter-health/chapter-health.controller.ts",
     "className": "ChapterHealthController",
     "methodName": "summary",

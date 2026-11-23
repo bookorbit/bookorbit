@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { shallowMount } from '@vue/test-utils'
-import { nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref } from 'vue'
 import type { BookDetail, LinkedBookSummary } from '@bookorbit/types'
 
 const mocks = vi.hoisted(() => ({
@@ -200,8 +200,31 @@ function linkedBook(overrides: Partial<LinkedBookSummary> = {}): LinkedBookSumma
   }
 }
 
+describe('first published year in Details', () => {
+  it('shows a first published year earlier than this edition’s year (E20, E21)', () => {
+    const shown = mountTab({ originalPublishedYear: 1990, publishedYear: 2012 })
+    expect(shown.get('[data-testid="details-first-published"]').text()).toContain('1990')
+    expect(
+      mountTab({ originalPublishedYear: 1990, publishedYear: null, publishedDate: null }).find('[data-testid="details-first-published"]').exists(),
+    ).toBe(true)
+  })
+
+  it('hides a missing, equal or later first published year', () => {
+    for (const originalPublishedYear of [null, 2012, 2015]) {
+      expect(mountTab({ originalPublishedYear, publishedYear: 2012 }).find('[data-testid="details-first-published"]').exists()).toBe(false)
+    }
+  })
+})
+
 describe('linking from the detail page', () => {
   const linked = { linkGroupId: 4, linkedBooks: [linkedBook()] }
+
+  beforeEach(() => {
+    mocks.libraries.value = [
+      { id: 3, accessLevel: 'editor' },
+      { id: 5, accessLevel: 'editor' },
+    ]
+  })
 
   function menuItems(wrapper: ReturnType<typeof mountTab>) {
     return {
@@ -211,12 +234,17 @@ describe('linking from the detail page', () => {
     }
   }
 
-  it('offers no link items without the merge permission', () => {
-    mocks.hasPermission.mockImplementation((permission) => permission !== 'library_merge_books')
+  it('offers no link items without the metadata permission editions need', () => {
+    mocks.hasPermission.mockImplementation((permission) => permission !== 'library_edit_metadata')
     const items = menuItems(mountTab(linked))
     expect(items.link.exists()).toBe(false)
     expect(items.unlink.exists()).toBe(false)
     expect(items.makeMain.exists()).toBe(false)
+  })
+
+  it('offers linking with the metadata permission alone', () => {
+    mocks.hasPermission.mockImplementation((permission) => permission !== 'library_merge_books')
+    expect(menuItems(mountTab(linked)).link.exists()).toBe(true)
   })
 
   it('offers no link items to a viewer of the library', () => {
@@ -226,13 +254,24 @@ describe('linking from the detail page', () => {
     expect(items.unlink.exists()).toBe(false)
   })
 
+  it('offers only removing this edition when another edition is in a library the user cannot edit', () => {
+    mocks.libraries.value = [
+      { id: 3, accessLevel: 'editor' },
+      { id: 5, accessLevel: 'viewer' },
+    ]
+    const items = menuItems(mountTab(linked))
+    expect(items.link.exists()).toBe(false)
+    expect(items.makeMain.exists()).toBe(false)
+    expect(items.unlink.exists()).toBe(true)
+  })
+
   it('offers only linking for a book that is not linked yet', () => {
     const wrapper = mountTab()
     const items = menuItems(wrapper)
     expect(items.link.exists()).toBe(true)
     expect(items.unlink.exists()).toBe(false)
     expect(items.makeMain.exists()).toBe(false)
-    expect(wrapper.findComponent({ name: 'BookLinkedChips' }).exists()).toBe(false)
+    expect(wrapper.findComponent({ name: 'EditionStrip' }).exists()).toBe(false)
   })
 
   it('offers unlinking and making this the main book when another book leads', () => {
@@ -241,9 +280,13 @@ describe('linking from the detail page', () => {
     expect(items.link.exists()).toBe(true)
     expect(items.unlink.exists()).toBe(true)
     expect(items.makeMain.exists()).toBe(true)
-    const chips = wrapper.findAllComponents({ name: 'BookLinkedChips' })
-    expect(chips.length).toBeGreaterThan(0)
-    expect(chips[0]!.props('books')).toEqual(linked.linkedBooks)
+    const strips = wrapper.findAllComponents({ name: 'EditionStrip' })
+    expect(strips).toHaveLength(2)
+    const editions = strips[0]!.props('editions') as Array<{ summary: { bookId: number }; current: boolean }>
+    expect(editions.map((entry) => [entry.summary.bookId, entry.current])).toEqual([
+      [linked.linkedBooks[0]!.bookId, false],
+      [12, true],
+    ])
   })
 
   it('leaves out Make this the main book when no other visible book leads', () => {
@@ -279,6 +322,70 @@ describe('linking from the detail page', () => {
     const [url, init] = mocks.api.mock.calls.at(-1)!
     expect(url).toBe('/api/v1/books/links/4')
     expect(init).toEqual(expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ leadBookId: 12 }) }))
+  })
+
+  it('gives the Editions tab every edition and what this viewer may do to each', () => {
+    const shelf = mountTab(linked).findComponent({ name: 'DiscoverRow' })
+    expect((shelf.props('editions') as Array<{ summary: { bookId: number } }>).map((entry) => entry.summary.bookId)).toEqual([40, 12])
+    expect(shelf.props()).toMatchObject({ canAddEdition: true, canMakeMainEdition: true, removableEditionIds: [40, 12] })
+  })
+
+  it('lets the Editions tab remove only editions in libraries this viewer can edit', () => {
+    mocks.libraries.value = [
+      { id: 3, accessLevel: 'editor' },
+      { id: 5, accessLevel: 'viewer' },
+    ]
+    const shelf = mountTab(linked).findComponent({ name: 'DiscoverRow' })
+    expect(shelf.props()).toMatchObject({ canAddEdition: false, canMakeMainEdition: false, removableEditionIds: [12] })
+  })
+
+  it('makes another edition the main one from its row', async () => {
+    const wrapper = mountTab(linked)
+    mocks.api.mockResolvedValue(response({ groupId: 4, leadBookId: 40, books: [] }))
+
+    wrapper.findComponent({ name: 'DiscoverRow' }).vm.$emit('make-main-edition', 40)
+    await vi.waitFor(() => expect(wrapper.emitted('links-changed')).toHaveLength(1))
+
+    const [url, init] = mocks.api.mock.calls.at(-1)!
+    expect(url).toBe('/api/v1/books/links/4')
+    expect(init).toEqual(expect.objectContaining({ method: 'PATCH', body: JSON.stringify({ leadBookId: 40 }) }))
+  })
+
+  it('removes another edition from its row', async () => {
+    const wrapper = mountTab(linked)
+    mocks.api.mockResolvedValue({ ok: true, status: 204, json: async () => null } as unknown as Response)
+
+    wrapper.findComponent({ name: 'DiscoverRow' }).vm.$emit('remove-edition', 40)
+    await vi.waitFor(() => expect(wrapper.emitted('links-changed')).toHaveLength(1))
+
+    expect(mocks.api).toHaveBeenCalledWith('/api/v1/books/40/link', expect.objectContaining({ method: 'DELETE' }))
+  })
+
+  it('opens Add edition from the Editions tab', async () => {
+    const wrapper = mountTab(linked)
+    wrapper.findComponent({ name: 'DiscoverRow' }).vm.$emit('add-edition')
+    await nextTick()
+    expect(wrapper.findComponent({ name: 'LinkBooksSheet' }).exists()).toBe(true)
+  })
+
+  it('opens the Editions tab from the strip', async () => {
+    const showEditions = vi.fn<() => Promise<void>>()
+    const wrapper = shallowMount(DetailsTab, {
+      props: { book: makeBook(linked) },
+      global: {
+        stubs: {
+          DiscoverRow: defineComponent({
+            name: 'DiscoverRow',
+            setup(_, { expose }) {
+              expose({ showEditions })
+              return () => h('div')
+            },
+          }),
+        },
+      },
+    })
+    wrapper.findComponent({ name: 'EditionStrip' }).vm.$emit('show-all')
+    expect(showEditions).toHaveBeenCalledTimes(1)
   })
 
   it('opens the link sheet with the open book and its linked books kept out of the search', async () => {

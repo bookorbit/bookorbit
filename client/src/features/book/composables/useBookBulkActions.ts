@@ -14,6 +14,7 @@ import { i18n } from '@/i18n'
 import { formatNumber } from '@/i18n/formatters'
 import { api } from '@/lib/api'
 import { toast } from 'vue-sonner'
+import { useLibraryCountsRefresh } from '@/features/library/composables/useLibraryCountsRefresh'
 import { useCoverVersions } from './useCoverVersions'
 import { useRefreshingBooks } from './useRefreshingBooks'
 import { useBookDownload } from './useBookDownload'
@@ -78,6 +79,8 @@ type ReExtractCoverEvent = { bookId?: number; done?: boolean; processed?: number
 
 export type QuerySelectionState = BookSelectionQuery & {
   total: number
+  /** Matching books counting every edition, when the listing folds them (`collapseLinked`). */
+  editionTotal?: number
 }
 
 function buildLocalReadStatus(patch: BulkReadingStatePatch, existing: UserBookStatus | null, nowIso: string): UserBookStatus {
@@ -104,16 +107,31 @@ export function useBookBulkActions(
   const { markRefreshing, clearRefreshing } = useRefreshingBooks()
   const refreshFeedback = useBookRefreshFeedback()
   const { exportBooks } = useBookDownload()
+  const refreshLibraryCounts = useLibraryCountsRefresh()
 
   const tracker = useBulkRunTracker()
   const inFlight = tracker.inFlight
 
   function getSelectionPayload(): BookSelectionPayload {
     if (querySelection?.value) {
+      const { libraryId, filter, q, sort, collapseLinked } = querySelection.value
+      return { query: { libraryId, filter, q, sort, ...(collapseLinked ? { collapseLinked: true } : {}) } }
+    }
+    return { bookIds: [...selectedIds.value] }
+  }
+
+  /** Every edition behind the selection: query selections stop folding, explicit ones add each card's other editions. */
+  function getAllEditionsPayload(canDelete: (libraryId: number) => boolean): BookSelectionPayload {
+    if (querySelection?.value) {
       const { libraryId, filter, q, sort } = querySelection.value
       return { query: { libraryId, filter, q, sort } }
     }
-    return { bookIds: [...selectedIds.value] }
+    const ids = new Set(selectedIds.value)
+    for (const book of books?.value ?? []) {
+      if (!selectedIds.value.has(book.id)) continue
+      for (const other of book.linked?.books ?? []) if (canDelete(other.libraryId)) ids.add(other.bookId)
+    }
+    return { bookIds: [...ids] }
   }
 
   function hasSelection(): boolean {
@@ -340,7 +358,7 @@ export function useBookBulkActions(
       body: JSON.stringify({ ...getSelectionPayload(), rating }),
     })
     if (!res.ok) {
-      toast.error('Failed to update rating')
+      toast.error(t('book.bulkActions.ratingFailed'))
       return
     }
     const editableIds = books
@@ -355,10 +373,20 @@ export function useBookBulkActions(
       rating,
     }))
     const count = querySelection?.value ? querySelection.value.total : editableIds.length
-    const baseLabel =
-      rating === null ? `Cleared rating for ${count} book${count === 1 ? '' : 's'}` : `Rated ${count} book${count === 1 ? '' : 's'} ${rating}/5`
-    const label = skippedCount > 0 ? `${baseLabel} (${skippedCount} locked skipped)` : baseLabel
-    toast.success(label)
+    if (rating === null) {
+      toast.success(
+        skippedCount > 0
+          ? t('book.bulkActions.ratingClearedSkipped', { count, skipped: skippedCount })
+          : t('book.bulkActions.ratingCleared', { count }),
+      )
+      return
+    }
+    const ratingLabel = formatNumber(rating)
+    toast.success(
+      skippedCount > 0
+        ? t('book.bulkActions.ratedSkipped', { count, rating: ratingLabel, skipped: skippedCount })
+        : t('book.bulkActions.rated', { count, rating: ratingLabel }),
+    )
   }
 
   async function handleBulkSetField(field: BulkEditableField, value: BulkEditableValue) {
@@ -377,7 +405,7 @@ export function useBookBulkActions(
       body: JSON.stringify({ ...getSelectionPayload(), field, value }),
     })
     if (!res.ok) {
-      toast.error(`Failed to update ${field}`)
+      toast.error(t('book.bulkActions.updateFailed'))
       return
     }
     const editableIds = books
@@ -412,11 +440,9 @@ export function useBookBulkActions(
       }
     })
     const count = querySelection?.value ? querySelection.value.total : editableIds.length
-    if (skippedCount > 0) {
-      toast.success(`Updated ${field} for ${count} book${count === 1 ? '' : 's'} (${skippedCount} locked skipped)`)
-      return
-    }
-    toast.success(`Updated ${field} for ${count} book${count === 1 ? '' : 's'}`)
+    toast.success(
+      skippedCount > 0 ? t('book.bulkActions.updatedSkipped', { count, skipped: skippedCount }) : t('book.bulkActions.updated', { count }),
+    )
   }
 
   async function handleBulkSetMetadataLock(locked: boolean) {
@@ -428,7 +454,7 @@ export function useBookBulkActions(
       body: JSON.stringify({ ...getSelectionPayload(), locked }),
     })
     if (!res.ok) {
-      toast.error(`Failed to ${locked ? 'lock' : 'unlock'} metadata`)
+      toast.error(t(locked ? 'book.bulkActions.lockFailed' : 'book.bulkActions.unlockFailed'))
       return
     }
     updateSelectedBooks(ids, (book) => ({
@@ -437,24 +463,30 @@ export function useBookBulkActions(
       lockedFields: locked ? [...BOOK_METADATA_LOCK_FIELDS] : [],
     }))
     const count = querySelection?.value ? querySelection.value.total : ids.length
-    toast.success(`${locked ? 'Locked' : 'Unlocked'} metadata for ${count} book${count === 1 ? '' : 's'}`)
+    toast.success(t(locked ? 'book.bulkActions.locked' : 'book.bulkActions.unlocked', { count }))
   }
 
-  async function handleDeleteSelected() {
+  async function handleDeleteSelected(includeOtherEditions = false, canDelete: (libraryId: number) => boolean = () => true) {
     if (!hasSelection()) return
-    const ids = querySelection?.value ? [] : [...selectedIds.value]
-    const count = querySelection?.value ? querySelection.value.total : ids.length
+    const payload = includeOtherEditions ? getAllEditionsPayload(canDelete) : getSelectionPayload()
+    const ids = payload.bookIds ?? []
+    const count = querySelection?.value
+      ? includeOtherEditions
+        ? (querySelection.value.editionTotal ?? querySelection.value.total)
+        : querySelection.value.total
+      : ids.length
     const res = await api('/api/v1/books', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(getSelectionPayload()),
+      body: JSON.stringify(payload),
     })
     if (!res.ok) {
-      toast.error('Failed to delete books')
+      toast.error(t('book.bulkActions.deleteFailed'))
       return
     }
     onDeleted(ids)
-    toast.success(`Deleted ${count} book${count === 1 ? '' : 's'}`)
+    refreshLibraryCounts()
+    toast.success(t('book.bulkActions.deleted', { count }))
   }
 
   return {

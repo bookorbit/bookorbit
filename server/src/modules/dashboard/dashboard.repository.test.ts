@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { PgDialect } from 'drizzle-orm/pg-core';
-import type { SQL } from 'drizzle-orm';
+import { sql, type SQL } from 'drizzle-orm';
 
 import * as schema from '../../db/schema';
 import { DashboardRepository } from './dashboard.repository';
@@ -161,16 +161,25 @@ describe('DashboardRepository', () => {
     });
   });
 
-  it('maps want-to-read rows to id list and joins user status', async () => {
+  it('maps want-to-read rows to id list, joins user status and keeps one edition per work', async () => {
+    const marked = { id: sql`id`, updatedAt: sql`updated_at`, workRank: sql`work_rank` };
+    const markedChain = { ...makeLimitChain([]), as: vi.fn().mockReturnValue(marked) };
+    markedChain.from.mockReturnValue(markedChain);
+    markedChain.innerJoin.mockReturnValue(markedChain);
+    markedChain.where.mockReturnValue(markedChain);
     const listChain = makeLimitChain([{ id: 77 }, { id: 12 }]);
-    const db = { select: vi.fn().mockReturnValue(listChain) };
+    const db = { select: vi.fn().mockReturnValueOnce(markedChain).mockReturnValue(listChain) };
     const repo = new DashboardRepository(db as never);
 
     const result = await repo.findWantToReadBookIds([12], 55, 6);
 
     expect(result).toEqual([77, 12]);
-    expect(listChain.innerJoin).toHaveBeenCalledTimes(1);
-    expect(listChain.innerJoin.mock.calls[0]?.[0]).toBe(userBookStatus);
+    expect(markedChain.innerJoin).toHaveBeenCalledTimes(1);
+    expect(markedChain.innerJoin.mock.calls[0]?.[0]).toBe(userBookStatus);
+    expect(compileSql((db.select.mock.calls[0]?.[0] as { workRank: { sql: SQL } }).workRank.sql)).toContain(
+      "partition by coalesce('g' || (SELECT bl.group_id FROM book_links bl",
+    );
+    expect(compileSql(listChain.where.mock.calls[0]?.[0])).toBe('work_rank = 1');
     expect(listChain.leftJoin).not.toHaveBeenCalled();
     expect(listChain.orderBy).toHaveBeenCalledTimes(1);
     expect(listChain.limit).toHaveBeenCalledWith(6);
@@ -352,12 +361,30 @@ describe('DashboardRepository', () => {
 
     await repo.findUpNextInSeriesBookIds([9], 55, 10);
     const query = compileSql(db.execute.mock.calls[0]?.[0]);
-    const gate = "and (os.read_status is null or os.read_status in ('unread', 'want_to_read'))";
+    const gate = 'and os.work_unstarted';
 
     expect(query).toContain('"user_book_status"."status" as read_status');
-    expect(query).toContain('ssb.read_status');
+    expect(query).toContain(
+      "bool_and(ssb.read_status is null or ssb.read_status in ('unread', 'want_to_read')) over (partition by ssb.work_key) as work_unstarted",
+    );
     expect(query.indexOf(gate)).toBeGreaterThan(query.indexOf('from ordered_series os'));
     expect(query.split(gate)).toHaveLength(2);
+  });
+
+  it('judges up-next volumes by their whole work and offers one edition per work', async () => {
+    const db = {
+      select: vi.fn(),
+      execute: vi.fn().mockResolvedValue({ rows: [] }),
+    };
+    const repo = new DashboardRepository(db as never);
+
+    await repo.findUpNextInSeriesBookIds([9], 55, 10);
+    const query = compileSql(db.execute.mock.calls[0]?.[0]);
+
+    expect(query).toContain('bool_or(ssb.is_completed) over (partition by ssb.work_key) as work_completed');
+    expect(query).toContain('lag(ssb.work_completed) over');
+    expect(query).toContain('and os.work_progress = 0');
+    expect(query).toContain('select distinct on (nc.work_key) nc.id');
   });
 
   it('returns empty up-next-in-series ids and does not query when limit is zero', async () => {

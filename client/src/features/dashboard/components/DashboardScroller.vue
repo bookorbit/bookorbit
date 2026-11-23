@@ -79,6 +79,7 @@ const addToCollectionBookId = ref<number | null>(null)
 const {
   pendingId: deleteBookId,
   deleting: deletingBook,
+  editions: deleteEditions,
   promptDelete,
   cancelDelete,
   confirmDelete,
@@ -98,7 +99,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
     return
   }
   if (action === 'delete') {
-    promptDelete(book.id)
+    promptDelete(book.id, book)
   }
 }
 
@@ -214,7 +215,13 @@ function coverAnimationDelay(index: number): string {
     @update:open="addToCollectionOpen = $event"
   />
 
-  <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+  <DeleteBookDialog
+    :open="deleteBookId !== null"
+    :deleting="deletingBook"
+    :editions="deleteEditions"
+    @confirm="confirmDelete"
+    @cancel="cancelDelete"
+  />
 </template>
 
 <style scoped>

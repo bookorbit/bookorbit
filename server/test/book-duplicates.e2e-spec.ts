@@ -9,7 +9,13 @@ import { dirname, join } from 'path';
 
 import { eq, inArray } from 'drizzle-orm';
 
-import type { BookDuplicateGroup, BookDuplicateGroupsResponse, BookDuplicateResolutionJob, BookDuplicateScan } from '@bookorbit/types';
+import type {
+  BookDuplicateGroup,
+  BookDuplicateGroupsResponse,
+  BookDuplicateKind,
+  BookDuplicateResolutionJob,
+  BookDuplicateScan,
+} from '@bookorbit/types';
 import { Permission } from '@bookorbit/types';
 
 import { LibraryOperationGate } from '../src/common/services/library-operation-gate.service';
@@ -77,7 +83,7 @@ describe('Duplicate books (e2e)', () => {
     return done!;
   }
 
-  async function groups(token: string, scanId: number, kind: 'duplicate' | 'other_format'): Promise<BookDuplicateGroup[]> {
+  async function groups(token: string, scanId: number, kind: BookDuplicateKind): Promise<BookDuplicateGroup[]> {
     const response = await ctx.app.inject({
       method: 'GET',
       url: `/api/v1/book-duplicates/scans/${scanId}/groups?kind=${kind}&pageSize=50`,
@@ -85,6 +91,15 @@ describe('Duplicate books (e2e)', () => {
     });
     expect(response.statusCode).toBe(200);
     return (response.json() as BookDuplicateGroupsResponse).groups;
+  }
+
+  async function kindTotals(token: string, scanId: number): Promise<BookDuplicateGroupsResponse['kindTotals']> {
+    const response = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/book-duplicates/scans/${scanId}/groups?kind=duplicate&pageSize=1`,
+      headers: authHeader(token),
+    });
+    return (response.json() as BookDuplicateGroupsResponse).kindTotals;
   }
 
   async function resolve(token: string, body: Record<string, unknown>) {
@@ -247,6 +262,7 @@ describe('Duplicate books (e2e)', () => {
     let copyIds: number[];
     let mergeOnly: { userId: number; accessToken: string };
     let deleteOnly: { userId: number; accessToken: string };
+    let linker: { userId: number; accessToken: string };
     let scanId: number;
 
     beforeAll(async () => {
@@ -273,8 +289,10 @@ describe('Duplicate books (e2e)', () => {
 
       mergeOnly = await createUserAndLogin(ctx, { permissions: [Permission.LibraryMergeBooks] });
       deleteOnly = await createUserAndLogin(ctx, { permissions: [Permission.LibraryDeleteBooks] });
+      linker = await createUserAndLogin(ctx, { permissions: [Permission.LibraryDeleteBooks, Permission.LibraryEditMetadata] });
       await grantLibraryAccess(ctx, mergeOnly.userId, library.libraryId, 'editor');
       await grantLibraryAccess(ctx, deleteOnly.userId, library.libraryId, 'editor');
+      await grantLibraryAccess(ctx, linker.userId, library.libraryId, 'editor');
       scanId = (await scan(mergeOnly.accessToken, library.libraryId)).id;
     }, SCENARIO_TIMEOUT_MS);
 
@@ -334,7 +352,7 @@ describe('Duplicate books (e2e)', () => {
       const [pair] = await groups(mergeOnly.accessToken, scanId, 'other_format');
       const release = ctx.app.get(LibraryOperationGate).tryAcquire(library.libraryId, 'scan');
       try {
-        const response = await resolve(mergeOnly.accessToken, { scanId, groups: [{ groupId: pair!.id, keeperId: ebookId, action: 'link' }] });
+        const response = await resolve(mergeOnly.accessToken, { scanId, groups: [{ groupId: pair!.id, keeperId: ebookId, action: 'merge' }] });
         expect(response.status).toBe(409);
         expect(response.body.errorCode).toBe('LIBRARY_BUSY');
       } finally {
@@ -353,6 +371,9 @@ describe('Duplicate books (e2e)', () => {
       expect(dismissed.statusCode).toBe(204);
       const listed = await ctx.app.inject({ method: 'GET', url: '/api/v1/book-duplicates/dismissals', headers: authHeader(mergeOnly.accessToken) });
       expect(listed.json()).toEqual([expect.objectContaining({ kind: 'other_format' })]);
+      // The scan still holds the pair, but a dismissed group leaves the list and its count at once.
+      expect(await groups(mergeOnly.accessToken, scanId, 'other_format')).toEqual([]);
+      expect((await kindTotals(mergeOnly.accessToken, scanId)).other_format).toBe(0);
 
       const [low, high] = [ebookId, audioId].sort((a, b) => a - b);
       const wrongKind = await ctx.app.inject({
@@ -367,13 +388,25 @@ describe('Duplicate books (e2e)', () => {
         headers: authHeader(mergeOnly.accessToken),
       });
       expect(restored.statusCode).toBe(204);
+      expect(await groups(mergeOnly.accessToken, scanId, 'other_format')).toHaveLength(1);
+      expect((await kindTotals(mergeOnly.accessToken, scanId)).other_format).toBe(1);
     });
 
-    it('links an ebook and its audiobook for a merge-only user', async () => {
-      const [pair] = await groups(mergeOnly.accessToken, scanId, 'other_format');
-      const started = await resolve(mergeOnly.accessToken, { scanId, groups: [{ groupId: pair!.id, keeperId: ebookId, action: 'link' }] });
+    it('links an ebook and its audiobook with the edit-metadata permission, not the merge permission', async () => {
+      const [mergeOnlyPair] = await groups(mergeOnly.accessToken, scanId, 'other_format');
+      const refused = await resolve(mergeOnly.accessToken, { scanId, groups: [{ groupId: mergeOnlyPair!.id, keeperId: ebookId, action: 'link' }] });
+      expect(refused.status).toBe(403);
+
+      const linkerScan = await scan(linker.accessToken, library.libraryId);
+      const [pair] = await groups(linker.accessToken, linkerScan.id, 'other_format');
+      const merge = await resolve(linker.accessToken, { scanId: linkerScan.id, groups: [{ groupId: pair!.id, keeperId: ebookId, action: 'merge' }] });
+      expect(merge.status).toBe(403);
+      const started = await resolve(linker.accessToken, {
+        scanId: linkerScan.id,
+        groups: [{ groupId: pair!.id, keeperId: ebookId, action: 'link' }],
+      });
       expect(started.status).toBe(202);
-      const job = await waitForResolution(mergeOnly.accessToken, started.body.jobId!);
+      const job = await waitForResolution(linker.accessToken, started.body.jobId!);
 
       expect(job.outcomes).toEqual([expect.objectContaining({ status: 'done', keeperId: ebookId })]);
       const links = await ctx.db
@@ -389,6 +422,162 @@ describe('Duplicate books (e2e)', () => {
         headers: authHeader(deleteOnly.accessToken),
       });
       expect(other.statusCode).toBe(404);
+    });
+  });
+
+  describe('other editions', () => {
+    let library: CreatedLibrary;
+    let scanned: BookDuplicateScan;
+    const ids = {} as Record<
+      'recordingA' | 'recordingB' | 'redownloadA' | 'redownloadB' | 'linkedEditionA' | 'linkedEditionB' | 'linkedCopyA' | 'linkedCopyB',
+      number
+    >;
+
+    const sorted = (...bookIds: number[]) => [...bookIds].sort((a, b) => a - b);
+    const members = (group: BookDuplicateGroup) => sorted(...group.books.map((book) => book.id));
+
+    beforeAll(async () => {
+      library = await createLibraryWithFolder(ctx, { name: `dupes-ed-${randomUUID()}`, mode: 'book_per_folder' });
+      const tag = randomUUID().slice(0, 8);
+      const paths = {
+        recordingA: join('recording-a', 'book.m4b'),
+        recordingB: join('recording-b', 'book.m4b'),
+        redownloadA: join('redownload-a', 'book.epub'),
+        redownloadB: join('redownload-b', 'book.epub'),
+        linkedEditionA: join('linked-edition-a', 'book.epub'),
+        linkedEditionB: join('linked-edition-b', 'book.epub'),
+        linkedCopyA: join('linked-copy-a', 'book.epub'),
+        linkedCopyB: join('linked-copy-b', 'book.epub'),
+      } satisfies Record<keyof typeof ids, string>;
+      const recordingTitle = `Hobbit ${randomUUID()}`;
+      await createM4bFixture(library.folderPath, paths.recordingA, { title: recordingTitle, durationSeconds: 1 });
+      await createM4bFixture(library.folderPath, paths.recordingB, { title: recordingTitle, durationSeconds: 2 });
+      await createEpubFixture(library.folderPath, paths.redownloadA, { title: `Redownload ${randomUUID()}` });
+      const linkedEditionTitle = `Linked edition ${randomUUID()}`;
+      await createEpubFixture(library.folderPath, paths.linkedEditionA, { title: linkedEditionTitle });
+      await createEpubFixture(library.folderPath, paths.linkedEditionB, { title: linkedEditionTitle });
+      await createEpubFixture(library.folderPath, paths.linkedCopyA, { title: `Linked copy ${randomUUID()}` });
+      for (const [from, to] of [
+        [paths.redownloadA, paths.redownloadB],
+        [paths.linkedCopyA, paths.linkedCopyB],
+      ] as const) {
+        await mkdir(dirname(join(library.folderPath, to)), { recursive: true });
+        await copyFile(join(library.folderPath, from), join(library.folderPath, to));
+      }
+      await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+      for (const [key, path] of Object.entries(paths) as [keyof typeof ids, string][]) {
+        ids[key] = (await locateBookFileByRelPath(ctx, library.libraryId, path)).bookId;
+      }
+      const titles: Record<keyof typeof ids, string> = {
+        recordingA: recordingTitle,
+        recordingB: recordingTitle,
+        redownloadA: `Redownload ${tag}`,
+        redownloadB: `Redownload ${tag} (Anniversary)`,
+        linkedEditionA: linkedEditionTitle,
+        linkedEditionB: linkedEditionTitle,
+        linkedCopyA: `Linked copy ${tag}`,
+        linkedCopyB: `Linked copy ${tag}`,
+      };
+
+      const [author] = await ctx.db
+        .insert(schema.authors)
+        .values({ name: `Edition Author ${tag}` })
+        .returning({ id: schema.authors.id });
+      for (const [key, bookId] of Object.entries(ids) as [keyof typeof ids, number][]) {
+        await ctx.db.delete(schema.bookAuthors).where(eq(schema.bookAuthors.bookId, bookId));
+        await ctx.db.insert(schema.bookAuthors).values({ bookId, authorId: author!.id });
+        await ctx.db.update(schema.bookMetadata).set({ title: titles[key] }).where(eq(schema.bookMetadata.bookId, bookId));
+      }
+
+      const narrators = await ctx.db
+        .insert(schema.narrators)
+        .values([{ name: `Rob Inglis ${tag}` }, { name: `Andy Serkis ${tag}` }])
+        .returning({ id: schema.narrators.id });
+      await ctx.db.delete(schema.bookNarrators).where(inArray(schema.bookNarrators.bookId, [ids.recordingA, ids.recordingB]));
+      await ctx.db.insert(schema.bookNarrators).values([
+        { bookId: ids.recordingA, narratorId: narrators[0]!.id },
+        { bookId: ids.recordingB, narratorId: narrators[1]!.id },
+      ]);
+
+      const isbnBase = Math.floor(Math.random() * 1e8);
+      await ctx.db
+        .update(schema.bookMetadata)
+        .set({ isbn13: isbn13(isbnBase), publisher: 'Fixture Press', publishedYear: 1990 })
+        .where(eq(schema.bookMetadata.bookId, ids.redownloadA));
+      await ctx.db
+        .update(schema.bookMetadata)
+        .set({ isbn13: isbn13(isbnBase + 1), publisher: 'Other House', publishedYear: 2011 })
+        .where(eq(schema.bookMetadata.bookId, ids.redownloadB));
+      await ctx.db.update(schema.bookMetadata).set({ publishedYear: 1990 }).where(eq(schema.bookMetadata.bookId, ids.linkedEditionA));
+      await ctx.db.update(schema.bookMetadata).set({ publishedYear: 2011 }).where(eq(schema.bookMetadata.bookId, ids.linkedEditionB));
+
+      for (const pair of [
+        [ids.linkedEditionA, ids.linkedEditionB],
+        [ids.linkedCopyA, ids.linkedCopyB],
+      ]) {
+        const [linkGroup] = await ctx.db.insert(schema.bookLinkGroups).values({ leadBookId: pair[0] }).returning({ id: schema.bookLinkGroups.id });
+        await ctx.db.insert(schema.bookLinks).values(pair.map((bookId) => ({ bookId, groupId: linkGroup!.id })));
+      }
+
+      scanned = await scan(ctx.adminToken, library.libraryId);
+    }, SCENARIO_TIMEOUT_MS);
+
+    it('keeps a re-download with identical files a duplicate, whatever edition its metadata names (E17)', async () => {
+      const duplicates = await groups(ctx.adminToken, scanned.id, 'duplicate');
+      const redownload = duplicates.find((group) => group.books.some((book) => book.id === ids.redownloadA));
+      expect(redownload).toBeDefined();
+      expect(redownload!.reasons).toContain('file_hash');
+      expect(members(redownload!)).toEqual(sorted(ids.redownloadA, ids.redownloadB));
+
+      const editions = await groups(ctx.adminToken, scanned.id, 'other_edition');
+      expect(editions.flatMap(members)).not.toContain(ids.redownloadA);
+    });
+
+    it('leaves linked books out of every kind, identical files included', async () => {
+      const linked = [ids.linkedEditionA, ids.linkedEditionB, ids.linkedCopyA, ids.linkedCopyB];
+      for (const kind of ['duplicate', 'other_format', 'other_edition'] as const) {
+        const found = (await groups(ctx.adminToken, scanned.id, kind)).flatMap(members);
+        expect(found.filter((bookId) => linked.includes(bookId))).toEqual([]);
+      }
+    });
+
+    it('offers two audiobook recordings with different narrators as other editions, to link but never delete (E18)', async () => {
+      expect(scanned.totalOtherEditionPairs).toBe(1);
+      const duplicates = await groups(ctx.adminToken, scanned.id, 'duplicate');
+      expect(duplicates.flatMap(members)).not.toContain(ids.recordingA);
+
+      const [edition, ...rest] = await groups(ctx.adminToken, scanned.id, 'other_edition');
+      expect(rest).toEqual([]);
+      expect(edition!.kind).toBe('other_edition');
+      expect(edition!.reasons).toEqual(['title_author']);
+      expect(members(edition!)).toEqual(sorted(ids.recordingA, ids.recordingB));
+
+      const deletion = await resolve(ctx.adminToken, {
+        scanId: scanned.id,
+        groups: [{ groupId: edition!.id, keeperId: ids.recordingA, action: 'delete' }],
+      });
+      expect(deletion.status).toBe(400);
+
+      const started = await resolve(ctx.adminToken, {
+        scanId: scanned.id,
+        groups: [{ groupId: edition!.id, keeperId: ids.recordingA, action: 'link' }],
+      });
+      expect(started.status).toBe(202);
+      const job = await waitForResolution(ctx.adminToken, started.body.jobId!);
+      expect(job.outcomes).toEqual([expect.objectContaining({ status: 'done', keeperId: ids.recordingA })]);
+      expect(await bookIdsStillPresent([ids.recordingA, ids.recordingB])).toEqual(sorted(ids.recordingA, ids.recordingB));
+      const links = await ctx.db
+        .select({ groupId: schema.bookLinks.groupId })
+        .from(schema.bookLinks)
+        .where(inArray(schema.bookLinks.bookId, [ids.recordingA, ids.recordingB]));
+      expect(links).toHaveLength(2);
+      expect(new Set(links.map((link) => link.groupId)).size).toBe(1);
+      // Grouped editions leave the scan's list and count straight away, before any rescan.
+      expect(await groups(ctx.adminToken, scanned.id, 'other_edition')).toEqual([]);
+      expect((await kindTotals(ctx.adminToken, scanned.id)).other_edition).toBe(0);
+
+      const rescanned = await scan(ctx.adminToken, library.libraryId);
+      expect(rescanned.totalOtherEditionPairs).toBe(0);
     });
   });
 

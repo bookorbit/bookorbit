@@ -17,7 +17,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   createBookDuplicateScan,
+  dismissBookDuplicateGroup,
   getActiveBookDuplicateScan,
+  getBookDuplicateDismissals,
   getBookDuplicateGroups,
   getBookDuplicateResolution,
   getBookDuplicateScan,
@@ -86,6 +88,7 @@ const runningScan: BookDuplicateScan = {
   createdAt: '2026-01-01T00:00:00.000Z',
   completedAt: null,
   totalOtherFormatPairs: null,
+  totalOtherEditionPairs: null,
 }
 
 const completedScan: BookDuplicateScan = {
@@ -177,7 +180,7 @@ function mountComposable() {
 describe('useBookDuplicates', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    grant(Permission.LibraryDeleteBooks, Permission.LibraryMergeBooks)
+    grant(Permission.LibraryDeleteBooks, Permission.LibraryMergeBooks, Permission.LibraryEditMetadata)
     viewerOnlyLibraries.clear()
     socketHandlers.clear()
     vi.mocked(createBookDuplicateScan).mockReset()
@@ -189,7 +192,13 @@ describe('useBookDuplicates', () => {
     vi.mocked(getActiveBookDuplicateScan).mockReset()
     vi.mocked(getBookDuplicateGroups).mockReset()
     vi.mocked(getBookDuplicateScan).mockReset()
-    vi.mocked(getBookDuplicateGroups).mockResolvedValue({ groups: [], total: 0, page: 1, pageSize: 20 })
+    vi.mocked(getBookDuplicateGroups).mockResolvedValue({
+      groups: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      kindTotals: { duplicate: 0, other_format: 0, other_edition: 0 },
+    })
   })
 
   afterEach(() => {
@@ -234,8 +243,14 @@ describe('useBookDuplicates', () => {
 
   it('moves back to the last populated page when results shrink', async () => {
     vi.mocked(getBookDuplicateGroups)
-      .mockResolvedValueOnce({ groups: [], total: 1, page: 2, pageSize: 20 })
-      .mockResolvedValueOnce({ groups: [] as BookDuplicateGroup[], total: 1, page: 1, pageSize: 20 })
+      .mockResolvedValueOnce({ groups: [], total: 1, page: 2, pageSize: 20, kindTotals: { duplicate: 1, other_format: 0, other_edition: 0 } })
+      .mockResolvedValueOnce({
+        groups: [] as BookDuplicateGroup[],
+        total: 1,
+        page: 1,
+        pageSize: 20,
+        kindTotals: { duplicate: 1, other_format: 0, other_edition: 0 },
+      })
     const { duplicates } = mountComposable()
     duplicates.scan.value = completedScan
     duplicates.page.value = 2
@@ -280,7 +295,13 @@ describe('useBookDuplicates', () => {
   })
 
   it('applies filters, bounded page changes, and session-only dismissals', async () => {
-    vi.mocked(getBookDuplicateGroups).mockImplementation(async (_scanId, params) => ({ groups: [], total: 60, page: params.page, pageSize: 20 }))
+    vi.mocked(getBookDuplicateGroups).mockImplementation(async (_scanId, params) => ({
+      groups: [],
+      total: 60,
+      page: params.page,
+      pageSize: 20,
+      kindTotals: { duplicate: 0, other_format: 0, other_edition: 0 },
+    }))
     const { duplicates } = mountComposable()
     duplicates.scan.value = completedScan
     duplicates.total.value = 60
@@ -323,8 +344,14 @@ describe('useBookDuplicates', () => {
     grant(Permission.LibraryMergeBooks)
     const mergeOnly = mountComposable().duplicates
 
-    expect(mergeOnly.actionsFor(group)).toEqual(['merge', 'link'])
+    expect(mergeOnly.actionsFor(group)).toEqual(['merge'])
     expect(mergeOnly.actionFor(duplicateGroup(3, [book(5), book(6)], ['same_work'], 'other_format'))).toBeNull()
+
+    grant(Permission.LibraryDeleteBooks, Permission.LibraryEditMetadata)
+    const linker = mountComposable().duplicates
+
+    expect(linker.actionsFor(group)).toEqual(['delete', 'link'])
+    expect(linker.actionsFor(duplicateGroup(4, [book(7), book(8)], ['same_work'], 'other_format'))).toEqual(['link'])
 
     grant()
     expect(mountComposable().duplicates.canUseTool.value).toBe(false)
@@ -356,8 +383,8 @@ describe('useBookDuplicates', () => {
   })
 
   it('gives the server pass no delete default, since it has no pairs to prove a group identical', () => {
-    const deleteOnly = { canDelete: true, canMerge: false }
-    const both = { canDelete: true, canMerge: true }
+    const deleteOnly = { canDelete: true, canMerge: false, canLink: false }
+    const both = { canDelete: true, canMerge: true, canLink: true }
 
     for (const reasons of [['file_hash'], ['isbn'], ['exact_metadata'], ['fuzzy_metadata']] as BookDuplicateMatchReason[][]) {
       expect(defaultDuplicateAction({ kind: 'duplicate', reasons, books: [book(1), book(2)] }, 1, deleteOnly)).toBeNull()
@@ -381,6 +408,44 @@ describe('useBookDuplicates', () => {
 
     duplicates.setAction(1, 'link')
     expect(duplicates.actionFor(viewed)).toBeNull()
+  })
+
+  it('offers other editions link first and merge, never delete, and starts with nothing chosen', () => {
+    const { duplicates } = mountComposable()
+    const ebooks = duplicateGroup(1, [book(1), book(2)], ['title_author'], 'other_edition')
+    const recordings = duplicateGroup(
+      2,
+      [
+        book(3, { files: [{ id: 3, format: 'm4b', sizeBytes: 3000, path: 'a/book.m4b' }] }),
+        book(4, { files: [{ id: 4, format: 'm4b', sizeBytes: 4000, path: 'b/book.m4b' }] }),
+      ],
+      ['same_work', 'title_author'],
+      'other_edition',
+    )
+
+    expect(duplicates.actionsFor(ebooks)).toEqual(['link', 'merge'])
+    expect(duplicates.actionFor(ebooks)).toBeNull()
+    expect(duplicates.actionsFor(recordings)).toEqual(['link'])
+    expect(duplicates.mergeAvailabilityFor(recordings).reason).toBe('BOTH_HAVE_AUDIO')
+
+    duplicates.setAction(2, 'link')
+    expect(duplicates.actionFor(recordings)).toBe('link')
+    duplicates.setAction(1, 'delete')
+    expect(duplicates.actionFor(ebooks)).toBeNull()
+
+    grant(Permission.LibraryDeleteBooks)
+    expect(mountComposable().duplicates.actionsFor(ebooks)).toEqual([])
+    grant(Permission.LibraryMergeBooks)
+    expect(mountComposable().duplicates.actionsFor(ebooks)).toEqual(['merge'])
+  })
+
+  it('offers link only where the user may edit metadata in every library of the group', () => {
+    grant(Permission.LibraryMergeBooks, Permission.LibraryEditMetadata)
+    viewerOnlyLibraries.add(3)
+    const { duplicates } = mountComposable()
+
+    expect(duplicates.actionsFor(duplicateGroup(1, [book(1), book(2, { libraryId: 3 })], ['title_author'], 'other_edition'))).toEqual([])
+    expect(duplicates.actionsFor(duplicateGroup(2, [book(3), book(4)], ['title_author'], 'other_edition'))).toEqual(['link', 'merge'])
   })
 
   it('offers merge for a group across libraries but never starts with it (X40)', () => {
@@ -557,6 +622,55 @@ describe('useBookDuplicates', () => {
       order: 'desc',
       kind: 'other_format',
     })
+  })
+
+  it('switches to the other-editions list and asks for that kind', async () => {
+    const { duplicates } = mountComposable()
+    duplicates.scan.value = completedScan
+
+    await duplicates.setKind('other_edition')
+
+    expect(duplicates.kind.value).toBe('other_edition')
+    expect(getBookDuplicateGroups).toHaveBeenLastCalledWith(11, expect.objectContaining({ page: 1, kind: 'other_edition' }))
+  })
+
+  it('refreshes the list and tab totals once a dismissal is stored', async () => {
+    vi.mocked(dismissBookDuplicateGroup).mockResolvedValue(undefined)
+    vi.mocked(getBookDuplicateDismissals).mockResolvedValue([])
+    const { duplicates } = mountComposable()
+    duplicates.scan.value = completedScan
+    vi.mocked(getBookDuplicateGroups).mockResolvedValue({
+      groups: [],
+      total: 0,
+      page: 1,
+      pageSize: 20,
+      kindTotals: { duplicate: 0, other_format: 0, other_edition: 4 },
+    })
+
+    await duplicates.dismissGroup(42)
+
+    expect(dismissBookDuplicateGroup).toHaveBeenCalledWith({ scanId: 11, groupId: 42 })
+    expect(getBookDuplicateGroups).toHaveBeenCalled()
+    expect(duplicates.kindTotals.value).toEqual({ duplicate: 0, other_format: 0, other_edition: 4 })
+  })
+
+  it("brings a restored pair's group back to the list without a rescan", async () => {
+    vi.mocked(restoreBookDuplicateDismissal).mockResolvedValue(undefined)
+    const { duplicates } = mountComposable()
+    duplicates.scan.value = completedScan
+    const group = duplicateGroup(42, [book(1), book(2)], ['same_work'], 'other_edition')
+    duplicates.hideGroup(42)
+    vi.mocked(getBookDuplicateGroups).mockResolvedValue({
+      groups: [group],
+      total: 1,
+      page: 1,
+      pageSize: 20,
+      kindTotals: { duplicate: 0, other_format: 0, other_edition: 1 },
+    })
+
+    await duplicates.restoreDismissal(1, 2, 'other_edition')
+
+    expect(duplicates.visibleGroups.value.map((entry) => entry.id)).toEqual([42])
   })
 
   it('restores an other-format dismissal by its kind', async () => {

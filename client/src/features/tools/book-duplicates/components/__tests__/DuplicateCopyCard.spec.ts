@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
-import type { BookDuplicateAction, BookDuplicateCandidate } from '@bookorbit/types'
+import type { BookDuplicateAction, BookDuplicateCandidate, BookDuplicateKind } from '@bookorbit/types'
 
 import { activateI18nLocale } from '@/i18n'
 import DuplicateCopyCard from '../DuplicateCopyCard.vue'
@@ -22,9 +22,9 @@ const book = {
   bookPerFile: false,
 } as unknown as BookDuplicateCandidate
 
-function status(keeper: boolean, action: BookDuplicateAction | null): string {
+function status(keeper: boolean, action: BookDuplicateAction | null, kind?: BookDuplicateKind): string {
   const wrapper = mount(DuplicateCopyCard, {
-    props: { book, groupId: 7, index: 0, keeper, recommended: false, action },
+    props: { book, groupId: 7, index: 0, keeper, recommended: false, action, kind },
     global: { stubs: { BookCoverImage: true } },
   })
   return wrapper.find('span.uppercase').text()
@@ -39,6 +39,15 @@ describe('DuplicateCopyCard', () => {
     expect(status(false, null)).toBe('Other copy')
     expect(status(true, null)).toBe('Keeping')
     expect(status(true, 'link')).toBe('Main book')
+  })
+
+  it('names the copies of other editions being grouped as editions, and keeps link wording elsewhere', () => {
+    activateI18nLocale('en')
+    expect(status(true, 'link', 'other_edition')).toBe('Main edition')
+    expect(status(false, 'link', 'other_edition')).toBe('Other edition')
+    expect(status(false, 'merge', 'other_edition')).toBe('Merge in')
+    expect(status(true, 'link', 'other_format')).toBe('Main book')
+    expect(status(false, 'link', 'other_format')).toBe('Link')
   })
 
   it('shows reading progress sent from 0 to 100 as that percentage', () => {

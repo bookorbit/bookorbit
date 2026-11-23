@@ -488,7 +488,7 @@ describe('BookService', () => {
       await expect(service.findLinkGroupMembers(9, makeUser())).resolves.toEqual([
         { bookId: 1, libraryId: 2, libraryName: 'Ebooks', title: 'Kindred', formats: ['epub'], mediaKind: 'ebook', status: 'present', isLead: true },
       ]);
-      expect(findMembers).toHaveBeenCalledWith([9], 'access-where');
+      expect(findMembers).toHaveBeenCalledWith([9], 'access-where', 1);
     });
 
     it('returns nothing when links are not available', async () => {
@@ -1971,6 +1971,35 @@ describe('BookService', () => {
           seriesName: 'Dune Chronicles',
           updatedAt: expect.any(Date),
         }),
+        expect.anything(),
+      );
+    });
+
+    it('updateMetadata normalizes the edition name and sets the first published year without touching the published date', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { editionName: '  Full\t Cast  ', originalPublishedYear: 1965 }, user);
+
+      const fields = bookRepo.updateMetadataFields.mock.calls[0]![1];
+      expect(fields).toEqual(expect.objectContaining({ editionName: 'Full Cast', originalPublishedYear: 1965 }));
+      expect(fields).not.toHaveProperty('publishedDate');
+      expect(fields).not.toHaveProperty('publishedYear');
+    });
+
+    it('updateMetadata clears the edition fields with null and a blank edition name', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      vi.spyOn(service, 'getDetail').mockResolvedValue({ id: 5 } as never);
+
+      await service.updateMetadata(5, { editionName: '   ', originalPublishedYear: null }, user);
+
+      expect(bookRepo.updateMetadataFields).toHaveBeenCalledWith(
+        5,
+        expect.objectContaining({ editionName: null, originalPublishedYear: null }),
         expect.anything(),
       );
     });
@@ -4686,6 +4715,27 @@ describe('BookService', () => {
       );
     });
 
+    it('bulkSetMetadata sets the edition name and first published year without touching the published date', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser({ id: 11 });
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      await service.bulkSetMetadata([7], 'editionName', '  Full\t Cast  ', user);
+      await service.bulkSetMetadata([7], 'originalPublishedYear', 1965, user);
+
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenNthCalledWith(1, [7], { editionName: 'Full Cast', updatedAt: expect.any(Date) });
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenNthCalledWith(2, [7], { originalPublishedYear: 1965, updatedAt: expect.any(Date) });
+    });
+
+    it('bulkSetMetadata rejects a first published year outside the stored range', async () => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser({ id: 11 });
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      await expect(service.bulkSetMetadata([7], 'originalPublishedYear', 999, user)).rejects.toThrow(BadRequestException);
+      expect(bookRepo.bulkUpdateMetadataFields).not.toHaveBeenCalled();
+    });
+
     it('bulkSetMetadata skips books where the field is metadata-locked', async () => {
       const { service, bookRepo, fileWriteService, fileRenameService, scoreService, bookMetadataLockService } = makeService();
       const user = makeUser({ id: 11 });
@@ -4823,6 +4873,36 @@ describe('BookService', () => {
       const result = await service.bulkEditMetadata([7], fields, user);
 
       expect(result.fields.publishedYear).toEqual({ updated: 1, skippedLocked: 0 });
+    });
+
+    it('updates the edition name and first published year, skipping books that lock them', async () => {
+      const { service, bookRepo, bookMetadataLockService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+      bookMetadataLockService.getLockedFieldsMap.mockResolvedValue(new Map([[9, ['originalPublishedYear']]]));
+      const tx = {};
+      bookRepo.withTransaction.mockImplementation(async (cb: (value: unknown) => Promise<unknown>) => cb(tx));
+
+      const result = await service.bulkEditMetadata(
+        [7, 9],
+        makeFields({ editionName: { value: '  25th   Anniversary ' }, originalPublishedYear: { value: 1965 } }),
+        user,
+      );
+
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenCalledWith([7, 9], { editionName: '25th Anniversary', updatedAt: expect.any(Date) }, tx);
+      expect(bookRepo.bulkUpdateMetadataFields).toHaveBeenCalledWith([7], { originalPublishedYear: 1965, updatedAt: expect.any(Date) }, tx);
+      expect(result.fields.editionName).toEqual({ updated: 2, skippedLocked: 0 });
+      expect(result.fields.originalPublishedYear).toEqual({ updated: 1, skippedLocked: 1 });
+    });
+
+    it.each([999, 2201, 1965.5])('rejects a first published year of %s before writing anything', async (year) => {
+      const { service, bookRepo } = makeService();
+      const user = makeUser();
+      const access = vi.spyOn(service, 'verifyLibraryAccessForBookIds').mockResolvedValue(undefined);
+
+      await expect(service.bulkEditMetadata([7], makeFields({ originalPublishedYear: { value: year } }), user)).rejects.toThrow(BadRequestException);
+      expect(access).not.toHaveBeenCalled();
+      expect(bookRepo.bulkUpdateMetadataFields).not.toHaveBeenCalled();
     });
 
     it('replaces authors in replace mode', async () => {
@@ -5638,6 +5718,40 @@ describe('BookService', () => {
           filename: 'foundation.epub',
         }),
       ]);
+    });
+
+    it('always sends the edition name and first published year, null when unset', async () => {
+      const { service, bookRepo, userBookStatusService, comicMetadataService } = makeService();
+      const user = makeUser();
+      vi.spyOn(service, 'verifyBookAccess').mockResolvedValue(undefined);
+      userBookStatusService.findOne.mockResolvedValue(null);
+      comicMetadataService.findByBookId.mockResolvedValue(null);
+      bookRepo.findCollectionsByBookId.mockResolvedValue([]);
+      bookRepo.findRatingByBookAndUser.mockResolvedValue(null);
+      const found = (metadata: Record<string, unknown>) => ({
+        book: {
+          books: { id: 12, libraryId: 3, primaryFileId: null, status: 'present', folderPath: '/books/dune', addedAt: new Date('2026-02-01') },
+          libraries: { name: 'Main', formatPriority: null },
+          book_metadata: { title: 'Dune', lockedFields: null, chapters: null, ...metadata },
+        },
+        authorRows: [],
+        genreRows: [],
+        tagRows: [],
+        fileRows: [],
+        narratorRows: [],
+        communityRatingRows: [],
+      });
+
+      bookRepo.findById.mockResolvedValueOnce(found({}));
+      const unset = await service.getDetail(12, user);
+      bookRepo.findById.mockResolvedValueOnce(found({ editionName: 'Full Cast', originalPublishedYear: 1965 }));
+      const set = await service.getDetail(12, user);
+
+      expect(Object.keys(unset)).toEqual(expect.arrayContaining(['editionName', 'originalPublishedYear']));
+      expect(unset.editionName).toBeNull();
+      expect(unset.originalPublishedYear).toBeNull();
+      expect(JSON.parse(JSON.stringify(unset))).toMatchObject({ editionName: null, originalPublishedYear: null });
+      expect(set).toMatchObject({ editionName: 'Full Cast', originalPublishedYear: 1965 });
     });
 
     it('returns narrators for a read-along EPUB without audio files, leaving out stored audio details', async () => {
@@ -6785,7 +6899,7 @@ describe('BookService', () => {
         timeZone: 'UTC',
         contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
-      expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('where-clause');
+      expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('where-clause', {});
     });
 
     it('restricts query selections to the requested accessible library', async () => {
@@ -6804,7 +6918,18 @@ describe('BookService', () => {
         timeZone: 'UTC',
         contentFilters: EMPTY_CONTENT_FILTER_RULES,
       });
-      expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('library-where');
+      expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('library-where', {});
+    });
+
+    it('folds linked editions in a query selection when the request asks for it', async () => {
+      const { service, bookRepo, libraryService, queryBuilder } = makeService();
+      const user = makeUser({ id: 7 });
+      libraryService.findAll.mockResolvedValue([{ id: 5 }]);
+      queryBuilder.buildWhere.mockReturnValue('folded-where');
+      bookRepo.findIdsByWhere.mockResolvedValue([31]);
+
+      await expect(service.resolveSelectionToIds({ query: { collapseLinked: true } }, user)).resolves.toEqual([31]);
+      expect(bookRepo.findIdsByWhere).toHaveBeenCalledWith('folded-where', { collapseLinkedForUserId: 7 });
     });
 
     it('rejects query selections for inaccessible libraries', async () => {

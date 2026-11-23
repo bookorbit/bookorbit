@@ -70,6 +70,7 @@ export class SeriesService {
         id: row.id,
         name: row.name,
         bookCount: row.bookCount,
+        workCount: row.workCount,
         readCount: row.readCount,
         readingCount: row.readingCount,
         authors: row.authors,
@@ -126,6 +127,7 @@ export class SeriesService {
           order: dto.order ?? 'asc',
           libraryIds,
           contentFilters: user.isSuperuser ? undefined : user.contentFilters,
+          ...(dto.collapseLinked === true ? { collapseLinked: { userId: user.id } } : {}),
         }),
       ]);
 
@@ -149,6 +151,7 @@ export class SeriesService {
             id: existsInAnyLibrary.id,
             name: existsInAnyLibrary.name,
             bookCount: 0,
+            workCount: 0,
             readCount: 0,
             ownedVolumeCount: 0,
             readVolumeCount: 0,
@@ -182,6 +185,13 @@ export class SeriesService {
         cardData.seriesMembershipRows,
       );
       await this.coverStore.enrichCardFaces(cards);
+      if (dto.collapseLinked === true) {
+        const visibleLibraryIds = await this.resolveLibraryIds(user);
+        await this.bookReadService.attachCardLinks(
+          cards,
+          this.seriesRepo.buildVisibleBooksWhere(visibleLibraryIds, user.isSuperuser ? undefined : user.contentFilters),
+        );
+      }
       const orderMap = new Map(bookPage.bookIds.map((id, i) => [id, i]));
       items = cards
         .map((card) => {
@@ -202,6 +212,7 @@ export class SeriesService {
       id: detail.id,
       name: detail.name,
       bookCount: detail.bookCount,
+      workCount: detail.workCount,
       readCount: detail.readCount,
       ownedVolumeCount: volumeCounts.ownedVolumeCount,
       readVolumeCount: volumeCounts.readVolumeCount,
@@ -210,7 +221,7 @@ export class SeriesService {
       expectedBookCount: detail.expectedBookCount ?? null,
     };
 
-    return { items, total: bookPage.total, page, size, seriesInfo };
+    return { items, total: bookPage.total, ...(dto.collapseLinked === true ? { bookTotal: bookPage.bookTotal } : {}), page, size, seriesInfo };
   }
 
   /**

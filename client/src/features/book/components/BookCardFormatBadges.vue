@@ -86,7 +86,7 @@ const summary = computed(() => {
       return library ? t('book.link.badges.linkedFormat', { format, library }) : format
     })
   if (linked.length === 0 || own.length === 0) return t('book.link.badges.summary', { formats: formatList([...own, ...linked]) })
-  return t('book.link.badges.summaryLinked', { formats: formatList(own), linked: formatList(linked) })
+  return t('book.editions.formatsWithEditions', { formats: formatList(own), editions: formatList(linked) })
 })
 </script>
 

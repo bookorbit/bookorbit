@@ -17,6 +17,15 @@ describe('MetadataPreferenceResolver', () => {
     expect(fields.abridged.providers).toEqual(audiobookSources);
   });
 
+  it('defaults the first published year to the providers that tell it apart from the edition year', () => {
+    const { fields } = resolver.getDefaultPreferences();
+    expect(fields.originalPublishedYear).toEqual({
+      enabled: true,
+      providers: [MetadataProviderKey.HARDCOVER, MetadataProviderKey.OPEN_LIBRARY],
+      mergeStrategy: 'overwriteIfProvided',
+    });
+  });
+
   it('lists no provider in a default rule that never supplies that field', () => {
     const { fields } = resolver.getDefaultPreferences();
     for (const field of ALL_METADATA_FIELDS) {

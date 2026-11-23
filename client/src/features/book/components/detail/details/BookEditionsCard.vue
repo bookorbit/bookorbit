@@ -73,10 +73,10 @@ function rowMeasure(row: BookFormatEntry): string {
 </script>
 
 <template>
-  <section class="rounded-xl border border-border bg-card px-3.5 py-3" :aria-label="t('book.detail.details.editions')">
+  <section class="rounded-xl border border-border bg-card px-3.5 py-3" :aria-label="t('book.detail.details.formatsCard')">
     <div class="flex items-baseline gap-2">
       <h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-        {{ t('book.detail.details.editions') }}
+        {{ t('book.detail.details.formatsCard') }}
       </h3>
       <p class="ml-auto text-[11px] tabular-nums text-muted-foreground">
         {{ t('book.detail.details.editionsSummary', { count: rows.length, size: formatBytes(totalBytes) }) }}

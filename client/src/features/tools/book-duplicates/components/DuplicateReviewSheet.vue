@@ -20,6 +20,7 @@ import { formatBytes } from '@/lib/formatting'
 import { formatNumber } from '@/i18n/formatters'
 import { formatCopyProgress } from '../utils/copy-progress'
 import { copyBytes, copyFolderLabel, crossLibraryMergeLibrary, isProtectedCopy, reclaimableBytes } from '../utils/duplicate-keeper'
+import { duplicateActionKey, duplicateBookOutcomeKey, duplicateCopyStatusKey } from '../utils/duplicate-labels'
 import DuplicateMergeReview from './DuplicateMergeReview.vue'
 
 const props = defineProps<{
@@ -67,6 +68,8 @@ const actionable = computed(() => props.groups.filter((group) => props.actionFor
 const capped = computed(() => props.allGroups && props.totalGroups > BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS)
 const allGroupsCount = computed(() => Math.min(props.totalGroups, BOOK_DUPLICATE_RESOLUTION_MAX_GROUPS))
 const groupCount = computed(() => (props.allGroups ? allGroupsCount.value : actionable.value.length))
+/** A run keeps the size it started with; resolved groups lose their action once it ends. */
+const titleCount = computed(() => props.job?.total ?? groupCount.value)
 const otherPages = computed(() => (props.allGroups ? Math.max(0, allGroupsCount.value - props.groups.length) : 0))
 const anyAction = (wanted: BookDuplicateAction) =>
   props.groups.some((group) => group.books.some((book) => book.id !== props.keeperFor(group) && props.bookActionFor(group, book.id) === wanted))
@@ -94,6 +97,12 @@ const crossLibraryMerges = computed(() =>
 const outcomes = computed(() => new Map((props.job?.outcomes ?? []).map((outcome) => [outcome.groupId, outcome])))
 const progressPercent = computed(() => (props.job && props.job.total > 0 ? Math.round((props.job.processed / props.job.total) * 100) : 0))
 const finished = computed(() => props.job !== null && props.job.status !== 'running')
+
+/** The keeper's role; a finished run clears the chosen actions, so a linked result still names the main edition. */
+function keeperStatusKey(group: BookDuplicateGroup): string {
+  const linked = outcomes.value.get(group.id)?.books.some((book) => book.status === 'linked') ?? false
+  return duplicateCopyStatusKey(group.kind, true, linked ? 'link' : props.actionFor(group))
+}
 
 function handleOpenChange(open: boolean): void {
   if (!open && !props.running) emit('cancel')
@@ -124,6 +133,10 @@ function handleBookAction(group: BookDuplicateGroup, bookId: number, value: stri
   if (action) emit('book-action', group.id, bookId, action)
 }
 
+function actionLabel(group: BookDuplicateGroup, action: BookDuplicateAction | null): string {
+  return action ? t(duplicateActionKey(group.kind, action)) : t('tools.bookDuplicates.actions.none')
+}
+
 function label(book: BookDuplicateGroup['books'][number]): string {
   return copyFolderLabel(book) || book.title || t('book.untitled')
 }
@@ -143,8 +156,8 @@ function bookOutcome(group: BookDuplicateGroup, bookId: number): BookDuplicateBo
   return outcomes.value.get(group.id)?.books.find((book) => book.bookId === bookId) ?? null
 }
 
-function bookOutcomeText(outcome: BookDuplicateBookOutcome): string {
-  const status = t(`tools.bookDuplicates.bookOutcomes.${outcome.status}`)
+function bookOutcomeText(group: BookDuplicateGroup, outcome: BookDuplicateBookOutcome): string {
+  const status = t(duplicateBookOutcomeKey(group.kind, outcome.status))
   return outcome.reason && outcome.status !== 'merged' && outcome.status !== 'deleted' && outcome.status !== 'linked'
     ? t('tools.bookDuplicates.outcomes.withReason', { status, reason: reasonText(outcome.reason) })
     : status
@@ -159,7 +172,7 @@ function bookOutcomeText(outcome: BookDuplicateBookOutcome): string {
           {{
             mergeGroup
               ? t('tools.bookDuplicates.review.mergeTitle')
-              : t('tools.bookDuplicates.review.resolveTitle', { count: groupCount }, groupCount)
+              : t('tools.bookDuplicates.review.resolveTitle', { count: titleCount }, titleCount)
           }}
         </SheetTitle>
         <SheetDescription class="text-[13px]">
@@ -234,7 +247,7 @@ function bookOutcomeText(outcome: BookDuplicateBookOutcome): string {
                   {{ groupOutcomeText(outcomes.get(group.id)!) }}
                 </span>
                 <span v-else class="shrink-0 text-[12px] text-muted-foreground">
-                  {{ actionFor(group) ? t(`tools.bookDuplicates.actions.${actionFor(group)}`) : t('tools.bookDuplicates.actions.none') }}
+                  {{ actionLabel(group, actionFor(group)) }}
                 </span>
               </p>
               <ul class="grid gap-1 px-3 py-2">
@@ -253,10 +266,10 @@ function bookOutcomeText(outcome: BookDuplicateBookOutcome): string {
                   </span>
                   <span class="shrink-0 tabular-nums text-muted-foreground">{{ formatBytes(copyBytes(book)) }}</span>
                   <span v-if="book.id === keeperFor(group)" class="w-36 shrink-0 text-end text-[12px] font-medium text-foreground">{{
-                    t('tools.bookDuplicates.keeping')
+                    t(keeperStatusKey(group))
                   }}</span>
                   <span v-else-if="bookOutcome(group, book.id)" class="w-36 shrink-0 text-end text-[12px] text-foreground">
-                    {{ bookOutcomeText(bookOutcome(group, book.id)!) }}
+                    {{ bookOutcomeText(group, bookOutcome(group, book.id)!) }}
                   </span>
                   <label v-else-if="actionFor(group)" class="shrink-0">
                     <span class="sr-only">{{ t('tools.bookDuplicates.review.bookAction', { name: label(book) }) }}</span>
@@ -267,7 +280,7 @@ function bookOutcomeText(outcome: BookDuplicateBookOutcome): string {
                       @update:model-value="handleBookAction(group, book.id, $event)"
                     >
                       <option v-for="option in actionsFor(group)" :key="option" :value="option">
-                        {{ t(`tools.bookDuplicates.actions.${option}`) }}
+                        {{ actionLabel(group, option) }}
                       </option>
                       <option value="skip">{{ t('tools.bookDuplicates.actions.skip') }}</option>
                     </Select>

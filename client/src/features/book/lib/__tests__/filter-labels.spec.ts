@@ -229,3 +229,11 @@ describe('ruleToParts', () => {
     expect(ruleToParts(rule)).toEqual({ field: 'Community Review Count (Hardcover)', operator: 'at least', value: '1000' })
   })
 })
+
+describe('first published labels', () => {
+  it('names the original publication year apart from the published year in filters and sorts', () => {
+    expect(fieldLabel('originalPublishedYear')).toBe('First published')
+    expect(sortFieldLabel('originalPublishedYear')).toBe('First published')
+    expect(fieldLabel('publishedYear')).not.toBe(fieldLabel('originalPublishedYear'))
+  })
+})

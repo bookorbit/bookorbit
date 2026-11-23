@@ -22,7 +22,7 @@ import type {
   SortSpec,
 } from '@bookorbit/types';
 import { DB } from '../../db';
-import { bookLastReadSql } from '../../db/book-last-read';
+import { bookLastReadAtSql } from '../../db/book-last-read';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
@@ -178,6 +178,8 @@ export class BookQueryBuilder {
         return this.publishedDateRuleToSql(operator, value as string | number, valueTo as string | number | undefined, timeZone);
       case 'publishedYear':
         return this.numericRuleToSql(bookMetadata.publishedYear, operator, value as number, valueTo as number | undefined);
+      case 'originalPublishedYear':
+        return this.numericRuleToSql(bookMetadata.originalPublishedYear, operator, value as number, valueTo as number | undefined);
       case 'seriesIndex':
         return this.seriesIndexRuleToSql(operator, value as string, valueTo as string | undefined);
       case 'pageCount':
@@ -1258,6 +1260,9 @@ export class BookQueryBuilder {
         case 'publishedYear':
           parts.push(`published_year ${D} NULLS LAST`);
           break;
+        case 'originalPublishedYear':
+          parts.push(`original_published_year ${D} NULLS LAST`);
+          break;
         case 'publishedDate':
           parts.push(`coalesce(published_date, make_date(published_year, 1, 1)) ${D} NULLS LAST`);
           break;
@@ -1291,7 +1296,7 @@ export class BookQueryBuilder {
           );
           break;
         case 'lastReadAt':
-          parts.push(sql`${bookLastReadSql(sql`r.id`, userId)} ${sql.raw(D)} NULLS LAST`);
+          parts.push(sql`${bookLastReadAtSql()} ${sql.raw(D)} NULLS LAST`);
           break;
         case 'finishedAt':
           parts.push(`(SELECT ubs.finished_at FROM user_book_status ubs WHERE ubs.book_id = r.id AND ubs.user_id = ${safeUserId}) ${D} NULLS LAST`);

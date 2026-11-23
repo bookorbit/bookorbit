@@ -87,12 +87,20 @@ export class RecommendationService {
       const candidateMetadata = await this.recRepo.getCandidateMetadata(candidates.map((c) => c.bookId));
       const metaMap = new Map(candidateMetadata.map((m) => [m.bookId, m]));
 
+      const seenWorks = new Set<string>();
       const rescored = candidates
         .map((candidate) => ({
           bookId: candidate.bookId,
+          workKey: candidate.workKey,
           score: this.rescore(candidate, target, metaMap.get(candidate.bookId) ?? null),
         }))
         .sort((a, b) => b.score - a.score)
+        .filter((candidate) => {
+          if (!candidate.workKey) return true;
+          if (seenWorks.has(candidate.workKey)) return false;
+          seenWorks.add(candidate.workKey);
+          return true;
+        })
         .slice(0, MAX_RECOMMENDATIONS);
 
       if (rescored.length === 0) {
@@ -142,7 +150,10 @@ export class RecommendationService {
       }
 
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-      const rows = await this.recRepo.findSeriesBooks(series.id, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
+      const rows = await this.recRepo.findSeriesBooks(series.id, libraryIds, user.isSuperuser ? undefined : user.contentFilters, {
+        userId: user.id,
+        openBookId: bookId,
+      });
 
       this.logger.log(
         `[${SERIES_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} seriesId=${series.id} seriesName="${sanitizeLogValue(series.name ?? '')}" resultCount=${rows.length} - series books lookup completed`,
@@ -181,7 +192,10 @@ export class RecommendationService {
       await this.libraryService.verifyAccess(user, libraryId);
 
       const libraryIds = await this.libraryService.findAccessibleLibraryIds(user);
-      const rows = await this.recRepo.findAuthorBooks(bookId, libraryIds, user.isSuperuser ? undefined : user.contentFilters);
+      const rows = await this.recRepo.findAuthorBooks(bookId, libraryIds, user.isSuperuser ? undefined : user.contentFilters, {
+        userId: user.id,
+        openBookId: bookId,
+      });
 
       this.logger.log(
         `[${AUTHOR_BOOKS_EVENT}] [end] bookId=${bookId} durationMs=${Date.now() - startedAt} resultCount=${rows.length} - author books lookup completed`,

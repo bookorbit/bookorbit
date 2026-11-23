@@ -90,6 +90,7 @@ function handleKeep(bookId: number): void {
               :keeper="book.id === keeperId"
               :recommended="book.id === recommendedId"
               :action="action"
+              :kind="group.kind"
               @keep="handleKeep"
             />
           </th>
@@ -145,6 +146,7 @@ function handleKeep(bookId: number): void {
         :keeper="book.id === keeperId"
         :recommended="book.id === recommendedId"
         :action="action"
+        :kind="group.kind"
         @keep="handleKeep"
       >
         <dl class="mt-0.5 grid gap-0">

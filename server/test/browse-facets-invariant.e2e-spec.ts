@@ -1,4 +1,4 @@
-import { BOOK_FORMATS, type BookFormat, type BooksPage, type GroupRule, type LibraryBookFacets, type Rule } from '@bookorbit/types';
+import { BOOK_FILTER_FORMATS, type BookFilterFormat, type BooksPage, type GroupRule, type LibraryBookFacets, type Rule } from '@bookorbit/types';
 import { eq } from 'drizzle-orm';
 
 import { bookFiles, bookMetadata, books, userBookStatus, users } from '../src/db/schema';
@@ -65,7 +65,7 @@ type Scenario = {
   filter?: GroupRule;
   q?: string;
   /** The listing filter whose total must equal the facet count for `format`. */
-  formatListingFilter: (format: BookFormat) => GroupRule;
+  formatListingFilter: (format: BookFilterFormat) => GroupRule;
 };
 
 const SCENARIOS: Scenario[] = [
@@ -215,7 +215,7 @@ describe('Browse facets invariant (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
         expect(facets.libraryTotal).toBe(VISIBLE_SEED_COUNT);
 
         const formatTotals = await Promise.all(
-          BOOK_FORMATS.map(async (format) => ({
+          BOOK_FILTER_FORMATS.map(async (format) => ({
             format,
             count: await listingTotal(token, {
               filter: scenario.formatListingFilter(format),
@@ -230,13 +230,13 @@ describe('Browse facets invariant (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
     }
   }
 
-  it('counts every format a visible book holds, once per book, and nothing else', async () => {
+  it('counts every format and filter value a visible book matches, once per book, and nothing else', async () => {
     const facets = await fetchFacets(ctx.adminToken, {});
     const counts = Object.fromEntries(facets.formats.map((facet) => [facet.format, facet.count]));
 
-    expect(counts).toEqual({ epub: 6, pdf: 4, cbz: 3, mobi: 2, m4b: 2, cbr: 1, mp3: 1, azw3: 1 });
+    expect(counts).toEqual({ epub: 6, 'epub:plain': 6, pdf: 4, cbz: 3, mobi: 2, m4b: 2, cbr: 1, mp3: 1, azw3: 1 });
     expect(facets.total).toBe(VISIBLE_SEED_COUNT);
-    for (const facet of facets.formats) expect(BOOK_FORMATS).toContain(facet.format);
+    for (const facet of facets.formats) expect(BOOK_FILTER_FORMATS).toContain(facet.format);
   });
 
   it('keeps the other formats visible while one is selected, but narrows the total', async () => {

@@ -1,4 +1,6 @@
+import type { SQL } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/node-postgres';
+import { PgDialect } from 'drizzle-orm/pg-core';
 
 import * as schema from '../../db/schema';
 import { UserStatisticsRepository } from './user-statistics.repository';
@@ -80,6 +82,20 @@ describe('UserStatisticsRepository', () => {
       completedBooks: 0,
       meanProgressPercent: 0,
     });
+  });
+
+  it('counts linked editions of one book once among completed books, and every status row elsewhere', async () => {
+    const db = makeDb([[{ trackedBooks: 4, startedBooks: 4, inProgressBooks: 1, completedBooks: 2 }], [], [{ meanProgressPercent: 40 }]]);
+    const repo = new UserStatisticsRepository(db as never);
+
+    await expect(repo.getSummary(5, null)).resolves.toMatchObject({ trackedBooks: 4, completedBooks: 2 });
+
+    const fields = db.select.mock.calls[0]![0] as Record<string, SQL>;
+    const dialect = new PgDialect();
+    expect(dialect.sqlToQuery(fields.completedBooks).sql.replace(/\s+/g, ' ')).toBe(
+      `count(distinct coalesce('g' || (SELECT bl.group_id FROM book_links bl WHERE bl.book_id = "user_book_status"."book_id"), 'b' || "user_book_status"."book_id")) filter (where "user_book_status"."status" = 'read')::int`,
+    );
+    expect(dialect.sqlToQuery(fields.trackedBooks).sql).toBe('count(*)::int');
   });
 
   it('returns daily/peak/favorite aggregates and monthly completion timeline', async () => {

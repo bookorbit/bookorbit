@@ -9,6 +9,7 @@ export interface BookEligibilityData {
   description: string | null;
   publisher: string | null;
   publishedYear: number | null;
+  originalPublishedYear: number | null;
   language: string | null;
   pageCount: number | null;
   isbn10: string | null;
@@ -80,6 +81,8 @@ export class BookMetadataFetchEligibilityService {
         return book.publisher === null || book.publisher === '';
       case 'publishedYear':
         return book.publishedYear === null;
+      case 'originalPublishedYear':
+        return book.originalPublishedYear === null;
       case 'language':
         return book.language === null || book.language === '';
       case 'pageCount':

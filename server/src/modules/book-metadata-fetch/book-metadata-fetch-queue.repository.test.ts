@@ -160,6 +160,20 @@ describe('BookMetadataFetchQueueRepository', () => {
     expect(sqlCalls.some((call) => call.slice(1).includes(bookFiles.mediaOverlayAvailable))).toBe(true);
   });
 
+  it('schedules books without a first published year by a plain null check', async () => {
+    const { db, selectBuilder } = makeDb();
+    selectBuilder.where.mockResolvedValueOnce([{ bookId: 7 }]);
+    const repo = new BookMetadataFetchQueueRepository(db as never);
+    const config = baseConfig();
+    config.conditions.missingFields = { enabled: true, fields: ['originalPublishedYear'] };
+
+    await expect(repo.fetchEligibleBookIds(config)).resolves.toEqual([7]);
+
+    const clause = vi.mocked(sql).mock.calls.find((call) => call.slice(1).includes(bookMetadata.originalPublishedYear));
+    expect(clause?.slice(1)).toEqual([bookMetadata.originalPublishedYear]);
+    expect(clause?.[0].join('?')).toBe('? IS NULL');
+  });
+
   it('checks both ISBN columns when scheduling books without an ISBN', async () => {
     const { db, selectBuilder } = makeDb();
     selectBuilder.where.mockResolvedValueOnce([{ bookId: 7 }]);

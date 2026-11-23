@@ -9,7 +9,7 @@ import { AudiobookChaptersService } from '../audiobook-chapters/audiobook-chapte
 import { JobChangesService } from '../jobs/job-changes.service';
 import { BookCoverStore } from '../book-cover-store/book-cover-store.service';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
-import { normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
+import { isPublishedYear, normalizePublishedDate, publishedYearFromDateKey } from '../../common/utils/published-date.utils';
 import { BookReadService } from '../book/book-read.service';
 import * as schema from '../../db/schema';
 import { MetadataScoreService } from '../metadata-score/metadata-score.service';
@@ -324,6 +324,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
         authors: authorRows.map((a) => a.name),
         publisher: meta?.publisher,
         publishedYear: meta?.publishedYear,
+        originalPublishedYear: meta?.originalPublishedYear,
         language: meta?.language,
         pageCount: meta?.pageCount,
         isbn10: meta?.isbn10,
@@ -420,6 +421,10 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       scalarFields.publishedYear = publishedYear;
     } else if (publishedYear !== undefined && publishedDate === null) {
       scalarFields.publishedYear = publishedYear;
+    }
+    const originalPublishedYear = this.asNullableNumber(filteredResolved.originalPublishedYear);
+    if (originalPublishedYear === null || (originalPublishedYear !== undefined && isPublishedYear(originalPublishedYear))) {
+      scalarFields.originalPublishedYear = originalPublishedYear;
     }
     const language = this.asNullableString(filteredResolved.language);
     if (language !== undefined) scalarFields.language = language;
@@ -553,6 +558,7 @@ export class BookMetadataFetchOrchestratorService implements OnApplicationBootst
       description: meta?.description ?? null,
       publisher: meta?.publisher ?? null,
       publishedYear: meta?.publishedYear ?? null,
+      originalPublishedYear: meta?.originalPublishedYear ?? null,
       language: meta?.language ?? null,
       pageCount: meta?.pageCount ?? null,
       isbn10: meta?.isbn10 ?? null,

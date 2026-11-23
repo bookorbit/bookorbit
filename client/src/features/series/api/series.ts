@@ -19,6 +19,8 @@ type ListSeriesBooksParams = {
   sort: SeriesBookSort
   order: SortDirection
   libraryId?: number | null
+  /** Folds linked editions into one card. Servers without editions support reject it. */
+  collapseLinked?: boolean
 }
 
 function toQuery(params: Record<string, unknown>): string {
@@ -34,7 +36,7 @@ export async function fetchSeries(params: ListSeriesParams): Promise<SeriesPage>
 }
 
 export async function fetchSeriesBooks(seriesId: number, params: ListSeriesBooksParams): Promise<SeriesBooksPage> {
-  const qs = toQuery(params)
+  const qs = toQuery({ ...params, collapseLinked: params.collapseLinked ? 'true' : undefined })
   const res = await api(`/api/v1/series/${seriesId}/books?${qs}`)
   if (!res.ok) throw new Error(`Failed to fetch series books: ${res.status}`)
   return res.json()

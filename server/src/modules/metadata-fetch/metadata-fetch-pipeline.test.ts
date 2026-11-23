@@ -1015,6 +1015,30 @@ describe('MetadataFetchPipeline', () => {
     expect(resolved.abridged).toBe(false);
   });
 
+  it("resolves the first published year on its own rule, leaving the edition's year and date alone", async () => {
+    const prefs = createPreferences((fields) => {
+      fields.originalPublishedYear = { enabled: true, providers: [MetadataProviderKey.HARDCOVER], mergeStrategy: 'fillMissing' };
+      fields.publishedYear = { enabled: false, providers: [MetadataProviderKey.HARDCOVER], mergeStrategy: 'overwrite' };
+    });
+
+    preferencesService.getGlobal.mockResolvedValue(prefs);
+    resolver.resolve.mockReturnValue(prefs);
+    resolver.withForwardCompatibility.mockReturnValue(prefs);
+    registry.all.mockReturnValue([{ key: MetadataProviderKey.HARDCOVER }] as never);
+    fetchService.searchCandidates.mockReturnValue(
+      of(candidate(MetadataProviderKey.HARDCOVER, 'h1', { originalPublishedYear: 1954, publishedYear: 2020, publishedDate: '2020-09-01' })),
+    );
+
+    const missing = await pipeline.runWithSources({ title: 'Query' }, { publishedYear: 2020 });
+    const present = await pipeline.runWithSources({ title: 'Query' }, { originalPublishedYear: 1937 });
+
+    expect(missing.resolved.originalPublishedYear).toBe(1954);
+    expect(missing.sources.originalPublishedYear).toBe(MetadataProviderKey.HARDCOVER);
+    expect(missing.resolved).not.toHaveProperty('publishedYear');
+    expect(missing.resolved).not.toHaveProperty('publishedDate');
+    expect(present.resolved).not.toHaveProperty('originalPublishedYear');
+  });
+
   it('resolves community ratings from every configured provider', async () => {
     const prefs = createPreferences((fields) => {
       for (const field of ALL_METADATA_FIELDS) {
@@ -2147,8 +2171,10 @@ describe('MetadataFetchPipeline', () => {
 
     it('takes nothing but art from a provider only a cover rule brought in, apart from an audiobook id', async () => {
       usePreferences((preferences) => {
-        // Community ratings and the audiobook fields name Audible by default, which would make it a full provider.
+        // Community ratings, the first published year and the audiobook fields name Audible or Hardcover
+        // by default, which would make them full providers.
         preferences.fields.communityRating.providers = [MetadataProviderKey.GOOGLE];
+        preferences.fields.originalPublishedYear.providers = [MetadataProviderKey.GOOGLE];
         for (const field of ['narrators', 'duration', 'abridged'] as const) preferences.fields[field].providers = [MetadataProviderKey.GOOGLE];
         preferences.fields.audioCover.providers = [MetadataProviderKey.AUDIBLE, MetadataProviderKey.HARDCOVER];
       });

@@ -16,9 +16,10 @@ function userWith(permissions: Permission[]): RequestUser {
   return { id: 7, isSuperuser: false, permissions, contentFilters: EMPTY_CONTENT_FILTER_RULES } as unknown as RequestUser;
 }
 
-const both = userWith([Permission.LibraryDeleteBooks, Permission.LibraryMergeBooks]);
+const every = userWith([Permission.LibraryDeleteBooks, Permission.LibraryMergeBooks, Permission.LibraryEditMetadata]);
 const mergeOnly = userWith([Permission.LibraryMergeBooks]);
 const deleteOnly = userWith([Permission.LibraryDeleteBooks]);
+const linker = userWith([Permission.LibraryDeleteBooks, Permission.LibraryEditMetadata]);
 
 interface GroupFixture {
   kind: BookDuplicateKind;
@@ -144,7 +145,7 @@ describe('BookDuplicateResolutionService', () => {
           { groupId: 6, keeperId: 20, action: 'merge' },
         ],
       },
-      both,
+      every,
     );
     const outcomes = await finished(repo);
 
@@ -165,7 +166,7 @@ describe('BookDuplicateResolutionService', () => {
     const release = gate.tryAcquire(1, 'scan');
 
     const error = await service
-      .start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, both)
+      .start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, every)
       .catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(ConflictException);
     expect((error as ConflictException).getResponse()).toEqual(expect.objectContaining({ errorCode: 'LIBRARY_BUSY' }));
@@ -177,7 +178,7 @@ describe('BookDuplicateResolutionService', () => {
     const { service, repo } = setup({ 5: isbn([10, 11]) });
     repo.findRunningForUser.mockResolvedValue({ id: 66 });
 
-    await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, both)).rejects.toThrow(ConflictException);
+    await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, every)).rejects.toThrow(ConflictException);
   });
 
   it('skips stale members and groups whose keeper is gone instead of acting blindly (H1)', async () => {
@@ -196,7 +197,7 @@ describe('BookDuplicateResolutionService', () => {
           { groupId: 6, keeperId: 20, action: 'merge' },
         ],
       },
-      both,
+      every,
     );
     const outcomes = await finished(repo);
 
@@ -211,7 +212,11 @@ describe('BookDuplicateResolutionService', () => {
     );
     expect(outcomes[1]).toEqual(expect.objectContaining({ status: 'skipped', reason: 'KEEPER_MISSING', books: [] }));
     expect(merges.mergeWithinLease).toHaveBeenCalledTimes(1);
-    expect(merges.mergeWithinLease).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: 10, sourceBookIds: [11] }), both, expect.anything());
+    expect(merges.mergeWithinLease).toHaveBeenCalledWith(
+      expect.objectContaining({ targetBookId: 10, sourceBookIds: [11] }),
+      every,
+      expect.anything(),
+    );
   });
 
   it('resolves a book merged by an earlier group to its keeper (H7)', async () => {
@@ -225,14 +230,14 @@ describe('BookDuplicateResolutionService', () => {
           { groupId: 6, keeperId: 11, action: 'merge' },
         ],
       },
-      both,
+      every,
     );
     const outcomes = await finished(repo);
 
     expect(merges.mergeWithinLease).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ targetBookId: 10, sourceBookIds: [12] }),
-      both,
+      every,
       expect.anything(),
     );
     expect(outcomes[1]).toEqual(expect.objectContaining({ keeperId: 10, status: 'done' }));
@@ -256,12 +261,16 @@ describe('BookDuplicateResolutionService', () => {
           },
         ],
       },
-      both,
+      every,
     );
     const outcomes = await finished(repo);
 
-    expect(merges.mergeWithinLease).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: 10, sourceBookIds: [11] }), both, expect.anything());
-    expect(books.deleteBooks).toHaveBeenCalledWith([12], both);
+    expect(merges.mergeWithinLease).toHaveBeenCalledWith(
+      expect.objectContaining({ targetBookId: 10, sourceBookIds: [11] }),
+      every,
+      expect.anything(),
+    );
+    expect(books.deleteBooks).toHaveBeenCalledWith([12], every);
     expect(links.link).not.toHaveBeenCalled();
     expect(outcomes[0]!.books).toEqual([
       { bookId: 11, action: 'merge', status: 'merged', reason: null },
@@ -292,7 +301,7 @@ describe('BookDuplicateResolutionService', () => {
       errorCode: 'MERGE_BLOCKED',
     });
 
-    await service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, both);
+    await service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, every);
     const outcomes = await finished(repo);
 
     expect(outcomes[0]).toEqual(expect.objectContaining({ status: 'skipped', reason: 'BOTH_HAVE_AUDIO' }));
@@ -310,11 +319,11 @@ describe('BookDuplicateResolutionService', () => {
           { groupId: 6, keeperId: 20, action: 'link' },
         ],
       },
-      mergeOnly,
+      linker,
     );
     const outcomes = await finished(repo);
 
-    expect(links.link).toHaveBeenNthCalledWith(1, { bookIds: [10, 11] }, mergeOnly);
+    expect(links.link).toHaveBeenNthCalledWith(1, { bookIds: [10, 11] }, linker);
     expect(outcomes[0]).toEqual(expect.objectContaining({ status: 'done' }));
     expect(outcomes[1]).toEqual(expect.objectContaining({ status: 'failed', reason: 'LINK_GROUP_FULL' }));
   });
@@ -358,11 +367,66 @@ describe('BookDuplicateResolutionService', () => {
     it('never deletes a book of another format', async () => {
       const { service } = setup({ 5: { kind: 'other_format', reasons: ['same_work'], members: [10, 11] } });
 
-      await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'delete' }] }, both)).rejects.toThrow(BadRequestException);
-      await expect(service.start({ scanId: 2, allGroups: { kind: 'other_format', keepRule: 'metadata', action: 'delete' } }, both)).rejects.toThrow(
+      await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'delete' }] }, every)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.start({ scanId: 2, allGroups: { kind: 'other_format', keepRule: 'metadata', action: 'delete' } }, every)).rejects.toThrow(
         BadRequestException,
       );
     });
+
+    it('links with the edit-metadata permission, not the merge permission', async () => {
+      const { service, repo, links } = setup({ 5: { kind: 'other_format', reasons: ['same_work'], members: [10, 11] } });
+
+      await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'link' }] }, mergeOnly)).rejects.toThrow(
+        ForbiddenException,
+      );
+      await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, linker)).rejects.toThrow(ForbiddenException);
+      expect(repo.create).not.toHaveBeenCalled();
+
+      await expect(service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'link' }] }, linker)).resolves.toEqual({
+        jobId: 70,
+        total: 1,
+      });
+      await finished(repo);
+      expect(links.link).toHaveBeenCalledWith({ bookIds: [10, 11] }, linker);
+    });
+
+    it('offers other editions link and merge, never delete', async () => {
+      const edition = { 5: { kind: 'other_edition' as const, reasons: ['title_author' as const], members: [10, 11] } };
+
+      const refused = setup(edition);
+      await expect(refused.service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'delete' }] }, every)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(
+        refused.service.start({ scanId: 2, allGroups: { kind: 'other_edition', keepRule: 'metadata', action: 'delete' } }, every),
+      ).rejects.toThrow(BadRequestException);
+
+      const linked = setup(edition);
+      await linked.service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'link' }] }, linker);
+      expect(await finished(linked.repo)).toEqual([expect.objectContaining({ status: 'done' })]);
+
+      const merged = setup(edition);
+      await merged.service.start({ scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }] }, mergeOnly);
+      expect(await finished(merged.repo)).toEqual([expect.objectContaining({ status: 'done' })]);
+    });
+  });
+
+  it('never picks an action for other editions on its own when every group is selected', async () => {
+    const { service, repo, duplicates, links, merges } = setup({});
+    repo.findResolvableGroups
+      .mockResolvedValueOnce([{ id: 5, kind: 'other_edition', reasons: ['same_work', 'title_author'] }])
+      .mockResolvedValueOnce([]);
+    duplicates.findCandidates.mockResolvedValue(new Map([[5, [candidate(10), candidate(11)]]]));
+
+    await service.start({ scanId: 2, allGroups: { kind: 'other_edition', keepRule: 'metadata' } }, every);
+    const outcomes = await finished(repo);
+
+    expect(repo.findResolvableGroups).toHaveBeenCalledWith(2, [1], every, expect.objectContaining({ kind: 'other_edition' }), 50);
+    expect(outcomes).toEqual([]);
+    expect(links.link).not.toHaveBeenCalled();
+    expect(merges.mergeWithinLease).not.toHaveBeenCalled();
   });
 
   it('resolves every matching group across pages with the shared keeper rule (H8)', async () => {
@@ -386,24 +450,28 @@ describe('BookDuplicateResolutionService', () => {
 
     await service.start(
       { scanId: 2, groups: [{ groupId: 5, keeperId: 10, action: 'merge' }], allGroups: { keepRule: 'metadata', excludeGroupIds: [9] } },
-      both,
+      every,
     );
     const outcomes = await finished(repo);
 
     expect(repo.findResolvableGroups).toHaveBeenCalledWith(
       2,
       [1],
-      both,
+      every,
       expect.objectContaining({ kind: 'duplicate', excludeGroupIds: [5, 9], afterGroupId: 0 }),
       50,
     );
-    expect(repo.findResolvableGroups).toHaveBeenCalledWith(2, [1], both, expect.objectContaining({ afterGroupId: 7 }), 50);
+    expect(repo.findResolvableGroups).toHaveBeenCalledWith(2, [1], every, expect.objectContaining({ afterGroupId: 7 }), 50);
     // Group 6 has no default, so the run leaves it out instead of reporting it.
     expect(outcomes.map((outcome) => [outcome.groupId, outcome.keeperId, outcome.status, outcome.reason])).toEqual([
       [5, 10, 'done', null],
       [7, 31, 'done', null],
     ]);
-    expect(merges.mergeWithinLease).toHaveBeenCalledWith(expect.objectContaining({ targetBookId: 31, sourceBookIds: [30] }), both, expect.anything());
+    expect(merges.mergeWithinLease).toHaveBeenCalledWith(
+      expect.objectContaining({ targetBookId: 31, sourceBookIds: [30] }),
+      every,
+      expect.anything(),
+    );
   });
 
   it('keeps groups with nothing to do out of the room, so a full run still reaches later groups', async () => {
@@ -418,7 +486,7 @@ describe('BookDuplicateResolutionService', () => {
     );
     repo.findMemberIds.mockResolvedValue(new Map([[60, [600, 601]]]));
 
-    await service.start({ scanId: 2, allGroups: { keepRule: 'metadata' } }, both);
+    await service.start({ scanId: 2, allGroups: { keepRule: 'metadata' } }, every);
     const outcomes = await finished(repo);
 
     expect(repo.findResolvableGroups).toHaveBeenCalledTimes(3);
@@ -444,7 +512,7 @@ describe('BookDuplicateResolutionService', () => {
       libraryId === 2 ? Promise.reject(new ForbiddenException('Insufficient library access level')) : Promise.resolve(),
     );
 
-    await service.start({ scanId: 2, allGroups: { keepRule: 'metadata' } }, both);
+    await service.start({ scanId: 2, allGroups: { keepRule: 'metadata' } }, every);
     const outcomes = await finished(repo);
 
     expect(outcomes.map((outcome) => outcome.groupId)).toEqual([6]);
@@ -474,7 +542,7 @@ describe('BookDuplicateResolutionService', () => {
       return Promise.resolve({ total: ids.length, books: [], omitted: 0 });
     });
 
-    await service.start({ scanId: 2, groups: requests }, both);
+    await service.start({ scanId: 2, groups: requests }, every);
     const outcomes = await finished(repo);
 
     expect(outcomes).toHaveLength(50);
@@ -494,7 +562,7 @@ describe('BookDuplicateResolutionService', () => {
   it('skips a group the scan does not hold and one with nothing chosen', async () => {
     const { service, repo } = setup({ 5: isbn([10, 11]) });
 
-    await service.start({ scanId: 2, groups: [{ groupId: 404, keeperId: 1, action: 'merge' }] }, both);
+    await service.start({ scanId: 2, groups: [{ groupId: 404, keeperId: 1, action: 'merge' }] }, every);
     const outcomes = await finished(repo);
 
     expect(outcomes).toEqual([{ groupId: 404, keeperId: 1, status: 'skipped', reason: 'STALE', books: [] }]);
@@ -503,14 +571,14 @@ describe('BookDuplicateResolutionService', () => {
   it('requires at least one group', async () => {
     const { service } = setup({});
 
-    await expect(service.start({ scanId: 2 }, both)).rejects.toThrow(BadRequestException);
+    await expect(service.start({ scanId: 2 }, every)).rejects.toThrow(BadRequestException);
   });
 
   it("hides another user's resolution", async () => {
     const { service, repo } = setup({});
     repo.find.mockResolvedValue({ id: 70, userId: 99 });
 
-    await expect(service.getJob(70, both)).rejects.toThrow(NotFoundException);
+    await expect(service.getJob(70, every)).rejects.toThrow(NotFoundException);
   });
 
   it('marks resolutions cut short by a restart as failed', async () => {

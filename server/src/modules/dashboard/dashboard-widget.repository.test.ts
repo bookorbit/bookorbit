@@ -21,6 +21,13 @@ function render(fragment: unknown) {
   return dialect.sqlToQuery(fragment as SQL);
 }
 
+/** Linked editions of one book are one work, so read-book totals count work keys rather than status rows. */
+const READ_WORKS = `count(distinct coalesce('g' || (SELECT bl.group_id FROM book_links bl WHERE bl.book_id = "user_book_status"."book_id"), 'b' || "user_book_status"."book_id"))::int`;
+
+function selectedField(db: { select: ReturnType<typeof vi.fn> }, call: number, field: string) {
+  return render((db.select.mock.calls[call]![0] as Record<string, unknown>)[field]).sql.replace(/\s+/g, ' ');
+}
+
 describe('computeLongestStreak', () => {
   it('returns 0 for empty set', () => {
     expect(computeLongestStreak(new Set())).toBe(0);
@@ -399,5 +406,40 @@ describe('DashboardWidgetRepository.getReadingDnaData', () => {
     expect(render(peakQuery.groupBy!.mock.calls[0]![0]).sql).toBe('1');
     expect(render(dailyQuery.where!.mock.calls[0]![0]).params).toContain('2026-03-27');
     expect(result.peakHour).toBe(20);
+    expect(selectedField(db, 0, 'total')).toBe(READ_WORKS);
+  });
+});
+
+describe('DashboardWidgetRepository.getChallengePatternData', () => {
+  it('counts linked editions once in the books-read, short-books and per-author totals', async () => {
+    const db = { select: vi.fn() };
+    db.select.mockImplementation(() => Object.assign(makeQuery([{ count: 0 }]), { as: vi.fn(() => ({ c: 0 })) }));
+    const repository = new DashboardWidgetRepository(db as never);
+    vi.spyOn(repository as unknown as { estimatePagesReadSince: () => Promise<unknown> }, 'estimatePagesReadSince').mockResolvedValue({
+      pagesRead: 0,
+      avgPageCount: 0,
+    });
+    vi.spyOn(repository, 'getReadingStreak').mockResolvedValue({ currentStreak: 0 } as never);
+    const month = { start: new Date('2026-11-01T06:00:00Z'), startDay: '2026-11-01', today: '2026-11-22' };
+
+    await repository.getChallengePatternData(1, [3], month, new Date('2026-05-01T06:00:00Z'));
+
+    // In build order: per-author counts, genres, stale, top author, books read, short books, ...
+    expect(render((db.select.mock.calls[0]![0] as { c: { sql: SQL } }).c.sql).sql.replace(/\s+/g, ' ')).toBe(READ_WORKS);
+    expect(selectedField(db, 4, 'count')).toBe(READ_WORKS);
+    expect(selectedField(db, 5, 'count')).toBe(READ_WORKS);
+    // Whether anything was finished this month needs no regrouping.
+    expect(selectedField(db, 8, 'count')).toBe('count(*)::int');
+  });
+});
+
+describe('DashboardWidgetRepository.getDiversityData', () => {
+  it('counts linked editions once in the books-read total', async () => {
+    const db = { select: vi.fn(() => makeQuery([{ count: 0 }])) };
+    const repository = new DashboardWidgetRepository(db as never);
+
+    await repository.getDiversityData(1, [3]);
+
+    expect(selectedField(db, 3, 'count')).toBe(READ_WORKS);
   });
 });

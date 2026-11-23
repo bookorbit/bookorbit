@@ -78,6 +78,8 @@ export const BOOK_MERGE_FIELDS = [
   "description",
   "publisher",
   "publishedYear",
+  "editionName",
+  "originalPublishedYear",
   "language",
   "pageCount",
   "series",

@@ -1,4 +1,4 @@
-import type { BookLinkGroup, BookLinkLeadRequest, BookLinkRequest } from '@bookorbit/types'
+import type { BookEditionSuggestions, BookLinkGroup, BookLinkLeadRequest, BookLinkRequest } from '@bookorbit/types'
 import { apiJson, apiSend, jsonBody } from '@/lib/api-json'
 
 export function linkBooks(body: BookLinkRequest): Promise<BookLinkGroup> {
@@ -11,4 +11,8 @@ export function setBookLinkLead(groupId: number, body: BookLinkLeadRequest): Pro
 
 export function unlinkBook(bookId: number): Promise<void> {
   return apiSend(`/api/v1/books/${bookId}/link`, { method: 'DELETE' }, 'book.link.errors.unlinkFailed')
+}
+
+export function fetchEditionSuggestions(bookId: number, signal?: AbortSignal): Promise<BookEditionSuggestions> {
+  return apiJson(`/api/v1/books/${bookId}/edition-suggestions`, { signal }, 'book.editions.suggestions.failed')
 }

@@ -13,17 +13,22 @@ import { BookDuplicateResolutionService } from './book-duplicate-resolution.serv
 import { BookDuplicatesController } from './book-duplicates.controller';
 import { BookDuplicatesRepository } from './book-duplicates.repository';
 import { BookDuplicatesService } from './book-duplicates.service';
+import { BookEditionSuggestionsController } from './book-edition-suggestions.controller';
+import { BookEditionSuggestionsRepository } from './book-edition-suggestions.repository';
+import { BookEditionSuggestionsService } from './book-edition-suggestions.service';
 import { DuplicateScanJobSource } from './duplicate-scan-job-source';
 
 @Module({
   imports: [LibraryModule, CommonModule, AuditModule, BookModule, BookMergeModule, BookLinkModule, JobsModule, ScannerModule],
-  controllers: [BookDuplicatesController],
+  controllers: [BookDuplicatesController, BookEditionSuggestionsController],
   providers: [
     BookDuplicatesService,
     BookDuplicatesRepository,
     BookDuplicateResolutionService,
     BookDuplicateResolutionRepository,
     DuplicateScanJobSource,
+    BookEditionSuggestionsService,
+    BookEditionSuggestionsRepository,
   ],
 })
 export class BookDuplicatesModule {}

@@ -316,6 +316,7 @@ describe('useAuthorBooks', () => {
       order: 'asc',
       libraryId: 7,
       collapseSeries: true,
+      collapseLinked: true,
     })
   })
 

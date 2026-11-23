@@ -20,6 +20,7 @@ function makeBookRow(id: number, overrides?: Partial<Parameters<typeof assembleB
     lockedFields: null,
     subtitle: null,
     publisher: null,
+    editionName: null,
     pageCount: null,
     isbn13: null,
     hardcoverId: null,
@@ -345,20 +346,22 @@ describe('assembleBookCards', () => {
     expect(card.narrators).toEqual([]);
   });
 
-  it('maps subtitle, publisher, pageCount, isbn13 from row', () => {
-    const rows = [makeBookRow(1, { subtitle: 'A Subtitle', publisher: 'Pub', pageCount: 300, isbn13: '9780000000000' })];
+  it('maps subtitle, publisher, edition name, pageCount, isbn13 from row', () => {
+    const rows = [makeBookRow(1, { subtitle: 'A Subtitle', publisher: 'Pub', editionName: 'Full Cast', pageCount: 300, isbn13: '9780000000000' })];
     const [card] = assembleBookCards(rows, [], [], [], []);
     expect(card.subtitle).toBe('A Subtitle');
     expect(card.publisher).toBe('Pub');
+    expect(card.editionName).toBe('Full Cast');
     expect(card.pageCount).toBe(300);
     expect(card.isbn13).toBe('9780000000000');
   });
 
-  it('returns null for subtitle, publisher, pageCount, isbn13 when absent', () => {
+  it('returns null for subtitle, publisher, edition name, pageCount, isbn13 when absent', () => {
     const rows = [makeBookRow(1)];
     const [card] = assembleBookCards(rows, [], [], [], []);
     expect(card.subtitle).toBeNull();
     expect(card.publisher).toBeNull();
+    expect(card.editionName).toBeNull();
     expect(card.pageCount).toBeNull();
     expect(card.isbn13).toBeNull();
   });
@@ -410,6 +413,7 @@ function makeCollapsedRow(id: number, overrides?: Record<string, unknown>) {
     lockedFields: null,
     subtitle: null,
     publisher: null,
+    editionName: null,
     pageCount: null,
     isbn13: null,
     bookCount: 3,

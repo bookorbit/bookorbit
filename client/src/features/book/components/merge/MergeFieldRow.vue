@@ -2,7 +2,7 @@
 import { computed, useId } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Lock } from '@lucide/vue'
-import type { BookMergeFieldPreview, BookMergeFieldValue } from '@bookorbit/types'
+import type { BookMergeField, BookMergeFieldPreview, BookMergeFieldValue } from '@bookorbit/types'
 import { formatLanguageName, formatList, formatNumber } from '@/i18n/formatters'
 import { isBlankMergeValue } from '@/features/book/lib/book-merge'
 
@@ -27,6 +27,8 @@ interface FieldOption {
   sources: string
 }
 
+const YEAR_FIELDS = new Set<BookMergeField>(['publishedYear', 'originalPublishedYear'])
+
 const label = computed(() => t(`book.merge.fields.${props.field.field}`))
 
 function plainText(html: string): string {
@@ -37,7 +39,7 @@ function displayValue(value: BookMergeFieldValue): string {
   if (value === null) return ''
   if (Array.isArray(value)) return formatList(value.map((entry) => entry.trim()).filter((entry) => entry.length > 0))
   if (typeof value === 'boolean') return value ? t('common.yes') : t('common.no')
-  if (typeof value === 'number') return props.field.field === 'publishedYear' ? String(value) : formatNumber(value)
+  if (typeof value === 'number') return YEAR_FIELDS.has(props.field.field) ? String(value) : formatNumber(value)
   if (props.field.field === 'language') return formatLanguageName(value)
   if (props.field.field === 'description') return plainText(value)
   return value

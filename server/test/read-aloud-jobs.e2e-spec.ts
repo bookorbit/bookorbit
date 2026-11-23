@@ -272,6 +272,13 @@ describe('Read-aloud jobs (e2e)', { timeout: 240_000 }, () => {
     worker.outcome = 'hang';
     const created = await call<ReadAloudJob>(owner, 'POST', `/books/${book.bookId}/read-aloud-jobs`, { epubFileId: book.epubFileId, language: 'en' });
     await waitForJob(created.body.id, (job) => job.status === 'processing' && job.stage !== 'queued');
+    // A claimed job leaves the queued stage before it is sent, so forgetting earlier would let the
+    // worker receive it afterwards and finish it as if nothing had been lost.
+    await waitForCondition(() =>
+      worker.requests.some((request) => request.method === 'POST' && request.body?.jobId === created.body.id)
+        ? Promise.resolve()
+        : Promise.reject(new Error('the worker has not received the job yet')),
+    );
     worker.outcome = 'aligned';
     worker.forgetJobs();
     await waitForJob(created.body.id, (job) => job.status === 'completed');

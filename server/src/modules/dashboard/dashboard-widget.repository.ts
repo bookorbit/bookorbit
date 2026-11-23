@@ -15,6 +15,7 @@ import type {
 } from '@bookorbit/types';
 
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 import {
   audiobookProgress,
@@ -558,8 +559,9 @@ export class DashboardWidgetRepository {
     const libFilter = inArray(books.libraryId, accessibleLibraryIds);
     const presentFilter = eq(books.status, 'present');
 
+    const readWorks = sql<number>`count(distinct ${workKeySql(userBookStatus.bookId)})::int`;
     const authorCountsSubq = this.db
-      .select({ c: sql<number>`count(${userBookStatus.bookId})::int`.as('c') })
+      .select({ c: readWorks.as('c') })
       .from(userBookStatus)
       .innerJoin(books, eq(books.id, userBookStatus.bookId))
       .innerJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
@@ -611,12 +613,12 @@ export class DashboardWidgetRepository {
         ),
       this.db.select({ count: sql<number>`coalesce(max(${authorCountsSubq.c}), 0)::int` }).from(authorCountsSubq),
       this.db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: readWorks })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read'), libFilter, presentFilter, ...cfClauses)),
       this.db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: readWorks })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .innerJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
@@ -943,7 +945,7 @@ export class DashboardWidgetRepository {
       this.db
         .select({
           avg: sql<number>`coalesce(avg(${bookMetadata.pageCount}), 0)::int`,
-          total: sql<number>`count(*)::int`,
+          total: sql<number>`count(distinct ${workKeySql(userBookStatus.bookId)})::int`,
         })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
@@ -1159,7 +1161,7 @@ export class DashboardWidgetRepository {
         .innerJoin(bookAuthors, eq(bookAuthors.bookId, books.id))
         .where(and(readFilter, libFilter, presentFilter, ...cfClauses)),
       this.db
-        .select({ count: sql<number>`count(*)::int` })
+        .select({ count: sql<number>`count(distinct ${workKeySql(userBookStatus.bookId)})::int` })
         .from(userBookStatus)
         .innerJoin(books, eq(books.id, userBookStatus.bookId))
         .where(and(readFilter, libFilter, presentFilter, ...cfClauses)),

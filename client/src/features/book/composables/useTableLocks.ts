@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { toast } from 'vue-sonner'
 import { BOOK_METADATA_LOCK_FIELDS, type BookMetadataLockField } from '@bookorbit/types'
+import { i18n } from '@/i18n'
 import { api } from '@/lib/api'
 
 type LockState = {
@@ -47,7 +48,7 @@ export function useTableLocks() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
       state.fields = previousFields
-      toast.error('Failed to update locks')
+      toast.error(i18n.global.t('book.table.locks.failed'))
     } finally {
       state.pending = false
     }

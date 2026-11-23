@@ -53,6 +53,8 @@ export function useBookDuplicates() {
   const kind = ref<BookDuplicateKind>('duplicate')
   const groups = ref<BookDuplicateGroup[]>([])
   const total = ref(0)
+  /** Open groups per tab as of the last page fetched; null until then, when the scan's own totals stand in. */
+  const kindTotals = ref<Record<BookDuplicateKind, number> | null>(null)
   const page = ref(1)
   const pageSize = ref(20)
   const reason = ref<BookDuplicateMatchReason | undefined>()
@@ -82,6 +84,7 @@ export function useBookDuplicates() {
   const permissions = computed<BookDuplicatePermissions>(() => ({
     canDelete: hasPermission(Permission.LibraryDeleteBooks),
     canMerge: hasPermission(Permission.LibraryMergeBooks),
+    canLink: hasPermission(Permission.LibraryEditMetadata),
   }))
   const canUseTool = computed(() => permissions.value.canDelete || permissions.value.canMerge)
 
@@ -98,17 +101,15 @@ export function useBookDuplicates() {
   }
 
   /** Merge and link need editor access to every book's library; the server refuses the rest. */
-  function editsEveryLibrary(group: BookDuplicateGroup): boolean {
-    return [...new Set(group.books.map((book) => book.libraryId))].every((libraryId) =>
-      hasLibraryPermission(Permission.LibraryMergeBooks, libraryId, 'editor'),
-    )
+  function editsEveryLibrary(group: BookDuplicateGroup, permission: Permission): boolean {
+    return [...new Set(group.books.map((book) => book.libraryId))].every((libraryId) => hasLibraryPermission(permission, libraryId, 'editor'))
   }
 
   /** What the user may choose for a group: the permission rule, less what the group itself cannot do (H3, H4, H11). */
   function actionsFor(group: BookDuplicateGroup): BookDuplicateAction[] {
     return allowedDuplicateActions(group.kind, permissions.value).filter((action) => {
-      if (action === 'merge') return editsEveryLibrary(group) && mergeAvailabilityFor(group).available
-      if (action === 'link') return editsEveryLibrary(group) && duplicateLinkAvailable(group.books)
+      if (action === 'merge') return editsEveryLibrary(group, Permission.LibraryMergeBooks) && mergeAvailabilityFor(group).available
+      if (action === 'link') return editsEveryLibrary(group, Permission.LibraryEditMetadata) && duplicateLinkAvailable(group.books)
       return true
     })
   }
@@ -165,6 +166,7 @@ export function useBookDuplicates() {
   function resetResults(): void {
     groups.value = []
     total.value = 0
+    kindTotals.value = null
     page.value = 1
     reason.value = undefined
     hiddenGroupIds.value = new Set()
@@ -267,6 +269,7 @@ export function useBookDuplicates() {
       }
       groups.value = response.groups
       total.value = response.total
+      kindTotals.value = response.kindTotals ?? null
       page.value = response.page
       loaded.value = true
     } catch {
@@ -283,7 +286,7 @@ export function useBookDuplicates() {
     await fetchGroups()
   }
 
-  /** Switches between duplicates and the same book in another format; each is its own list. */
+  /** Switches between duplicates, the same book in another format, and other editions; each is its own list. */
   async function setKind(value: BookDuplicateKind): Promise<void> {
     if (kind.value === value) return
     kind.value = value
@@ -387,10 +390,11 @@ export function useBookDuplicates() {
     hideGroup(groupId)
     try {
       await dismissBookDuplicateGroup({ scanId: scan.value.id, groupId })
-      await fetchDismissals()
     } catch {
       toast.error(t('tools.bookDuplicates.errors.dismiss'))
+      return
     }
+    await Promise.all([fetchDismissals(), fetchGroups()])
   }
 
   async function fetchDismissals(): Promise<void> {
@@ -408,7 +412,15 @@ export function useBookDuplicates() {
       toast.success(t('tools.bookDuplicates.dismissed.restored'))
     } catch {
       toast.error(t('tools.bookDuplicates.errors.restore'))
+      return
     }
+    // A group of the current scan holding the pair is open again, so it comes back without a rescan.
+    await fetchGroups()
+    const hidden = new Set(hiddenGroupIds.value)
+    for (const group of groups.value) {
+      if (group.kind === dismissalKind && [bookIdA, bookIdB].every((id) => group.books.some((book) => book.id === id))) hidden.delete(group.id)
+    }
+    if (hidden.size !== hiddenGroupIds.value.size) hiddenGroupIds.value = hidden
   }
 
   /**
@@ -469,6 +481,7 @@ export function useBookDuplicates() {
     kind,
     visibleGroups,
     total,
+    kindTotals,
     page,
     pageSize,
     reason,

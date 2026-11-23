@@ -13,6 +13,8 @@ export type AuthorSummary = {
   description?: string | null;
   imageUrl?: string | null;
   bookCount: number;
+  /** Books counted once per work: linked editions count as one. Absent from servers without `book-editions`. */
+  workCount?: number;
   lastAddedAt: string | null;
   /**
    * A book of theirs that has cover art, most recently added first. Only 19% of a

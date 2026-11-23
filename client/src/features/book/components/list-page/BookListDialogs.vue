@@ -44,6 +44,7 @@ function handleRemoveFromCollection() {
     :merge="page.mergeSelection"
     :link="page.linkSelection"
     :linked-selected="page.selectionHasLinked"
+    :other-editions="page.selectionOtherEditions"
     @send="page.openSendBook"
     @download="page.handleDownloadFiles"
     @export-metadata="page.openMetadataExport"
@@ -115,6 +116,7 @@ function handleRemoveFromCollection() {
     :open="page.deleteBookId !== null"
     :deleting="page.deletingBook"
     :linked="page.pendingDeleteLinked"
+    :editions="page.deleteEditions"
     @confirm="page.confirmDelete"
     @cancel="page.cancelDelete"
   />

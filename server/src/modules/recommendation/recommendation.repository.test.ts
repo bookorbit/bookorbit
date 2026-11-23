@@ -343,6 +343,86 @@ describe('RecommendationRepository', () => {
     expect(chains[1].limit).toHaveBeenCalledWith(25);
   });
 
+  it('folds a viewer’s series shelf to one edition per work, keeping the open book for its own work', async () => {
+    const fold = { status: 'present', lastReadAt: null };
+    const rows = [
+      {
+        bookId: 1,
+        title: 'Book 1',
+        coverAspectRatio: '2/3',
+        seriesIndex: '1',
+        coverSource: null,
+        primaryFormat: 'epub',
+        workKey: 'g4',
+        leadBookId: 1,
+        ...fold,
+      },
+      {
+        bookId: 2,
+        title: 'Book 1',
+        coverAspectRatio: '2/3',
+        seriesIndex: '1',
+        coverSource: null,
+        primaryFormat: 'm4b',
+        workKey: 'g4',
+        leadBookId: 1,
+        ...fold,
+      },
+      {
+        bookId: 3,
+        title: 'Book 2',
+        coverAspectRatio: '2/3',
+        seriesIndex: '2',
+        coverSource: null,
+        primaryFormat: 'epub',
+        workKey: 'g5',
+        leadBookId: 4,
+        ...fold,
+      },
+      {
+        bookId: 4,
+        title: 'Book 2',
+        coverAspectRatio: '2/3',
+        seriesIndex: '2',
+        coverSource: null,
+        primaryFormat: 'epub',
+        workKey: 'g5',
+        leadBookId: 4,
+        ...fold,
+      },
+    ];
+    const { db, chains } = makeDb([
+      { terminal: 'limit', result: rows },
+      { terminal: 'where', result: [] },
+    ]);
+    const repo = new RecommendationRepository(db);
+
+    const result = await repo.findSeriesBooks(88, [1], undefined, { userId: 7, openBookId: 2 });
+
+    expect(result.map((book) => book.bookId)).toEqual([2, 4]);
+    expect(chains[0].limit).toHaveBeenCalledWith(200);
+  });
+
+  it('folds a viewer’s author shelf to one edition per work', async () => {
+    const fold = { status: 'present', lastReadAt: null, sharedAuthors: 1, coverAspectRatio: '2/3', coverSource: null, primaryFormat: 'epub' };
+    const rows = [
+      { bookId: 10, title: 'Other', workKey: 'g9', leadBookId: 11, ...fold },
+      { bookId: 11, title: 'Other', workKey: 'g9', leadBookId: 11, ...fold },
+      { bookId: 12, title: 'Solo', workKey: 'b12', leadBookId: null, ...fold },
+    ];
+    const { db, chains } = makeDb([
+      { terminal: 'where', result: undefined },
+      { terminal: 'limit', result: rows },
+      { terminal: 'where', result: [] },
+    ]);
+    const repo = new RecommendationRepository(db);
+
+    const result = await repo.findAuthorBooks(1, [3], undefined, { userId: 7, openBookId: 1 });
+
+    expect(result.map((book) => book.bookId)).toEqual([11, 12]);
+    expect(chains[1].limit).toHaveBeenCalledWith(100);
+  });
+
   it('returns author books with empty authorNames when no authors exist', async () => {
     const rows = [{ bookId: 7, title: 'Anonymous Work', coverAspectRatio: '2/3', sharedAuthors: 1, coverSource: null, primaryFormat: null }];
     const { db } = makeDb([

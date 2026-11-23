@@ -47,6 +47,7 @@ const SECTION_OF: Partial<Record<DiffFieldKey, SectionId>> = {
   description: 'description',
   publisher: 'publication',
   publishedDate: 'publication',
+  originalPublishedYear: 'publication',
   language: 'publication',
   pageCount: 'publication',
   durationSeconds: 'publication',

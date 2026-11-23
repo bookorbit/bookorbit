@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { ref } from 'vue'
-import type { BookCard, BookLinkGroup, Library } from '@bookorbit/types'
+import type { BookCard, BookEditionSuggestion, BookLinkGroup, Library } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import LinkBooksSheet from '../LinkBooksSheet.vue'
 import type { LinkSeedBook } from '@/features/book/lib/book-link'
@@ -92,7 +92,7 @@ describe('LinkBooksSheet from a selection', () => {
     const list = sheet.get('[data-testid="link-books-list"]')
     expect(list.text()).toContain('In Ebooks')
     expect(list.text()).toContain('In Audiobooks')
-    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Link 2 books')
+    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Group 2 editions')
 
     await sheet.get('[data-testid="link-confirm"]').trigger('click')
     await flushPromises()
@@ -102,7 +102,7 @@ describe('LinkBooksSheet from a selection', () => {
     expect(init).toEqual(expect.objectContaining({ method: 'POST', body: JSON.stringify({ bookIds: [1, 2] }) }))
     expect(sheet.emitted('linked')).toEqual([[group]])
     expect(sheet.emitted('update:open')).toEqual([[false]])
-    expect(mocks.toast.success).toHaveBeenCalledWith('Linked 2 books')
+    expect(mocks.toast.success).toHaveBeenCalledWith('Grouped 2 editions')
   })
 
   it('counts selected books whose cards are not loaded', () => {
@@ -117,7 +117,7 @@ describe('LinkBooksSheet from a selection', () => {
     await sheet.get('[data-testid="link-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(sheet.get('[data-testid="link-error"]').text()).toBe('These books are linked with a book you cannot edit.')
+    expect(sheet.get('[data-testid="link-error"]').text()).toBe('One of these books is grouped with an edition you cannot edit.')
     expect(sheet.get('[data-testid="link-error"]').attributes('role')).toBe('alert')
     expect(sheet.emitted('linked')).toBeUndefined()
     expect(sheet.emitted('update:open')).toBeUndefined()
@@ -130,7 +130,44 @@ describe('LinkBooksSheet from a selection', () => {
     await sheet.get('[data-testid="link-confirm"]').trigger('click')
     await flushPromises()
 
-    expect(sheet.get('[data-testid="link-error"]').text()).toBe('The books could not be linked.')
+    expect(sheet.get('[data-testid="link-error"]').text()).toBe('The editions could not be grouped.')
+  })
+
+  it('names a full group in edition words, with the limit the server sent', async () => {
+    mocks.api.mockResolvedValue(json(409, { errorCode: 'LINK_GROUP_FULL', errorMeta: { max: 10 }, message: 'server text' }))
+    const sheet = mountSheet({ bookIds: [1, 2], books })
+
+    await sheet.get('[data-testid="link-confirm"]').trigger('click')
+    await flushPromises()
+
+    expect(sheet.get('[data-testid="link-error"]').text()).toBe('A book can have at most 10 editions. Remove some first.')
+  })
+
+  it('names the first book the main edition when none is grouped yet', () => {
+    const sheet = mountSheet({ bookIds: [1, 2], books })
+    const rows = sheet.get('[data-testid="link-books-list"]').findAll('li')
+    expect(rows[0]!.find('[data-testid="link-main-badge"]').exists()).toBe(true)
+    expect(rows[1]!.find('[data-testid="link-main-badge"]').exists()).toBe(false)
+  })
+
+  it('counts the editions a grouped book brings along and names no main edition of its own', () => {
+    const grouped = {
+      ...card(1, 2, 'Dune', 'epub'),
+      linked: { groupId: 7, books: [{ bookId: 9, libraryId: 3, formats: ['m4b'], mediaKind: 'audiobook' }], memberCount: 2 },
+    } as BookCard
+    const sheet = mountSheet({ bookIds: [1, 2], books: [grouped, card(2, 3, 'Dune', 'm4b')] })
+
+    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Group 3 editions')
+    expect(sheet.find('[data-testid="link-main-badge"]').exists()).toBe(false)
+  })
+
+  it('refuses a grouping that would pass the edition limit before asking the server', () => {
+    const others = Array.from({ length: 9 }, (_, i) => ({ bookId: 100 + i, libraryId: 3, formats: ['epub'], mediaKind: 'ebook' as const }))
+    const grouped = { ...card(1, 2, 'Dune', 'epub'), linked: { groupId: 7, books: others, memberCount: 10 } } as BookCard
+    const sheet = mountSheet({ bookIds: [1, 2], books: [grouped, card(2, 3, 'Dune', 'm4b')] })
+
+    expect(sheet.get('[data-testid="link-over-limit"]').text()).toBe('That makes 11 editions, more than the 10 a book can have.')
+    expect(sheet.get('[data-testid="link-confirm"]').attributes('disabled')).toBeDefined()
   })
 })
 
@@ -161,7 +198,7 @@ describe('LinkBooksSheet from the detail page', () => {
     const sheet = mountSheet({ bookIds: [1], picker: true, excludeIds: [5] })
     expect(sheet.find('[data-testid="link-books-list"]').exists()).toBe(false)
     expect(sheet.get('[data-testid="link-confirm"]').attributes('disabled')).toBeDefined()
-    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Link books')
+    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Group editions')
   })
 
   it('searches every library and offers only books in libraries the user can edit', async () => {
@@ -172,14 +209,13 @@ describe('LinkBooksSheet from the detail page', () => {
       { id: 3, name: 'Audiobooks', accessLevel: 'editor' },
       { id: 4, name: 'Shared', accessLevel: 'viewer' },
     ] as Library[]
-    mocks.api.mockResolvedValue(
-      json(200, {
-        items: [card(1, 2, 'Dune', 'epub'), card(2, 3, 'Dune', 'm4b'), card(3, 4, 'Dune', 'pdf'), card(5, 3, 'Dune', 'mp3')],
-        total: 4,
-        page: 0,
-        size: 20,
-      }),
-    )
+    const page = {
+      items: [card(1, 2, 'Dune', 'epub'), card(2, 3, 'Dune', 'm4b'), card(3, 4, 'Dune', 'pdf'), card(5, 3, 'Dune', 'mp3')],
+      total: 4,
+      page: 0,
+      size: 20,
+    }
+    mocks.api.mockImplementation(async (input) => json(200, String(input).endsWith('/edition-suggestions') ? { items: [] } : page))
     const sheet = mountSheet({ bookIds: [1], picker: true, excludeIds: [5] })
 
     await sheet.get('input[type="search"]').setValue('dune')
@@ -187,7 +223,7 @@ describe('LinkBooksSheet from the detail page', () => {
     await flushPromises()
     vi.useRealTimers()
 
-    const [url, init] = mocks.api.mock.calls[0]!
+    const [url, init] = mocks.api.mock.calls.find(([input]) => String(input) === '/api/v1/books/query')!
     expect(url).toBe('/api/v1/books/query')
     expect(JSON.parse(String(init?.body))).not.toHaveProperty('collapseLinked')
 
@@ -198,11 +234,100 @@ describe('LinkBooksSheet from the detail page', () => {
 
     await results.get('input[type="checkbox"]').setValue(true)
     await flushPromises()
-    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Link 2 books')
+    // The open book's existing edition (5) joins too, so the count covers all three.
+    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Group 3 editions')
 
     mocks.api.mockResolvedValue(json(200, group))
     await sheet.get('[data-testid="link-confirm"]').trigger('click')
     await flushPromises()
     expect(JSON.parse(String(mocks.api.mock.calls.at(-1)![1]?.body))).toEqual({ bookIds: [1, 2] })
+  })
+
+  function suggestion(book: BookCard, kind: BookEditionSuggestion['kind'], reasons: BookEditionSuggestion['reasons']): BookEditionSuggestion {
+    return { book, kind, reasons }
+  }
+
+  function serveSuggestions(items: BookEditionSuggestion[], page: BookCard[] = []) {
+    mocks.api.mockImplementation(async (input) =>
+      json(200, String(input).endsWith('/edition-suggestions') ? { items } : { items: page, total: page.length, page: 0, size: 20 }),
+    )
+  }
+
+  it('lists likely editions before anything is typed, each saying why, and groups a picked one', async () => {
+    libraries.value = [
+      { id: 2, name: 'Ebooks', accessLevel: 'editor' },
+      { id: 3, name: 'Audiobooks', accessLevel: 'editor' },
+      { id: 4, name: 'Shared', accessLevel: 'viewer' },
+    ] as Library[]
+    serveSuggestions([
+      suggestion(card(2, 3, 'Dune', 'm4b'), 'other_format', ['same_work', 'title_author']),
+      suggestion(card(6, 2, 'Dune', 'epub'), 'other_edition', ['title_author']),
+      suggestion(card(5, 3, 'Dune', 'mp3'), 'other_format', ['title_author']),
+      suggestion(card(3, 4, 'Dune', 'pdf'), 'other_edition', ['same_work']),
+    ])
+    const sheet = mountSheet({ bookIds: [1], picker: true, excludeIds: [5] })
+    await flushPromises()
+
+    expect(mocks.api.mock.calls[0]![0]).toBe('/api/v1/books/1/edition-suggestions')
+    const list = sheet.get('[data-testid="link-picker-suggestions"]')
+    expect(sheet.text()).toContain('Suggested editions')
+    expect(sheet.text()).not.toContain('Type to search your libraries.')
+    // A book already in the group and one in a viewer-only library are left out.
+    const rows = list.findAll('li')
+    expect(rows).toHaveLength(2)
+    expect(rows.map((row) => row.get('[data-testid="link-picker-suggestion-reason"]').text())).toEqual([
+      'Other formatSame work, title and author',
+      'Other editionSame title and author',
+    ])
+    expect(list.attributes('aria-labelledby')).toBe(sheet.get('h3').attributes('id'))
+
+    await rows[0]!.get('input[type="checkbox"]').setValue(true)
+    await flushPromises()
+    expect(sheet.get('[data-testid="link-confirm"]').text()).toBe('Group 3 editions')
+
+    mocks.api.mockResolvedValue(json(200, group))
+    await sheet.get('[data-testid="link-confirm"]').trigger('click')
+    await flushPromises()
+    expect(JSON.parse(String(mocks.api.mock.calls.at(-1)![1]?.body))).toEqual({ bookIds: [1, 2] })
+  })
+
+  it('swaps the suggestions for search results while a search is typed, and brings them back when it is cleared', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    serveSuggestions([suggestion(card(2, 3, 'Dune', 'm4b'), 'other_format', ['title_author'])], [card(7, 2, 'Dune Messiah', 'epub')])
+    const sheet = mountSheet({ bookIds: [1], picker: true })
+    await flushPromises()
+
+    await sheet.get('input[type="search"]').setValue('messiah')
+    await vi.advanceTimersByTimeAsync(400)
+    await flushPromises()
+    expect(sheet.find('[data-testid="link-picker-suggestions"]').exists()).toBe(false)
+    expect(sheet.get('[data-testid="link-picker-results"]').text()).toContain('Dune Messiah')
+    expect(sheet.text()).not.toContain('Suggested editions')
+
+    await sheet.get('input[type="search"]').setValue('')
+    await flushPromises()
+    vi.useRealTimers()
+    expect(sheet.get('[data-testid="link-picker-suggestions"]').findAll('li')).toHaveLength(1)
+  })
+
+  it('says it is looking while suggestions load, and keeps the search prompt when none are found or they fail', async () => {
+    let answer: (response: Response) => void = () => {}
+    mocks.api.mockImplementation(() => new Promise<Response>((resolve) => (answer = resolve)))
+    const sheet = mountSheet({ bookIds: [1], picker: true })
+    await flushPromises()
+    expect(sheet.find('[data-testid="link-picker-suggestions-loading"]').exists()).toBe(true)
+
+    answer(json(200, { items: [] }))
+    await flushPromises()
+    expect(sheet.find('[data-testid="link-picker-suggestions-loading"]').exists()).toBe(false)
+    expect(sheet.find('[data-testid="link-picker-suggestions"]').exists()).toBe(false)
+    expect(sheet.text()).toContain('Type to search your libraries.')
+
+    wrapper?.unmount()
+    mocks.api.mockResolvedValue(json(500, { message: 'boom' }))
+    const failed = mountSheet({ bookIds: [1], picker: true })
+    await flushPromises()
+    expect(failed.text()).toContain('Type to search your libraries.')
+    expect(failed.find('[role="alert"]').exists()).toBe(false)
   })
 })

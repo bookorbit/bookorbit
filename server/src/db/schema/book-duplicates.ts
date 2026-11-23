@@ -36,6 +36,7 @@ export const bookDuplicateScans = pgTable(
     totalExtraCopies: integer('total_extra_copies'),
     totalReclaimableBytes: bigint('total_reclaimable_bytes', { mode: 'number' }),
     totalOtherFormatPairs: integer('total_other_format_pairs'),
+    totalOtherEditionPairs: integer('total_other_edition_pairs'),
     errorCode: varchar('error_code', { length: 50 }),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
@@ -86,7 +87,7 @@ export const bookDuplicateGroups = pgTable(
     memberBytesMax: bigint('member_bytes_max', { mode: 'number' }).notNull().default(0),
   },
   (t) => [
-    // Other-format groups are pairs, and one ebook can pair with several audiobooks.
+    // Other-format and other-edition groups are pairs, and one book can pair with several others.
     uniqueIndex('book_duplicate_groups_scan_root_uidx')
       .on(t.scanId, t.rootBookId)
       .where(sql`${t.kind} = 'duplicate'`),
@@ -96,7 +97,7 @@ export const bookDuplicateGroups = pgTable(
     index('book_duplicate_groups_scan_reclaimable_idx').on(t.scanId, sql`(${t.memberBytesTotal} - ${t.memberBytesMax}) desc`),
     index('book_duplicate_groups_scan_confidence_idx').on(t.scanId, t.confidence),
     check('book_duplicate_groups_confidence_chk', sql`${t.confidence} between 1 and 4`),
-    check('book_duplicate_groups_kind_chk', sql`${t.kind} in ('duplicate', 'other_format')`),
+    check('book_duplicate_groups_kind_chk', sql`${t.kind} in ('duplicate', 'other_format', 'other_edition')`),
   ],
 );
 
@@ -123,7 +124,7 @@ export const bookDuplicateDismissals = pgTable(
     primaryKey({ columns: [t.userId, t.kind, t.bookIdA, t.bookIdB] }),
     index('book_duplicate_dismissals_user_created_idx').on(t.userId, sql`${t.createdAt} desc`),
     check('book_duplicate_dismissals_order_chk', sql`${t.bookIdA} < ${t.bookIdB}`),
-    check('book_duplicate_dismissals_kind_chk', sql`${t.kind} in ('duplicate', 'other_format')`),
+    check('book_duplicate_dismissals_kind_chk', sql`${t.kind} in ('duplicate', 'other_format', 'other_edition')`),
   ],
 );
 
@@ -150,7 +151,7 @@ export const bookDuplicatePairs = pgTable(
     index('book_duplicate_pairs_scan_a_idx').on(t.scanId, t.bookIdA),
     index('book_duplicate_pairs_scan_b_idx').on(t.scanId, t.bookIdB),
     check('book_duplicate_pairs_order_chk', sql`${t.bookIdA} < ${t.bookIdB}`),
-    check('book_duplicate_pairs_kind_chk', sql`${t.kind} in ('duplicate', 'other_format')`),
+    check('book_duplicate_pairs_kind_chk', sql`${t.kind} in ('duplicate', 'other_format', 'other_edition')`),
   ],
 );
 

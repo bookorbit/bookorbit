@@ -13,6 +13,7 @@ import {
   FileType,
   HardDrive,
   Hash,
+  History,
   Languages,
   Layers,
   Library,
@@ -54,6 +55,7 @@ export const SORT_FIELD_KINDS: Record<BrowseSortField, SortKind> = {
   seriesIndex: 'index',
   publishedDate: 'date',
   publishedYear: 'date',
+  originalPublishedYear: 'date',
   publisher: 'text',
   language: 'text',
   pageCount: 'number',
@@ -79,6 +81,7 @@ export const SORT_FIELD_ICONS: Record<BrowseSortField, Component> = {
   seriesIndex: ListOrdered,
   publishedDate: Calendar,
   publishedYear: CalendarDays,
+  originalPublishedYear: History,
   publisher: Building,
   language: Languages,
   pageCount: FileText,
@@ -94,7 +97,7 @@ export const SORT_FIELD_ICONS: Record<BrowseSortField, Component> = {
 export const SORT_FIELD_GROUPS: { key: Exclude<SortGroupKey, 'custom'>; fields: BrowseSortField[] }[] = [
   { key: 'common', fields: ['collectionOrder', 'title', 'author', 'series', 'addedAt', 'lastReadAt', 'rating'] },
   { key: 'reading', fields: ['readStatus', 'readProgress', 'startedAt', 'finishedAt'] },
-  { key: 'details', fields: ['seriesIndex', 'publishedDate', 'publishedYear', 'publisher', 'language', 'pageCount'] },
+  { key: 'details', fields: ['seriesIndex', 'publishedDate', 'publishedYear', 'originalPublishedYear', 'publisher', 'language', 'pageCount'] },
   { key: 'files', fields: ['format', 'fileSize', 'updatedAt', 'metadataScore'] },
   { key: 'other', fields: ['random'] },
 ]

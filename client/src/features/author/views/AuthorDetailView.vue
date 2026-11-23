@@ -175,6 +175,7 @@ type BookActionType = 'quick-view' | 'edit-metadata' | 'add-to-collection' | 'mo
 const {
   pendingId: deleteBookId,
   deleting: deletingBook,
+  editions: deleteEditions,
   promptDelete,
   cancelDelete,
   confirmDelete,
@@ -191,6 +192,7 @@ const {
     author.value = {
       ...author.value,
       bookCount: Math.max(0, author.value.bookCount - 1),
+      ...(author.value.workCount === undefined ? {} : { workCount: Math.max(0, author.value.workCount - 1) }),
     }
   }
 })
@@ -270,7 +272,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
   }
 
   if (action === 'delete') {
-    promptDelete(book.id)
+    promptDelete(book.id, book)
   }
 }
 
@@ -278,6 +280,9 @@ function handleBookUpdate(updated: BookCard) {
   const idx = books.value.findIndex((b) => b.id === updated.id)
   if (idx !== -1) books.value = books.value.map((b, i) => (i === idx ? updated : b))
 }
+
+// Folded editions count once, as in the header; collapsed series cards still speak for their books.
+const loadedBookCount = computed(() => (collapseSeries.value ? bookTotal.value : total.value))
 
 const collapseToggleLabel = computed(() => (collapseSeries.value ? t('views.bookView.expandSeries') : t('views.bookView.collapseSeries')))
 
@@ -855,7 +860,7 @@ defineOptions({ name: 'AuthorDetailView' })
           <div ref="sentinel" class="mt-4 flex h-8 items-center justify-center">
             <span v-if="loadingBooks" class="text-xs text-muted-foreground">{{ t('common.loading') }}</span>
             <span v-else-if="!hasMore && books.length > 0" class="text-xs text-muted-foreground">{{
-              t('author.detail.books.allLoaded', { total: formatNumber(bookTotal) })
+              t('author.detail.books.allLoaded', { total: formatNumber(loadedBookCount) })
             }}</span>
           </div>
         </section>
@@ -883,6 +888,12 @@ defineOptions({ name: 'AuthorDetailView' })
       @cancel="confirmMergeOpen = false"
     />
 
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+    <DeleteBookDialog
+      :open="deleteBookId !== null"
+      :deleting="deletingBook"
+      :editions="deleteEditions"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>

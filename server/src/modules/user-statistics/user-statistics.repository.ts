@@ -25,6 +25,7 @@ import {
 } from '../../common/utils/reading-daily-stats.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 import {
   bookFiles,
@@ -477,7 +478,7 @@ export class UserStatisticsRepository {
         trackedBooks: sql<number>`count(*)::int`,
         startedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} in ('reading', 'on_hold', 'rereading', 'read', 'skimmed', 'abandoned'))::int`,
         inProgressBooks: sql<number>`count(*) filter (where ${userBookStatus.status} in ('reading', 'on_hold', 'rereading'))::int`,
-        completedBooks: sql<number>`count(*) filter (where ${userBookStatus.status} = 'read')::int`,
+        completedBooks: sql<number>`count(distinct ${workKeySql(userBookStatus.bookId)}) filter (where ${userBookStatus.status} = 'read')::int`,
       })
       .from(userBookStatus)
       .innerJoin(books, eq(books.id, userBookStatus.bookId))

@@ -122,7 +122,7 @@ describe('useTableLocks', () => {
       await toggleField(1, 'title')
 
       expect(isLocked(1, 'title')).toBe(false)
-      expect(toastMock.error).toHaveBeenCalledWith('Failed to update locks')
+      expect(toastMock.error).toHaveBeenCalledWith('Could not update the locks')
     })
 
     it('reverts optimistic update on non-ok HTTP response', async () => {
@@ -133,7 +133,7 @@ describe('useTableLocks', () => {
       await toggleField(1, 'title')
 
       expect(isLocked(1, 'title')).toBe(false)
-      expect(toastMock.error).toHaveBeenCalledWith('Failed to update locks')
+      expect(toastMock.error).toHaveBeenCalledWith('Could not update the locks')
     })
 
     it('sends PATCH request with correct locked fields', async () => {
@@ -206,7 +206,7 @@ describe('useTableLocks', () => {
       await lockAll(1)
 
       expect(getFields(1)).toEqual(['title'])
-      expect(toastMock.error).toHaveBeenCalledWith('Failed to update locks')
+      expect(toastMock.error).toHaveBeenCalledWith('Could not update the locks')
     })
   })
 
@@ -240,7 +240,7 @@ describe('useTableLocks', () => {
       await unlockAll(1)
 
       expect(getFields(1)).toEqual(['title', 'cover'])
-      expect(toastMock.error).toHaveBeenCalledWith('Failed to update locks')
+      expect(toastMock.error).toHaveBeenCalledWith('Could not update the locks')
     })
   })
 

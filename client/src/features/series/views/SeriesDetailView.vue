@@ -180,6 +180,7 @@ const quickViewOpen = ref(false)
 const {
   pendingId: deleteBookId,
   deleting: deletingBook,
+  editions: deleteEditions,
   promptDelete,
   cancelDelete,
   confirmDelete,
@@ -203,7 +204,7 @@ function handleBookAction(book: BookCard, action: BookActionType) {
   }
 
   if (action === 'delete') {
-    promptDelete(book.id)
+    promptDelete(book.id, book)
     return
   }
 }
@@ -322,6 +323,7 @@ async function loadLeadBookPreview(preserveCurrent = false) {
       sort: 'seriesIndex',
       order: 'asc',
       libraryId: libraryId.value,
+      collapseLinked: true,
     })
 
     if (token !== leadBookRequestToken) return
@@ -760,7 +762,13 @@ defineOptions({ name: 'SeriesDetailView' })
       @action="quickViewBookId !== null && handleBookAction({ id: quickViewBookId } as BookCard, $event)"
     />
 
-    <DeleteBookDialog :open="deleteBookId !== null" :deleting="deletingBook" @confirm="confirmDelete" @cancel="cancelDelete" />
+    <DeleteBookDialog
+      :open="deleteBookId !== null"
+      :deleting="deletingBook"
+      :editions="deleteEditions"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+    />
   </div>
 </template>
 

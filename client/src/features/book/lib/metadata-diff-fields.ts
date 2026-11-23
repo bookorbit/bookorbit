@@ -47,6 +47,7 @@ export type DiffFieldKey =
   | 'publisher'
   | 'publishedDate'
   | 'publishedYear'
+  | 'originalPublishedYear'
   | 'language'
   | 'pageCount'
   | 'communityRating'
@@ -75,6 +76,7 @@ export const FIELD_DEFS: { key: DiffFieldKey; labelKey: string }[] = (
     'description',
     'publisher',
     'publishedDate',
+    'originalPublishedYear',
     'language',
     'pageCount',
     'communityRating',
@@ -442,6 +444,8 @@ export function classifyField(key: DiffFieldKey, current: MetadataSource, candid
       return classifyLanguage(current.language ?? '', candidate.language ?? '')
     case 'pageCount':
       return classifyNumber(current.pageCount, candidate.pageCount)
+    case 'originalPublishedYear':
+      return classifyNumber(current.originalPublishedYear, candidate.originalPublishedYear)
     case 'durationSeconds':
       return classifyNumber(current.durationSeconds, candidate.durationSeconds)
     case 'seriesIndex':

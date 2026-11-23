@@ -1,7 +1,20 @@
 import { ref } from 'vue'
-import type { BookLinkGroup } from '@bookorbit/types'
-import { errorMessage } from '@/lib/api-json'
+import { BOOK_LINK_MAX_MEMBERS, type BookLinkGroup } from '@bookorbit/types'
+import { i18n } from '@/i18n'
+import { ApiError, errorMessage } from '@/lib/api-json'
 import { linkBooks, setBookLinkLead, unlinkBook } from '../api/book-link'
+
+/** The server's link refusals, worded for editions; the shared catalog entries still say "link". */
+function editionsMessage(reason: unknown, fallbackKey: string): string {
+  if (reason instanceof ApiError) {
+    if (reason.errorCode === 'LINK_GROUP_FULL') {
+      const max = Number(reason.errorMeta.max ?? BOOK_LINK_MAX_MEMBERS)
+      return i18n.global.t('book.editions.errors.full', { max }, max)
+    }
+    if (reason.errorCode === 'LINK_GROUP_NOT_EDITABLE') return i18n.global.t('book.editions.errors.notEditable')
+  }
+  return errorMessage(reason, fallbackKey)
+}
 
 /**
  * The three link requests with one in-flight flag, so a menu or sheet never sends twice. Each
@@ -19,7 +32,7 @@ export function useBookLinkActions() {
     try {
       return await request()
     } catch (reason) {
-      error.value = errorMessage(reason, fallbackKey)
+      error.value = editionsMessage(reason, fallbackKey)
       return null
     } finally {
       pending.value = false
@@ -27,19 +40,19 @@ export function useBookLinkActions() {
   }
 
   function link(bookIds: number[]): Promise<BookLinkGroup | null> {
-    return run(() => linkBooks({ bookIds: [...new Set(bookIds)] }), 'book.link.errors.linkFailed')
+    return run(() => linkBooks({ bookIds: [...new Set(bookIds)] }), 'book.editions.errors.groupFailed')
   }
 
   async function unlink(bookId: number): Promise<boolean> {
     const done = await run(async () => {
       await unlinkBook(bookId)
       return true
-    }, 'book.link.errors.unlinkFailed')
+    }, 'book.editions.errors.removeFailed')
     return done === true
   }
 
   function makeLead(groupId: number, leadBookId: number): Promise<BookLinkGroup | null> {
-    return run(() => setBookLinkLead(groupId, { leadBookId }), 'book.link.errors.leadFailed')
+    return run(() => setBookLinkLead(groupId, { leadBookId }), 'book.editions.errors.mainFailed')
   }
 
   function clearError(): void {

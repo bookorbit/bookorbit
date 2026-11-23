@@ -19,6 +19,7 @@ const CANDIDATE_FIELDS: Record<keyof MetadataCandidate, CacheFieldKind> = {
   publisher: 'string',
   publishedDate: 'string',
   publishedYear: 'number',
+  originalPublishedYear: 'number',
   language: 'string',
   pageCount: 'number',
   isbn10: 'string',

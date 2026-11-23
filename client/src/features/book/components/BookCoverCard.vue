@@ -5,6 +5,8 @@ import BookCardFormatBadges from './BookCardFormatBadges.vue'
 import BookCardFormatList from './BookCardFormatList.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
+import { cardEditionCount } from '../lib/book-editions'
+import { formatNumber } from '@/i18n/formatters'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import {
@@ -17,6 +19,7 @@ import {
   FolderInput,
   FolderPlus,
   Image,
+  Layers,
   Lock,
   LockOpen,
   Loader2,
@@ -177,6 +180,11 @@ const seriesPositionLabel = computed(() => {
   if (index == null) return ''
   return `#${index}`
 })
+/** Other editions this viewer can see stand behind the card; the pill says how many in all. */
+const editionCount = computed(() => cardEditionCount(props.book))
+const menuLabel = computed(() => t('book.card.moreActions', { title: props.book.title?.trim() || t('book.untitled') }))
+const showEditionsPill = computed(() => editionCount.value > 0 && !props.selectionMode && !isMissing.value)
+
 const seriesPositionTooltip = computed(() => {
   const label = seriesPositionLabel.value
   return props.book.seriesName ? `${props.book.seriesName} ${label}` : label
@@ -571,6 +579,25 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                 <p>{{ seriesPositionTooltip }}</p>
               </TooltipContent>
             </Tooltip>
+
+            <Tooltip v-if="showEditionsPill">
+              <TooltipTrigger as-child>
+                <div
+                  data-card-click-blocker
+                  data-testid="card-editions-pill"
+                  class="pointer-events-auto flex items-center gap-[3px] bg-black/60 rounded-full px-1.5 py-0.5 transition-opacity duration-150 cursor-default"
+                  :class="showMobileOverlay ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0 group-hover:pointer-events-none'"
+                  role="img"
+                  :aria-label="t('book.editions.card.count', { count: editionCount })"
+                >
+                  <Layers class="size-[9px] text-white" aria-hidden="true" />
+                  <span class="text-[9px] font-bold text-white leading-none" aria-hidden="true">{{ formatNumber(editionCount) }}</span>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <p>{{ t('book.editions.card.count', { count: editionCount }) }}</p>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <!-- Bottom-left overlay: rating -->
@@ -708,7 +735,10 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
             <div v-if="!showBelowCoverLabelArea" class="absolute bottom-2 right-2 z-20">
               <DropdownMenu>
                 <DropdownMenuTrigger as-child>
-                  <button class="px-0.75 py-1.5 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0">
+                  <button
+                    class="px-0.75 py-1.5 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0"
+                    :aria-label="menuLabel"
+                  >
                     <MoreVertical class="size-3.5" />
                   </button>
                 </DropdownMenuTrigger>
@@ -864,7 +894,11 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
         <div v-else class="flex-1" />
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
-            <button class="shrink-0 p-0.5 rounded-xs text-muted-foreground hover:text-foreground transition-colors" data-testid="grid-card-kebab">
+            <button
+              class="shrink-0 p-0.5 rounded-xs text-muted-foreground hover:text-foreground transition-colors"
+              data-testid="grid-card-kebab"
+              :aria-label="menuLabel"
+            >
               <MoreVertical class="size-3.5" />
             </button>
           </DropdownMenuTrigger>

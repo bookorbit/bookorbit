@@ -2,9 +2,10 @@
 import { computed, onScopeDispose, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import type { KoboDevice, ReadAloudDeliveryPreference } from '@bookorbit/types'
+import type { BookCard, KoboDevice, ReadAloudDeliveryPreference } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
 import { useGlobalSearch } from '@/features/book/composables/useGlobalSearch'
+import { cardEditionDetail } from '@/features/book/lib/book-editions'
 import { useKoboReplacement } from '../composables/useKoboReplacement'
 import ReadAloudDeliverySelect from './ReadAloudDeliverySelect.vue'
 
@@ -19,6 +20,13 @@ watch(query, () => {
   bookId.value = null
 })
 const { results, loading, settled, hasMore, loadMore, clear } = useGlobalSearch(query)
+
+/** Every edition is offered, so each option names its edition beside the shared title. */
+function bookOptionLabel(book: BookCard): string {
+  const title = book.title ?? ''
+  const edition = cardEditionDetail(book)
+  return edition ? t('delivery.readAloud.bookOption', { title, edition }) : title
+}
 onScopeDispose(clear)
 const { replacement, busy, failed, alreadyOnDevice, prepare, transition, refresh } = useKoboReplacement(deviceId, bookId)
 const locked = computed(() => busy.value || (!!replacement.value && !['cancelled', 'user_confirmed'].includes(replacement.value.state)))
@@ -76,7 +84,7 @@ async function handleCancel() {
           class="select-field w-full text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           <option :value="null">{{ t('delivery.readAloud.chooseBook') }}</option>
-          <option v-for="book in results" :key="book.id" :value="book.id">{{ book.title }}</option>
+          <option v-for="book in results" :key="book.id" :value="book.id">{{ bookOptionLabel(book) }}</option>
         </select>
         <p v-if="loading" role="status" class="text-sm text-muted-foreground">{{ t('common.loading') }}</p>
         <p v-else-if="settled && !results.length" role="status" class="text-sm text-muted-foreground">{{ t('delivery.readAloud.noResults') }}</p>

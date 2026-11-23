@@ -26,6 +26,8 @@ const ROOT_FIELDS = [
   'publisher',
   'publishedDate',
   'publishedYear',
+  'editionName',
+  'originalPublishedYear',
   'language',
   'pageCount',
   'isbn10',
@@ -155,6 +157,8 @@ export function useMetadataEditor() {
     publisher: null as string | null,
     publishedDate: null as string | null,
     publishedYear: null as number | null,
+    editionName: null as string | null,
+    originalPublishedYear: null as number | null,
     language: null as string | null,
     pageCount: null as number | null,
     communityRatings: [] as BookCommunityRating[],
@@ -215,6 +219,8 @@ export function useMetadataEditor() {
     form.publisher = book.publisher
     form.publishedDate = book.publishedDate
     form.publishedYear = book.publishedYear
+    form.editionName = book.editionName ?? null
+    form.originalPublishedYear = book.originalPublishedYear ?? null
     form.language = book.language
     form.pageCount = book.pageCount
     form.communityRatings = [...book.communityRatings]

@@ -587,6 +587,8 @@ export class BookMetadataFetchQueueRepository {
         return sql`(${bookMetadata.publisher} IS NULL OR ${bookMetadata.publisher} = '')`;
       case 'publishedYear':
         return sql`${bookMetadata.publishedYear} IS NULL`;
+      case 'originalPublishedYear':
+        return sql`${bookMetadata.originalPublishedYear} IS NULL`;
       case 'language':
         return sql`(${bookMetadata.language} IS NULL OR ${bookMetadata.language} = '')`;
       case 'pageCount':

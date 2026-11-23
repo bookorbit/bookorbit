@@ -77,6 +77,7 @@ describe('mapSearchDocument', () => {
       pageCount: 662,
       publishedDate: '2007-03-27',
       publishedYear: 2007,
+      originalPublishedYear: 2007,
       isbn13: '9780756404079',
       isbn10: '0756404079',
       genres: ['Fantasy', 'Fiction'],
@@ -297,6 +298,7 @@ describe('mapBookWithEditions', () => {
       pageCount: 662,
       publishedDate: '2007-03-27',
       publishedYear: 2007,
+      originalPublishedYear: 2007,
       isbn10: '0756404079',
       isbn13: '9780756404079',
       genres: ['Fantasy', 'Fiction'],
@@ -309,6 +311,27 @@ describe('mapBookWithEditions', () => {
       coverShape: 'portrait',
       sourceUrl: 'https://hardcover.app/books/the-name-of-the-wind',
     });
+  });
+
+  it("takes the first published year from the book, apart from the edition's own year", () => {
+    const book: HardcoverBookWithEditions = {
+      ...baseBook,
+      release_year: 1954,
+      release_date: '1954-07-29',
+      editions: [{ ...baseBook.editions![0], release_year: 2020, release_date: '2020-09-01' }],
+    };
+
+    const [result] = mapBookWithEditions(book);
+
+    expect(result).toMatchObject({ publishedYear: 2020, publishedDate: '2020-09-01', originalPublishedYear: 1954 });
+  });
+
+  it("falls back to the book's release date for the first published year, and drops an out-of-range one", () => {
+    const fromDate: HardcoverBookWithEditions = { ...baseBook, release_year: undefined, release_date: '1954-07-29' };
+    const outOfRange: HardcoverBookWithEditions = { ...baseBook, release_year: 19, release_date: undefined };
+
+    expect(mapBookWithEditions(fromDate)[0]?.originalPublishedYear).toBe(1954);
+    expect(mapBookWithEditions(outOfRange)[0]?.originalPublishedYear).toBeUndefined();
   });
 
   it('returns empty array when editions is absent', () => {

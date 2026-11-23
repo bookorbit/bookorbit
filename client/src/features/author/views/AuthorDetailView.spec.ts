@@ -348,6 +348,7 @@ describe('AuthorDetailView', () => {
 
     it('counts books rather than rows in the all-loaded label', async () => {
       // 2 collapsed rows standing for 200 books: the reader should be told about the books.
+      mocks.collapsePreference = true
       mocks.total = ref(2)
       mocks.bookTotal = ref(200)
       mocks.hasMore = ref(false)
@@ -355,6 +356,18 @@ describe('AuthorDetailView', () => {
       const wrapper = await mountView()
 
       expect(wrapper.text()).toContain(i18n.global.t('author.detail.books.allLoaded', { total: '200' }))
+    })
+
+    it('counts folded editions once in the all-loaded label', async () => {
+      // One work with five editions, folded into one card: the header says 1, so does the footer.
+      mocks.total = ref(1)
+      mocks.bookTotal = ref(5)
+      mocks.hasMore = ref(false)
+
+      const wrapper = await mountView()
+
+      expect(wrapper.text()).toContain(i18n.global.t('author.detail.books.allLoaded', { total: '1' }))
+      expect(wrapper.text()).not.toContain(i18n.global.t('author.detail.books.allLoaded', { total: '5' }))
     })
   })
 

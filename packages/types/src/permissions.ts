@@ -46,7 +46,7 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   [Permission.LibraryUpload]: "Upload books",
   [Permission.LibraryEditMetadata]: "Edit metadata",
   [Permission.LibraryDeleteBooks]: "Delete books",
-  [Permission.LibraryMergeBooks]: "Merge and link books",
+  [Permission.LibraryMergeBooks]: "Merge books",
   [Permission.LibraryGenerateReadAloud]: "Generate read-aloud books",
   [Permission.LibraryGenerateStoryGuide]: "Build story guides",
   [Permission.BookDockAccess]: "Library Dock",

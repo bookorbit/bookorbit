@@ -75,6 +75,7 @@ function permissionsOf(user: RequestUser): BookDuplicatePermissions {
   return {
     canDelete: user.isSuperuser || user.permissions.includes(Permission.LibraryDeleteBooks),
     canMerge: user.isSuperuser || user.permissions.includes(Permission.LibraryMergeBooks),
+    canLink: user.isSuperuser || user.permissions.includes(Permission.LibraryEditMetadata),
   };
 }
 
@@ -301,7 +302,7 @@ export class BookDuplicateResolutionService implements OnApplicationBootstrap {
 
   private assertAllowed(kind: BookDuplicateKind, action: BookDuplicateAction, permissions: BookDuplicatePermissions): void {
     if (allowedDuplicateActions(kind, permissions).includes(action)) return;
-    if (action === 'delete' && kind !== 'duplicate') throw new BadRequestException('Books of another format are never deleted from this tool');
+    if (action === 'delete' && kind !== 'duplicate') throw new BadRequestException('Only duplicate copies are ever deleted from this tool');
     throw new ForbiddenException(`The ${action} action needs a permission this account does not have`);
   }
 

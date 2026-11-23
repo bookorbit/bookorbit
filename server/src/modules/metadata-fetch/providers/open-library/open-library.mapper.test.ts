@@ -29,6 +29,7 @@ describe('OpenLibraryMapper', () => {
         title: 'The Great Gatsby',
         authors: ['F. Scott Fitzgerald'],
         publishedYear: 1925,
+        originalPublishedYear: 1925,
         isbn10: '1234567890',
         isbn13: '1234567890123',
         publisher: "Charles Scribner's Sons",
@@ -57,6 +58,13 @@ describe('OpenLibraryMapper', () => {
       expect(result.authors).toBeUndefined();
       expect(result.isbn10).toBeUndefined();
       expect(result.coverUrl).toBeUndefined();
+    });
+
+    it('keeps the search year as published year and leaves an out-of-range one out of the first published year', () => {
+      const result = mapOpenLibraryDoc({ key: '/works/OL1W', title: 'Odd Year', first_publish_year: 19 } as OpenLibraryDoc);
+
+      expect(result.publishedYear).toBe(19);
+      expect(result.originalPublishedYear).toBeUndefined();
     });
 
     it('should slice genres to 10 items', () => {
@@ -94,6 +102,7 @@ describe('OpenLibraryMapper', () => {
         title: 'The Great Gatsby',
         description: 'A classic novel.',
         publishedYear: 1925,
+        originalPublishedYear: 1925,
         genres: ['Fiction'],
         coverUrl: 'https://covers.openlibrary.org/b/id/12345-L.jpg',
         sourceUrl: 'https://openlibrary.org/works/OL12345W',
@@ -115,6 +124,12 @@ describe('OpenLibraryMapper', () => {
       expect(result.description).toBe('This is the description value.');
     });
 
+    it('fills the first published year from a full first publish date, as it fills the published year', () => {
+      const result = mapOpenLibraryWork({ key: '/works/OL1W', title: 'Dated', first_publish_date: '1925-04-10' } as OpenLibraryWork);
+
+      expect(result).toMatchObject({ publishedDate: '1925-04-10', publishedYear: 1925, originalPublishedYear: 1925 });
+    });
+
     it('should handle missing publish date or invalid format', () => {
       const mockWork: Partial<OpenLibraryWork> = {
         key: '/works/OL1',
@@ -125,6 +140,7 @@ describe('OpenLibraryMapper', () => {
       const result = mapOpenLibraryWork(mockWork as OpenLibraryWork);
 
       expect(result.publishedYear).toBeUndefined();
+      expect(result.originalPublishedYear).toBeUndefined();
     });
 
     it('should return undefined for a sub-4-digit publish date', () => {

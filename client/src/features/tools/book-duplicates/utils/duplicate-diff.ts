@@ -1,4 +1,4 @@
-import type { BookDuplicateCandidate, BookDuplicateGroup, BookDuplicateMatchReason } from '@bookorbit/types'
+import type { BookDuplicateCandidate, BookDuplicateGroup, BookDuplicateKind, BookDuplicateMatchReason } from '@bookorbit/types'
 
 import { copyBytes, copyFormats } from './duplicate-keeper'
 
@@ -94,11 +94,17 @@ const REASON_RANK: Record<BookDuplicateMatchReason, number> = {
   series_position: 1,
 }
 
+const WEAKEST_REASON: Record<BookDuplicateKind, BookDuplicateMatchReason> = {
+  duplicate: 'fuzzy_metadata',
+  other_format: 'series_position',
+  other_edition: 'title_author',
+}
+
 /** Reasons strongest first, so a group leads with the one that decides how much judgement it needs. */
 export function rankedReasons(reasons: BookDuplicateMatchReason[]): BookDuplicateMatchReason[] {
   return [...reasons].sort((a, b) => REASON_RANK[b] - REASON_RANK[a])
 }
 
 export function strongestReason(group: BookDuplicateGroup): BookDuplicateMatchReason {
-  return rankedReasons(group.reasons)[0] ?? (group.kind === 'other_format' ? 'series_position' : 'fuzzy_metadata')
+  return rankedReasons(group.reasons)[0] ?? WEAKEST_REASON[group.kind]
 }

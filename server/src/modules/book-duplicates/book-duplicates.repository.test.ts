@@ -187,6 +187,80 @@ describe('BookDuplicatesRepository', () => {
     expect(rendered.params).toEqual([9, 9, 0.9]);
   });
 
+  it('pairs same-medium books by shared work id as edition candidates, leaving duplicate pairs to the duplicate passes', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 4 });
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
+
+    await expect(repo.createSameMediumWorkPairs(9)).resolves.toBe(4);
+
+    expect(renderSql(execute.mock.calls[0]![0]).sql).toBe('SET LOCAL statement_timeout = 600000');
+    const query = renderSql(execute.mock.calls[1]![0]).sql.replace(/\s+/g, ' ');
+    expect(query).toContain("first_key.kind = 'of_work'");
+    expect(query).toContain('second_key.value = first_key.value');
+    expect(query).toContain('second_key.book_id > first_key.book_id');
+    expect(query).toContain("'other_edition', matched.book_id_a, matched.book_id_b, ARRAY['same_work']::text[]");
+    expect(query).toContain("existing.kind = 'duplicate'");
+  });
+
+  it('removes pairs of books already linked together from every kind', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 2 });
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
+
+    await expect(repo.deleteLinkedPairs(9)).resolves.toBe(2);
+
+    const query = renderSql(execute.mock.calls[1]![0]).sql.replace(/\s+/g, ' ');
+    expect(query).toContain('DELETE FROM "book_duplicate_pairs" pair WHERE pair.scan_id = $1 AND EXISTS');
+    expect(query).toContain('JOIN book_links link_b ON link_b.group_id = link_a.group_id');
+    expect(query).not.toContain('pair.kind');
+  });
+
+  it('pages edition candidates by pair key and never offers identical files or a shared ISBN', async () => {
+    const execute = vi.fn().mockResolvedValue({ rows: [] });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await repo.findEditionCandidatePairs(9, { bookIdA: 3, bookIdB: 8 }, 500);
+
+    const rendered = renderSql(execute.mock.calls[0]![0]);
+    const query = rendered.sql.replace(/\s+/g, ' ');
+    expect(query).toContain("pair.kind = 'other_edition'");
+    expect(query).toContain("NOT ('file_hash' = ANY(pair.reasons)) AND NOT ('isbn' = ANY(pair.reasons))");
+    expect(query).toContain('(pair.book_id_a, pair.book_id_b) > ($2::integer, $3::integer)');
+    expect(query).toContain('ORDER BY pair.book_id_a, pair.book_id_b LIMIT $4');
+    expect(rendered.params).toEqual([9, 3, 8, 500]);
+  });
+
+  it('moves reclassified pairs and drops rejected candidates in one statement each', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 1 });
+    const repo = new BookDuplicatesRepository({ execute } as never);
+
+    await repo.applyEditionOutcomes(9, [{ bookIdA: 1, bookIdB: 2, sameWork: true }], [{ bookIdA: 5, bookIdB: 6 }]);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+    const update = renderSql(execute.mock.calls[0]![0]);
+    expect(update.sql.replace(/\s+/g, ' ')).toContain("SET kind = 'other_edition'");
+    expect(update.sql.replace(/\s+/g, ' ')).toContain("pair.kind = 'duplicate'");
+    expect(update.params).toEqual([[1], [2], [true], 9]);
+    const remove = renderSql(execute.mock.calls[1]![0]);
+    expect(remove.sql.replace(/\s+/g, ' ')).toContain("pair.kind = 'other_edition'");
+    expect(remove.params).toEqual([[5], [6], 9]);
+
+    execute.mockClear();
+    await repo.applyEditionOutcomes(9, [], []);
+    expect(execute).not.toHaveBeenCalled();
+  });
+
+  it('turns every other-edition pair into a group of its own', async () => {
+    const execute = vi.fn().mockResolvedValue({ rowCount: 3 });
+    const repo = new BookDuplicatesRepository(transactionalDb(execute));
+
+    await expect(repo.finalizeOtherEditionGroups(9)).resolves.toBe(3);
+
+    const rendered = renderSql(execute.mock.calls[1]![0]);
+    expect(rendered.sql.replace(/\s+/g, ' ')).toContain('pair.kind = $2');
+    expect(rendered.params.filter((param) => param === 'other_edition')).toHaveLength(3);
+    expect(rendered.params).not.toContain('other_format');
+  });
+
   it('persists and retrieves user scan lifecycle state atomically', async () => {
     const created = { id: 9, userId: 7 };
     const db = mockDb({ selectResults: [[], [created], [created], [{ count: 3 }]], insertResults: [[created]] });
@@ -281,11 +355,15 @@ describe('BookDuplicatesRepository', () => {
 
   it('paginates only groups with at least two currently accessible members', async () => {
     const groups = [{ id: 5, memberCount: 2 }];
-    const db = mockDb({ selectResults: [[], [{ count: 1 }], groups, [{ groupId: 5 }], []] });
+    const db = mockDb({ selectResults: [[], [{ count: 1 }], [{ kind: 'duplicate', count: 1 }], groups, [{ groupId: 5 }], []] });
     const repo = new BookDuplicatesRepository(db as never);
     const user = { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never;
 
-    await expect(repo.findGroups(9, 1, 20, [2], user, 'isbn', 'reclaimable', 'desc')).resolves.toEqual({ groups, total: 1 });
+    await expect(repo.findGroups(9, 1, 20, [2], user, 'isbn', 'reclaimable', 'desc')).resolves.toEqual({
+      groups,
+      total: 1,
+      kindTotals: { duplicate: 1, other_format: 0, other_edition: 0 },
+    });
     await expect(repo.findPairs([])).resolves.toEqual([]);
     await expect(repo.findPairs([5])).resolves.toEqual([{ groupId: 5 }]);
     await expect(repo.findCandidatePreviews([], [2], user)).resolves.toEqual([]);
@@ -296,7 +374,7 @@ describe('BookDuplicatesRepository', () => {
     const user = { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never;
     const orderings: Record<string, string> = {};
     for (const sortBy of ['reclaimable', 'copies', 'confidence', 'title'] as const) {
-      const db = mockDb({ selectResults: [[], [{ count: 0 }], []] });
+      const db = mockDb({ selectResults: [[], [{ count: 0 }], [], []] });
       const repo = new BookDuplicatesRepository(db as never);
       await repo.findGroups(9, 1, 20, [2], user, undefined, sortBy, 'desc');
       const builder = (db.select as ReturnType<typeof vi.fn>).mock.results.at(-1)!.value as Record<string, ReturnType<typeof vi.fn>>;
@@ -308,6 +386,23 @@ describe('BookDuplicatesRepository', () => {
     expect(orderings.copies).toContain('member_count');
     expect(orderings.confidence).toContain('confidence');
     expect(orderings.title).toContain('lower(coalesce(');
+  });
+
+  it('leaves out groups whose members are now editions of one work or whose pairs were all dismissed', async () => {
+    const db = mockDb({ selectResults: [[], [{ count: 0 }], [], []] });
+    const repo = new BookDuplicatesRepository(db as never);
+    const user = { id: 7, isSuperuser: true, contentFilters: EMPTY_CONTENT_FILTER_RULES } as never;
+
+    await repo.findGroups(9, 1, 20, [2], user, undefined, 'reclaimable', 'desc', 'other_edition');
+
+    const selects = (db.select as ReturnType<typeof vi.fn>).mock.results.map((result) => result.value as Record<string, ReturnType<typeof vi.fn>>);
+    const having = renderSql(selects[0]!.having.mock.calls[0]![0]).sql;
+    expect(having).toContain(`count(DISTINCT COALESCE('link:' || "book_links"."group_id", 'book:' || "books"."id")) >= 2`);
+    const where = renderSql(selects[1]!.where.mock.calls[0]![0]);
+    const flat = where.sql.replace(/\s+/g, ' ');
+    expect(flat).toContain('FROM "book_duplicate_dismissals" dismissal');
+    expect(flat).toContain('dismissal.user_id = $');
+    expect(where.params).toContain(7);
   });
 
   it('deletes dismissed pairs for the scanning user before groups are formed', async () => {

@@ -1,16 +1,19 @@
 import { sql, type SQL } from 'drizzle-orm';
 
+import { bookLastReadAtSql, bookLastReadJoinSql } from './book-last-read';
+
 /**
  * Linked books that match a listing, as a `link_members` CTE (trailing comma included). It starts
  * from `book_links`, so its cost follows the number of linked books rather than the library size.
  *
  * - `matched_members`: members of the group that match. Only groups with two or more fold.
- * - `pref_rn`: 1 for the group's representative, present before missing, then the lead, then the
- *   lowest id. The sort plays no part, so selection ids stay stable when only the sort changes.
+ * - `pref_rn`: 1 for the group's representative: present before missing, then the edition this
+ *   viewer read last, then the lead, then the lowest id. The sort plays no part, so selection ids
+ *   stay stable when only the sort changes; another user's reading never moves it.
  * - `sort_rn` (only with `orderBy`): 1 for the member the listing sorts first, which places the
  *   group's card at its best position.
  */
-export function linkMembersCte(visibleWhere: SQL, orderBy?: SQL[]): SQL {
+export function linkMembersCte(visibleWhere: SQL, userId: number, orderBy?: SQL[]): SQL {
   const sortRank = orderBy ? sql`, row_number() OVER (PARTITION BY bl.group_id ORDER BY ${sql.join(orderBy, sql`, `)}) AS sort_rn` : sql``;
   return sql`
     link_members AS MATERIALIZED (
@@ -21,6 +24,7 @@ export function linkMembersCte(visibleWhere: SQL, orderBy?: SQL[]): SQL {
         row_number() OVER (
           PARTITION BY bl.group_id
           ORDER BY CASE WHEN books.status = 'present' THEN 0 ELSE 1 END,
+            ${bookLastReadAtSql()} DESC NULLS LAST,
             CASE WHEN books.id = g.lead_book_id THEN 0 ELSE 1 END,
             books.id
         ) AS pref_rn
@@ -29,6 +33,7 @@ export function linkMembersCte(visibleWhere: SQL, orderBy?: SQL[]): SQL {
       INNER JOIN book_link_groups g ON g.id = bl.group_id
       INNER JOIN books ON books.id = bl.book_id
       LEFT JOIN book_metadata ON book_metadata.book_id = books.id
+      ${bookLastReadJoinSql(sql`books.id`, userId, 'linked')}
       WHERE ${visibleWhere}
     ),
   `;

@@ -55,6 +55,7 @@ import { useFilterTokens } from '@/features/book/composables/useFilterTokens'
 import { useSortBarLabels } from '@/features/book/composables/useSortFields'
 import { useLibraryFacets } from '@/features/library/composables/useLibraryFacets'
 import { useLibraryHeaderFacts } from '@/features/library/composables/useLibraryHeaderFacts'
+import { useLibraryContentRefresh } from '@/features/library/composables/useLibraryContentRefresh'
 import { formatFilterValueLabel, sortFieldLabel } from '@/features/book/lib/filter-labels'
 import { formatBytes } from '@/lib/formatting'
 import { formatRelativeTimeFromNow } from '@/i18n/formatters'
@@ -275,11 +276,16 @@ function activateQuerySelection() {
     filter: filter.value,
     q: debouncedQuery.value || undefined,
     sort: sort.value,
-    // Every matching book is acted on, linked ones included, so the count is books, not cards (G7).
-    total: bookTotal.value,
+    // The grid folds linked editions, so the selection acts on the edition each card shows (E24).
+    collapseLinked: true,
+    total: selectionTotal.value,
+    editionTotal: bookTotal.value,
   }
   showQuerySelectionBanner.value = false
 }
+
+/** Matching books with linked editions counted once, as the folded grid shows them. Series stacks still count their books. */
+const selectionTotal = computed(() => (effectiveCollapseEnabled.value ? bookTotal.value : total.value))
 
 function dismissQuerySelectionBanner() {
   showQuerySelectionBanner.value = false
@@ -320,7 +326,9 @@ function forgetSavedFilter() {
 }
 
 const { subscribeLibrary, getProgress, isScanning } = useScanProgress()
-const { newBookIds, start: startLiveScan, stop: stopLiveScan } = useLiveScanBooks(libraryId, books)
+/** New books a scan or upload has streamed into this page; each batch makes the header recount. */
+const liveAddedCount = ref(0)
+const { newBookIds, start: startLiveScan, stop: stopLiveScan } = useLiveScanBooks(libraryId, books, liveAddedCount)
 
 watch(
   libraryId,
@@ -369,8 +377,25 @@ const canUpload = computed(() => hasPermission('library_upload'))
 const canExport = computed(() => hasPermission('library_download') && !isDemoRestrictedAccount.value)
 const hasPageMenu = computed(() => canExport.value || ((canManageLibraries.value || canUpload.value) && currentLibrary.value !== undefined))
 
-const { sizeBytes, lastScanAt } = useLibraryHeaderFacts(libraryId, canManageLibraries)
+const { sizeBytes, lastScanAt, refresh: refreshHeaderFacts } = useLibraryHeaderFacts(libraryId, canManageLibraries)
 const libraryScanning = computed(() => libraryId.value !== null && isScanning(libraryId.value))
+
+function reloadAfterLibraryChange() {
+  refreshBuckets()
+  void refreshHeaderFacts()
+}
+
+function recountLibrary() {
+  void refreshFacets()
+}
+
+useLibraryContentRefresh({
+  libraryId,
+  bookCount: computed(() => currentLibrary.value?.bookCount),
+  liveAdded: liveAddedCount,
+  recount: recountLibrary,
+  reload: reloadAfterLibraryChange,
+})
 
 interface HeaderFact {
   key: string
@@ -554,6 +579,7 @@ const {
   toggleSelectionMode,
   deleteBookId,
   deletingBook,
+  deleteEditions,
   cancelDelete,
   confirmDelete,
   inFlight,
@@ -568,6 +594,7 @@ const {
   handleBulkSetField,
   handleBulkSetMetadataLock,
   handleDeleteSelected,
+  selectionOtherEditions,
   getSelectionPayload,
   addToCollectionOpen,
   bulkEditOpen,
@@ -1095,10 +1122,10 @@ defineOptions({ name: 'HomeView' })
         class="fixed bottom-16 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-lg border border-primary/30 bg-background px-4 py-2.5 text-sm shadow-lg"
       >
         <span class="text-muted-foreground">
-          {{ t('views.library.querySelection.loadedSelected', { selected: formatNumber(selectedCount), total: formatNumber(bookTotal) }) }}
+          {{ t('views.library.querySelection.loadedSelected', { selected: formatNumber(selectedCount), total: formatNumber(selectionTotal) }) }}
         </span>
         <button class="font-medium text-primary underline-offset-2 hover:underline" @click="activateQuerySelection">
-          {{ t('views.library.querySelection.selectAllMatching', { total: formatNumber(bookTotal) }) }}
+          {{ t('views.library.querySelection.selectAllMatching', { total: formatNumber(selectionTotal) }) }}
         </button>
         <button class="text-muted-foreground hover:text-foreground" @click="dismissQuerySelectionBanner">
           <X :size="14" />
@@ -1119,6 +1146,7 @@ defineOptions({ name: 'HomeView' })
       :merge="mergeSelection"
       :link="linkSelection"
       :linked-selected="selectionHasLinked"
+      :other-editions="selectionOtherEditions"
       @move-to-library="openMoveForSelection"
       @merge="openMergeForSelection"
       @link="openLinkForSelection"
@@ -1197,6 +1225,7 @@ defineOptions({ name: 'HomeView' })
       :open="deleteBookId !== null"
       :deleting="deletingBook"
       :linked="pendingDeleteLinked"
+      :editions="deleteEditions"
       @confirm="confirmDelete"
       @cancel="cancelDelete"
     />

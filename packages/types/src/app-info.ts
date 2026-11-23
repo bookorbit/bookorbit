@@ -123,6 +123,14 @@ export const SERVER_FEATURES = [
    * (`AudioCoverEmbedCode`), where a client that does not know a code reads `status`.
    */
   "audio-cover-embed",
+  /**
+   * Linked books are editions of one work. Book detail always carries `editionName` and
+   * `originalPublishedYear` (null when unset) and both are editable and lockable; `linkedBooks`
+   * members carry the edition fields and the viewer's progress; a folded card stands for the edition
+   * the viewer read last; `GET /series/:id/books` and `GET /authors/:id/books` accept
+   * `collapseLinked`; series and author summaries carry `workCount`.
+   */
+  "book-editions",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

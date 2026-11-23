@@ -92,7 +92,7 @@ describe('BulkEditMetadataDialog', () => {
 
     it('renders all expected field labels', () => {
       const wrapper = mountDialog()
-      const labels = ['Authors', 'Genres', 'Tags', 'Narrators', 'Series', 'Publisher', 'Language', 'Year']
+      const labels = ['Authors', 'Genres', 'Tags', 'Narrators', 'Series', 'Publisher', 'Edition name', 'Language', 'Year', 'First published']
       for (const label of labels) {
         expect(wrapper.text()).toContain(label)
       }
@@ -309,6 +309,49 @@ describe('BulkEditMetadataDialog', () => {
       expect(emitted).toHaveLength(1)
       const fields = (emitted![0] as [Record<string, unknown>])[0]
       expect(fields.publishedYear).toEqual({ value: 2024 })
+    })
+
+    it('emits the edition name and first published year as their own fields', async () => {
+      const wrapper = mountDialog()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'Edition name')!
+        .trigger('click')
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'First published')!
+        .trigger('click')
+      await nextTick()
+      await wrapper.find('input[placeholder="Enter edition name"]').setValue('  Full Cast ')
+      await wrapper.find('input[placeholder="e.g. 2024"]').setValue('1965')
+      await nextTick()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text().includes('Apply'))!
+        .trigger('click')
+      await nextTick()
+
+      const fields = (wrapper.emitted('confirm')![0] as [Record<string, unknown>])[0]
+      expect(fields).toEqual({ editionName: { value: 'Full Cast' }, originalPublishedYear: { value: 1965 } })
+    })
+
+    it('holds Apply back for a first published year the server cannot store', async () => {
+      const wrapper = mountDialog()
+      await wrapper
+        .findAll('button')
+        .find((b) => b.text() === 'First published')!
+        .trigger('click')
+      await nextTick()
+      await wrapper.find('input[placeholder="e.g. 2024"]').setValue('965')
+      await nextTick()
+
+      expect(wrapper.text()).toContain('Enter a year from 1000 to 2200')
+      expect(
+        wrapper
+          .findAll('button')
+          .find((b) => b.text().includes('Apply'))
+          ?.attributes('disabled'),
+      ).toBeDefined()
     })
 
     it('emits confirm with null when scalar field is empty', async () => {

@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   markRefreshing: vi.fn<(bookIds: number[]) => void>(),
   clearRefreshing: vi.fn<(bookIds: number[]) => void>(),
   exportBooks: vi.fn<(bookIds: number[], includeAll?: boolean, formatGroup?: string) => Promise<void>>(),
+  refreshLibraryCounts: vi.fn<() => void>(),
 }))
 
 function makeSseStream(lines: string[]): { ok: true; body: { getReader: () => { read: () => Promise<{ done: boolean; value?: Uint8Array }> } } } {
@@ -48,6 +49,7 @@ vi.mock('vue-sonner', () => ({
 }))
 
 vi.mock('@/features/jobs/api/jobs.api', () => ({ actOnJobs: mocks.actOnJobs }))
+vi.mock('@/features/library/composables/useLibraryCountsRefresh', () => ({ useLibraryCountsRefresh: () => mocks.refreshLibraryCounts }))
 
 /** A bulk route's answer whose stream the test feeds by hand, naming its run in the header. */
 function liveSse(runId = 'run-7') {
@@ -152,6 +154,7 @@ describe('useBookBulkActions', () => {
     mocks.api.mockReset()
     mocks.toastSuccess.mockReset()
     mocks.toastError.mockReset()
+    mocks.refreshLibraryCounts.mockReset()
   })
 
   afterEach(() => {
@@ -235,7 +238,7 @@ describe('useBookBulkActions', () => {
     await handleBulkSetRating(5)
 
     expect(books.value.map((book) => book.rating)).toEqual([5, 2, 5])
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Rated 2 books 5/5 (1 locked skipped)')
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Rated 2 books 5/5; 1 locked book skipped')
   })
 
   it('does not mutate local books when the bulk status request fails', async () => {
@@ -286,7 +289,7 @@ describe('useBookBulkActions', () => {
     await handleBulkSetField('language', 'fr')
 
     expect(books.value.map((book) => book.language)).toEqual(['fr', 'de', 'fr'])
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated language for 2 books (1 locked skipped)')
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated 2 books; 1 locked book skipped')
   })
 
   it('replaces relation list fields locally for editable books', async () => {
@@ -303,7 +306,7 @@ describe('useBookBulkActions', () => {
     await handleBulkSetField('authors', ['New A', 'New B'])
 
     expect(books.value.map((book) => book.authors)).toEqual([['New A', 'New B'], ['Old B'], ['New A', 'New B']])
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated authors for 2 books (1 locked skipped)')
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated 2 books; 1 locked book skipped')
   })
 
   it('sends bulk status updates using query selection payloads', async () => {
@@ -413,7 +416,7 @@ describe('useBookBulkActions', () => {
         }),
       }),
     )
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated language for 500 books')
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Updated 500 books')
   })
 
   it('sends bulk metadata lock updates using query selection payloads', async () => {
@@ -434,7 +437,7 @@ describe('useBookBulkActions', () => {
         }),
       }),
     )
-    expect(mocks.toastSuccess).toHaveBeenCalledWith('Locked metadata for 500 books')
+    expect(mocks.toastSuccess).toHaveBeenCalledWith('Locked the metadata of 500 books')
   })
 
   it('sends delete requests using query selection payloads', async () => {
@@ -457,6 +460,7 @@ describe('useBookBulkActions', () => {
       }),
     )
     expect(onDeleted).toHaveBeenCalledWith([])
+    expect(mocks.refreshLibraryCounts).toHaveBeenCalledOnce()
     expect(mocks.toastSuccess).toHaveBeenCalledWith('Deleted 500 books')
   })
 

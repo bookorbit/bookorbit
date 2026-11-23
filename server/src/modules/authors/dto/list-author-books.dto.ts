@@ -39,4 +39,10 @@ export class ListAuthorBooksDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   collapseSeries?: boolean;
+
+  /** Fold linked editions into one card, the one this user read last, else the main one. Released clients never send it. */
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  collapseLinked?: boolean;
 }

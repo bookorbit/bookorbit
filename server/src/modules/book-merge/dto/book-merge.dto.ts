@@ -50,6 +50,16 @@ export class BookMergeFieldOverridesDto implements Partial<Record<BookMergeField
   @IsOptional()
   @IsInt()
   @Min(1)
+  editionName?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  originalPublishedYear?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
   language?: number;
 
   @IsOptional()

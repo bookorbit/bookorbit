@@ -36,6 +36,8 @@ const ALLOWED_FIELD_KEYS = new Set<string>([
   'publisher',
   'language',
   'publishedYear',
+  'editionName',
+  'originalPublishedYear',
   'narrators',
 ]);
 
@@ -80,6 +82,16 @@ export class BulkEditFieldsDto {
   @ValidateNested()
   @Type(() => BulkScalarNumberFieldDto)
   publishedYear?: BulkScalarNumberFieldDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BulkScalarStringFieldDto)
+  editionName?: BulkScalarStringFieldDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => BulkScalarNumberFieldDto)
+  originalPublishedYear?: BulkScalarNumberFieldDto;
 
   @IsOptional()
   @ValidateNested()

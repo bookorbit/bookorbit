@@ -231,6 +231,8 @@ export type BookCard = {
   lockedFields: BookMetadataLockField[];
   subtitle: string | null;
   publisher: string | null;
+  /** The edition's own name, such as "Full Cast". Sent by servers with `book-editions`. */
+  editionName?: string | null;
   pageCount: number | null;
   isbn13: string | null;
   hardcoverId?: string | null;
@@ -378,6 +380,12 @@ export type BookDetail = {
   linkGroupId?: number | null;
   /** This book is its link group's main book. False when it is not linked. Absent from older servers. */
   linkIsLead?: boolean;
+  /** This book drawn like its `linkedBooks`, to list it among them. Null when it is not linked; absent from servers without `book-editions`. */
+  linkSelf?: import("./book-link").LinkedBookSummary | null;
+  /** What sets this edition apart: "Full Cast", "25th Anniversary". Sent, null when unset, by servers with `book-editions`. */
+  editionName?: string | null;
+  /** The work's first publication year, which this edition's `publishedYear` may be later than. Sent like `editionName`. */
+  originalPublishedYear?: number | null;
 };
 
 export type BookCoverSlot = {
@@ -404,6 +412,7 @@ export type BookMetadataRefreshPreviewFields = {
   publisher?: string | null;
   publishedDate?: string | null;
   publishedYear?: number | null;
+  originalPublishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;
   seriesName?: string | null;

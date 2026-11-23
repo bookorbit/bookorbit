@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { addDateKeyDays } from '../../common/utils/reading-daily-stats.utils';
 import { resolveTimeZone, toDateKeyInTimeZone, toTimeZoneStartOfDay } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
+import { workKeySql } from '../../db/book-work-key';
 import * as schema from '../../db/schema';
 import {
   achievements,
@@ -222,7 +223,7 @@ export class AchievementRepository {
 
   async countFinishedBooks(userId: number): Promise<number> {
     const [{ value }] = await this.db
-      .select({ value: count() })
+      .select({ value: countDistinct(workKeySql(userBookStatus.bookId)) })
       .from(userBookStatus)
       .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read')));
     return value;
@@ -327,31 +328,35 @@ export class AchievementRepository {
 
   async hasCompletedSeries(userId: number): Promise<boolean> {
     const result = await this.db.execute(sql`
-      SELECT 1 FROM (
-	        SELECT bm.series_id,
-          COUNT(DISTINCT bm.book_id) AS total_in_series,
-          COUNT(DISTINCT ubs.book_id) AS read_count
-        FROM book_metadata bm
-        LEFT JOIN user_book_status ubs
-          ON ubs.book_id = bm.book_id AND ubs.user_id = ${userId} AND ubs.status = 'read'
-	        WHERE bm.series_id IS NOT NULL
-	        GROUP BY bm.series_id
-        HAVING COUNT(DISTINCT bm.book_id) >= 2
-          AND COUNT(DISTINCT bm.book_id) = COUNT(DISTINCT ubs.book_id)
-      ) complete_series
+      SELECT 1 FROM ${this.seriesWorks(userId)}
+      GROUP BY series_works.series_id
+      HAVING COUNT(DISTINCT series_works.work_key) >= 2
+        AND COUNT(DISTINCT series_works.work_key) = COUNT(DISTINCT series_works.work_key) FILTER (WHERE series_works.is_read)
       LIMIT 1
     `);
     return (result as unknown as { rows: unknown[] }).rows.length > 0;
   }
 
+  /** Each series book as its work (linked editions are one work), and whether the user has read that edition. */
+  private seriesWorks(userId: number) {
+    return sql`(
+      SELECT bm.series_id, ${workKeySql(sql`bm.book_id`)} AS work_key, ubs.book_id IS NOT NULL AS is_read
+      FROM book_metadata bm
+      LEFT JOIN user_book_status ubs
+        ON ubs.book_id = bm.book_id AND ubs.user_id = ${userId} AND ubs.status = 'read'
+      WHERE bm.series_id IS NOT NULL
+    ) series_works`;
+  }
+
   async maxBooksPerAuthor(userId: number): Promise<number> {
+    const works = countDistinct(workKeySql(userBookStatus.bookId));
     const rows = await this.db
-      .select({ cnt: count() })
+      .select({ cnt: works })
       .from(userBookStatus)
       .innerJoin(bookAuthors, eq(userBookStatus.bookId, bookAuthors.bookId))
       .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read')))
       .groupBy(bookAuthors.authorId)
-      .orderBy(desc(count()))
+      .orderBy(desc(works))
       .limit(1);
     return rows.length > 0 ? rows[0].cnt : 0;
   }
@@ -703,18 +708,10 @@ export class AchievementRepository {
 
   async hasCompletedSeriesOfSize(userId: number, size: number): Promise<boolean> {
     const result = await this.db.execute(sql`
-      SELECT 1 FROM (
-	        SELECT bm.series_id,
-          COUNT(DISTINCT bm.book_id) AS total_in_series,
-          COUNT(DISTINCT ubs.book_id) AS read_count
-        FROM book_metadata bm
-        LEFT JOIN user_book_status ubs
-          ON ubs.book_id = bm.book_id AND ubs.user_id = ${userId} AND ubs.status = 'read'
-	        WHERE bm.series_id IS NOT NULL
-	        GROUP BY bm.series_id
-        HAVING COUNT(DISTINCT bm.book_id) = ${size}
-          AND COUNT(DISTINCT bm.book_id) = COUNT(DISTINCT ubs.book_id)
-      ) complete_series
+      SELECT 1 FROM ${this.seriesWorks(userId)}
+      GROUP BY series_works.series_id
+      HAVING COUNT(DISTINCT series_works.work_key) = ${size}
+        AND COUNT(DISTINCT series_works.work_key) = COUNT(DISTINCT series_works.work_key) FILTER (WHERE series_works.is_read)
       LIMIT 1
     `);
     return (result as unknown as { rows: unknown[] }).rows.length > 0;
@@ -732,7 +729,7 @@ export class AchievementRepository {
 
   async countFinishedBooksByMaxPageCount(userId: number, maxPages: number): Promise<number> {
     const [{ value }] = await this.db
-      .select({ value: count() })
+      .select({ value: countDistinct(workKeySql(userBookStatus.bookId)) })
       .from(userBookStatus)
       .innerJoin(bookMetadata, eq(userBookStatus.bookId, bookMetadata.bookId))
       .where(
@@ -781,13 +778,14 @@ export class AchievementRepository {
   }
 
   async maxBooksPerGenre(userId: number): Promise<number> {
+    const works = countDistinct(workKeySql(userBookStatus.bookId));
     const rows = await this.db
-      .select({ cnt: count() })
+      .select({ cnt: works })
       .from(userBookStatus)
       .innerJoin(bookGenres, eq(userBookStatus.bookId, bookGenres.bookId))
       .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read')))
       .groupBy(bookGenres.genreId)
-      .orderBy(desc(count()))
+      .orderBy(desc(works))
       .limit(1);
     return rows.length > 0 ? rows[0].cnt : 0;
   }
@@ -827,7 +825,7 @@ export class AchievementRepository {
 
   async countDistinctFinishedAnnotatedBooks(userId: number): Promise<number> {
     const [{ value }] = await this.db
-      .select({ value: countDistinct(userBookStatus.bookId) })
+      .select({ value: countDistinct(workKeySql(userBookStatus.bookId)) })
       .from(userBookStatus)
       .innerJoin(annotations, and(eq(annotations.bookId, userBookStatus.bookId), eq(annotations.userId, userId)))
       .where(and(eq(userBookStatus.userId, userId), eq(userBookStatus.status, 'read')));
@@ -836,7 +834,7 @@ export class AchievementRepository {
 
   async countDistinctFinishedBooksInCollections(userId: number): Promise<number> {
     const [{ value }] = await this.db
-      .select({ value: countDistinct(userBookStatus.bookId) })
+      .select({ value: countDistinct(workKeySql(userBookStatus.bookId)) })
       .from(userBookStatus)
       .innerJoin(collectionBooks, eq(collectionBooks.bookId, userBookStatus.bookId))
       .innerJoin(collections, and(eq(collections.id, collectionBooks.collectionId), eq(collections.userId, userId)))

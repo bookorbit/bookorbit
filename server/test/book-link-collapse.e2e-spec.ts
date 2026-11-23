@@ -8,12 +8,16 @@ import { randomUUID } from 'crypto';
 import { and, eq, inArray } from 'drizzle-orm';
 
 import type {
+  AuthorBooksPage,
+  AuthorDetail,
   BookCard,
   BookReadingSessionListResponse,
   BooksPage,
   GroupRule,
   JumpBucketsResponse,
   LibraryBookFacets,
+  SeriesBooksPage,
+  SeriesPage,
   SortSpec,
 } from '@bookorbit/types';
 
@@ -61,6 +65,7 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
     number
   >;
   let duneGroupId!: number;
+  let expanseSeriesId!: number;
 
   async function seedBook(
     library: CreatedLibrary,
@@ -180,6 +185,7 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
     // present can make the other copy the representative.
     ids.solarisAudio = await seedBook(audiobooks, { title: 'Solaris', format: 'm4b', addedAt: '2024-01-06', status: 'missing' });
     ids.solarisEbook = await seedBook(ebooks, { title: 'Solaris', format: 'epub', addedAt: '2024-01-08' });
+    expanseSeriesId = expanse!.id;
     const series = { id: expanse!.id, name: 'Expanse' };
     ids.leviathanEpub = await seedBook(ebooks, {
       title: 'Leviathan Wakes',
@@ -336,6 +342,26 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
     expect(rows).toHaveLength(folded.bookTotal!);
   });
 
+  it('E24: selecting every match in a folded view reaches only the editions the cards show', async () => {
+    const folded = await listAll(reader.accessToken, { collapseLinked: true, q: 'Leviathan' });
+    expect(folded.total).toBe(1);
+    expect(folded.bookTotal).toBe(2);
+
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/books/bulk-set-status',
+      headers: authHeader(reader.accessToken),
+      payload: { query: { q: 'Leviathan', collapseLinked: true }, status: 'want_to_read' },
+    });
+    expect(response.statusCode, response.body).toBe(204);
+
+    const rows = await ctx.db
+      .select({ bookId: schema.userBookStatus.bookId })
+      .from(schema.userBookStatus)
+      .where(and(eq(schema.userBookStatus.userId, reader.userId), inArray(schema.userBookStatus.bookId, [ids.leviathanEpub, ids.leviathanPdf])));
+    expect(rows.map((row) => row.bookId)).toEqual([folded.items[0]!.id]);
+  });
+
   it('G8: links fold before series, so a series stack does not count one book twice', async () => {
     const page = await listLibrary(reader.accessToken, ebooks.libraryId, { collapseSeries: true, collapseLinked: true });
 
@@ -398,7 +424,7 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
     expect(listing.items.find((item) => item.title === 'Hyperion')?.id).toBe(ids.hyperionPdf);
   });
 
-  it('orders a Smart Scope and its date buckets by the displayed edition’s Last Read', async () => {
+  it('shows the edition this reader read last, and orders a Smart Scope and its date buckets by its Last Read', async () => {
     const activity = [
       { bookId: ids.alpha, progressDay: 2, sessionDay: 10 },
       { bookId: ids.zeta, progressDay: 7, sessionDay: 3 },
@@ -463,14 +489,19 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
         post<BooksPage>(reader.accessToken, `${path}/query`, query),
         post<JumpBucketsResponse>(reader.accessToken, `${path}/jump-buckets`, { ...query, maxBuckets: 32 }),
       ]);
-      expect(listing.items.map(({ id }) => id)).toEqual([ids.alpha, ids.zeta, ids.hyperionPdf]);
+      expect(listing.items.map(({ id }) => id)).toEqual([ids.hyperionEpub, ids.alpha, ids.zeta]);
       expect(listing.bookTotal).toBe(4);
       expect(buckets.buckets.map(({ key, index }) => [key, index])).toEqual([
-        ['2026-06-10', 0],
-        ['2026-06-07', 1],
-        ['2026-06-01', 2],
+        ['2026-06-12', 0],
+        ['2026-06-10', 1],
+        ['2026-06-07', 2],
       ]);
     }
+
+    const readerGrid = await listLibrary(reader.accessToken, ebooks.libraryId, { collapseLinked: true });
+    expect(readerGrid.items.filter((item) => item.title === 'Hyperion').map((item) => item.id)).toEqual([ids.hyperionEpub]);
+    const otherGrid = await listLibrary(ebooksOnly.accessToken, ebooks.libraryId, { collapseLinked: true });
+    expect(otherGrid.items.filter((item) => item.title === 'Hyperion').map((item) => item.id)).toEqual([ids.hyperionPdf]);
 
     const log = await ctx.app.inject({
       url: `/api/v1/books/${ids.zeta}/sessions?dateTo=2026-06-02T00:00:00.000Z`,
@@ -483,11 +514,68 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
     });
   });
 
+  async function get<T>(token: string, url: string): Promise<T> {
+    const response = await ctx.app.inject({ method: 'GET', url: `/api/v1${url}`, headers: authHeader(token) });
+    expect(response.statusCode, response.body).toBe(200);
+    return response.json() as T;
+  }
+
+  it('E22: a series page folds linked editions only when asked, and counts works beside books', async () => {
+    const flat = await get<SeriesBooksPage>(reader.accessToken, `/series/${expanseSeriesId}/books`);
+    expect(flat.items.map((item) => item.id)).toEqual([ids.leviathanEpub, ids.leviathanPdf, ids.caliban]);
+    expect(flat).not.toHaveProperty('bookTotal');
+    expect(flat.items.every((item) => item.linked === undefined)).toBe(true);
+
+    const folded = await get<SeriesBooksPage>(reader.accessToken, `/series/${expanseSeriesId}/books?collapseLinked=true`);
+    expect(folded.items.map((item) => item.id)).toEqual([ids.leviathanEpub, ids.caliban]);
+    expect(folded.total).toBe(2);
+    expect(folded.bookTotal).toBe(3);
+    expect(card(folded as BooksPage, ids.leviathanEpub).linked?.memberCount).toBe(2);
+    expect(folded.seriesInfo).toMatchObject({ bookCount: 3, workCount: 2 });
+
+    const list = await get<SeriesPage>(reader.accessToken, '/series?q=Expanse');
+    expect(list.items.find((item) => item.id === expanseSeriesId)).toMatchObject({ bookCount: 3, workCount: 2 });
+  });
+
+  it('E9: an author page folds only the editions credited to that author, and counts works', async () => {
+    const [author] = await ctx.db
+      .insert(schema.authors)
+      .values({ name: `Frank Herbert ${randomUUID()}` })
+      .returning({ id: schema.authors.id });
+    const [narrator] = await ctx.db
+      .insert(schema.authors)
+      .values({ name: `Narrator ${randomUUID()}` })
+      .returning({ id: schema.authors.id });
+    await ctx.db.insert(schema.bookAuthors).values([
+      { bookId: ids.duneEbook, authorId: author!.id },
+      { bookId: ids.duneAudio, authorId: author!.id },
+      { bookId: ids.alpha, authorId: author!.id },
+      { bookId: ids.hyperionEpub, authorId: narrator!.id },
+    ]);
+
+    const flat = await get<AuthorBooksPage>(reader.accessToken, `/authors/${author!.id}/books?sort=title&order=asc`);
+    expect(flat.items.map((item) => item.id)).toEqual([ids.alpha, ids.duneEbook, ids.duneAudio]);
+
+    const folded = await get<AuthorBooksPage>(reader.accessToken, `/authors/${author!.id}/books?sort=title&order=asc&collapseLinked=true`);
+    expect(folded.items).toHaveLength(2);
+    expect(folded.items.map((item) => item.title)).toEqual(['Alpha', 'Dune']);
+    expect(folded.total).toBe(2);
+    expect(folded.bookTotal).toBe(3);
+    expect(folded.items.find((item) => item.title === 'Dune')?.linked?.memberCount).toBe(2);
+
+    // Only the epub of Hyperion credits this person, so nothing folds and its card stays its own.
+    const single = await get<AuthorBooksPage>(reader.accessToken, `/authors/${narrator!.id}/books?collapseLinked=true`);
+    expect(single.items.map((item) => item.id)).toEqual([ids.hyperionEpub]);
+
+    const detail = await get<AuthorDetail>(reader.accessToken, `/authors/${author!.id}`);
+    expect(detail).toMatchObject({ bookCount: 3, workCount: 2 });
+  });
+
   it('G18: facet counts stay book counts when the listing folds links', async () => {
     const facets = await post<LibraryBookFacets>(reader.accessToken, `/libraries/${ebooks.libraryId}/books/facets`, { collapseLinked: true });
 
     expect(facets.total).toBe(9);
-    expect(Object.fromEntries(facets.formats.map((facet) => [facet.format, facet.count]))).toEqual({ epub: 7, pdf: 2 });
+    expect(Object.fromEntries(facets.formats.map((facet) => [facet.format, facet.count]))).toEqual({ epub: 7, 'epub:plain': 7, pdf: 2 });
   });
 
   it('G20: where no group has two members in scope, the plain listing runs and bookTotal equals total', async () => {
@@ -496,6 +584,45 @@ describe('Linked books in listings (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () 
     expect(page.total).toBe(3);
     expect(page.bookTotal).toBe(3);
     expect(page.items.map((item) => item.id).sort((a, b) => a - b)).toEqual([ids.duneAudio, ids.mid, ids.solarisAudio].sort((a, b) => a - b));
+  });
+
+  it('counts an audiobook position without a listening session as the edition read last', async () => {
+    const duneCard = (page: BooksPage) => page.items.filter((item) => item.title === 'Dune').map((item) => item.id);
+    expect(duneCard(await listAll(reader.accessToken, { collapseLinked: true }))).toEqual([ids.duneEbook]);
+
+    // Later than every other read in this suite; the rescan that touched the row a year on does not count.
+    const capturedAt = new Date(Date.UTC(2026, 5, 20, 12));
+    const [audio] = await ctx.db.select({ fileId: schema.books.primaryFileId }).from(schema.books).where(eq(schema.books.id, ids.duneAudio));
+    await ctx.db.insert(schema.audiobookProgress).values({
+      userId: reader.userId,
+      bookId: ids.duneAudio,
+      currentFileId: audio!.fileId!,
+      positionSeconds: 600,
+      percentage: 12,
+      capturedAt,
+      updatedAt: new Date(Date.UTC(2027, 5, 20, 12)),
+    });
+
+    const lastRead = [{ field: 'lastReadAt', dir: 'desc' }];
+    expect(duneCard(await listAll(reader.accessToken, { collapseLinked: true }))).toEqual([ids.duneAudio]);
+    expect((await listAll(reader.accessToken, { collapseLinked: true, sort: lastRead })).items[0]?.id).toBe(ids.duneAudio);
+    expect((await listAll(reader.accessToken, { sort: lastRead })).items[0]?.id).toBe(ids.duneAudio);
+    expect((await listAll(ebooksOnly.accessToken, { sort: lastRead })).items.map((item) => item.id)).not.toContain(ids.duneAudio);
+
+    const stats = async () => {
+      const response = await ctx.app.inject({ url: `/api/v1/books/${ids.duneAudio}/sessions`, headers: authHeader(reader.accessToken) });
+      expect(response.statusCode).toBe(200);
+      return response.json<BookReadingSessionListResponse>().stats;
+    };
+    expect(await stats()).toMatchObject({ lastSessionAt: null, lastReadAt: capturedAt.toISOString() });
+
+    // A device clock running years fast is held to when the server stored the position.
+    const storedAt = new Date(Date.UTC(2026, 5, 21, 12));
+    await ctx.db
+      .update(schema.audiobookProgress)
+      .set({ capturedAt: new Date(Date.UTC(2099, 0, 1)), updatedAt: storedAt })
+      .where(and(eq(schema.audiobookProgress.userId, reader.userId), eq(schema.audiobookProgress.bookId, ids.duneAudio)));
+    expect(await stats()).toMatchObject({ lastReadAt: storedAt.toISOString() });
   });
 
   it('G21: a series-collapsed page reports its book total too', async () => {

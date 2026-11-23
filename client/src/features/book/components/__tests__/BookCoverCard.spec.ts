@@ -213,6 +213,26 @@ describe('BookCoverCard — cover aspect override', () => {
   })
 })
 
+describe('BookCoverCard - actions menu', () => {
+  const menuButtons = (wrapper: ReturnType<typeof mountCard>) =>
+    wrapper.findAll('button').filter((button) => button.find('.lucide-ellipsis-vertical, .lucide-more-vertical').exists())
+
+  it('names the menu after the book on the cover', () => {
+    const buttons = menuButtons(mountCard(presentBook))
+    expect(buttons).toHaveLength(1)
+    expect(buttons[0]!.attributes('aria-label')).toBe('More actions for Available Book')
+  })
+
+  it('names the menu in the label row below the cover too', () => {
+    cardInfoMode.value = 'below-cover'
+    const wrapper = mount(BookCoverCard, {
+      props: { book: { ...presentBook, title: null }, showLabel: true },
+      global: { ...globalStubs, provide: { [COVER_ASPECT_RATIO_KEY as symbol]: ref('2/3') } },
+    })
+    expect(wrapper.get('[data-testid="grid-card-kebab"]').attributes('aria-label')).toBe('More actions for Untitled')
+  })
+})
+
 describe('BookCoverCard - present state', () => {
   it('marks the EPUB format overlay for media-overlay read-along files', () => {
     cardOverlays.value = ['format']
@@ -266,6 +286,39 @@ describe('BookCoverCard - present state', () => {
     expect(dots).toHaveLength(2)
     expect(dots[0]!.attributes('data-linked')).toBeUndefined()
     expect(dots[1]!.attributes('data-linked')).toBe('true')
+  })
+
+  it('marks a card standing for several editions with the editions pill', () => {
+    const wrapper = mountCard({
+      ...presentBook,
+      linked: {
+        groupId: 1,
+        memberCount: 3,
+        books: [
+          { bookId: 50, libraryId: 4, formats: ['m4b'], mediaKind: 'audiobook' },
+          { bookId: 51, libraryId: 4, formats: ['epub'], mediaKind: 'ebook' },
+        ],
+      },
+    })
+
+    const pill = wrapper.get('[data-testid="card-editions-pill"]')
+    expect(pill.text()).toBe('3')
+    expect(pill.attributes('aria-label')).toBe('3 editions')
+  })
+
+  it('shows no editions pill on a book without other editions or in selection mode', () => {
+    expect(mountCard(presentBook).find('[data-testid="card-editions-pill"]').exists()).toBe(false)
+    const linked = mount(BookCoverCard, {
+      props: {
+        book: {
+          ...presentBook,
+          linked: { groupId: 1, memberCount: 2, books: [{ bookId: 50, libraryId: 4, formats: ['m4b'], mediaKind: 'audiobook' }] },
+        },
+        selectionMode: true,
+      },
+      global: { ...globalStubs, provide: { [COVER_ASPECT_RATIO_KEY as symbol]: ref('2/3') } },
+    })
+    expect(linked.find('[data-testid="card-editions-pill"]').exists()).toBe(false)
   })
 
   it('lists every format in the hover overlay for any style but the primary pill', () => {

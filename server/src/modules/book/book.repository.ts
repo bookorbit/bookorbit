@@ -35,10 +35,10 @@ import { SeriesIdentityService } from '../../common/services/series-identity.ser
 import { SeriesMembershipService } from '../../common/services/series-membership.service';
 import { BookQueryBuilder } from './book-query-builder.service';
 import { letterJumpBucketExpr } from './jump-bucket-expr';
-import { LINK_FOLDED_BY_PREFERENCE_SQL, LINK_FOLDED_BY_SORT_SQL, LINK_FOLDED_COUNT_SQL, linkMembersCte } from './link-collapse-sql';
+import { LINK_FOLDED_BY_PREFERENCE_SQL, LINK_FOLDED_BY_SORT_SQL, LINK_FOLDED_COUNT_SQL, linkMembersCte } from '../../db/link-collapse-sql';
 import { preserveOutgoingChapters } from '../../db/preserve-audiobook-revision';
 import { DB } from '../../db';
-import { latestReadingSessionSql } from '../../db/book-last-read';
+import { bookLastReadAtSql, bookLastReadJoinSql, bookLastReadOnSql, bookLastReadRowsSql } from '../../db/book-last-read';
 import * as schema from '../../db/schema';
 import {
   authors,
@@ -109,6 +109,7 @@ type CollapsedRawRow = {
   hardcover_id: string | null;
   hardcover_edition_id: string | null;
   publisher: string | null;
+  edition_name: string | null;
   page_count: number | null;
   sort_title: string | null;
   sort_series: string | null;
@@ -332,19 +333,11 @@ function temporalSourceParts(field: SortField, userId: number, timeZone: string,
   });
 
   if (field === 'lastReadAt') {
-    const bookId = collapsed ? sql`r.id` : books.id;
-    const progressAt = collapsed ? sql`r.rail_temporal_value` : sql`rail_last_read.value`;
     return {
-      prefixCte: sql`rail_last_read AS MATERIALIZED (
-        SELECT rail_bf.book_id, max(rail_rp.last_read_at) AS value
-        FROM ${readingProgress} rail_rp
-        INNER JOIN ${bookFiles} rail_bf ON rail_bf.id = rail_rp.book_file_id
-        WHERE rail_rp.user_id = ${userId}
-        GROUP BY rail_bf.book_id
-      ),`,
-      join: sql`LEFT JOIN rail_last_read ON rail_last_read.book_id = ${books.id}`,
-      value: sql`timezone(${timeZone}, greatest(${latestReadingSessionSql(bookId, userId)}, ${progressAt}))`,
-      baseExtraSelect: collapsed ? sql`, rail_last_read.value AS rail_temporal_value` : empty,
+      prefixCte: empty,
+      join: bookLastReadJoinSql(books.id, userId),
+      value: collapsed ? sql`timezone(${timeZone}, r.rail_temporal_value)` : sql`timezone(${timeZone}, ${bookLastReadAtSql()})`,
+      baseExtraSelect: collapsed ? sql`, ${bookLastReadAtSql()} AS rail_temporal_value` : empty,
       representativeExtraSelect: collapsed ? sql`, base.rail_temporal_value` : empty,
     };
   }
@@ -550,10 +543,15 @@ export class BookRepository {
     return where ? and(where, ne(books.status, 'processing'))! : ne(books.status, 'processing');
   }
 
-  private linkCollapseParts(visibleWhere: SQL, collapseLinked: boolean, orderBy?: SQL[]): { prefixCte: SQL; where: SQL; addFolded: SQL } {
+  private linkCollapseParts(
+    visibleWhere: SQL,
+    collapseLinked: boolean,
+    userId: number,
+    orderBy?: SQL[],
+  ): { prefixCte: SQL; where: SQL; addFolded: SQL } {
     if (!collapseLinked) return { prefixCte: sql``, where: visibleWhere, addFolded: sql`` };
     return {
-      prefixCte: linkMembersCte(visibleWhere, orderBy),
+      prefixCte: linkMembersCte(visibleWhere, userId, orderBy),
       where: sql`${visibleWhere} AND ${orderBy ? LINK_FOLDED_BY_SORT_SQL : LINK_FOLDED_BY_PREFERENCE_SQL}`,
       addFolded: sql` + ${LINK_FOLDED_COUNT_SQL}`,
     };
@@ -589,6 +587,7 @@ export class BookRepository {
         lockedFields: bookMetadata.lockedFields,
         subtitle: bookMetadata.subtitle,
         publisher: bookMetadata.publisher,
+        editionName: bookMetadata.editionName,
         pageCount: bookMetadata.pageCount,
         isbn13: bookMetadata.isbn13,
         hardcoverId: bookMetadata.hardcoverId,
@@ -600,6 +599,7 @@ export class BookRepository {
       .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, userId)))
+      .leftJoin(bookLastReadRowsSql(userId), bookLastReadOnSql(books.id))
       .where(visibleWhere)
       .orderBy(...orderBy)
       .limit(limit)
@@ -648,7 +648,7 @@ export class BookRepository {
   }): Promise<Awaited<ReturnType<BookRepository['findCards']>> & { bookTotal: number }> {
     const { where, orderBy, limit, offset, userId } = opts;
     const visibleWhere = this.visibleWhere(where);
-    const link = this.linkCollapseParts(visibleWhere, true, opts.sortByRepresentative ? undefined : orderBy);
+    const link = this.linkCollapseParts(visibleWhere, true, userId, opts.sortByRepresentative ? undefined : orderBy);
     const page = await this.db.execute<{ card_id: number; total_count: string; folded_count: string }>(sql`
       WITH ${link.prefixCte}
       folded AS (SELECT ${LINK_FOLDED_COUNT_SQL} AS folded_count)
@@ -660,6 +660,7 @@ export class BookRepository {
       LEFT JOIN book_metadata ON book_metadata.book_id = books.id
       LEFT JOIN link_members member ON member.id = books.id AND member.matched_members > 1
       LEFT JOIN link_members rep ON rep.group_id = member.group_id AND rep.pref_rn = 1
+      ${bookLastReadJoinSql(sql`books.id`, userId)}
       CROSS JOIN folded
       WHERE ${link.where}
       ORDER BY ${sql.join(orderBy, sql`, `)}
@@ -669,7 +670,7 @@ export class BookRepository {
     const first = page.rows[0];
     if (!first) {
       const counts = await this.db.execute<{ book_total: string; folded_count: string }>(sql`
-        WITH ${linkMembersCte(visibleWhere)}
+        WITH ${linkMembersCte(visibleWhere, userId)}
         counted AS (
           SELECT count(*) AS book_total
           FROM books
@@ -760,6 +761,7 @@ export class BookRepository {
       .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(userBookRatings, and(eq(userBookRatings.bookId, books.id), eq(userBookRatings.userId, opts.userId)))
+      .leftJoin(bookLastReadRowsSql(opts.userId), bookLastReadOnSql(books.id))
       .where(this.visibleWhere(opts.where))
       .orderBy(...opts.orderBy)
       .limit(opts.limit)
@@ -1000,6 +1002,7 @@ export class BookRepository {
       lockedFields: string[] | null;
       subtitle: string | null;
       publisher: string | null;
+      editionName: string | null;
       pageCount: number | null;
       isbn13: string | null;
       hardcoverId: string | null;
@@ -1052,7 +1055,7 @@ export class BookRepository {
       throw new BadRequestException('Invalid default collection id');
     }
     const visibleWhere = this.visibleWhere(where);
-    const link = this.linkCollapseParts(visibleWhere, opts.collapseLinked === true);
+    const link = this.linkCollapseParts(visibleWhere, opts.collapseLinked === true, userId);
     const orderBy = BookQueryBuilder.buildCollapseOrderBy(sort, userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     // The collectionOrder branch of the order by names sort_collection_position, so the column has
     // to exist even for the library and smart scope queries that can never sort on it.
@@ -1085,10 +1088,12 @@ export class BookRepository {
           book_metadata.series_index,
           book_metadata.published_date,
           book_metadata.published_year,
+          book_metadata.original_published_year,
           book_metadata.language,
           book_metadata.cover_source,
           book_metadata.locked_fields,
           book_metadata.publisher,
+          book_metadata.edition_name,
           book_metadata.page_count,
           book_metadata.subtitle,
           book_metadata.isbn13,
@@ -1225,11 +1230,13 @@ export class BookRepository {
           base.series_index,
           base.published_date,
           base.published_year,
+          base.original_published_year,
           base.language,
           ubr.rating,
           base.cover_source,
           base.locked_fields,
           base.publisher,
+          base.edition_name,
           base.page_count,
           base.subtitle,
           base.isbn13,
@@ -1281,9 +1288,11 @@ export class BookRepository {
       LEFT JOIN LATERAL (
         SELECT r.*
         FROM representatives r
+        ${bookLastReadJoinSql(sql`r.id`, userId)}
         ORDER BY ${orderBy}
         LIMIT ${limit} OFFSET ${offset}
       ) r ON true
+      ${bookLastReadJoinSql(sql`r.id`, userId)}
       ORDER BY ${orderBy}
     `);
 
@@ -1314,6 +1323,7 @@ export class BookRepository {
       lockedFields: r.locked_fields,
       subtitle: r.subtitle,
       publisher: r.publisher,
+      editionName: r.edition_name,
       pageCount: r.page_count !== null ? Number(r.page_count) : null,
       isbn13: r.isbn13,
       hardcoverId: r.hardcover_id,
@@ -1347,7 +1357,12 @@ export class BookRepository {
     const source = flatDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
     const visibleWhere = this.visibleWhere(opts.where);
-    const link = this.linkCollapseParts(visibleWhere, opts.collapseLinked === true, opts.sortByRepresentative ? undefined : opts.orderBy);
+    const link = this.linkCollapseParts(
+      visibleWhere,
+      opts.collapseLinked === true,
+      opts.userId,
+      opts.sortByRepresentative ? undefined : opts.orderBy,
+    );
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
     const result = await this.db.execute<DiscreteJumpBucketRawRow>(
@@ -1361,6 +1376,7 @@ export class BookRepository {
         FROM ${books}
         LEFT JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
         ${source.join}
+        ${bookLastReadJoinSql(books.id, opts.userId)}
         WHERE ${link.where}
       `,
         maxBuckets: opts.maxBuckets,
@@ -1385,7 +1401,7 @@ export class BookRepository {
     if (!source) return { buckets: [], total: 0, kind: 'temporal', granularity: null };
 
     const visibleWhere = this.visibleWhere(opts.where);
-    const link = this.linkCollapseParts(visibleWhere, opts.linkCollapseOrderBy !== undefined, opts.linkCollapseOrderBy ?? undefined);
+    const link = this.linkCollapseParts(visibleWhere, opts.linkCollapseOrderBy !== undefined, opts.userId, opts.linkCollapseOrderBy ?? undefined);
     const temporalRows = sql`
       SELECT ${source.value} AS value
       FROM ${books}
@@ -1423,7 +1439,7 @@ export class BookRepository {
   }): Promise<JumpBucketsResponse> {
     const source = collapsedDiscreteSourceParts(opts.field, opts.userId);
     if (!source) return { buckets: [], total: 0, kind: opts.kind, granularity: null };
-    const link = this.linkCollapseParts(this.visibleWhere(opts.where), opts.collapseLinked === true);
+    const link = this.linkCollapseParts(this.visibleWhere(opts.where), opts.collapseLinked === true, opts.userId);
     const orderBy = BookQueryBuilder.buildCollapseOrderBy(opts.sort, opts.userId, opts.customFieldTypes, { randomSeed: opts.randomSeed });
     const bucketExpr = opts.kind === 'letter' ? letterJumpBucketExpr(source.value) : sql`coalesce((${source.value})::text, '__unknown__')`;
     const isUnknownExpr = opts.kind === 'category' ? sql`${source.value} IS NULL` : sql`false`;
@@ -1446,6 +1462,7 @@ export class BookRepository {
           book_metadata.series_index,
           book_metadata.published_date,
           book_metadata.published_year,
+          book_metadata.original_published_year,
           book_metadata.publisher,
           book_metadata.page_count,
           book_metadata.metadata_score,
@@ -1473,6 +1490,7 @@ export class BookRepository {
           base.series_index,
           base.published_date,
           base.published_year,
+          base.original_published_year,
           base.publisher,
           base.page_count,
           base.metadata_score,
@@ -1496,6 +1514,7 @@ export class BookRepository {
           ${isUnknownExpr} AS is_unknown,
           (ROW_NUMBER() OVER (ORDER BY ${orderBy}) - 1) AS item_index
         FROM representatives r
+        ${bookLastReadJoinSql(sql`r.id`, opts.userId)}
       `,
         maxBuckets: opts.maxBuckets,
       }),
@@ -1517,7 +1536,7 @@ export class BookRepository {
     const source = temporalSourceParts(opts.field, opts.userId, opts.timeZone, true);
     if (!source) return { buckets: [], total: 0, kind: 'temporal', granularity: null };
 
-    const link = this.linkCollapseParts(this.visibleWhere(opts.where), opts.collapseLinked === true);
+    const link = this.linkCollapseParts(this.visibleWhere(opts.where), opts.collapseLinked === true, opts.userId);
     const empty = sql.raw('');
     const usesSeriesLatest = opts.field === 'addedAt';
     const seriesLatestCte = usesSeriesLatest
@@ -2307,7 +2326,19 @@ export class BookRepository {
     return rows.map((r) => r.id);
   }
 
-  async findIdsByWhere(where: SQL | undefined): Promise<number[]> {
+  /** With `collapseLinkedForUserId`, linked editions count as the one their folded card shows to that user. */
+  async findIdsByWhere(where: SQL | undefined, opts: { collapseLinkedForUserId?: number } = {}): Promise<number[]> {
+    if (opts.collapseLinkedForUserId !== undefined) {
+      const link = this.linkCollapseParts(this.visibleWhere(where), true, opts.collapseLinkedForUserId);
+      const result = await this.db.execute<{ id: number }>(sql`
+        WITH ${link.prefixCte}
+        picked AS (
+          SELECT books.id FROM books LEFT JOIN book_metadata ON book_metadata.book_id = books.id WHERE ${link.where}
+        )
+        SELECT id FROM picked
+      `);
+      return result.rows.map((row) => Number(row.id));
+    }
     const rows = await this.db
       .select({ id: books.id })
       .from(books)

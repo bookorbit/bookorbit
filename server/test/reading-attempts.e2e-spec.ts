@@ -1251,6 +1251,62 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect(monthsLastYear.reduce((sum, month) => sum + month.count, 0)).toBe(1);
   });
 
+  it('33. counts finishing both linked editions as one finished book and a re-read, while the goal counts both completions', async () => {
+    const username = `linked-editions-${randomUUID()}`;
+    const password = 'LinkedEditions123!';
+    const [user] = await ctx.db
+      .insert(schema.users)
+      .values({
+        username,
+        name: 'Linked Editions User',
+        passwordHash: await hash(password, 4),
+        isDefaultPassword: false,
+        provisioningMethod: 'local',
+      })
+      .returning({ id: schema.users.id });
+    await ctx.db.insert(schema.userLibraryAccess).values({ userId: user.id, libraryId, accessLevel: 'viewer' });
+    const login = await ctx.app.inject({ method: 'POST', url: '/api/v1/auth/login', payload: { username, password } });
+    const token = (login.json() as { accessToken: string }).accessToken;
+    const ebook = await createBook();
+    const audiobook = await createBook();
+    const getJson = async <T>(url: string) => {
+      const response = await ctx.app.inject({ method: 'GET', url: `/api/v1${url}`, headers: auth(token) });
+      expect(response.statusCode).toBe(200);
+      return response.json() as T;
+    };
+    const counts = async () => ({
+      completedBooks: (await getJson<{ completedBooks: number }>('/user-statistics/summary')).completedBooks,
+      goal: (await getJson<{ completedBooks: number }>('/dashboard/widgets/reading-goal')).completedBooks,
+      audiobookRead: (
+        await getJson<{ items: Array<{ readNumber: number | null; completedReads: number }> }>(`/reading-history?bookId=${audiobook.bookId}`)
+      ).items[0],
+    });
+
+    for (const book of [ebook, audiobook]) {
+      const finished = await ctx.app.inject({
+        method: 'PATCH',
+        url: `/api/v1/books/${book.bookId}/status`,
+        headers: auth(token),
+        payload: { status: 'read' },
+      });
+      expect(finished.statusCode).toBe(200);
+    }
+    expect(await counts()).toEqual({ completedBooks: 2, goal: 2, audiobookRead: expect.objectContaining({ readNumber: 1, completedReads: 1 }) });
+
+    const linked = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/books/links',
+      headers: auth(ctx.adminToken),
+      payload: { bookIds: [ebook.bookId, audiobook.bookId] },
+    });
+    expect(linked.statusCode).toBe(201);
+    expect(await counts()).toEqual({ completedBooks: 1, goal: 2, audiobookRead: expect.objectContaining({ readNumber: 2, completedReads: 2 }) });
+
+    const unlinked = await ctx.app.inject({ method: 'DELETE', url: `/api/v1/books/${ebook.bookId}/link`, headers: auth(ctx.adminToken) });
+    expect(unlinked.statusCode).toBe(204);
+    expect(await counts()).toEqual({ completedBooks: 2, goal: 2, audiobookRead: expect.objectContaining({ readNumber: 1, completedReads: 1 }) });
+  });
+
   it('refreshes cached dashboard and statistics counts immediately after reading history and status date edits', async () => {
     const book = await createBook();
     let dashboardBaseline: number | undefined;

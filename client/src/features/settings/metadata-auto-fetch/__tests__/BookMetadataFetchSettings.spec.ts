@@ -52,6 +52,7 @@ const breakdown: BookMetadataFetchBreakdown = {
     publisher: 20,
     isbn: 136,
     publishedYear: 24,
+    originalPublishedYear: 410,
     language: 9,
     pageCount: 189,
     communityRating: 236,

@@ -33,6 +33,7 @@ type BookRow = {
   lockedFields: string[] | null;
   subtitle: string | null;
   publisher: string | null;
+  editionName: string | null;
   pageCount: number | null;
   isbn13: string | null;
   hardcoverId: string | null;
@@ -245,6 +246,7 @@ export function assembleBookCards(
       lockedFields: normalizeLockedFields(row.lockedFields),
       subtitle: row.subtitle ?? null,
       publisher: row.publisher ?? null,
+      editionName: row.editionName ?? null,
       pageCount: row.pageCount ?? null,
       isbn13: row.isbn13 ?? null,
       hardcoverId: row.hardcoverId ?? null,

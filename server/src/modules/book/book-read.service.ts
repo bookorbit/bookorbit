@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { SQL } from 'drizzle-orm';
 
+import type { BookCard } from '@bookorbit/types';
+
+import { attachCardLinks } from './book-card-links';
 import { BookRepository } from './book.repository';
 
 @Injectable()
@@ -33,6 +36,15 @@ export class BookReadService {
 
   findCardsCollapsed(opts: Parameters<BookRepository['findCardsCollapsed']>[0]) {
     return this.bookRepo.findCardsCollapsed(opts);
+  }
+
+  findCardsLinkCollapsed(opts: Parameters<BookRepository['findCardsLinkCollapsed']>[0]) {
+    return this.bookRepo.findCardsLinkCollapsed(opts);
+  }
+
+  /** Fills `linked` on cards whose book has editions the viewer can see (`accessWhere`). */
+  attachCardLinks(cards: BookCard[], accessWhere: SQL | undefined): Promise<void> {
+    return attachCardLinks(this.bookRepo, cards, () => accessWhere);
   }
 
   countWhere(where: SQL | undefined): Promise<number> {

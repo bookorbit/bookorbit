@@ -43,7 +43,7 @@ const reasonCounts = computed<Record<BookDuplicateMatchReason, number>>(() => {
 })
 
 const reasons = computed(() => BOOK_DUPLICATE_REASONS_BY_KIND[props.kind])
-const groupLabel = computed(() => (props.kind === 'other_format' ? 'tools.bookDuplicates.summary.pairs' : 'tools.bookDuplicates.summary.groups'))
+const groupLabel = computed(() => (props.kind === 'duplicate' ? 'tools.bookDuplicates.summary.groups' : 'tools.bookDuplicates.summary.pairs'))
 
 function handleFilter(reason: BookDuplicateMatchReason): void {
   emit('filter', props.activeReason === reason ? undefined : reason)

@@ -18,6 +18,12 @@ function handleToggle(): void {
   expanded.value = !expanded.value
 }
 
+/** One side of the pair, with its edition detail when both share a title. */
+function sideLabel(title: string | null, detail: string | null | undefined): string {
+  const name = title ?? t('book.untitled')
+  return detail ? t('tools.bookDuplicates.dismissed.withDetail', { title: name, detail }) : name
+}
+
 function handleRestore(dismissal: BookDuplicateDismissal): void {
   emit('restore', dismissal.bookIdA, dismissal.bookIdB, dismissal.kind)
 }
@@ -43,13 +49,13 @@ function handleRestore(dismissal: BookDuplicateDismissal): void {
         <span class="min-w-0 flex-1 truncate text-foreground">
           {{
             t('tools.bookDuplicates.pairLabel', {
-              first: dismissal.titleA ?? t('book.untitled'),
-              second: dismissal.titleB ?? t('book.untitled'),
+              first: sideLabel(dismissal.titleA, dismissal.detailA),
+              second: sideLabel(dismissal.titleB, dismissal.detailB),
             })
           }}
         </span>
-        <span v-if="dismissal.kind === 'other_format'" class="shrink-0 text-muted-foreground">{{
-          t('tools.bookDuplicates.kinds.other_format')
+        <span v-if="dismissal.kind !== 'duplicate'" class="shrink-0 text-muted-foreground">{{
+          t(`tools.bookDuplicates.kinds.${dismissal.kind}`)
         }}</span>
         <span class="shrink-0 text-muted-foreground">{{ formatDate(new Date(dismissal.createdAt)) }}</span>
         <button

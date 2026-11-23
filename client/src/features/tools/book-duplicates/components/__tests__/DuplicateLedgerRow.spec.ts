@@ -159,6 +159,31 @@ describe('DuplicateLedgerRow', () => {
     expect(note.text()).toContain('Link keeps them as separate books')
   })
 
+  it('words grouping other editions as editions: the review button and the merge note', () => {
+    const books = [candidate({ id: 1 }), candidate({ id: 2, libraryId: 2 })]
+    const editions: BookDuplicateGroup = {
+      id: 7,
+      kind: 'other_edition',
+      reasons: ['same_work'],
+      maxTitleSimilarity: null,
+      reclaimableBytes: 0,
+      books,
+      pairs: [],
+    }
+    const wrapper = mountRow(books, 1, {
+      group: editions,
+      expanded: true,
+      action: 'link',
+      actions: ['link', 'merge'],
+      mergeUnavailableReason: 'DIFFERENT_LIBRARIES',
+    })
+
+    const buttons = wrapper.findAll('button').map((button) => button.text())
+    expect(buttons).toContain('Review grouping')
+    expect(buttons).not.toContain('Review link')
+    expect(wrapper.get('[data-testid="duplicate-merge-unavailable"]').text()).toContain('Group as editions keeps them as separate books')
+  })
+
   it('names the library a merge across libraries puts the book in, and says nothing of it within one library', () => {
     const books = [candidate({ id: 1 }), candidate({ id: 2, libraryId: 2, libraryName: 'Classics' })]
     const across = mountRow(books, 2, { expanded: true, action: 'merge' })

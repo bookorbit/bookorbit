@@ -43,6 +43,7 @@ export function mapOpenLibraryDoc(raw: OpenLibraryDoc): MetadataCandidate {
     title: raw.title,
     authors: raw.author_name,
     publishedYear: raw.first_publish_year,
+    originalPublishedYear: parsePublishedYear(raw.first_publish_year),
     isbn10,
     isbn13,
     publisher: raw.publisher?.[0],
@@ -60,6 +61,7 @@ export function mapOpenLibraryWork(raw: OpenLibraryWork): MetadataCandidate {
   const providerId = stripWorkPrefix(raw.key);
   const firstCover = raw.covers?.[0];
   const publishedDate = parsePublishedDateKey(raw.first_publish_date);
+  const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(raw.first_publish_date);
 
   return {
     provider: MetadataProviderKey.OPEN_LIBRARY,
@@ -67,7 +69,8 @@ export function mapOpenLibraryWork(raw: OpenLibraryWork): MetadataCandidate {
     title: raw.title,
     description: extractDescription(raw.description),
     publishedDate,
-    publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : parseYear(raw.first_publish_date),
+    publishedYear,
+    originalPublishedYear: publishedYear,
     genres: raw.subjects?.slice(0, 10),
     coverUrl: coverUrl(firstCover),
     sourceUrl: `https://openlibrary.org${raw.key}`,

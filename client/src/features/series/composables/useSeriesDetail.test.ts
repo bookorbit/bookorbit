@@ -257,6 +257,7 @@ describe('useSeriesDetail', () => {
       sort: 'title',
       order: 'desc',
       libraryId: 3,
+      collapseLinked: true,
     })
   })
 

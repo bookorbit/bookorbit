@@ -46,7 +46,7 @@ export class HardcoverProvider implements IdentifiableProvider {
   private readonly logger = new Logger(HardcoverProvider.name);
 
   readonly cache: ProviderCacheSpec<MetadataSearchParams> = {
-    version: 2,
+    version: 3,
     trustEmpty: true,
     context: async () => {
       const { enabled, apiKey } = (await this.providerConfig.getConfig()).hardcover;

@@ -37,6 +37,7 @@ export default defineConfigWithVueTs(
       'src/features/book/components/metadata-match/*.vue',
       'src/features/book/components/merge/*.vue',
       'src/features/book/components/link/*.vue',
+      'src/features/book/components/DeleteBookDialog.vue',
       'src/components/browse-header/*.vue',
       'src/features/api-keys/**/*.vue',
     ],

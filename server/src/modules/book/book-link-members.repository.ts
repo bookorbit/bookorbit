@@ -5,6 +5,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { getBookMediaKind, type LinkedBookSummary } from '@bookorbit/types';
 
 import { DB } from '../../db';
+import { bookLastReadSql } from '../../db/book-last-read';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -12,8 +13,33 @@ type Db = NodePgDatabase<typeof schema>;
 export type LinkGroupMember = LinkedBookSummary & { groupId: number };
 
 export function toLinkedBookSummary(member: LinkGroupMember): LinkedBookSummary {
-  const { bookId, libraryId, libraryName, title, formats, mediaKind, status, isLead } = member;
-  return { bookId, libraryId, libraryName, title, formats, mediaKind, status, isLead };
+  const summary: LinkedBookSummary & { groupId?: number } = { ...member };
+  delete summary.groupId;
+  return summary;
+}
+
+type ProgressInputs = {
+  status: string | null;
+  filePercentage: number | null;
+  fileReadAt: Date | null;
+  audioPercentage: number | null;
+  audioUpdatedAt: Date | null;
+};
+
+/**
+ * The viewer's progress as a card shows it: the more recent of file and audiobook progress.
+ * Finished, like the up-next shelf decides it: marked read or skimmed, or read to the end.
+ */
+export function memberProgress(row: ProgressInputs): LinkedBookSummary['progress'] {
+  let percentage: number | null;
+  if (row.filePercentage != null && row.audioPercentage != null) {
+    percentage = (row.fileReadAt?.getTime() ?? 0) >= (row.audioUpdatedAt?.getTime() ?? 0) ? row.filePercentage : row.audioPercentage;
+  } else {
+    percentage = row.filePercentage ?? row.audioPercentage;
+  }
+  if (row.status === 'read' || row.status === 'skimmed' || (percentage ?? 0) >= 100) return { percentage: 100, finished: true };
+  if (percentage == null || percentage <= 0) return null;
+  return { percentage: Math.round(Math.min(100, percentage) * 10) / 10, finished: false };
 }
 
 /** Who is linked with whom. Read side only: the book-link module owns the writes. */
@@ -33,16 +59,22 @@ export class BookLinkMembersRepository {
 
   /**
    * Members of these groups that pass `accessWhere` (the viewer's libraries and content filters),
-   * in group order: lead first, then by id. Groups with fewer than two members mean "not linked"
-   * and are left out.
+   * in group order: lead first, then by id, with the viewer's own progress. Groups with fewer than
+   * two members mean "not linked" and are left out. A group holds at most ten books, so the
+   * per-member lookups stay small.
    */
-  async findMembers(groupIds: number[], accessWhere: SQL | undefined): Promise<LinkGroupMember[]> {
+  async findMembers(groupIds: number[], accessWhere: SQL | undefined, userId: number): Promise<LinkGroupMember[]> {
     const ids = [...new Set(groupIds)];
     if (ids.length === 0) return [];
     const formats = sql<string[] | null>`(
-      select array_agg(lower(bf.format) order by (bf.id = ${schema.books.primaryFileId}) desc, bf.sort_order, bf.id)
-      from book_files bf
-      where bf.book_id = ${schema.books.id} and bf.role = 'content' and bf.format is not null
+      select array_agg(file_formats.format order by file_formats.rank_key)
+      from (
+        select lower(bf.format) as format,
+          min(array[case when bf.id = ${schema.books.primaryFileId} then 0 else 1 end, coalesce(bf.sort_order, 2147483647), bf.id]) as rank_key
+        from book_files bf
+        where bf.book_id = ${schema.books.id} and bf.role = 'content' and bf.format is not null
+        group by lower(bf.format)
+      ) file_formats
     )`;
     const rows = await this.db
       .select({
@@ -54,6 +86,32 @@ export class BookLinkMembersRepository {
         status: schema.books.status,
         leadBookId: schema.bookLinkGroups.leadBookId,
         formats,
+        editionName: schema.bookMetadata.editionName,
+        publisher: schema.bookMetadata.publisher,
+        publishedYear: schema.bookMetadata.publishedYear,
+        originalPublishedYear: schema.bookMetadata.originalPublishedYear,
+        coverUpdatedAt: schema.bookMetadata.coverUpdatedAt,
+        narrators: sql<string[] | null>`(
+          select array_agg(n.name order by bn.display_order, n.id)
+          from book_narrators bn inner join narrators n on n.id = bn.narrator_id
+          where bn.book_id = ${schema.books.id}
+        )`,
+        viewerStatus: sql<string | null>`(
+          select ubs.status from user_book_status ubs where ubs.user_id = ${userId} and ubs.book_id = ${schema.books.id}
+        )`,
+        filePercentage: sql<number | null>`(
+          select rp.percentage from reading_progress rp where rp.user_id = ${userId} and rp.book_file_id = ${schema.books.primaryFileId}
+        )`,
+        fileReadAt: sql<Date | null>`(
+          select rp.last_read_at from reading_progress rp where rp.user_id = ${userId} and rp.book_file_id = ${schema.books.primaryFileId}
+        )`.mapWith((value: string | Date | null) => (value == null ? null : new Date(value))),
+        audioPercentage: sql<number | null>`(
+          select ap.percentage from audiobook_progress ap where ap.user_id = ${userId} and ap.book_id = ${schema.books.id}
+        )`,
+        audioUpdatedAt: sql<Date | null>`(
+          select ap.updated_at from audiobook_progress ap where ap.user_id = ${userId} and ap.book_id = ${schema.books.id}
+        )`.mapWith((value: string | Date | null) => (value == null ? null : new Date(value))),
+        lastReadAt: bookLastReadSql(schema.books.id, userId).mapWith((value: string | Date | null) => (value == null ? null : new Date(value))),
       })
       .from(schema.bookLinks)
       .innerJoin(schema.bookLinkGroups, eq(schema.bookLinkGroups.id, schema.bookLinks.groupId))
@@ -81,6 +139,20 @@ export class BookLinkMembersRepository {
         mediaKind: getBookMediaKind(bookFormats[0]),
         status: row.status,
         isLead: row.leadBookId === row.bookId,
+        editionName: row.editionName ?? null,
+        publisher: row.publisher ?? null,
+        publishedYear: row.publishedYear ?? null,
+        originalPublishedYear: row.originalPublishedYear ?? null,
+        narrators: row.narrators ?? [],
+        coverUpdatedAt: row.coverUpdatedAt ? new Date(row.coverUpdatedAt).toISOString() : null,
+        progress: memberProgress({
+          status: row.viewerStatus,
+          filePercentage: row.filePercentage == null ? null : Number(row.filePercentage),
+          fileReadAt: row.fileReadAt,
+          audioPercentage: row.audioPercentage == null ? null : Number(row.audioPercentage),
+          audioUpdatedAt: row.audioUpdatedAt,
+        }),
+        lastReadAt: row.lastReadAt ? row.lastReadAt.toISOString() : null,
       };
     });
   }
@@ -91,11 +163,12 @@ export class BookLinkMembersRepository {
     bookId: number,
     groupId: number,
     accessWhere: SQL | undefined,
-  ): Promise<{ groupId: number | null; books: LinkedBookSummary[]; isLead: boolean }> {
-    const members = await this.findMembers([groupId], accessWhere);
+    userId: number,
+  ): Promise<{ groupId: number | null; books: LinkedBookSummary[]; isLead: boolean; self: LinkedBookSummary | null }> {
+    const members = await this.findMembers([groupId], accessWhere, userId);
     const self = members.find((member) => member.bookId === bookId);
     const books = self ? members.filter((member) => member.bookId !== bookId).map(toLinkedBookSummary) : [];
-    if (books.length === 0) return { groupId: null, books: [], isLead: false };
-    return { groupId, books, isLead: self?.isLead ?? false };
+    if (!self || books.length === 0) return { groupId: null, books: [], isLead: false, self: null };
+    return { groupId, books, isLead: self.isLead, self: toLinkedBookSummary(self) };
   }
 }

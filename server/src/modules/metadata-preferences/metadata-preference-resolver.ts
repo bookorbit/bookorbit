@@ -89,6 +89,8 @@ const FIELD_DEFAULTS: Partial<Record<MetadataField, Partial<FieldPreference>>> =
   // Google and Open Library carry no series.
   seriesName: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.AMAZON, MetadataProviderKey.KOBO] },
   seriesIndex: { providers: [MetadataProviderKey.GOODREADS, MetadataProviderKey.AMAZON, MetadataProviderKey.KOBO] },
+  // Only these two tell a work's first year apart from the edition's.
+  originalPublishedYear: { providers: [MetadataProviderKey.HARDCOVER, MetadataProviderKey.OPEN_LIBRARY] },
   // Only audiobook sources carry these, so the base order could never fill them. Audnexus stays out
   // for the reason it stays out of the audio cover: chapters follow the narrators order, and it would
   // bring Audible's timings in over the book's own. Duration only fills a gap, because the one

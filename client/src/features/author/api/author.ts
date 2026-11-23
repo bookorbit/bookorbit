@@ -46,6 +46,8 @@ type ListAuthorBooksParams = {
   order: SortDirection
   libraryId?: number | null
   collapseSeries?: boolean
+  /** Folds linked editions into one card. Servers without editions support reject it. */
+  collapseLinked?: boolean
 }
 
 export type UpdateAuthorPayload = AuthorFactsPayload & {
@@ -181,6 +183,7 @@ export async function fetchAuthorBooks(authorId: number, params: ListAuthorBooks
     order: params.order,
     libraryId: params.libraryId ?? undefined,
     collapseSeries: params.collapseSeries ? 'true' : undefined,
+    collapseLinked: params.collapseLinked ? 'true' : undefined,
   })
 
   const res = await api(`/api/v1/authors/${authorId}/books${query}`)

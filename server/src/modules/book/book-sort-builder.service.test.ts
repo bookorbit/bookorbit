@@ -84,6 +84,12 @@ describe('BookSortBuilder', () => {
     expect(raw).toHaveBeenNthCalledWith(2, 'DESC');
   });
 
+  it('builds the first published year sort on its own column', () => {
+    const result = service.build([{ field: 'originalPublishedYear', dir: 'asc' }]) as unknown as Array<{ values: unknown[] }>;
+
+    expect(result[0]?.values[0]).toMatchObject({ name: 'original_published_year' });
+  });
+
   it('builds weighted relevance sorting when a query is present', () => {
     const raw = (sql as unknown as { raw: vi.Mock }).raw;
 
@@ -197,17 +203,13 @@ describe('BookSortBuilder', () => {
 
   // reading_progress.updated_at is frozen by the KOReader sync path, so ordering on it left
   // KOReader-only readers with an effectively random "Last Read" order.
-  it('orders lastReadAt on the latest session or saved last_read_at timestamp', () => {
+  it('orders lastReadAt on the joined last-read row set, not a per-row subquery', () => {
     const result = service.build([{ field: 'lastReadAt', dir: 'desc' }], 42);
 
-    const [lastRead] = result[0]!.values as [{ text: string; values: [{ text: string; values: unknown[] }, unknown, number] }];
-    const { text } = lastRead;
-    expect(text).toContain('greatest(');
-    expect(lastRead.values[0].text).toContain('SELECT rs.started_at');
-    expect(lastRead.values[0].values[0]).toBe(42);
-    expect(text).toContain('SELECT max(rp.last_read_at)');
-    expect(text).not.toContain('rp.updated_at');
-    expect(lastRead.values[2]).toBe(42);
+    expect(result[0]?.values).toEqual([
+      { type: 'raw', value: 'book_last_read.last_read_at' },
+      { type: 'raw', value: 'DESC' },
+    ]);
   });
 
   it('throws for finishedAt sort without userId', () => {
