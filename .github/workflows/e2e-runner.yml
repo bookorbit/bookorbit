@@ -29,7 +29,6 @@ on:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: "26"
-  PNPM_VERSION: "11"
   E2E_DATABASE_URL: postgres://bookorbit:bookorbit@localhost:5432/bookorbit_e2e
   NODE_ENV: test
   JWT_SECRET: scanner-e2e-secret-1234
@@ -69,7 +68,6 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
           prefetch: "true"
 
       - name: Install DjVuLibre tools

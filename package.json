@@ -12,7 +12,7 @@
     "url": "https://github.com/bookorbit/bookorbit/issues"
   },
   "private": true,
-  "packageManager": "pnpm@11.28.9",
+  "packageManager": "pnpm@12.23.0",
   "scripts": {
     "setup": "bash ./scripts/bootstrap/local.sh",
     "dev": "concurrently --names \"types,server,client\" --prefix-colors \"cyan,blue,green\" \"pnpm --filter @bookorbit/types dev\" \"pnpm run dev:server\" \"pnpm run dev:client\"",
@@ -61,7 +61,7 @@
   },
   "engines": {
     "node": ">=24",
-    "pnpm": ">=11"
+    "pnpm": ">=12"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.4",
@@ -72,7 +72,7 @@
     "concurrently": "^10.0.7",
     "conventional-changelog-conventionalcommits": "^10.4.1",
     "husky": "^9.1.7",
-    "lint-staged": "^17.6.1",
+    "lint-staged": "^17.6.2",
     "prettier": "^3.10.1",
     "semantic-release": "^26.0.1"
   },

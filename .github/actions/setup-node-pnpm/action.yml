@@ -1,15 +1,11 @@
 name: Setup Node and pnpm
-description: Set up Node.js, activate pnpm via Corepack, and optionally install dependencies.
+description: Set up Node.js and pnpm, and optionally install dependencies.
 
 inputs:
   node-version:
     description: Node.js version to install.
     required: false
     default: "26"
-  pnpm-version:
-    description: pnpm version to activate via Corepack.
-    required: false
-    default: "11"
   install:
     description: Whether to run pnpm install.
     required: false
@@ -35,14 +31,16 @@ runs:
       with:
         node-version: ${{ inputs.node-version }}
 
-    - name: Enable Corepack and activate pnpm
+    - name: Install the workspace's pnpm version
+      id: pnpm
       shell: bash
       run: |
-        corepack enable
-        corepack prepare "pnpm@${{ inputs.pnpm-version }}" --activate
+        package_manager=$(node -p 'require("./package.json").packageManager')
+        npm install --global "$package_manager"
+        echo "version=$(pnpm --version)" >> "$GITHUB_OUTPUT"
 
     # pnpm must be on PATH before its store path can be resolved for cache keying,
-    # so caching is configured in a separate step after Corepack activates pnpm.
+    # so caching is configured after installing pnpm.
     - name: Get pnpm store directory
       if: ${{ inputs.cache == 'true' }}
       id: pnpm-store
@@ -54,17 +52,19 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.pnpm-store.outputs.path }}
-        key: ${{ runner.os }}-pnpm-${{ inputs.pnpm-version }}-store-${{ hashFiles(inputs.cache-dependency-path) }}
+        key: ${{ runner.os }}-pnpm-${{ steps.pnpm.outputs.version }}-store-${{ hashFiles(inputs.cache-dependency-path) }}
         restore-keys: |
-          ${{ runner.os }}-pnpm-${{ inputs.pnpm-version }}-store-
+          ${{ runner.os }}-pnpm-${{ steps.pnpm.outputs.version }}-store-
 
+    # onnxruntime-node's postinstall runs during prefetch as well as installation. CI only uses the
+    # CPU binding bundled in the npm package, so skip the CUDA provider download in both steps.
     - name: Prefetch dependencies
       if: ${{ inputs.prefetch == 'true' }}
       shell: bash
+      env:
+        ONNXRUNTIME_NODE_INSTALL: skip
       run: pnpm fetch --frozen-lockfile
 
-    # onnxruntime-node's postinstall otherwise downloads its CUDA provider on Linux x64. Nothing in CI
-    # uses it, and the CPU binding the read-aloud worker tests load ships in the npm package itself.
     - name: Install dependencies
       if: ${{ inputs.install == 'true' }}
       shell: bash

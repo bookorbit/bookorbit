@@ -22,7 +22,6 @@ permissions:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
   NODE_VERSION: "26"
-  PNPM_VERSION: "11"
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   BUILDX_GIT_LABELS: "1"
@@ -207,7 +206,6 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
 
       - name: Enforce localization change policy
         shell: bash
@@ -361,7 +359,6 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
           prefetch: "true"
 
       - name: Run lint checks
@@ -433,7 +430,6 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
           prefetch: "true"
 
       - name: Run typecheck
@@ -498,7 +494,6 @@ jobs:
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
-          pnpm-version: ${{ env.PNPM_VERSION }}
           prefetch: "true"
 
       - name: Prepare test report directory

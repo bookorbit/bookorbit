@@ -79,7 +79,7 @@ bookorbit/
 ## Prerequisites
 
 - **Node.js** >= 24 - [nodejs.org](https://nodejs.org)
-- **pnpm** >= 9 - `npm install -g pnpm` (or see [pnpm.io](https://pnpm.io/installation))
+- **pnpm** >= 12 - `npm install -g pnpm` (or see [pnpm.io](https://pnpm.io/installation))
 - **Docker** - [docs.docker.com/get-started/get-docker](https://docs.docker.com/get-started/get-docker/)
 
 ---

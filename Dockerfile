@@ -1,7 +1,7 @@
 ARG NODE_IMAGE=node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5
 
 FROM ${NODE_IMAGE} AS base
-RUN npm install -g pnpm@11.28.9
+RUN npm install -g pnpm@12.23.0
 
 # Stage 1: Build client
 FROM base AS client-builder
@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 COPY packages/ ./packages/
 COPY client/ ./client/
-# pnpm 11 defaults verifyDepsBeforeRun to "install", so running a script
+# pnpm defaults verifyDepsBeforeRun to "install", so running a script
 # re-installs first. Each stage installed its own filtered subset with a frozen
 # lockfile two steps up, and no stage carries the whole workspace, so that
 # re-install is both redundant and wrong: it resolves against a partial
