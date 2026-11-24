@@ -1,11 +1,17 @@
 name: Release
 run-name: >-
-  ${{ github.event_name == 'workflow_dispatch' && format('Release - {0}', github.ref_name) || format('Release checks - PR #{0}', github.event.pull_request.number) }}
+  ${{ github.event_name == 'workflow_dispatch' && (inputs.tag != '' && format('Promote {0}', inputs.tag) || format('Release - {0}', github.ref_name)) || format('Release checks - PR #{0}', github.event.pull_request.number) }}
 
 on:
   pull_request:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build Docker images for, e.g. v3.10.0. Skips semantic-release. Leave empty for a normal release."
+        required: false
+        default: ""
+        type: string
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event_name == 'workflow_dispatch' && 'release' || format('pr-{0}', github.event.pull_request.number) }}
@@ -199,7 +205,7 @@ jobs:
     name: Publish Release
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       actions: read
       contents: write
@@ -207,9 +213,9 @@ jobs:
       pull-requests: write
       packages: read
     outputs:
-      published: ${{ steps.semantic.outputs.new_release_published }}
-      version: ${{ steps.semantic.outputs.new_release_version }}
-      tag: ${{ steps.semantic.outputs.new_release_git_tag }}
+      published: ${{ steps.semantic.outputs.new_release_published || steps.target.outputs.published }}
+      version: ${{ steps.semantic.outputs.new_release_version || steps.target.outputs.version }}
+      tag: ${{ steps.semantic.outputs.new_release_git_tag || steps.target.outputs.tag }}
     steps:
       - name: Guard against non-main branch
         shell: bash
@@ -226,11 +232,50 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify CI success for current SHA
+      - name: Resolve release target
+        id: target
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          COMMIT_SHA: ${{ github.sha }}
+          GH_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.sha }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$INPUT_TAG" ]]; then
+            echo "sha=${HEAD_SHA}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [[ ! "$INPUT_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag must look like vX.Y.Z. Got: ${INPUT_TAG}"
+            exit 1
+          fi
+          if ! TAG_SHA=$(git rev-parse --verify --quiet "refs/tags/${INPUT_TAG}^{commit}"); then
+            echo "::error::Tag ${INPUT_TAG} does not exist."
+            exit 1
+          fi
+          LATEST_TAG=$(git tag --list 'v*' --sort=-v:refname | head -1)
+          if [[ "$INPUT_TAG" != "$LATEST_TAG" ]]; then
+            echo "::error::Only the newest release tag (${LATEST_TAG}) can be promoted again. Promoting ${INPUT_TAG} would move :latest backwards."
+            exit 1
+          fi
+          if ! gh release view "$INPUT_TAG" --repo "$GH_REPO" --json tagName > /dev/null; then
+            echo "::error::No GitHub release exists for ${INPUT_TAG}."
+            exit 1
+          fi
+          echo "Promoting existing release ${INPUT_TAG} (${TAG_SHA}) without running semantic-release."
+          {
+            echo "sha=${TAG_SHA}"
+            echo "published=true"
+            echo "version=${INPUT_TAG#v}"
+            echo "tag=${INPUT_TAG}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Verify CI success for release commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ steps.target.outputs.sha }}
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -258,7 +303,7 @@ jobs:
       - name: Verify SHA image exists in GHCR
         shell: bash
         env:
-          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_SHA: ${{ steps.target.outputs.sha }}
           IMAGE_NAME: ${{ github.repository }}
         run: |
           set -euo pipefail
@@ -271,6 +316,7 @@ jobs:
           echo "Image sha-${SHORT_SHA} verified in GHCR."
 
       - name: Set up Node.js and pnpm
+        if: inputs.tag == ''
         uses: ./.github/actions/setup-node-pnpm
         with:
           node-version: ${{ env.NODE_VERSION }}
@@ -278,6 +324,7 @@ jobs:
 
       - name: Run semantic-release
         id: semantic
+        if: inputs.tag == ''
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
