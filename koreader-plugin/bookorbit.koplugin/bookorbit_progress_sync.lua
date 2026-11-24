@@ -185,8 +185,31 @@ function ProgressSync:progressComparedSinceOpen()
     return compared ~= nil and compared == self:getDocumentDigest()
 end
 
+-- Outlives the plugin instance: a layout change makes KOReader rebuild the reader
+-- and with it this plugin, but the book and its reading session carry on.
+local carried_compared_digest
+
 function ProgressSync:noteProgressCompared(digest)
     self.progress_compared_digest = digest or self:getDocumentDigest()
+    carried_compared_digest = self.progress_compared_digest
+end
+
+-- Whether this reader is the open book rebuilt by a reload (rotation, font or
+-- margin change) whose place was already weighed against BookOrbit's. The new
+-- layout paginates differently, so percentages from before the reload no longer
+-- line up and a fresh open-time pull would move the reader about a page.
+-- Hands the weighed state to this instance when it is. `reloading` is the
+-- reader's own flag, which KOReader clears again right after ReaderReady.
+function ProgressSync:continuesReloadedBook(reloading)
+    local carried = carried_compared_digest
+    if not reloading then
+        carried_compared_digest = nil
+        return false
+    end
+    local digest = self:getDocumentDigest()
+    if not digest or digest ~= carried then return false end
+    self.progress_compared_digest = digest
+    return true
 end
 
 function ProgressSync:applyRemoteProgress(body, on_done)

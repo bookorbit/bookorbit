@@ -51,7 +51,7 @@ local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "2.4.1"
+local PLUGIN_VERSION = "2.4.2"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -817,6 +817,7 @@ function BookOrbit:requestOpenBookMatch(source, opts)
                 if opts.schedule_annotation_sync and self.settings.annotation_sync then
                     self:scheduleOpenAnnotationSync(opts.annotation_digest or self:getDocumentDigest(), "annotation_open")
                 end
+                if opts.skip_progress_pull then return end
                 self:requestProgressPull(true, false, "reader_ready")
             end)
         end,
@@ -989,6 +990,8 @@ function BookOrbit:onDispatcherRegisterActions()
 end
 
 function BookOrbit:onReaderReady()
+    -- Read before anything is deferred: KOReader clears the flag once ReaderReady returns.
+    local reloading = self.ui.reloading == true
     -- Primed here so the close and suspend handlers, which are on a hard
     -- latency budget, never open statistics.sqlite3 to learn the row ids.
     -- Only those handlers consume it, and they run only while logged in.
@@ -1010,6 +1013,7 @@ function BookOrbit:onReaderReady()
             self:requestOpenBookMatch("reader_ready", {
                 schedule_annotation_sync = self.settings.annotation_sync,
                 annotation_digest = digest,
+                skip_progress_pull = self:continuesReloadedBook(reloading),
             })
         end)
     end
