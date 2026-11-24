@@ -177,6 +177,14 @@ describe('AiJobRunner outcomes for each client answer', () => {
     expect(h.events).toContainEqual({ code: 'unit_skipped', step: 'names', data: { unit: 'p0', reason } });
   });
 
+  it('counts what a failed request was billed, so the over-estimate pause sees it', async () => {
+    const h = createRunnerHarness();
+    const billed = Object.assign(new AiError('too-long'), { spent: { input: 1000, output: 9000, cost: 0.05 } });
+    h.client.handler = (request) => (request.user.startsWith('Passage 0 ') ? Promise.reject(billed) : defaultAnswer(request));
+    expect(await h.run(h.job(10))).toMatchObject({ kind: 'paused', reason: 'over-estimate' });
+    expect(h.jobState.usage).toEqual({ tokens: 10_000 + 9 * 120, costMicros: 50_000 + 9 * 100 });
+  });
+
   it('fails low-coverage, naming the step, below 90% of its units', async () => {
     const h = createRunnerHarness();
     h.client.handler = (request) =>

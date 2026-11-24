@@ -63,6 +63,8 @@ export type AiErrorCode = (typeof AI_ERROR_CODES)[number];
 
 export class AiError extends Error {
   override readonly name = 'AiError';
+  /** What the request's attempts were billed before it failed. */
+  spent?: AiUsage;
 
   constructor(
     readonly code: AiErrorCode | (string & {}),
@@ -83,6 +85,15 @@ export function aiErrorCode(error: unknown): string | null {
     return typeof code === 'string' ? code : null;
   }
   return null;
+}
+
+/** What a failed request was billed, recognised by shape like `aiErrorCode`. */
+export function aiErrorSpent(error: unknown): AiUsage | null {
+  if (aiErrorCode(error) === null) return null;
+  const spent = (error as { spent?: unknown }).spent;
+  if (!spent || typeof spent !== 'object') return null;
+  const { input, output } = spent as Partial<AiUsage>;
+  return typeof input === 'number' && typeof output === 'number' ? (spent as AiUsage) : null;
 }
 
 export interface AiClientPort {

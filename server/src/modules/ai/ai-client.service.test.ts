@@ -210,7 +210,10 @@ describe('AiClient', () => {
     it('retries once with the validation error appended, then succeeds', async () => {
       const { client, respondInOrder, sent, rows } = setup();
       respondInOrder(reply('{"names":[{"name":"Elizabeth Bennet"}]}'), reply(`Sure! ${VALID_JSON}`));
-      await expect(client.complete(request())).resolves.toMatchObject({ json: { names: [{ kind: 'person' }] } });
+      await expect(client.complete(request())).resolves.toMatchObject({
+        json: { names: [{ kind: 'person' }] },
+        usage: { input: 2000, output: 400, cost: 0.0036 },
+      });
 
       const messages = bodyOf(sent[1]).messages as Array<{ role: string; content: string }>;
       expect(messages.slice(1)).toEqual([
@@ -231,6 +234,7 @@ describe('AiClient', () => {
       expect(error).toBeInstanceOf(AiError);
       expect(error?.code).toBe('invalid-json');
       expect(error?.details.validation).toBe('The reply did not contain a JSON object');
+      expect(error?.spent).toEqual({ input: 2000, output: 400, cost: 0.0036 });
       expect(rows).toHaveLength(2);
     });
 
@@ -257,9 +261,10 @@ describe('AiClient', () => {
     it('retries once with double the output allowance', async () => {
       const { client, respondInOrder, sent, rows } = setup();
       respondInOrder(reply('{"names":[', 'length'), reply(VALID_JSON));
-      await client.complete(request());
+      const result = await client.complete(request());
       expect(sent.map((entry) => bodyOf(entry).max_tokens)).toEqual([800, 1600]);
       expect(rows.map((row) => row.outcome)).toEqual(['length', 'ok']);
+      expect(result.usage).toEqual({ input: 2000, output: 400, cost: 0.0036 });
     });
 
     it("caps the retry at the model's limit, and fails too-long when that leaves no room", async () => {
@@ -277,14 +282,19 @@ describe('AiClient', () => {
     it('fails too-long when the doubled reply is cut short too', async () => {
       const { client, respond, rows } = setup();
       respond(() => reply('{', 'length'));
-      await expect(errorOf(client.complete(request()))).resolves.toMatchObject({ code: 'too-long' });
+      await expect(errorOf(client.complete(request()))).resolves.toMatchObject({
+        code: 'too-long',
+        spent: { input: 2000, output: 400, cost: 0.0036 },
+      });
       expect(rows.map((row) => row.outcome)).toEqual(['length', 'length']);
     });
 
     it('maps a context-length error to too-long, which features split on', async () => {
       const { client, respondInOrder } = setup();
       respondInOrder(loadFixture('openai-chat', 'context-length'));
-      await expect(errorOf(client.complete(request()))).resolves.toMatchObject({ code: 'too-long' });
+      const error = await errorOf(client.complete(request()));
+      expect(error).toMatchObject({ code: 'too-long' });
+      expect(error?.spent).toBeUndefined();
     });
   });
 

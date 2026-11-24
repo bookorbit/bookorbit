@@ -71,6 +71,8 @@ interface Run {
   json: AiJsonSupport | 'none';
   messages: AiMessage[];
   maxOutputTokens: number;
+  /** Every attempt the provider billed for, so retries count toward the job as well as the ledger. */
+  spent: { usage: AiAdapterUsage; cost: number | null };
   lengthRetried: boolean;
   repaired: boolean;
   transientFailures: number;
@@ -132,12 +134,17 @@ export class AiClient {
 
   async complete(request: AiRequest, options: AiCompleteOptions = {}): Promise<AiResult> {
     const run = await this.prepare(request, options, false);
-    for (let number = 1; number <= MAX_ATTEMPTS; number++) {
-      const step = await this.attempt(run, number);
-      if ('done' in step) return step.done;
-      if (!(await this.beforeRetry(run, step))) break;
+    try {
+      for (let number = 1; number <= MAX_ATTEMPTS; number++) {
+        const step = await this.attempt(run, number);
+        if ('done' in step) return step.done;
+        if (!(await this.beforeRetry(run, step))) break;
+      }
+      return await this.giveUp(run);
+    } catch (err) {
+      if (err instanceof AiError && hasSpent(run)) err.spent = spentUsage(run);
+      throw err;
     }
-    return this.giveUp(run);
   }
 
   /**
@@ -178,6 +185,7 @@ export class AiClient {
       json: !request.schema ? 'none' : choice.jsonMode === 'auto' ? (connection.jsonSupport ?? 'schema') : choice.jsonMode,
       messages: [{ role: 'user', content: userContent(request) }],
       maxOutputTokens: request.maxOutputTokens,
+      spent: { usage: { input: 0, output: 0, reasoning: 0, cached: 0 }, cost: null },
       lengthRetried: false,
       repaired: false,
       transientFailures: 0,
@@ -335,7 +343,7 @@ export class AiClient {
     await this.record(run, attempt, outcome, usage, cost, durationMs);
     if (reply.finish === 'stop' || reply.finish === 'length') await this.clearSlotHealth(run);
     const refused = reply.finish === 'refused' || reply.finish === 'filtered';
-    return { text: refused ? '' : reply.text, usage: toUsage(usage, cost), finish: reply.finish, model: reply.model || run.choice.model };
+    return { text: refused ? '' : reply.text, usage: spentUsage(run), finish: reply.finish, model: reply.model || run.choice.model };
   }
 
   private async recordEstimate(run: Run, attempt: Attempt, outcome: AiUsageOutcome, received: string): Promise<void> {
@@ -419,11 +427,10 @@ export class AiClient {
   private async onReply(run: Run, attempt: Attempt, reply: AiAdapterResult, response: AiHttpResponse): Promise<Step> {
     const { request, choice } = run;
     const cost = costOf(reply.usage, choice.prices);
-    const usage = toUsage(reply.usage, cost);
     const result = (text: string, json?: unknown): AiResult => ({
       text,
       ...(json !== undefined ? { json } : {}),
-      usage,
+      usage: spentUsage(run),
       finish: reply.finish,
       model: reply.model || choice.model,
     });
@@ -630,6 +637,13 @@ export class AiClient {
     status?: number,
   ): Promise<void> {
     const { request, choice, connection } = run;
+    run.spent.usage = {
+      input: run.spent.usage.input + usage.input,
+      output: run.spent.usage.output + usage.output,
+      reasoning: run.spent.usage.reasoning + usage.reasoning,
+      cached: run.spent.usage.cached + usage.cached,
+    };
+    if (cost !== null) run.spent.cost = (run.spent.cost ?? 0) + cost;
     try {
       await this.ledger.insert({
         at: attempt.startedAt,
@@ -708,6 +722,15 @@ function costOf(usage: AiAdapterUsage, prices: AiModelPrices | null): number | n
   if (usage.cost !== undefined) return usage.cost;
   if (!prices) return null;
   return (usage.input * prices.input + usage.output * prices.output) / 1_000_000;
+}
+
+function spentUsage(run: Run): AiUsage {
+  return toUsage(run.spent.usage, run.spent.cost);
+}
+
+function hasSpent(run: Run): boolean {
+  const { usage, cost } = run.spent;
+  return cost !== null || usage.input + usage.output + usage.reasoning > 0;
 }
 
 function toUsage(usage: AiAdapterUsage, cost: number | null): AiUsage {

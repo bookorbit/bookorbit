@@ -64,6 +64,7 @@ export type AiFinish = 'stop' | 'length' | 'refused' | 'filtered';
 export interface AiResult {
   text: string;
   json?: unknown;
+  /** Every attempt the request was billed for: a reply cut short or sent back for repair counts too. */
   usage: AiUsage;
   finish: AiFinish;
   /** As the provider reported it. */
@@ -82,6 +83,9 @@ export interface AiErrorDetails {
 
 /** What `AiClient.complete` throws. Jobs pause or skip by `code`. */
 export class AiError extends Error {
+  /** What the request's attempts were billed before it failed; absent when nothing was billed. */
+  spent?: AiUsage;
+
   constructor(
     readonly code: AiErrorCode,
     message: string,

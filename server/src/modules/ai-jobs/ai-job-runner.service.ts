@@ -25,7 +25,7 @@ import { AiJobChecks } from './ai-job-checks.service';
 import { AiJobRepository } from './ai-job.repository';
 import { AiJobStepRepository, type CachedUnit, type CacheScope } from './ai-job-step.repository';
 import { AI_JOBS_MIN_COVERAGE, AI_JOBS_OVER_ESTIMATE_FACTOR, AI_JOBS_STATE_CHECK_MS, AI_JOBS_UNIT_CONCURRENCY } from './ai-jobs.constants';
-import { AI_JOBS_PORTS, aiErrorCode, type AiJobsPorts, type AiResult } from './ai-jobs.ports';
+import { AI_JOBS_PORTS, aiErrorCode, aiErrorSpent, type AiJobsPorts, type AiResult, type AiUsage } from './ai-jobs.ports';
 
 export type AiArtifactValues = Omit<NewAiArtifactRow, 'jobId' | 'builtAt'>;
 
@@ -250,23 +250,35 @@ export class AiJobRunner {
     if (!step.slot) throw new Error(`Step ${step.id} runs code only and cannot send requests`);
     await run.ensureStillRunning();
     if (run.overCap()) throw new AiJobPause('over-estimate');
-    const result = await this.ports.client.complete({
-      ...request,
-      feature: run.feature.id,
-      slot: step.slot,
-      jobId: run.row.id,
-      signal: run.signal,
-      use: run.models[step.slot],
-    });
-    const tokens = result.usage.input + result.usage.output + (result.usage.reasoning ?? 0);
-    const costMicros = result.usage.cost == null ? null : Math.round(result.usage.cost * 1_000_000);
-    usage.tokens += tokens;
+    let result: AiResult;
+    try {
+      result = await this.ports.client.complete({
+        ...request,
+        feature: run.feature.id,
+        slot: step.slot,
+        jobId: run.row.id,
+        signal: run.signal,
+        use: run.models[step.slot],
+      });
+    } catch (error) {
+      const spent = aiErrorSpent(error);
+      if (spent) await this.count(run, usage, spent);
+      throw error;
+    }
     usage.model = result.model || usage.model;
+    await this.count(run, usage, result.usage);
+    if (result.finish === 'refused' || result.finish === 'filtered') throw new AiUnitSkipped(result.finish);
+    return result;
+  }
+
+  /** Adds what a request was billed to the unit, the job and the over-estimate cap. */
+  private async count(run: JobRun, usage: { tokens: number; costMicros: number | null }, spent: AiUsage): Promise<void> {
+    const tokens = spent.input + spent.output + (spent.reasoning ?? 0);
+    const costMicros = spent.cost == null ? null : Math.round(spent.cost * 1_000_000);
+    usage.tokens += tokens;
     if (costMicros != null) usage.costMicros = (usage.costMicros ?? 0) + costMicros;
     run.spend(costMicros);
     await this.jobs.addUsage(run.row.id, tokens, costMicros);
-    if (result.finish === 'refused' || result.finish === 'filtered') throw new AiUnitSkipped(result.finish);
-    return result;
   }
 
   private async assemble(run: JobRun): Promise<AiArtifactValues> {
