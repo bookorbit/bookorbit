@@ -79,6 +79,38 @@ describe('findIsbnInText', () => {
     expect(findIsbnInText('ISBN 978-0-306-40615-8')).toEqual([]);
   });
 
+  it('finds an ISBN printed just before another number', () => {
+    const text = 'ISBN 978-0-306-40615-7 (Paperback) eISBN 9781635766264\n1. Fiction. I. Title.';
+    expect(findIsbnInText(text)).toMatchObject([
+      { value: ISBN_13, labeled: true, edition: 'paperback' },
+      { value: OTHER_13, labeled: true, edition: 'ebook' },
+    ]);
+    expect(findIsbnInText('eISBN 9781635766264 1. Fiction')).toMatchObject([{ value: OTHER_13, labeled: true }]);
+  });
+
+  it('finds an ISBN printed just after another number', () => {
+    expect(findIsbnInText('ISBN-13 978-0-306-40615-7')).toMatchObject([{ value: ISBN_13, labeled: true }]);
+    expect(findIsbnInText('ISBN 13 9780306406157')).toMatchObject([{ value: ISBN_13, labeled: true }]);
+    expect(findIsbnInText('ISBN-10 0-306-40615-2')).toMatchObject([{ value: ISBN_10, labeled: true }]);
+  });
+
+  it('separates ISBNs printed side by side', () => {
+    expect(findIsbnInText('ISBN 9780306406157 9781635766264')).toMatchObject([
+      { value: ISBN_13, labeled: true },
+      { value: OTHER_13, labeled: true },
+    ]);
+  });
+
+  it('keeps the spaced groups of one ISBN together', () => {
+    expect(findIsbnInText('ISBN 0 306 40615 2 1. Fiction')).toMatchObject([{ value: ISBN_10, labeled: true }]);
+    expect(findIsbnInText('ISBN 9780 3064 06157')).toMatchObject([{ value: ISBN_13, labeled: true }]);
+  });
+
+  it("does not read an ISBN out of a printer's key", () => {
+    const hits = findIsbnInText('ISBN 978-0-306-40615-7\n12 13 14 15 16 10 9 8 7 6 5 4 3 2 1');
+    expect(hits.map((h) => h.value)).toEqual([ISBN_13]);
+  });
+
   it('de-duplicates by value and upgrades to labeled', () => {
     const hits = findIsbnInText('9780306406157\nfoo bar baz\nISBN: 9780306406157');
     expect(hits).toMatchObject([{ value: ISBN_13, kind: 13, labeled: true }]);

@@ -32,6 +32,8 @@ const CONTEXT_AFTER = 40;
 const MAX_CANDIDATES = 20;
 
 const CANDIDATE = /[0-9][0-9\s-]{7,16}[0-9Xx]/g;
+const SPACE = /\s+/g;
+const MAX_SPACED_GROUPS = 5;
 // "ISBN", "eISBN" or "e-ISBN" as a word of prose. In a URL (`?isbn=`, `/isbn/`) it names a query
 // parameter, and the number there is often another edition's.
 const LABEL = /(?<![A-Za-z0-9?&=/])(e-?)?isbn(?!\s*=)/gi;
@@ -109,6 +111,39 @@ function nearestLabel(labels: Label[], numberStart: number): Label | null {
   return nearest;
 }
 
+function isbnKind(value: string): 10 | 13 | null {
+  if (value.length === 13 && isValidIsbn13(value)) return 13;
+  if (value.length === 10 && isValidIsbn10(value)) return 10;
+  return null;
+}
+
+/**
+ * An ISBN printed in spaced groups has at most five of them and ends in its check digit alone.
+ * Lines such as a printer's key ("12 13 14 15 16") pass the checksum often enough to need this.
+ */
+function spacedLikeIsbn(part: string): boolean {
+  const groups = part.split(SPACE);
+  return groups.length === 1 || (groups.length <= MAX_SPACED_GROUPS && normalizeIsbn(groups[groups.length - 1]).length === 1);
+}
+
+/**
+ * The ISBN a run of digits starts with, and how many characters of the run it takes. A space can
+ * group an ISBN's digits ("0 306 40615 2") or end it before the next number ("eISBN
+ * 9780834821095 1. Spiritual life"), so a run that is not an ISBN as a whole is cut back at each
+ * space, longest first. Only a whole run the scan found by itself (`trusted`) needs nothing but
+ * the checksum; a cut, or a run started again after a number, must also be grouped like an ISBN.
+ */
+function leadingIsbn(run: string, trusted: boolean): { value: string; kind: 10 | 13; length: number } | null {
+  const ends = [run.length, ...[...run.matchAll(SPACE)].map((space) => space.index ?? 0).reverse()];
+  for (const [index, end] of ends.entries()) {
+    const part = run.slice(0, end);
+    const value = normalizeIsbn(part);
+    const kind = isbnKind(value);
+    if (kind && ((trusted && index === 0) || spacedLikeIsbn(part))) return { value, kind, length: end };
+  }
+  return null;
+}
+
 /**
  * Find checksum-valid ISBN-10/13 strings inside free text. Each hit records whether an "ISBN"
  * label sits just before it or before the list it belongs to, the edition named beside it, and
@@ -118,18 +153,28 @@ function nearestLabel(labels: Label[], numberStart: number): Label | null {
 export function findIsbnInText(text: string): IsbnHit[] {
   const labels = labelsIn(text);
   const byValue = new Map<string, IsbnHit>();
+  const candidates = new RegExp(CANDIDATE);
   let previousEnd = 0;
   let previousLabeled = false;
+  let retryAt = -1;
 
-  for (const match of text.matchAll(CANDIDATE)) {
-    const norm = normalizeIsbn(match[0]);
-    let kind: 10 | 13 | null = null;
-    if (norm.length === 13 && isValidIsbn13(norm)) kind = 13;
-    else if (norm.length === 10 && isValidIsbn10(norm)) kind = 10;
-    if (kind === null) continue;
+  for (let match = candidates.exec(text); match; match = candidates.exec(text)) {
+    const start = match.index;
+    const isbn = leadingIsbn(match[0], start !== retryAt);
+    if (!isbn) {
+      // A number before an ISBN joins its run too ("ISBN-13 978-0-306-40615-7"), and can push the
+      // ISBN past the run's length cap, so the scan starts again at the run's next number.
+      const space = /\s+/.exec(match[0]);
+      if (space) {
+        retryAt = start + space.index + space[0].length;
+        candidates.lastIndex = retryAt;
+      }
+      continue;
+    }
 
-    const start = match.index ?? 0;
-    const end = start + match[0].length;
+    const { value: norm, kind } = isbn;
+    const end = start + isbn.length;
+    candidates.lastIndex = end;
     const continuesList = previousLabeled && start - previousEnd <= LIST_GAP;
     const label = nearestLabel(labels, start) ?? (continuesList ? { start, end: start, ebook: false } : null);
     const hit: IsbnHit = {
