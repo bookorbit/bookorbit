@@ -1,7 +1,7 @@
 import type { BookDockUnitFile } from "./book-dock";
 
 /** The fields the import is compared on. Order is the order the drawer lists them in. */
-export const BOOK_REQUEST_VERIFICATION_FIELDS = ["title", "authors", "isbn13"] as const;
+export const BOOK_REQUEST_VERIFICATION_FIELDS = ["title", "authors", "isbn13", "year"] as const;
 export type BookRequestVerificationField = (typeof BOOK_REQUEST_VERIFICATION_FIELDS)[number];
 
 /**
@@ -22,7 +22,14 @@ export interface BookRequestVerificationRow {
  * Why the check landed where it did, as a code rather than a sentence. The server's prose is
  * still stored on the request for logs and for older clients, but the drawer localizes from this.
  */
-export const BOOK_REQUEST_VERIFICATION_REASONS = ["isbn_match", "above_threshold", "below_threshold", "author_mismatch", "no_title"] as const;
+export const BOOK_REQUEST_VERIFICATION_REASONS = [
+  "isbn_match",
+  "above_threshold",
+  "below_threshold",
+  "author_mismatch",
+  "no_title",
+  "edition_mismatch",
+] as const;
 export type BookRequestVerificationReason = (typeof BOOK_REQUEST_VERIFICATION_REASONS)[number];
 
 export interface BookRequestVerification {

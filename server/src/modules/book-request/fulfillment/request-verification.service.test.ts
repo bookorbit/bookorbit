@@ -129,6 +129,138 @@ describe('verifyAgainstRequest', () => {
 });
 
 /**
+ * The case a title and an author cannot catch: two editions of one work agree on both. A request for
+ * the third edition of a textbook that receives its first carries the same title and author, and
+ * only the ISBN and the year can tell them apart.
+ */
+describe('verifyAgainstRequest against an older edition of the requested work', () => {
+  const THIRD_EDITION_ISBN = '9781324072553';
+  const FIRST_EDITION_ISBN = '9780393923599';
+
+  function ebookRequest(overrides: Partial<RequestSnapshot> = {}): RequestSnapshot {
+    return request({
+      title: 'An Introduction to Moral Philosophy',
+      authors: ['Jonathan Wolff'],
+      mediaKind: 'ebook',
+      isbn13: THIRD_EDITION_ISBN,
+      publishedYear: 2025,
+      ...overrides,
+    });
+  }
+
+  function file(overrides: Partial<BookDockMetadata> = {}): BookDockMetadata {
+    return metadata({
+      title: 'An Introduction to Moral Philosophy',
+      authors: ['Jonathan Wolff'],
+      isbn13: FIRST_EDITION_ISBN,
+      publishedYear: 2017,
+      ...overrides,
+    });
+  }
+
+  const yearRow = (outcome: ReturnType<typeof verifyAgainstRequest>) => outcome.rows.find((row) => row.field === 'year');
+
+  it('holds the first edition requested as the third, however well the title and author score', () => {
+    const outcome = verifyAgainstRequest(ebookRequest(), null, file());
+
+    expect(outcome).toMatchObject({ passed: false, score: 0, code: 'edition_mismatch' });
+    expect(outcome.reason).toContain('8 years before the 2025 edition');
+    expect(outcome.rows.find((row) => row.field === 'isbn13')).toMatchObject({ requested: THIRD_EDITION_ISBN, verdict: 'mismatch' });
+    expect(yearRow(outcome)).toEqual({ field: 'year', requested: '2025', imported: '2017', verdict: 'mismatch' });
+  });
+
+  it('holds on the gap itself and files one year short of it', () => {
+    expect(verifyAgainstRequest(ebookRequest(), null, file({ publishedYear: 2022 }))).toMatchObject({ passed: false, code: 'edition_mismatch' });
+    expect(verifyAgainstRequest(ebookRequest(), null, file({ publishedYear: 2023 }))).toMatchObject({ passed: true, code: 'above_threshold' });
+  });
+
+  it('reads the year from a published date when the file states no bare year', () => {
+    const outcome = verifyAgainstRequest(ebookRequest(), null, file({ publishedYear: null, publishedDate: '2017-08-01' }));
+
+    expect(outcome).toMatchObject({ passed: false, code: 'edition_mismatch' });
+  });
+
+  it('files a file that is newer than the request, which is how a first-publication year looks', () => {
+    const outcome = verifyAgainstRequest(ebookRequest({ publishedYear: 1965 }), null, file({ publishedYear: 2019 }));
+
+    expect(outcome).toMatchObject({ passed: true, code: 'above_threshold' });
+    expect(yearRow(outcome)).toBeUndefined();
+  });
+
+  it('files the same edition when the epub spells the requested ISBN as an ISBN-10', () => {
+    const outcome = verifyAgainstRequest(
+      ebookRequest({ isbn13: '9780441013593', publishedYear: 2019 }),
+      null,
+      file({ isbn13: null, isbn10: '0441013597', publishedYear: 2005 }),
+    );
+
+    expect(outcome.passed).toBe(true);
+  });
+
+  it('files an audiobook, whose ISBN and date describe a recording rather than an edition of the text', () => {
+    const outcome = verifyAgainstRequest(ebookRequest({ mediaKind: 'audiobook' }), null, file());
+
+    expect(outcome.passed).toBe(true);
+  });
+
+  it('judges a request that names no edition on title and author alone', () => {
+    expect(verifyAgainstRequest(ebookRequest({ isbn13: null }), null, file()).passed).toBe(true);
+    expect(verifyAgainstRequest(ebookRequest({ publishedYear: null }), null, file()).passed).toBe(true);
+  });
+
+  it('judges a file that states no ISBN or no year of its own on title and author alone', () => {
+    expect(verifyAgainstRequest(ebookRequest(), null, file({ isbn13: null })).passed).toBe(true);
+    expect(verifyAgainstRequest(ebookRequest(), null, file({ publishedYear: null })).passed).toBe(true);
+  });
+
+  it('does not let a provider match convict a file whose own metadata says nothing', () => {
+    const guess = metadata({
+      title: 'An Introduction to Moral Philosophy',
+      authors: ['Jonathan Wolff'],
+      isbn13: FIRST_EDITION_ISBN,
+      publishedYear: 2017,
+    });
+    const outcome = verifyAgainstRequest(
+      ebookRequest(),
+      guess,
+      metadata({ title: 'An Introduction to Moral Philosophy', authors: ['Jonathan Wolff'] }),
+    );
+
+    expect(outcome.passed).toBe(true);
+  });
+
+  it('files a file whose own ISBN is foreign when the provider matched it to the requested edition', () => {
+    const matched = metadata({
+      title: 'An Introduction to Moral Philosophy',
+      authors: ['Jonathan Wolff'],
+      isbn13: THIRD_EDITION_ISBN,
+      publishedYear: 2025,
+    });
+
+    expect(verifyAgainstRequest(ebookRequest(), matched, file()).passed).toBe(true);
+  });
+
+  it('files a file whose own year is old when the provider places it in the requested era', () => {
+    const matched = metadata({ title: 'An Introduction to Moral Philosophy', authors: ['Jonathan Wolff'], publishedYear: 2025 });
+
+    expect(verifyAgainstRequest(ebookRequest(), matched, file()).passed).toBe(true);
+  });
+
+  it('keeps the usual reason when the title already failed, rather than renaming it an edition problem', () => {
+    const outcome = verifyAgainstRequest(ebookRequest(), null, file({ title: 'A Completely Different Book' }));
+
+    expect(outcome).toMatchObject({ passed: false, code: 'below_threshold' });
+    expect(yearRow(outcome)).toBeUndefined();
+  });
+
+  it('holds the edition regardless of how low the operator sets the bar', () => {
+    const outcome = verifyAgainstRequest(ebookRequest(), null, file(), 0);
+
+    expect(outcome).toMatchObject({ passed: false, code: 'edition_mismatch' });
+  });
+});
+
+/**
  * The right number depends on an instance's own trackers and metadata providers, so the operator
  * moves it. What must not move is the shape: one score, measured against whatever it was told.
  */

@@ -10,6 +10,7 @@ import {
 import { access } from 'fs/promises';
 import { basename } from 'path';
 import {
+  canonicalizeBookRequestIsbn,
   DEFAULT_BOOK_REQUEST_AUTOMATION_SETTINGS,
   isBookRequestMediaKind,
   NotificationType,
@@ -37,6 +38,7 @@ import {
 import { mainTitlePart, symmetricTitleSimilarity } from '../../../common/text-match/title-match';
 import type { RequestUser } from '../../../common/types/request-user';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
+import { parsePublishedYear } from '../../../common/utils/published-date.utils';
 import type { BookDockFileRow, BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
 import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from '../../book-dock/book-dock-events.service';
 import { BookDockFinalizeService } from '../../book-dock/book-dock-finalize.service';
@@ -68,6 +70,13 @@ const HELD_ON_REQUEST_REASON = 'the release was sent to be reviewed before it is
 
 const TITLE_WEIGHT = 0.7;
 const AUTHOR_WEIGHT = 0.3;
+
+/**
+ * How many years older than the requested edition an ebook has to say it is, while stating a
+ * different ISBN, before it is held as another edition. Providers and publishers disagree by a year
+ * or two about when one printing came out, which is not worth sending anyone to look at.
+ */
+const EDITION_YEAR_GAP = 3;
 
 /**
  * The two statuses a finished import may be filed from: the automatic path arrives at `importing`,
@@ -552,16 +561,20 @@ export class RequestVerificationService implements OnModuleInit {
 }
 
 /**
- * ISBN13 agreement is decisive when both sides carry one. A mismatch is not, because a different
- * edition of the same work has a different ISBN and is still the right book, so it falls through
- * to the title and author comparison rather than failing outright.
+ * ISBN13 agreement is decisive when both sides carry one. A mismatch alone is not, because an ISBN
+ * names one format of one edition and a request's is often just the one a provider listed first, so
+ * it falls through to the title and author comparison rather than failing outright. The exception
+ * is a file that also says it is years older than the requested edition: see `findOlderEdition`.
  *
  * Every path returns the field-by-field comparison as well as the number, because a bare score is
  * unactionable: an approver deciding whether to file this anyway needs to see that the title
  * gained a "Book 1 (Unabridged)" suffix, not that something somewhere came to 65.
  */
 export function verifyAgainstRequest(
-  request: Pick<BookRequestRow, 'title' | 'subtitle' | 'authors' | 'seriesName' | 'seriesIndex' | 'isbn13'>,
+  request: Pick<
+    BookRequestRow,
+    'title' | 'subtitle' | 'authors' | 'seriesName' | 'seriesIndex' | 'isbn10' | 'isbn13' | 'publishedYear' | 'mediaKind'
+  >,
   fetched: BookDockMetadata | null,
   embedded: BookDockMetadata | null,
   threshold: number = DEFAULT_VERIFICATION_THRESHOLD,
@@ -580,7 +593,7 @@ export function verifyAgainstRequest(
   const titleScore = importedTitle ? bestTitleSimilarity(request.title, request.subtitle, importedTitle) : 0;
   const authorScore = requestedAuthors.length && importedAuthors.length ? bestPairSimilarity(requestedAuthors, importedAuthors) : null;
 
-  const rows = (isbnVerdict: BookRequestVerificationVerdict): BookRequestVerificationRow[] => [
+  const rows = (isbnVerdict: BookRequestVerificationVerdict, olderEdition: OlderEdition | null = null): BookRequestVerificationRow[] => [
     {
       field: 'title',
       requested: joinTitle(request.title, request.subtitle),
@@ -596,6 +609,18 @@ export function verifyAgainstRequest(
     // The normalizer answers '' rather than null for a missing ISBN, and an empty row would
     // read as a blank value rather than as a field neither side filled in.
     { field: 'isbn13', requested: requestedIsbn || null, imported: importedIsbn || null, verdict: isbnVerdict },
+    // Shown only when it is what held the import: elsewhere a year is not compared, and a row
+    // that never affects the outcome would invite approvers to read it as if it did.
+    ...(olderEdition
+      ? [
+          {
+            field: 'year' as const,
+            requested: String(olderEdition.requestedYear),
+            imported: String(olderEdition.importedYear),
+            verdict: 'mismatch' as const,
+          },
+        ]
+      : []),
   ];
 
   if (requestedIsbn && importedIsbn && requestedIsbn === importedIsbn) {
@@ -635,6 +660,19 @@ export function verifyAgainstRequest(
   const score = Math.round(combined * 100);
   const passed = score >= threshold;
 
+  // Looked for only once the file would otherwise be filed, so it can add a hold and never changes
+  // why an import that already failed did.
+  const olderEdition = passed ? findOlderEdition(request, fetched, embedded) : null;
+  if (olderEdition) {
+    return {
+      score: 0,
+      passed: false,
+      reason: `the file is from ${olderEdition.importedYear}, ${olderEdition.requestedYear - olderEdition.importedYear} years before the ${olderEdition.requestedYear} edition that was requested, and carries a different ISBN`,
+      code: 'edition_mismatch',
+      rows: rows('mismatch', olderEdition),
+    };
+  }
+
   return {
     score,
     passed,
@@ -644,6 +682,55 @@ export function verifyAgainstRequest(
     code: passed ? 'above_threshold' : 'below_threshold',
     rows: rows(isbnVerdict),
   };
+}
+
+interface OlderEdition {
+  requestedYear: number;
+  importedYear: number;
+}
+
+/**
+ * The one case where a different ISBN counts against an import: an ebook whose own metadata names
+ * an ISBN other than the requested one and a year at least `EDITION_YEAR_GAP` years before the
+ * requested edition's. A request for a textbook's third edition that receives its first is the
+ * case; both editions share a title and an author, so nothing else in the score can tell them apart.
+ *
+ * Neither signal is enough alone. An ISBN names one format of one edition, so an epub rarely
+ * carries the print ISBN a request holds, and a year drifts with each provider's idea of "published".
+ *
+ * The limits are each there to keep a correct import from being held:
+ * - The evidence is the file's own metadata. A provider's match is a guess at the edition, so it can
+ *   only clear an import, never convict one. A file that states no ISBN or year, and a request that
+ *   names no edition (no ISBN, or no year), keep being judged on title and author.
+ * - Only a file older than the request. Providers often report a work's first publication year, so a
+ *   newer file is the ordinary case rather than a different edition.
+ * - Only ebooks. An audiobook's ISBN and date describe a recording, and its tags are rarely trustworthy.
+ * - Only the request's own ISBN clears an import. The other ISBNs a request carries come from every
+ *   edition its search results grouped together, so one of them proves nothing about this one.
+ */
+function findOlderEdition(
+  request: Pick<BookRequestRow, 'isbn10' | 'isbn13' | 'publishedYear' | 'mediaKind'>,
+  fetched: BookDockMetadata | null,
+  embedded: BookDockMetadata | null,
+): OlderEdition | null {
+  if (request.mediaKind !== 'ebook') return null;
+
+  const requestedIsbn = canonicalizeBookRequestIsbn(request.isbn10, request.isbn13);
+  const requestedYear = parsePublishedYear(request.publishedYear);
+  const embeddedIsbn = canonicalizeBookRequestIsbn(embedded?.isbn10, embedded?.isbn13);
+  const embeddedYear = statedYear(embedded);
+  if (requestedIsbn === null || requestedYear === undefined || embeddedIsbn === null || embeddedYear === null) return null;
+
+  if (embeddedIsbn === requestedIsbn || canonicalizeBookRequestIsbn(fetched?.isbn10, fetched?.isbn13) === requestedIsbn) return null;
+
+  // The newest year any source states, so a provider that places the file in the requested era
+  // outweighs a file that says otherwise.
+  const importedYear = Math.max(embeddedYear, statedYear(fetched) ?? embeddedYear);
+  return requestedYear - importedYear >= EDITION_YEAR_GAP ? { requestedYear, importedYear } : null;
+}
+
+function statedYear(metadata: BookDockMetadata | null): number | null {
+  return parsePublishedYear(metadata?.publishedYear) ?? parsePublishedYear(metadata?.publishedDate) ?? null;
 }
 
 function resolveImportedSeriesIndex(

@@ -11817,18 +11817,21 @@
       "scoreShort": "The imported file scored {score} against this request, below the {threshold} needed to file it automatically.",
       "scoreClears": "The imported file scored {score}, which clears the {threshold} needed to file it automatically.",
       "verificationOff": "Import checking is off, so this file was never scored against the request.",
+      "editionHeld": "The title and author match, but the file looks like an older edition than the one requested, so it is waiting for you.",
       "heldOnRequest": "This release was sent to be checked before filing, so it is waiting for you.",
       "reason": {
         "isbn_match": "Its ISBN is the one that was requested.",
         "above_threshold": "It looks like the book that was asked for.",
         "below_threshold": "Check the fields below and decide whether it is the right book.",
         "author_mismatch": "The title is close, but the author is somebody else.",
-        "no_title": "The file carries no readable title, so there was nothing to compare."
+        "no_title": "The file carries no readable title, so there was nothing to compare.",
+        "edition_mismatch": "The title and author match, but the file says it is an older edition than the one that was requested."
       },
       "field": {
         "title": "Title",
         "authors": "Author",
-        "isbn13": "ISBN"
+        "isbn13": "ISBN",
+        "year": "Year"
       },
       "verdict": {
         "match": "Matches",

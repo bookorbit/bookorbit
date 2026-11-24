@@ -64,6 +64,8 @@ function reviewSentence(review: BookRequestReview, t: RequestCardInput['t']): st
   if (review.heldOnRequest) return t('bookRequests.review.heldOnRequest')
   const detail = review.verification
   if (!detail) return t('bookRequests.review.verificationOff')
+  // The score of a file vetoed on its edition says nothing: its title and author matched.
+  if (detail.reason === 'edition_mismatch') return t('bookRequests.review.editionHeld')
   const named = { score: detail.score, threshold: detail.threshold }
   return detail.passed ? t('bookRequests.review.scoreClears', named) : t('bookRequests.review.scoreShort', named)
 }
@@ -125,7 +127,7 @@ export function requestCardModel(input: RequestCardInput): RequestCardModel {
         icon: 'review',
         headline: t('bookRequests.outcome.awaitingReview'),
         sentence: review ? reviewSentence(review, t) : failure,
-        score: verification ? { score: verification.score, threshold: verification.threshold } : null,
+        score: verification && verification.reason !== 'edition_mismatch' ? { score: verification.score, threshold: verification.threshold } : null,
       }
     }
     case 'failed': {

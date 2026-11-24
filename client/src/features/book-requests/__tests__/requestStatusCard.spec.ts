@@ -87,6 +87,18 @@ describe('requestCardModel', () => {
     expect(card.sentence).toContain('bookRequests.review.scoreShort')
   })
 
+  it('names the older edition instead of drawing the score of a file whose title and author matched', () => {
+    const review = {
+      bookDockFileId: 100,
+      heldOnRequest: false,
+      verification: { score: 0, threshold: 80, passed: false, reason: 'edition_mismatch', rows: [] },
+    } as unknown as BookRequestReview
+    const card = model({ request: request({ status: 'needs_review' }), review })
+
+    expect(card.score).toBeNull()
+    expect(card.sentence).toBe('bookRequests.review.editionHeld')
+  })
+
   it('says the entry is gone rather than drawing a score for it', () => {
     const review = { bookDockFileId: null, heldOnRequest: false, verification: null } as unknown as BookRequestReview
     const card = model({ request: request({ status: 'needs_review' }), review })
