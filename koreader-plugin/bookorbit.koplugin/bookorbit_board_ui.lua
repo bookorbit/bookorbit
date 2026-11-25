@@ -322,6 +322,35 @@ end
 
 -- One line of styled runs on a shared baseline, e.g. a bold number followed
 -- by a muted unit. parts: strings or { t, b, s, col, serif, i }.
+-- Parts for BoardUI.runs from one translated template, so a styled value
+-- stays inside a sentence a translator can reorder. Each %1, %2... becomes
+-- values[n] (a part table, or text shown in the surrounding style); the text
+-- between markers takes `rest` (a part table without t).
+--   BoardUI.styled(_("%1 today"), { { t = "+3", b = true } }, { col = INK.g4 })
+function BoardUI.styled(template, values, rest)
+    local parts, pos = {}, 1
+    local function literal(piece)
+        if piece == "" then return end
+        local part = { t = piece }
+        for key, value in pairs(rest or {}) do part[key] = value end
+        table.insert(parts, part)
+    end
+    while true do
+        local first, last, n = template:find("%%(%d)", pos)
+        if not first then break end
+        literal(template:sub(pos, first - 1))
+        local value = values[tonumber(n)]
+        if type(value) == "table" then
+            table.insert(parts, value)
+        else
+            literal(tostring(value == nil and "" or value))
+        end
+        pos = last + 1
+    end
+    literal(template:sub(pos))
+    return parts
+end
+
 function BoardUI.runs(parts, o)
     o = o or {}
     local base = o.s or 14
@@ -624,11 +653,14 @@ end
 -- An icon. o: col (an INK key), sw, fill.
 function BoardUI.icon(name, size, o)
     o = o or {}
-    return BoardIcons.widget(name, size, {
+    local widget = BoardIcons.widget(name, size, {
         color = BoardMetrics.INK_HEX[o.col or "black"] or o.col,
         sw = o.sw or 2,
         fill = o.fill,
     })
+    -- A tile header gives up a decorative icon before it cuts its title.
+    if type(widget) == "table" then widget.bo_decor = true end
+    return widget
 end
 
 -- A circle of diameter d with an icon centred in it.

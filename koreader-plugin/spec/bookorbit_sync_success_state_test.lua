@@ -16,7 +16,10 @@ for _, name in ipairs({ "bookorbit_main_menu", "bookorbit_progress_sync", "booko
 end
 local recorded = {}
 package.loaded["bookorbit_activity"] = { recordSuccess = function(_, event) table.insert(recorded, event) end,
-    recordError = function(_, event) table.insert(recorded, event) end }
+    recordError = function(_, event) table.insert(recorded, event) end,
+    detail = function(key, ...) return { key = key, args = { ... } } end,
+    detailText = function(value) return type(value) == "table" and value.key or value end,
+    errorLabel = function(err) return tostring(err) end }
 local flushes = 0
 G_reader_settings = { flush = function() flushes = flushes + 1 end }
 local Plugin = dofile("koreader-plugin/bookorbit.koplugin/main.lua")

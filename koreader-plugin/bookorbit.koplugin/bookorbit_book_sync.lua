@@ -190,8 +190,7 @@ local function finish(ctx, err)
         elseif not err and ctx.plugin.recordSyncSuccess then
             ctx.plugin:recordSyncSuccess(
                 "book_sync",
-                T(_("%1 reading events, %2 highlights uploaded"),
-                    ctx.counts.page_stats, ctx.counts.annotations))
+                require("bookorbit_activity").detail("reading_upload", ctx.counts.page_stats, ctx.counts.annotations))
         end
     end
 

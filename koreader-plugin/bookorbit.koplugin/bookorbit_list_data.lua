@@ -133,8 +133,8 @@ function ListData.bookMeta(book, o)
     local state = ListData.stateOf(book)
     if state == "reading" then
         local after
-        if o.minutes_left then after = T(_(" · %1 left"), ListData.shortDuration(o.minutes_left))
-        elseif book.readStatus == "rereading" then after = _(" · rereading")
+        if o.minutes_left then after = " · " .. T(_("%1 left"), ListData.shortDuration(o.minutes_left))
+        elseif book.readStatus == "rereading" then after = " · " .. _.pgettext("Read status", "rereading")
         else after = " · " .. (BoardData.relativeDay(book.lastReadAt, o.now) or "") end
         return { { t = ListData.pctLabel(book) or "0%", b = true }, { t = after } }
     elseif state == "finished" then
@@ -247,7 +247,7 @@ function ListData.authorCell(entry)
     local finished = tonumber(entry.finishedCount) or 0
     local first = entry.previewBooks and entry.previewBooks[1]
     if reading > 0 then
-        local bottom = count == 1 and first and ((ListData.pctLabel(first) or "0%") .. " " .. _("read")) or T(_("%1 of %2"), reading, count)
+        local bottom = count == 1 and first and T(_.pgettext("Percent read", "%1 read"), ListData.pctLabel(first) or "0%") or T(_("%1 of %2"), reading, count)
         return { kind = "reading", label = _("Reading"), bottom = bottom }
     end
     if count > 0 and finished >= count then

@@ -1,8 +1,8 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: bookorbit.koplugin\n"
-"Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-24 21:00+0000\n"
+"Report-Msgid-Bugs-To: https://github.com/bookorbit/bookorbit/issues\n"
+"POT-Creation-Date: 2026-11-25 00:19+0000\n"
 "Language: ru\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -77,14 +77,92 @@ msgstr "Не удалось проверить обновления"
 msgid "Highlight sync needs attention"
 msgstr "Требуется проверить синхронизацию выделений"
 
-#: bookorbit_activity.lua bookorbit_menu_sheet.lua
-msgid "Sync failed"
-msgstr "Синхронизация не выполнена"
+#: bookorbit_activity.lua
+msgid "login failed"
+msgstr "ошибка входа"
+
+#: bookorbit_activity.lua
+msgid "server not reachable"
+msgstr "сервер недоступен"
+
+#: bookorbit_activity.lua
+msgid "server request failed"
+msgstr "ошибка запроса к серверу"
+
+#: bookorbit_activity.lua
+msgid "invalid server response"
+msgstr "некорректный ответ сервера"
+
+#: bookorbit_activity.lua
+msgid "server update required"
+msgstr "требуется обновление сервера"
+
+#: bookorbit_activity.lua
+msgid "request too large"
+msgstr "слишком большой запрос"
+
+#: bookorbit_activity.lua
+msgid "background request interrupted"
+msgstr "фоновый запрос прерван"
+
+#: bookorbit_activity.lua
+msgid "partial sync failure"
+msgstr "частичная ошибка синхронизации"
+
+#: bookorbit_activity.lua
+msgid "lifecycle sync could not be saved"
+msgstr "не удалось сохранить фоновую синхронизацию"
+
+#: bookorbit_activity.lua
+msgid "server error %1"
+msgstr "ошибка сервера %1"
+
+#: bookorbit_activity.lua bookorbit_status_page.lua
+msgid "unknown error"
+msgstr "неизвестная ошибка"
+
+#: bookorbit_activity.lua
+msgid "%1 reading events, %2 highlights uploaded"
+msgstr "Событий чтения: %1, выделений отправлено: %2"
+
+#: bookorbit_activity.lua
+msgid "%1 books, %2 reading events, %3 highlights"
+msgstr "Книг: %1, событий чтения: %2, выделений: %3"
+
+#. TRANSLATORS: two sentences of a sync summary; %1 is the first, %2 the second.
+#: bookorbit_activity.lua
+msgid "%1. %2"
+msgstr "%1. %2"
+
+#: bookorbit_activity.lua bookorbit_sweep.lua
+msgid "1 book needs to be opened and synced once to recover its reading history."
+msgid_plural "%1 books need to be opened and synced once to recover their reading history."
+msgstr[0] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
+msgstr[1] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
+msgstr[2] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
+msgstr[3] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
+
+#: bookorbit_activity.lua
+msgid "Progress pushed"
+msgstr "Прогресс отправлен"
+
+#: bookorbit_activity.lua
+msgid "Progress pulled"
+msgstr "Прогресс получен"
+
+#: bookorbit_activity.lua
+msgid "Connection test succeeded"
+msgstr "Проверка соединения выполнена успешно"
 
 #: bookorbit_activity.lua
 msgid "Highlights: %1 sent, %2 received"
 msgstr "Выделения: отправлено %1, получено %2"
 
+#: bookorbit_activity.lua bookorbit_menu_sheet.lua
+msgid "Sync failed"
+msgstr "Синхронизация не выполнена"
+
+#. TRANSLATORS: weekday, day of the month, then the month as it reads inside a date.
 #: bookorbit_board_data.lua
 msgid "%1, %2 %3"
 msgstr "%1, %2 %3"
@@ -113,26 +191,36 @@ msgstr "Добрый день, %1"
 msgid "Good evening, %1"
 msgstr "Добрый вечер, %1"
 
-#: bookorbit_board_data.lua bookorbit_board_widgets.lua bookorbit_catalog_util.lua bookorbit_detail_data.lua
+#. TRANSLATORS: minutes, abbreviated.
+#: bookorbit_board_data.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_util.lua bookorbit_detail_data.lua
 msgid "%1 min"
 msgstr "%1 мин"
 
-#: bookorbit_board_data.lua bookorbit_board_decor.lua bookorbit_board_widgets.lua bookorbit_catalog_util.lua bookorbit_detail_data.lua
+#. TRANSLATORS: hours, abbreviated.
+#: bookorbit_board_data.lua bookorbit_board_decor.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_data.lua
 msgid "%1 h"
 msgstr "%1 ч"
 
-#: bookorbit_board_data.lua bookorbit_catalog_util.lua bookorbit_detail_data.lua
+#. TRANSLATORS: hours and minutes, abbreviated.
+#: bookorbit_board_data.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_data.lua
 msgid "%1 h %2 min"
 msgstr "%1 ч %2 мин"
 
+#. TRANSLATORS: minutes in the shortest form, for small tiles (5m).
 #: bookorbit_board_data.lua bookorbit_detail_data.lua
 msgid "%1m"
 msgstr "%1 мин"
 
+#. TRANSLATORS: hours in the shortest form, for small tiles (2h).
 #: bookorbit_board_data.lua bookorbit_detail_data.lua
 msgid "%1h"
 msgstr "%1 ч"
 
+#. TRANSLATORS: hours and minutes in the shortest form, for small tiles (2h 5m).
 #: bookorbit_board_data.lua bookorbit_detail_data.lua
 msgid "%1h %2m"
 msgstr "%1 ч %2 мин"
@@ -153,23 +241,20 @@ msgstr "%1 ч назад"
 msgid "yesterday"
 msgstr "вчера"
 
-#: bookorbit_board_data.lua
-msgctxt "Month and day"
-msgid "%1 %2"
-msgstr "%2 %1"
-
+#. TRANSLATORS: %1 is the month as it reads inside a date, %2 the year.
 #: bookorbit_board_data.lua
 msgid "Early %1 %2"
-msgstr "Начало: %1 %2"
+msgstr "Начало %1 %2"
 
 #: bookorbit_board_data.lua
 msgid "Mid %1 %2"
-msgstr "Середина: %1 %2"
+msgstr "Середина %1 %2"
 
 #: bookorbit_board_data.lua
 msgid "Late %1 %2"
-msgstr "Конец: %1 %2"
+msgstr "Конец %1 %2"
 
+#. TRANSLATORS: %1 is the short month on its own (as in a calendar), %2 the year.
 #: bookorbit_board_data.lua
 msgctxt "Month and year"
 msgid "%1 %2"
@@ -179,7 +264,9 @@ msgstr "%1 %2"
 msgid "<1%"
 msgstr "<1%"
 
-#: bookorbit_board_data.lua bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+#: bookorbit_board_data.lua bookorbit_board_edit.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_view.lua
 msgid "Today"
 msgstr "Сегодня"
 
@@ -187,6 +274,7 @@ msgstr "Сегодня"
 msgid "Tomorrow"
 msgstr "Завтра"
 
+#. TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date.
 #: bookorbit_board_data.lua bookorbit_detail_data.lua
 msgctxt "Day and month"
 msgid "%1 %2"
@@ -341,18 +429,20 @@ msgstr "Получено: %1"
 msgid "Earned %1 %2"
 msgstr "Получено: %1 %2"
 
+#. TRANSLATORS: %1 is the day of the month, %2 the month as it reads inside a date.
 #: bookorbit_board_data.lua
 msgctxt "Day and month name"
 msgid "%1 %2"
 msgstr "%1 %2"
 
-#: bookorbit_board_decor.lua
-msgid "Reading with you"
-msgstr "Читаем вместе"
-
+#. TRANSLATORS: pages turned today; %1 is the count, such as +12, shown bold.
 #: bookorbit_board_decor.lua
 msgid "%1 today"
 msgstr "%1 сегодня"
+
+#: bookorbit_board_decor.lua
+msgid "Reading with you"
+msgstr "Читаем вместе"
 
 #: bookorbit_board_decor.lua
 msgid "Fast asleep"
@@ -383,28 +473,24 @@ msgid "Book finished!"
 msgstr "Книга закончена!"
 
 #: bookorbit_board_decor.lua
-msgid "Past bedtime"
-msgstr "Позднее чтение"
-
-#: bookorbit_board_decor.lua
 msgid "%1 read today"
 msgstr "Сегодня прочитано: %1"
 
 #: bookorbit_board_decor.lua
-msgid "Ready when you are"
-msgstr "Готов, когда готовы вы"
+msgid "Past bedtime"
+msgstr "Позднее чтение"
 
 #: bookorbit_board_decor.lua
 msgid "Open a book to start"
 msgstr "Откройте книгу, чтобы начать"
 
 #: bookorbit_board_decor.lua
-msgid "%1% lit"
-msgstr "Прочитано: %1%"
+msgid "Ready when you are"
+msgstr "Готов, когда готовы вы"
 
 #: bookorbit_board_decor.lua
-msgid "today"
-msgstr "сегодня"
+msgid "%1% lit"
+msgstr "Прочитано: %1%"
 
 #: bookorbit_board_decor.lua
 msgid "since %1"
@@ -419,12 +505,12 @@ msgid "Glyph of the day"
 msgstr "Глиф дня"
 
 #: bookorbit_board_decor.lua
-msgid "The fonts on this device have no glyph to show today."
-msgstr "В шрифтах этого устройства нет глифа для показа сегодня."
-
-#: bookorbit_board_decor.lua
 msgid "No glyph today."
 msgstr "Сегодня глифа нет."
+
+#: bookorbit_board_decor.lua
+msgid "The fonts on this device have no glyph to show today."
+msgstr "В шрифтах этого устройства нет глифа для показа сегодня."
 
 #: bookorbit_board_decor.lua bookorbit_board_edit.lua
 msgid "Tree rings"
@@ -434,7 +520,8 @@ msgstr "Кольца дерева"
 msgid "A ring grows for every month you read."
 msgstr "За каждый месяц чтения появляется новое кольцо."
 
-#: bookorbit_board_decor.lua bookorbit_download_sheet.lua bookorbit_status_page.lua
+#: bookorbit_board_decor.lua bookorbit_download_sheet.lua
+#: bookorbit_status_page.lua
 msgid "%1, %2"
 msgstr "%1, %2"
 
@@ -486,9 +573,10 @@ msgstr[1] "%1 остановки до конца"
 msgstr[2] "%1 остановок до конца"
 msgstr[3] "%1 остановки до конца"
 
+#. TRANSLATORS: %1 is the reading time left, such as 3 h 20 min, shown bold.
 #: bookorbit_board_decor.lua
-msgid "End of book in"
-msgstr "До конца книги"
+msgid "End of book in %1"
+msgstr "До конца книги %1"
 
 #: bookorbit_board_decor.lua
 msgid "%1 stop"
@@ -514,10 +602,6 @@ msgstr "Эпическое"
 msgid "Legendary"
 msgstr "Легендарное"
 
-#: bookorbit_board_decor.lua bookorbit_board_edit.lua
-msgid "Next badge"
-msgstr "Следующий значок"
-
 #: bookorbit_board_decor.lua
 msgid "Badges show up here with a newer BookOrbit server."
 msgstr "Значки появятся здесь с более новым сервером BookOrbit."
@@ -526,41 +610,44 @@ msgstr "Значки появятся здесь с более новым сер
 msgid "Needs a newer server."
 msgstr "Нужен более новый сервер."
 
-#: bookorbit_board_decor.lua
-msgid "Achievements are turned off in your BookOrbit settings."
-msgstr "Достижения отключены в настройках BookOrbit."
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Next badge"
+msgstr "Следующий значок"
 
 #: bookorbit_board_decor.lua
 msgid "Achievements are off."
 msgstr "Достижения отключены."
 
 #: bookorbit_board_decor.lua
-msgid "Read a little and your first badge shows up here."
-msgstr "Почитайте немного, и здесь появится ваш первый значок."
+msgid "Achievements are turned off in your BookOrbit settings."
+msgstr "Достижения отключены в настройках BookOrbit."
 
 #: bookorbit_board_decor.lua
 msgid "No badges yet."
 msgstr "Значков пока нет."
 
 #: bookorbit_board_decor.lua
+msgid "Read a little and your first badge shows up here."
+msgstr "Почитайте немного, и здесь появится ваш первый значок."
+
+#: bookorbit_board_decor.lua
 msgid "New badge"
 msgstr "Новый значок"
 
-#: bookorbit_board_decor.lua bookorbit_list_view.lua
-msgid "of %1"
-msgstr "из %1"
-
-#: bookorbit_board_decor.lua bookorbit_catalog_board.lua bookorbit_catalog_detail.lua bookorbit_detail_view.lua bookorbit_download_sheet.lua bookorbit_list_data.lua bookorbit_list_view.lua bookorbit_text_pages.lua
+#: bookorbit_board_decor.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_board.lua bookorbit_catalog_detail.lua
+#: bookorbit_detail_view.lua bookorbit_download_sheet.lua
+#: bookorbit_list_data.lua bookorbit_list_view.lua bookorbit_text_pages.lua
 msgid "%1 of %2"
 msgstr "%1 из %2"
-
-#: bookorbit_board_decor.lua bookorbit_board_edit.lua
-msgid "Gathering dust"
-msgstr "Покрываются пылью"
 
 #: bookorbit_board_decor.lua
 msgid "Books you download and never open collect dust here."
 msgstr "Здесь собираются скачанные, но не открытые книги."
+
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Gathering dust"
+msgstr "Покрываются пылью"
 
 #: bookorbit_board_decor.lua
 msgid "Unopened books collect dust here."
@@ -626,37 +713,37 @@ msgstr "Прогноз завершения"
 msgid "When your book ends at your pace"
 msgstr "Когда книга закончится при вашем темпе"
 
+#: bookorbit_board_edit.lua
+msgid "One square a day for a whole year"
+msgstr "Один квадрат на каждый день года"
+
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
 msgid "Year in reading"
 msgstr "Год чтения"
 
 #: bookorbit_board_edit.lua
-msgid "One square a day for a whole year"
-msgstr "Один квадрат на каждый день года"
+msgid "Ahead or behind on your yearly goal"
+msgstr "Опережение или отставание от годовой цели"
 
 #: bookorbit_board_edit.lua
 msgid "Goal pace"
 msgstr "Темп достижения цели"
 
 #: bookorbit_board_edit.lua
-msgid "Ahead or behind on your yearly goal"
-msgstr "Опережение или отставание от годовой цели"
+msgid "Brightness and warmth steppers"
+msgstr "Регуляторы яркости и теплоты"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
 msgid "Light"
 msgstr "Подсветка"
 
 #: bookorbit_board_edit.lua
-msgid "Brightness and warmth steppers"
-msgstr "Регуляторы яркости и теплоты"
+msgid "A word you looked up, in context"
+msgstr "Найденное вами слово в контексте"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
 msgid "Word of the day"
 msgstr "Слово дня"
-
-#: bookorbit_board_edit.lua
-msgid "A word you looked up, in context"
-msgstr "Найденное вами слово в контексте"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
 msgid "A year ago"
@@ -690,33 +777,34 @@ msgstr "Когда вы читаете"
 msgid "Your reading by hour of the day"
 msgstr "Ваше чтение по часам дня"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "Finished this year"
-msgstr "Прочитано в этом году"
-
 #: bookorbit_board_edit.lua
 msgid "Covers of the books you finished"
 msgstr "Обложки законченных книг"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "Pick back up"
-msgstr "Вернуться к чтению"
+msgid "Finished this year"
+msgstr "Прочитано в этом году"
 
 #: bookorbit_board_edit.lua
 msgid "Books you put down a while ago"
 msgstr "Книги, которые вы давно отложили"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "Want to read"
-msgstr "Хочу прочитать"
+msgid "Pick back up"
+msgstr "Вернуться к чтению"
 
 #: bookorbit_board_edit.lua
 msgid "Books waiting for their turn"
 msgstr "Книги, ожидающие своей очереди"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog_board.lua bookorbit_detail_data.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Want to read"
+msgstr "Хочу прочитать"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_board.lua bookorbit_detail_data.lua
 msgid "Continue reading"
-msgstr "Продолжить чтение"
+msgstr "Читаю сейчас"
 
 #: bookorbit_board_edit.lua
 msgid "Your current book with Resume"
@@ -730,7 +818,8 @@ msgstr "Также читаю"
 msgid "The rest of your pile"
 msgstr "Остальные книги из вашей стопки"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_highlight_sheet.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+#: bookorbit_highlight_sheet.lua
 msgid "Highlight of the day"
 msgstr "Цитата дня"
 
@@ -738,21 +827,21 @@ msgstr "Цитата дня"
 msgid "One of your highlights, daily"
 msgstr "Одно из ваших выделений каждый день"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "Streak"
-msgstr "Серия дней"
-
 #: bookorbit_board_edit.lua
 msgid "Days in a row, and your best"
 msgstr "Дней подряд и ваш рекорд"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "This week"
-msgstr "Эта неделя"
+msgid "Streak"
+msgstr "Серия дней"
 
 #: bookorbit_board_edit.lua
 msgid "Minutes read each day"
 msgstr "Минут чтения каждый день"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "This week"
+msgstr "Эта неделя"
 
 #: bookorbit_board_edit.lua
 msgid "Minutes read today"
@@ -766,55 +855,64 @@ msgstr "Календарь чтения"
 msgid "This month, one square a day"
 msgstr "Этот месяц, один квадрат на каждый день"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "Up next in series"
-msgstr "Следующие в сериях"
-
 #: bookorbit_board_edit.lua
 msgid "The next book in each series you read"
 msgstr "Следующая книга в каждой читаемой серии"
 
 #: bookorbit_board_edit.lua bookorbit_board_widgets.lua
-msgid "Discover"
-msgstr "Обзор"
+msgid "Up next in series"
+msgstr "Следующие в сериях"
 
 #: bookorbit_board_edit.lua
 msgid "A shuffle of your library"
 msgstr "Случайная выборка из вашей библиотеки"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Discover"
+msgstr "Обзор"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
 msgid "Recently added"
-msgstr "Недавно добавленные"
+msgstr "Новинки"
 
 #: bookorbit_board_edit.lua
 msgid "The newest books in your library"
 msgstr "Самые новые книги в вашей библиотеке"
 
 #: bookorbit_board_edit.lua
-msgid "Shelf from your library"
-msgstr "Полка из вашей библиотеки"
-
-#: bookorbit_board_edit.lua
 msgid "One library, collection, SmartScope, author or series"
 msgstr "Библиотека, коллекция, SmartScope, автор или серия"
 
-#: bookorbit_board_edit.lua bookorbit_board_store.lua bookorbit_board_widgets.lua bookorbit_catalog_board.lua bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua bookorbit_detail_data.lua bookorbit_main_menu.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua
-msgid "Library"
-msgstr "Библиотека"
+#: bookorbit_board_edit.lua
+msgid "Shelf from your library"
+msgstr "Полка из вашей библиотеки"
 
 #: bookorbit_board_edit.lua
 msgid "All your books"
 msgstr "Все ваши книги"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_list_pages.lua bookorbit_menu_sheet.lua
-msgid "Series"
-msgstr "Серии"
+#: bookorbit_board_edit.lua bookorbit_board_store.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua bookorbit_main_menu.lua bookorbit_menu_sheet.lua
+#: bookorbit_settings_page.lua
+msgid "Library"
+msgstr "Библиотека"
 
 #: bookorbit_board_edit.lua
 msgid "Every series"
 msgstr "Все серии"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_list_pages.lua bookorbit_menu_sheet.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_list_pages.lua
+#: bookorbit_menu_sheet.lua
+msgid "Series"
+msgstr "Серии"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_list_pages.lua
+#: bookorbit_menu_sheet.lua
 msgid "Authors"
 msgstr "Авторы"
 
@@ -822,7 +920,9 @@ msgstr "Авторы"
 msgid "Every author"
 msgstr "Все авторы"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua bookorbit_catalog_detail.lua bookorbit_detail_data.lua bookorbit_list_pages.lua bookorbit_menu_sheet.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_list_pages.lua bookorbit_menu_sheet.lua
 msgid "Collections"
 msgstr "Коллекции"
 
@@ -830,7 +930,8 @@ msgstr "Коллекции"
 msgid "Your collections"
 msgstr "Ваши коллекции"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua bookorbit_list_pages.lua bookorbit_menu_sheet.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_list_pages.lua bookorbit_menu_sheet.lua
 msgid "SmartScopes"
 msgstr "SmartScopes"
 
@@ -838,15 +939,18 @@ msgstr "SmartScopes"
 msgid "Your saved SmartScopes"
 msgstr "Ваши сохранённые SmartScopes"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_detail_view.lua bookorbit_menu_sheet.lua
-msgid "On device"
-msgstr "На устройстве"
-
 #: bookorbit_board_edit.lua
 msgid "Books on this device, and space left"
 msgstr "Книги на этом устройстве и свободное место"
 
-#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog_lists.lua
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+#: bookorbit_menu_sheet.lua
+msgid "On device"
+msgstr "На устройстве"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_lists.lua
 msgid "Search"
 msgstr "Поиск"
 
@@ -862,53 +966,54 @@ msgstr "Часы"
 msgid "Time and date, each minute"
 msgstr "Время и дата с точностью до минуты"
 
-#: bookorbit_board_edit.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua bookorbit_status_page.lua
-msgid "Sync status"
-msgstr "Состояние синхронизации"
-
 #: bookorbit_board_edit.lua
 msgid "Last sync, with Sync now"
 msgstr "Последняя синхронизация и кнопка «Синхронизировать сейчас»"
 
-#: bookorbit_board_edit.lua
-msgid "Reading buddy"
-msgstr "Спутник чтения"
+#: bookorbit_board_edit.lua bookorbit_menu_sheet.lua
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
+msgid "Sync status"
+msgstr "Состояние синхронизации"
 
 #: bookorbit_board_edit.lua
 msgid "A cat that keeps you company"
 msgstr "Кот, который составляет вам компанию"
 
 #: bookorbit_board_edit.lua
-msgid "Reading dog"
-msgstr "Собака-читатель"
+msgid "Reading buddy"
+msgstr "Спутник чтения"
 
 #: bookorbit_board_edit.lua
 msgid "A floppy-eared friend for every chapter"
 msgstr "Друг с висячими ушами для каждой главы"
 
 #: bookorbit_board_edit.lua
-msgid "Reading rabbit"
-msgstr "Кролик-читатель"
+msgid "Reading dog"
+msgstr "Собака-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "A quiet companion with a curious nose"
 msgstr "Тихий спутник с любопытным носом"
 
 #: bookorbit_board_edit.lua
-msgid "Reading owl"
-msgstr "Сова-читатель"
+msgid "Reading rabbit"
+msgstr "Кролик-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "A feathered friend for one more page"
 msgstr "Пернатый друг ещё для одной страницы"
 
 #: bookorbit_board_edit.lua
-msgid "Reading penguin"
-msgstr "Пингвин-читатель"
+msgid "Reading owl"
+msgstr "Сова-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "A little bookworm in a feathered coat"
 msgstr "Маленький книжный червь в пернатом наряде"
+
+#: bookorbit_board_edit.lua
+msgid "Reading penguin"
+msgstr "Пингвин-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "Reading robot"
@@ -919,36 +1024,36 @@ msgid "Recharges with a good book"
 msgstr "Заряжается хорошей книгой"
 
 #: bookorbit_board_edit.lua
-msgid "Reading vampire"
-msgstr "Вампир-читатель"
-
-#: bookorbit_board_edit.lua
 msgid "A tiny night owl with a cape and fangs"
 msgstr "Маленькая ночная сова с плащом и клыками"
 
 #: bookorbit_board_edit.lua
-msgid "Reading dragon"
-msgstr "Дракон-читатель"
+msgid "Reading vampire"
+msgstr "Вампир-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "A little dragon guarding a hoard of stories"
 msgstr "Маленький дракон, охраняющий сокровища историй"
 
 #: bookorbit_board_edit.lua
-msgid "Reading ghost"
-msgstr "Призрак-читатель"
+msgid "Reading dragon"
+msgstr "Дракон-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "A friendly spirit between the pages"
 msgstr "Добрый дух между страницами"
 
 #: bookorbit_board_edit.lua
-msgid "Reading mimic"
-msgstr "Мимик-читатель"
+msgid "Reading ghost"
+msgstr "Призрак-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "A book that reads you back"
 msgstr "Книга, которая читает вас"
+
+#: bookorbit_board_edit.lua
+msgid "Reading mimic"
+msgstr "Мимик-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "Reading mummy"
@@ -959,12 +1064,12 @@ msgid "Three thousand years of catching up"
 msgstr "Три тысячи лет наверстывания"
 
 #: bookorbit_board_edit.lua
-msgid "Reading witch"
-msgstr "Ведьма-читатель"
-
-#: bookorbit_board_edit.lua
 msgid "Never without her spellbook"
 msgstr "Всегда со своей книгой заклинаний"
+
+#: bookorbit_board_edit.lua
+msgid "Reading witch"
+msgstr "Ведьма-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "Reading skeleton"
@@ -975,20 +1080,20 @@ msgid "Reads to the bone"
 msgstr "Читает до костей"
 
 #: bookorbit_board_edit.lua
-msgid "Reading candle"
-msgstr "Свеча чтения"
-
-#: bookorbit_board_edit.lua
 msgid "Burns the midnight oil"
 msgstr "Читает допоздна"
 
 #: bookorbit_board_edit.lua
-msgid "Reading alien"
-msgstr "Инопланетянин-читатель"
+msgid "Reading candle"
+msgstr "Свеча чтения"
 
 #: bookorbit_board_edit.lua
 msgid "Came a long way for a good book"
 msgstr "Прошёл долгий путь ради хорошей книги"
+
+#: bookorbit_board_edit.lua
+msgid "Reading alien"
+msgstr "Инопланетянин-читатель"
 
 #: bookorbit_board_edit.lua
 msgid "Chapter line"
@@ -1019,12 +1124,12 @@ msgid "One letter from your fonts"
 msgstr "Одна буква из ваших шрифтов"
 
 #: bookorbit_board_edit.lua
-msgid "Analog clock"
-msgstr "Аналоговые часы"
-
-#: bookorbit_board_edit.lua
 msgid "A clock face, each minute"
 msgstr "Циферблат с каждой минутой"
+
+#: bookorbit_board_edit.lua
+msgid "Analog clock"
+msgstr "Аналоговые часы"
 
 #: bookorbit_board_edit.lua
 msgid "Moon phase"
@@ -1044,7 +1149,8 @@ msgctxt "Widget category"
 msgid "Reading"
 msgstr "Чтение"
 
-#: bookorbit_board_edit.lua bookorbit_catalog_board.lua bookorbit_settings_page.lua
+#: bookorbit_board_edit.lua bookorbit_catalog_board.lua
+#: bookorbit_settings_page.lua
 msgid "Stats"
 msgstr "Статистика"
 
@@ -1092,25 +1198,26 @@ msgstr "Автор"
 msgid "A series"
 msgstr "Серия"
 
-#: bookorbit_board_edit.lua bookorbit_catalog_board.lua bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_board_edit.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
 msgid "Pages"
 msgstr "Страницы"
-
-#: bookorbit_board_edit.lua
-msgid "Reset this page"
-msgstr "Сбросить эту страницу"
 
 #: bookorbit_board_edit.lua
 msgid "Back to how it started"
 msgstr "Вернуть исходный вид"
 
 #: bookorbit_board_edit.lua
-msgid "Reset all pages"
-msgstr "Сбросить все страницы"
+msgid "Reset this page"
+msgstr "Сбросить эту страницу"
 
 #: bookorbit_board_edit.lua
 msgid "Every page back to how it started"
 msgstr "Вернуть все страницы к исходному виду"
+
+#: bookorbit_board_edit.lua
+msgid "Reset all pages"
+msgstr "Сбросить все страницы"
 
 #: bookorbit_board_edit.lua
 msgid "Reset all pages?"
@@ -1124,17 +1231,14 @@ msgstr "Все страницы вернутся к исходной раскл�
 msgid "Reset"
 msgstr "Сбросить"
 
-#: bookorbit_board_store.lua bookorbit_catalog_detail.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_board_store.lua bookorbit_catalog_detail.lua
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
 msgid "Home"
 msgstr "Главная"
 
 #: bookorbit_board_store.lua
 msgid "Insights"
 msgstr "Аналитика"
-
-#: bookorbit_board_widgets.lua
-msgid "Three picks from your library"
-msgstr "Три книги из вашей библиотеки"
 
 #: bookorbit_board_widgets.lua
 msgid "Pick a book to start"
@@ -1145,10 +1249,15 @@ msgid "Start here"
 msgstr "Начните здесь"
 
 #: bookorbit_board_widgets.lua
+msgid "Three picks from your library"
+msgstr "Три книги из вашей библиотеки"
+
+#: bookorbit_board_widgets.lua
 msgid "Picks from your library"
 msgstr "Выбор из вашей библиотеки"
 
-#: bookorbit_board_widgets.lua bookorbit_detail_data.lua bookorbit_download_sheet.lua
+#: bookorbit_board_widgets.lua bookorbit_detail_data.lua
+#: bookorbit_download_sheet.lua
 msgid "Start reading"
 msgstr "Начать чтение"
 
@@ -1162,11 +1271,18 @@ msgstr "Выберите книгу из библиотеки, чтобы нач
 
 #: bookorbit_board_widgets.lua
 msgid "Continue reading · %1 of %2"
-msgstr "Продолжить чтение · %1 из %2"
+msgstr "Читаю сейчас · %1 из %2"
 
-#: bookorbit_board_widgets.lua bookorbit_detail_data.lua bookorbit_list_data.lua bookorbit_list_pages.lua
+#: bookorbit_board_widgets.lua bookorbit_detail_data.lua
+#: bookorbit_list_data.lua bookorbit_list_pages.lua
 msgid "%1 left"
 msgstr "Осталось: %1"
+
+#: bookorbit_board_widgets.lua bookorbit_book_peek.lua
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua bookorbit_download_sheet.lua
+msgid "Download"
+msgstr "Скачать"
 
 #: bookorbit_board_widgets.lua
 msgid "Resume"
@@ -1176,21 +1292,18 @@ msgstr "Продолжить"
 msgid "Resume reading"
 msgstr "Продолжить чтение"
 
-#: bookorbit_board_widgets.lua bookorbit_book_peek.lua bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua bookorbit_detail_data.lua bookorbit_download_sheet.lua
-msgid "Download"
-msgstr "Скачать"
-
 #: bookorbit_board_widgets.lua
 msgid "%1 / %2"
 msgstr "%1 / %2"
 
+#. TRANSLATORS: a reading streak; %1 is the number of days, shown large.
 #: bookorbit_board_widgets.lua
-msgid "day"
-msgid_plural "days"
-msgstr[0] "день"
-msgstr[1] "дня"
-msgstr[2] "дней"
-msgstr[3] "дня"
+msgid "%1 day"
+msgid_plural "%1 days"
+msgstr[0] "%1 день"
+msgstr[1] "%1 дня"
+msgstr[2] "%1 дней"
+msgstr[3] "%1 дня"
 
 #: bookorbit_board_widgets.lua
 msgid "Read today"
@@ -1205,10 +1318,6 @@ msgid "Nothing yet"
 msgstr "Пока ничего"
 
 #: bookorbit_board_widgets.lua
-msgid "min"
-msgstr "мин"
-
-#: bookorbit_board_widgets.lua
 msgid "Not yet"
 msgstr "Пока нет"
 
@@ -1221,24 +1330,29 @@ msgid "%1 goal"
 msgstr "Цель: %1"
 
 #: bookorbit_board_widgets.lua
-msgid "Set a reading goal in BookOrbit to track your pace."
-msgstr "Задайте цель чтения в BookOrbit, чтобы отслеживать темп."
-
-#: bookorbit_board_widgets.lua
 msgid "Set a goal in BookOrbit."
 msgstr "Задайте цель в BookOrbit."
+
+#: bookorbit_board_widgets.lua
+msgid "Set a reading goal in BookOrbit to track your pace."
+msgstr "Задайте цель чтения в BookOrbit, чтобы отслеживать темп."
 
 #: bookorbit_board_widgets.lua
 msgid "First book starts it"
 msgstr "Всё начинается с первой книги"
 
+#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua
+#: bookorbit_settings_page.lua
+msgid "New"
+msgstr "Новое"
+
 #: bookorbit_board_widgets.lua
 msgid "Starting out"
 msgstr "Начало"
 
-#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua
-msgid "New"
-msgstr "Новое"
+#: bookorbit_board_widgets.lua
+msgid "Goal met"
+msgstr "Цель достигнута"
 
 #: bookorbit_board_widgets.lua
 msgid "Goal met · on pace for %1"
@@ -1249,36 +1363,28 @@ msgid "on pace for %1"
 msgstr "темп соответствует %1"
 
 #: bookorbit_board_widgets.lua
-msgid "Goal met"
-msgstr "Цель достигнута"
+msgid "%1 ahead"
+msgstr "Опережение: %1"
 
 #: bookorbit_board_widgets.lua
 msgid "%1 ahead of pace"
 msgstr "Опережение темпа на %1"
 
 #: bookorbit_board_widgets.lua
-msgid "%1 ahead"
-msgstr "Опережение: %1"
+msgid "%1 behind"
+msgstr "Отставание: %1"
 
 #: bookorbit_board_widgets.lua
 msgid "%1 behind pace"
 msgstr "Отставание от темпа на %1"
 
-#: bookorbit_board_widgets.lua
-msgid "%1 behind"
-msgstr "Отставание: %1"
-
-#: bookorbit_board_widgets.lua
-msgid " of 1 book"
-msgid_plural " of %1 books"
-msgstr[0] " из %1 книги"
-msgstr[1] " из %1 книг"
-msgstr[2] " из %1 книг"
-msgstr[3] " из %1 книг"
-
-#: bookorbit_board_widgets.lua
-msgid " of %1"
-msgstr " из %1"
+#: bookorbit_board_widgets.lua bookorbit_list_data.lua
+msgid "%1 of 1 book"
+msgid_plural "%1 of %2 books"
+msgstr[0] "%1 из %2 книги"
+msgstr[1] "%1 из %2 книг"
+msgstr[2] "%1 из %2 книг"
+msgstr[3] "%1 из %2 книг"
 
 #: bookorbit_board_widgets.lua
 msgid "Less"
@@ -1292,9 +1398,16 @@ msgstr "Больше"
 msgid "Your reading days fill in here"
 msgstr "Здесь появятся дни чтения"
 
+#. TRANSLATORS: %1 is the most time read in one day, shown bold; %2 that day's date, such as Sat 17 Oct.
 #: bookorbit_board_widgets.lua
-msgid "Best day"
-msgstr "Лучший день"
+msgid "Best day %1, %2"
+msgstr "Лучший день %1, %2"
+
+#. TRANSLATORS: short weekday, day of the month, then the short month as it reads inside a date.
+#: bookorbit_board_widgets.lua
+msgctxt "Weekday, day and month"
+msgid "%1 %2 %3"
+msgstr "%1, %2 %3"
 
 #: bookorbit_board_widgets.lua
 msgid "Past 1 month"
@@ -1308,6 +1421,14 @@ msgstr[3] "Последние %1 месяца"
 msgctxt "Time read"
 msgid "read"
 msgstr "чтения"
+
+#: bookorbit_board_widgets.lua
+msgid "day"
+msgid_plural "days"
+msgstr[0] "день"
+msgstr[1] "дня"
+msgstr[2] "дней"
+msgstr[3] "дня"
 
 #: bookorbit_board_widgets.lua
 msgid "best streak"
@@ -1333,7 +1454,8 @@ msgstr[1] "Дней чтения: %1"
 msgstr[2] "Дней чтения: %1"
 msgstr[3] "Дней чтения: %1"
 
-#: bookorbit_board_widgets.lua bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_view.lua
 msgid "All %1"
 msgstr "Всего: %1"
 
@@ -1345,7 +1467,8 @@ msgstr "Здесь появятся начатые вами книги."
 msgid "Your highlights come back here, one a day."
 msgstr "Здесь будут появляться ваши выделения, по одному в день."
 
-#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_lists.lua bookorbit_detail_view.lua
 msgid "In progress"
 msgstr "В процессе"
 
@@ -1437,41 +1560,48 @@ msgstr[3] "книги здесь"
 msgid "%1 GB free"
 msgstr "Свободно: %1 ГБ"
 
+#: bookorbit_board_widgets.lua bookorbit_bulk_sheet.lua bookorbit_catalog.lua
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+#: bookorbit_list_pages.lua
+msgid "Books"
+msgstr "Книги"
+
 #: bookorbit_board_widgets.lua
 msgid "Title, author"
 msgstr "Название, автор"
-
-#: bookorbit_board_widgets.lua bookorbit_bulk_sheet.lua bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua bookorbit_list_pages.lua
-msgid "Books"
-msgstr "Книги"
 
 #: bookorbit_board_widgets.lua
 msgid "not yet"
 msgstr "пока нет"
 
-#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua bookorbit_status_page.lua
-msgid "Synced"
-msgstr "Синхронизировано"
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+#: bookorbit_detail_data.lua bookorbit_detail_view.lua bookorbit_list_view.lua
+#: bookorbit_menu_sheet.lua bookorbit_status_page.lua
+msgid "Offline"
+msgstr "Офлайн"
 
-#: bookorbit_board_widgets.lua bookorbit_main_menu.lua bookorbit_settings_page.lua
+#: bookorbit_board_widgets.lua bookorbit_main_menu.lua
+#: bookorbit_settings_page.lua
 msgid "Sync"
 msgstr "Синхронизация"
 
-#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua bookorbit_detail_data.lua bookorbit_detail_view.lua bookorbit_list_view.lua bookorbit_menu_sheet.lua bookorbit_status_page.lua
-msgid "Offline"
-msgstr "Офлайн"
+#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua
+#: bookorbit_status_page.lua
+msgid "Synced"
+msgstr "Актуально"
 
 #: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
 msgid "saved %1"
 msgstr "сохранено: %1"
 
-#: bookorbit_board_widgets.lua bookorbit_book_sheet.lua bookorbit_menu_sheet.lua bookorbit_status_page.lua
-msgid "Sync now"
-msgstr "Синхронизировать сейчас"
-
 #: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua
 msgid "Connect"
 msgstr "Подключиться"
+
+#: bookorbit_board_widgets.lua bookorbit_book_sheet.lua
+#: bookorbit_status_page.lua
+msgid "Sync now"
+msgstr "Синхронизировать"
 
 #: bookorbit_board_widgets.lua
 msgid "Mornings"
@@ -1503,7 +1633,7 @@ msgstr "Статистика будет заполняться по мере ч�
 
 #: bookorbit_board_widgets.lua
 msgid "longest session"
-msgstr "самая длинная сессия"
+msgstr "макс. сессия"
 
 #: bookorbit_board_widgets.lua
 msgid "pages an hour"
@@ -1516,10 +1646,6 @@ msgstr "средняя сессия"
 #: bookorbit_board_widgets.lua
 msgid "sessions"
 msgstr "сессий"
-
-#: bookorbit_board_widgets.lua
-msgid "Wi-Fi"
-msgstr "Wi-Fi"
 
 #: bookorbit_board_widgets.lua
 msgid "Night"
@@ -1535,28 +1661,32 @@ msgid "Sync"
 msgstr "Синхронизация"
 
 #: bookorbit_board_widgets.lua
-msgid "This device has no frontlight."
-msgstr "На этом устройстве нет подсветки."
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
 
 #: bookorbit_board_widgets.lua
-msgid "Brightness · Warmth"
-msgstr "Яркость · Теплота"
+msgid "This device has no frontlight."
+msgstr "На этом устройстве нет подсветки."
 
 #: bookorbit_board_widgets.lua
 msgid "Brightness"
 msgstr "Яркость"
 
 #: bookorbit_board_widgets.lua
+msgid "Brightness · Warmth"
+msgstr "Яркость · Теплота"
+
+#: bookorbit_board_widgets.lua
 msgid "Finish"
 msgstr "Завершение"
 
 #: bookorbit_board_widgets.lua
-msgid "Read a little on this device and a finish date shows up here."
-msgstr "Почитайте немного на этом устройстве, и здесь появится дата завершения."
-
-#: bookorbit_board_widgets.lua
 msgid "Read a little"
 msgstr "Почитайте немного"
+
+#: bookorbit_board_widgets.lua
+msgid "Read a little on this device and a finish date shows up here."
+msgstr "Почитайте немного на этом устройстве, и здесь появится дата завершения."
 
 #: bookorbit_board_widgets.lua
 msgid "%1 left at ~%2 min a day"
@@ -1571,12 +1701,12 @@ msgid "Look up a word while reading."
 msgstr "Ищите слова во время чтения."
 
 #: bookorbit_board_widgets.lua
-msgid "Next year, this shows what you were reading today."
-msgstr "В следующем году здесь будет показано, что вы читали сегодня."
-
-#: bookorbit_board_widgets.lua
 msgid "Check back next year."
 msgstr "Загляните сюда в следующем году."
+
+#: bookorbit_board_widgets.lua
+msgid "Next year, this shows what you were reading today."
+msgstr "В следующем году здесь будет показано, что вы читали сегодня."
 
 #: bookorbit_board_widgets.lua
 msgid "Stopped at %1%"
@@ -1588,15 +1718,15 @@ msgstr "Прочитано: %1%"
 
 #: bookorbit_board_widgets.lua
 msgid "Pick it up"
-msgstr "Продолжить"
+msgstr "Читать"
 
 #: bookorbit_board_widgets.lua
 msgid "%1 over %2 day, then you stopped at %3%."
 msgid_plural "%1 over %2 days, then you stopped at %3%."
-msgstr[0] "%1 за %2 день, затем остановились на %3%."
-msgstr[1] "%1 за %2 дня, затем остановились на %3%."
-msgstr[2] "%1 за %2 дней, затем остановились на %3%."
-msgstr[3] "%1 за %2 дня, затем остановились на %3%."
+msgstr[0] "%1 за %2 день, остановились на %3%."
+msgstr[1] "%1 за %2 дня, остановились на %3%."
+msgstr[2] "%1 за %2 дней, остановились на %3%."
+msgstr[3] "%1 за %2 дня, остановились на %3%."
 
 #: bookorbit_board_widgets.lua
 msgid "Stopped at %1%."
@@ -1606,7 +1736,9 @@ msgstr "Остановились на %1%."
 msgid "Could not draw this widget."
 msgstr "Не удалось отобразить этот виджет."
 
-#: bookorbit_book_peek.lua bookorbit_bulk_sheet.lua bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua bookorbit_catalog_util.lua bookorbit_catalog_widgets.lua bookorbit_detail_data.lua
+#: bookorbit_book_peek.lua bookorbit_bulk_sheet.lua bookorbit_catalog.lua
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_util.lua
+#: bookorbit_catalog_widgets.lua bookorbit_detail_data.lua
 msgid "Untitled"
 msgstr "Без названия"
 
@@ -1618,13 +1750,14 @@ msgstr "%1, в %2"
 msgid "%1 · %2%"
 msgstr "%1 · %2%"
 
-#: bookorbit_book_peek.lua bookorbit_catalog_lists.lua bookorbit_detail_data.lua bookorbit_update_sheet.lua
-msgid "On this device"
-msgstr "На этом устройстве"
-
 #: bookorbit_book_peek.lua bookorbit_catalog_lists.lua
 msgid "Not on this device"
 msgstr "Не на этом устройстве"
+
+#: bookorbit_book_peek.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua bookorbit_update_sheet.lua
+msgid "On this device"
+msgstr "На этом устройстве"
 
 #: bookorbit_book_peek.lua bookorbit_detail_data.lua
 msgctxt "Action"
@@ -1635,7 +1768,8 @@ msgstr "Читать"
 msgid "Details"
 msgstr "Сведения"
 
-#: bookorbit_book_peek.lua bookorbit_catalog_detail.lua bookorbit_detail_view.lua bookorbit_text_pages.lua
+#: bookorbit_book_peek.lua bookorbit_catalog_detail.lua
+#: bookorbit_detail_view.lua bookorbit_text_pages.lua
 msgid "About this book"
 msgstr "Об этой книге"
 
@@ -1660,18 +1794,19 @@ msgid "Edition, folder and file name"
 msgstr "Издание, папка и имя файла"
 
 #: bookorbit_book_peek.lua
-msgid "Unselect"
-msgstr "Снять выбор"
+msgid "Pick books to download or mark read together"
+msgstr "Выберите книги для совместной загрузки или отметки прочитанными"
 
 #: bookorbit_book_peek.lua
 msgid "Select"
 msgstr "Выбрать"
 
 #: bookorbit_book_peek.lua
-msgid "Pick books to download or mark read together"
-msgstr "Выберите книги для совместной загрузки или отметки прочитанными"
+msgid "Unselect"
+msgstr "Снять выбор"
 
-#: bookorbit_book_peek.lua bookorbit_catalog_board.lua bookorbit_catalog_detail.lua
+#: bookorbit_book_peek.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_detail.lua
 msgid "Open the file browser to remove this book."
 msgstr "Откройте файловый браузер, чтобы удалить эту книгу."
 
@@ -1680,12 +1815,12 @@ msgid "%1, page %2 of %3"
 msgstr "%1, страница %2 из %3"
 
 #: bookorbit_book_sheet.lua
-msgid "No position yet"
-msgstr "Позиции пока нет"
-
-#: bookorbit_book_sheet.lua
 msgid "Checking…"
 msgstr "Проверка…"
+
+#: bookorbit_book_sheet.lua
+msgid "No position yet"
+msgstr "Позиции пока нет"
 
 #: bookorbit_book_sheet.lua
 msgid "Not checked yet"
@@ -1695,7 +1830,8 @@ msgstr "Ещё не проверено"
 msgid "This device"
 msgstr "Это устройство"
 
-#: bookorbit_book_sheet.lua bookorbit_catalog.lua bookorbit_main_menu.lua bookorbit_settings_page.lua bookorbit_sync_sheet.lua main.lua
+#: bookorbit_book_sheet.lua bookorbit_catalog.lua bookorbit_main_menu.lua
+#: bookorbit_settings_page.lua bookorbit_sync_sheet.lua main.lua
 msgid "BookOrbit"
 msgstr "BookOrbit"
 
@@ -1708,20 +1844,20 @@ msgid "BookOrbit has an earlier place"
 msgstr "В BookOrbit сохранена более ранняя позиция"
 
 #: bookorbit_book_sheet.lua
-msgid "Jump to %1"
-msgstr "Перейти к %1"
-
-#: bookorbit_book_sheet.lua
 msgid "Go back to %1"
 msgstr "Вернуться к %1"
 
 #: bookorbit_book_sheet.lua
-msgid "Stay here"
-msgstr "Остаться здесь"
+msgid "Jump to %1"
+msgstr "Перейти к %1"
 
 #: bookorbit_book_sheet.lua
 msgid "Stay at %1"
 msgstr "Остаться на позиции %1"
+
+#: bookorbit_book_sheet.lua
+msgid "Stay here"
+msgstr "Остаться здесь"
 
 #: bookorbit_book_sheet.lua
 msgid "Reading time syncs either way. Highlights and bookmarks don't sync for this copy."
@@ -1795,14 +1931,6 @@ msgstr "Открыть главную BookOrbit"
 msgid "Book synced"
 msgstr "Книга синхронизирована"
 
-#: bookorbit_book_sheet.lua bookorbit_progress_sync.lua
-msgid "Progress pulled"
-msgstr "Прогресс получен"
-
-#: bookorbit_book_sync.lua
-msgid "%1 reading events, %2 highlights uploaded"
-msgstr "Событий чтения: %1, выделений отправлено: %2"
-
 #: bookorbit_book_sync.lua
 msgid "BookOrbit sign-in failed. Check your account"
 msgstr "Не удалось войти в BookOrbit. Проверьте учётную запись"
@@ -1856,18 +1984,19 @@ msgid "in %1"
 msgstr "в %1"
 
 #: bookorbit_bulk_sheet.lua
-msgid "Download settings"
-msgstr "Настройки загрузки"
-
-#: bookorbit_bulk_sheet.lua
 msgid "Download books"
 msgstr "Загрузка книг"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Download settings"
+msgstr "Настройки загрузки"
 
 #: bookorbit_bulk_sheet.lua bookorbit_download_sheet.lua
 msgid "Folder"
 msgstr "Папка"
 
-#: bookorbit_bulk_sheet.lua bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+#: bookorbit_bulk_sheet.lua bookorbit_catalog.lua
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
 msgid "Format"
 msgstr "Формат"
 
@@ -1915,7 +2044,8 @@ msgstr "Загрузка %1 из %2"
 msgid "Getting ready…"
 msgstr "Подготовка…"
 
-#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua bookorbit_catalog_download.lua bookorbit_download_sheet.lua
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+#: bookorbit_catalog_download.lua bookorbit_download_sheet.lua
 msgid "Downloaded"
 msgstr "Скачано"
 
@@ -1931,13 +2061,13 @@ msgstr "Пропущено"
 msgid "Failed"
 msgstr "Ошибка"
 
-#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
-msgid "Stopping after this book…"
-msgstr "Остановка после этой книги…"
-
 #: bookorbit_bulk_sheet.lua
 msgid "Stop after this book"
 msgstr "Остановить после этой книги"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "Stopping after this book…"
+msgstr "Остановка после этой книги…"
 
 #: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
 msgid "%1, and %2 more"
@@ -1955,7 +2085,9 @@ msgstr "Повторить неудачные"
 msgid "View on device"
 msgstr "Просмотреть на устройстве"
 
-#: bookorbit_bulk_sheet.lua bookorbit_catalog_board.lua bookorbit_download_sheet.lua bookorbit_list_pages.lua bookorbit_signin_page.lua bookorbit_sync_sheet.lua
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_board.lua
+#: bookorbit_download_sheet.lua bookorbit_list_pages.lua
+#: bookorbit_signin_page.lua bookorbit_sync_sheet.lua
 msgid "Done"
 msgstr "Готово"
 
@@ -2031,7 +2163,8 @@ msgstr "Книг, соответствующих этим фильтрам, не
 msgid "No books here yet."
 msgstr "Книг здесь пока нет."
 
-#: bookorbit_catalog.lua bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_catalog.lua bookorbit_catalog_detail.lua
+#: bookorbit_catalog_lists.lua
 msgid "Opening %1…"
 msgstr "Открытие %1…"
 
@@ -2052,12 +2185,12 @@ msgid "Or press Enter on the keyboard"
 msgstr "Или нажмите Enter на клавиатуре"
 
 #: bookorbit_catalog.lua
-msgid "Show the whole list"
-msgstr "Показать весь список"
-
-#: bookorbit_catalog.lua
 msgid "Filtered by: %1"
 msgstr "Фильтр: %1"
+
+#: bookorbit_catalog.lua
+msgid "Show the whole list"
+msgstr "Показать весь список"
 
 #: bookorbit_catalog.lua bookorbit_list_pages.lua
 msgid "Libraries"
@@ -2080,18 +2213,19 @@ msgid "Search: %1"
 msgstr "Поиск: %1"
 
 #: bookorbit_catalog.lua
-msgid "Search in %1"
-msgstr "Поиск в %1"
-
-#: bookorbit_catalog.lua
 msgid "Search BookOrbit"
 msgstr "Поиск в BookOrbit"
+
+#: bookorbit_catalog.lua
+msgid "Search in %1"
+msgstr "Поиск в %1"
 
 #: bookorbit_catalog.lua
 msgid "Title, author, series or ISBN"
 msgstr "Название, автор, серия или ISBN"
 
-#: bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_catalog_util.lua bookorbit_detail_view.lua
+#: bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_view.lua
 msgid "All"
 msgstr "Все"
 
@@ -2115,9 +2249,10 @@ msgstr[3] "%1 книги - сортировка: %2"
 msgid "Sort: %1"
 msgstr "Сортировка: %1"
 
+#. TRANSLATORS: %1 is the line so far (count and sort), %2 the active filters.
 #: bookorbit_catalog.lua
-msgid " - Filter: %1"
-msgstr " - Фильтр: %1"
+msgid "%1 - Filter: %2"
+msgstr "%1 - Фильтр: %2"
 
 #: bookorbit_catalog.lua
 msgid "Read %1/%2 - %3"
@@ -2143,7 +2278,8 @@ msgstr "Статус чтения"
 msgid "The books you selected"
 msgstr "Выбранные книги"
 
-#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua
+#: bookorbit_catalog_lists.lua
 msgid "Selected books"
 msgstr "Выбранные книги"
 
@@ -2172,12 +2308,12 @@ msgid "View: Mosaic"
 msgstr "Вид: плитка"
 
 #: bookorbit_catalog.lua
-msgid "Titles: Shown"
-msgstr "Названия: показывать"
-
-#: bookorbit_catalog.lua
 msgid "Titles: Hidden"
 msgstr "Названия: скрывать"
+
+#: bookorbit_catalog.lua
+msgid "Titles: Shown"
+msgstr "Названия: показывать"
 
 #: bookorbit_catalog.lua
 msgid "Refresh"
@@ -2191,7 +2327,8 @@ msgstr "Фильтр…"
 msgid "Clear filter"
 msgstr "Очистить фильтр"
 
-#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua
+#: bookorbit_catalog_lists.lua
 msgid "Select books"
 msgstr "Выбрать книги"
 
@@ -2488,12 +2625,12 @@ msgid "Downloading..."
 msgstr "Загрузка…"
 
 #: bookorbit_catalog_bulk_download.lua
-msgid "Bulk download stopped"
-msgstr "Массовая загрузка остановлена"
-
-#: bookorbit_catalog_bulk_download.lua
 msgid "Bulk download complete"
 msgstr "Массовая загрузка завершена"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Bulk download stopped"
+msgstr "Массовая загрузка остановлена"
 
 #: bookorbit_catalog_bulk_download.lua
 msgid "Linked for sync"
@@ -2569,6 +2706,7 @@ msgid "Published"
 msgstr "Опубликовано"
 
 #: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_main_menu.lua
 msgid "Language"
 msgstr "Язык"
 
@@ -2584,7 +2722,8 @@ msgstr "ISBN-10"
 msgid "File"
 msgstr "Файл"
 
-#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua bookorbit_detail_data.lua
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua
 msgid "Added"
 msgstr "Добавлено"
 
@@ -2605,12 +2744,12 @@ msgid "Saving your rating…"
 msgstr "Сохранение оценки…"
 
 #: bookorbit_catalog_detail.lua
-msgid "Rating saved"
-msgstr "Оценка сохранена"
-
-#: bookorbit_catalog_detail.lua
 msgid "Rating cleared"
 msgstr "Оценка удалена"
+
+#: bookorbit_catalog_detail.lua
+msgid "Rating saved"
+msgstr "Оценка сохранена"
 
 #: bookorbit_catalog_detail.lua
 msgid "No supported format"
@@ -2640,7 +2779,8 @@ msgstr "Отметить непрочитанной"
 msgid "Mark as read"
 msgstr "Отметить прочитанной"
 
-#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua bookorbit_detail_view.lua
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_detail_view.lua
 msgid "More by %1"
 msgstr "Ещё от %1"
 
@@ -2673,12 +2813,12 @@ msgid "No highlights in this book yet"
 msgstr "В этой книге пока нет выделений"
 
 #: bookorbit_catalog_download.lua
-msgid "Saving EPUB delivery preference..."
-msgstr "Сохранение настройки EPUB…"
-
-#: bookorbit_catalog_download.lua
 msgid "Loading EPUB delivery preference..."
 msgstr "Загрузка настройки EPUB…"
+
+#: bookorbit_catalog_download.lua
+msgid "Saving EPUB delivery preference..."
+msgstr "Сохранение настройки EPUB…"
 
 #: bookorbit_catalog_download.lua
 msgid "Loading book..."
@@ -2749,12 +2889,12 @@ msgid "Last to first"
 msgstr "От последнего к первому"
 
 #: bookorbit_catalog_lists.lua
-msgid "Oldest"
-msgstr "Сначала старые"
-
-#: bookorbit_catalog_lists.lua
 msgid "Newest"
 msgstr "Сначала новые"
+
+#: bookorbit_catalog_lists.lua
+msgid "Oldest"
+msgstr "Сначала старые"
 
 #: bookorbit_catalog_lists.lua
 msgid "A–Z"
@@ -2765,12 +2905,12 @@ msgid "Z–A"
 msgstr "Я–А"
 
 #: bookorbit_catalog_lists.lua
-msgid "Recent first"
-msgstr "Сначала новые"
-
-#: bookorbit_catalog_lists.lua
 msgid "Oldest first"
 msgstr "Сначала старые"
+
+#: bookorbit_catalog_lists.lua
+msgid "Recent first"
+msgstr "Сначала новые"
 
 #: bookorbit_catalog_lists.lua
 msgid "Still checking which books are on this device"
@@ -2780,17 +2920,20 @@ msgstr "Проверяем, какие книги находятся на уст
 msgid "Sort and filter"
 msgstr "Сортировка и фильтр"
 
-#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua bookorbit_detail_data.lua
-msgid "Unread"
-msgstr "Не прочитано"
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_view.lua
+msgid "Finished"
+msgstr "Прочитано"
 
-#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua bookorbit_list_data.lua
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_list_data.lua
 msgid "Reading"
 msgstr "Читаю"
 
-#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua bookorbit_detail_view.lua
-msgid "Finished"
-msgstr "Прочитано"
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_data.lua
+msgid "Unread"
+msgstr "Не прочитано"
 
 #: bookorbit_catalog_lists.lua
 msgid "Saved for this list"
@@ -2808,20 +2951,8 @@ msgstr "Любой"
 msgid "Author"
 msgstr "Автор"
 
-#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua bookorbit_list_data.lua bookorbit_list_pages.lua
-msgid "Read"
-msgstr "Прочитано"
-
-#: bookorbit_catalog_lists.lua
-msgid "Everyone"
-msgstr "Все"
-
-#: bookorbit_catalog_lists.lua
-msgid "Reading now"
-msgstr "Читаю сейчас"
-
-#: bookorbit_catalog_lists.lua
-msgctxt "Authors filter"
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_list_data.lua bookorbit_list_pages.lua
 msgid "Read"
 msgstr "Прочитано"
 
@@ -2830,17 +2961,30 @@ msgid "All series"
 msgstr "Все серии"
 
 #: bookorbit_catalog_lists.lua
+msgid "Everyone"
+msgstr "Все"
+
+#: bookorbit_catalog_lists.lua
 msgctxt "Series filter"
 msgid "Finished"
 msgstr "Прочитано"
 
 #: bookorbit_catalog_lists.lua
-msgid "Name"
-msgstr "Название"
+msgctxt "Authors filter"
+msgid "Read"
+msgstr "Прочитано"
+
+#: bookorbit_catalog_lists.lua
+msgid "Reading now"
+msgstr "Читаю сейчас"
 
 #: bookorbit_catalog_lists.lua
 msgid "Most books"
 msgstr "Больше всего книг"
+
+#: bookorbit_catalog_lists.lua
+msgid "Name"
+msgstr "Название"
 
 #: bookorbit_catalog_lists.lua
 msgid "Loading libraries…"
@@ -2867,10 +3011,6 @@ msgid "Try fewer words, or search the whole library from the header."
 msgstr "Попробуйте ввести меньше слов или выполните поиск по всей библиотеке в заголовке."
 
 #: bookorbit_catalog_lists.lua
-msgid "Every book here is on this device"
-msgstr "Все книги здесь уже на этом устройстве"
-
-#: bookorbit_catalog_lists.lua
 msgid "Books you have not downloaded appear here."
 msgstr "Здесь появляются книги, которые вы не скачали."
 
@@ -2879,20 +3019,24 @@ msgid "Clear filters"
 msgstr "Очистить фильтры"
 
 #: bookorbit_catalog_lists.lua
-msgid "Nothing matches these filters"
-msgstr "По этим фильтрам ничего не найдено"
+msgid "Every book here is on this device"
+msgstr "Все книги здесь уже на этом устройстве"
 
 #: bookorbit_catalog_lists.lua
 msgid "Clear a filter to see more."
 msgstr "Очистите фильтр, чтобы увидеть больше."
 
 #: bookorbit_catalog_lists.lua
-msgid "No authors yet"
-msgstr "Авторов пока нет"
+msgid "Nothing matches these filters"
+msgstr "По этим фильтрам ничего не найдено"
 
 #: bookorbit_catalog_lists.lua
 msgid "Authors appear here as books are added to your libraries."
 msgstr "Авторы появятся здесь, когда в библиотеки будут добавлены книги."
+
+#: bookorbit_catalog_lists.lua
+msgid "No authors yet"
+msgstr "Авторов пока нет"
 
 #: bookorbit_catalog_lists.lua
 msgid "No series yet"
@@ -2903,28 +3047,24 @@ msgid "Series appear here as books that belong to one are added."
 msgstr "Серии появятся здесь, когда будут добавлены относящиеся к ним книги."
 
 #: bookorbit_catalog_lists.lua
-msgid "No books here yet"
-msgstr "Книг здесь пока нет"
-
-#: bookorbit_catalog_lists.lua
 msgid "Books you add to BookOrbit appear here."
 msgstr "Добавленные в BookOrbit книги появятся здесь."
 
 #: bookorbit_catalog_lists.lua
-msgid "Title A–Z"
-msgstr "Название А–Я"
+msgid "No books here yet"
+msgstr "Книг здесь пока нет"
 
 #: bookorbit_catalog_lists.lua
 msgid "Author A–Z"
 msgstr "Автор А–Я"
 
+#: bookorbit_catalog_lists.lua
+msgid "Title A–Z"
+msgstr "Название А–Я"
+
 #: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
 msgid "Recently updated"
 msgstr "Недавно обновлённые"
-
-#: bookorbit_catalog_lists.lua
-msgid "Title Z–A"
-msgstr "Название Я–А"
 
 #: bookorbit_catalog_lists.lua
 msgid "Author Z–A"
@@ -2935,12 +3075,16 @@ msgid "Reverse series order"
 msgstr "Обратный порядок серии"
 
 #: bookorbit_catalog_lists.lua
-msgid "Publication date (oldest)"
-msgstr "Дата публикации (сначала старые)"
+msgid "Title Z–A"
+msgstr "Название Я–А"
 
 #: bookorbit_catalog_lists.lua
-msgid "(oldest)"
-msgstr "(сначала старые)"
+msgid "%1 (oldest)"
+msgstr "%1 (сначала старые)"
+
+#: bookorbit_catalog_lists.lua
+msgid "Publication date (oldest)"
+msgstr "Дата публикации (сначала старые)"
 
 #: bookorbit_catalog_lists.lua
 msgid "Publication date (newest)"
@@ -2951,28 +3095,28 @@ msgid "Not on device"
 msgstr "Не на устройстве"
 
 #: bookorbit_catalog_lists.lua
-msgid "Name Z–A"
-msgstr "Название Я–А"
-
-#: bookorbit_catalog_lists.lua
 msgid "Name A–Z"
 msgstr "Название А–Я"
 
 #: bookorbit_catalog_lists.lua
-msgid "Tap covers to add or remove"
-msgstr "Нажимайте на обложки, чтобы добавлять или удалять"
+msgid "Name Z–A"
+msgstr "Название Я–А"
 
 #: bookorbit_catalog_lists.lua
 msgid "Tap books to add or remove"
 msgstr "Нажимайте на книги, чтобы добавлять или удалять"
 
 #: bookorbit_catalog_lists.lua
-msgid "%1 · oldest read first"
-msgstr "%1 · сначала давно читавшиеся"
+msgid "Tap covers to add or remove"
+msgstr "Нажимайте на обложки, чтобы добавлять или удалять"
 
 #: bookorbit_catalog_lists.lua
 msgid "%1 · last read first"
 msgstr "%1 · сначала недавно читавшиеся"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 · oldest read first"
+msgstr "%1 · сначала давно читавшиеся"
 
 #: bookorbit_catalog_lists.lua
 msgid "most books first"
@@ -2995,12 +3139,12 @@ msgstr[2] "%1 серий"
 msgstr[3] "%1 серии"
 
 #: bookorbit_catalog_lists.lua
-msgid "Pick an author"
-msgstr "Выберите автора"
-
-#: bookorbit_catalog_lists.lua
 msgid "Pick a series"
 msgstr "Выберите серию"
+
+#: bookorbit_catalog_lists.lua
+msgid "Pick an author"
+msgstr "Выберите автора"
 
 #: bookorbit_catalog_lists.lua
 msgid "Their books become a shelf on Home"
@@ -3039,12 +3183,12 @@ msgstr[2] "%1 областей"
 msgstr[3] "%1 области"
 
 #: bookorbit_catalog_lists.lua
-msgid "Pick a shelf"
-msgstr "Выберите полку"
-
-#: bookorbit_catalog_lists.lua
 msgid "Its books become a shelf on Home"
 msgstr "Её книги станут полкой на главной"
+
+#: bookorbit_catalog_lists.lua
+msgid "Pick a shelf"
+msgstr "Выберите полку"
 
 #: bookorbit_catalog_lists.lua
 msgid "Standalone"
@@ -3079,12 +3223,12 @@ msgid "Z-A"
 msgstr "Я-А"
 
 #: bookorbit_catalog_util.lua
-msgid "oldest first"
-msgstr "сначала старые"
-
-#: bookorbit_catalog_util.lua
 msgid "newest first"
 msgstr "сначала новые"
+
+#: bookorbit_catalog_util.lua
+msgid "oldest first"
+msgstr "сначала старые"
 
 #: bookorbit_catalog_util.lua bookorbit_list_data.lua
 msgid "To read"
@@ -3096,7 +3240,7 @@ msgstr "Отложено"
 
 #: bookorbit_catalog_util.lua bookorbit_list_data.lua
 msgid "Rereading"
-msgstr "Повторное чтение"
+msgstr "Перечитываю"
 
 #: bookorbit_catalog_util.lua
 msgid "Skimmed"
@@ -3150,6 +3294,134 @@ msgstr "Загрузка обложки"
 msgid "Cover unavailable"
 msgstr "Обложка недоступна"
 
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "February"
+msgstr "февраля"
+
+#. TRANSLATORS: each month as it reads inside a date, after a day number ("24 November"): use the form your language needs there, such as the genitive in Russian or lower case in Spanish.
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "January"
+msgstr "января"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "April"
+msgstr "апреля"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "March"
+msgstr "марта"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "June"
+msgstr "июня"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "May"
+msgstr "мая"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "August"
+msgstr "августа"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "July"
+msgstr "июля"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "October"
+msgstr "октября"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "September"
+msgstr "сентября"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "December"
+msgstr "декабря"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "November"
+msgstr "ноября"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Feb"
+msgstr "февр."
+
+#. TRANSLATORS: each short month as it reads inside a date ("24 Nov"), in the form your language needs there.
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Jan"
+msgstr "янв."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Apr"
+msgstr "апр."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Mar"
+msgstr "мар."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Jun"
+msgstr "июн."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "May"
+msgstr "мая"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Aug"
+msgstr "авг."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Jul"
+msgstr "июл."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Oct"
+msgstr "окт."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Sep"
+msgstr "сент."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Dec"
+msgstr "дек."
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Nov"
+msgstr "нояб."
+
+#. TRANSLATORS: %1 is the short month as it reads inside a date, %2 the day of the month.
+#: bookorbit_dates.lua
+msgctxt "Month and day"
+msgid "%1 %2"
+msgstr "%2 %1"
+
 #: bookorbit_delivery.lua
 msgid "The server returned an invalid EPUB delivery preference. Reconnect and retry."
 msgstr "Сервер вернул некорректную настройку EPUB. Подключитесь снова и повторите попытку."
@@ -3187,12 +3459,12 @@ msgid "%1 file"
 msgstr "%1 файл"
 
 #: bookorbit_detail_data.lua
-msgid "Main edition"
-msgstr "Основное издание"
-
-#: bookorbit_detail_data.lua
 msgid "Another edition"
 msgstr "Другое издание"
+
+#: bookorbit_detail_data.lua
+msgid "Main edition"
+msgstr "Основное издание"
 
 #: bookorbit_detail_data.lua
 msgid "Main file"
@@ -3211,12 +3483,12 @@ msgid "Text only; narration in BookOrbit"
 msgstr "Только текст; озвучка в BookOrbit"
 
 #: bookorbit_detail_data.lua
-msgid "audiobook, %1"
-msgstr "аудиокнига, %1"
-
-#: bookorbit_detail_data.lua
 msgid "audiobook"
 msgstr "аудиокнига"
+
+#: bookorbit_detail_data.lua
+msgid "audiobook, %1"
+msgstr "аудиокнига, %1"
 
 #: bookorbit_detail_data.lua
 msgid "%1 format"
@@ -3255,6 +3527,48 @@ msgid "%1 and %2 more"
 msgstr "%1 и ещё %2"
 
 #: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "English"
+msgstr "Английский"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Japanese"
+msgstr "Японский"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "French"
+msgstr "Французский"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "German"
+msgstr "Немецкий"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Spanish"
+msgstr "Испанский"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Italian"
+msgstr "Итальянский"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Portuguese"
+msgstr "Португальский"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Dutch"
+msgstr "Нидерландский"
+
+#. TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date, %3 the year.
+#: bookorbit_detail_data.lua
+msgctxt "Day, month and year"
 msgid "%1 %2 %3"
 msgstr "%1 %2 %3"
 
@@ -3287,12 +3601,12 @@ msgid "Continue"
 msgstr "Продолжить"
 
 #: bookorbit_detail_data.lua
-msgid "Audiobook · listen in BookOrbit"
-msgstr "Аудиокнига · слушать в BookOrbit"
-
-#: bookorbit_detail_data.lua
 msgid "Audiobook only"
 msgstr "Только аудиокнига"
+
+#: bookorbit_detail_data.lua
+msgid "Audiobook · listen in BookOrbit"
+msgstr "Аудиокнига · слушать в BookOrbit"
 
 #: bookorbit_detail_data.lua
 msgid "No file KOReader can open"
@@ -3351,7 +3665,8 @@ msgstr[3] "%1 страницы в час"
 msgid "%1 p/h"
 msgstr "%1 стр./ч"
 
-#: bookorbit_detail_view.lua bookorbit_download_sheet.lua bookorbit_update_sheet.lua
+#: bookorbit_detail_view.lua bookorbit_download_sheet.lua
+#: bookorbit_update_sheet.lua
 msgid "Downloading"
 msgstr "Загрузка"
 
@@ -3423,13 +3738,13 @@ msgstr "Эта книга"
 msgid "Next: Book %1, %2"
 msgstr "Далее: книга %1, %2"
 
-#: bookorbit_detail_view.lua
-msgid "%1: %2 of %3 read"
-msgstr "%1: прочитано %2 из %3"
-
 #: bookorbit_detail_view.lua bookorbit_list_data.lua bookorbit_list_pages.lua
 msgid "%1 of %2 read"
 msgstr "Прочитано %1 из %2"
+
+#: bookorbit_detail_view.lua
+msgid "%1: %2 of %3 read"
+msgstr "%1: прочитано %2 из %3"
 
 #: bookorbit_detail_view.lua
 msgid "Next: Book %1"
@@ -3464,52 +3779,45 @@ msgid "Genres and tags"
 msgstr "Жанры и теги"
 
 #: bookorbit_detail_view.lua
-msgid "Time read"
-msgstr "Время чтения"
+msgid "Pace"
+msgstr "Темп"
 
 #: bookorbit_detail_view.lua
 msgid "Reading days"
 msgstr "Дней чтения"
 
 #: bookorbit_detail_view.lua
-msgid "Pace"
-msgstr "Темп"
+msgid "Time read"
+msgstr "Время чтения"
 
 #: bookorbit_detail_view.lua
 msgid "Started"
 msgstr "Начато"
 
+#. TRANSLATORS: %1 is the time read, shown bold; %2 the number of reading days; %3 and %4 dates.
 #: bookorbit_detail_view.lua
-msgid " over 1 day, finished %2"
-msgid_plural " over %1 days, finished %2"
-msgstr[0] " за %1 день, завершено %2"
-msgstr[1] " за %1 дня, завершено %2"
-msgstr[2] " за %1 дней, завершено %2"
-msgstr[3] " за %1 дня, завершено %2"
+msgid "%1 over 1 day, finished %3"
+msgid_plural "%1 over %2 days, finished %3"
+msgstr[0] "%1 за %2 день, завершено %3"
+msgstr[1] "%1 за %2 дня, завершено %3"
+msgstr[2] "%1 за %2 дней, завершено %3"
+msgstr[3] "%1 за %2 дня, завершено %3"
 
 #: bookorbit_detail_view.lua
-msgid " over 1 day"
-msgid_plural " over %1 days"
-msgstr[0] " за %1 день"
-msgstr[1] " за %1 дня"
-msgstr[2] " за %1 дней"
-msgstr[3] " за %1 дня"
+msgid "%1 over 1 day since %3"
+msgid_plural "%1 over %2 days since %3"
+msgstr[0] "%1 за %2 день с %3"
+msgstr[1] "%1 за %2 дня с %3"
+msgstr[2] "%1 за %2 дней с %3"
+msgstr[3] "%1 за %2 дня с %3"
 
 #: bookorbit_detail_view.lua
-msgid " over 1 day since %2, last read %3"
-msgid_plural " over %1 days since %2, last read %3"
-msgstr[0] " за %1 день с %2, последнее чтение %3"
-msgstr[1] " за %1 дня с %2, последнее чтение %3"
-msgstr[2] " за %1 дней с %2, последнее чтение %3"
-msgstr[3] " за %1 дня с %2, последнее чтение %3"
-
-#: bookorbit_detail_view.lua
-msgid " over 1 day since %2"
-msgid_plural " over %1 days since %2"
-msgstr[0] " за %1 день с %2"
-msgstr[1] " за %1 дня с %2"
-msgstr[2] " за %1 дней с %2"
-msgstr[3] " за %1 дня с %2"
+msgid "%1 over 1 day since %3, last read %4"
+msgid_plural "%1 over %2 days since %3, last read %4"
+msgstr[0] "%1 за %2 день с %3, последнее чтение %4"
+msgstr[1] "%1 за %2 дня с %3, последнее чтение %4"
+msgstr[2] "%1 за %2 дней с %3, последнее чтение %4"
+msgstr[3] "%1 за %2 дня с %3, последнее чтение %4"
 
 #: bookorbit_detail_view.lua
 msgid "1 highlight"
@@ -3520,12 +3828,12 @@ msgstr[2] "%1 выделений"
 msgstr[3] "%1 выделения"
 
 #: bookorbit_detail_view.lua
-msgid "Your reading on this device"
-msgstr "Ваше чтение на этом устройстве"
-
-#: bookorbit_detail_view.lua
 msgid "Your highlights"
 msgstr "Ваши выделения"
+
+#: bookorbit_detail_view.lua
+msgid "Your reading on this device"
+msgstr "Ваше чтение на этом устройстве"
 
 #: bookorbit_detail_view.lua
 msgid "Formats"
@@ -3559,11 +3867,13 @@ msgstr "Книга"
 msgid "More details"
 msgstr "Подробнее"
 
-#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Testing…"
 msgstr "Проверка…"
 
-#: bookorbit_diagnostics_page.lua bookorbit_main_menu.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_diagnostics_page.lua bookorbit_main_menu.lua
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
 msgid "Connection works"
 msgstr "Соединение работает"
 
@@ -3575,11 +3885,13 @@ msgstr "Ошибка: %1"
 msgid "Rechecking…"
 msgstr "Повторная проверка…"
 
-#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Done: every book was checked again"
 msgstr "Готово: все книги проверены повторно"
 
-#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Could not recheck: %1"
 msgstr "Не удалось проверить повторно: %1"
 
@@ -3587,15 +3899,18 @@ msgstr "Не удалось проверить повторно: %1"
 msgid "Run from here"
 msgstr "Запустить отсюда"
 
-#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua bookorbit_status_page.lua
-msgid "Technical details"
-msgstr "Технические сведения"
-
-#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Everything the sync knows, for bug reports"
 msgstr "Все сведения синхронизации для сообщений об ошибках"
 
-#: bookorbit_dialog_ui.lua bookorbit_download_sheet.lua bookorbit_main_menu.lua bookorbit_signin_page.lua
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Technical details"
+msgstr "Технические сведения"
+
+#: bookorbit_dialog_ui.lua bookorbit_download_sheet.lua bookorbit_main_menu.lua
+#: bookorbit_signin_page.lua
 msgid "Cancel"
 msgstr "Отмена"
 
@@ -3640,12 +3955,12 @@ msgid "Read-along EPUB with narration"
 msgstr "EPUB с синхронным чтением и озвучкой"
 
 #: bookorbit_download_sheet.lua
-msgid "Includes the audio, %1"
-msgstr "Включает аудио, %1"
-
-#: bookorbit_download_sheet.lua
 msgid "Includes the audio"
 msgstr "Включает аудио"
+
+#: bookorbit_download_sheet.lua
+msgid "Includes the audio, %1"
+msgstr "Включает аудио, %1"
 
 #: bookorbit_download_sheet.lua
 msgid "Edition"
@@ -3667,7 +3982,8 @@ msgstr "Заменить"
 msgid "Replacing it can move your place and highlights. The old copy stays until the new one is complete."
 msgstr "Замена может изменить позицию и выделения. Старая копия сохраняется до завершения новой."
 
-#: bookorbit_download_sheet.lua bookorbit_sync_sheet.lua bookorbit_update_sheet.lua
+#: bookorbit_download_sheet.lua bookorbit_sync_sheet.lua
+#: bookorbit_update_sheet.lua
 msgid "Starting…"
 msgstr "Запуск…"
 
@@ -3727,7 +4043,8 @@ msgstr "%1, %2 не синхронизировано (другая копия)"
 msgid "%1 at %2"
 msgstr "%1 в %2"
 
-#: bookorbit_highlight_diagnostics.lua bookorbit_highlight_summary.lua bookorbit_main_menu.lua
+#: bookorbit_highlight_diagnostics.lua bookorbit_highlight_summary.lua
+#: bookorbit_main_menu.lua
 msgid "none"
 msgstr "нет"
 
@@ -3799,21 +4116,10 @@ msgstr "Пропущено книг: %1. Копия на устройстве о
 msgid "with audio"
 msgstr "с аудио"
 
-#: bookorbit_list_data.lua bookorbit_list_pages.lua
-msgid " · %1 left"
-msgstr " · осталось %1"
-
 #: bookorbit_list_data.lua
-msgid " · rereading"
-msgstr " · повторное чтение"
-
-#: bookorbit_list_data.lua
-msgid "%1 of 1 book"
-msgid_plural "%1 of %2 books"
-msgstr[0] "%1 из %2 книги"
-msgstr[1] "%1 из %2 книг"
-msgstr[2] "%1 из %2 книг"
-msgstr[3] "%1 из %2 книг"
+msgctxt "Read status"
+msgid "rereading"
+msgstr "перечитываю"
 
 #: bookorbit_list_data.lua
 msgid "%1 and others"
@@ -3824,8 +4130,9 @@ msgid "All %1 read"
 msgstr "Все: %1 прочитано"
 
 #: bookorbit_list_data.lua
-msgid "read"
-msgstr "прочитано"
+msgctxt "Percent read"
+msgid "%1 read"
+msgstr "%1 прочитано"
 
 #: bookorbit_list_data.lua
 msgid "all %1"
@@ -3853,20 +4160,20 @@ msgid "%1 in progress"
 msgstr "В процессе: %1"
 
 #: bookorbit_list_pages.lua
-msgid "Up next · Book %1"
-msgstr "Далее · книга %1"
-
-#: bookorbit_list_pages.lua
 msgid "Up next"
 msgstr "Далее"
 
 #: bookorbit_list_pages.lua
-msgid "Start book %1"
-msgstr "Начать книгу %1"
+msgid "Up next · Book %1"
+msgstr "Далее · книга %1"
 
 #: bookorbit_list_pages.lua
 msgid "Start book"
 msgstr "Начать книгу"
+
+#: bookorbit_list_pages.lua
+msgid "Start book %1"
+msgstr "Начать книгу %1"
 
 #: bookorbit_list_pages.lua
 msgid "Reading order"
@@ -3948,9 +4255,18 @@ msgstr "читается"
 msgid "Updates as books change"
 msgstr "Обновляется при изменении книг"
 
+#. TRANSLATORS: how many items are selected; %1 is the count, shown bold.
 #: bookorbit_list_view.lua
-msgid "selected"
-msgstr "выбрано"
+msgid "%1 selected"
+msgid_plural "%1 selected"
+msgstr[0] "Выбрано: %1"
+msgstr[1] "Выбрано: %1"
+msgstr[2] "Выбрано: %1"
+msgstr[3] "Выбрано: %1"
+
+#: bookorbit_list_view.lua
+msgid "of %1"
+msgstr "из %1"
 
 #: bookorbit_list_view.lua
 msgid "First"
@@ -3960,17 +4276,34 @@ msgstr "Первая"
 msgid "Last"
 msgstr "Последняя"
 
-#: bookorbit_main_menu.lua
-msgid "On"
-msgstr "Вкл."
-
 #: bookorbit_main_menu.lua bookorbit_settings_page.lua
 msgid "Off"
 msgstr "Выкл."
 
+#: bookorbit_main_menu.lua
+msgid "On"
+msgstr "Вкл."
+
 #: bookorbit_main_menu.lua bookorbit_update_sheet.lua
 msgid "unknown"
 msgstr "неизвестно"
+
+#: bookorbit_main_menu.lua
+msgid "%1, %2 string"
+msgid_plural "%1, %2 strings"
+msgstr[0] "%1, %2 строка"
+msgstr[1] "%1, %2 строки"
+msgstr[2] "%1, %2 строк"
+msgstr[3] "%1, %2 строки"
+
+#: bookorbit_main_menu.lua
+msgid "English"
+msgstr "Английский"
+
+#. TRANSLATORS: %1 is KOReader's language code, such as de or pt_BR.
+#: bookorbit_main_menu.lua
+msgid "%1, no plugin translation"
+msgstr "%1, нет перевода плагина"
 
 #: bookorbit_main_menu.lua
 msgid "Device ID"
@@ -3988,7 +4321,8 @@ msgstr "Последняя версия плагина"
 msgid "Account"
 msgstr "Учётная запись"
 
-#: bookorbit_main_menu.lua bookorbit_settings_page.lua bookorbit_signin_page.lua
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+#: bookorbit_signin_page.lua
 msgid "Server"
 msgstr "Сервер"
 
@@ -4013,14 +4347,15 @@ msgid "not configured"
 msgstr "не настроено"
 
 #: bookorbit_main_menu.lua
-msgid "Last results"
-msgstr "Последние результаты"
-
-#: bookorbit_main_menu.lua
 msgid "Last error"
 msgstr "Последняя ошибка"
 
-#: bookorbit_main_menu.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_main_menu.lua
+msgid "Last results"
+msgstr "Последние результаты"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Test connection"
 msgstr "Проверить соединение"
 
@@ -4128,17 +4463,14 @@ msgstr "Сначала укажите адрес сервера BookOrbit."
 msgid "No server address"
 msgstr "Адрес сервера не указан"
 
-#: bookorbit_main_menu.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_main_menu.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Not signed in"
 msgstr "Вход не выполнен"
 
 #: bookorbit_main_menu.lua
 msgid "Testing the connection…"
 msgstr "Проверка соединения…"
-
-#: bookorbit_main_menu.lua
-msgid "Connection test succeeded"
-msgstr "Проверка соединения выполнена успешно"
 
 #: bookorbit_main_menu.lua bookorbit_settings_page.lua
 msgid "Connection failed: %1"
@@ -4264,13 +4596,19 @@ msgstr "Wi-Fi выключен"
 msgid "Nothing waiting"
 msgstr "Ничего не ожидает"
 
+#. TRANSLATORS: title of the sync tile at the top of the menu, which is narrow: keep it short, a noun is fine.
+#: bookorbit_menu_sheet.lua
+msgctxt "Menu tile"
+msgid "Sync now"
+msgstr "Синхронизация"
+
 #: bookorbit_menu_sheet.lua
 msgid "Customize"
 msgstr "Настроить"
 
 #: bookorbit_menu_sheet.lua
 msgid "Edit Home"
-msgstr "Редактировать главную"
+msgstr "Изменить главную"
 
 #: bookorbit_menu_sheet.lua
 msgid "Your board"
@@ -4308,7 +4646,8 @@ msgstr[1] "Ожидают отправки изменений: %1"
 msgstr[2] "Ожидают отправки изменений: %1"
 msgstr[3] "Ожидают отправки изменений: %1"
 
-#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "The last sync did not finish"
 msgstr "Последняя синхронизация не завершилась"
 
@@ -4316,7 +4655,8 @@ msgstr "Последняя синхронизация не завершилас�
 msgid "All synced"
 msgstr "Всё синхронизировано"
 
-#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua bookorbit_status_page.lua
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
 msgid "Not synced yet"
 msgstr "Ещё не синхронизировано"
 
@@ -4325,12 +4665,12 @@ msgid "Help & about"
 msgstr "Помощь и сведения"
 
 #: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
-msgid "Version %1 is ready"
-msgstr "Версия %1 готова"
-
-#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
 msgid "Version %1"
 msgstr "Версия %1"
+
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+msgid "Version %1 is ready"
+msgstr "Версия %1 готова"
 
 #: bookorbit_menu_sheet.lua
 msgid "Update"
@@ -4377,10 +4717,6 @@ msgid "Kept your place. BookOrbit is further ahead."
 msgstr "Ваша позиция сохранена. В BookOrbit вы читали дальше."
 
 #: bookorbit_progress_sync.lua
-msgid "Progress pushed"
-msgstr "Прогресс отправлен"
-
-#: bookorbit_progress_sync.lua
 msgid "Progress sent to BookOrbit"
 msgstr "Прогресс отправлен в BookOrbit"
 
@@ -4405,12 +4741,12 @@ msgid "no shortcut"
 msgstr "нет быстрого доступа"
 
 #: bookorbit_settings_page.lua
-msgid "BookOrbit is home"
-msgstr "BookOrbit - главная"
-
-#: bookorbit_settings_page.lua
 msgid "At startup"
 msgstr "При запуске"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit is home"
+msgstr "BookOrbit - главная"
 
 #: bookorbit_settings_page.lua
 msgid "File browser first"
@@ -4425,16 +4761,16 @@ msgid "By hand"
 msgstr "Вручную"
 
 #: bookorbit_settings_page.lua
+msgid "ask before jumping"
+msgstr "спрашивать перед переходом"
+
+#: bookorbit_settings_page.lua
 msgid "jump to newer"
 msgstr "перейти к более новой"
 
 #: bookorbit_settings_page.lua
 msgid "stay put"
 msgstr "оставаться на месте"
-
-#: bookorbit_settings_page.lua
-msgid "ask before jumping"
-msgstr "спрашивать перед переходом"
 
 #: bookorbit_settings_page.lua
 msgid "%1 layout, %2 size"
@@ -4469,24 +4805,24 @@ msgid "Help"
 msgstr "Помощь"
 
 #: bookorbit_settings_page.lua
-msgid "Show the file browser"
-msgstr "Показывать файловый браузер"
-
-#: bookorbit_settings_page.lua
 msgid "Open BookOrbit from the menu bar or your shortcut"
 msgstr "Открывать BookOrbit из меню или быстрым доступом"
+
+#: bookorbit_settings_page.lua
+msgid "Show the file browser"
+msgstr "Показывать файловый браузер"
 
 #: bookorbit_settings_page.lua
 msgid "Once, when KOReader starts"
 msgstr "Один раз при запуске KOReader"
 
 #: bookorbit_settings_page.lua
-msgid "Make BookOrbit home"
-msgstr "Сделать BookOrbit главной"
-
-#: bookorbit_settings_page.lua
 msgid "At startup, and whenever you close a book"
 msgstr "При запуске и после закрытия книги"
+
+#: bookorbit_settings_page.lua
+msgid "Make BookOrbit home"
+msgstr "Сделать BookOrbit главной"
 
 #: bookorbit_settings_page.lua
 msgid "This device has no touchscreen. KOReader's keyboard shortcuts can open BookOrbit: its action is \"BookOrbit: open\"."
@@ -4541,24 +4877,24 @@ msgid "Pull when a book opens, push when it closes and on sleep"
 msgstr "Получать данные при открытии книги, отправлять при закрытии и переходе в сон"
 
 #: bookorbit_settings_page.lua
-msgid "Push while reading"
-msgstr "Отправлять во время чтения"
-
-#: bookorbit_settings_page.lua
 msgid "Every few page turns"
 msgstr "Через несколько перелистываний"
+
+#: bookorbit_settings_page.lua
+msgid "Push while reading"
+msgstr "Отправлять во время чтения"
 
 #: bookorbit_settings_page.lua
 msgid "pages"
 msgstr "стр."
 
 #: bookorbit_settings_page.lua
-msgid "Skip when offline"
-msgstr "Не синхронизировать офлайн"
-
-#: bookorbit_settings_page.lua
 msgid "Never wake Wi-Fi just to sync"
 msgstr "Не включать Wi-Fi только ради синхронизации"
+
+#: bookorbit_settings_page.lua
+msgid "Skip when offline"
+msgstr "Не синхронизировать офлайн"
 
 #: bookorbit_settings_page.lua
 msgid "Bring marks made elsewhere to this device"
@@ -4609,10 +4945,6 @@ msgid "Move, resize, add and remove widgets"
 msgstr "Перемещайте, изменяйте размер, добавляйте и удаляйте виджеты"
 
 #: bookorbit_settings_page.lua
-msgid "Tap Continue reading"
-msgstr "Нажмите «Продолжить чтение»"
-
-#: bookorbit_settings_page.lua
 msgid "Opens the book when it is on this device"
 msgstr "Открывает книгу, если она находится на устройстве"
 
@@ -4621,16 +4953,20 @@ msgid "Shows the book's details"
 msgstr "Показывает сведения о книге"
 
 #: bookorbit_settings_page.lua
+msgid "Tap Continue reading"
+msgstr "Нажмите «Читаю сейчас»"
+
+#: bookorbit_settings_page.lua
+msgid "Ink"
+msgstr "Чернила"
+
+#: bookorbit_settings_page.lua
 msgid "Outline"
 msgstr "Контур"
 
 #: bookorbit_settings_page.lua
 msgid "Soft"
 msgstr "Мягкий"
-
-#: bookorbit_settings_page.lua
-msgid "Ink"
-msgstr "Чернила"
 
 #: bookorbit_settings_page.lua
 msgid "Accents"
@@ -4645,12 +4981,12 @@ msgid "Colour"
 msgstr "Цвет"
 
 #: bookorbit_settings_page.lua
-msgid "Starting layout"
-msgstr "Начальная раскладка"
-
-#: bookorbit_settings_page.lua
 msgid "Replaces your pages with a starter set"
 msgstr "Заменяет страницы начальным набором"
+
+#: bookorbit_settings_page.lua
+msgid "Starting layout"
+msgstr "Начальная раскладка"
 
 #: bookorbit_settings_page.lua
 msgid "Tile style"
@@ -4665,12 +5001,12 @@ msgid "Text and controls across BookOrbit"
 msgstr "Текст и элементы управления BookOrbit"
 
 #: bookorbit_settings_page.lua
-msgid "Reset Home"
-msgstr "Сбросить главную"
-
-#: bookorbit_settings_page.lua
 msgid "Back to the starting layout and outline tiles"
 msgstr "Вернуться к исходной раскладке и контурным плиткам"
+
+#: bookorbit_settings_page.lua
+msgid "Reset Home"
+msgstr "Сбросить главную"
 
 #: bookorbit_settings_page.lua
 msgid "Look"
@@ -4689,12 +5025,12 @@ msgid "Not set"
 msgstr "Не задано"
 
 #: bookorbit_settings_page.lua
-msgid "Signed in as"
-msgstr "Выполнен вход как"
-
-#: bookorbit_settings_page.lua
 msgid "Nobody"
 msgstr "Нет пользователя"
+
+#: bookorbit_settings_page.lua
+msgid "Signed in as"
+msgstr "Выполнен вход как"
 
 #: bookorbit_settings_page.lua
 msgid "Sign out"
@@ -4705,12 +5041,12 @@ msgid "This device stops syncing until you sign in again"
 msgstr "Синхронизация на этом устройстве остановится до следующего входа"
 
 #: bookorbit_settings_page.lua bookorbit_status_page.lua
-msgid "Recheck all books"
-msgstr "Повторно проверить все книги"
-
-#: bookorbit_settings_page.lua bookorbit_status_page.lua
 msgid "Matches every book on this device again"
 msgstr "Повторно сопоставляет все книги на устройстве"
+
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
+msgid "Recheck all books"
+msgstr "Повторно проверить все книги"
 
 #: bookorbit_settings_page.lua
 msgid "Update to %1"
@@ -4769,16 +5105,16 @@ msgid "This device stops syncing until you sign in again. Books already download
 msgstr "Синхронизация остановится до следующего входа. Уже скачанные книги останутся на устройстве."
 
 #: bookorbit_settings_page.lua
-msgid "Use this gesture for BookOrbit?"
-msgstr "Использовать этот жест для BookOrbit?"
-
-#: bookorbit_settings_page.lua
 msgid "%1."
 msgstr "%1."
 
 #: bookorbit_settings_page.lua
 msgid "Use it"
 msgstr "Использовать"
+
+#: bookorbit_settings_page.lua
+msgid "Use this gesture for BookOrbit?"
+msgstr "Использовать этот жест для BookOrbit?"
 
 #: bookorbit_shortcut.lua
 msgid "In books: hold the top-left corner"
@@ -4889,12 +5225,12 @@ msgid "Looking for BookOrbit…"
 msgstr "Поиск BookOrbit…"
 
 #: bookorbit_signin_page.lua
-msgid "That address is not a BookOrbit server"
-msgstr "По этому адресу находится не сервер BookOrbit"
-
-#: bookorbit_signin_page.lua
 msgid "Could not reach it: %1"
 msgstr "Не удалось подключиться: %1"
+
+#: bookorbit_signin_page.lua
+msgid "That address is not a BookOrbit server"
+msgstr "По этому адресу находится не сервер BookOrbit"
 
 #: bookorbit_signin_page.lua
 msgid "Signing in…"
@@ -4920,10 +5256,6 @@ msgstr[3] "Офлайн: ожидают %1 изменения"
 msgid "Kept on this device and sent when Wi-Fi is back"
 msgstr "Сохранено на устройстве и отправится после восстановления Wi-Fi"
 
-#: bookorbit_status_page.lua main.lua
-msgid "unknown error"
-msgstr "неизвестная ошибка"
-
 #: bookorbit_status_page.lua
 msgid "They go out with the next sync"
 msgstr "Они будут отправлены при следующей синхронизации"
@@ -4937,12 +5269,12 @@ msgid "Everything is synced"
 msgstr "Всё синхронизировано"
 
 #: bookorbit_status_page.lua
-msgid "Last sync %1, %2"
-msgstr "Последняя синхронизация: %1, %2"
-
-#: bookorbit_status_page.lua
 msgid "Last sync %1"
 msgstr "Последняя синхронизация: %1"
+
+#: bookorbit_status_page.lua
+msgid "Last sync %1, %2"
+msgstr "Последняя синхронизация: %1, %2"
 
 #: bookorbit_status_page.lua bookorbit_sweep.lua
 msgid "books matched"
@@ -4997,24 +5329,12 @@ msgid "What synced so far is kept. The rest syncs next time."
 msgstr "Синхронизированные данные сохранены. Остальное будет синхронизировано в следующий раз."
 
 #: bookorbit_sweep.lua
-msgid "%1 books, %2 reading events, %3 highlights"
-msgstr "Книг: %1, событий чтения: %2, выделений: %3"
-
-#: bookorbit_sweep.lua
-msgid "1 book needs to be opened and synced once to recover its reading history."
-msgid_plural "%1 books need to be opened and synced once to recover their reading history."
-msgstr[0] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
-msgstr[1] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
-msgstr[2] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
-msgstr[3] "Чтобы восстановить историю чтения, нужно один раз открыть и синхронизировать книг: %1."
+msgid "Check your KOReader login in BookOrbit: Settings, KOReader."
+msgstr "Проверьте данные входа KOReader в BookOrbit: Настройки, KOReader."
 
 #: bookorbit_sweep.lua
 msgid "Sign-in failed"
 msgstr "Не удалось войти"
-
-#: bookorbit_sweep.lua
-msgid "Check your KOReader login in BookOrbit: Settings, KOReader."
-msgstr "Проверьте данные входа KOReader в BookOrbit: Настройки, KOReader."
 
 #: bookorbit_sweep.lua
 msgid "BookOrbit sign-in failed"
@@ -5209,20 +5529,20 @@ msgid "Restart now"
 msgstr "Перезапустить сейчас"
 
 #: bookorbit_update_sheet.lua
-msgid "The update did not finish"
-msgstr "Обновление не завершено"
-
-#: bookorbit_update_sheet.lua
 msgid "BookOrbit %1"
 msgstr "BookOrbit %1"
 
 #: bookorbit_update_sheet.lua
-msgid "Something went wrong."
-msgstr "Что-то пошло не так."
+msgid "The update did not finish"
+msgstr "Обновление не завершено"
 
 #: bookorbit_update_sheet.lua
 msgid "Nothing changed: this device still runs the version it had."
 msgstr "Ничего не изменилось: на устройстве осталась прежняя версия."
+
+#: bookorbit_update_sheet.lua
+msgid "Something went wrong."
+msgstr "Что-то пошло не так."
 
 #: bookorbit_updater.lua
 msgid "Plugin update available: v%1 -> v%2"
@@ -5273,52 +5593,12 @@ msgid "Update failed: %1"
 msgstr "Не удалось обновить: %1"
 
 #: main.lua
-msgid "login failed"
-msgstr "ошибка входа"
-
-#: main.lua
-msgid "server not reachable"
-msgstr "сервер недоступен"
-
-#: main.lua
-msgid "server request failed"
-msgstr "ошибка запроса к серверу"
-
-#: main.lua
-msgid "invalid server response"
-msgstr "некорректный ответ сервера"
-
-#: main.lua
-msgid "server update required"
-msgstr "требуется обновление сервера"
-
-#: main.lua
-msgid "request too large"
-msgstr "слишком большой запрос"
-
-#: main.lua
-msgid "background request interrupted"
-msgstr "фоновый запрос прерван"
-
-#: main.lua
-msgid "partial sync failure"
-msgstr "частичная ошибка синхронизации"
-
-#: main.lua
-msgid "lifecycle sync could not be saved"
-msgstr "не удалось сохранить фоновую синхронизацию"
-
-#: main.lua
 msgid "Login to BookOrbit"
 msgstr "Войти в BookOrbit"
 
 #: main.lua
 msgid "BookOrbit is set up as %1"
 msgstr "BookOrbit настроен как %1"
-
-#: main.lua
-msgid "server error %1"
-msgstr "ошибка сервера %1"
 
 #: main.lua
 msgid "Lifecycle sync storage is full. Open BookOrbit diagnostics and reconnect before closing more books."
@@ -5441,9 +5721,9 @@ msgid "Open KOReader's Network settings, set 'Action when Wi-Fi is off' to 'Turn
 msgstr "Откройте сетевые настройки KOReader, установите для параметра «Действие при отключённом Wi-Fi» значение «Включить», затем снова включите автосинхронизацию."
 
 #: main.lua
-msgid "Auto sync on"
-msgstr "Автосинхронизация включена"
-
-#: main.lua
 msgid "Auto sync off"
 msgstr "Автосинхронизация выключена"
+
+#: main.lua
+msgid "Auto sync on"
+msgstr "Автосинхронизация включена"

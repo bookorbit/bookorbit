@@ -1153,7 +1153,7 @@ function CatalogLists:listSortLabel(params)
     if CatalogUtil.SORT_KIND[sort] == "alpha" and order == "desc" then
         label = sort == "title" and _("Title Z–A") or sort == "author" and _("Author Z–A") or sort == "series" and _("Reverse series order") or label
     elseif CatalogUtil.SORT_KIND[sort] == "time" and order == "asc" then
-        label = sort == "published" and _("Publication date (oldest)") or label .. " " .. _("(oldest)")
+        label = sort == "published" and _("Publication date (oldest)") or T(_("%1 (oldest)"), label)
     elseif sort == "published" then
         label = _("Publication date (newest)")
     end

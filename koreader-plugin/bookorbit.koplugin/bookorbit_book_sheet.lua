@@ -355,7 +355,7 @@ local function onAction(page, action)
         page:close()
         plugin:noteProgressCompared(page.book_data.digest)
         plugin:syncToProgress(remote.progress, remote.percentage)
-        plugin:recordSyncSuccess("progress_pull", _("Progress pulled"))
+        plugin:recordSyncSuccess("progress_pull", require("bookorbit_activity").detail("progress_pulled"))
     elseif kind == "stay" then
         page:close()
         plugin:noteProgressCompared(page.book_data.digest)

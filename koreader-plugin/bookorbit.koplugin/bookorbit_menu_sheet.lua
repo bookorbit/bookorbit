@@ -192,7 +192,8 @@ function MenuSheet.body(d, w, o)
     elseif not d.online then
         first = tile(tw, th, "wifi", _("Connect"), d.waiting > 0 and T(_.ngettext("1 waiting", "%1 waiting", d.waiting), d.waiting) or _("Wi-Fi is off"), { kind = "connect" })
     else
-        first = tile(tw, th, "refresh-cw", _("Sync now"), d.waiting > 0 and T(_.ngettext("1 waiting", "%1 waiting", d.waiting), d.waiting) or _("Nothing waiting"), { kind = "sync" })
+        -- TRANSLATORS: title of the sync tile at the top of the menu, which is narrow: keep it short, a noun is fine.
+        first = tile(tw, th, "refresh-cw", _.pgettext("Menu tile", "Sync now"), d.waiting > 0 and T(_.ngettext("1 waiting", "%1 waiting", d.waiting), d.waiting) or _("Nothing waiting"), { kind = "sync" })
     end
     local second = d.on_home and tile(tw, th, "layout-grid", _("Customize"), _("Edit Home"), { kind = "customize" })
         or tile(tw, th, "house", _("Home"), _("Your board"), { kind = "home" })

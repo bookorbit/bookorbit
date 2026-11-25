@@ -355,7 +355,7 @@ function MenuUI.ago(ts, now)
         return T(_("%1 h ago"), math.floor(delta / 3600))
     end
     if os.date("%Y%m%d", ts) == os.date("%Y%m%d", now - 86400) then return _("yesterday") end
-    return os.date("%b %d", ts):gsub(" 0", " ")
+    return require("bookorbit_dates").shortDayMonth(ts)
 end
 
 -- The server's address without its scheme or API path, as people type it.

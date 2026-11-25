@@ -351,25 +351,32 @@ end
 
 -- ---------------------------------------------------------------- facts
 
-local LANGUAGES = { en = "English", eng = "English", english = "English", ja = "Japanese", ["ja-jp"] = "Japanese",
-    fr = "French", de = "German", es = "Spanish", it = "Italian", pt = "Portuguese", nl = "Dutch" }
+local function english() return _.pgettext("Book language", "English") end
+local function japanese() return _.pgettext("Book language", "Japanese") end
+local LANGUAGES = { en = english, eng = english, english = english, ja = japanese, ["ja-jp"] = japanese,
+    fr = function() return _.pgettext("Book language", "French") end,
+    de = function() return _.pgettext("Book language", "German") end,
+    es = function() return _.pgettext("Book language", "Spanish") end,
+    it = function() return _.pgettext("Book language", "Italian") end,
+    pt = function() return _.pgettext("Book language", "Portuguese") end,
+    nl = function() return _.pgettext("Book language", "Dutch") end }
 
 function DetailData.languageName(code)
     local text = trim(code)
     if not text then return nil end
-    return LANGUAGES[text:lower()] or text
+    local name = LANGUAGES[text:lower()]
+    return name and name() or text
 end
-
-local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
 
 -- "18 Jun 2013" from an ISO date or timestamp.
 function DetailData.dateLabel(value, with_year)
     if type(value) ~= "string" then return nil end
     local y, m, d = value:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)")
     if not y then return nil end
-    local month = require("datetime").shortMonthTranslation[MONTHS[tonumber(m)]] or m
+    local month = require("bookorbit_dates").monthInDate(m, false)
     if with_year == false then return T(_.pgettext("Day and month", "%1 %2"), tonumber(d), month) end
-    return T(_("%1 %2 %3"), tonumber(d), month, y)
+    -- TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date, %3 the year.
+    return T(_.pgettext("Day, month and year", "%1 %2 %3"), tonumber(d), month, y)
 end
 
 -- The More details ledger: every field the payload has.

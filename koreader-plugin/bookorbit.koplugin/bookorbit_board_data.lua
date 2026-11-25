@@ -15,6 +15,7 @@ local datetime = require("datetime")
 local util = require("util")
 local T = require("ffi/util").template
 local _ = require("bookorbit_gettext")
+local Dates = require("bookorbit_dates")
 
 local BookOrbitStatsReader = require("bookorbit_stats_reader")
 local CatalogUtil = require("bookorbit_catalog_util")
@@ -66,7 +67,8 @@ function BoardData.shortMonth(t)
 end
 
 function BoardData.longDate(t)
-    return T(_("%1, %2 %3"), BoardData.longWeekday(t), tonumber(os.date("%d", t)), BoardData.longMonth(t))
+    -- TRANSLATORS: weekday, day of the month, then the month as it reads inside a date.
+    return T(_("%1, %2 %3"), BoardData.longWeekday(t), tonumber(os.date("%d", t)), Dates.monthInDate(os.date("%m", t), true))
 end
 
 function BoardData.greeting(name, t)
@@ -83,17 +85,24 @@ end
 
 function BoardData.formatDuration(min)
     min = math.floor((min or 0) + 0.5)
+    -- TRANSLATORS: minutes, abbreviated.
     if min < 60 then return T(_("%1 min"), min) end
     local h, m = math.floor(min / 60), min % 60
+    -- TRANSLATORS: hours, abbreviated.
     if m == 0 then return T(_("%1 h"), h) end
+    -- TRANSLATORS: hours and minutes, abbreviated.
     return T(_("%1 h %2 min"), h, m)
 end
 
+-- The tightest form, for small tiles: keep it as short as the language allows.
 function BoardData.formatShortDuration(min)
     min = math.floor((min or 0) + 0.5)
+    -- TRANSLATORS: minutes in the shortest form, for small tiles (5m).
     if min < 60 then return T(_("%1m"), min) end
     local h, m = math.floor(min / 60), min % 60
+    -- TRANSLATORS: hours in the shortest form, for small tiles (2h).
     if m == 0 then return T(_("%1h"), h) end
+    -- TRANSLATORS: hours and minutes in the shortest form, for small tiles (2h 5m).
     return T(_("%1h %2m"), h, m)
 end
 
@@ -110,7 +119,7 @@ function BoardData.relativeDay(iso, now)
     local days = math.floor((dayStart(now) - dayStart(t)) / DAY + 0.5)
     if days <= 1 then return _("yesterday") end
     if days < 7 then return BoardData.longWeekday(t) end
-    return T(_.pgettext("Month and day", "%1 %2"), BoardData.shortMonth(t), tonumber(os.date("%d", t)))
+    return Dates.shortDayMonth(t)
 end
 
 -- "Late September 2025" for a YYYY-MM-DD date.
@@ -119,8 +128,9 @@ function BoardData.partOfMonth(date_key)
     local y, m, d = date_key:match("^(%d+)-(%d+)-(%d+)")
     if not y then return nil end
     local t = os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
-    local month, year = BoardData.longMonth(t), tonumber(y)
+    local month, year = Dates.monthInDate(m, true), tonumber(y)
     local day = tonumber(d)
+    -- TRANSLATORS: %1 is the month as it reads inside a date, %2 the year.
     if day <= 10 then return T(_("Early %1 %2"), month, year) end
     if day <= 20 then return T(_("Mid %1 %2"), month, year) end
     return T(_("Late %1 %2"), month, year)
@@ -131,6 +141,7 @@ function BoardData.monthYear(iso)
     if type(iso) ~= "string" then return nil end
     local t = datetime.stringISO8601ToSeconds and datetime.stringISO8601ToSeconds(iso)
     if not t then return nil end
+    -- TRANSLATORS: %1 is the short month on its own (as in a calendar), %2 the year.
     return T(_.pgettext("Month and year", "%1 %2"), BoardData.shortMonth(t), tonumber(os.date("%Y", t)))
 end
 
@@ -226,7 +237,8 @@ function BoardData.forecast(book, md5, now)
         finish = finish,
         day = days_out == 0 and _("Today") or (days_out == 1 and _("Tomorrow") or BoardData.longWeekday(finish)),
         short = BoardData.shortWeekday(finish),
-        date = T(_.pgettext("Day and month", "%1 %2"), tonumber(os.date("%d", finish)), BoardData.shortMonth(finish)),
+        -- TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date.
+        date = T(_.pgettext("Day and month", "%1 %2"), tonumber(os.date("%d", finish)), Dates.monthInDate(os.date("%m", finish), false)),
     }
 end
 
@@ -646,7 +658,8 @@ function BoardData.build(catalog, context, now)
     d.date_long = BoardData.longDate(now)
     d.clock = datetime.secondsToHour(now, G_reader_settings:isTrue("twelve_hour_clock"))
     d.weekday = BoardData.longWeekday(now)
-    d.day_month = T(_.pgettext("Day and month name", "%1 %2"), tonumber(os.date("%d", now)), BoardData.longMonth(now))
+    -- TRANSLATORS: %1 is the day of the month, %2 the month as it reads inside a date.
+    d.day_month = T(_.pgettext("Day and month name", "%1 %2"), tonumber(os.date("%d", now)), Dates.monthInDate(os.date("%m", now), true))
     d.updated = BoardData.relativeDay(body.generatedAt, now)
     local last_sync = catalog.settings and catalog.settings.last_sync
     d.last_sync_at = type(last_sync) == "table" and last_sync.event ~= "connection_test" and tonumber(last_sync.at) or nil

@@ -39,3 +39,6 @@ test-results/
 
 # vite-plugin-pwa dev service worker output
 dev-dist
+
+# Poedit writes compiled catalogs beside the .po files; the plugin reads .po only.
+koreader-plugin/bookorbit.koplugin/l10n/*.mo

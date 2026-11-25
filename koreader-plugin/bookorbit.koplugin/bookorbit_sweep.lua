@@ -207,15 +207,10 @@ local function finish(ctx, err)
         elseif not err and ctx.had_errors then
             ctx.plugin:recordSyncError("sweep", "partial_failure")
         elseif not err and ctx.plugin.recordSyncSuccess then
-            local message = T(_("%1 books, %2 reading events, %3 highlights"),
-                ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations)
-            if (ctx.counts.stats_ambiguous or 0) > 0 then
-                message = message .. ". " .. T(_.ngettext("1 book needs to be opened and synced once to recover its reading history.", "%1 books need to be opened and synced once to recover their reading history.", ctx.counts.stats_ambiguous),
-                    ctx.counts.stats_ambiguous)
-            end
             ctx.plugin:recordSyncSuccess(
                 "sweep",
-                message)
+                require("bookorbit_activity").detail("library", ctx.counts.books_matched, ctx.counts.page_stats,
+                    ctx.counts.annotations, ctx.counts.stats_ambiguous or 0))
         end
     end
 

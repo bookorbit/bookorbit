@@ -1077,13 +1077,16 @@ local function detailsParts(d, w, lw, rw, two_col)
             end
         end
         local function one_line()
-            local tail_opts = done and { T(_.ngettext(" over 1 day, finished %2", " over %1 days, finished %2", j.days), j.days, j.finished_on or ""), T(_.ngettext(" over 1 day", " over %1 days", j.days), j.days) }
-                or { T(_.ngettext(" over 1 day since %2, last read %3", " over %1 days since %2, last read %3", j.days), j.days, j.started or "", j.last_read or ""), T(_.ngettext(" over 1 day since %2", " over %1 days since %2", j.days), j.days, j.started or ""), T(_.ngettext(" over 1 day", " over %1 days", j.days), j.days) }
-            local tail = tail_opts[#tail_opts]
-            for _i, t in ipairs(tail_opts) do
-                if textWidth(j.time, { s = 13, b = true }) + textWidth(t, { s = 13 }) <= jw then tail = t; break end
+            -- TRANSLATORS: %1 is the time read, shown bold; %2 the number of reading days; %3 and %4 dates.
+            local templates = done and { _.ngettext("%1 over 1 day, finished %3", "%1 over %2 days, finished %3", j.days), _.ngettext("%1 over 1 day", "%1 over %2 days", j.days) }
+                or { _.ngettext("%1 over 1 day since %3, last read %4", "%1 over %2 days since %3, last read %4", j.days), _.ngettext("%1 over 1 day since %3", "%1 over %2 days since %3", j.days), _.ngettext("%1 over 1 day", "%1 over %2 days", j.days) }
+            local values = { { t = j.time, b = true, col = INK.black }, tostring(j.days), (done and j.finished_on or j.started) or "", j.last_read or "" }
+            for i, template in ipairs(templates) do
+                local line = runs(BoardUI.styled(template, values), { s = 13, col = INK.g3 })
+                if i == #templates or line:getSize().w <= jw then
+                    return i == #templates and runs(BoardUI.styled(template, values), { s = 13, col = INK.g3, w = jw }) or line
+                end
             end
-            return runs({ { t = j.time, b = true }, { t = tail, col = INK.g3 } }, { s = 13, w = jw })
         end
         local chartable = j and d.progress and not done and j.path and #j.path > 0
         local right = hl and T(_.ngettext("1 highlight", "%1 highlights", hl.count), hl.count) or nil

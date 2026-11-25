@@ -78,8 +78,26 @@ jobs:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: pnpm exec commitlint --config commitlint.config.cjs --from "$PR_BASE_SHA" --to "$PR_HEAD_SHA" --verbose
 
+      - name: Classify KOReader plugin translation pull request
+        id: plugin_l10n
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-${PR_NUMBER}"
+          script="scripts/koreader/classify-translation-pr.sh"
+          if git cat-file -e "$PR_BASE_SHA:$script" 2>/dev/null; then
+            is_translation="$(git show "$PR_BASE_SHA:$script" | bash -s -- "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          else
+            is_translation="$(git show "$PR_HEAD_SHA:$script" | bash -s -- "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          fi
+          echo "is_translation=$is_translation" >> "$GITHUB_OUTPUT"
+
       - name: Validate referenced issues exist
-        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true' && steps.plugin_l10n.outputs.is_translation != 'true'
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
@@ -244,6 +262,10 @@ jobs:
             exit 1
           fi
           echo "CI verification passed: ${success_count} successful run(s) found."
+
+      - name: Verify the KOReader plugin version moved with its changes
+        shell: bash
+        run: node scripts/koreader/check-plugin-version.mjs
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1

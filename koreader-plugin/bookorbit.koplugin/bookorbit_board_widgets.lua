@@ -17,6 +17,7 @@ local BoardData = require("bookorbit_board_data")
 local BoardStore = require("bookorbit_board_store")
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")
+local Dates = require("bookorbit_dates")
 
 local INK = BoardMetrics.INK
 local px, lh1, lh = BoardMetrics.px, BoardMetrics.lh1, BoardMetrics.lh
@@ -56,6 +57,17 @@ local function head(iw, label, right, o)
     while lab:getSize().w > room and size > 11 do
         size = size - 1
         lab = BoardUI.text(label, { s = size, b = true, col = o.col })
+    end
+    -- A title that still does not fit beside an icon keeps its words and
+    -- drops the icon, which only decorates (a longer translation, say).
+    if lab:getSize().w > room and right and right.bo_decor then
+        right, room = nil, iw
+        size = 13
+        lab = BoardUI.text(label, { s = size, b = true, col = o.col })
+        while lab:getSize().w > room and size > 11 do
+            size = size - 1
+            lab = BoardUI.text(label, { s = size, b = true, col = o.col })
+        end
     end
     if lab:getSize().w > room then
         lab = BoardUI.text(label, { s = size, b = true, col = o.col, w = math.max(1, room) })
@@ -415,7 +427,8 @@ W.streak = function(ctx, w, hh)
     local val_s = fillSize(hh - 2 * pad - lh1(13) - px(18), 20, wide and 40 or 36)
     local function count(width)
         if n > 0 then
-            return runs({ { t = tostring(n), b = true, s = val_s }, { t = " " .. _.ngettext("day", "days", n), col = INK.g4 } }, { s = 13, w = width })
+            -- TRANSLATORS: a reading streak; %1 is the number of days, shown large.
+            return runs(BoardUI.styled(_.ngettext("%1 day", "%1 days", n), { { t = tostring(n), b = true, s = val_s } }, { col = INK.g4 }), { s = 13, w = width })
         end
         local rs = math.min(val_s, 18)
         if width then rs = BoardUI.fitSize(_("Read today"), { s = rs, b = true }, width, 12) end
@@ -524,7 +537,7 @@ W.today = function(ctx, w, hh)
     local val_s = fillSize(hh - 2 * pad - lh1(13) - px(20), 18, 30)
     local function value()
         return d.today_min > 0
-            and runs({ { t = tostring(d.today_min), b = true, s = val_s }, { t = " " .. _("min"), col = INK.g4 } }, { s = 14, w = iw })
+            and runs(BoardUI.styled(_("%1 min"), { { t = tostring(d.today_min), b = true, s = val_s } }, { col = INK.g4 }), { s = 14, w = iw })
             or runs({ { t = _("Not yet"), b = true, s = math.min(val_s, 20) } }, { s = 14, w = iw })
     end
     -- A short row drops the weekly average.
@@ -600,12 +613,12 @@ W.goalpace = function(ctx, w, hh)
     local val_s = fillSize(hh - 2 * pad - lh1(13) - lh1(12) - px(10), 20, 32)
     local variants = {}
     for _i, st in ipairs(statuses) do
-        for _i, unit in ipairs({ T(_.ngettext(" of 1 book", " of %1 books", goal), goal), T(_(" of %1"), goal) }) do
+        for _i, unit in ipairs({ _.ngettext("%1 of 1 book", "%1 of %2 books", goal), _("%1 of %2") }) do
             table.insert(variants, function()
                 return vstack({ w = w, h = hh, pad = pad }, {
                     head(iw, T(_("%1 goal"), g.year), trophy),
                     flex(0),
-                    BoardUI.spread(iw, runs({ { t = tostring(done), b = true, s = 24 }, { t = unit, col = INK.g4 } }, { s = 13 }),
+                    BoardUI.spread(iw, runs(BoardUI.styled(unit, { { t = tostring(done), b = true, s = 24 }, tostring(goal) }, { col = INK.g4 }), { s = 13 }),
                         text(st, { s = 12, b = behind, col = behind and INK.black or INK.g4 })),
                     space(nil, px(4)),
                     goalBar(),
@@ -614,12 +627,12 @@ W.goalpace = function(ctx, w, hh)
         end
     end
     for _i, st in ipairs(statuses) do
-        for _i, unit in ipairs({ T(_.ngettext(" of 1 book", " of %1 books", goal), goal), T(_(" of %1"), goal) }) do
+        for _i, unit in ipairs({ _.ngettext("%1 of 1 book", "%1 of %2 books", goal), _("%1 of %2") }) do
             table.insert(variants, function()
                 return vstack({ w = w, h = hh, pad = pad }, {
                     head(iw, T(_("%1 goal"), g.year), trophy),
                     flex(0),
-                    runs({ { t = tostring(done), b = true, s = val_s }, { t = unit, col = INK.g4 } }, { s = 13, w = iw }),
+                    runs(BoardUI.styled(unit, { { t = tostring(done), b = true, s = val_s }, tostring(goal) }, { col = INK.g4 }), { s = 13, w = iw }),
                     space(nil, px(5)),
                     text(st, { s = 12, b = behind, col = behind and INK.black or INK.g4, w = iw }),
                 })
@@ -632,7 +645,7 @@ W.goalpace = function(ctx, w, hh)
             return vstack({ w = w, h = hh, pad = pad }, {
                 head(iw, T(_("%1 goal"), g.year), trophy),
                 flex(0),
-                BoardUI.spread(iw, runs({ { t = tostring(done), b = true, s = 20 }, { t = T(_(" of %1"), goal), col = INK.g4 } }, { s = 13 }),
+                BoardUI.spread(iw, runs(BoardUI.styled(_("%1 of %2"), { { t = tostring(done), b = true, s = 20 }, tostring(goal) }, { col = INK.g4 }), { s = 13 }),
                     text(st, { s = 12, b = behind, col = behind and INK.black or INK.g4 })),
             })
         end)
@@ -641,7 +654,7 @@ W.goalpace = function(ctx, w, hh)
         return vstack({ w = w, h = hh, pad = pad }, {
             head(iw, T(_("%1 goal"), g.year), trophy),
             flex(0),
-            runs({ { t = tostring(done), b = true, s = 20 }, { t = T(_(" of %1"), goal), col = INK.g4 } }, { s = 13, w = iw }),
+            runs(BoardUI.styled(_("%1 of %2"), { { t = tostring(done), b = true, s = 20 }, tostring(goal) }, { col = INK.g4 }), { s = 13, w = iw }),
         })
     end)
     return pick(variants)
@@ -722,8 +735,12 @@ W.heatmap = function(ctx, w, hh)
     local function bestEl()
         if not best_i then return text(_("Your reading days fill in here"), { s = 11, col = INK.g4 }) end
         local t = d.heatmap_start + (best_i - 1) * 86400
-        return runs({ { t = _("Best day") .. " " }, { t = BoardData.formatShortDuration(best), b = true, col = INK.black },
-            { t = ", " .. BoardData.shortWeekday(t) .. " " .. tonumber(os.date("%d", t)) .. " " .. BoardData.shortMonth(t) } }, { s = 11, col = INK.g4 })
+        -- TRANSLATORS: %1 is the most time read in one day, shown bold; %2 that day's date, such as Sat 17 Oct.
+        return runs(BoardUI.styled(_("Best day %1, %2"), {
+            { t = BoardData.formatShortDuration(best), b = true, col = INK.black },
+            -- TRANSLATORS: short weekday, day of the month, then the short month as it reads inside a date.
+            T(_.pgettext("Weekday, day and month", "%1 %2 %3"), BoardData.shortWeekday(t), tonumber(os.date("%d", t)), Dates.monthInDate(os.date("%m", t), false)),
+        }), { s = 11, col = INK.g4 })
     end
     local function legend(lv)
         if lv == -1 then return space(grid_w, legend_h) end
@@ -1289,6 +1306,18 @@ W.sync = function(ctx, w, hh)
                 text(o[1], { s = o[2], b = true, w = iw }),
                 space(nil, px(6)),
                 hstack({ gap = px(5) }, { icon(on and "refresh-cw" or "wifi", px(14), BoardColour.icon(ctx, 2.5)), text(on and _("Sync now") or _("Connect"), { s = 12, b = true }) }),
+            })
+        end)
+    end
+    -- A longer translation of the action keeps its words and drops the icon.
+    for _i, o in ipairs(opts) do
+        table.insert(variants, function()
+            return vstack({ w = w, h = hh, pad = pad }, {
+                head(iw, title, icon(on and "cloud-check" or "cloud-off", px(17), BoardColour.icon(ctx, 2.25))),
+                flex(0),
+                text(o[1], { s = o[2], b = true, w = iw }),
+                space(nil, px(6)),
+                text(on and _("Sync now") or _("Connect"), { s = 11, b = true }),
             })
         end)
     end

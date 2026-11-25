@@ -48,6 +48,9 @@ This is the end-to-end journey from idea to merged PR. Each phase builds on the 
 
 > **Issue first, PR second.** Every pull request must link to an approved issue assigned to the
 > contributor. PRs without prior approval and assignment will be closed without review.
+>
+> One exception: a pull request that only adds or improves KOReader plugin translations needs no
+> issue. See the [plugin translator guide](koreader-plugin/l10n/README.md).
 
 - Browse [open issues](../../issues) for something you want to tackle.
 - Report a problem using the [bug report](https://github.com/bookorbit/bookorbit/issues/new?template=bug_report.yml) form, or propose a concrete improvement using the [feature request](https://github.com/bookorbit/bookorbit/issues/new?template=feature_request.yml) form.
@@ -126,7 +129,7 @@ Refer to [DEVELOPMENT.md](docs/DEVELOPMENT.md) for architecture details, project
 
 #### Localizing User-Facing Text
 
-BookOrbit uses Vue I18n, with English as the complete source catalog and Crowdin as the source of truth for every other language.
+The web client uses Vue I18n, with English as the complete source catalog and Crowdin as the source of truth for every other language.
 
 - Add every new user-facing message, including accessibility labels and transient states, to `client/src/locales/en.json` and reference it through Vue I18n.
 - Do not add the key or an English fallback to any non-English catalog. Target catalogs are intentionally sparse, and missing messages fall back to English at runtime.
@@ -135,6 +138,8 @@ BookOrbit uses Vue I18n, with English as the complete source catalog and Crowdin
 - Read [LOCALIZATION.md](docs/LOCALIZATION.md) before changing ICU plural structure, changing the meaning of an existing message, or adding a language.
 
 CI rejects edits to existing non-English catalogs in ordinary pull requests. A deliberate new-language setup may add only an empty target catalog until Crowdin export is enabled.
+
+The KOReader plugin is different: its catalogs live in Git and are translated by pull request, without Crowdin. In plugin code, translate through `bookorbit_gettext`, write whole sentences with `%1` markers, and run `pnpm koreader:l10n:extract` to commit the updated template; do not edit the plugin's `.po` files in a feature pull request. The [plugin translator guide](koreader-plugin/l10n/README.md) has the details.
 
 ### Phase 7: Write and Run Tests
 

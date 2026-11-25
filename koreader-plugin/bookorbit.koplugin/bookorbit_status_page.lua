@@ -36,7 +36,7 @@ function Status.data(plugin)
         unmatched = summary.unmatched or 0,
         waiting = (outbox.count or 0) + (coordinator.pending_count or 0),
         synced = last_sync.event ~= "connection_test" and MenuUI.ago(last_sync.at) or nil,
-        last_message = last_sync.event ~= "connection_test" and last_sync.message or nil,
+        last_message = last_sync.event ~= "connection_test" and (Activity.detailText(last_sync.detail) or last_sync.message) or nil,
         user = settings.username or "",
         host = MenuUI.serverHost(settings.server_url) or "",
         activity = Activity.list(settings),
@@ -44,7 +44,7 @@ function Status.data(plugin)
     -- A failure newer than the last success is the verdict until it clears.
     if last_error and last_error.event ~= "connection_test"
         and (tonumber(last_error.at) or 0) > (last_sync.event ~= "connection_test" and tonumber(last_sync.at) or 0) then
-        d.error = { message = last_error.message, when = MenuUI.ago(last_error.at) }
+        d.error = { message = Activity.detailText(last_error.detail) or last_error.message, when = MenuUI.ago(last_error.at) }
     end
     return d
 end
@@ -137,8 +137,8 @@ local function activityList(d, w, max_h)
         local r = hstack({ w = iw, gap = px(10) }, {
             text(MenuUI.ago(a.at) or "", { s = 13, col = INK.g4, w = tw }),
             vstack({ w = cw, pad = { px(8), 0, px(8), 0 } }, {
-                text(a.text, { s = 15, w = cw, lines = 2, data = true }),
-                a.sub and text(a.sub, { s = 13, col = INK.g4, w = cw, lines = 2, data = true }) or false,
+                text(Activity.title(a), { s = 15, w = cw, lines = 2, data = true }),
+                Activity.sub(a) and text(Activity.sub(a), { s = 13, col = INK.g4, w = cw, lines = 2, data = true }) or false,
             }),
             a.warn and icon("triangle-alert", px(20), { sw = 2 }) or false,
         })
