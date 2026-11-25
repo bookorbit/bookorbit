@@ -1,3 +1,5 @@
+local runShell = require("run_shell")
+
 local TempFilesystem = {}
 TempFilesystem.__index = TempFilesystem
 
@@ -26,7 +28,7 @@ function TempFilesystem.new()
     local path = os.tmpname()
     os.remove(path)
     assert(path:match("^/tmp/") or path:match("^/var/folders/"), "unexpected temporary path")
-    assert(os.execute("mkdir -p " .. shellQuote(path)) == 0)
+    assert(runShell("mkdir -p " .. shellQuote(path)))
     return setmetatable({
         path = path,
         directories = { [path] = true },
@@ -37,9 +39,9 @@ end
 
 function TempFilesystem:makePath(path)
     if self.fail_make_path then return false end
-    local result = os.execute("mkdir -p " .. shellQuote(path))
-    if result == 0 then self.directories[path] = true end
-    return result == 0
+    local ok = runShell("mkdir -p " .. shellQuote(path))
+    if ok then self.directories[path] = true end
+    return ok
 end
 
 function TempFilesystem:attributes(path, attribute)

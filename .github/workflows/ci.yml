@@ -267,9 +267,11 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         shell: bash
         run: |
-          echo "server=true" >> "$GITHUB_OUTPUT"
-          echo "client=true" >> "$GITHUB_OUTPUT"
-          echo "koreader=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "server=true"
+            echo "client=true"
+            echo "koreader=true"
+          } >> "$GITHUB_OUTPUT"
 
       # For push events dorny/paths-filter diffs github.event.before..github.sha.
       # New-branch pushes (before = 0000...) are handled by treating all files as changed.

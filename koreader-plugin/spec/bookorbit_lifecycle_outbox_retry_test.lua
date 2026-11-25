@@ -1,4 +1,4 @@
-package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/?.lua;" .. package.path
+package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/?.lua;koreader-plugin/spec/helpers/?.lua;" .. package.path
 
 package.loaded["datastorage"] = { getSettingsDir = function() return "/unused" end }
 package.loaded["dump"] = function() return "{}" end

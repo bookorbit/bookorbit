@@ -309,6 +309,7 @@ jobs:
           echo "CI verification passed: ${success_count} successful run(s) found."
 
       - name: Verify the KOReader plugin version moved with its changes
+        if: inputs.tag == ''
         shell: bash
         run: node scripts/koreader/check-plugin-version.mjs
 
