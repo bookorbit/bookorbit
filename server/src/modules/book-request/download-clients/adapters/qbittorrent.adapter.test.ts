@@ -16,6 +16,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: 'admin',
     password: 'adminadmin',
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: true,
     settings: null,
     ...overrides,
@@ -98,6 +100,14 @@ describe('QbittorrentAdapter', () => {
       const form = add?.init.body as FormData;
       expect(form.get('urls')).toBe(`magnet:?xt=urn:btih:${INFO_HASH}`);
       expect(form.get('category')).toBe('bookorbit');
+    });
+
+    it('files the download under the category the grab names rather than the default', async () => {
+      const { calls } = mockFetch();
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, category: 'bookorbit-audio' }, config());
+
+      const form = calls.find((call) => call.url.includes('/torrents/add'))?.init.body as FormData;
+      expect(form.get('category')).toBe('bookorbit-audio');
     });
 
     it.each(['magnet', 'torrent'] as const)('leaves the client seed defaults untouched when adding a %s without goals', async (transport) => {
@@ -539,6 +549,49 @@ describe('QbittorrentAdapter', () => {
       const inventory = await adapter.listOwned(config());
       expect(inventory.items.map((item) => item.clientKey)).toEqual([INFO_HASH, 'f'.repeat(40)]);
       expect(new URL(calls.at(-1)!.url).searchParams.get('limit')).toBe('1001');
+    });
+  });
+
+  describe('listOwned', () => {
+    const overridden = { audiobookCategory: 'bookorbit-audio', comicCategory: 'bookorbit-comics' };
+
+    it('lists the downloads under every category BookOrbit files into, one listing per category', async () => {
+      const { calls, handlers } = mockFetch();
+      const byCategory: Record<string, object[]> = {
+        bookorbit: [{ hash: 'a'.repeat(40), name: 'Dune' }],
+        'bookorbit-audio': [{ hash: 'b'.repeat(40), name: 'Dune (Audiobook)' }],
+        'bookorbit-comics': [{ hash: 'c'.repeat(40), name: 'Saga 01' }],
+      };
+      handlers.set('/torrents/info', (url) => response(byCategory[url.searchParams.get('category') ?? ''] ?? []));
+
+      const inventory = await adapter.listOwned(config(overridden));
+
+      expect(inventory.items.map((item) => item.name)).toEqual(['Dune', 'Dune (Audiobook)', 'Saga 01']);
+      expect(inventory.truncated).toBe(false);
+      const asked = calls.filter((call) => call.url.includes('/torrents/info')).map((call) => new URL(call.url).searchParams.get('category'));
+      expect(asked).toEqual(['bookorbit', 'bookorbit-audio', 'bookorbit-comics']);
+    });
+
+    it('stops asking once the inventory is already past the limit', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () =>
+        response(Array.from({ length: 1001 }, (_, index) => ({ hash: (index + 1).toString(16).padStart(40, '0') }))),
+      );
+
+      const inventory = await adapter.listOwned(config(overridden));
+
+      expect(inventory.truncated).toBe(true);
+      expect(inventory.items).toHaveLength(1000);
+      expect(calls.filter((call) => call.url.includes('/torrents/info'))).toHaveLength(1);
+    });
+
+    it('asks once for a category repeated as an override', async () => {
+      const { calls, handlers } = mockFetch();
+      handlers.set('/torrents/info', () => response([]));
+
+      await adapter.listOwned(config({ audiobookCategory: 'bookorbit' }));
+
+      expect(calls.filter((call) => call.url.includes('/torrents/info'))).toHaveLength(1);
     });
   });
 

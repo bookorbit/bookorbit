@@ -15,6 +15,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: 'admin',
     password: 'adminadmin',
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: true,
     settings: null,
     ...overrides,
@@ -149,6 +151,16 @@ describe('TransmissionAdapter', () => {
       expect(add?.args.filename).toBe(`magnet:?xt=urn:btih:${INFO_HASH}`);
       expect(add?.args['download-dir']).toBe('/downloads/bookorbit');
       expect(add?.args.paused).toBe(false);
+    });
+
+    it('posts under the subfolder of the category the grab names rather than the default', async () => {
+      const { calls, handlers } = mockRpc();
+      handlers.set('session-get', () => success({ 'download-dir': '/downloads/' }));
+      handlers.set('torrent-add', () => success({ 'torrent-added': { hashString: INFO_HASH } }));
+
+      await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, category: 'bookorbit-audio' }, config());
+
+      expect(calls.find((call) => call.method === 'torrent-add')?.args['download-dir']).toBe('/downloads/bookorbit-audio');
     });
 
     it('uploads a .torrent as base64 metainfo', async () => {
@@ -355,6 +367,40 @@ describe('TransmissionAdapter', () => {
       handlers.set('torrent-get', () => success({ torrents: [{ hashString: 'f'.repeat(40), status: 4 }] }));
 
       await expect(adapter.status([INFO_HASH], config())).resolves.toEqual([]);
+    });
+  });
+
+  describe('listOwned', () => {
+    it('lists the torrents in every category folder BookOrbit files into, reading the download directory once', async () => {
+      const { calls, handlers } = mockRpc();
+      handlers.set('session-get', () => success({ 'download-dir': '/downloads' }));
+      handlers.set('torrent-get', () =>
+        success({
+          torrents: [
+            { hashString: 'a'.repeat(40), name: 'Dune', downloadDir: '/downloads/bookorbit' },
+            { hashString: 'b'.repeat(40), name: 'Dune (Audiobook)', downloadDir: '/downloads/bookorbit-audio/' },
+            { hashString: 'c'.repeat(40), name: 'Saga 01', downloadDir: '/downloads/bookorbit-comics' },
+            { hashString: 'd'.repeat(40), name: 'Someone else', downloadDir: '/downloads/tv' },
+            { hashString: 'e'.repeat(40), name: 'No folder' },
+          ],
+        }),
+      );
+
+      const inventory = await adapter.listOwned(config({ audiobookCategory: 'bookorbit-audio', comicCategory: 'bookorbit-comics' }));
+
+      expect(inventory.supported).toBe(true);
+      expect(inventory.items.map((item) => item.name)).toEqual(['Dune', 'Dune (Audiobook)', 'Saga 01']);
+      expect(calls.filter((call) => call.method === 'session-get')).toHaveLength(1);
+    });
+
+    it('cannot list without a usable category folder', async () => {
+      mockRpc();
+
+      await expect(adapter.listOwned(config({ category: '..', audiobookCategory: '.' }))).resolves.toEqual({
+        supported: false,
+        truncated: false,
+        items: [],
+      });
     });
   });
 

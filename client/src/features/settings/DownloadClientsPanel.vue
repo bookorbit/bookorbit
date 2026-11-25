@@ -53,6 +53,10 @@ interface ClientDraft {
   enabled: boolean
   priority: number
   category: string
+  /** Blank means audiobooks are filed under `category`. */
+  audiobookCategory: string
+  /** Blank means comic archives are filed under `category`. */
+  comicCategory: string
   useHardlinks: boolean
   removeCompletedDownloads: boolean
   allowPrivateAddress: boolean
@@ -150,6 +154,8 @@ function emptyDraft(adapterType: DownloadClientType): ClientDraft {
     enabled: true,
     priority: 1,
     category: 'bookorbit',
+    audiobookCategory: '',
+    comicCategory: '',
     useHardlinks: true,
     removeCompletedDownloads: false,
     allowPrivateAddress: true,
@@ -186,6 +192,8 @@ function startEdit(client: DownloadClientItem) {
     enabled: client.enabled,
     priority: client.priority,
     category: client.category,
+    audiobookCategory: client.audiobookCategory ?? '',
+    comicCategory: client.comicCategory ?? '',
     useHardlinks: client.useHardlinks,
     removeCompletedDownloads: client.removeCompletedDownloads,
     allowPrivateAddress: client.allowPrivateAddress,
@@ -240,6 +248,8 @@ const baseUrlBrief = computed(() => (isRtorrent.value ? t('settings.system.reque
 
 const stagesLocally = computed(() => (draft.value ? DOWNLOAD_CLIENT_STAGES_LOCALLY[draft.value.adapterType] : false))
 const removesCompleted = computed(() => (draft.value ? DOWNLOAD_CLIENT_REMOVES_COMPLETED[draft.value.adapterType] : false))
+/** What a blank override falls back to, shown in its box so the operator sees where those downloads go. */
+const defaultCategory = computed(() => draft.value?.category.trim() || 'bookorbit')
 
 const validating = ref(false)
 const keyCheck = ref<'idle' | 'ok' | 'invalid'>('idle')
@@ -392,6 +402,8 @@ function toPayload(current: ClientDraft): CreateDownloadClientPayload | UpdateDo
     enabled: current.enabled,
     priority: current.priority,
     category: current.category.trim(),
+    audiobookCategory: current.audiobookCategory.trim() || null,
+    comicCategory: current.comicCategory.trim() || null,
     useHardlinks: current.useHardlinks,
     removeCompletedDownloads: DOWNLOAD_CLIENT_REMOVES_COMPLETED[current.adapterType] && current.removeCompletedDownloads,
     allowPrivateAddress: current.allowPrivateAddress,
@@ -602,6 +614,14 @@ async function confirmOrphanRemoval() {
                     <span>{{ client.adapterType }}</span>
                     <span class="size-[3px] rounded-full bg-border" aria-hidden="true"></span>
                     <span>{{ t('settings.system.requests.categoryLabel', { category: client.category }) }}</span>
+                    <template v-if="client.audiobookCategory">
+                      <span class="size-[3px] rounded-full bg-border" aria-hidden="true"></span>
+                      <span>{{ t('settings.system.requests.audiobookCategoryLabel', { category: client.audiobookCategory }) }}</span>
+                    </template>
+                    <template v-if="client.comicCategory">
+                      <span class="size-[3px] rounded-full bg-border" aria-hidden="true"></span>
+                      <span>{{ t('settings.system.requests.comicCategoryLabel', { category: client.comicCategory }) }}</span>
+                    </template>
                     <span class="size-[3px] rounded-full bg-border" aria-hidden="true"></span>
                     <span>{{ t('settings.system.requests.priorityLabel', { priority: client.priority }) }}</span>
                   </div>
@@ -919,6 +939,45 @@ async function confirmOrphanRemoval() {
                 class="settings-control max-w-28"
               />
             </SettingsField>
+          </div>
+
+          <!-- A client that stages its own files ignores categories, so there is nothing to override. -->
+          <div v-if="!stagesLocally" class="space-y-2">
+            <div class="grid gap-4 sm:grid-cols-2">
+              <SettingsField
+                :label="t('settings.system.requests.fields.audiobookCategory')"
+                input-id="download-client-audiobook-category"
+                :brief="t('settings.system.requests.fields.audiobookCategoryHint')"
+              >
+                <template #default="{ describedBy }">
+                  <input
+                    id="download-client-audiobook-category"
+                    v-model="draft.audiobookCategory"
+                    type="text"
+                    class="settings-control"
+                    :placeholder="defaultCategory"
+                    :aria-describedby="describedBy"
+                  />
+                </template>
+              </SettingsField>
+              <SettingsField
+                :label="t('settings.system.requests.fields.comicCategory')"
+                input-id="download-client-comic-category"
+                :brief="t('settings.system.requests.fields.comicCategoryHint')"
+              >
+                <template #default="{ describedBy }">
+                  <input
+                    id="download-client-comic-category"
+                    v-model="draft.comicCategory"
+                    type="text"
+                    class="settings-control"
+                    :placeholder="defaultCategory"
+                    :aria-describedby="describedBy"
+                  />
+                </template>
+              </SettingsField>
+            </div>
+            <p class="text-xs text-muted-foreground">{{ t('settings.system.requests.fields.categoryOverridesNote') }}</p>
           </div>
 
           <div class="grid gap-4 sm:grid-cols-2">

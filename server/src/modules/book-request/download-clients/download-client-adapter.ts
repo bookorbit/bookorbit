@@ -10,7 +10,10 @@ export interface ResolvedClientConfig {
   baseUrl: string;
   username: string | null;
   password: string | null;
+  /** The row's default category: ebook grabs, and every medium without an override of its own. */
   category: string;
+  audiobookCategory: string | null;
+  comicCategory: string | null;
   allowPrivateAddress: boolean;
   settings: Record<string, unknown> | null;
 }
@@ -30,6 +33,11 @@ export interface GrabPayload {
    * stable digest for other deliveries, keeping duplicate-grab protection client-independent.
    */
   clientKey: string;
+  /**
+   * The category this download is filed under, chosen per medium by `categoryForMedium`. Absent
+   * means the row's default `category`.
+   */
+  category?: string;
   /**
    * Passed to the client at add time so the client, not BookOrbit, enforces the seed goal.
    * Unset in phase 2: there is no indexer to take a goal from yet.
@@ -162,6 +170,30 @@ export function stagedClientDir(appDataPath: string, adapterType: DownloadClient
  */
 export function legacyStagedClientDir(appDataPath: string, adapterType: DownloadClientType, clientKey: string): string {
   return join(stagedDownloadRoot(appDataPath), adapterType, clientKey);
+}
+
+/**
+ * What a grab counts as when its category is chosen. Comics are not a request medium of their own,
+ * so a comic is an ebook request whose release is a comic archive.
+ */
+export type GrabMedium = 'ebook' | 'audiobook' | 'comic';
+
+type ClientCategories = Pick<ResolvedClientConfig, 'category' | 'audiobookCategory' | 'comicCategory'>;
+
+export function categoryForMedium(config: ClientCategories, medium: GrabMedium): string {
+  if (medium === 'audiobook') return config.audiobookCategory?.trim() || config.category;
+  if (medium === 'comic') return config.comicCategory?.trim() || config.category;
+  return config.category;
+}
+
+/**
+ * Every category BookOrbit files downloads under on this client, the default first. Each one marks
+ * a download as BookOrbit's: the inventory lists what sits under any of them, and an adapter that
+ * only answers for its own jobs accepts all of them.
+ */
+export function ownedCategories(config: ClientCategories): string[] {
+  const categories = [config.category, config.audiobookCategory, config.comicCategory].map((value) => value?.trim() ?? '').filter(Boolean);
+  return [...new Set(categories)];
 }
 
 export const DOWNLOAD_CLIENT_ADAPTERS = Symbol('DOWNLOAD_CLIENT_ADAPTERS');

@@ -3,7 +3,7 @@ import 'reflect-metadata';
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 
-import { TestPathMappingDto, ValidateDownloadClientDto } from './download-client.dto';
+import { CreateDownloadClientDto, TestPathMappingDto, UpdateDownloadClientDto, ValidateDownloadClientDto } from './download-client.dto';
 
 const validationOptions = { whitelist: true, forbidNonWhitelisted: true } as const;
 
@@ -69,5 +69,30 @@ describe('ValidateDownloadClientDto', () => {
     });
 
     expect(await validate(dto, validationOptions)).not.toEqual([]);
+  });
+});
+
+describe.each([
+  ['CreateDownloadClientDto', CreateDownloadClientDto, { name: 'qbit', adapterType: 'qbittorrent', baseUrl: 'http://127.0.0.1:8080' }],
+  ['UpdateDownloadClientDto', UpdateDownloadClientDto, {}],
+] as const)('%s category overrides', (_name, Dto, base) => {
+  it('accepts a payload from an older caller that sends neither override', async () => {
+    expect(await validate(plainToInstance(Dto, base), validationOptions)).toEqual([]);
+  });
+
+  it('accepts an override, a blank one and null', async () => {
+    const dto = plainToInstance(Dto, { ...base, audiobookCategory: 'bookorbit audio-1.0', comicCategory: null });
+    expect(await validate(dto, validationOptions)).toEqual([]);
+    expect(await validate(plainToInstance(Dto, { ...base, audiobookCategory: '', comicCategory: '' }), validationOptions)).toEqual([]);
+  });
+
+  it.each([
+    ['a path separator', 'books/audio'],
+    ['a label separator', 'audio,books'],
+    ['a non-string', 42],
+    ['more than 100 characters', 'a'.repeat(101)],
+  ])('rejects an override with %s', async (_case, value) => {
+    expect(await validate(plainToInstance(Dto, { ...base, audiobookCategory: value }), validationOptions)).not.toEqual([]);
+    expect(await validate(plainToInstance(Dto, { ...base, comicCategory: value }), validationOptions)).not.toEqual([]);
   });
 });

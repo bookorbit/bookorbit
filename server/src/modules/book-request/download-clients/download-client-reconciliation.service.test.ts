@@ -111,6 +111,22 @@ describe('DownloadClientReconciliationService', () => {
     expect(downloads.findTrackedForClientKeys).not.toHaveBeenCalled();
   });
 
+  it('names every category the inventory covers, keeping the default as the single marker older callers read', async () => {
+    const { service, clients } = makeService();
+    clients.resolveConfig.mockResolvedValue({
+      id: 4,
+      adapterType: 'qbittorrent',
+      category: 'bookorbit',
+      audiobookCategory: 'bookorbit-audio',
+      comicCategory: null,
+    });
+
+    await expect(service.reconcile(4)).resolves.toMatchObject({
+      ownershipMarker: 'bookorbit',
+      ownershipMarkers: ['bookorbit', 'bookorbit-audio'],
+    });
+  });
+
   it('rechecks the client item and adopts the exact failed attempt atomically', async () => {
     const { service, adapter, downloads, gateway } = makeService();
     const candidate = attempt(12, 8, ORPHAN_KEY, 'failed', 'Retry this book');

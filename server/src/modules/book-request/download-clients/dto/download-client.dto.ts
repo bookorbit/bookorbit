@@ -74,6 +74,20 @@ export class CreateDownloadClientDto {
   @Matches(/^[\w .-]*$/, { message: 'category may only contain letters, numbers, spaces, dots, dashes and underscores' })
   category?: string;
 
+  /** Optional with a null default, so older callers keep filing audiobooks under `category`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^[\w .-]*$/, { message: 'audiobookCategory may only contain letters, numbers, spaces, dots, dashes and underscores' })
+  audiobookCategory?: string | null;
+
+  /** Optional with a null default, so older callers keep filing comic archives under `category`. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^[\w .-]*$/, { message: 'comicCategory may only contain letters, numbers, spaces, dots, dashes and underscores' })
+  comicCategory?: string | null;
+
   @IsOptional()
   @IsBoolean()
   useHardlinks?: boolean;
@@ -147,6 +161,20 @@ export class UpdateDownloadClientDto {
   @MaxLength(100)
   @Matches(/^[\w .-]*$/, { message: 'category may only contain letters, numbers, spaces, dots, dashes and underscores' })
   category?: string;
+
+  /** Omitted keeps the stored override; null or blank clears it. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^[\w .-]*$/, { message: 'audiobookCategory may only contain letters, numbers, spaces, dots, dashes and underscores' })
+  audiobookCategory?: string | null;
+
+  /** Omitted keeps the stored override; null or blank clears it. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Matches(/^[\w .-]*$/, { message: 'comicCategory may only contain letters, numbers, spaces, dots, dashes and underscores' })
+  comicCategory?: string | null;
 
   @IsOptional()
   @IsBoolean()

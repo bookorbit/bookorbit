@@ -12,6 +12,7 @@ import type {
   ResolvedClientConfig,
   SeedInfo,
 } from '../download-client-adapter';
+import { ownedCategories } from '../download-client-adapter';
 import { type ClientContent, DownloadContentRemovalService } from '../download-content-removal.service';
 import { basicAuthHeader, fetchClient, readClientText, throwForClientServerError } from './client-http.utils';
 import {
@@ -134,7 +135,7 @@ export class RtorrentAdapter implements DownloadClientAdapter {
     const hash = release.clientKey.toLowerCase();
     if (!INFO_HASH.test(hash)) throw new BadRequestException('rTorrent identifies a download by its 40-character infohash');
     const target = hash.toUpperCase();
-    const label = config.category.trim();
+    const label = (release.category ?? config.category).trim();
 
     // Loading a torrent rTorrent already holds is a silent no-op, so it has to be asked first. An
     // earlier attempt on this release leaves its torrent behind when the import fails, and that
@@ -256,19 +257,27 @@ export class RtorrentAdapter implements DownloadClientAdapter {
   }
 
   async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
-    const label = config.category.trim();
-    // A blank marker would claim every unlabelled torrent in the instance.
-    if (!label) return { supported: false, truncated: false, items: [] };
+    // Blank markers are already dropped: one would claim every unlabelled torrent in the instance.
+    const ownedLabels = ownedCategories(config);
+    if (ownedLabels.length === 0) return { supported: false, truncated: false, items: [] };
 
     const { labels, filtered } = await this.labels(config);
-    const owned = labels.flatMap(([hash, custom1]) => (carriesLabel(custom1, label) ? [hash] : []));
+    const owned = labels.flatMap(([hash, custom1]) => (ownedLabels.some((label) => carriesLabel(custom1, label)) ? [hash] : []));
     const shown = owned.slice(0, RECONCILIATION_LIMIT);
 
     // rTorrent walks its whole list for every hash: among 16,800 torrents, reading a thousand by hash
-    // took 4 to 18 s. The ones carrying BookOrbit's spelling of the label come back in one more pass
-    // instead, in under a second; whatever that pass leaves out is still read by hash.
-    const exact = filtered && FILTERABLE_LABEL.test(label) ? labels.filter(([, custom1]) => custom1 === label).length : 0;
-    const rows = exact > 0 && exact <= FILTERED_READ_LIMIT ? await this.readLabelled(label, config) : new Map<string, TorrentRow>();
+    // took 4 to 18 s. The ones carrying BookOrbit's spelling of a label come back in one more pass
+    // per label instead, in under a second; whatever those passes leave out is still read by hash.
+    // The row limit is shared by every label, so several categories read no more than one did.
+    const rows = new Map<string, TorrentRow>();
+    let budget = FILTERED_READ_LIMIT;
+    for (const label of filtered ? ownedLabels : []) {
+      if (!FILTERABLE_LABEL.test(label)) continue;
+      const exact = labels.filter(([, custom1]) => custom1 === label).length;
+      if (exact === 0 || exact > budget) continue;
+      budget -= exact;
+      for (const [hash, row] of await this.readLabelled(label, config)) rows.set(hash, row);
+    }
     const missed = shown.filter((hash) => !rows.has(hash));
     for (const [hash, row] of await this.readTorrents(missed, config)) rows.set(hash, row);
 

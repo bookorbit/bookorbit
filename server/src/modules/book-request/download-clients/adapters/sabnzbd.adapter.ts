@@ -13,6 +13,7 @@ import type {
   OwnedDownloadClientInventory,
   ResolvedClientConfig,
 } from '../download-client-adapter';
+import { ownedCategories } from '../download-client-adapter';
 import { type ContentRemovalPlan, DownloadContentRemovalService, remoteFolderName } from '../download-content-removal.service';
 import { endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
@@ -57,7 +58,8 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
   async add(release: GrabPayload, config: ResolvedClientConfig): Promise<{ clientKey: string }> {
     if (!release.nzbFile?.length) throw new BadRequestException('A SABnzbd grab needs an NZB file');
     const key = normalizeKey(release.clientKey);
-    await this.requireCategory(config);
+    const category = release.category ?? config.category;
+    await this.requireCategories(config, [category]);
     // A failed history entry is not an in-flight job. SABnzbd keeps one until somebody clears its
     // history, and the client key is a stable digest, so adopting it would fail every later grab of
     // the same release before an NZB was ever sent.
@@ -73,7 +75,7 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
     const result = await this.call(
       config,
       'addfile',
-      { cat: config.category, nzbname: ownedName(config.id, key, filename) },
+      { cat: category, nzbname: ownedName(config.id, key, filename) },
       {
         method: 'POST',
         body: form as unknown as BodyInit,
@@ -151,7 +153,7 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
       const result = await this.call(config, 'version');
       const version = stringField(result.version);
       if (!version) return { success: false, error: 'SABnzbd returned an invalid version' };
-      await this.requireCategory(config);
+      await this.requireCategories(config, ownedCategories(config));
       return { success: true, version };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -165,25 +167,23 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
   private async findOwned(config: ResolvedClientConfig): Promise<Map<string, LocatedSlot>> {
     const [queue, history] = await Promise.all([this.slots(config, 'queue'), this.slots(config, 'history')]);
     const found = new Map<string, LocatedSlot>();
-    for (const slot of history) addOwned(found, slot, 'history', config);
-    for (const slot of queue) addOwned(found, slot, 'queue', config);
+    const categories = new Set(ownedCategories(config));
+    for (const slot of history) addOwned(found, slot, 'history', categories, config.id);
+    for (const slot of queue) addOwned(found, slot, 'queue', categories, config.id);
     return found;
   }
 
-  private async requireCategory(config: ResolvedClientConfig): Promise<void> {
+  private async requireCategories(config: ResolvedClientConfig, wanted: string[]): Promise<void> {
     const result = await this.call(config, 'get_config', { section: 'categories' });
     const root = result.config;
     const categories = root && typeof root === 'object' && !Array.isArray(root) ? (root as Record<string, unknown>).categories : null;
-    const exists =
-      Array.isArray(categories) &&
-      categories.some(
-        (category) =>
-          category &&
-          typeof category === 'object' &&
-          !Array.isArray(category) &&
-          stringField((category as Record<string, unknown>).name) === config.category,
-      );
-    if (!exists) throw new BadRequestException(`SABnzbd category "${config.category}" does not exist`);
+    const names = new Set(
+      (Array.isArray(categories) ? categories : []).flatMap((category) =>
+        category && typeof category === 'object' && !Array.isArray(category) ? (stringField((category as Record<string, unknown>).name) ?? []) : [],
+      ),
+    );
+    const missing = wanted.find((category) => !names.has(category));
+    if (missing !== undefined) throw new BadRequestException(`SABnzbd category "${missing}" does not exist`);
   }
 
   private async slots(config: ResolvedClientConfig, location: LocatedSlot['location']): Promise<SabSlot[]> {
@@ -234,10 +234,16 @@ export class SabnzbdAdapter implements DownloadClientAdapter {
   }
 }
 
-function addOwned(found: Map<string, LocatedSlot>, slot: SabSlot, location: LocatedSlot['location'], config: ResolvedClientConfig): void {
-  const key = ownedClientKey(slot, config.id);
+function addOwned(
+  found: Map<string, LocatedSlot>,
+  slot: SabSlot,
+  location: LocatedSlot['location'],
+  categories: ReadonlySet<string>,
+  clientId: number,
+): void {
+  const key = ownedClientKey(slot, clientId);
   const category = stringField(location === 'queue' ? slot.cat : slot.category);
-  if (!key || category !== config.category) return;
+  if (!key || !category || !categories.has(category)) return;
   found.set(key, { slot, location });
 }
 

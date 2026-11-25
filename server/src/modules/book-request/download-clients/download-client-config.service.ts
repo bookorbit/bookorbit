@@ -94,6 +94,8 @@ export class DownloadClientConfigService {
           enabled: dto.enabled ?? true,
           priority: dto.priority ?? 1,
           category: dto.category?.trim() || 'bookorbit',
+          audiobookCategory: dto.audiobookCategory?.trim() || null,
+          comicCategory: dto.comicCategory?.trim() || null,
           useHardlinks: dto.useHardlinks ?? true,
           removeCompletedDownloads: dto.removeCompletedDownloads ?? false,
           allowPrivateAddress: dto.allowPrivateAddress ?? true,
@@ -138,6 +140,8 @@ export class DownloadClientConfigService {
     if (dto.enabled !== undefined) patch.enabled = dto.enabled;
     if (dto.priority !== undefined) patch.priority = dto.priority;
     if (dto.category !== undefined) patch.category = dto.category.trim() || 'bookorbit';
+    if (dto.audiobookCategory !== undefined) patch.audiobookCategory = dto.audiobookCategory?.trim() || null;
+    if (dto.comicCategory !== undefined) patch.comicCategory = dto.comicCategory?.trim() || null;
     if (dto.useHardlinks !== undefined) patch.useHardlinks = dto.useHardlinks;
     if (dto.removeCompletedDownloads !== undefined) patch.removeCompletedDownloads = dto.removeCompletedDownloads;
     if (dto.allowPrivateAddress !== undefined) patch.allowPrivateAddress = dto.allowPrivateAddress;
@@ -228,6 +232,8 @@ export class DownloadClientConfigService {
         username: dto.username?.trim() || null,
         password: dto.password ?? null,
         category: 'bookorbit',
+        audiobookCategory: null,
+        comicCategory: null,
         allowPrivateAddress: dto.allowPrivateAddress ?? false,
         settings: null,
       });
@@ -264,6 +270,8 @@ export class DownloadClientConfigService {
       username: client.username,
       password: client.credentialsEnc ? this.credentials.decrypt(client.credentialsEnc) : null,
       category: client.category,
+      audiobookCategory: client.audiobookCategory ?? null,
+      comicCategory: client.comicCategory ?? null,
       allowPrivateAddress: client.allowPrivateAddress,
       settings: client.settings ?? null,
     };
@@ -403,6 +411,8 @@ function toItem({ client, pathMappings }: DownloadClientWithMappings): DownloadC
     username: client.username,
     hasPassword: client.credentialsEnc !== null,
     category: client.category,
+    audiobookCategory: client.audiobookCategory ?? null,
+    comicCategory: client.comicCategory ?? null,
     useHardlinks: client.useHardlinks,
     removeCompletedDownloads: client.removeCompletedDownloads,
     allowPrivateAddress: client.allowPrivateAddress,

@@ -11,6 +11,7 @@ import type {
   OwnedDownloadClientInventory,
   ResolvedClientConfig,
 } from '../download-client-adapter';
+import { ownedCategories } from '../download-client-adapter';
 import { type ContentRemovalPlan, DownloadContentRemovalService, remoteFolderName } from '../download-content-removal.service';
 import { basicAuthHeader, endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
@@ -66,7 +67,7 @@ export class NzbgetAdapter implements DownloadClientAdapter {
     const id = await this.rpc<number>(config, 'append', [
       filename,
       release.nzbFile.toString('base64'),
-      config.category,
+      release.category ?? config.category,
       0,
       false,
       false,
@@ -89,8 +90,9 @@ export class NzbgetAdapter implements DownloadClientAdapter {
   async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
     const [queue, history] = await Promise.all([this.listGroups(config), this.history(config)]);
     const byKey = new Map<string, LocatedItem>();
-    for (const item of history) addOwned(byKey, item, 'history', config.category, config.id);
-    for (const item of queue) addOwned(byKey, item, 'queue', config.category, config.id);
+    const categories = new Set(ownedCategories(config));
+    for (const item of history) addOwned(byKey, item, 'history', categories, config.id);
+    for (const item of queue) addOwned(byKey, item, 'queue', categories, config.id);
     const items = [...byKey.values()];
     return {
       supported: true,
@@ -225,9 +227,15 @@ function collectWanted(
   if (key && wanted.has(key) && !found.has(key)) found.set(key, { item, location });
 }
 
-function addOwned(found: Map<string, LocatedItem>, item: NzbGetItem, location: LocatedItem['location'], category: string, clientId: number): void {
+function addOwned(
+  found: Map<string, LocatedItem>,
+  item: NzbGetItem,
+  location: LocatedItem['location'],
+  categories: ReadonlySet<string>,
+  clientId: number,
+): void {
   const key = clientKey(item.DupeKey, clientId);
-  if (!key || item.Category !== category) return;
+  if (!key || item.Category === undefined || !categories.has(item.Category)) return;
   found.set(key, { item, location });
 }
 

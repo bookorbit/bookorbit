@@ -26,6 +26,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: 'nzbget',
     password: 'password',
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: true,
     settings: null,
     ...overrides,
@@ -99,6 +101,17 @@ describe('NzbgetAdapter', () => {
       'ALL',
       [],
     ]);
+  });
+
+  it('appends the NZB under the category the grab names rather than the default', async () => {
+    const calls = mockRpc({ listgroups: [], history: [], append: 42 });
+
+    await new NzbgetAdapter(contentRemoval()).add(
+      { nzbFile: Buffer.from('<nzb />'), nzbFileName: 'Dune.nzb', clientKey: CLIENT_KEY, category: 'bookorbit-audio' },
+      config({ audiobookCategory: 'bookorbit-audio' }),
+    );
+
+    expect(calls.find((call) => call.method === 'append')?.params[2]).toBe('bookorbit-audio');
   });
 
   it('keeps the NZB extension when a supplied filename is truncated', async () => {
@@ -268,6 +281,22 @@ describe('NzbgetAdapter', () => {
       truncated: false,
       items: [{ name: 'owned' }],
     });
+  });
+
+  it('lists owned items under every category BookOrbit files into', async () => {
+    mockRpc({
+      listgroups: [
+        { NZBID: 1, NZBName: 'ebook', Category: 'bookorbit', DupeKey: `bookorbit:9:${CLIENT_KEY}`, Status: 'QUEUED' },
+        { NZBID: 2, NZBName: 'audiobook', Category: 'bookorbit-audio', DupeKey: `bookorbit:9:${'b'.repeat(64)}`, Status: 'QUEUED' },
+        { NZBID: 3, NZBName: 'other category', Category: 'movies', DupeKey: `bookorbit:9:${'c'.repeat(64)}`, Status: 'QUEUED' },
+        { NZBID: 4, NZBName: 'no category', DupeKey: `bookorbit:9:${'d'.repeat(64)}`, Status: 'QUEUED' },
+      ],
+      history: [],
+    });
+
+    const inventory = await new NzbgetAdapter(contentRemoval()).listOwned(config({ audiobookCategory: 'bookorbit-audio' }));
+
+    expect(inventory.items.map((item) => item.name)).toEqual(['ebook', 'audiobook']);
   });
 
   it('bounds owned reconciliation inventory and reports truncation', async () => {

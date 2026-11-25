@@ -31,6 +31,10 @@ export const downloadClients = pgTable(
 
     /** Tags our torrents in the client so BookOrbit only ever touches its own. */
     category: varchar('category', { length: 100 }).notNull().default('bookorbit'),
+    /** Files audiobook grabs under their own category. Null keeps them under `category`. */
+    audiobookCategory: varchar('audiobook_category', { length: 100 }),
+    /** Files releases in a comic archive format under their own category. Null keeps them under `category`. */
+    comicCategory: varchar('comic_category', { length: 100 }),
     useHardlinks: boolean('use_hardlinks').notNull().default(true),
     /** Drop a finished Usenet job and its folder once the Book Dock holds the import. */
     removeCompletedDownloads: boolean('remove_completed_downloads').notNull().default(false),

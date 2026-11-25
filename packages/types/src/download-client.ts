@@ -128,6 +128,10 @@ export interface DownloadClientItem {
   /** The password itself never leaves the server; this only says whether one is stored. */
   hasPassword: boolean;
   category: string;
+  /** Audiobook grabs go here instead of `category`. Null keeps them under `category`. */
+  audiobookCategory: string | null;
+  /** Releases in a comic archive format (CBZ, CBR, CB7) go here instead of `category`. Null keeps them under `category`. */
+  comicCategory: string | null;
   useHardlinks: boolean;
   /** Only ever true for a client `DOWNLOAD_CLIENT_REMOVES_COMPLETED` allows. */
   removeCompletedDownloads: boolean;
@@ -181,7 +185,9 @@ export interface DownloadClientReconciliationItem {
 export interface DownloadClientReconciliationResult {
   clientId: number;
   supported: boolean;
+  /** The client's default category. `ownershipMarkers` holds every category the inventory covers. */
   ownershipMarker: string;
+  ownershipMarkers: string[];
   truncated: boolean;
   items: DownloadClientReconciliationItem[];
   missingAttempts: DownloadClientReconciliationAttempt[];
@@ -205,6 +211,10 @@ export interface CreateDownloadClientPayload {
   enabled?: boolean;
   priority?: number;
   category?: string;
+  /** Null or blank clears the override, filing audiobooks under `category` as before. */
+  audiobookCategory?: string | null;
+  /** Null or blank clears the override, filing comic archives under `category` as before. */
+  comicCategory?: string | null;
   useHardlinks?: boolean;
   /** Defaults to false, which keeps every download in the client as before. */
   removeCompletedDownloads?: boolean;

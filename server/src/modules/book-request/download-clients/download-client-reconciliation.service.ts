@@ -8,7 +8,7 @@ import type {
 
 import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestDownloadRepository, type ReconciliationAttemptRow } from '../fulfillment/book-request-download.repository';
-import type { OwnedDownloadClientItem } from './download-client-adapter';
+import { ownedCategories, type OwnedDownloadClientItem } from './download-client-adapter';
 import { DownloadClientConfigService } from './download-client-config.service';
 import { DownloadClientRegistry } from './download-client-registry';
 
@@ -33,6 +33,7 @@ export class DownloadClientReconciliationService {
         clientId,
         supported: false,
         ownershipMarker: config.category,
+        ownershipMarkers: ownedCategories(config),
         truncated: false,
         items: [],
         missingAttempts: [],
@@ -53,6 +54,7 @@ export class DownloadClientReconciliationService {
       clientId,
       supported: true,
       ownershipMarker: config.category,
+      ownershipMarkers: ownedCategories(config),
       truncated: inventory.truncated,
       items: inventory.items.map((item) => ({
         clientKey: item.clientKey.toLowerCase(),

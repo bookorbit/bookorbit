@@ -4548,6 +4548,11 @@
           "apiKeyWillClear": "The stored API key is removed when you save",
           "category": "Category",
           "categoryHint": "Tags the downloads BookOrbit adds, so it only ever acts on its own.",
+          "audiobookCategory": "Audiobook category",
+          "audiobookCategoryHint": "Audiobook downloads go here. Leave empty to use the category above.",
+          "comicCategory": "Comic category",
+          "comicCategoryHint": "CBZ, CBR and CB7 releases go here. Leave empty to use the category above.",
+          "categoryOverridesNote": "Use categories only BookOrbit files into. Each one's download folder needs a path mapping below.",
           "priority": "Priority",
           "enabled": "Enabled",
           "useHardlinks": "Use hardlinks",
@@ -5024,6 +5029,8 @@
           "failedAt": "failed {time}"
         },
         "categoryLabel": "category {category}",
+        "audiobookCategoryLabel": "audiobooks in {category}",
+        "comicCategoryLabel": "comics in {category}",
         "priorityLabel": "priority {priority}",
         "editClientName": "Edit {name}",
         "sections": {

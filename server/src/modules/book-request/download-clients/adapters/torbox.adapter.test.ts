@@ -37,6 +37,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: null,
     password: 'api-secret',
     category: '',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: false,
     settings: null,
     ...overrides,

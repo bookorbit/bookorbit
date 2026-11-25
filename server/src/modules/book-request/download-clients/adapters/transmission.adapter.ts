@@ -12,6 +12,7 @@ import type {
   ResolvedClientConfig,
   SeedInfo,
 } from '../download-client-adapter';
+import { ownedCategories } from '../download-client-adapter';
 import { basicAuthHeader, endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'Transmission';
@@ -104,7 +105,7 @@ export class TransmissionAdapter implements DownloadClientAdapter {
       throw new BadRequestException('A grab needs either a magnet link or a .torrent file');
     }
 
-    const downloadDir = await this.categoryDir(config);
+    const [downloadDir] = await this.categoryDirs(config, [release.category ?? config.category]);
     if (downloadDir) args['download-dir'] = downloadDir;
 
     const result = await this.rpc<TransmissionAddResult>(config, 'torrent-add', args);
@@ -157,20 +158,20 @@ export class TransmissionAdapter implements DownloadClientAdapter {
   }
 
   /**
-   * Transmission has no categories, so the category becomes a subfolder of the daemon's own
-   * download directory. Read per add rather than cached, so moving that directory does not need
+   * Transmission has no categories, so each category becomes a subfolder of the daemon's own
+   * download directory. Read per call rather than cached, so moving that directory does not need
    * BookOrbit restarted to take effect.
    */
-  private async categoryDir(config: ResolvedClientConfig): Promise<string | null> {
-    const category = config.category.trim();
+  private async categoryDirs(config: ResolvedClientConfig, categories: string[]): Promise<string[]> {
     // The DTO bounds the character set, but `..` sits inside it and this becomes a path segment
     // on the client's own filesystem.
-    if (!category || /^\.+$/.test(category)) return null;
+    const usable = categories.map((category) => category.trim()).filter((category) => category && !/^\.+$/.test(category));
+    if (usable.length === 0) return [];
 
     const session = await this.rpc<{ 'download-dir'?: string }>(config, 'session-get', {});
     const base = session['download-dir']?.trim();
-    if (!base) return null;
-    return `${base.replace(/\/+$/, '')}/${category}`;
+    if (!base) return [];
+    return [...new Set(usable.map((category) => `${base.replace(/\/+$/, '')}/${category}`))];
   }
 
   async status(hashes: string[], config: ResolvedClientConfig): Promise<DownloadStatus[]> {
@@ -192,11 +193,14 @@ export class TransmissionAdapter implements DownloadClientAdapter {
   }
 
   async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
-    const ownedDir = await this.categoryDir(config);
-    if (!ownedDir) return { supported: false, truncated: false, items: [] };
+    const ownedDirs = new Set((await this.categoryDirs(config, ownedCategories(config))).map((dir) => dir.replace(/\/+$/, '')));
+    if (ownedDirs.size === 0) return { supported: false, truncated: false, items: [] };
 
     const result = await this.rpc<{ torrents?: TransmissionTorrent[] }>(config, 'torrent-get', { fields: STATUS_FIELDS });
-    const owned = (result.torrents ?? []).filter((entry) => entry.downloadDir?.replace(/\/+$/, '') === ownedDir.replace(/\/+$/, ''));
+    const owned = (result.torrents ?? []).filter((entry) => {
+      const dir = entry.downloadDir?.replace(/\/+$/, '');
+      return dir !== undefined && ownedDirs.has(dir);
+    });
     return {
       supported: true,
       truncated: owned.length > RECONCILIATION_LIMIT,

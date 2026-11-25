@@ -18,6 +18,7 @@ import {
   DOWNLOAD_CLIENT_TYPES,
   GRABBABLE_BOOK_REQUEST_STATUSES,
   GRAB_FAILURE_CODES,
+  isComicFormat,
   isGrabbableBookRequestStatus,
   NotificationType,
   normalizeBookRequestIsbn,
@@ -53,6 +54,7 @@ import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestNotifier } from '../book-request-notifier.service';
 import { mapBookRequestDownload, mapBookRequestRow } from '../book-request.mapper';
 import { BookRequestRepository } from '../book-request.repository';
+import { categoryForMedium, type GrabMedium } from '../download-clients/download-client-adapter';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
 import { DownloadClientRegistry } from '../download-clients/download-client-registry';
 import { ADD_PATH_MAPPING_HINT } from '../download-clients/path-mapping.service';
@@ -231,7 +233,7 @@ export class RequestFulfillmentService {
     }
 
     try {
-      return await this.startGrab(requestId, dto, user);
+      return await this.startGrab(requestId, request.mediaKind, dto, user);
     } catch (error) {
       // The claim is only good while this attempt is live. Anything that stops it hands the request
       // back in the state it was found in, so the picker still offers another release - but only if
@@ -242,7 +244,12 @@ export class RequestFulfillmentService {
     }
   }
 
-  private async startGrab(requestId: number, dto: GrabBookRequestDto, user: RequestUser | null): Promise<BookRequestItem> {
+  private async startGrab(
+    requestId: number,
+    mediaKind: BookRequestRow['mediaKind'],
+    dto: GrabBookRequestDto,
+    user: RequestUser | null,
+  ): Promise<BookRequestItem> {
     // Asking the source is the part worth recording when it refuses, because a refusal nobody
     // recorded is exactly the one that gets asked about later: "it downloaded from the second
     // source, but was the first one even tried?"
@@ -291,6 +298,7 @@ export class RequestFulfillmentService {
     }
 
     this.events.emit(BOOK_REQUEST_DOWNLOAD_QUEUED);
+    let category: string | null = null;
     try {
       if (client === null) {
         await this.direct.add({
@@ -302,9 +310,12 @@ export class RequestFulfillmentService {
       } else {
         const config = await this.clients.resolveConfig(client.id);
         const adapter = this.registry.require(config.adapterType);
+        const fileUnder = categoryForMedium(config, grabMedium(mediaKind, grab));
+        category = fileUnder;
         await this.withTransientRetry(user === null, requestId, 'client', () =>
           adapter.add(
             {
+              category: fileUnder,
               magnet: grab.magnet,
               torrentFile: grab.torrentFile,
               torrentFileName: grab.torrentFileName ?? dto.torrentFileName,
@@ -346,7 +357,7 @@ export class RequestFulfillmentService {
     // the book when it lands. Leaving the dismissal on would hide the arrival too.
     await this.requests.clearDismissals(requestId);
     this.logger.log(
-      `[book_request.grab] [end] requestId=${requestId} downloadId=${download.id} clientId=${client?.id ?? 'direct'} indexerId=${grab.indexerId ?? 'none'} indexer="${sanitizeLogValue(grab.indexerName ?? 'pasted by hand')}" userId=${user?.id ?? 'automation'} source=${grab.source} key=${grab.clientKey} - release grab started`,
+      `[book_request.grab] [end] requestId=${requestId} downloadId=${download.id} clientId=${client?.id ?? 'direct'} indexerId=${grab.indexerId ?? 'none'} indexer="${sanitizeLogValue(grab.indexerName ?? 'pasted by hand')}" userId=${user?.id ?? 'automation'} source=${grab.source} key=${grab.clientKey} category="${sanitizeLogValue(category ?? 'none')}" - release grab started`,
     );
     this.gateway.emitChanged();
 
@@ -981,6 +992,19 @@ interface ParsedGrab {
   /** The size of what the release carries, which a magnet does not state. */
   releaseSizeBytes: number | null;
   inspection: ReleaseFileInspection;
+}
+
+/**
+ * An audiobook request is an audiobook whatever its release holds. An ebook request is a comic only
+ * when its release is nothing but comic archives: the files say so when the release lists them, and
+ * the stated format stands in only when it does not, as for a magnet. A mixed or unknown release
+ * keeps the default category.
+ */
+function grabMedium(mediaKind: BookRequestRow['mediaKind'], grab: ResolvedGrab): GrabMedium {
+  if (mediaKind === 'audiobook') return 'audiobook';
+  const { units, unitCount } = grab.inspection;
+  if (unitCount > 0) return units.length === unitCount && units.every((unit) => unit.mediaKind === 'comic') ? 'comic' : 'ebook';
+  return grab.releaseFormat && isComicFormat(grab.releaseFormat) ? 'comic' : 'ebook';
 }
 
 /** A parsed grab plus what an indexer knows about it, which a hand-pasted link cannot supply. */

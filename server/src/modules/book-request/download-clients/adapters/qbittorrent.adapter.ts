@@ -12,6 +12,7 @@ import type {
   ResolvedClientConfig,
   SeedInfo,
 } from '../download-client-adapter';
+import { ownedCategories } from '../download-client-adapter';
 import { endpointUrl, fetchClient, readClientJson, readClientText, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'qBittorrent';
@@ -100,7 +101,7 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
       throw new BadRequestException('A grab needs either a magnet link or a .torrent file');
     }
 
-    form.append('category', config.category);
+    form.append('category', release.category ?? config.category);
     // Torrent-level goals: the client enforces them, BookOrbit never stops a seed itself.
     if (release.seedRatioGoal !== undefined) form.append('ratioLimit', String(release.seedRatioGoal));
     if (release.seedTimeMinutes !== undefined) form.append('seedingTimeLimit', String(release.seedTimeMinutes));
@@ -214,7 +215,13 @@ export class QbittorrentAdapter implements DownloadClientAdapter {
   }
 
   async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
-    const entries = await this.readTorrents(config, `category=${encodeURIComponent(config.category)}&limit=${RECONCILIATION_LIMIT + 1}`);
+    // The listing filters by one category at a time, and a torrent carries only one, so the
+    // listings never overlap. Once they pass the limit the answer is already truncated.
+    const entries: QbTorrentInfo[] = [];
+    for (const category of ownedCategories(config)) {
+      if (entries.length > RECONCILIATION_LIMIT) break;
+      entries.push(...(await this.readTorrents(config, `category=${encodeURIComponent(category)}&limit=${RECONCILIATION_LIMIT + 1}`)));
+    }
     return {
       supported: true,
       truncated: entries.length > RECONCILIATION_LIMIT,

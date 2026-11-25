@@ -28,6 +28,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: null,
     password: null,
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: true,
     settings: null,
     ...overrides,
@@ -356,6 +358,14 @@ describe('RtorrentAdapter', () => {
       expect(load?.params[0]).toBe('');
       expect(load?.params[1]).toEqual(torrentFile);
       expect(loadCommands(fake)).toEqual(['d.custom1.set="bookorbit"']);
+    });
+
+    it('labels the torrent with the category the grab names rather than the default', async () => {
+      appearOnLoad(MURDERBOT);
+
+      await adapter.add({ torrentFile, clientKey: MURDERBOT, category: 'bookorbit-audio' }, config());
+
+      expect(loadCommands(fake)).toEqual(['d.custom1.set="bookorbit-audio"']);
     });
 
     it('leaves where the files go to rTorrent, since it cannot create a new folder two levels deep', async () => {
@@ -696,6 +706,39 @@ describe('RtorrentAdapter', () => {
       ]);
       // No torrent carries this exact spelling, so there is nothing for a one-pass read to find.
       expect(fake.requests.map((request) => request.method)).toEqual(['d.multicall.filtered', 'system.multicall']);
+    });
+
+    it('lists the torrents under every label BookOrbit files into, with one filtered read per label', async () => {
+      fake.hold(AGNES, torrent({ 'd.name': 'Agnes' }));
+      fake.hold(MURDERBOT, torrent({ 'd.name': 'Murderbot', 'd.custom1': 'bookorbit-audio' }));
+      fake.hold(UNKNOWN, torrent({ 'd.name': 'Someone else', 'd.custom1': 'tv' }));
+
+      const owned = await adapter.listOwned(config({ audiobookCategory: 'bookorbit-audio' }));
+
+      expect(owned.items.map((item) => [item.clientKey, item.name])).toEqual([
+        [AGNES, 'Agnes'],
+        [MURDERBOT, 'Murderbot'],
+      ]);
+      expect(fake.requests.map((request) => request.params[2])).toEqual([
+        'd.custom1=',
+        'equal={d.custom1=,cat="bookorbit"}',
+        'equal={d.custom1=,cat="bookorbit-audio"}',
+      ]);
+    });
+
+    it('shares the filtered-read row limit between labels, reading the rest by hash', async () => {
+      for (let index = 1; index <= 6000; index += 1) fake.hold(index.toString(16).padStart(40, '0'), torrent());
+      for (let index = 6001; index <= 12_000; index += 1)
+        fake.hold(index.toString(16).padStart(40, '0'), torrent({ 'd.custom1': 'bookorbit-audio' }));
+
+      const owned = await adapter.listOwned(config({ audiobookCategory: 'bookorbit-audio' }));
+
+      expect(owned.items).toHaveLength(1000);
+      expect(owned.truncated).toBe(true);
+      expect(fake.requests.filter((request) => request.method === 'd.multicall.filtered').map((request) => request.params[2])).toEqual([
+        'd.custom1=',
+        'equal={d.custom1=,cat="bookorbit"}',
+      ]);
     });
 
     it('falls back to the hash for a torrent with no name yet', async () => {

@@ -28,6 +28,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: null,
     password: 'api-secret',
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: true,
     settings: null,
     ...overrides,
@@ -100,6 +102,54 @@ describe('SabnzbdAdapter', () => {
       success: false,
       error: 'SABnzbd category "bookorbit" does not exist',
     });
+  });
+
+  it('reports a missing override category during the connection test, so a grab is not the first to find out', async () => {
+    mockApi({ version: { version: '4.5.3' }, get_config: configuredCategory() });
+
+    await expect(new SabnzbdAdapter(contentRemoval()).test(config({ audiobookCategory: 'bookorbit-audio' }))).resolves.toEqual({
+      success: false,
+      error: 'SABnzbd category "bookorbit-audio" does not exist',
+    });
+  });
+
+  it('passes the connection test when every category it files into exists', async () => {
+    mockApi({
+      version: { version: '4.5.3' },
+      get_config: { config: { categories: [{ name: 'bookorbit' }, { name: 'bookorbit-audio' }, { name: 'bookorbit-comics' }] } },
+    });
+
+    await expect(
+      new SabnzbdAdapter(contentRemoval()).test(config({ audiobookCategory: 'bookorbit-audio', comicCategory: 'bookorbit-comics' })),
+    ).resolves.toEqual({ success: true, version: '4.5.3' });
+  });
+
+  it('uploads under the category the grab names, and only requires that one', async () => {
+    const calls = mockApi({
+      queue: { queue: { slots: [] } },
+      history: { history: { slots: [] } },
+      addfile: { status: true, nzo_ids: ['SABnzbd_nzo_1'] },
+      get_config: { config: { categories: [{ name: 'bookorbit-audio' }] } },
+    });
+
+    await new SabnzbdAdapter(contentRemoval()).add(
+      { nzbFile: Buffer.from('<nzb />'), nzbFileName: 'Dune.nzb', clientKey: CLIENT_KEY, category: 'bookorbit-audio' },
+      config({ audiobookCategory: 'bookorbit-audio' }),
+    );
+
+    expect(calls.find((call) => call.url.searchParams.get('mode') === 'addfile')?.url.searchParams.get('cat')).toBe('bookorbit-audio');
+  });
+
+  it('refuses to upload under a category SABnzbd does not have', async () => {
+    const calls = mockApi({ queue: { queue: { slots: [] } }, history: { history: { slots: [] } }, get_config: configuredCategory() });
+
+    await expect(
+      new SabnzbdAdapter(contentRemoval()).add(
+        { nzbFile: Buffer.from('<nzb />'), nzbFileName: 'Dune.nzb', clientKey: CLIENT_KEY, category: 'bookorbit-audio' },
+        config({ audiobookCategory: 'bookorbit-audio' }),
+      ),
+    ).rejects.toThrow('SABnzbd category "bookorbit-audio" does not exist');
+    expect(calls.some((call) => call.url.searchParams.get('mode') === 'addfile')).toBe(false);
   });
 
   it('uploads an NZB with the configured category and stable ownership name', async () => {
@@ -241,6 +291,40 @@ describe('SabnzbdAdapter', () => {
       truncated: false,
       items: [expect.objectContaining({ clientKey: CLIENT_KEY, name: 'Dune', state: 'queued' })],
     });
+  });
+
+  it('follows a job filed under an override category through status and the inventory', async () => {
+    mockApi({
+      queue: {
+        queue: {
+          slots: [
+            { nzo_id: 'ebook', filename: `bookorbit-9-${CLIENT_KEY}-Dune`, cat: 'bookorbit', status: 'Queued' },
+            { nzo_id: 'other-category', filename: `bookorbit-9-${'c'.repeat(64)}-Other`, cat: 'movies', status: 'Queued' },
+          ],
+        },
+      },
+      history: {
+        history: {
+          slots: [
+            {
+              nzo_id: 'audio',
+              name: `bookorbit-9-${OTHER_KEY}-Dune Audio`,
+              category: 'bookorbit-audio',
+              status: 'Completed',
+              storage: '/downloads/Dune Audio',
+            },
+          ],
+        },
+      },
+    });
+    const adapter = new SabnzbdAdapter(contentRemoval());
+    const overridden = config({ audiobookCategory: 'bookorbit-audio' });
+
+    await expect(adapter.status([OTHER_KEY], overridden)).resolves.toEqual([
+      expect.objectContaining({ clientKey: OTHER_KEY, state: 'completed', contentPath: '/downloads/Dune Audio' }),
+    ]);
+    const inventory = await adapter.listOwned(overridden);
+    expect(inventory.items.map((item) => item.clientKey).sort()).toEqual([CLIENT_KEY, OTHER_KEY].sort());
   });
 
   it.each([

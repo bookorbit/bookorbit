@@ -15,6 +15,8 @@ function clientRow(overrides: Partial<DownloadClientRow> = {}): DownloadClientRo
     username: 'admin',
     credentialsEnc: 'cipher',
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     useHardlinks: true,
     removeCompletedDownloads: false,
     allowPrivateAddress: false,
@@ -381,6 +383,8 @@ describe('DownloadClientConfigService', () => {
       username: 'user',
       password: 'key',
       category: 'bookorbit',
+      audiobookCategory: null,
+      comicCategory: null,
       allowPrivateAddress: false,
       settings: null,
     });
@@ -515,6 +519,52 @@ describe('DownloadClientConfigService', () => {
 
       await expect(torrent.service.removesCompletedDownloads(4)).resolves.toBe(false);
       await expect(usenet.service.removesCompletedDownloads(4)).resolves.toBe(true);
+    });
+  });
+
+  describe('per-medium categories', () => {
+    it('stores no override unless the save names one, so every medium keeps the default category', async () => {
+      const { service, repo } = makeService();
+
+      await service.create(createDto);
+
+      expect(repo.createWithPathMappings).toHaveBeenCalledWith(
+        expect.objectContaining({ category: 'bookorbit', audiobookCategory: null, comicCategory: null }),
+        expect.anything(),
+      );
+    });
+
+    it('trims an override on create and stores a blank one as none', async () => {
+      const { service, repo } = makeService();
+
+      await service.create({ ...createDto, audiobookCategory: '  bookorbit-audio  ', comicCategory: '   ' });
+
+      expect(repo.createWithPathMappings).toHaveBeenCalledWith(
+        expect.objectContaining({ audiobookCategory: 'bookorbit-audio', comicCategory: null }),
+        expect.anything(),
+      );
+    });
+
+    it('clears an override on an edit that sends null or blank, and keeps it when the edit omits it', async () => {
+      const { service, repo } = makeService();
+
+      await service.update(4, { audiobookCategory: null, comicCategory: '' });
+      expect(repo.update).toHaveBeenLastCalledWith(4, { audiobookCategory: null, comicCategory: null });
+
+      await service.update(4, { comicCategory: ' bookorbit-comics ' });
+      expect(repo.update).toHaveBeenLastCalledWith(4, { comicCategory: 'bookorbit-comics' });
+    });
+
+    it('returns the overrides with the client and hands them to the adapter config', async () => {
+      const row = clientRow({ audiobookCategory: 'bookorbit-audio', comicCategory: null });
+      const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue({ client: row, pathMappings: [] }) } });
+
+      await expect(service.findOne(4)).resolves.toMatchObject({ audiobookCategory: 'bookorbit-audio', comicCategory: null });
+      await expect(service.resolveConfig(4)).resolves.toMatchObject({
+        category: 'bookorbit',
+        audiobookCategory: 'bookorbit-audio',
+        comicCategory: null,
+      });
     });
   });
 

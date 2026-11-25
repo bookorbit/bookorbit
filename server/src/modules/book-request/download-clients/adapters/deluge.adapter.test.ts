@@ -16,6 +16,8 @@ function config(overrides: Partial<ResolvedClientConfig> = {}): ResolvedClientCo
     username: null,
     password: 'deluge',
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     allowPrivateAddress: true,
     settings: null,
     ...overrides,
@@ -256,6 +258,16 @@ describe('DelugeAdapter', () => {
         expect(calls.find((call) => call.method === 'label.set_torrent')?.params).toEqual([INFO_HASH, 'bookorbit']);
       });
 
+      it('labels the torrent with the category the grab names rather than the default', async () => {
+        const { calls, handlers } = mockRpc();
+        handlers.set('core.get_enabled_plugins', () => result(['Label']));
+        handlers.set('core.add_torrent_magnet', () => result(INFO_HASH));
+
+        await adapter.add({ magnet: `magnet:?xt=urn:btih:${INFO_HASH}`, clientKey: INFO_HASH, category: 'bookorbit-audio' }, config());
+
+        expect(calls.find((call) => call.method === 'label.set_torrent')?.params).toEqual([INFO_HASH, 'bookorbit-audio']);
+      });
+
       /** The plugin accepts lowercase letters, digits, dashes and underscores only. */
       it('folds a category the plugin would refuse into a usable label', async () => {
         const { calls, handlers } = mockRpc();
@@ -290,6 +302,54 @@ describe('DelugeAdapter', () => {
           clientKey: INFO_HASH,
         });
       });
+    });
+  });
+
+  describe('listOwned', () => {
+    const torrents: Record<string, Record<string, object>> = {
+      bookorbit: { ['a'.repeat(40)]: { hash: 'a'.repeat(40), name: 'Dune', label: 'bookorbit' } },
+      'bookorbit-audio': { ['b'.repeat(40)]: { hash: 'b'.repeat(40), name: 'Dune (Audiobook)', label: 'bookorbit-audio' } },
+    };
+
+    function labelled(calls: RpcCall[]): () => Response {
+      return () => {
+        const filter = calls.at(-1)!.params[0] as { label: string };
+        return result(torrents[filter.label] ?? {});
+      };
+    }
+
+    it('lists the torrents under every label BookOrbit files into', async () => {
+      const { calls, handlers } = mockRpc();
+      handlers.set('core.get_enabled_plugins', () => result(['Label']));
+      handlers.set('core.get_torrents_status', labelled(calls));
+
+      const inventory = await adapter.listOwned(config({ audiobookCategory: 'bookorbit-audio' }));
+
+      expect(inventory.supported).toBe(true);
+      expect(inventory.items.map((item) => item.name)).toEqual(['Dune', 'Dune (Audiobook)']);
+      const asked = calls.filter((call) => call.method === 'core.get_torrents_status').map((call) => (call.params[0] as { label: string }).label);
+      expect(asked).toEqual(['bookorbit', 'bookorbit-audio']);
+    });
+
+    it('asks once for two categories that fold to the same label', async () => {
+      const { calls, handlers } = mockRpc();
+      handlers.set('core.get_enabled_plugins', () => result(['Label']));
+      handlers.set('core.get_torrents_status', labelled(calls));
+
+      await adapter.listOwned(config({ audiobookCategory: 'BookOrbit' }));
+
+      expect(calls.filter((call) => call.method === 'core.get_torrents_status')).toHaveLength(1);
+    });
+
+    it('is unsupported without the Label plugin, whatever the categories', async () => {
+      const { calls } = mockRpc();
+
+      await expect(adapter.listOwned(config({ audiobookCategory: 'bookorbit-audio' }))).resolves.toEqual({
+        supported: false,
+        truncated: false,
+        items: [],
+      });
+      expect(calls.some((call) => call.method === 'core.get_torrents_status')).toBe(false);
     });
   });
 

@@ -24,6 +24,8 @@ function client(overrides: Partial<DownloadClientItem> = {}): DownloadClientItem
     username: 'admin',
     hasPassword: true,
     category: 'bookorbit',
+    audiobookCategory: null,
+    comicCategory: null,
     useHardlinks: true,
     removeCompletedDownloads: false,
     allowPrivateAddress: true,
@@ -447,6 +449,78 @@ describe('DownloadClientsPanel', () => {
 
       const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === 'PUT')
       expect(JSON.parse(String(saveCall?.[1]?.body))).toMatchObject({ removeCompletedDownloads: false })
+    })
+  })
+
+  describe('category overrides', () => {
+    const audiobookField = () => sheet().querySelector<HTMLInputElement>('#download-client-audiobook-category')
+    const comicField = () => sheet().querySelector<HTMLInputElement>('#download-client-comic-category')
+
+    function savedBody(method: 'POST' | 'PUT') {
+      const saveCall = apiMock.mock.calls.find(([, init]) => init?.method === method)
+      return JSON.parse(String(saveCall?.[1]?.body)) as Record<string, unknown>
+    }
+
+    it('starts blank, showing the default category each one falls back to, and saves none', async () => {
+      const wrapper = await mountPanel()
+      await openCreate(wrapper)
+
+      expect(audiobookField()?.value).toBe('')
+      expect(audiobookField()?.placeholder).toBe('bookorbit')
+      expect(comicField()?.placeholder).toBe('bookorbit')
+      typeInto('#download-client-category', 'books')
+      await flushPromises()
+      expect(audiobookField()?.placeholder).toBe('books')
+
+      typeInto('#download-client-name', 'qbit')
+      typeInto('#download-client-url', 'http://127.0.0.1:8080')
+      fillMapping()
+      clickInSheet('Save')
+      await flushPromises()
+
+      expect(savedBody('POST')).toMatchObject({ category: 'books', audiobookCategory: null, comicCategory: null })
+    })
+
+    it('saves trimmed overrides and describes each field', async () => {
+      const wrapper = await mountPanel([client()])
+      await clickInPanel(wrapper, 'Edit My qBittorrent')
+
+      expect(audiobookField()?.getAttribute('aria-describedby')).toBe('download-client-audiobook-category-hint')
+      typeInto('#download-client-audiobook-category', '  bookorbit-audio ')
+      typeInto('#download-client-comic-category', 'bookorbit-comics')
+      clickInSheet('Save')
+      await flushPromises()
+
+      expect(savedBody('PUT')).toMatchObject({ audiobookCategory: 'bookorbit-audio', comicCategory: 'bookorbit-comics' })
+    })
+
+    it('shows saved overrides in the form and on the card, and clears one emptied again', async () => {
+      const wrapper = await mountPanel([client({ audiobookCategory: 'bookorbit-audio', comicCategory: 'bookorbit-comics' })])
+
+      expect(wrapper.text()).toContain('audiobooks in bookorbit-audio')
+      expect(wrapper.text()).toContain('comics in bookorbit-comics')
+      await clickInPanel(wrapper, 'Edit My qBittorrent')
+      expect(audiobookField()?.value).toBe('bookorbit-audio')
+      typeInto('#download-client-audiobook-category', '   ')
+      clickInSheet('Save')
+      await flushPromises()
+
+      expect(savedBody('PUT')).toMatchObject({ audiobookCategory: null, comicCategory: 'bookorbit-comics' })
+    })
+
+    it('leaves the card alone for a client without overrides', async () => {
+      const wrapper = await mountPanel([client()])
+
+      expect(wrapper.text()).not.toContain('audiobooks in')
+      expect(wrapper.text()).not.toContain('comics in')
+    })
+
+    it('is not offered for TorBox, which files nothing under a category', async () => {
+      const wrapper = await mountPanel()
+      await openTorboxCreate(wrapper)
+
+      expect(audiobookField()).toBeNull()
+      expect(comicField()).toBeNull()
     })
   })
 

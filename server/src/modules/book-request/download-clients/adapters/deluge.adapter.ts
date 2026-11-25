@@ -12,6 +12,7 @@ import type {
   ResolvedClientConfig,
   SeedInfo,
 } from '../download-client-adapter';
+import { ownedCategories } from '../download-client-adapter';
 import { endpointUrl, fetchClient, readClientJson, throwForClientServerError } from './client-http.utils';
 
 const LABEL = 'Deluge';
@@ -143,7 +144,7 @@ export class DelugeAdapter implements DownloadClientAdapter {
       hash = release.clientKey.toLowerCase();
     }
 
-    await this.applyLabel(hash, config);
+    await this.applyLabel(hash, release.category ?? config.category, config);
     return { clientKey: hash };
   }
 
@@ -166,11 +167,11 @@ export class DelugeAdapter implements DownloadClientAdapter {
    * so this is best-effort: the torrent is already downloading by now, nothing in the poll loop
    * finds it by label, and failing the grab over a missing plugin would help nobody.
    */
-  private async applyLabel(hash: string, config: ResolvedClientConfig): Promise<void> {
+  private async applyLabel(hash: string, category: string, config: ResolvedClientConfig): Promise<void> {
     const session = await this.session(config);
     if (!session.labelPlugin) return;
 
-    const label = toLabelId(config.category);
+    const label = toLabelId(category);
     if (!label) return;
 
     try {
@@ -206,11 +207,16 @@ export class DelugeAdapter implements DownloadClientAdapter {
 
   async listOwned(config: ResolvedClientConfig): Promise<OwnedDownloadClientInventory> {
     const session = await this.session(config);
-    const label = toLabelId(config.category);
-    if (!session.labelPlugin || !label) return { supported: false, truncated: false, items: [] };
+    // Two categories can fold to one label id, which is then asked for once.
+    const labels = [...new Set(ownedCategories(config).flatMap((category) => toLabelId(category) ?? []))];
+    if (!session.labelPlugin || labels.length === 0) return { supported: false, truncated: false, items: [] };
 
-    const result = await this.rpc<Record<string, DelugeTorrent> | null>(config, 'core.get_torrents_status', [{ label }, STATUS_FIELDS]);
-    const owned = Object.entries(result ?? {}).filter(([, entry]) => entry.label === undefined || entry.label === label);
+    const owned: Array<[string, DelugeTorrent]> = [];
+    for (const label of labels) {
+      if (owned.length > RECONCILIATION_LIMIT) break;
+      const result = await this.rpc<Record<string, DelugeTorrent> | null>(config, 'core.get_torrents_status', [{ label }, STATUS_FIELDS]);
+      owned.push(...Object.entries(result ?? {}).filter(([, entry]) => entry.label === undefined || entry.label === label));
+    }
     return {
       supported: true,
       truncated: owned.length > RECONCILIATION_LIMIT,
