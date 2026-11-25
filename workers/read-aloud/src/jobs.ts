@@ -317,6 +317,7 @@ export class JobRegistry {
       device: this.options.device,
       dtype: config.dtype,
       batchSize: config.batchSize,
+      ctcServer: config.ctcServer,
       redactions: this.redactions,
     };
     const child = fork(this.runnerPath, [], {

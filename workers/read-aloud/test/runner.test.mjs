@@ -88,6 +88,7 @@ function runnerJob(sandbox) {
     device: "cpu",
     dtype: null,
     batchSize: null,
+    ctcServer: null,
     redactions: [],
   };
 }

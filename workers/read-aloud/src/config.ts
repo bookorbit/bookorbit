@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
 import { CTC_DEVICES, type ConfiguredCtcDevice } from "./accelerator.js";
 import { parsePathMap, type PathMapping } from "./path-map.js";
+import type { CtcServer } from "./protocol.js";
 
 export type WorkerConfig = {
   host: string;
@@ -16,6 +17,8 @@ export type WorkerConfig = {
   configuredDevice: ConfiguredCtcDevice;
   dtype: "fp32" | "fp16" | null;
   batchSize: number | null;
+  /** READ_ALOUD_CTC_SERVER_URL: compute emissions on a remote ghost-story server; null runs them locally. */
+  ctcServer: CtcServer | null;
 };
 
 type Env = Record<string, string | undefined>;
@@ -49,7 +52,33 @@ export function loadConfig(env: Env): WorkerConfig {
     configuredDevice: readEnum(env.READ_ALOUD_CTC_DEVICE, CTC_DEVICES, "auto", "READ_ALOUD_CTC_DEVICE"),
     dtype: readOptionalEnum(env.READ_ALOUD_CTC_DTYPE, ["fp32", "fp16"] as const, "READ_ALOUD_CTC_DTYPE"),
     batchSize: optionalBatchSize(env.READ_ALOUD_CTC_BATCH_SIZE),
+    ctcServer: parseCtcServer(env),
   };
+}
+
+/**
+ * READ_ALOUD_CTC_SERVER_URL (http or https) and an optional READ_ALOUD_CTC_SERVER_API_KEY: the
+ * emissions stage, the bulk of a run's compute, then runs on a ghost-story emission server such as
+ * one on a GPU machine. The worker uploads only its processed audio and downloads the emissions, so
+ * the server needs no access to the library or the job folder.
+ */
+export function parseCtcServer(env: Env): CtcServer | null {
+  const url = env.READ_ALOUD_CTC_SERVER_URL?.trim();
+  const apiKey = env.READ_ALOUD_CTC_SERVER_API_KEY?.trim() || null;
+  if (!url) {
+    if (apiKey) throw new Error("READ_ALOUD_CTC_SERVER_API_KEY is set but READ_ALOUD_CTC_SERVER_URL is not");
+    return null;
+  }
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`READ_ALOUD_CTC_SERVER_URL must be an http or https URL, got "${url}"`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new Error(`READ_ALOUD_CTC_SERVER_URL must be an http or https URL, got "${url}"`);
+  }
+  return { url: url.replace(/\/+$/, ""), apiKey };
 }
 
 /** READ_ALOUD_LIBRARY_ROOTS (comma-separated), else READ_ALOUD_LIBRARY_ROOT (one folder), else /books. */

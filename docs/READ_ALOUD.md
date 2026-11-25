@@ -157,6 +157,24 @@ An explicit setting that cannot run on the host stops the worker at startup inst
 
 Optional tuning values are `READ_ALOUD_CTC_DTYPE=fp16|fp32` and `READ_ALOUD_CTC_BATCH_SIZE=<1-64>`. Leave both unset or `auto` unless you have measured the target system. CPU always runs float32, and Storyteller chooses a batch size of one for CPU and two for a GPU.
 
+### Remote emissions server
+
+The emissions stage (running QuartzNet over the audio) is most of a run's compute: on a few CPU cores it runs at roughly 15x realtime, so a 10 hour book spends about 40 minutes there and well under a minute in every other stage combined. `READ_ALOUD_CTC_SERVER_URL` sends just that stage to a [ghost-story](https://www.npmjs.com/package/@storyteller/ghost-story) emission server, the same one Storyteller uses, for example on a machine with a GPU:
+
+```bash
+# On the GPU machine (macOS on Apple Silicon uses MLX; see `ghost-story serve --help` for devices)
+GHOST_STORY_API_KEY=<server-key> npx @storyteller/ghost-story@<version> serve --device mlx
+
+# On the worker
+READ_ALOUD_CTC_SERVER_URL=http://gpu-machine:8765
+READ_ALOUD_CTC_SERVER_API_KEY=<server-key>   # or READ_ALOUD_CTC_SERVER_API_KEY_FILE
+```
+
+- The worker uploads each processed audio track (skipping tracks the server already has) and downloads the emissions file. The server never reads the library or the job folder, so no shared folders or path map are needed; preparing audio, marking up the EPUB and alignment still run in the worker.
+- Use the ghost-story version the worker ships (see `workers/read-aloud/package.json`); the two speak ghost-story's protocol.
+- With a server set, the worker skips its own model download. `READ_ALOUD_CTC_DEVICE` and the tuning values then only describe the worker itself; the server chooses its own device.
+- If the server cannot be reached, the emissions stage fails and the job can be retried; tracks already done are reused.
+
 The worker health response reports its version (the release for the Docker image, the package version for a native worker), the configured device, the device in use, whether it was checked at startup, the library folders it can read, and the free space in its data folder.
 
 ## Disk space

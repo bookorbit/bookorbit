@@ -37,11 +37,16 @@ export type RunnerJob = {
   device: ResolvedCtcDevice;
   dtype: "fp32" | "fp16" | null;
   batchSize: number | null;
+  /** When set, emissions are computed by this server instead of in the runner. */
+  ctcServer: CtcServer | null;
   /** Absolute folders replaced by placeholders in event messages and logs. */
   redactions: Redaction[];
 };
 
 export type Redaction = { path: string; placeholder: string };
+
+/** A ghost-story emission server (`ghost-story serve`) that computes CTC emissions for this worker. */
+export type CtcServer = { url: string; apiKey: string | null };
 
 export type ControlToRunner = { type: "start"; job: RunnerJob } | { type: "cancel" };
 

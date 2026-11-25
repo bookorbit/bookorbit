@@ -44,6 +44,7 @@ export async function startTestWorker(sandbox, options = {}) {
     configuredDevice: "cpu",
     dtype: null,
     batchSize: null,
+    ctcServer: null,
   };
   mkdirSync(sandbox.tmpDir, { recursive: true });
   const worker = await startWorker({
