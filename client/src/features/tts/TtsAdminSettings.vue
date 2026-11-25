@@ -11,9 +11,8 @@ import LoadErrorPanel from '@/components/LoadErrorPanel.vue'
 import TtsAdminProviderCard from './components/TtsAdminProviderCard.vue'
 import TtsAdminProviderForm from './components/TtsAdminProviderForm.vue'
 import TtsOpenAiVoiceCuration from './TtsOpenAiVoiceCuration.vue'
-import * as ttsApi from './api/tts.api'
 import { useTtsAdminProviders, type TtsAdminProvider, type TtsAdminVoice } from './composables/useTtsAdminProviders'
-import type { StaticVoiceConfig, TtsDbProvider } from './api/tts.api'
+import type { TtsDbProvider } from './api/tts.api'
 
 const { t } = useI18n()
 
@@ -158,16 +157,9 @@ function handleCloseProviderCuration() {
   curatingProvider.value = null
 }
 
-async function handleProviderCurationSave(voices: StaticVoiceConfig[]) {
-  const provider = curatingProvider.value
-  if (!provider) return
-  try {
-    const updated = await ttsApi.updateProvider(provider.id, { staticVoices: voices })
-    replaceProvider(updated)
-    curatingProvider.value = updated
-  } catch {
-    toast.error(t('settings.admin.tts.saveFailed', { name: provider.name }))
-  }
+function handleProviderCurationSaved(provider: TtsDbProvider) {
+  replaceProvider(provider)
+  curatingProvider.value = provider
 }
 
 async function handleTest(provider: TtsAdminProvider) {
@@ -255,7 +247,7 @@ async function handleRetry() {
     <TtsOpenAiVoiceCuration
       v-if="curatingProvider"
       :provider="curatingProvider"
-      @save="handleProviderCurationSave"
+      @saved="handleProviderCurationSaved"
       @close="handleCloseProviderCuration"
     />
 

@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
+import * as apiClient from '@/lib/api'
 import TtsAdminSettings from './TtsAdminSettings.vue'
+import TtsOpenAiVoiceCuration from './TtsOpenAiVoiceCuration.vue'
 import TtsAdminProviderCard from './components/TtsAdminProviderCard.vue'
 import TtsAdminVoiceChips from './components/TtsAdminVoiceChips.vue'
 import * as ttsApi from './api/tts.api'
@@ -103,6 +105,89 @@ describe('TtsAdminSettings', () => {
 
     const kokoro = wrapper.findAllComponents(TtsAdminProviderCard)[0]!
     expect(kokoro.props('provider').voices.map((voice) => voice.id)).toEqual(['af_heart', 'am_adam'])
+  })
+
+  it('adds the first PocketTTS voice with discovery off and retries a failed save', async () => {
+    const provider = {
+      ...PIPER,
+      name: 'LocalAI',
+      baseUrl: 'http://localhost:8080/v1',
+      enabled: true,
+      defaultModel: 'pocket-tts',
+      supportsVoiceDiscovery: false,
+      staticVoices: null,
+    }
+    const voice: StaticVoiceConfig = { id: 'alba', name: 'Alba', shortName: 'alba', language: '', locale: '', gender: 'Unknown' }
+    const request = vi
+      .spyOn(apiClient, 'api')
+      .mockResolvedValueOnce(Response.json([]))
+      .mockResolvedValueOnce(Response.json(provider, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 500 }))
+      .mockResolvedValueOnce(Response.json({ ...provider, staticVoices: [voice] }))
+    const wrapper = await mountSettings()
+
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Add provider')!
+      .trigger('click')
+    const providerForm = wrapper.get('form')
+    await providerForm.get('#tts-provider-name').setValue(provider.name)
+    await providerForm.get('#tts-provider-url').setValue(provider.baseUrl)
+    await providerForm.get('#tts-provider-model').setValue(provider.defaultModel)
+    await providerForm.get('input[type="checkbox"]').setValue(false)
+    await providerForm.trigger('submit')
+    await flushPromises()
+    expect(request).toHaveBeenNthCalledWith(
+      2,
+      '/api/v1/tts/admin/providers',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({
+          name: provider.name,
+          baseUrl: provider.baseUrl,
+          defaultModel: provider.defaultModel,
+          supportsVoiceDiscovery: false,
+        }),
+      }),
+    )
+
+    await wrapper.get('button[aria-expanded="false"]').trigger('click')
+    const manageVoices = wrapper.findAll('button').find((button) => button.text() === 'Manage voices')!
+    await manageVoices.trigger('click')
+    const dialog = wrapper.getComponent(TtsOpenAiVoiceCuration)
+    expect(dialog.get<HTMLButtonElement>('[data-testid="import-from-provider"]').element.disabled).toBe(true)
+    expect(dialog.findAll('button').some((button) => button.text().includes('preset'))).toBe(false)
+    await dialog
+      .findAll('button')
+      .find((button) => button.text() === 'Add voice')!
+      .trigger('click')
+    const voiceForm = dialog.get('form')
+    await voiceForm.get('input[name="voice-id"]').setValue(' alba ')
+    await voiceForm.get('input[name="voice-name"]').setValue(' Alba ')
+    await voiceForm.trigger('submit')
+
+    const save = dialog.findAll<HTMLButtonElement>('button').find((button) => button.text() === 'Save 1 voice')!
+    expect(save.element.disabled).toBe(false)
+    await save.trigger('click')
+    await flushPromises()
+    expect(dialog.get('[role="alert"]').text()).toContain('Failed to save LocalAI')
+    expect(save.element.disabled).toBe(false)
+    await save.trigger('click')
+    await flushPromises()
+
+    for (const attempt of [3, 4]) {
+      expect(request).toHaveBeenNthCalledWith(
+        attempt,
+        '/api/v1/tts/admin/providers/2',
+        expect.objectContaining({ method: 'PUT', body: JSON.stringify({ staticVoices: [voice] }) }),
+      )
+    }
+    expect(dialog.find('[role="alert"]').exists()).toBe(false)
+    expect(save.element.disabled).toBe(true)
+    await dialog.get('button[aria-label="Close"]').trigger('click')
+    await manageVoices.trigger('click')
+    expect(wrapper.getComponent(TtsOpenAiVoiceCuration).find('button[aria-label="Edit Alba"]').exists()).toBe(true)
+    wrapper.unmount()
   })
 
   it('toggles a provider through the provider update route', async () => {

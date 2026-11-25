@@ -406,6 +406,35 @@ describe('OpenAiCompatibleProvider', () => {
     });
   });
 
+  describe('model-scoped voice responses', () => {
+    it.each(['discoverVoicesLive', 'listVoices'] as const)('uses the configured LocalAI model for %s', async (method) => {
+      const provider = makeProvider({ defaultModel: 'pocket-tts' });
+      const fetchSpy = vi.spyOn(global, 'fetch').mockResolvedValue(
+        mockFetchResponse({
+          data: [
+            null,
+            { model: 'other-model', voices: [{ name: 'other-voice' }] },
+            { model: 'pocket-tts', voices: [{ name: 'alba', language: 'en_US', gender: 'female' }, { name: 'marius' }, { language: 'en' }] },
+          ],
+        }),
+      );
+
+      const voices = await provider[method]();
+      expect(fetchSpy).toHaveBeenCalledWith('http://localhost:8880/v1/audio/voices', expect.anything());
+      expect(voices).toMatchObject([
+        { id: 'alba', name: 'alba', language: 'en_US', gender: 'female' },
+        { id: 'marius', name: 'marius' },
+      ]);
+    });
+
+    it('does not offer another model’s voices when the configured model is absent', async () => {
+      const provider = makeProvider({ defaultModel: 'pocket-tts' });
+      vi.spyOn(global, 'fetch').mockResolvedValue(mockFetchResponse({ data: [{ model: 'other-model', voices: [{ name: 'other-voice' }] }] }));
+
+      await expect(provider.discoverVoicesLive()).resolves.toEqual([]);
+    });
+  });
+
   describe('discoverVoicesLive', () => {
     it('returns TtsVoice[] when API returns voices array', async () => {
       const provider = makeProvider();

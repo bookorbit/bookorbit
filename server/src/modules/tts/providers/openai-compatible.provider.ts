@@ -329,8 +329,19 @@ export class OpenAiCompatibleProvider implements ITtsProvider {
 
   private extractVoiceEntries(data: unknown): unknown[] {
     if (Array.isArray(data)) return data;
-    if (typeof data !== 'object' || data === null || !('voices' in data)) return [];
-    return Array.isArray(data.voices) ? data.voices : [];
+    if (typeof data !== 'object' || data === null) return [];
+    if ('voices' in data && Array.isArray(data.voices)) return data.voices;
+    if (!('data' in data) || !Array.isArray(data.data)) return [];
+
+    for (const group of data.data as unknown[]) {
+      if (typeof group !== 'object' || group === null || !('model' in group) || group.model !== this.defaultModel) continue;
+      if (!('voices' in group) || !Array.isArray(group.voices)) continue;
+      // LocalAI's model-scoped voice entries use the synthesis ID as their name.
+      return group.voices.map((voice: unknown) =>
+        typeof voice === 'object' && voice !== null ? { ...voice, id: this.readString(voice, 'id') || this.readString(voice, 'name') } : voice,
+      );
+    }
+    return [];
   }
 
   private mapApiVoices(rawVoices: unknown[]): TtsVoice[] {

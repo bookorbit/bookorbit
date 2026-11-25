@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import TtsOpenAiVoiceCuration from './TtsOpenAiVoiceCuration.vue'
 import type { TtsDbProvider, StaticVoiceConfig } from './api/tts.api'
 import * as ttsApi from './api/tts.api'
@@ -215,10 +215,23 @@ describe('TtsOpenAiVoiceCuration', () => {
   })
 
   describe('Add voice manually', () => {
-    it('does not show an add voice form or button', () => {
-      const wrapper = mountCuration()
-      expect(wrapper.text()).not.toContain('Add voice manually')
-      expect(wrapper.find('input[placeholder="af_heart"]').exists()).toBe(false)
+    it('blocks duplicate IDs and allows canceling the form', async () => {
+      const wrapper = mountCuration({ ...BASE_PROVIDER, staticVoices: SAVED_VOICES })
+      const add = wrapper.findAll('button').find((button) => button.text() === 'Add voice')!
+      await add.trigger('click')
+      const form = wrapper.get('form')
+      const submit = form.get<HTMLButtonElement>('button[type="submit"]')
+      expect(submit.element.disabled).toBe(true)
+      const id = form.get('input[name="voice-id"]')
+      await id.setValue(' af_heart ')
+      await form.get('input[name="voice-name"]').setValue('Duplicate')
+      expect(id.attributes('aria-invalid')).toBe('true')
+      expect(id.attributes('aria-describedby')).toBe(form.get('[role="alert"]').attributes('id'))
+      expect(submit.element.disabled).toBe(true)
+      await form.trigger('submit')
+      expect(wrapper.findAll('button[aria-label^="Edit "]')).toHaveLength(2)
+      await form.get('button[type="button"]').trigger('click')
+      expect(wrapper.find('form').exists()).toBe(false)
     })
   })
 
@@ -249,17 +262,20 @@ describe('TtsOpenAiVoiceCuration', () => {
   })
 
   describe('Save', () => {
-    it('emits save with current voices', async () => {
+    it('emits the provider after saving the current voices', async () => {
       const wrapper = mountCuration({ ...BASE_PROVIDER, staticVoices: SAVED_VOICES })
+      const staticVoices = [{ ...SAVED_VOICES[0]!, id: 'af_heart_v2' }, SAVED_VOICES[1]!]
+      const saved = { ...BASE_PROVIDER, staticVoices }
+      const update = vi.spyOn(ttsApi, 'updateProvider').mockResolvedValue(saved)
       await wrapper.find('button[aria-label="Edit Heart"]').trigger('click')
       await wrapper.find('input').setValue('af_heart_v2')
       const saveRowBtn = wrapper.findAll('button').find((b) => b.text().trim() === 'Save' && !b.classes().includes('bg-primary'))
       await saveRowBtn!.trigger('click')
       const saveFooterBtn = wrapper.find('button.bg-primary')
       await saveFooterBtn.trigger('click')
-      const emitted = wrapper.emitted('save')
-      expect(emitted).toBeTruthy()
-      expect(emitted![0]).toBeTruthy()
+      await flushPromises()
+      expect(update).toHaveBeenCalledWith(BASE_PROVIDER.id, { staticVoices })
+      expect(wrapper.emitted('saved')).toEqual([[saved]])
     })
 
     it('Save button is disabled when there are no unsaved changes', () => {
