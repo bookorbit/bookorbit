@@ -114,6 +114,10 @@ The workflow will:
 
 If all commits since the last release are non-releasable types (`chore`, `docs`, `test`, `build`, `ci`, `refactor`), semantic-release will skip the release. The Docker publish job will also be skipped.
 
+### Tag created but no Docker image
+
+If the release job stops after semantic-release has pushed the tag (for example a timeout while it comments on released issues), re-running the workflow does not help: semantic-release finds the tag, publishes nothing, and the Docker job is skipped again. Instead, run the workflow from `main` with the **tag** input set to the existing tag, for example `v3.10.0`. This skips semantic-release, checks that CI passed and the SHA image exists for the tagged commit, and builds and pushes the versioned and `latest` images from that tag. Only the newest release tag is accepted, so `latest` never moves backwards.
+
 ### Authoring the "What's New" highlights
 
 semantic-release creates the GitHub release as a **draft** with a `## Highlights` scaffold (added by `release.config.js`) that lists this release's `feat` commits as candidate highlights. Open the draft, curate those candidates into user-facing highlight bullets (with optional icons and dragged-in media), validate with `cd server && pnpm whats-new:check <tag>`, then click **Publish release**. The highlights power the in-app "What's New" popup and the `/whats-new` archive; the draft stays hidden in the app until you publish (even though the `:latest` Docker image is pushed beforehand).
