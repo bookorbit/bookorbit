@@ -104,8 +104,10 @@ function makeService() {
     deleteUnitBookRecords: vi.fn().mockResolvedValue(undefined),
     reconcileCoversAsync: vi.fn(),
   };
+  const reportExit = vi.fn().mockResolvedValue(undefined);
   const events = {
     on: vi.fn(),
+    beforeOwnedFilesExit: vi.fn().mockResolvedValue(reportExit),
   };
   const gateway = {
     emitChanged: vi.fn(),
@@ -186,6 +188,7 @@ function makeService() {
     storage,
     processor,
     events,
+    reportExit,
     gateway,
     processingState,
     seriesMemberships,
@@ -972,6 +975,81 @@ describe('BookDockFinalizeService', () => {
   });
 
   describe('finalize', () => {
+    it('tells the owning module about each file a person filed, with the book it became', async () => {
+      const { service, repo, events, reportExit } = makeService();
+      const filed = makeRow({ id: 1, autoFinalizeSuppressed: true });
+      const refused = makeRow({ id: 2, autoFinalizeSuppressed: true });
+      repo.findByIds.mockResolvedValue([filed, refused]);
+      vi.spyOn(service as never, 'prepareFinalizeBatch').mockResolvedValue({
+        analyses: [
+          { fileId: 1, fileName: 'book.epub', row: filed, status: 'ready' },
+          { fileId: 2, fileName: 'book.epub', row: refused, status: 'ready' },
+        ],
+        existingDestinations: new Map(),
+      } as never);
+      const finalizeCandidate = vi
+        .spyOn(service as never, 'finalizePreparedCandidate')
+        .mockResolvedValueOnce({ fileId: 1, fileName: 'book.epub', success: true, bookId: 101 } as never)
+        .mockResolvedValueOnce({ fileId: 2, fileName: 'book.epub', success: false, message: 'destination taken' } as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
+
+      await service.finalize(7, true, true, [1, 2], false, [], 5, 9);
+
+      expect(events.beforeOwnedFilesExit).toHaveBeenCalledExactlyOnceWith([filed, refused]);
+      expect(events.beforeOwnedFilesExit.mock.invocationCallOrder[0]!).toBeLessThan(finalizeCandidate.mock.invocationCallOrder[0]!);
+      expect(reportExit).toHaveBeenCalledExactlyOnceWith(1, { kind: 'filed', bookId: 101 });
+    });
+
+    it('reads selectAll batches for the owning module one batch at a time', async () => {
+      const { service, repo, events, reportExit } = makeService();
+      const first = [makeRow({ id: 1 })];
+      const second = [makeRow({ id: 2 })];
+      repo.findSelectionBatch.mockResolvedValueOnce(first).mockResolvedValueOnce(second).mockResolvedValueOnce([]);
+      vi.spyOn(service as never, 'prepareFinalizeBatch').mockImplementation(
+        (rows: unknown[]) =>
+          Promise.resolve({
+            analyses: rows.map((row: any) => ({ fileId: row.id, fileName: row.fileName, row, status: 'ready' })),
+            existingDestinations: new Map(),
+          }) as never,
+      );
+      vi.spyOn(service as never, 'finalizePreparedCandidate').mockImplementation(
+        (analysis: any) =>
+          Promise.resolve({ fileId: analysis.fileId, fileName: analysis.fileName, success: true, bookId: analysis.fileId + 100 }) as never,
+      );
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
+
+      await service.finalize(7, true, true, [], true, [], 5, 9);
+
+      expect(events.beforeOwnedFilesExit.mock.calls).toEqual([[first], [second]]);
+      expect(reportExit.mock.calls).toEqual([
+        [1, { kind: 'filed', bookId: 101 }],
+        [2, { kind: 'filed', bookId: 102 }],
+      ]);
+    });
+
+    /** The owner called this itself and settles its own record from the result. */
+    it('never reports a managed filing to the module that asked for it', async () => {
+      const { service, repo, events, reportExit } = makeService();
+      const owned = makeRow({ id: 9, autoFinalizeSuppressed: true });
+      repo.findById.mockResolvedValue(owned);
+      vi.spyOn(service as never, 'prepareFinalizeBatch').mockResolvedValue({
+        analyses: [{ fileId: 9, fileName: 'book.epub', row: owned, status: 'ready' }],
+        existingDestinations: new Map(),
+      } as never);
+      vi.spyOn(service as never, 'finalizePreparedCandidate').mockResolvedValue({
+        fileId: 9,
+        fileName: 'book.epub',
+        success: true,
+        bookId: 55,
+      } as never);
+      vi.spyOn(service as never, 'emitChange').mockReturnValue(undefined as never);
+
+      await expect(service.finalizeManagedFile(9, { libraryId: 3, folderId: 4 })).resolves.toMatchObject({ success: true, bookId: 55 });
+
+      expect(events.beforeOwnedFilesExit).not.toHaveBeenCalled();
+      expect(reportExit).not.toHaveBeenCalled();
+    });
+
     it('returns missing-row failures for explicit ids not found in repository', async () => {
       const { service, repo, notificationService } = makeService();
       const rowOne = makeRow({ id: 1 });
@@ -1925,6 +2003,37 @@ describe('BookDockFinalizeService', () => {
       expect(mockUnlink).not.toHaveBeenCalledWith('/dock/conflict.epub');
       expect(mockUnlink).not.toHaveBeenCalledWith('/dock/ready.epub');
       expect(repo.deleteByIds).toHaveBeenCalledWith([1]);
+    });
+
+    it('tells the owning module only about the duplicates it discarded, once their rows are gone', async () => {
+      const { service, repo, events, reportExit } = makeService();
+      const duplicateRow = makeRow({
+        id: 1,
+        fileName: 'duplicate.epub',
+        absolutePath: '/dock/duplicate.epub',
+        targetLibraryId: 5,
+        targetFolderId: 9,
+      });
+      const readyRow = makeRow({ id: 3, fileName: 'ready.epub', absolutePath: '/dock/ready.epub', targetLibraryId: 5, targetFolderId: 9 });
+      repo.findByIds.mockResolvedValue([duplicateRow, readyRow]);
+      repo.findExistingBooksByAbsolutePaths.mockResolvedValue([{ absolutePath: '/library/duplicate.epub', bookId: 77, libraryId: 5 }]);
+      vi.spyOn(service as never, 'findLibraryOrFail').mockResolvedValue({ id: 5, allowedFormats: ['epub'], fileNamingPattern: null } as never);
+      vi.spyOn(service as never, 'findFolderOrFail').mockResolvedValue({ id: 9, libraryId: 5, path: '/library' } as never);
+      vi.spyOn(service as never, 'resolveDestination').mockImplementation((_, __, row: { fileName: string }) =>
+        Promise.resolve(`/library/${row.fileName}`),
+      );
+      mockAccess.mockImplementation((path) => {
+        if (String(path).includes('ready.epub')) {
+          return Promise.reject(Object.assign(new Error('not found'), { code: 'ENOENT' })) as never;
+        }
+        return Promise.resolve(undefined) as never;
+      });
+
+      await service.discardDuplicateCandidates(1, true, true, [1, 3], false, [], undefined, undefined);
+
+      expect(events.beforeOwnedFilesExit).toHaveBeenCalledExactlyOnceWith([duplicateRow]);
+      expect(reportExit).toHaveBeenCalledExactlyOnceWith(1, { kind: 'discarded' });
+      expect(repo.deleteByIds.mock.invocationCallOrder[0]!).toBeLessThan(reportExit.mock.invocationCallOrder[0]!);
     });
   });
 

@@ -21,6 +21,7 @@ import { LibraryService } from '../library/library.service';
 import { BookDockRepository, type BookDockFilter, type ListOptions } from './book-dock.repository';
 import { BookDockIngestService } from './book-dock-ingest.service';
 import { BookDockDuplicateService } from './book-dock-duplicate.service';
+import { BookDockEventsService } from './book-dock-events.service';
 import { BookDockKeptFilesService } from './book-dock-kept-files.service';
 import { BookDockFinalizeService, mergeBookDockMetadata } from './book-dock-finalize.service';
 import { BookDockGateway } from './book-dock.gateway';
@@ -49,6 +50,7 @@ export class BookDockService {
     private readonly duplicates: BookDockDuplicateService,
     private readonly libraryService: LibraryService,
     private readonly keptFiles: BookDockKeptFilesService,
+    private readonly events: BookDockEventsService,
   ) {}
 
   async listFiles(query: ListOptions, viewer?: RequestUser): Promise<BookDockFilesPage> {
@@ -144,8 +146,10 @@ export class BookDockService {
   async discardFile(id: number, userId: number, canManageAll: boolean): Promise<void> {
     const row = await this.findFileForUser(id, userId, canManageAll);
 
+    const reportExit = await this.events.beforeOwnedFilesExit([row]);
     await this.cleanupFiles(row, await this.keptFiles.keepsOriginals(row));
     await this.repo.deleteById(id);
+    await reportExit(id, { kind: 'discarded' });
   }
 
   async bulkDiscard(
@@ -175,10 +179,12 @@ export class BookDockService {
         canManageAll,
       },
       async (rows) => {
+        const reportExit = await this.events.beforeOwnedFilesExit(rows);
         for (const row of rows) {
           await this.cleanupFiles(row, await keepsOriginals(row));
         }
         await this.repo.deleteByIds(rows.map((row) => row.id));
+        for (const row of rows) await reportExit(row.id, { kind: 'discarded' });
       },
     );
   }

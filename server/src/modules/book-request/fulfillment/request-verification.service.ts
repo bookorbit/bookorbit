@@ -40,7 +40,7 @@ import type { RequestUser } from '../../../common/types/request-user';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import { parsePublishedYear } from '../../../common/utils/published-date.utils';
 import type { BookDockFileRow, BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
-import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from '../../book-dock/book-dock-events.service';
+import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED, type BookDockOwnedFileExitReport } from '../../book-dock/book-dock-events.service';
 import { BookDockFinalizeService } from '../../book-dock/book-dock-finalize.service';
 import { BookDockRepository } from '../../book-dock/book-dock.repository';
 import { BookDockService } from '../../book-dock/book-dock.service';
@@ -67,6 +67,9 @@ const DEFAULT_VERIFICATION_THRESHOLD = DEFAULT_BOOK_REQUEST_AUTOMATION_SETTINGS.
 
 /** Prose for the stored reason and the notification. The drawer reads `heldOnRequest` instead. */
 const HELD_ON_REQUEST_REASON = 'the release was sent to be reviewed before it is filed';
+
+/** Stored on the request and the attempt, whether the discard came from the request or the Book Dock. */
+const HELD_IMPORT_DISCARDED_REASON = 'The imported file was discarded during review';
 
 const TITLE_WEIGHT = 0.7;
 const AUTHOR_WEIGHT = 0.3;
@@ -132,6 +135,7 @@ export class RequestVerificationService implements OnModuleInit {
         this.logger.error(`[book_request.verify] [fail] dockFileId=${fileId} error="${message}" - verification handler failed`);
       });
     });
+    this.events.onOwnedFileExit((fileIds) => this.watchHeldFiles(fileIds));
   }
 
   private async handleIngested(fileId: number): Promise<void> {
@@ -346,8 +350,8 @@ export class RequestVerificationService implements OnModuleInit {
     const heldOnRequest = download?.holdForReview ?? false;
     const releaseInfoUrl = download?.releaseInfoUrl ?? null;
 
-    // Filing or discarding the entry by hand empties both pointers to it, which leaves the request
-    // held over a file that is not there any more. Saying so is the only useful thing left.
+    // A dock file deleted from disk empties both pointers to it, which leaves the request held over
+    // a file that is not there any more. Saying so is the only useful thing left.
     if (!row) {
       return {
         requestId,
@@ -461,7 +465,7 @@ export class RequestVerificationService implements OnModuleInit {
    */
   async discardHeldImport(requestId: number, user: RequestUser): Promise<void> {
     const { request, download, fileId } = await this.loadHeld(requestId);
-    const reason = 'The imported file was discarded during review';
+    const reason = HELD_IMPORT_DISCARDED_REASON;
     const startedAt = Date.now();
 
     const claimed = await this.requests.updateIf(requestId, ['needs_review'], {
@@ -522,21 +526,119 @@ export class RequestVerificationService implements OnModuleInit {
     this.logger.log(
       `[book_request.discard_import] [end] requestId=${requestId} dockFileId=${fileId ?? 'none'} downloadId=${download?.id ?? 'none'} userId=${user.id} durationMs=${Date.now() - startedAt} title="${sanitizeLogValue(request.title)}" - a held import was discarded`,
     );
+    await this.notifyDiscarded(request, download?.id ?? null, fileId);
+    this.gateway.emitChanged();
+  }
+
+  /**
+   * A person can answer a hold from the Book Dock as well as from the request, by filing the held
+   * file there or discarding it. The request waits on that file, so it settles the way the
+   * request's own File or Discard would have; left alone it would sit in review over a file that
+   * is gone.
+   *
+   * Read before the dock acts, because removing the dock row empties the columns that tie the hold
+   * to it. The request's own File never reaches here, and its Discard settles the hold before it
+   * touches the dock, so neither is settled twice.
+   */
+  private async watchHeldFiles(fileIds: number[]): Promise<BookDockOwnedFileExitReport> {
+    const held = new Map((await this.downloads.findHeldOverDockFiles(fileIds)).map((row) => [row.fileId, row]));
+    return async (fileId, exit) => {
+      const row = held.get(fileId);
+      if (!row) return;
+      held.delete(fileId);
+      if (exit.kind === 'filed') await this.settleFiledInDock(row.request, row.download, fileId, exit.bookId);
+      else await this.settleDiscardedInDock(row.request, row.download, fileId);
+    };
+  }
+
+  private async settleFiledInDock(request: BookRequestRow, download: BookRequestDownloadRow, fileId: number, bookId: number): Promise<void> {
+    // Conditional, like every write in the pipeline: somebody may have answered the hold on the
+    // request while the dock was filing, and that answer stands.
+    const filed = await this.requests.updateIf(request.id, ['needs_review'], {
+      status: 'available',
+      matchedBookId: bookId,
+      bookDockFileId: null,
+      statusReason: null,
+    });
+    if (!filed) {
+      this.logger.log(
+        `[book_request.dock_filed] [end] requestId=${request.id} dockFileId=${fileId} bookId=${bookId} - the request left review before its held file was filed in the Library Dock, so it was left alone`,
+      );
+      return;
+    }
+
+    try {
+      if (!(await this.downloads.updateIf(download.id, ['needs_review'], { status: 'imported', importedAt: new Date() }))) {
+        this.logger.warn(
+          `[book_request.dock_filed] [fail] requestId=${request.id} downloadId=${download.id} - the attempt left review while its file was filed in the Library Dock, so it keeps the outcome it reached`,
+        );
+      }
+      this.logger.log(
+        `[book_request.dock_filed] [end] requestId=${request.id} downloadId=${download.id} dockFileId=${fileId} bookId=${bookId} - a held import was filed from the Library Dock, so its request is available`,
+      );
+      await this.notifier.notifyBookAvailable(request.id, bookId, {
+        title: 'Your requested book is available',
+        message: `"${request.title}" is ready`,
+        meta: { requestId: request.id, bookId },
+      });
+      await this.companions.handOn(request, bookId);
+    } finally {
+      this.gateway.emitChanged();
+    }
+  }
+
+  private async settleDiscardedInDock(request: BookRequestRow, download: BookRequestDownloadRow, fileId: number): Promise<void> {
+    const claimed = await this.requests.updateIf(request.id, ['needs_review'], {
+      status: 'failed',
+      statusReason: HELD_IMPORT_DISCARDED_REASON,
+      failureCode: null,
+      failureMeta: null,
+    });
+    if (!claimed) {
+      this.logger.log(
+        `[book_request.dock_discarded] [end] requestId=${request.id} dockFileId=${fileId} - the request left review before its held file was discarded in the Library Dock, so it was left alone`,
+      );
+      return;
+    }
+
+    try {
+      // Unlike a discard from the request, nothing is put back when the attempt has moved on: the
+      // file is already gone, and a request returned to review would be waiting on nothing.
+      const claimedDownload = await this.downloads.updateIf(download.id, ['needs_review'], {
+        status: 'failed',
+        errorMessage: HELD_IMPORT_DISCARDED_REASON,
+        failureCode: 'discarded',
+      });
+      if (!claimedDownload) {
+        this.logger.warn(
+          `[book_request.dock_discarded] [fail] requestId=${request.id} downloadId=${download.id} - the attempt left review while its file was discarded in the Library Dock, so it keeps the outcome it reached`,
+        );
+      }
+      this.logger.log(
+        `[book_request.dock_discarded] [end] requestId=${request.id} downloadId=${download.id} dockFileId=${fileId} - a held import was discarded from the Library Dock, so its request failed`,
+      );
+      await this.notifyDiscarded(request, download.id, fileId);
+    } finally {
+      this.gateway.emitChanged();
+    }
+  }
+
+  private async notifyDiscarded(request: BookRequestRow, downloadId: number | null, fileId: number | null): Promise<void> {
     await this.notifier.notifyResponsible(request, NotificationType.BookRequestFailed, {
       title: 'Book request import discarded',
-      message: `"${request.title}": ${reason}`,
+      message: `"${request.title}": ${HELD_IMPORT_DISCARDED_REASON}`,
       actionUrl: '/requests',
-      meta: { requestId, downloadId: download?.id ?? null, dockFileId: fileId },
+      meta: { requestId: request.id, downloadId, dockFileId: fileId },
     });
-    this.gateway.emitChanged();
   }
 
   /**
    * The one place that decides a request is genuinely sitting in the dock waiting on a person.
    *
    * The dock file is looked up through the request first and the attempt second, and may still
-   * come back null: both columns reference `book_dock_files` with `on delete set null`, so filing
-   * or discarding the entry by hand empties them together and the hold outlives its file.
+   * come back null: both columns reference `book_dock_files` with `on delete set null`. Filing or
+   * discarding the entry in the dock settles the hold (`watchHeldFiles`), but a file deleted from
+   * disk empties them together without saying how it went, and the hold outlives its file.
    */
   private async loadHeld(requestId: number): Promise<{ request: BookRequestRow; download: BookRequestDownloadRow | null; fileId: number | null }> {
     const joined = await this.requests.findById(requestId);

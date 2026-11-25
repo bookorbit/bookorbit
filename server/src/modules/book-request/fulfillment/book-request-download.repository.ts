@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { and, count, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
+import { aliasedTable, and, count, desc, eq, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm';
 
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import {
@@ -18,6 +18,7 @@ import {
   downloadClients,
   requestIndexers,
   type BookRequestDownloadRow,
+  type BookRequestRow,
   type NewBookRequestDownloadRow,
 } from '../../../db/schema';
 import { publicReleaseGuid } from '../indexers/release-guid';
@@ -47,6 +48,15 @@ export interface BookRequestDownloadJoinedRow {
   indexerName: string | null;
   indexerColor: IndexerColor | null;
 }
+
+/** A request held for review and the attempt it waits on, keyed by the Book Dock file they point at. */
+export interface HeldDockFileRow {
+  fileId: number;
+  download: BookRequestDownloadRow;
+  request: BookRequestRow;
+}
+
+const laterAttempt = aliasedTable(bookRequestDownloads, 'later_attempt');
 
 export interface ReconciliationAttemptRow {
   download: BookRequestDownloadRow;
@@ -137,6 +147,31 @@ export class BookRequestDownloadRepository {
       .orderBy(desc(bookRequestDownloads.id))
       .limit(1);
     return row;
+  }
+
+  /**
+   * The requests held for review over these Book Dock files, each with the attempt it waits on:
+   * both in review, the attempt still the request's newest, and the request pointing at the same
+   * file or at none, the same two cases a review of the hold accepts.
+   */
+  async findHeldOverDockFiles(fileIds: readonly number[]): Promise<HeldDockFileRow[]> {
+    if (fileIds.length === 0) return [];
+    const rows = await this.db
+      .select({ download: bookRequestDownloads, request: bookRequests })
+      .from(bookRequestDownloads)
+      .innerJoin(bookRequests, eq(bookRequests.id, bookRequestDownloads.requestId))
+      .where(
+        and(
+          inArray(bookRequestDownloads.bookDockFileId, [...fileIds]),
+          eq(bookRequestDownloads.status, 'needs_review'),
+          eq(bookRequests.status, 'needs_review'),
+          or(isNull(bookRequests.bookDockFileId), eq(bookRequests.bookDockFileId, bookRequestDownloads.bookDockFileId)),
+          sql`not exists (select 1 from ${bookRequestDownloads} ${laterAttempt} where ${laterAttempt.requestId} = ${bookRequestDownloads.requestId} and ${laterAttempt.id} > ${bookRequestDownloads.id})`,
+        ),
+      );
+    return rows.flatMap(({ download, request }) =>
+      download.bookDockFileId === null ? [] : [{ fileId: download.bookDockFileId, download, request }],
+    );
   }
 
   /**

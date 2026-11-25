@@ -1,7 +1,8 @@
 import { NotFoundException } from '@nestjs/common';
 import { NotificationType, type BookDockMetadata } from '@bookorbit/types';
 
-import type { BookRequestDownloadRow } from '../../../db/schema';
+import type { BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
+import type { BookDockOwnedFileExitHandler } from '../../book-dock/book-dock-events.service';
 import { UploadValidatorService } from '../../upload/upload-validator.service';
 import { RequestVerificationService, verifyAgainstRequest } from './request-verification.service';
 
@@ -296,7 +297,7 @@ describe('verifyAgainstRequest with an operator-set threshold', () => {
  */
 describe('RequestVerificationService against the configured threshold', () => {
   function makeService(threshold: number, verificationEnabled = true, overrides: { requestSettled?: boolean; holdForReview?: boolean } = {}) {
-    const events = { on: vi.fn() };
+    const events = { on: vi.fn(), onOwnedFileExit: vi.fn() };
     const dockRepo = {
       findById: vi
         .fn()
@@ -972,5 +973,163 @@ describe('RequestVerificationService review surface', () => {
     expect(requests.updateIf).toHaveBeenLastCalledWith(7, ['failed'], expect.objectContaining({ status: 'needs_review' }));
     expect(downloads.updateIf).toHaveBeenLastCalledWith(11, ['failed'], expect.objectContaining({ status: 'needs_review' }));
     expect(gateway.emitChanged).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A person can answer a hold in the Book Dock instead of on the request. The request waits on that
+ * file, so it has to settle the way the request's own File or Discard would, rather than sit in
+ * review over a file that is gone.
+ */
+describe('RequestVerificationService when a held file leaves the Book Dock', () => {
+  const heldRequest = {
+    ...request(),
+    id: 7,
+    status: 'needs_review',
+    bookDockFileId: 100,
+    companionRequestId: null,
+    selfServe: true,
+  } as BookRequestRow;
+  const heldDownload = { id: 11, requestId: 7, status: 'needs_review', bookDockFileId: 100 } as BookRequestDownloadRow;
+  const settledAs = (id: number, _expected: unknown, patch: Record<string, unknown>) => Promise.resolve({ id, ...patch });
+
+  function makeService(held = [{ fileId: 100, download: heldDownload, request: heldRequest }]) {
+    const events = { on: vi.fn(), onOwnedFileExit: vi.fn() };
+    const downloads = { findHeldOverDockFiles: vi.fn().mockResolvedValue(held), updateIf: vi.fn().mockImplementation(settledAs) };
+    const requests = { updateIf: vi.fn().mockImplementation(settledAs) };
+    const notifier = { notifyResponsible: vi.fn().mockResolvedValue(undefined), notifyBookAvailable: vi.fn().mockResolvedValue(undefined) };
+    const gateway = { emitChanged: vi.fn() };
+    const companions = { handOn: vi.fn().mockResolvedValue(false) };
+
+    const service = new RequestVerificationService(
+      events as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      downloads as never,
+      requests as never,
+      {} as never,
+      notifier as never,
+      gateway as never,
+      {} as never,
+      companions as never,
+      {} as never,
+      new UploadValidatorService(),
+    );
+    service.onModuleInit();
+    const handler = events.onOwnedFileExit.mock.calls[0]![0] as BookDockOwnedFileExitHandler;
+
+    return { handler, downloads, requests, notifier, gateway, companions };
+  }
+
+  it('reads the holds before the dock acts, for the files it was given', async () => {
+    const { handler, downloads, requests } = makeService();
+
+    await handler([100, 101]);
+
+    expect(downloads.findHeldOverDockFiles).toHaveBeenCalledExactlyOnceWith([100, 101]);
+    expect(requests.updateIf).not.toHaveBeenCalled();
+  });
+
+  it('makes the request available with the book its held file was filed into', async () => {
+    const { handler, downloads, requests, notifier, gateway, companions } = makeService();
+
+    const reportExit = await handler([100]);
+    await reportExit(100, { kind: 'filed', bookId: 55 });
+
+    expect(requests.updateIf).toHaveBeenCalledExactlyOnceWith(7, ['needs_review'], {
+      status: 'available',
+      matchedBookId: 55,
+      bookDockFileId: null,
+      statusReason: null,
+    });
+    expect(downloads.updateIf).toHaveBeenCalledExactlyOnceWith(11, ['needs_review'], { status: 'imported', importedAt: expect.any(Date) });
+    expect(notifier.notifyBookAvailable).toHaveBeenCalledWith(7, 55, expect.objectContaining({ meta: { requestId: 7, bookId: 55 } }));
+    expect(companions.handOn).toHaveBeenCalledWith(heldRequest, 55);
+    expect(notifier.notifyResponsible).not.toHaveBeenCalled();
+    expect(gateway.emitChanged).toHaveBeenCalledOnce();
+  });
+
+  it('fails the request the way its own Discard does when the held file is discarded', async () => {
+    const { handler, downloads, requests, notifier, gateway, companions } = makeService();
+
+    const reportExit = await handler([100]);
+    await reportExit(100, { kind: 'discarded' });
+
+    expect(requests.updateIf).toHaveBeenCalledExactlyOnceWith(7, ['needs_review'], {
+      status: 'failed',
+      statusReason: 'The imported file was discarded during review',
+      failureCode: null,
+      failureMeta: null,
+    });
+    expect(downloads.updateIf).toHaveBeenCalledExactlyOnceWith(11, ['needs_review'], {
+      status: 'failed',
+      errorMessage: 'The imported file was discarded during review',
+      failureCode: 'discarded',
+    });
+    expect(notifier.notifyResponsible).toHaveBeenCalledWith(
+      heldRequest,
+      NotificationType.BookRequestFailed,
+      expect.objectContaining({ title: 'Book request import discarded', meta: { requestId: 7, downloadId: 11, dockFileId: 100 } }),
+    );
+    expect(notifier.notifyBookAvailable).not.toHaveBeenCalled();
+    expect(companions.handOn).not.toHaveBeenCalled();
+    expect(gateway.emitChanged).toHaveBeenCalledOnce();
+  });
+
+  it('leaves alone a request somebody answered while the dock was working', async () => {
+    const { handler, downloads, requests, notifier, gateway } = makeService();
+    requests.updateIf.mockResolvedValue(undefined);
+
+    const reportExit = await handler([100]);
+    await reportExit(100, { kind: 'filed', bookId: 55 });
+    await reportExit(100, { kind: 'discarded' });
+
+    expect(requests.updateIf).toHaveBeenCalledOnce();
+    expect(downloads.updateIf).not.toHaveBeenCalled();
+    expect(notifier.notifyBookAvailable).not.toHaveBeenCalled();
+    expect(gateway.emitChanged).not.toHaveBeenCalled();
+  });
+
+  /** The file is gone either way, so the request is not put back in review over nothing. */
+  it('keeps the request settled when its attempt already moved on', async () => {
+    const { handler, downloads, requests, notifier } = makeService();
+    downloads.updateIf.mockResolvedValue(undefined);
+
+    const reportExit = await handler([100]);
+    await reportExit(100, { kind: 'discarded' });
+
+    expect(requests.updateIf).toHaveBeenCalledOnce();
+    expect(notifier.notifyResponsible).toHaveBeenCalledOnce();
+  });
+
+  it('touches nothing for a file no request is waiting on', async () => {
+    const { handler, downloads, requests, gateway } = makeService([]);
+
+    const reportExit = await handler([100]);
+    await reportExit(100, { kind: 'filed', bookId: 55 });
+
+    expect(requests.updateIf).not.toHaveBeenCalled();
+    expect(downloads.updateIf).not.toHaveBeenCalled();
+    expect(gateway.emitChanged).not.toHaveBeenCalled();
+  });
+
+  it('ignores an exit for a file it was not asked about', async () => {
+    const { handler, requests } = makeService();
+
+    const reportExit = await handler([100]);
+    await reportExit(200, { kind: 'discarded' });
+
+    expect(requests.updateIf).not.toHaveBeenCalled();
+  });
+
+  it('still refreshes the lists when telling people fails', async () => {
+    const { handler, notifier, gateway } = makeService();
+    notifier.notifyBookAvailable.mockRejectedValue(new Error('mail server down'));
+
+    const reportExit = await handler([100]);
+
+    await expect(reportExit(100, { kind: 'filed', bookId: 55 })).rejects.toThrow('mail server down');
+    expect(gateway.emitChanged).toHaveBeenCalledOnce();
   });
 });

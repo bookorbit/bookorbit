@@ -78,7 +78,7 @@ import { BookDockRepository, type BookDockFilter } from './book-dock.repository'
 import { BookDockDuplicateService, IDENTIFIER_MATCH_REASONS, type DuplicateMatch } from './book-dock-duplicate.service';
 import { BookDockKeptFilesService } from './book-dock-kept-files.service';
 import { BookDockDigestService } from './book-dock-digest.service';
-import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED } from './book-dock-events.service';
+import { BookDockEventsService, BOOK_DOCK_FILE_INGESTED, type BookDockOwnedFileExitReport } from './book-dock-events.service';
 import { BookDockGateway } from './book-dock.gateway';
 import {
   BookDockJoinService,
@@ -400,9 +400,10 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         });
         if (rows.length === 0) break;
 
+        const reportExit = await this.events.beforeOwnedFilesExit(rows);
         const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
         for (const analysis of prepared.analyses) {
-          const result = await this.finalizePreparedCandidate(analysis, prepared.existingDestinations);
+          const result = await this.fileForPerson(analysis, prepared.existingDestinations, reportExit);
           results.push(result);
           if (result.success) succeeded++;
           else failed++;
@@ -414,6 +415,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       for (let i = 0; i < ids.length; i += BATCH_SIZE) {
         const batch = ids.slice(i, i + BATCH_SIZE);
         const rows = await this.repo.findByIds(batch, userId, canManageAll);
+        const reportExit = await this.events.beforeOwnedFilesExit(rows);
         const prepared = await this.prepareFinalizeBatch(rows, defaultLibraryId, defaultFolderId, overrideMap, userId, isSuperuser, requester);
         const analysisById = new Map(prepared.analyses.map((analysis) => [analysis.fileId, analysis]));
 
@@ -430,7 +432,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
             continue;
           }
 
-          const result = await this.finalizePreparedCandidate(analysis, prepared.existingDestinations);
+          const result = await this.fileForPerson(analysis, prepared.existingDestinations, reportExit);
           results.push(result);
           if (result.success) succeeded++;
           else failed++;
@@ -451,6 +453,21 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       .catch(() => {});
 
     return { total: results.length, succeeded, failed, results };
+  }
+
+  /**
+   * A person's filing, which a module that owns the file has to hear about. Auto-file and
+   * `finalizeManagedFile` never report: auto-file skips owned files, and the owner's own filing
+   * already knows how it ended.
+   */
+  private async fileForPerson(
+    analysis: FinalizeCandidateAnalysis,
+    existingDestinations: Map<string, number>,
+    reportExit: BookDockOwnedFileExitReport,
+  ): Promise<BookDockFinalizeFileResult> {
+    const result = await this.finalizePreparedCandidate(analysis, existingDestinations);
+    if (result.success && result.bookId !== undefined) await reportExit(result.fileId, { kind: 'filed', bookId: result.bookId });
+    return result;
   }
 
   private async finalizeFile(
@@ -683,6 +700,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
           if (duplicateRows.length === 0) return;
 
+          const reportExit = await this.events.beforeOwnedFilesExit(duplicateRows);
           const keepsOriginals = await this.keptFiles.keepOriginalCheck();
           for (const row of duplicateRows) {
             await this.cleanupDiscardedBookDockFile(row, await keepsOriginals(row));
@@ -690,6 +708,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
           }
           await this.repo.deleteByIds(duplicateRows.map((row) => row.id));
           discarded += duplicateRows.length;
+          for (const row of duplicateRows) await reportExit(row.id, { kind: 'discarded' });
         },
       );
 

@@ -96,6 +96,10 @@ function makeService() {
   const gateway = {
     emitChanged: vi.fn(),
   };
+  const reportExit = vi.fn().mockResolvedValue(undefined);
+  const events = {
+    beforeOwnedFilesExit: vi.fn().mockResolvedValue(reportExit),
+  };
   const service = new BookDockService(
     db as never,
     repo as never,
@@ -107,8 +111,23 @@ function makeService() {
     duplicates as never,
     libraryService as never,
     keptFiles as never,
+    events as never,
   );
-  return { service, db, repo, ingestService, finalizeService, watcherService, processingState, gateway, duplicates, libraryService, keptFiles };
+  return {
+    service,
+    db,
+    repo,
+    ingestService,
+    finalizeService,
+    watcherService,
+    processingState,
+    gateway,
+    duplicates,
+    libraryService,
+    keptFiles,
+    events,
+    reportExit,
+  };
 }
 
 describe('BookDockService', () => {
@@ -386,6 +405,49 @@ describe('BookDockService', () => {
     expect(unlinked).toContain('/dock/plain.epub');
     expect(unlinked).not.toContain('/dock/_libraries/Fiction/kept.epub');
     expect(repo.deleteByIds).toHaveBeenCalledWith([1, 2]);
+  });
+
+  /**
+   * A file another module owns is read for that module before anything is touched, because removing
+   * the row empties the columns that point at it, and reported only once the row is gone.
+   */
+  it('tells the owning module a discarded file left, in that order', async () => {
+    const { service, repo, events, reportExit } = makeService();
+    const owned = row({ id: 4, autoFinalizeSuppressed: true });
+    repo.findById.mockResolvedValue(owned);
+
+    await service.discardFile(4, 1, true);
+
+    expect(events.beforeOwnedFilesExit).toHaveBeenCalledWith([owned]);
+    expect(reportExit).toHaveBeenCalledExactlyOnceWith(4, { kind: 'discarded' });
+    const prepared = events.beforeOwnedFilesExit.mock.invocationCallOrder[0]!;
+    expect(prepared).toBeLessThan(vi.mocked(unlink).mock.invocationCallOrder[0]!);
+    expect(repo.deleteById.mock.invocationCallOrder[0]!).toBeLessThan(reportExit.mock.invocationCallOrder[0]!);
+  });
+
+  it('reports every discarded file of a bulk discard after its batch is deleted', async () => {
+    const { service, repo, events, reportExit } = makeService();
+    const rows = [row({ id: 1, absolutePath: '/dock/1.epub' }), row({ id: 2, absolutePath: '/dock/2.epub', autoFinalizeSuppressed: true })];
+    repo.findByIds.mockResolvedValue(rows);
+
+    await service.bulkDiscard([1, 2]);
+
+    expect(events.beforeOwnedFilesExit).toHaveBeenCalledExactlyOnceWith(rows);
+    expect(reportExit.mock.calls).toEqual([
+      [1, { kind: 'discarded' }],
+      [2, { kind: 'discarded' }],
+    ]);
+    expect(repo.deleteByIds.mock.invocationCallOrder[0]!).toBeLessThan(reportExit.mock.invocationCallOrder[0]!);
+  });
+
+  it('reports nothing when the discard fails before the row is deleted', async () => {
+    const { service, repo, reportExit } = makeService();
+    repo.findById.mockResolvedValue(row({ id: 4, autoFinalizeSuppressed: true }));
+    repo.deleteById.mockRejectedValue(new Error('connection lost'));
+
+    await expect(service.discardFile(4, 1, true)).rejects.toThrow('connection lost');
+
+    expect(reportExit).not.toHaveBeenCalled();
   });
 
   it('updateFile throws when row disappears during update', async () => {

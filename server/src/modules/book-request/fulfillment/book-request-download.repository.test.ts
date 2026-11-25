@@ -46,6 +46,47 @@ describe('BookRequestDownloadRepository.findLatestForRequests', () => {
   });
 });
 
+/**
+ * Read before a person files or discards a request's held file in the Book Dock. It has to find
+ * only a request still waiting on that exact file, or the dock would settle a request that has
+ * already moved on.
+ */
+describe('BookRequestDownloadRepository.findHeldOverDockFiles', () => {
+  async function compiled(): Promise<{ sql: string; params: unknown[] }> {
+    const { db, queries } = createCapturingDb();
+    await new BookRequestDownloadRepository(db as never).findHeldOverDockFiles([100, 101]);
+    expect(queries).toHaveLength(1);
+    return queries[0];
+  }
+
+  it('reads the attempts linked to those files, with both sides still in review', async () => {
+    const { sql, params } = await compiled();
+
+    expect(sql).toContain('"book_request_downloads"."book_dock_file_id" in ($1, $2)');
+    expect(sql).toContain('"book_request_downloads"."status" = $3');
+    expect(sql).toContain('"book_requests"."status" = $4');
+    expect(params).toEqual([100, 101, 'needs_review', 'needs_review']);
+  });
+
+  it("takes only the request's newest attempt, and only while the request points at the same file", async () => {
+    const { sql } = await compiled();
+
+    expect(sql).toContain(
+      'not exists (select 1 from "book_request_downloads" "later_attempt" where "later_attempt"."request_id" = "book_request_downloads"."request_id" and "later_attempt"."id" > "book_request_downloads"."id")',
+    );
+    expect(sql).toContain(
+      '("book_requests"."book_dock_file_id" is null or "book_requests"."book_dock_file_id" = "book_request_downloads"."book_dock_file_id")',
+    );
+  });
+
+  it('asks nothing at all for no files', async () => {
+    const { db, queries } = createCapturingDb();
+
+    await expect(new BookRequestDownloadRepository(db as never).findHeldOverDockFiles([])).resolves.toEqual([]);
+    expect(queries).toHaveLength(0);
+  });
+});
+
 describe('BookRequestDownloadRepository.findTriedReleaseKeys', () => {
   function repositoryReturning(rows: Array<{ indexerId: number | null; releaseGuid: string | null }>) {
     const db = { select: () => ({ from: () => ({ where: () => Promise.resolve(rows) }) }) };

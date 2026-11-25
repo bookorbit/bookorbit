@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
 
-import { and, eq } from 'drizzle-orm';
-import { Permission } from '@bookorbit/types';
+import { and, eq, sql } from 'drizzle-orm';
+import { NotificationType, Permission } from '@bookorbit/types';
 import { BOOK_REQUEST_LIST_VIEWS, BOOK_REQUEST_SEARCH_MAX_LENGTH } from '@bookorbit/types';
 import type {
+  BookDockFinalizeResult,
   BookRequestBulkResult,
   BookRequestItem,
   BookRequestPage,
@@ -1130,6 +1131,146 @@ describe('Book requests (e2e)', () => {
         expect(
           await ctx.db.select({ id: schema.bookDockFiles.id }).from(schema.bookDockFiles).where(eq(schema.bookDockFiles.id, dockRow.id)),
         ).toHaveLength(0);
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+  });
+
+  /**
+   * The held file sits in the Book Dock, where a person can file or discard it directly instead of
+   * answering on the request. The request has to settle either way, or it waits in review for a
+   * file that no longer exists.
+   */
+  describe('held imports answered in the Book Dock', () => {
+    const DISCARDED = 'The imported file was discarded during review';
+
+    /** A request held over a pipeline import, as verification leaves it. */
+    async function holdOverDockFile(): Promise<{ requestId: number; downloadId: number; dockFileId: number }> {
+      const { request } = await submitOk(requester);
+      const dockRow = await createBookDockRow(ctx, {
+        targetLibraryId: library.libraryId,
+        targetFolderId: library.libraryFolderId,
+        status: 'ready',
+      });
+      await ctx.db.update(schema.bookDockFiles).set({ autoFinalizeSuppressed: true }).where(eq(schema.bookDockFiles.id, dockRow.id));
+      await ctx.db
+        .update(schema.bookRequests)
+        .set({ status: 'needs_review', bookDockFileId: dockRow.id })
+        .where(eq(schema.bookRequests.id, request.id));
+      const [download] = await ctx.db
+        .insert(schema.bookRequestDownloads)
+        .values({ requestId: request.id, source: 'magnet', status: 'needs_review', releaseTitle: 'Held in the dock', bookDockFileId: dockRow.id })
+        .returning({ id: schema.bookRequestDownloads.id });
+      return { requestId: request.id, downloadId: download.id, dockFileId: dockRow.id };
+    }
+
+    async function requestState(requestId: number) {
+      const [row] = await ctx.db
+        .select({
+          status: schema.bookRequests.status,
+          matchedBookId: schema.bookRequests.matchedBookId,
+          bookDockFileId: schema.bookRequests.bookDockFileId,
+          statusReason: schema.bookRequests.statusReason,
+        })
+        .from(schema.bookRequests)
+        .where(eq(schema.bookRequests.id, requestId));
+      return row;
+    }
+
+    async function attemptState(downloadId: number) {
+      const [row] = await ctx.db
+        .select({ status: schema.bookRequestDownloads.status, failureCode: schema.bookRequestDownloads.failureCode })
+        .from(schema.bookRequestDownloads)
+        .where(eq(schema.bookRequestDownloads.id, downloadId));
+      return row;
+    }
+
+    it(
+      'makes the request available with the book its held file was filed into',
+      async () => {
+        const held = await holdOverDockFile();
+
+        const response = await inject('POST', '/book-dock/finalize', superuser, { fileIds: [held.dockFileId] });
+
+        expect(response.statusCode).toBe(201);
+        const result = response.json() as BookDockFinalizeResult;
+        expect(result).toMatchObject({ succeeded: 1, failed: 0 });
+        const bookId = result.results[0].bookId;
+        expect(bookId).toEqual(expect.any(Number));
+        expect(await requestState(held.requestId)).toEqual({ status: 'available', matchedBookId: bookId, bookDockFileId: null, statusReason: null });
+        expect(await attemptState(held.downloadId)).toEqual({ status: 'imported', failureCode: null });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'fails the request the way its own Discard does when the held file is discarded',
+      async () => {
+        const held = await holdOverDockFile();
+
+        const response = await inject('DELETE', `/book-dock/files/${held.dockFileId}`, superuser);
+
+        expect(response.statusCode).toBe(204);
+        expect(await requestState(held.requestId)).toEqual({ status: 'failed', matchedBookId: null, bookDockFileId: null, statusReason: DISCARDED });
+        expect(await attemptState(held.downloadId)).toEqual({ status: 'failed', failureCode: 'discarded' });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'settles every held request in a bulk discard',
+      async () => {
+        const first = await holdOverDockFile();
+        const second = await holdOverDockFile();
+
+        const response = await inject('POST', '/book-dock/files/discard', superuser, { fileIds: [first.dockFileId, second.dockFileId] });
+
+        expect(response.statusCode).toBe(204);
+        for (const held of [first, second]) {
+          expect((await requestState(held.requestId))?.status).toBe('failed');
+          expect(await attemptState(held.downloadId)).toEqual({ status: 'failed', failureCode: 'discarded' });
+        }
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    it(
+      'leaves a request that already left review alone',
+      async () => {
+        const held = await holdOverDockFile();
+        await ctx.db.update(schema.bookRequests).set({ status: 'cancelled' }).where(eq(schema.bookRequests.id, held.requestId));
+
+        const response = await inject('DELETE', `/book-dock/files/${held.dockFileId}`, superuser);
+
+        expect(response.statusCode).toBe(204);
+        expect((await requestState(held.requestId))?.status).toBe('cancelled');
+        expect(await attemptState(held.downloadId)).toEqual({ status: 'needs_review', failureCode: null });
+      },
+      SCENARIO_TIMEOUT_MS,
+    );
+
+    /** The request's own Discard settles the hold first, so the dock's report finds nothing left to do. */
+    it(
+      'settles a discard made from the request once, telling each person once',
+      async () => {
+        const held = await holdOverDockFile();
+
+        const response = await inject('POST', `/admin/book-requests/${held.requestId}/discard-import`, moderator);
+
+        expect(response.statusCode).toBe(200);
+        expect(await attemptState(held.downloadId)).toEqual({ status: 'failed', failureCode: 'discarded' });
+        const sent = await ctx.db
+          .select({ userId: schema.notifications.userId, count: schema.notifications.count })
+          .from(schema.notifications)
+          .where(
+            and(
+              eq(schema.notifications.type, NotificationType.BookRequestFailed),
+              sql`${schema.notifications.meta}->>'requestId' = ${String(held.requestId)}`,
+            ),
+          );
+        expect(sent.length).toBeGreaterThan(0);
+        expect(sent.every((row) => row.count === 1)).toBe(true);
+        expect(new Set(sent.map((row) => row.userId)).size).toBe(sent.length);
       },
       SCENARIO_TIMEOUT_MS,
     );
