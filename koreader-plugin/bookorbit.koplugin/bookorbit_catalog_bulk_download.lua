@@ -18,7 +18,7 @@ local lfs = require("libs/libkoreader-lfs")
 local logger = require("logger")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitStateManager = require("bookorbit_state_manager")
 local BulkCheckpoint = require("bookorbit_bulk_checkpoint")
@@ -227,7 +227,7 @@ function CatalogBulkDownload.install(Catalog)
     function Catalog:bulkDecorateTitle(title, subtitle)
         if not self.bulk_selection_mode then return title, subtitle end
         local count = self:bulkSelectedCount()
-        local selected_text = count == 1 and _("1 selected") or T(_("%1 selected"), count)
+        local selected_text = T(_.ngettext("1 selected", "%1 selected", count), count)
         if subtitle and subtitle ~= "" then
             subtitle = selected_text .. " - " .. subtitle
         else

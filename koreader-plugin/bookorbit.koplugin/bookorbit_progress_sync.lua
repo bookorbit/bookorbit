@@ -16,7 +16,7 @@ local logger = require("logger")
 local time = require("ui/time")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitStateManager = require("bookorbit_state_manager")
 local DeviceNames = require("bookorbit_device_names")
@@ -353,7 +353,7 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
     if interactive then
         if body then
             if self.recordSyncSuccess then
-                self:recordSyncSuccess("progress_push", _("Progress pushed"))
+                self:recordSyncSuccess("progress_push", require("bookorbit_activity").detail("progress_pushed"))
             end
             Toast.show(_("Progress sent to BookOrbit"))
             if not on_suspend then
@@ -376,7 +376,7 @@ function ProgressSync:updateProgress(ensure_networking, interactive, on_suspend)
         logger.dbg("BookOrbit: push failed:", err)
     elseif not on_suspend then
         if self.recordSyncSuccess then
-            self:recordSyncSuccess("progress_push", _("Progress pushed"))
+            self:recordSyncSuccess("progress_push", require("bookorbit_activity").detail("progress_pushed"))
         end
         if self.requestUpdateCheck then
             self:requestUpdateCheck(false, "progress_push")
@@ -482,7 +482,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
         self:noteProgressCompared(digest)
         self:syncToProgress(body.progress, body.percentage)
         if self.recordSyncSuccess then
-            self:recordSyncSuccess("progress_pull", _("Progress pulled"))
+            self:recordSyncSuccess("progress_pull", require("bookorbit_activity").detail("progress_pulled"))
         end
         showMoved(body)
         return
@@ -495,7 +495,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
             self:noteProgressCompared(digest)
             self:syncToProgress(body.progress, body.percentage)
             if self.recordSyncSuccess then
-                self:recordSyncSuccess("progress_pull", _("Progress pulled"))
+                self:recordSyncSuccess("progress_pull", require("bookorbit_activity").detail("progress_pulled"))
             end
             showMoved(body)
         end, function()
@@ -507,7 +507,7 @@ function ProgressSync:getProgress(ensure_networking, interactive)
     if strategy == SYNC_STRATEGY.SILENT then
         self:syncToProgress(body.progress, body.percentage)
         if self.recordSyncSuccess then
-            self:recordSyncSuccess("progress_pull", _("Progress pulled"))
+            self:recordSyncSuccess("progress_pull", require("bookorbit_activity").detail("progress_pulled"))
         end
         showMoved(body)
     end

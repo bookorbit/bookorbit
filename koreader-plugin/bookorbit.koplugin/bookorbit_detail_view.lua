@@ -21,7 +21,7 @@ local Widget = require("ui/widget/widget")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local BD = require("ui/bidi")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")
@@ -405,7 +405,7 @@ local function columnStanding(d, w)
     if d.status == "read" then
         if not d.finished or not d.finished.date then return nil end
         local j = d.journal
-        local tail = j and firstFitting({ T(_("%1 over %2 days"), j.time, j.days), j.time }, { s = 12 }, w) or nil
+        local tail = j and firstFitting({ T(_.ngettext("%1 over 1 day", "%1 over %2 days", j.days), j.time, j.days), j.time }, { s = 12 }, w) or nil
         return two(T(_("Finished %1"), d.finished.date), tail)
     end
     if not p then
@@ -416,7 +416,7 @@ local function columnStanding(d, w)
             table.insert(options, T(_("about %1 at your pace"), ns.estimate))
             table.insert(options, T(_("about %1"), ns.estimate))
         end
-        table.insert(options, T(_("%1 pages"), ns.pages))
+        table.insert(options, T(_.ngettext("1 page", "%1 pages", ns.pages), ns.pages))
         return two(_("Not started"), firstFitting(options, { s = 12 }, w))
     end
     local big = text(p.label, { s = 26, b = true })
@@ -638,7 +638,7 @@ local function seriesPath(s, w, o)
             table.insert(layers, { widget = region(node, { kind = "detail", book_id = b.id }, "series"), x = x, y = px(4) })
         end
         if caps and (b.current or (s.next and b.id == s.next.id)) then
-            local cap = text(b.current and _("This book") or _("Next"), { s = 11, b = b.current, col = b.current and INK.black or INK.g4 })
+            local cap = text(b.current and _("This book") or _.pgettext("Next book", "Next"), { s = 11, b = b.current, col = b.current and INK.black or INK.g4 })
             local cw = wOf(cap)
             table.insert(layers, { widget = cap, x = math.floor(clamp(x + D / 2 - cw / 2, 0, w - cw)), y = px(4) + D + px(8) })
         end
@@ -1077,16 +1077,19 @@ local function detailsParts(d, w, lw, rw, two_col)
             end
         end
         local function one_line()
-            local tail_opts = done and { T(_(" over %1 days, finished %2"), j.days, j.finished_on or ""), T(_(" over %1 days"), j.days) }
-                or { T(_(" over %1 days since %2, last read %3"), j.days, j.started or "", j.last_read or ""), T(_(" over %1 days since %2"), j.days, j.started or ""), T(_(" over %1 days"), j.days) }
-            local tail = tail_opts[#tail_opts]
-            for _i, t in ipairs(tail_opts) do
-                if textWidth(j.time, { s = 13, b = true }) + textWidth(t, { s = 13 }) <= jw then tail = t; break end
+            -- TRANSLATORS: %1 is the time read, shown bold; %2 the number of reading days; %3 and %4 dates.
+            local templates = done and { _.ngettext("%1 over 1 day, finished %3", "%1 over %2 days, finished %3", j.days), _.ngettext("%1 over 1 day", "%1 over %2 days", j.days) }
+                or { _.ngettext("%1 over 1 day since %3, last read %4", "%1 over %2 days since %3, last read %4", j.days), _.ngettext("%1 over 1 day since %3", "%1 over %2 days since %3", j.days), _.ngettext("%1 over 1 day", "%1 over %2 days", j.days) }
+            local values = { { t = j.time, b = true, col = INK.black }, tostring(j.days), (done and j.finished_on or j.started) or "", j.last_read or "" }
+            for i, template in ipairs(templates) do
+                local line = runs(BoardUI.styled(template, values), { s = 13, col = INK.g3 })
+                if i == #templates or line:getSize().w <= jw then
+                    return i == #templates and runs(BoardUI.styled(template, values), { s = 13, col = INK.g3, w = jw }) or line
+                end
             end
-            return runs({ { t = j.time, b = true }, { t = tail, col = INK.g3 } }, { s = 13, w = jw })
         end
         local chartable = j and d.progress and not done and j.path and #j.path > 0
-        local right = hl and (hl.count == 1 and _("1 highlight") or T(_("%1 highlights"), hl.count)) or nil
+        local right = hl and T(_.ngettext("1 highlight", "%1 highlights", hl.count), hl.count) or nil
         local function yours(v)
             local items = {}
             local h_ = sectionHead(jw, j and _("Your reading on this device") or _("Your highlights"), right, 15)

@@ -27,7 +27,7 @@ local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")
@@ -723,13 +723,34 @@ function ListView.indexColumns(total_w)
     return ((W - 28) / 2 >= 440) and 2 or 1
 end
 
+-- Characters, not bytes, so a Cyrillic or Greek initial reads as one letter.
+local function charCount(label)
+    return select(2, label:gsub("[^\128-\191]", ""))
+end
+
 local function gutterMark(gw, label, carried)
     if gw <= 0 then return nil end
     local items = { space(nil, px(9)) }
     if label and label ~= "" then
-        table.insert(items, text(label, { s = #label > 1 and 13 or 22, b = true, serif = #label == 1, col = carried and INK.g9 or INK.black, w = gw - px(4), data = true }))
+        local letter = charCount(label) == 1
+        table.insert(items, text(label, { s = letter and 22 or 13, b = true, serif = letter, col = carried and INK.g9 or INK.black, w = gw - px(4), data = true }))
     end
     return vstack({ w = gw }, items)
+end
+
+-- Wide enough for the longest group name on the page ("Сегодня" next to
+-- "Today"), within limits, so a translation is not cut short.
+local function gutterWidth(gw, o)
+    if gw <= 0 then return gw end
+    local widest, seen = 0, {}
+    for _i, entry in ipairs(o.entries or {}) do
+        local g = o.groupOf(entry)
+        if type(g) == "string" and g ~= "" and not seen[g] and charCount(g) > 1 then
+            seen[g] = true
+            widest = math.max(widest, text(g, { s = 13, b = true }):getSize().w)
+        end
+    end
+    return math.max(gw, math.min(px(72), widest + px(6)))
 end
 
 -- o: entries (this page), rows_per_col, row_h, gutter (dp), rail, groupOf,
@@ -738,6 +759,7 @@ end
 function ListView.indexList(w, hh, o)
     local gw = px(o.gutter or 34)
     if o.gutter == 0 then gw = 0 end
+    gw = gutterWidth(gw, o)
     local rail = o.rail
     local total = w - (rail and ListView.RAIL_W() or 0)
     local ncols = o.cols or ListView.indexColumns(total)
@@ -1013,7 +1035,10 @@ function ListView.selectBar(w, count, actions)
         { icons = false, word = false, s = 13, pad = 10 },
     }
     local function count_label(step)
-        return runs({ { t = tostring(count), b = true }, step.word and { t = " " .. _("selected") } or nil }, { s = 15 })
+        local number = { t = tostring(count), b = true }
+        if not step.word then return runs({ number }, { s = 15 }) end
+        -- TRANSLATORS: how many items are selected; %1 is the count, shown bold.
+        return runs(BoardUI.styled(_.ngettext("%1 selected", "%1 selected", count), { number }), { s = 15 })
     end
     local function pill(a, step)
         return ListView.pill(a.label, { kind = a.kind or "outline", icon = step.icons and a.icon or nil, h = 40, s = step.s, pad_x = step.pad, disabled = a.disabled })

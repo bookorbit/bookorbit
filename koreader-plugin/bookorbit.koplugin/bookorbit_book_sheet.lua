@@ -11,7 +11,7 @@ when online, so opening it never waits on Wi-Fi.
 local ImageWidget = require("ui/widget/imagewidget")
 local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -355,7 +355,7 @@ local function onAction(page, action)
         page:close()
         plugin:noteProgressCompared(page.book_data.digest)
         plugin:syncToProgress(remote.progress, remote.percentage)
-        plugin:recordSyncSuccess("progress_pull", _("Progress pulled"))
+        plugin:recordSyncSuccess("progress_pull", require("bookorbit_activity").detail("progress_pulled"))
     elseif kind == "stay" then
         page:close()
         plugin:noteProgressCompared(page.book_data.digest)

@@ -1,9 +1,12 @@
 -- Proves persistent plugin state is published atomically and retains the last
 -- readable generation instead of relying on LuaSettings' unchecked flush.
 
+package.path = "koreader-plugin/spec/helpers/?.lua;" .. package.path
+local runShell = require("run_shell")
+
 local temp_root = os.tmpname()
 os.remove(temp_root)
-assert(os.execute("mkdir -p '" .. temp_root .. "'") == 0)
+assert(runShell("mkdir -p '" .. temp_root .. "'"))
 
 local function serialize(value)
     if type(value) == "string" then return string.format("%q", value) end

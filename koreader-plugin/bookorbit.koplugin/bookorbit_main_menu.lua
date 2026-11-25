@@ -14,7 +14,7 @@ local NetworkMgr = require("ui/network/manager")
 local UIManager = require("ui/uimanager")
 local md5 = require("ffi/sha2").md5
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitApi = require("bookorbit_api")
 local BookOrbitHighlightDiagnostics = require("bookorbit_highlight_diagnostics")
@@ -49,10 +49,22 @@ local function versionText(version)
     return "v" .. version:gsub("^v", "")
 end
 
+-- Which translation catalog loaded, for bug reports about wording.
+local function languageText()
+    local info = type(_) == "table" and _.info and _.info() or {}
+    if info.catalog then
+        return T(_.ngettext("%1, %2 string", "%1, %2 strings", info.strings), info.catalog, info.strings)
+    end
+    local lang = info.language
+    if type(lang) ~= "string" or lang == "" or lang == "C" or lang:match("^en") then return _("English") end
+    -- TRANSLATORS: %1 is KOReader's language code, such as de or pt_BR.
+    return T(_("%1, no plugin translation"), lang)
+end
+
 local function recordText(entry)
     if type(entry) ~= "table" then return _("none") end
     local when = formatTime(entry.at)
-    local message = entry.message or entry.event or _("unknown")
+    local message = require("bookorbit_activity").detailText(entry.detail) or entry.message or entry.event or _("unknown")
     return T(_("%1 at %2"), tostring(message), when)
 end
 
@@ -106,6 +118,7 @@ function MainMenu:diagnosticsSections()
             { _("Device ID"), deviceIdPrefix(self.device_id) },
             { _("Plugin"), versionText(self.PLUGIN_VERSION) },
             { _("Latest plugin"), versionText(self.settings.update_latest_version) },
+            { _("Language"), languageText() },
         } },
         { title = _("Account"), rows = {
             { _("Server"), self.settings.server_url or _("not set") },
@@ -222,7 +235,7 @@ function MainMenu:testConnection(on_done)
         local body, err = self:newClient():auth()
         if checking then checking:close() end
         if body then
-            self:recordSyncSuccess("connection_test", _("Connection test succeeded"))
+            self:recordSyncSuccess("connection_test", require("bookorbit_activity").detail("connection_ok"))
         else
             self:recordSyncError("connection_test", err)
         end

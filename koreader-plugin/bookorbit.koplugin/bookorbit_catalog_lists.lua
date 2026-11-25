@@ -17,7 +17,7 @@ local UIManager = require("ui/uimanager")
 local datetime = require("datetime")
 local logger = require("logger")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardData = require("bookorbit_board_data")
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -748,7 +748,7 @@ function CatalogLists:listSortSheetModel(sheet)
         end
         return {
             title = _("Sort and filter"),
-            sorts = { labels = { _("Title"), _("Author"), _("Series"), _("Added"), _("Read") }, selected = sort_index },
+            sorts = { labels = { _("Title"), _("Author"), _.pgettext("Book field", "Series"), _("Added"), _("Read") }, selected = sort_index },
             order = { labels = order_labels, selected = (s.order or natural) == first_order and 1 or 2 },
             shows = { labels = { _("All"), _("Unread"), _("Reading"), _("Finished") }, selected = show_index },
             rows = {
@@ -762,7 +762,7 @@ function CatalogLists:listSortSheetModel(sheet)
     end
     local by_books = s.sort == "books"
     local name_index = (s.sort == "name_desc") and 2 or 1
-    local shows = kind == "authors" and { _("Everyone"), _("Reading now"), _("Read") } or { _("All series"), _("In progress"), _("Finished") }
+    local shows = kind == "authors" and { _("Everyone"), _("Reading now"), _.pgettext("Authors filter", "Read") } or { _("All series"), _("In progress"), _.pgettext("Series filter", "Finished") }
     local show_index = s.filter == "reading" and 2 or s.filter == "finished" and 3 or 1
     return {
         title = _("Sort and filter"),
@@ -1153,7 +1153,7 @@ function CatalogLists:listSortLabel(params)
     if CatalogUtil.SORT_KIND[sort] == "alpha" and order == "desc" then
         label = sort == "title" and _("Title Z–A") or sort == "author" and _("Author Z–A") or sort == "series" and _("Reverse series order") or label
     elseif CatalogUtil.SORT_KIND[sort] == "time" and order == "asc" then
-        label = sort == "published" and _("Publication date (oldest)") or label .. " " .. _("(oldest)")
+        label = sort == "published" and _("Publication date (oldest)") or T(_("%1 (oldest)"), label)
     elseif sort == "published" then
         label = _("Publication date (newest)")
     end
@@ -1193,8 +1193,8 @@ function CatalogLists:listToolbar(kind, context)
     local sort_label = sort == "books" and _("Most books") or sort == "name_desc" and _("Name Z–A") or _("Name A–Z")
     local filter = context.filter
     local show_label
-    if kind == "authors" then show_label = filter == "reading" and _("Reading now") or filter == "finished" and _("Read") or _("Everyone")
-    else show_label = filter == "reading" and _("In progress") or filter == "finished" and _("Finished") or _("All series") end
+    if kind == "authors" then show_label = filter == "reading" and _("Reading now") or filter == "finished" and _.pgettext("Authors filter", "Read") or _("Everyone")
+    else show_label = filter == "reading" and _("In progress") or filter == "finished" and _.pgettext("Series filter", "Finished") or _("All series") end
     return {
         { icon = "arrow-up-down", label = sort_label, action = { kind = "sort-sheet", focus = "sort" }, key = "tb-sort" },
         { icon = "list-filter", label = show_label, on = filter ~= nil, action = { kind = "sort-sheet", focus = "show" }, key = "tb-show" },
@@ -1206,7 +1206,7 @@ function CatalogLists:listHeader(kind, context)
     local clock = datetime.secondsToHour(os.time(), G_reader_settings:isTrue("twelve_hour_clock"))
     if self:isBulkSelectionActive() then
         local n = self.bulk_select_all and (context.total or 0) or self:bulkSelectedCount()
-        return { title = T(_("%1 selected"), n), sub = self:listView(kind) == "grid" and _("Tap covers to add or remove") or _("Tap books to add or remove"), select = true, clock = clock }
+        return { title = T(_.ngettext("1 selected", "%1 selected", n), n), sub = self:listView(kind) == "grid" and _("Tap covers to add or remove") or _("Tap books to add or remove"), select = true, clock = clock }
     end
     if kind == "books" or kind == "reading" then
         local total = context.total or 0
@@ -1219,8 +1219,8 @@ function CatalogLists:listHeader(kind, context)
     if kind == "authors" or kind == "series" then
         local sort = context.sort or "name"
         local order = sort == "books" and _("most books first") or sort == "name_desc" and _("Z–A") or _("A–Z")
-        local count = context.total and (kind == "authors" and ListData.plural(context.total, _("%1 author"), _("%1 authors"))
-            or ListData.plural(context.total, _("%1 series"), _("%1 series")))
+        local count = context.total and T(kind == "authors" and _.ngettext("%1 author", "%1 authors", context.total)
+            or _.ngettext("1 series", "%1 series", context.total), context.total)
         if context.dashboard_source_index then
             return { title = kind == "authors" and _("Pick an author") or _("Pick a series"), sub = _("Their books become a shelf on Home"), clock = clock }
         end
@@ -1244,10 +1244,11 @@ function CatalogLists:listHeader(kind, context)
     end
     if kind == "shelves" then
         local s = context.shelves or {}
+        local libraries, collections, scopes = #(s.libraries or {}), #(s.collections or {}), #(s["smart-scopes"] or {})
         local parts = {
-            ListData.plural(#(s.libraries or {}), _("%1 library"), _("%1 libraries")),
-            ListData.plural(#(s.collections or {}), _("%1 collection"), _("%1 collections")),
-            ListData.plural(#(s["smart-scopes"] or {}), _("%1 scope"), _("%1 scopes")),
+            T(_.ngettext("%1 library", "%1 libraries", libraries), libraries),
+            T(_.ngettext("%1 collection", "%1 collections", collections), collections),
+            T(_.ngettext("%1 scope", "%1 scopes", scopes), scopes),
         }
         if context.dashboard_source_index then
             return { title = _("Pick a shelf"), sub = _("Its books become a shelf on Home"), clock = clock }

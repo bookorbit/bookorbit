@@ -82,6 +82,10 @@ Position-only bookmarks (dogears) sync the same way:
 
 New bookmarks retain their source file. Mapping into a structurally different sibling requires equivalent chapter text; otherwise the bookmark remains unresolved. Legacy bookmarks without source-file provenance remain listed, but the selected-file web reader and delivery to another device withhold their position until a source-device sync or a new bookmark request establishes it. Device-side renames update BookOrbit; an already-linked second device keeps its existing title because bookmark exchange has no edit operation.
 
+## Translations
+
+The plugin follows KOReader's interface language. Its translations live in this repository as one gettext catalog per language under `bookorbit.koplugin/l10n/`, contributed by pull request; Spanish and Russian ship today. Text a catalog lacks falls back to KOReader's own translation, then to English. To translate the plugin or add a language, see the [translator guide](l10n/README.md).
+
 ## Limitations
 
 - Web highlight changes reach a closed book only via a manual sweep or its next open.

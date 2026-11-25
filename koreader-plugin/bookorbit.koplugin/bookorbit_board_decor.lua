@@ -20,7 +20,7 @@ local TextWidget = require("ui/widget/textwidget")
 local Widget = require("ui/widget/widget")
 local bit = require("bit")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardArt = require("bookorbit_board_art")
 local BoardColour = require("bookorbit_board_colour")
@@ -519,7 +519,8 @@ function Decor.odometer(ctx, w, hh)
         return hstack({ gap = g }, items)
     end
     local function todayRuns(s)
-        return runs({ { t = "+" .. formatCount(today), b = true, col = INK.black }, { t = " " .. _("today") } }, { s = s, col = INK.g4 })
+        -- TRANSLATORS: pages turned today; %1 is the count, such as +12, shown bold.
+        return runs(BoardUI.styled(_("%1 today"), { { t = "+" .. formatCount(today), b = true, col = INK.black } }), { s = s, col = INK.g4 })
     end
     local function sub(s)
         local left = todayRuns(s)
@@ -937,7 +938,8 @@ function Decor.chapters(ctx, w, hh)
     local stops_left = #cs.stops - cs.cur
     local function endRuns(s)
         if not cs.end_min then return text(T(_.ngettext("%1 stop to the end", "%1 stops to the end", stops_left), stops_left), { s = s, col = INK.g4 }) end
-        return runs({ { t = _("End of book in") .. " " }, { t = BoardData.formatDuration(cs.end_min), b = true, col = INK.black } }, { s = s, col = INK.g4 })
+        -- TRANSLATORS: %1 is the reading time left, such as 3 h 20 min, shown bold.
+        return runs(BoardUI.styled(_("End of book in %1"), { { t = BoardData.formatDuration(cs.end_min), b = true, col = INK.black } }), { s = s, col = INK.g4 })
     end
     local when = next_min and BoardData.formatDuration(next_min) or BoardData.pctLabel(cs.book) or ""
     local variants = {}
@@ -1094,7 +1096,7 @@ function Decor.badge(ctx, w, hh)
     local label = earned and _("New badge") or _("Next badge")
     local function progressRuns(s)
         if earned then return text(b.when or "", { s = s, col = INK.g4 }) end
-        return runs({ { t = formatCount(b.progress or 0), b = true, col = INK.black }, { t = " " .. T(_("of %1"), formatCount(b.threshold or 0)) } }, { s = s, col = INK.g4 })
+        return runs(BoardUI.styled(_("%1 of %2"), { { t = formatCount(b.progress or 0), b = true, col = INK.black }, formatCount(b.threshold or 0) }), { s = s, col = INK.g4 })
     end
     local variants = {}
     if tall and not earned then

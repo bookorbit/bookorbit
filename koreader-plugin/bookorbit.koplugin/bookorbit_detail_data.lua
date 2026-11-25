@@ -9,7 +9,7 @@ screen; DetailData.build gathers their inputs from the catalog.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = require("bookorbit_catalog_util")
 
@@ -351,25 +351,32 @@ end
 
 -- ---------------------------------------------------------------- facts
 
-local LANGUAGES = { en = "English", eng = "English", english = "English", ja = "Japanese", ["ja-jp"] = "Japanese",
-    fr = "French", de = "German", es = "Spanish", it = "Italian", pt = "Portuguese", nl = "Dutch" }
+local function english() return _.pgettext("Book language", "English") end
+local function japanese() return _.pgettext("Book language", "Japanese") end
+local LANGUAGES = { en = english, eng = english, english = english, ja = japanese, ["ja-jp"] = japanese,
+    fr = function() return _.pgettext("Book language", "French") end,
+    de = function() return _.pgettext("Book language", "German") end,
+    es = function() return _.pgettext("Book language", "Spanish") end,
+    it = function() return _.pgettext("Book language", "Italian") end,
+    pt = function() return _.pgettext("Book language", "Portuguese") end,
+    nl = function() return _.pgettext("Book language", "Dutch") end }
 
 function DetailData.languageName(code)
     local text = trim(code)
     if not text then return nil end
-    return LANGUAGES[text:lower()] or text
+    local name = LANGUAGES[text:lower()]
+    return name and name() or text
 end
-
-local MONTHS = { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec" }
 
 -- "18 Jun 2013" from an ISO date or timestamp.
 function DetailData.dateLabel(value, with_year)
     if type(value) ~= "string" then return nil end
     local y, m, d = value:match("^(%d%d%d%d)%-(%d%d)%-(%d%d)")
     if not y then return nil end
-    local month = _(MONTHS[tonumber(m)] or m)
-    if with_year == false then return T(_("%1 %2"), tonumber(d), month) end
-    return T(_("%1 %2 %3"), tonumber(d), month, y)
+    local month = require("bookorbit_dates").monthInDate(m, false)
+    if with_year == false then return T(_.pgettext("Day and month", "%1 %2"), tonumber(d), month) end
+    -- TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date, %3 the year.
+    return T(_.pgettext("Day, month and year", "%1 %2 %3"), tonumber(d), month, y)
 end
 
 -- The More details ledger: every field the payload has.
@@ -433,7 +440,7 @@ function DetailData.primary(state, usable, other)
         elseif (state.pct or 0) > 0 then
             return { kind = "continue", icon = "play", labels = { _("Continue reading"), _("Continue") } }
         end
-        return { kind = "start", icon = "book-open", labels = { _("Start reading"), _("Read") } }
+        return { kind = "start", icon = "book-open", labels = { _("Start reading"), _.pgettext("Action", "Read") } }
     end
     local file = usable[1]
     if not file then
@@ -493,7 +500,7 @@ function DetailData.progress(detail, forecast)
     if pages and pages > 0 then
         local at = math.floor(pages * p / 100 + 0.5)
         out.page = T(_("p. %1 of %2"), at, pages)
-        out.page_short = T(_("%1 / %2 pages"), at, pages)
+        out.page_short = T(_.ngettext("%1 / 1 page", "%1 / %2 pages", pages), at, pages)
     end
     if forecast and forecast.minutes_left and detail.readStatus ~= "read" then
         out.left = T(_("%1 left"), fmtDuration(forecast.minutes_left))
@@ -542,7 +549,7 @@ function DetailData.pager(list)
         index = list.index,
         total = list.total,
         prev = list.has_prev and (DetailData.pagerTitle(list.prev_title, list.titles) or _("Previous")) or nil,
-        next = list.has_next and (DetailData.pagerTitle(list.next_title, list.titles) or _("Next")) or nil,
+        next = list.has_next and (DetailData.pagerTitle(list.next_title, list.titles) or _.pgettext("Next book", "Next")) or nil,
     }
 end
 
@@ -669,7 +676,7 @@ function DetailData.build(catalog, context, now)
             time_short = fmtShort(journal.seconds / 60),
             days = journal.days,
             last_read = relativeDay(journal.last_read, now),
-            pace = per_hour and T(_("%1 pages an hour"), per_hour) or nil,
+            pace = per_hour and T(_.ngettext("1 page an hour", "%1 pages an hour", per_hour), per_hour) or nil,
             pace_short = per_hour and T(_("%1 p/h"), per_hour) or nil,
             path = DetailData.readingPath(journal, now, 120),
         }

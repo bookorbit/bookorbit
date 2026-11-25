@@ -4,7 +4,8 @@
 -- guaranteed to exist: a build that has no extraction support at all must
 -- surface an error rather than crash the reader (bookorbit/bookorbit#827).
 
-package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/?.lua;" .. package.path
+package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/?.lua;koreader-plugin/spec/helpers/?.lua;" .. package.path
+local runShell = require("run_shell")
 
 local function assertEqual(actual, expected, label)
     if actual ~= expected then
@@ -27,8 +28,8 @@ local function dirname(path)
 end
 
 local function pathMode(path)
-    if os.execute("test -d " .. shellQuote(path)) == 0 then return "directory" end
-    if os.execute("test -f " .. shellQuote(path)) == 0 then return "file" end
+    if runShell("test -d " .. shellQuote(path)) then return "directory" end
+    if runShell("test -f " .. shellQuote(path)) then return "file" end
     return nil
 end
 
@@ -60,7 +61,7 @@ end
 
 function lfs.mkdir(path)
     if pathMode(path) then return nil, "File exists" end
-    return os.execute("mkdir " .. shellQuote(path)) == 0 or nil
+    return runShell("mkdir " .. shellQuote(path)) or nil
 end
 
 function lfs.dir(path)
@@ -169,7 +170,7 @@ local function setup()
     local root = os.tmpname()
     os.remove(root)
     assert(root:match("^/tmp/") or root:match("^/var/folders/"), "unexpected temporary path")
-    assert(os.execute("mkdir -p " .. shellQuote(root)) == 0)
+    assert(runShell("mkdir -p " .. shellQuote(root)))
 
     local plugin_dir = root .. "/bookorbit.koplugin"
     writeFile(plugin_dir .. "/main.lua", "-- installed main\n")

@@ -121,7 +121,8 @@ package.loaded["ui/trapper"] = {
     end,
 }
 
-package.path = "koreader-plugin/bookorbit.koplugin/?.lua;" .. package.path
+package.path = "koreader-plugin/bookorbit.koplugin/?.lua;koreader-plugin/spec/helpers/?.lua;" .. package.path
+local runShell = require("run_shell")
 
 local BookOrbitApi = require("bookorbit_api")
 
@@ -148,7 +149,7 @@ end
 
 local temp_root = os.tmpname()
 os.remove(temp_root)
-assert(os.execute("mkdir -p '" .. temp_root .. "'") == 0)
+assert(runShell("mkdir -p '" .. temp_root .. "'"))
 local final_path = temp_root .. "/cover.jpg"
 local temp_path = temp_root .. "/cover.part"
 

@@ -35,7 +35,7 @@ local VerticalSpan = require("ui/widget/verticalspan")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitApi = require("bookorbit_api")
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -1320,7 +1320,8 @@ function BookOrbitCatalog:showBookPage(body, query, title, push, opts)
         subtitle = T(_("Sort: %1"), sort_label)
     end
     if filters then
-        subtitle = subtitle .. T(_(" - Filter: %1"), filters)
+        -- TRANSLATORS: %1 is the line so far (count and sort), %2 the active filters.
+        subtitle = T(_("%1 - Filter: %2"), subtitle, filters)
     end
     if body.seriesSummary then
         subtitle = T(_("Read %1/%2 - %3"), body.seriesSummary.finished or 0, body.seriesSummary.total or total, subtitle)

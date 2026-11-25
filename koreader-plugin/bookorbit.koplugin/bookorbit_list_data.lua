@@ -7,7 +7,7 @@ caption steps down, how a series counts) are tested without KOReader.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardData = require("bookorbit_board_data")
 
@@ -40,13 +40,8 @@ function ListData.pctLabel(book)
     return tostring(math.floor(p + 0.5)) .. "%"
 end
 
-function ListData.plural(n, one, many)
-    if n == 1 then return T(one, n) end
-    return T(many, n)
-end
-
 function ListData.bookCount(n)
-    return ListData.plural(n, _("%1 book"), _("%1 books"))
+    return T(_.ngettext("%1 book", "%1 books", n), n)
 end
 
 local function formats(book)
@@ -138,8 +133,8 @@ function ListData.bookMeta(book, o)
     local state = ListData.stateOf(book)
     if state == "reading" then
         local after
-        if o.minutes_left then after = T(_(" · %1 left"), ListData.shortDuration(o.minutes_left))
-        elseif book.readStatus == "rereading" then after = _(" · rereading")
+        if o.minutes_left then after = " · " .. T(_("%1 left"), ListData.shortDuration(o.minutes_left))
+        elseif book.readStatus == "rereading" then after = " · " .. _.pgettext("Read status", "rereading")
         else after = " · " .. (BoardData.relativeDay(book.lastReadAt, o.now) or "") end
         return { { t = ListData.pctLabel(book) or "0%", b = true }, { t = after } }
     elseif state == "finished" then
@@ -195,7 +190,7 @@ end
 function ListData.seriesCounts(entry)
     local count = tonumber(entry.count) or 0
     local expected = tonumber(entry.expectedCount)
-    if expected and expected > count then return T(_("%1 of %2 books"), count, expected) end
+    if expected and expected > count then return T(_.ngettext("%1 of 1 book", "%1 of %2 books", expected), count, expected) end
     return ListData.bookCount(count)
 end
 
@@ -252,14 +247,14 @@ function ListData.authorCell(entry)
     local finished = tonumber(entry.finishedCount) or 0
     local first = entry.previewBooks and entry.previewBooks[1]
     if reading > 0 then
-        local bottom = count == 1 and first and ((ListData.pctLabel(first) or "0%") .. " " .. _("read")) or T(_("%1 of %2"), reading, count)
+        local bottom = count == 1 and first and T(_.pgettext("Percent read", "%1 read"), ListData.pctLabel(first) or "0%") or T(_("%1 of %2"), reading, count)
         return { kind = "reading", label = _("Reading"), bottom = bottom }
     end
     if count > 0 and finished >= count then
         return { kind = "finished", label = _("Read"), bottom = count > 1 and T(_("all %1"), count) or (first and ListData.finishedOn(first)) }
     end
     if finished > 0 then
-        return { kind = "partial", label = T(_("%1 of %2"), finished, count), bottom = _("read") }
+        return { kind = "partial", label = T(_("%1 of %2"), finished, count), bottom = _.pgettext("Books read", "read") }
     end
     return nil
 end

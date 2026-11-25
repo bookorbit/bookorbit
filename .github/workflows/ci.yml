@@ -76,8 +76,26 @@ jobs:
           fi
           echo "is_crowdin=$is_crowdin" >> "$GITHUB_OUTPUT"
 
+      - name: Classify KOReader plugin translation pull request
+        id: plugin_l10n
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -euo pipefail
+          git fetch --quiet --no-tags origin "+refs/pull/${PR_NUMBER}/head:refs/remotes/origin/pr-${PR_NUMBER}"
+          script="scripts/koreader/classify-translation-pr.sh"
+          if git cat-file -e "$PR_BASE_SHA:$script" 2>/dev/null; then
+            is_translation="$(git show "$PR_BASE_SHA:$script" | bash -s -- "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          else
+            is_translation="$(git show "$PR_HEAD_SHA:$script" | bash -s -- "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          fi
+          echo "is_translation=$is_translation" >> "$GITHUB_OUTPUT"
+
       - name: Validate PR branch name
-        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true' && steps.plugin_l10n.outputs.is_translation != 'true'
         shell: bash
         env:
           PR_BRANCH: ${{ github.head_ref }}
@@ -91,7 +109,7 @@ jobs:
           fi
 
       - name: Validate referenced issues exist
-        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true'
+        if: github.event.pull_request.user.login != 'dependabot[bot]' && steps.crowdin.outputs.is_crowdin != 'true' && steps.plugin_l10n.outputs.is_translation != 'true'
         shell: bash
         env:
           GH_REPO: ${{ github.repository }}
@@ -237,6 +255,7 @@ jobs:
     outputs:
       server: ${{ steps.manual.outputs.server || steps.changes.outputs.server }}
       client: ${{ steps.manual.outputs.client || steps.changes.outputs.client }}
+      koreader: ${{ steps.manual.outputs.koreader || steps.changes.outputs.koreader }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -248,8 +267,11 @@ jobs:
         if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
         shell: bash
         run: |
-          echo "server=true" >> "$GITHUB_OUTPUT"
-          echo "client=true" >> "$GITHUB_OUTPUT"
+          {
+            echo "server=true"
+            echo "client=true"
+            echo "koreader=true"
+          } >> "$GITHUB_OUTPUT"
 
       # For push events dorny/paths-filter diffs github.event.before..github.sha.
       # New-branch pushes (before = 0000...) are handled by treating all files as changed.
@@ -281,12 +303,18 @@ jobs:
               - '.github/actions/setup-node-pnpm/action.yml'
               - '.github/workflows/ci.yml'
               - '.github/workflows/crowdin-translations.yml'
+            koreader:
+              - 'koreader-plugin/**'
+              - 'scripts/koreader/**'
+              - 'package.json'
+              - '.github/workflows/ci.yml'
 
       - name: Print change scope
         shell: bash
         run: |
           echo "server=${{ steps.manual.outputs.server || steps.changes.outputs.server }}"
           echo "client=${{ steps.manual.outputs.client || steps.changes.outputs.client }}"
+          echo "koreader=${{ steps.manual.outputs.koreader || steps.changes.outputs.koreader }}"
 
   lint:
     name: Lint (${{ matrix.package_label }})
@@ -549,6 +577,57 @@ jobs:
           path: test-results/${{ matrix.package }}
           retention-days: 7
 
+  koreader-plugin:
+    name: KOReader Plugin
+    runs-on: ubuntu-latest
+    needs: [dependency-review, detect-changes]
+    timeout-minutes: 10
+    if: >
+      always() &&
+      (needs.dependency-review.result == 'success' || needs.dependency-review.result == 'skipped') &&
+      needs.detect-changes.result == 'success' &&
+      needs.detect-changes.outputs.koreader == 'true'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install LuaJIT and gettext
+        shell: bash
+        run: |
+          sudo apt-get update --quiet
+          sudo apt-get install --yes --no-install-recommends luajit gettext
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Run plugin specs
+        shell: bash
+        run: |
+          failed=0
+          for spec in koreader-plugin/spec/*_test.lua; do
+            if ! output=$(luajit "$spec" 2>&1); then
+              echo "::error file=${spec}::${spec} failed"
+              printf '%s\n' "$output"
+              failed=1
+            fi
+          done
+          exit "$failed"
+
+      - name: Check translations
+        shell: bash
+        run: |
+          echo "## KOReader plugin translations" >> "$GITHUB_STEP_SUMMARY"
+          echo >> "$GITHUB_STEP_SUMMARY"
+          luajit koreader-plugin/l10n/check.lua | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Test the release version guard
+        shell: bash
+        run: node --test scripts/koreader/*.test.mjs
+
   quality-gate:
     name: Quality Gate
     runs-on: ubuntu-latest
@@ -559,6 +638,7 @@ jobs:
       - lint
       - typecheck
       - tests
+      - koreader-plugin
     timeout-minutes: 5
     if: always()
     steps:
@@ -576,6 +656,7 @@ jobs:
           echo "lint=${{ needs.lint.result }}"
           echo "typecheck=${{ needs.typecheck.result }}"
           echo "tests=${{ needs.tests.result }}"
+          echo "koreader-plugin=${{ needs.koreader-plugin.result }}"
 
   e2e-setup:
     name: Detect E2E Suites

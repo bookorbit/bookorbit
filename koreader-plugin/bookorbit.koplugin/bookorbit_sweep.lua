@@ -25,7 +25,7 @@ local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local util = require("util")
 local T = ffiutil.template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitAnnotations = require("bookorbit_annotations")
 local BookOrbitBookmarks = require("bookorbit_bookmarks")
@@ -207,15 +207,10 @@ local function finish(ctx, err)
         elseif not err and ctx.had_errors then
             ctx.plugin:recordSyncError("sweep", "partial_failure")
         elseif not err and ctx.plugin.recordSyncSuccess then
-            local message = T(_("%1 books, %2 reading events, %3 highlights"),
-                ctx.counts.books_matched, ctx.counts.page_stats, ctx.counts.annotations)
-            if (ctx.counts.stats_ambiguous or 0) > 0 then
-                message = message .. ". " .. T(_("%1 books need to be opened and synced once to recover their reading history."),
-                    ctx.counts.stats_ambiguous)
-            end
             ctx.plugin:recordSyncSuccess(
                 "sweep",
-                message)
+                require("bookorbit_activity").detail("library", ctx.counts.books_matched, ctx.counts.page_stats,
+                    ctx.counts.annotations, ctx.counts.stats_ambiguous or 0))
         end
     end
 
@@ -278,7 +273,7 @@ local function finish(ctx, err)
             table.insert(notes, _("Some books failed and will retry on the next sync."))
         end
         if (ctx.counts.stats_ambiguous or 0) > 0 then
-            table.insert(notes, T(_("%1 books need to be opened and synced once to recover their reading history."),
+            table.insert(notes, T(_.ngettext("1 book needs to be opened and synced once to recover its reading history.", "%1 books need to be opened and synced once to recover their reading history.", ctx.counts.stats_ambiguous),
                 ctx.counts.stats_ambiguous))
         end
         report(ctx, {

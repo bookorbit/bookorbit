@@ -11,7 +11,7 @@ from data the catalog already holds, so opening it never waits on the network.
 
 local NetworkMgr = require("ui/network/manager")
 local datetime = require("datetime")
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 local T = require("ffi/util").template
 
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -190,9 +190,10 @@ function MenuSheet.body(d, w, o)
     elseif sync and sync.done then
         first = tile(tw, th, "check", _("Synced"), _("Just now"), { kind = "sync" })
     elseif not d.online then
-        first = tile(tw, th, "wifi", _("Connect"), d.waiting > 0 and T(_("%1 waiting"), d.waiting) or _("Wi-Fi is off"), { kind = "connect" })
+        first = tile(tw, th, "wifi", _("Connect"), d.waiting > 0 and T(_.ngettext("1 waiting", "%1 waiting", d.waiting), d.waiting) or _("Wi-Fi is off"), { kind = "connect" })
     else
-        first = tile(tw, th, "refresh-cw", _("Sync now"), d.waiting > 0 and T(_("%1 waiting"), d.waiting) or _("Nothing waiting"), { kind = "sync" })
+        -- TRANSLATORS: title of the sync tile at the top of the menu, which is narrow: keep it short, a noun is fine.
+        first = tile(tw, th, "refresh-cw", _.pgettext("Menu tile", "Sync now"), d.waiting > 0 and T(_.ngettext("1 waiting", "%1 waiting", d.waiting), d.waiting) or _("Nothing waiting"), { kind = "sync" })
     end
     local second = d.on_home and tile(tw, th, "layout-grid", _("Customize"), _("Edit Home"), { kind = "customize" })
         or tile(tw, th, "house", _("Home"), _("Your board"), { kind = "home" })
@@ -222,7 +223,7 @@ function MenuSheet.body(d, w, o)
     if not d.signed_in then
         status_summary = _("Not signed in")
     elseif d.waiting > 0 then
-        status_summary = not d.online and T(_("%1 changes waiting to send"), d.waiting) or T(_("%1 waiting"), d.waiting)
+        status_summary = not d.online and T(_.ngettext("1 change waiting to send", "%1 changes waiting to send", d.waiting), d.waiting) or T(_.ngettext("1 waiting", "%1 waiting", d.waiting), d.waiting)
     elseif d.sync_error then
         status_summary = _("The last sync did not finish")
     else

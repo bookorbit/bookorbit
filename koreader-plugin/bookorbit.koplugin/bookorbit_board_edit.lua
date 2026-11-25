@@ -12,7 +12,7 @@ height before it is kept, so a page can never hold more than fits.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardLayout = require("bookorbit_board_layout")
 local BoardMetrics = require("bookorbit_board_metrics")
@@ -83,8 +83,8 @@ BoardEdit.LIBRARY = {
 }
 
 BoardEdit.TABS = {
-    { id = "new", label = function() return _("New") end },
-    { id = "reading", label = function() return _("Reading") end },
+    { id = "new", label = function() return _.pgettext("Widget category", "New") end },
+    { id = "reading", label = function() return _.pgettext("Widget category", "Reading") end },
     { id = "stats", label = function() return _("Stats") end },
     { id = "library", label = function() return _("Library") end },
     { id = "device", label = function() return _("Device") end },

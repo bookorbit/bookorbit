@@ -5,7 +5,7 @@ page is exactly one screen.
 ]]
 
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BoardMetrics = require("bookorbit_board_metrics")
 local BoardUI = require("bookorbit_board_ui")
@@ -272,7 +272,7 @@ function Pages.seriesBody(m, f)
                     if st == "reading" then
                         local ml = m.minutes_left and m.minutes_left(x)
                         local day = not ml and require("bookorbit_board_data").relativeDay(x.lastReadAt)
-                        return { { t = ListData.pctLabel(x) or "0%", b = true }, { t = ml and T(_(" · %1 left"), ListData.shortDuration(ml)) or day and (" · " .. day) or "" } }
+                        return { { t = ListData.pctLabel(x) or "0%", b = true }, { t = ml and (" · " .. T(_("%1 left"), ListData.shortDuration(ml))) or day and (" · " .. day) or "" } }
                     elseif st == "finished" then return { { t = _("Read"), b = true } } end
                     return { { t = _("Not started") } }
                 end,

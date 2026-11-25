@@ -378,7 +378,7 @@ do
     harness.scheduler:drain()
 
     assertEqual(#harness.calls.page_stats, 0, "an unbound collision row is never attributed by guesswork")
-    assert(harness.shown.text:find("1 books need to be opened and synced once", 1, true),
+    assert(harness.shown.text:find("1 book needs to be opened and synced once", 1, true),
         "the completed sweep exposes the recovery action")
     assertEqual(harness.calls.sweep_complete, 1, "the diagnostic does not turn safe deferral into a failed sweep")
 end

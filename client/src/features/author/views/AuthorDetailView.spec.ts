@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   routerPush: vi.fn<(to: unknown) => Promise<void>>(),
   routerBack: vi.fn<() => void>(),
   fetchLibraries: vi.fn<() => Promise<void>>(),
+  refreshLibraries: vi.fn<() => Promise<void>>(),
   loadAuthor: vi.fn<() => Promise<void>>(),
   loadBooks: vi.fn<(reset?: boolean) => Promise<void>>(),
   loadMetadataPreview: vi.fn<() => Promise<void>>(),
@@ -70,7 +71,7 @@ vi.mock('@/composables/useDisplaySettings', () => ({
 }))
 
 vi.mock('@/features/library/composables/useLibraries', () => ({
-  useLibraries: () => ({ libraries: ref([]), fetchLibraries: mocks.fetchLibraries }),
+  useLibraries: () => ({ libraries: ref([]), fetchLibraries: mocks.fetchLibraries, refreshLibraries: mocks.refreshLibraries }),
 }))
 
 vi.mock('@/features/library/composables/useLibraryPermissions', () => ({
@@ -246,6 +247,7 @@ describe('AuthorDetailView', () => {
     mocks.route.query = {}
     mocks.routerPush.mockResolvedValue()
     mocks.fetchLibraries.mockResolvedValue()
+    mocks.refreshLibraries.mockResolvedValue()
     mocks.loadAuthor.mockResolvedValue()
     mocks.loadBooks.mockResolvedValue()
     mocks.loadMetadataPreview.mockResolvedValue()
@@ -554,6 +556,7 @@ describe('AuthorDetailView', () => {
     expect(mocks.books.value.map((book) => book.id)).toEqual([102])
     expect(mocks.total.value).toBe(1)
     expect(mocks.author.value?.bookCount).toBe(1)
+    expect(mocks.refreshLibraries).toHaveBeenCalledTimes(1)
 
     dialog = wrapper.getComponent(DeleteBookDialogStub)
     expect(dialog.props('open')).toBe(false)

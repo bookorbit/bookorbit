@@ -26,7 +26,7 @@ local logger = require("logger")
 local lfs = require("libs/libkoreader-lfs")
 local md5 = require("ffi/sha2").md5
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local BookOrbitActivity = require("bookorbit_activity")
 local BookOrbitAnnotations = require("bookorbit_annotations")
@@ -51,7 +51,7 @@ local BookOrbitSidecar = require("bookorbit_sidecar")
 local BookOrbitSweep = require("bookorbit_sweep")
 local BookOrbitUpdater = require("bookorbit_updater")
 
-local PLUGIN_VERSION = "2.4.2"
+local PLUGIN_VERSION = "2.5.0"
 
 local SYNC_STRATEGY = {
     PROMPT = 1,
@@ -59,17 +59,6 @@ local SYNC_STRATEGY = {
     DISABLE = 3,
 }
 
-local LAST_ERROR_LABELS = {
-    auth = _("login failed"),
-    network = _("server not reachable"),
-    server = _("server request failed"),
-    invalid_json = _("invalid server response"),
-    unsupported_server = _("server update required"),
-    body_too_large = _("request too large"),
-    background_request_interrupted = _("background request interrupted"),
-    partial_failure = _("partial sync failure"),
-    outbox_persistence = _("lifecycle sync could not be saved"),
-}
 
 local SYNC_JOB_PRIORITY = BookOrbitSyncCoordinator.PRIORITY
 local OPEN_ANNOTATION_SYNC_DELAY = 2
@@ -285,22 +274,20 @@ function BookOrbit:isLoggedIn()
 end
 
 function BookOrbit:errorLabel(err, fallback)
-    if LAST_ERROR_LABELS[err] then return LAST_ERROR_LABELS[err] end
-    if err == 401 or err == 403 then return LAST_ERROR_LABELS.auth end
-    if type(err) == "number" then
-        return T(_("server error %1"), err)
-    end
-    return fallback or tostring(err or _("unknown error"))
+    return BookOrbitActivity.errorLabel(err, fallback)
 end
 
 local BOOK_EVENTS = { book_sync = true, progress_push = true, progress_pull = true }
 
+-- message: words, or a detail from BookOrbitActivity.detail, which the pages
+-- write out in the language KOReader uses when they show it.
 function BookOrbit:recordSyncSuccess(event, message)
     if event ~= "connection_test" then
         self.settings.last_sync = {
             event = event,
             at = os.time(),
-            message = message,
+            message = BookOrbitActivity.detailText(message),
+            detail = type(message) == "table" and message or nil,
         }
         self.settings.last_error = nil
     elseif self.settings.last_error and self.settings.last_error.event == "connection_test" then
@@ -319,6 +306,7 @@ function BookOrbit:recordSyncSuccess(event, message)
 end
 
 function BookOrbit:recordSyncError(event, err, message)
+    local detail = message == nil and (type(err) == "string" or type(err) == "number") and BookOrbitActivity.detail("error", err) or nil
     local error_message = message or self:errorLabel(err)
     if event ~= "connection_test" or not self.settings.last_error or self.settings.last_error.event == "connection_test" then
         self.settings.last_error = {
@@ -326,9 +314,10 @@ function BookOrbit:recordSyncError(event, err, message)
             at = os.time(),
             code = err,
             message = error_message,
+            detail = detail,
         }
     end
-    BookOrbitActivity.recordError(self.settings, event, error_message)
+    BookOrbitActivity.recordError(self.settings, event, detail or error_message)
     G_reader_settings:flush()
 end
 

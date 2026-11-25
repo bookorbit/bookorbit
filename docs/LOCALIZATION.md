@@ -2,6 +2,8 @@
 
 BookOrbit uses Vue I18n catalogs under `client/src/locales/`. English is the source language, and Crowdin is the source of truth for every other catalog listed below.
 
+Everything in this document except the last section concerns the web client. The KOReader plugin is translated separately, in Git, with no Crowdin involvement; see [KOReader Plugin](#koreader-plugin).
+
 ## Supported Catalogs
 
 | Application locale   | Crowdin language ID | Catalog        |
@@ -263,3 +265,15 @@ The Crowdin synchronization workflows require:
 Configure variable mismatches and leading or trailing whitespace as Crowdin QA errors. Keep punctuation and length checks enabled, and include translator instructions for Vue I18n plural branches, the HTML prohibition, and the Unicode em dash prohibition.
 
 Use a daily translation export schedule and manual synchronization before releases. Keep automatic merging disabled.
+
+## KOReader Plugin
+
+The KOReader plugin has its own gettext catalogs, and Git is their source of truth. Translators edit them directly and open pull requests; Crowdin never touches them. The [translator guide](../koreader-plugin/l10n/README.md) covers the contributor side.
+
+- `koreader-plugin/l10n/bookorbit.pot` is the template, generated from the plugin source with `pnpm koreader:l10n:extract`. It sits outside the plugin folder, so it never ships to devices.
+- `koreader-plugin/bookorbit.koplugin/l10n/<code>.po` holds one catalog per language, named with KOReader's own language code (`es`, `ru`, `pt_BR`). The plugin reads it at load time; there is no compile step. Fuzzy entries are drafts and never shown.
+- `koreader-plugin/bookorbit.koplugin/l10n/languages.lua` holds each language's plural rule, copied from KOReader's catalog for that language. A catalog whose language has no row there fails the check.
+- Feature pull requests change English strings and regenerate the template; they never edit `.po` files. `pnpm koreader:l10n:update` merges the template into every catalog, for maintainers before a release and for translators without Poedit.
+- `pnpm koreader:l10n:check` fails on a stale template, a header that disagrees with `languages.lua`, an empty plural form, a dropped or invented `%1` marker, or a link, domain, HTML tag or em dash the English does not have. It prints coverage per language. The `KOReader Plugin` CI job runs it with every plugin spec and writes the coverage to the job summary.
+- A pull request that changes only plugin catalogs, `languages.lua` and the translator guide needs no linked issue or `BO-` branch (`scripts/koreader/classify-translation-pr.sh`). It merges once CI passes and the language's listed reviewer or another native speaker approves; a brand-new language merges on CI, and its author becomes its reviewer.
+- Devices update the plugin only when `PLUGIN_VERSION` in `main.lua` changes. The release workflow refuses to publish when the plugin folder changed since the previous release tag and the version did not move forward (`scripts/koreader/check-plugin-version.mjs`).

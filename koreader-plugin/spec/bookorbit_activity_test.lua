@@ -64,4 +64,27 @@ assertEqual(#Activity.list(settings), 2, "an empty exchange records nothing")
 Activity.recordHighlights(settings, { uploaded = 4, applied = 1, deleted = 0, bm_uploaded = 1 })
 assertEqual(Activity.list(settings)[1].text, "Highlights: 5 sent, 1 received", "highlights and bookmarks are counted together")
 
+-- Entries keep keys and numbers, so the page writes them in the language
+-- KOReader uses when it is shown, not the one they were recorded in.
+local later = {}
+Activity.recordSuccess(later, "book_sync", Activity.detail("reading_upload", 2, 0))
+Activity.recordError(later, "sweep", Activity.detail("error", "network"))
+Activity.recordError(later, "progress_push", Activity.detail("error", 500))
+local list = Activity.list(later)
+assertEqual(Activity.sub(list[3]), "2 reading events, 0 highlights uploaded", "success detail from its key")
+assertEqual(Activity.sub(list[2]), "server not reachable", "error detail from its code")
+assertEqual(Activity.sub(list[1]), "server error 500", "an HTTP status as a detail")
+list[3].text = "Libro sincronizado"
+list[3].sub = "texto guardado"
+assertEqual(Activity.title(list[3]), "Synced this book", "the title follows the current language, not the stored words")
+assertEqual(Activity.sub(list[3]), "2 reading events, 0 highlights uploaded", "the detail follows the current language too")
+assertEqual(Activity.title({ kind = "something_new", text = "Stored words" }), "Stored words", "an unknown kind keeps its stored words")
+assertEqual(Activity.sub({ kind = "book_sync", sub = "Older entry" }), "Older entry", "an entry from before keys keeps its stored detail")
+assertEqual(Activity.title(Activity.list(settings)[1]), "Highlights: 5 sent, 1 received", "highlight counts are kept as numbers")
+assertEqual(Activity.detailText(Activity.detail("library", 3, 10, 1, 2)),
+    "3 books, 10 reading events, 1 highlights. 2 books need to be opened and synced once to recover their reading history.",
+    "library summary with books that need opening")
+assertEqual(Activity.detailText("plain words"), "plain words", "stored words pass through")
+assertEqual(Activity.detailText(nil), nil, "no detail")
+
 print("bookorbit_activity_test.lua: ok")

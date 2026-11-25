@@ -1,0 +1,5621 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: bookorbit.koplugin\n"
+"Report-Msgid-Bugs-To: https://github.com/bookorbit/bookorbit/issues\n"
+"POT-Creation-Date: 2026-11-25 00:19+0000\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=n != 1;\n"
+
+#: _meta.lua
+msgid "BookOrbit Sync"
+msgstr "BookOrbit Sync"
+
+#: _meta.lua
+msgid "Browse and download your BookOrbit library from KOReader, then synchronize reading progress, book status, ratings, reading statistics and highlights to BookOrbit. Highlights sync two ways: notes, edits and deletions made in the BookOrbit web reader appear on this device and vice versa."
+msgstr "Explora y descarga tu biblioteca de BookOrbit desde KOReader, luego sincroniza el progreso de lectura, el estado de los libros, las calificaciones, las estadísticas de lectura y los destacados con BookOrbit. La sincronización de destacados es bidireccional: las notas, ediciones y eliminaciones realizadas en el lector web de BookOrbit aparecen en este dispositivo y viceversa."
+
+#: bookorbit_activity.lua
+msgid "Synced your library"
+msgstr "Se ha sincronizado tu biblioteca"
+
+#: bookorbit_activity.lua
+msgid "Synced this book"
+msgstr "Se ha sincronizado este libro"
+
+#: bookorbit_activity.lua
+msgid "Sent reading progress"
+msgstr "Progreso de lectura enviado"
+
+#: bookorbit_activity.lua
+msgid "Pulled reading progress"
+msgstr "Progreso de lectura obtenido"
+
+#: bookorbit_activity.lua
+msgid "Connection test passed"
+msgstr "Prueba de conexión superada"
+
+#: bookorbit_activity.lua
+msgid "Skipped a book not in BookOrbit"
+msgstr "Se ha omitido un libro que no está en BookOrbit"
+
+#: bookorbit_activity.lua
+msgid "Library sync failed"
+msgstr "Error en la sincronización de la biblioteca"
+
+#: bookorbit_activity.lua
+msgid "Book sync failed"
+msgstr "Error de sincronización de libros"
+
+#: bookorbit_activity.lua
+msgid "Could not send progress"
+msgstr "No se pudo enviar el progreso"
+
+#: bookorbit_activity.lua
+msgid "Could not pull progress"
+msgstr "No se pudo obtener el progreso"
+
+#: bookorbit_activity.lua
+msgid "Could not match the open book"
+msgstr "No se pudo coincidir con el libro abierto"
+
+#: bookorbit_activity.lua
+msgid "Changes are waiting to send"
+msgstr "Hay cambios pendientes de enviar"
+
+#: bookorbit_activity.lua
+msgid "Connection test failed"
+msgstr "La prueba de conexión falló"
+
+#: bookorbit_activity.lua
+msgid "Update check failed"
+msgstr "Fallo al actualizar"
+
+#: bookorbit_activity.lua
+msgid "Highlight sync needs attention"
+msgstr "La sincronización de destacados requiere atención"
+
+#: bookorbit_activity.lua
+msgid "login failed"
+msgstr "error al iniciar sesión"
+
+#: bookorbit_activity.lua
+msgid "server not reachable"
+msgstr "servidor no alcanzable"
+
+#: bookorbit_activity.lua
+msgid "server request failed"
+msgstr "error en la solicitud al servidor"
+
+#: bookorbit_activity.lua
+msgid "invalid server response"
+msgstr "respuesta del servidor no válida"
+
+#: bookorbit_activity.lua
+msgid "server update required"
+msgstr "se requiere actualizar el servidor"
+
+#: bookorbit_activity.lua
+msgid "request too large"
+msgstr "solicitud demasiado grande"
+
+#: bookorbit_activity.lua
+msgid "background request interrupted"
+msgstr "solicitud en segundo plano interrumpida"
+
+#: bookorbit_activity.lua
+msgid "partial sync failure"
+msgstr "fallo de sincronización parcial"
+
+#: bookorbit_activity.lua
+msgid "lifecycle sync could not be saved"
+msgstr "no se pudo guardar la sincronización del ciclo de vida"
+
+#: bookorbit_activity.lua
+msgid "server error %1"
+msgstr "error del servidor %1"
+
+#: bookorbit_activity.lua bookorbit_status_page.lua
+msgid "unknown error"
+msgstr "error desconocido"
+
+#: bookorbit_activity.lua
+msgid "%1 reading events, %2 highlights uploaded"
+msgstr "Eventos de lectura: %1; destacados subidos: %2"
+
+#: bookorbit_activity.lua
+msgid "%1 books, %2 reading events, %3 highlights"
+msgstr "Libros: %1; eventos de lectura: %2; destacados: %3"
+
+#. TRANSLATORS: two sentences of a sync summary; %1 is the first, %2 the second.
+#: bookorbit_activity.lua
+msgid "%1. %2"
+msgstr "%1. %2"
+
+#: bookorbit_activity.lua bookorbit_sweep.lua
+msgid "1 book needs to be opened and synced once to recover its reading history."
+msgid_plural "%1 books need to be opened and synced once to recover their reading history."
+msgstr[0] "%1 libro necesita abrirse y sincronizarse una vez para recuperar su historial de lectura."
+msgstr[1] "%1 libros necesitan abrirse y sincronizarse una vez para recuperar su historial de lectura."
+
+#: bookorbit_activity.lua
+msgid "Progress pushed"
+msgstr "Progreso enviado"
+
+#: bookorbit_activity.lua
+msgid "Progress pulled"
+msgstr "Progreso obtenido"
+
+#: bookorbit_activity.lua
+msgid "Connection test succeeded"
+msgstr "Prueba de conexión exitosa"
+
+#: bookorbit_activity.lua
+msgid "Highlights: %1 sent, %2 received"
+msgstr "Destacados enviados: %1; recibidos: %2"
+
+#: bookorbit_activity.lua bookorbit_menu_sheet.lua
+msgid "Sync failed"
+msgstr "Error de sincronización"
+
+#. TRANSLATORS: weekday, day of the month, then the month as it reads inside a date.
+#: bookorbit_board_data.lua
+msgid "%1, %2 %3"
+msgstr "%1, %2 de %3"
+
+#: bookorbit_board_data.lua
+msgid "Good morning"
+msgstr "Buenos días"
+
+#: bookorbit_board_data.lua
+msgid "Good afternoon"
+msgstr "Buenas tardes"
+
+#: bookorbit_board_data.lua
+msgid "Good evening"
+msgstr "Buenas noches"
+
+#: bookorbit_board_data.lua
+msgid "Good morning, %1"
+msgstr "Buenos días, %1"
+
+#: bookorbit_board_data.lua
+msgid "Good afternoon, %1"
+msgstr "Buenas tardes, %1"
+
+#: bookorbit_board_data.lua
+msgid "Good evening, %1"
+msgstr "Buenas noches, %1"
+
+#. TRANSLATORS: minutes, abbreviated.
+#: bookorbit_board_data.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_util.lua bookorbit_detail_data.lua
+msgid "%1 min"
+msgstr "%1 min"
+
+#. TRANSLATORS: hours, abbreviated.
+#: bookorbit_board_data.lua bookorbit_board_decor.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_data.lua
+msgid "%1 h"
+msgstr "%1 h"
+
+#. TRANSLATORS: hours and minutes, abbreviated.
+#: bookorbit_board_data.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_data.lua
+msgid "%1 h %2 min"
+msgstr "%1 h %2 min"
+
+#. TRANSLATORS: minutes in the shortest form, for small tiles (5m).
+#: bookorbit_board_data.lua bookorbit_detail_data.lua
+msgid "%1m"
+msgstr "%1m"
+
+#. TRANSLATORS: hours in the shortest form, for small tiles (2h).
+#: bookorbit_board_data.lua bookorbit_detail_data.lua
+msgid "%1h"
+msgstr "%1h"
+
+#. TRANSLATORS: hours and minutes in the shortest form, for small tiles (2h 5m).
+#: bookorbit_board_data.lua bookorbit_detail_data.lua
+msgid "%1h %2m"
+msgstr "%1h %2m"
+
+#: bookorbit_board_data.lua bookorbit_catalog_util.lua bookorbit_menu_ui.lua
+msgid "just now"
+msgstr "ahora"
+
+#: bookorbit_board_data.lua bookorbit_catalog_util.lua bookorbit_menu_ui.lua
+msgid "%1 min ago"
+msgstr "hace %1 min"
+
+#: bookorbit_board_data.lua bookorbit_catalog_util.lua bookorbit_menu_ui.lua
+msgid "%1 h ago"
+msgstr "hace %1 h"
+
+#: bookorbit_board_data.lua bookorbit_catalog_util.lua bookorbit_menu_ui.lua
+msgid "yesterday"
+msgstr "ayer"
+
+#. TRANSLATORS: %1 is the month as it reads inside a date, %2 the year.
+#: bookorbit_board_data.lua
+msgid "Early %1 %2"
+msgstr "Principios de %1 de %2"
+
+#: bookorbit_board_data.lua
+msgid "Mid %1 %2"
+msgstr "Mediados de %1 de %2"
+
+#: bookorbit_board_data.lua
+msgid "Late %1 %2"
+msgstr "Finales de %1 de %2"
+
+#. TRANSLATORS: %1 is the short month on its own (as in a calendar), %2 the year.
+#: bookorbit_board_data.lua
+msgctxt "Month and year"
+msgid "%1 %2"
+msgstr "%1 %2"
+
+#: bookorbit_board_data.lua
+msgid "<1%"
+msgstr "<1%"
+
+#: bookorbit_board_data.lua bookorbit_board_edit.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_view.lua
+msgid "Today"
+msgstr "Hoy"
+
+#: bookorbit_board_data.lua
+msgid "Tomorrow"
+msgstr "Mañana"
+
+#. TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date.
+#: bookorbit_board_data.lua bookorbit_detail_data.lua
+msgctxt "Day and month"
+msgid "%1 %2"
+msgstr "%1 %2"
+
+#: bookorbit_board_data.lua
+msgid "New moon"
+msgstr "Luna nueva"
+
+#: bookorbit_board_data.lua
+msgid "Waxing crescent"
+msgstr "Luna creciente"
+
+#: bookorbit_board_data.lua
+msgid "First quarter"
+msgstr "Cuarto creciente"
+
+#: bookorbit_board_data.lua
+msgid "Waxing gibbous"
+msgstr "Luna gibosa creciente"
+
+#: bookorbit_board_data.lua
+msgid "Full moon"
+msgstr "Luna llena"
+
+#: bookorbit_board_data.lua
+msgid "Waning gibbous"
+msgstr "Gibosa menguante"
+
+#: bookorbit_board_data.lua
+msgid "Last quarter"
+msgstr "Cuarto menguante"
+
+#: bookorbit_board_data.lua
+msgid "Waning crescent"
+msgstr "Creciente menguante"
+
+#: bookorbit_board_data.lua
+msgid "Full moon %1 %2 %3"
+msgstr "Luna llena %1 %2 %3"
+
+#: bookorbit_board_data.lua
+msgid "New moon %1 %2 %3"
+msgstr "Luna nueva %1 %2 %3"
+
+#: bookorbit_board_data.lua
+msgid "Ampersand"
+msgstr "Et"
+
+#: bookorbit_board_data.lua
+msgid "Book, to write"
+msgstr "Libro; escribir"
+
+#: bookorbit_board_data.lua
+msgid "Pilcrow"
+msgstr "Calderón"
+
+#: bookorbit_board_data.lua
+msgid "Ain"
+msgstr "Ain"
+
+#: bookorbit_board_data.lua
+msgid "Sharp s"
+msgstr "Eszett"
+
+#: bookorbit_board_data.lua
+msgid "Ka"
+msgstr "Ka"
+
+#: bookorbit_board_data.lua
+msgid "Section sign"
+msgstr "Signo de sección"
+
+#: bookorbit_board_data.lua
+msgctxt "Glyph meaning"
+msgid "To read"
+msgstr "Leer"
+
+#: bookorbit_board_data.lua
+msgid "A, in Bengali"
+msgstr "A, en bengalí"
+
+#: bookorbit_board_data.lua
+msgid "At sign"
+msgstr "Signo @"
+
+#: bookorbit_board_data.lua
+msgid "Alef"
+msgstr "Alef"
+
+#: bookorbit_board_data.lua
+msgid "Eth"
+msgstr "Eth"
+
+#: bookorbit_board_data.lua
+msgid "Writing"
+msgstr "Escritura"
+
+#: bookorbit_board_data.lua
+msgid "Omega"
+msgstr "Omega"
+
+#: bookorbit_board_data.lua
+msgid "Zhe"
+msgstr "Zhe"
+
+#: bookorbit_board_data.lua
+msgid "Long s"
+msgstr "S larga"
+
+#: bookorbit_board_data.lua
+msgid "About a day to go"
+msgstr "Falta aproximadamente un día"
+
+#: bookorbit_board_data.lua
+msgid "About 1 day to go"
+msgid_plural "About %1 days to go"
+msgstr[0] "Falta aproximadamente %1 día"
+msgstr[1] "Faltan aproximadamente %1 días"
+
+#: bookorbit_board_data.lua
+msgid "About 1 week to go"
+msgid_plural "About %1 weeks to go"
+msgstr[0] "Falta aproximadamente %1 semana"
+msgstr[1] "Faltan unas %1 semanas"
+
+#: bookorbit_board_data.lua
+msgid "About 1 month to go"
+msgid_plural "About %1 months to go"
+msgstr[0] "Falta aproximadamente %1 mes"
+msgstr[1] "Faltan unos %1 meses"
+
+#: bookorbit_board_data.lua
+msgid "Earned today"
+msgstr "Obtenida hoy"
+
+#: bookorbit_board_data.lua
+msgid "Earned yesterday"
+msgstr "Obtenida ayer"
+
+#: bookorbit_board_data.lua
+msgid "Earned %1"
+msgstr "Obtenida el %1"
+
+#: bookorbit_board_data.lua
+msgid "Earned %1 %2"
+msgstr "Obtenida el %1 %2"
+
+#. TRANSLATORS: %1 is the day of the month, %2 the month as it reads inside a date.
+#: bookorbit_board_data.lua
+msgctxt "Day and month name"
+msgid "%1 %2"
+msgstr "%1 de %2"
+
+#. TRANSLATORS: pages turned today; %1 is the count, such as +12, shown bold.
+#: bookorbit_board_decor.lua
+msgid "%1 today"
+msgstr "%1 hoy"
+
+#: bookorbit_board_decor.lua
+msgid "Reading with you"
+msgstr "Leyendo contigo"
+
+#: bookorbit_board_decor.lua
+msgid "Fast asleep"
+msgstr "Profundamente dormido"
+
+#: bookorbit_board_decor.lua
+msgid "Wakes up when you read"
+msgstr "Se despierta cuando lees"
+
+#: bookorbit_board_decor.lua
+msgid "%1 day in a row!"
+msgid_plural "%1 days in a row!"
+msgstr[0] "¡%1 día seguido!"
+msgstr[1] "¡%1 días seguidos!"
+
+#: bookorbit_board_decor.lua
+msgid "A new best"
+msgstr "Un nuevo récord"
+
+#: bookorbit_board_decor.lua
+msgid "Your best is %1"
+msgstr "Tu récord es %1"
+
+#: bookorbit_board_decor.lua
+msgid "Book finished!"
+msgstr "¡Libro terminado!"
+
+#: bookorbit_board_decor.lua
+msgid "%1 read today"
+msgstr "%1 leído hoy"
+
+#: bookorbit_board_decor.lua
+msgid "Past bedtime"
+msgstr "Pasada la hora de dormir"
+
+#: bookorbit_board_decor.lua
+msgid "Open a book to start"
+msgstr "Abre un libro para empezar"
+
+#: bookorbit_board_decor.lua
+msgid "Ready when you are"
+msgstr "Listo cuando tú lo estés"
+
+#: bookorbit_board_decor.lua
+msgid "%1% lit"
+msgstr "%1% encendido"
+
+#: bookorbit_board_decor.lua
+msgid "since %1"
+msgstr "desde %1"
+
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Pages turned"
+msgstr "Páginas pasadas"
+
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Glyph of the day"
+msgstr "Glifo del día"
+
+#: bookorbit_board_decor.lua
+msgid "No glyph today."
+msgstr "Sin glifo hoy."
+
+#: bookorbit_board_decor.lua
+msgid "The fonts on this device have no glyph to show today."
+msgstr "Las fuentes de este dispositivo no tienen ningún glifo para mostrar hoy."
+
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Tree rings"
+msgstr "Anillos de árbol"
+
+#: bookorbit_board_decor.lua
+msgid "A ring grows for every month you read."
+msgstr "Crece un anillo por cada mes que leas."
+
+#: bookorbit_board_decor.lua bookorbit_download_sheet.lua
+#: bookorbit_status_page.lua
+msgid "%1, %2"
+msgstr "%1, %2"
+
+#: bookorbit_board_decor.lua
+msgid "One ring a month"
+msgstr "Un anillo al mes"
+
+#: bookorbit_board_decor.lua
+msgid "Widest"
+msgstr "Más ancho"
+
+#: bookorbit_board_decor.lua
+msgid "Thinnest"
+msgstr "Más fino"
+
+#: bookorbit_board_decor.lua
+msgid "12 months"
+msgstr "12 meses"
+
+#: bookorbit_board_decor.lua
+msgid "Widest ring"
+msgstr "Anillo más ancho"
+
+#: bookorbit_board_decor.lua
+msgid "End"
+msgstr "Fin"
+
+#: bookorbit_board_decor.lua
+msgid "now"
+msgstr "ahora"
+
+#: bookorbit_board_decor.lua
+msgid "Next stop"
+msgstr "Próxima parada"
+
+#: bookorbit_board_decor.lua
+msgid "Open a book and its chapters line up here."
+msgstr "Abre un libro y sus capítulos se alinearán aquí."
+
+#: bookorbit_board_decor.lua
+msgid "Open a book to start."
+msgstr "Abre un libro para empezar."
+
+#: bookorbit_board_decor.lua
+msgid "%1 stop to the end"
+msgid_plural "%1 stops to the end"
+msgstr[0] "%1 parada hasta el final"
+msgstr[1] "%1 paradas hasta el final"
+
+#. TRANSLATORS: %1 is the reading time left, such as 3 h 20 min, shown bold.
+#: bookorbit_board_decor.lua
+msgid "End of book in %1"
+msgstr "Fin del libro en %1"
+
+#: bookorbit_board_decor.lua
+msgid "%1 stop"
+msgid_plural "%1 stops"
+msgstr[0] "%1 parada"
+msgstr[1] "%1 paradas"
+
+#: bookorbit_board_decor.lua
+msgid "Common"
+msgstr "Común"
+
+#: bookorbit_board_decor.lua
+msgid "Rare"
+msgstr "Raro"
+
+#: bookorbit_board_decor.lua
+msgid "Epic"
+msgstr "Épico"
+
+#: bookorbit_board_decor.lua
+msgid "Legendary"
+msgstr "Legendario"
+
+#: bookorbit_board_decor.lua
+msgid "Badges show up here with a newer BookOrbit server."
+msgstr "Las insignias aparecerán aquí con un servidor de BookOrbit más reciente."
+
+#: bookorbit_board_decor.lua
+msgid "Needs a newer server."
+msgstr "Necesita un servidor más reciente."
+
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Next badge"
+msgstr "Siguiente insignia"
+
+#: bookorbit_board_decor.lua
+msgid "Achievements are off."
+msgstr "Los logros están desactivados."
+
+#: bookorbit_board_decor.lua
+msgid "Achievements are turned off in your BookOrbit settings."
+msgstr "Los logros están desactivados en tus ajustes de BookOrbit."
+
+#: bookorbit_board_decor.lua
+msgid "No badges yet."
+msgstr "Aún no hay insignias."
+
+#: bookorbit_board_decor.lua
+msgid "Read a little and your first badge shows up here."
+msgstr "Lee un poco y tu primera insignia aparecerá aquí."
+
+#: bookorbit_board_decor.lua
+msgid "New badge"
+msgstr "Nueva insignia"
+
+#: bookorbit_board_decor.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_board.lua bookorbit_catalog_detail.lua
+#: bookorbit_detail_view.lua bookorbit_download_sheet.lua
+#: bookorbit_list_data.lua bookorbit_list_view.lua bookorbit_text_pages.lua
+msgid "%1 of %2"
+msgstr "%1 de %2"
+
+#: bookorbit_board_decor.lua
+msgid "Books you download and never open collect dust here."
+msgstr "Los libros que descargas y nunca abres acumulan polvo aquí."
+
+#: bookorbit_board_decor.lua bookorbit_board_edit.lua
+msgid "Gathering dust"
+msgstr "Acumulando polvo"
+
+#: bookorbit_board_decor.lua
+msgid "Unopened books collect dust here."
+msgstr "Los libros sin abrir acumulan polvo aquí."
+
+#: bookorbit_board_decor.lua
+msgid "Never opened in %1 month"
+msgid_plural "Never opened in %1 months"
+msgstr[0] "Nunca abierto en %1 mes"
+msgstr[1] "Nunca abierto en %1 meses"
+
+#: bookorbit_board_decor.lua
+msgid "Never opened in %1 day"
+msgid_plural "Never opened in %1 days"
+msgstr[0] "Nunca abierto en %1 día"
+msgstr[1] "Nunca abierto en %1 días"
+
+#: bookorbit_board_decor.lua
+msgid "%1 month unopened"
+msgid_plural "%1 months unopened"
+msgstr[0] "%1 mes sin abrir"
+msgstr[1] "%1 meses sin abrir"
+
+#: bookorbit_board_decor.lua
+msgid "%1 day unopened"
+msgid_plural "%1 days unopened"
+msgstr[0] "%1 día sin abrir"
+msgstr[1] "%1 días sin abrir"
+
+#: bookorbit_board_decor.lua
+msgid "Open"
+msgstr "Abrir"
+
+#: bookorbit_board_decor.lua bookorbit_catalog.lua bookorbit_list_data.lua
+msgid "%1 book"
+msgid_plural "%1 books"
+msgstr[0] "%1 libro"
+msgstr[1] "%1 libros"
+
+#: bookorbit_board_decor.lua
+msgid "%1 more never opened, %2 MB in all"
+msgid_plural "%1 more never opened, %2 MB in all"
+msgstr[0] "%1 más nunca abierto, %2 MB en total"
+msgstr[1] "%1 más nunca abiertos, %2 MB en total"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Finish forecast"
+msgstr "Previsión de finalización"
+
+#: bookorbit_board_edit.lua
+msgid "When your book ends at your pace"
+msgstr "Cuándo terminará tu libro a tu ritmo"
+
+#: bookorbit_board_edit.lua
+msgid "One square a day for a whole year"
+msgstr "Un cuadrado al día durante todo un año"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Year in reading"
+msgstr "Año de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "Ahead or behind on your yearly goal"
+msgstr "Adelantado o atrasado respecto a tu objetivo anual"
+
+#: bookorbit_board_edit.lua
+msgid "Goal pace"
+msgstr "Ritmo del objetivo"
+
+#: bookorbit_board_edit.lua
+msgid "Brightness and warmth steppers"
+msgstr "Controles de brillo y calidez"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Light"
+msgstr "Luz"
+
+#: bookorbit_board_edit.lua
+msgid "A word you looked up, in context"
+msgstr "Una palabra que consultaste, en contexto"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Word of the day"
+msgstr "Palabra del día"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "A year ago"
+msgstr "Hace un año"
+
+#: bookorbit_board_edit.lua
+msgid "What you were reading last year"
+msgstr "Lo que estabas leyendo el año pasado"
+
+#: bookorbit_board_edit.lua
+msgid "Quick settings"
+msgstr "Ajustes rápidos"
+
+#: bookorbit_board_edit.lua
+msgid "Wi-Fi, light, night mode, rotate, sync"
+msgstr "Wi-Fi, luz, modo nocturno, rotar, sincronizar"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Reading records"
+msgstr "Récords de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "Your longest and average sessions"
+msgstr "Tus sesiones más largas y promedio"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "When you read"
+msgstr "Cuándo lees"
+
+#: bookorbit_board_edit.lua
+msgid "Your reading by hour of the day"
+msgstr "Tu lectura por hora del día"
+
+#: bookorbit_board_edit.lua
+msgid "Covers of the books you finished"
+msgstr "Portadas de los libros que terminaste"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Finished this year"
+msgstr "Terminados este año"
+
+#: bookorbit_board_edit.lua
+msgid "Books you put down a while ago"
+msgstr "Libros que dejaste hace tiempo"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Pick back up"
+msgstr "Continuar lectura"
+
+#: bookorbit_board_edit.lua
+msgid "Books waiting for their turn"
+msgstr "Libros esperando su turno"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Want to read"
+msgstr "Quiero leer"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_board.lua bookorbit_detail_data.lua
+msgid "Continue reading"
+msgstr "Continuar leyendo"
+
+#: bookorbit_board_edit.lua
+msgid "Your current book with Resume"
+msgstr "Tu libro actual con reanudación"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Also reading"
+msgstr "Otras lecturas"
+
+#: bookorbit_board_edit.lua
+msgid "The rest of your pile"
+msgstr "El resto de tu pila"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+#: bookorbit_highlight_sheet.lua
+msgid "Highlight of the day"
+msgstr "Destacado del día"
+
+#: bookorbit_board_edit.lua
+msgid "One of your highlights, daily"
+msgstr "Uno de tus destacados, a diario"
+
+#: bookorbit_board_edit.lua
+msgid "Days in a row, and your best"
+msgstr "Días seguidos y tu mejor récord"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Streak"
+msgstr "Racha"
+
+#: bookorbit_board_edit.lua
+msgid "Minutes read each day"
+msgstr "Minutos leídos cada día"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "This week"
+msgstr "Esta semana"
+
+#: bookorbit_board_edit.lua
+msgid "Minutes read today"
+msgstr "Minutos leídos hoy"
+
+#: bookorbit_board_edit.lua
+msgid "Reading calendar"
+msgstr "Calendario de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "This month, one square a day"
+msgstr "Este mes, un cuadrado al día"
+
+#: bookorbit_board_edit.lua
+msgid "The next book in each series you read"
+msgstr "El siguiente libro de cada serie que leas"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Up next in series"
+msgstr "Siguientes en tus series"
+
+#: bookorbit_board_edit.lua
+msgid "A shuffle of your library"
+msgstr "Una mezcla de tu biblioteca"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+msgid "Discover"
+msgstr "Descubrir"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+msgid "Recently added"
+msgstr "Añadidos recientemente"
+
+#: bookorbit_board_edit.lua
+msgid "The newest books in your library"
+msgstr "Los libros más nuevos de tu biblioteca"
+
+#: bookorbit_board_edit.lua
+msgid "One library, collection, SmartScope, author or series"
+msgstr "Una biblioteca, colección, SmartScope, autor o serie"
+
+#: bookorbit_board_edit.lua
+msgid "Shelf from your library"
+msgstr "Estantería de tu biblioteca"
+
+#: bookorbit_board_edit.lua
+msgid "All your books"
+msgstr "Todos tus libros"
+
+#: bookorbit_board_edit.lua bookorbit_board_store.lua
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua bookorbit_main_menu.lua bookorbit_menu_sheet.lua
+#: bookorbit_settings_page.lua
+msgid "Library"
+msgstr "Biblioteca"
+
+#: bookorbit_board_edit.lua
+msgid "Every series"
+msgstr "Todas las series"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_list_pages.lua
+#: bookorbit_menu_sheet.lua
+msgid "Series"
+msgstr "Series"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_list_pages.lua
+#: bookorbit_menu_sheet.lua
+msgid "Authors"
+msgstr "Autores"
+
+#: bookorbit_board_edit.lua
+msgid "Every author"
+msgstr "Todos los autores"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_list_pages.lua bookorbit_menu_sheet.lua
+msgid "Collections"
+msgstr "Colecciones"
+
+#: bookorbit_board_edit.lua
+msgid "Your collections"
+msgstr "Tus colecciones"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_list_pages.lua bookorbit_menu_sheet.lua
+msgid "SmartScopes"
+msgstr "SmartScopes"
+
+#: bookorbit_board_edit.lua
+msgid "Your saved SmartScopes"
+msgstr "Tus SmartScopes guardados"
+
+#: bookorbit_board_edit.lua
+msgid "Books on this device, and space left"
+msgstr "Libros en este dispositivo y espacio restante"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua bookorbit_catalog.lua
+#: bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+#: bookorbit_menu_sheet.lua
+msgid "On device"
+msgstr "En el dispositivo"
+
+#: bookorbit_board_edit.lua bookorbit_board_widgets.lua
+#: bookorbit_catalog_lists.lua
+msgid "Search"
+msgstr "Buscar"
+
+#: bookorbit_board_edit.lua
+msgid "Search your library"
+msgstr "Buscar en tu biblioteca"
+
+#: bookorbit_board_edit.lua
+msgid "Clock"
+msgstr "Reloj"
+
+#: bookorbit_board_edit.lua
+msgid "Time and date, each minute"
+msgstr "Hora y fecha, cada minuto"
+
+#: bookorbit_board_edit.lua
+msgid "Last sync, with Sync now"
+msgstr "Última sincronización, con Sincronizar ahora"
+
+#: bookorbit_board_edit.lua bookorbit_menu_sheet.lua
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
+msgid "Sync status"
+msgstr "Estado de sincronización"
+
+#: bookorbit_board_edit.lua
+msgid "A cat that keeps you company"
+msgstr "Un gato que te hace compañía"
+
+#: bookorbit_board_edit.lua
+msgid "Reading buddy"
+msgstr "Compañero de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "A floppy-eared friend for every chapter"
+msgstr "Un amigo de orejas caídas para cada capítulo"
+
+#: bookorbit_board_edit.lua
+msgid "Reading dog"
+msgstr "Perro de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "A quiet companion with a curious nose"
+msgstr "Un compañero tranquilo con una nariz curiosa"
+
+#: bookorbit_board_edit.lua
+msgid "Reading rabbit"
+msgstr "Conejo de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "A feathered friend for one more page"
+msgstr "Un amigo plumífero para una página más"
+
+#: bookorbit_board_edit.lua
+msgid "Reading owl"
+msgstr "Búho lector"
+
+#: bookorbit_board_edit.lua
+msgid "A little bookworm in a feathered coat"
+msgstr "Un pequeño ratón de biblioteca con abrigo de plumas"
+
+#: bookorbit_board_edit.lua
+msgid "Reading penguin"
+msgstr "Pingüino lector"
+
+#: bookorbit_board_edit.lua
+msgid "Reading robot"
+msgstr "Robot lector"
+
+#: bookorbit_board_edit.lua
+msgid "Recharges with a good book"
+msgstr "Se recarga con un buen libro"
+
+#: bookorbit_board_edit.lua
+msgid "A tiny night owl with a cape and fangs"
+msgstr "Un pequeño búho nocturno con capa y colmillos"
+
+#: bookorbit_board_edit.lua
+msgid "Reading vampire"
+msgstr "Vampiro lector"
+
+#: bookorbit_board_edit.lua
+msgid "A little dragon guarding a hoard of stories"
+msgstr "Un pequeño dragón custodiando un tesoro de historias"
+
+#: bookorbit_board_edit.lua
+msgid "Reading dragon"
+msgstr "Dragón lector"
+
+#: bookorbit_board_edit.lua
+msgid "A friendly spirit between the pages"
+msgstr "Un espíritu amable entre las páginas"
+
+#: bookorbit_board_edit.lua
+msgid "Reading ghost"
+msgstr "Fantasma lector"
+
+#: bookorbit_board_edit.lua
+msgid "A book that reads you back"
+msgstr "Un libro que te lee a ti"
+
+#: bookorbit_board_edit.lua
+msgid "Reading mimic"
+msgstr "Mímico lector"
+
+#: bookorbit_board_edit.lua
+msgid "Reading mummy"
+msgstr "Momia lectora"
+
+#: bookorbit_board_edit.lua
+msgid "Three thousand years of catching up"
+msgstr "Tres mil años de ponerse al día"
+
+#: bookorbit_board_edit.lua
+msgid "Never without her spellbook"
+msgstr "Nunca sin su libro de hechizos"
+
+#: bookorbit_board_edit.lua
+msgid "Reading witch"
+msgstr "Bruja lectora"
+
+#: bookorbit_board_edit.lua
+msgid "Reading skeleton"
+msgstr "Esqueleto lector"
+
+#: bookorbit_board_edit.lua
+msgid "Reads to the bone"
+msgstr "Lee hasta los huesos"
+
+#: bookorbit_board_edit.lua
+msgid "Burns the midnight oil"
+msgstr "Quema el aceite de medianoche"
+
+#: bookorbit_board_edit.lua
+msgid "Reading candle"
+msgstr "Vela de lectura"
+
+#: bookorbit_board_edit.lua
+msgid "Came a long way for a good book"
+msgstr "He venido lejos por un buen libro"
+
+#: bookorbit_board_edit.lua
+msgid "Reading alien"
+msgstr "Alienígena lector"
+
+#: bookorbit_board_edit.lua
+msgid "Chapter line"
+msgstr "Línea de capítulo"
+
+#: bookorbit_board_edit.lua
+msgid "Your book as a line, chapters as stops"
+msgstr "Tu libro como una línea, los capítulos como paradas"
+
+#: bookorbit_board_edit.lua
+msgid "The badge you are closest to earning"
+msgstr "La insignia que estás más cerca de ganar"
+
+#: bookorbit_board_edit.lua
+msgid "Books you downloaded and never opened"
+msgstr "Libros que descargaste y nunca abriste"
+
+#: bookorbit_board_edit.lua
+msgid "A ring for every month you read"
+msgstr "Un anillo por cada mes que leíste"
+
+#: bookorbit_board_edit.lua
+msgid "Every page, on a counter"
+msgstr "Cada página, en un contador"
+
+#: bookorbit_board_edit.lua
+msgid "One letter from your fonts"
+msgstr "Una letra de tus fuentes"
+
+#: bookorbit_board_edit.lua
+msgid "A clock face, each minute"
+msgstr "Esfera de reloj, cada minuto"
+
+#: bookorbit_board_edit.lua
+msgid "Analog clock"
+msgstr "Reloj analógico"
+
+#: bookorbit_board_edit.lua
+msgid "Moon phase"
+msgstr "Fase lunar"
+
+#: bookorbit_board_edit.lua
+msgid "Tonight's moon"
+msgstr "Luna de esta noche"
+
+#: bookorbit_board_edit.lua
+msgctxt "Widget category"
+msgid "New"
+msgstr "Nuevos"
+
+#: bookorbit_board_edit.lua
+msgctxt "Widget category"
+msgid "Reading"
+msgstr "Lectura"
+
+#: bookorbit_board_edit.lua bookorbit_catalog_board.lua
+#: bookorbit_settings_page.lua
+msgid "Stats"
+msgstr "Estadísticas"
+
+#: bookorbit_board_edit.lua bookorbit_catalog_lists.lua bookorbit_main_menu.lua
+msgid "Device"
+msgstr "Dispositivo"
+
+#: bookorbit_board_edit.lua bookorbit_board_store.lua
+msgid "Decor"
+msgstr "Decoración"
+
+#: bookorbit_board_edit.lua
+msgid "There is not enough room on this page for that size."
+msgstr "No hay suficiente espacio en esta página para ese tamaño."
+
+#: bookorbit_board_edit.lua
+msgid "%1 is full. Remove a widget there first."
+msgstr "%1 está lleno. Quita primero un widget de ahí."
+
+#: bookorbit_board_edit.lua
+msgid "Moved to %1."
+msgstr "Movido a %1."
+
+#: bookorbit_board_edit.lua
+msgid "This page is full. Remove a widget first, or add it on another page."
+msgstr "Esta página está llena. Quita un widget primero o añádelo en otra página."
+
+#: bookorbit_board_edit.lua
+msgid "Show a shelf of"
+msgstr "Mostrar una estantería de"
+
+#: bookorbit_board_edit.lua
+msgid "Pick where its books come from"
+msgstr "Elegir de dónde vienen sus libros"
+
+#: bookorbit_board_edit.lua
+msgid "A library, collection or SmartScope"
+msgstr "Una biblioteca, colección o SmartScope"
+
+#: bookorbit_board_edit.lua
+msgid "An author"
+msgstr "Un autor"
+
+#: bookorbit_board_edit.lua
+msgid "A series"
+msgstr "Una serie"
+
+#: bookorbit_board_edit.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+msgid "Pages"
+msgstr "Páginas"
+
+#: bookorbit_board_edit.lua
+msgid "Back to how it started"
+msgstr "Volver al estado inicial"
+
+#: bookorbit_board_edit.lua
+msgid "Reset this page"
+msgstr "Restablecer esta página"
+
+#: bookorbit_board_edit.lua
+msgid "Every page back to how it started"
+msgstr "Cada página vuelve a su estado inicial"
+
+#: bookorbit_board_edit.lua
+msgid "Reset all pages"
+msgstr "Restablecer todas las páginas"
+
+#: bookorbit_board_edit.lua
+msgid "Reset all pages?"
+msgstr "¿Restablecer todas las páginas?"
+
+#: bookorbit_board_edit.lua
+msgid "Every page goes back to its starting layout."
+msgstr "Cada página vuelve a su diseño inicial."
+
+#: bookorbit_board_edit.lua bookorbit_settings_page.lua
+msgid "Reset"
+msgstr "Restablecer"
+
+#: bookorbit_board_store.lua bookorbit_catalog_detail.lua
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+msgid "Home"
+msgstr "Inicio"
+
+#: bookorbit_board_store.lua
+msgid "Insights"
+msgstr "Estadísticas"
+
+#: bookorbit_board_widgets.lua
+msgid "Pick a book to start"
+msgstr "Elige un libro para empezar"
+
+#: bookorbit_board_widgets.lua
+msgid "Start here"
+msgstr "Empezar aquí"
+
+#: bookorbit_board_widgets.lua
+msgid "Three picks from your library"
+msgstr "Tres selecciones de tu biblioteca"
+
+#: bookorbit_board_widgets.lua
+msgid "Picks from your library"
+msgstr "Selecciones de tu biblioteca"
+
+#: bookorbit_board_widgets.lua bookorbit_detail_data.lua
+#: bookorbit_download_sheet.lua
+msgid "Start reading"
+msgstr "Empezar a leer"
+
+#: bookorbit_board_widgets.lua
+msgid "Shuffle"
+msgstr "Mezclar"
+
+#: bookorbit_board_widgets.lua
+msgid "Pick a book from your library to begin"
+msgstr "Elige un libro de tu biblioteca para comenzar"
+
+#: bookorbit_board_widgets.lua
+msgid "Continue reading · %1 of %2"
+msgstr "Continuar leyendo · %1 de %2"
+
+#: bookorbit_board_widgets.lua bookorbit_detail_data.lua
+#: bookorbit_list_data.lua bookorbit_list_pages.lua
+msgid "%1 left"
+msgstr "%1 restantes"
+
+#: bookorbit_board_widgets.lua bookorbit_book_peek.lua
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua bookorbit_download_sheet.lua
+msgid "Download"
+msgstr "Descargar"
+
+#: bookorbit_board_widgets.lua
+msgid "Resume"
+msgstr "Reanudar"
+
+#: bookorbit_board_widgets.lua
+msgid "Resume reading"
+msgstr "Reanudar lectura"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 / %2"
+msgstr "%1 / %2"
+
+#. TRANSLATORS: a reading streak; %1 is the number of days, shown large.
+#: bookorbit_board_widgets.lua
+msgid "%1 day"
+msgid_plural "%1 days"
+msgstr[0] "%1 día"
+msgstr[1] "%1 días"
+
+#: bookorbit_board_widgets.lua
+msgid "Read today"
+msgstr "Lee hoy"
+
+#: bookorbit_board_widgets.lua
+msgid "best %1"
+msgstr "mejor %1"
+
+#: bookorbit_board_widgets.lua
+msgid "Nothing yet"
+msgstr "Nada aún"
+
+#: bookorbit_board_widgets.lua
+msgid "Not yet"
+msgstr "Aún no"
+
+#: bookorbit_board_widgets.lua
+msgid "avg %1 min"
+msgstr "media %1 min"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 goal"
+msgstr "Objetivo de %1"
+
+#: bookorbit_board_widgets.lua
+msgid "Set a goal in BookOrbit."
+msgstr "Establece un objetivo en BookOrbit."
+
+#: bookorbit_board_widgets.lua
+msgid "Set a reading goal in BookOrbit to track your pace."
+msgstr "Establece un objetivo de lectura en BookOrbit para visualizar tu ritmo."
+
+#: bookorbit_board_widgets.lua
+msgid "First book starts it"
+msgstr "El primer libro lo empieza"
+
+#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua
+#: bookorbit_settings_page.lua
+msgid "New"
+msgstr "Nuevo"
+
+#: bookorbit_board_widgets.lua
+msgid "Starting out"
+msgstr "Empezando"
+
+#: bookorbit_board_widgets.lua
+msgid "Goal met"
+msgstr "Objetivo cumplido"
+
+#: bookorbit_board_widgets.lua
+msgid "Goal met · on pace for %1"
+msgstr "Objetivo cumplido · al ritmo para %1"
+
+#: bookorbit_board_widgets.lua
+msgid "on pace for %1"
+msgstr "al ritmo para %1"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 ahead"
+msgstr "%1 por delante"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 ahead of pace"
+msgstr "%1 por delante del ritmo"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 behind"
+msgstr "%1 por detrás"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 behind pace"
+msgstr "%1 por detrás del ritmo"
+
+#: bookorbit_board_widgets.lua bookorbit_list_data.lua
+msgid "%1 of 1 book"
+msgid_plural "%1 of %2 books"
+msgstr[0] "%1 de %2 libro"
+msgstr[1] "%1 de %2 libros"
+
+#: bookorbit_board_widgets.lua
+msgid "Less"
+msgstr "Menos"
+
+#: bookorbit_board_widgets.lua
+msgid "More"
+msgstr "Más"
+
+#: bookorbit_board_widgets.lua
+msgid "Your reading days fill in here"
+msgstr "Tus días de lectura se rellenarán aquí"
+
+#. TRANSLATORS: %1 is the most time read in one day, shown bold; %2 that day's date, such as Sat 17 Oct.
+#: bookorbit_board_widgets.lua
+msgid "Best day %1, %2"
+msgstr "Mejor día %1, %2"
+
+#. TRANSLATORS: short weekday, day of the month, then the short month as it reads inside a date.
+#: bookorbit_board_widgets.lua
+msgctxt "Weekday, day and month"
+msgid "%1 %2 %3"
+msgstr "%1 %2 %3"
+
+#: bookorbit_board_widgets.lua
+msgid "Past 1 month"
+msgid_plural "Past %1 months"
+msgstr[0] "Último mes"
+msgstr[1] "Últimos %1 meses"
+
+#: bookorbit_board_widgets.lua
+msgctxt "Time read"
+msgid "read"
+msgstr "de lectura"
+
+#: bookorbit_board_widgets.lua
+msgid "day"
+msgid_plural "days"
+msgstr[0] "día"
+msgstr[1] "días"
+
+#: bookorbit_board_widgets.lua
+msgid "best streak"
+msgstr "mejor racha"
+
+#: bookorbit_board_widgets.lua
+msgid "a reading day"
+msgstr "un día de lectura"
+
+#: bookorbit_board_widgets.lua
+msgid "1 day"
+msgid_plural "%1 days"
+msgstr[0] "%1 día"
+msgstr[1] "%1 días"
+
+#: bookorbit_board_widgets.lua
+msgid "1 day read"
+msgid_plural "%1 days read"
+msgstr[0] "%1 día de lectura"
+msgstr[1] "%1 días de lectura"
+
+#: bookorbit_board_widgets.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_view.lua
+msgid "All %1"
+msgstr "Todos (%1)"
+
+#: bookorbit_board_widgets.lua
+msgid "Books you start show up here."
+msgstr "Los libros que empieces aparecerán aquí."
+
+#: bookorbit_board_widgets.lua
+msgid "Your highlights come back here, one a day."
+msgstr "Tus destacados aparecerán aquí, uno al día."
+
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+msgid "In progress"
+msgstr "En progreso"
+
+#: bookorbit_board_widgets.lua
+msgid "Mark books Want to read and they wait here."
+msgstr "Marca libros como «Quiero leer» y te esperarán aquí."
+
+#: bookorbit_board_widgets.lua
+msgid "Books you put down a while ago show up here."
+msgstr "Los libros que dejaste hace tiempo aparecen aquí."
+
+#: bookorbit_board_widgets.lua
+msgid "Books you finish this year gather here."
+msgstr "Los libros que termines este año se reúnen aquí."
+
+#: bookorbit_board_widgets.lua
+msgid "Shelf"
+msgstr "Estantería"
+
+#: bookorbit_board_widgets.lua
+msgid "Finished in %1"
+msgstr "Terminados en %1"
+
+#: bookorbit_board_widgets.lua bookorbit_list_pages.lua
+msgid "See all"
+msgstr "Ver todo"
+
+#: bookorbit_board_widgets.lua bookorbit_catalog.lua
+msgid "Loading…"
+msgstr "Cargando…"
+
+#: bookorbit_board_widgets.lua
+msgid "Connect to Wi-Fi to fill this shelf."
+msgstr "Conéctate a Wi-Fi para rellenar esta estantería."
+
+#: bookorbit_board_widgets.lua bookorbit_catalog.lua
+msgid "Nothing here yet."
+msgstr "Aún no hay nada."
+
+#: bookorbit_board_widgets.lua
+msgid "book"
+msgid_plural "books"
+msgstr[0] "libro"
+msgstr[1] "libros"
+
+#: bookorbit_board_widgets.lua
+msgid "series"
+msgid_plural "series"
+msgstr[0] "serie"
+msgstr[1] "series"
+
+#: bookorbit_board_widgets.lua
+msgid "author"
+msgid_plural "authors"
+msgstr[0] "autor"
+msgstr[1] "autores"
+
+#: bookorbit_board_widgets.lua
+msgid "collection"
+msgid_plural "collections"
+msgstr[0] "colección"
+msgstr[1] "colecciones"
+
+#: bookorbit_board_widgets.lua
+msgid "scope"
+msgid_plural "scopes"
+msgstr[0] "alcance"
+msgstr[1] "alcances"
+
+#: bookorbit_board_widgets.lua
+msgid "book here"
+msgid_plural "books here"
+msgstr[0] "libro aquí"
+msgstr[1] "libros aquí"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 GB free"
+msgstr "%1 GB libres"
+
+#: bookorbit_board_widgets.lua bookorbit_bulk_sheet.lua bookorbit_catalog.lua
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+#: bookorbit_list_pages.lua
+msgid "Books"
+msgstr "Libros"
+
+#: bookorbit_board_widgets.lua
+msgid "Title, author"
+msgstr "Título, autor"
+
+#: bookorbit_board_widgets.lua
+msgid "not yet"
+msgstr "aún no"
+
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+#: bookorbit_detail_data.lua bookorbit_detail_view.lua bookorbit_list_view.lua
+#: bookorbit_menu_sheet.lua bookorbit_status_page.lua
+msgid "Offline"
+msgstr "Sin conexión"
+
+#: bookorbit_board_widgets.lua bookorbit_main_menu.lua
+#: bookorbit_settings_page.lua
+msgid "Sync"
+msgstr "Sincronización"
+
+#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua
+#: bookorbit_status_page.lua
+msgid "Synced"
+msgstr "Sincronizado"
+
+#: bookorbit_board_widgets.lua bookorbit_catalog_board.lua
+msgid "saved %1"
+msgstr "guardado %1"
+
+#: bookorbit_board_widgets.lua bookorbit_menu_sheet.lua
+msgid "Connect"
+msgstr "Conectar"
+
+#: bookorbit_board_widgets.lua bookorbit_book_sheet.lua
+#: bookorbit_status_page.lua
+msgid "Sync now"
+msgstr "Sincronizar ahora"
+
+#: bookorbit_board_widgets.lua
+msgid "Mornings"
+msgstr "Mañanas"
+
+#: bookorbit_board_widgets.lua
+msgid "Afternoons"
+msgstr "Tardes"
+
+#: bookorbit_board_widgets.lua
+msgid "Evenings"
+msgstr "Noches"
+
+#: bookorbit_board_widgets.lua
+msgid "Late nights"
+msgstr "Madrugadas"
+
+#: bookorbit_board_widgets.lua
+msgid "Read on this device and your hours show up here."
+msgstr "Lee en este dispositivo y tus horas aparecerán aquí."
+
+#: bookorbit_board_widgets.lua
+msgid "Most at %1"
+msgstr "Más en %1"
+
+#: bookorbit_board_widgets.lua
+msgid "Your records appear as you read on this device."
+msgstr "Tus registros aparecerán a medida que leas en este dispositivo."
+
+#: bookorbit_board_widgets.lua
+msgid "longest session"
+msgstr "sesión más larga"
+
+#: bookorbit_board_widgets.lua
+msgid "pages an hour"
+msgstr "páginas por hora"
+
+#: bookorbit_board_widgets.lua
+msgid "average session"
+msgstr "sesión media"
+
+#: bookorbit_board_widgets.lua
+msgid "sessions"
+msgstr "sesiones"
+
+#: bookorbit_board_widgets.lua
+msgid "Night"
+msgstr "Noche"
+
+#: bookorbit_board_widgets.lua
+msgid "Rotate"
+msgstr "Rotar"
+
+#: bookorbit_board_widgets.lua
+msgctxt "Action"
+msgid "Sync"
+msgstr "Sincronizar"
+
+#: bookorbit_board_widgets.lua
+msgid "Wi-Fi"
+msgstr "Wi-Fi"
+
+#: bookorbit_board_widgets.lua
+msgid "This device has no frontlight."
+msgstr "Este dispositivo no tiene luz frontal."
+
+#: bookorbit_board_widgets.lua
+msgid "Brightness"
+msgstr "Brillo"
+
+#: bookorbit_board_widgets.lua
+msgid "Brightness · Warmth"
+msgstr "Brillo · Calidez"
+
+#: bookorbit_board_widgets.lua
+msgid "Finish"
+msgstr "Fin"
+
+#: bookorbit_board_widgets.lua
+msgid "Read a little"
+msgstr "Lee un poco"
+
+#: bookorbit_board_widgets.lua
+msgid "Read a little on this device and a finish date shows up here."
+msgstr "Lee un poco en este dispositivo y aquí aparecerá una fecha de finalización."
+
+#: bookorbit_board_widgets.lua
+msgid "%1 left at ~%2 min a day"
+msgstr "%1 restantes a ~%2 min al día"
+
+#: bookorbit_board_widgets.lua
+msgid "Look up a word while reading and one comes back here each day."
+msgstr "Busca una palabra mientras lees y cada día aparecerá una aquí."
+
+#: bookorbit_board_widgets.lua
+msgid "Look up a word while reading."
+msgstr "Busca una palabra mientras lees."
+
+#: bookorbit_board_widgets.lua
+msgid "Check back next year."
+msgstr "Vuelve a consultar el próximo año."
+
+#: bookorbit_board_widgets.lua
+msgid "Next year, this shows what you were reading today."
+msgstr "El próximo año, esto mostrará lo que estabas leyendo hoy."
+
+#: bookorbit_board_widgets.lua
+msgid "Stopped at %1%"
+msgstr "Detenido en el %1%"
+
+#: bookorbit_board_widgets.lua
+msgid "%1% read"
+msgstr "%1% leído"
+
+#: bookorbit_board_widgets.lua
+msgid "Pick it up"
+msgstr "Continuar"
+
+#: bookorbit_board_widgets.lua
+msgid "%1 over %2 day, then you stopped at %3%."
+msgid_plural "%1 over %2 days, then you stopped at %3%."
+msgstr[0] "%1 en %2 día, luego te detuviste en el %3%."
+msgstr[1] "%1 en %2 días, luego te detuviste en el %3%."
+
+#: bookorbit_board_widgets.lua
+msgid "Stopped at %1%."
+msgstr "Detenido en el %1%."
+
+#: bookorbit_board_widgets.lua
+msgid "Could not draw this widget."
+msgstr "No se pudo dibujar este widget."
+
+#: bookorbit_book_peek.lua bookorbit_bulk_sheet.lua bookorbit_catalog.lua
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_util.lua
+#: bookorbit_catalog_widgets.lua bookorbit_detail_data.lua
+msgid "Untitled"
+msgstr "Sin título"
+
+#: bookorbit_book_peek.lua bookorbit_download_sheet.lua
+msgid "%1, to %2"
+msgstr "%1, en %2"
+
+#: bookorbit_book_peek.lua
+msgid "%1 · %2%"
+msgstr "%1 · %2%"
+
+#: bookorbit_book_peek.lua bookorbit_catalog_lists.lua
+msgid "Not on this device"
+msgstr "No está en este dispositivo"
+
+#: bookorbit_book_peek.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua bookorbit_update_sheet.lua
+msgid "On this device"
+msgstr "En este dispositivo"
+
+#: bookorbit_book_peek.lua bookorbit_detail_data.lua
+msgctxt "Action"
+msgid "Read"
+msgstr "Leer"
+
+#: bookorbit_book_peek.lua bookorbit_detail_view.lua
+msgid "Details"
+msgstr "Detalles"
+
+#: bookorbit_book_peek.lua bookorbit_catalog_detail.lua
+#: bookorbit_detail_view.lua bookorbit_text_pages.lua
+msgid "About this book"
+msgstr "Sobre este libro"
+
+#: bookorbit_book_peek.lua bookorbit_text_pages.lua
+msgid "Genres & tags"
+msgstr "Géneros y etiquetas"
+
+#: bookorbit_book_peek.lua
+msgid "Remove from this device"
+msgstr "Quitar de este dispositivo"
+
+#: bookorbit_book_peek.lua
+msgid "Stays in your library"
+msgstr "Se queda en tu biblioteca"
+
+#: bookorbit_book_peek.lua bookorbit_catalog_detail.lua
+msgid "Download options"
+msgstr "Opciones de descarga"
+
+#: bookorbit_book_peek.lua
+msgid "Edition, folder and file name"
+msgstr "Edición, carpeta y nombre de archivo"
+
+#: bookorbit_book_peek.lua
+msgid "Pick books to download or mark read together"
+msgstr "Elegir libros para descargar o marcar como leídos juntos"
+
+#: bookorbit_book_peek.lua
+msgid "Select"
+msgstr "Seleccionar"
+
+#: bookorbit_book_peek.lua
+msgid "Unselect"
+msgstr "Deseleccionar"
+
+#: bookorbit_book_peek.lua bookorbit_catalog_board.lua
+#: bookorbit_catalog_detail.lua
+msgid "Open the file browser to remove this book."
+msgstr "Abre el explorador de archivos para quitar este libro."
+
+#: bookorbit_book_sheet.lua
+msgid "%1, page %2 of %3"
+msgstr "%1, página %2 de %3"
+
+#: bookorbit_book_sheet.lua
+msgid "Checking…"
+msgstr "Comprobando…"
+
+#: bookorbit_book_sheet.lua
+msgid "No position yet"
+msgstr "Sin posición todavía"
+
+#: bookorbit_book_sheet.lua
+msgid "Not checked yet"
+msgstr "Aún no comprobado"
+
+#: bookorbit_book_sheet.lua bookorbit_main_menu.lua
+msgid "This device"
+msgstr "Este dispositivo"
+
+#: bookorbit_book_sheet.lua bookorbit_catalog.lua bookorbit_main_menu.lua
+#: bookorbit_settings_page.lua bookorbit_sync_sheet.lua main.lua
+msgid "BookOrbit"
+msgstr "BookOrbit"
+
+#: bookorbit_book_sheet.lua bookorbit_settings_page.lua
+msgid "BookOrbit is further ahead"
+msgstr "BookOrbit va por delante"
+
+#: bookorbit_book_sheet.lua
+msgid "BookOrbit has an earlier place"
+msgstr "BookOrbit tiene un lugar anterior"
+
+#: bookorbit_book_sheet.lua
+msgid "Go back to %1"
+msgstr "Volver a %1"
+
+#: bookorbit_book_sheet.lua
+msgid "Jump to %1"
+msgstr "Saltar a %1"
+
+#: bookorbit_book_sheet.lua
+msgid "Stay at %1"
+msgstr "Quedarse en %1"
+
+#: bookorbit_book_sheet.lua
+msgid "Stay here"
+msgstr "Quedarse aquí"
+
+#: bookorbit_book_sheet.lua
+msgid "Reading time syncs either way. Highlights and bookmarks don't sync for this copy."
+msgstr "El tiempo de lectura se sincroniza en ambos sentidos. Los destacados y marcadores no se sincronizan para esta copia."
+
+#: bookorbit_book_sheet.lua
+msgid "Highlights, bookmarks and reading time sync either way."
+msgstr "Los destacados, marcadores y el tiempo de lectura se sincronizan en ambos sentidos."
+
+#: bookorbit_book_sheet.lua
+msgid "When BookOrbit is ahead"
+msgstr "Cuando BookOrbit va por delante"
+
+#: bookorbit_book_sheet.lua
+msgid "When BookOrbit is behind"
+msgstr "Cuando BookOrbit se queda atrás"
+
+#: bookorbit_book_sheet.lua bookorbit_settings_page.lua
+msgid "Ask"
+msgstr "Preguntar"
+
+#: bookorbit_book_sheet.lua bookorbit_menu_sheet.lua
+msgid "Synced %1"
+msgstr "Sincronizado %1"
+
+#: bookorbit_book_sheet.lua
+msgid "In BookOrbit"
+msgstr "En BookOrbit"
+
+#: bookorbit_book_sheet.lua
+msgid "Not matched yet"
+msgstr "Aún no coinciden"
+
+#: bookorbit_book_sheet.lua bookorbit_menu_sheet.lua bookorbit_status_page.lua
+msgid "Syncing…"
+msgstr "Sincronizando…"
+
+#: bookorbit_book_sheet.lua bookorbit_main_menu.lua bookorbit_settings_page.lua
+msgid "Open BookOrbit"
+msgstr "Abrir BookOrbit"
+
+#: bookorbit_book_sheet.lua
+msgid "Could not sync: %1"
+msgstr "No se pudo sincronizar: %1"
+
+#: bookorbit_book_sheet.lua
+msgid "This copy is a different file from the one in BookOrbit. Progress syncs as a percentage. Highlights and bookmarks don't sync. Download the book from BookOrbit to sync everything."
+msgstr "Esta copia es un archivo diferente al de BookOrbit. El progreso se sincroniza como un porcentaje. Los destacados y marcadores no se sincronizan. Descarga el libro desde BookOrbit para sincronizarlo todo."
+
+#: bookorbit_book_sheet.lua bookorbit_settings_page.lua
+msgid "Auto-sync"
+msgstr "Sincronización automática"
+
+#: bookorbit_book_sheet.lua
+msgid "For every book"
+msgstr "Para todos los libros"
+
+#: bookorbit_book_sheet.lua
+msgid "Book details in BookOrbit"
+msgstr "Detalles del libro en BookOrbit"
+
+#: bookorbit_book_sheet.lua
+msgid "%1 highlights, %2 bookmarks"
+msgstr "Destacados: %1; marcadores: %2"
+
+#: bookorbit_book_sheet.lua
+msgid "Open BookOrbit Home"
+msgstr "Abrir el Inicio de BookOrbit"
+
+#: bookorbit_book_sheet.lua bookorbit_book_sync.lua
+msgid "Book synced"
+msgstr "Libro sincronizado"
+
+#: bookorbit_book_sync.lua
+msgid "BookOrbit sign-in failed. Check your account"
+msgstr "Error al iniciar sesión en BookOrbit. Comprueba tu cuenta"
+
+#: bookorbit_book_sync.lua
+msgid "BookOrbit server not reachable"
+msgstr "Servidor de BookOrbit no accesible"
+
+#: bookorbit_book_sync.lua
+msgid "This book is not in your BookOrbit library"
+msgstr "Este libro no está en tu biblioteca de BookOrbit"
+
+#: bookorbit_book_sync.lua
+msgid "1 reading event."
+msgid_plural "%1 reading events."
+msgstr[0] "%1 evento de lectura."
+msgstr[1] "%1 eventos de lectura."
+
+#: bookorbit_book_sync.lua bookorbit_highlight_summary.lua
+msgid "Highlights synced: %1 uploaded, %2 applied, %3 deleted."
+msgstr "Destacados sincronizados (subidos: %1; aplicados: %2; eliminados: %3)."
+
+#: bookorbit_book_sync.lua bookorbit_sweep.lua main.lua
+msgid "BookOrbit server needs an update for two-way highlights."
+msgstr "El servidor de BookOrbit necesita una actualización para los destacados bidireccionales."
+
+#: bookorbit_book_sync.lua bookorbit_sweep.lua
+msgid "Two-way highlight and bookmark sync is disabled."
+msgstr "La sincronización bidireccional de destacados y marcadores está desactivada."
+
+#: bookorbit_book_sync.lua
+msgid "Progress was not changed."
+msgstr "El progreso no ha cambiado."
+
+#: bookorbit_book_sync.lua
+msgid "Some uploads failed and will retry on the next sync."
+msgstr "Algunas subidas han fallado y se reintentarán en la próxima sincronización."
+
+#: bookorbit_book_sync.lua
+msgid "BookOrbit sync is already running"
+msgstr "La sincronización de BookOrbit ya se está ejecutando"
+
+#: bookorbit_book_sync.lua main.lua
+msgid "Sign in to BookOrbit first"
+msgstr "Inicia sesión en BookOrbit primero"
+
+#: bookorbit_bookmarks.lua
+msgid "in %1"
+msgstr "en %1"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Download books"
+msgstr "Descargar libros"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Download settings"
+msgstr "Ajustes de descarga"
+
+#: bookorbit_bulk_sheet.lua bookorbit_download_sheet.lua
+msgid "Folder"
+msgstr "Carpeta"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog.lua
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+msgid "Format"
+msgstr "Formato"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "Files already there"
+msgstr "Archivos ya existentes"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "Read-aloud EPUBs"
+msgstr "EPUB en voz alta"
+
+#: bookorbit_bulk_sheet.lua
+msgid "How"
+msgstr "Cómo"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Files already there are replaced"
+msgstr "Los archivos existentes se reemplazan"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Replacing a book can move its place and highlights. Each old file stays until its new copy is complete."
+msgstr "Reemplazar un libro puede cambiar su posición y destacados. Cada archivo antiguo se mantiene hasta que su nueva copia esté completa."
+
+#: bookorbit_bulk_sheet.lua
+msgid "%1 is already on this device"
+msgid_plural "%1 are already on this device"
+msgstr[0] "%1 ya está en este dispositivo"
+msgstr[1] "%1 ya están en este dispositivo"
+
+#: bookorbit_bulk_sheet.lua
+msgid "%1 has no format this reader opens"
+msgid_plural "%1 have no format this reader opens"
+msgstr[0] "%1 no tiene ningún formato que este lector abra"
+msgstr[1] "%1 no tienen un formato que este lector abra"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Downloading %1 of %2"
+msgstr "Descargando %1 de %2"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "Getting ready…"
+msgstr "Preparando…"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+#: bookorbit_catalog_download.lua bookorbit_download_sheet.lua
+msgid "Downloaded"
+msgstr "Descargado"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Already here"
+msgstr "Ya está aquí"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Skipped"
+msgstr "Omitido"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "Failed"
+msgstr "Fallido"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Stop after this book"
+msgstr "Detener después de este libro"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "Stopping after this book…"
+msgstr "Deteniéndose después de este libro…"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_bulk_download.lua
+msgid "%1, and %2 more"
+msgstr "%1 y %2 más"
+
+#: bookorbit_bulk_sheet.lua
+msgid "These did not download"
+msgstr "Estos no se descargaron"
+
+#: bookorbit_bulk_sheet.lua
+msgid "Retry failed"
+msgstr "Reintentar las descargas fallidas"
+
+#: bookorbit_bulk_sheet.lua
+msgid "View on device"
+msgstr "Ver en el dispositivo"
+
+#: bookorbit_bulk_sheet.lua bookorbit_catalog_board.lua
+#: bookorbit_download_sheet.lua bookorbit_list_pages.lua
+#: bookorbit_signin_page.lua bookorbit_sync_sheet.lua
+msgid "Done"
+msgstr "Hecho"
+
+#: bookorbit_catalog.lua
+msgid "BookOrbit login failed. Check your KOReader credentials."
+msgstr "Error de inicio de sesión en BookOrbit. Comprueba tus credenciales de KOReader."
+
+#: bookorbit_catalog.lua bookorbit_main_menu.lua bookorbit_signin_page.lua
+msgid "Could not reach the BookOrbit server: %1"
+msgstr "No se pudo conectar con el servidor de BookOrbit: %1"
+
+#: bookorbit_catalog.lua
+msgid "Could not reach the BookOrbit server."
+msgstr "No se pudo conectar con el servidor de BookOrbit."
+
+#: bookorbit_catalog.lua
+msgid "Refreshing..."
+msgstr "Actualizando..."
+
+#: bookorbit_catalog.lua bookorbit_catalog_detail.lua
+msgid "Offline cache"
+msgstr "Caché sin conexión"
+
+#: bookorbit_catalog.lua
+msgid "Filter: %1"
+msgstr "Filtro: %1"
+
+#: bookorbit_catalog.lua
+msgid "Results page %1"
+msgstr "Página de resultados %1"
+
+#: bookorbit_catalog.lua
+msgid "Loading..."
+msgstr "Cargando..."
+
+#: bookorbit_catalog.lua
+msgid "BookOrbit server error (%1)."
+msgstr "Error del servidor BookOrbit (%1)."
+
+#: bookorbit_catalog.lua
+msgid "Could not reach the BookOrbit server. Check your connection."
+msgstr "No se pudo alcanzar el servidor BookOrbit. Comprueba tu conexión."
+
+#: bookorbit_catalog.lua
+msgid "No libraries you can access."
+msgstr "No tienes bibliotecas a las que acceder."
+
+#: bookorbit_catalog.lua
+msgid "No collections yet."
+msgstr "Aún no hay colecciones."
+
+#: bookorbit_catalog.lua
+msgid "No SmartScopes yet."
+msgstr "Aún no hay SmartScopes."
+
+#: bookorbit_catalog.lua
+msgid "No authors found."
+msgstr "No se encontraron autores."
+
+#: bookorbit_catalog.lua
+msgid "No series found."
+msgstr "No se han encontrado series."
+
+#: bookorbit_catalog.lua
+msgid "No books match \"%1\"."
+msgstr "No hay libros que coincidan con \"%1\"."
+
+#: bookorbit_catalog.lua
+msgid "No books match these filters."
+msgstr "No hay libros que coincidan con estos filtros."
+
+#: bookorbit_catalog.lua
+msgid "No books here yet."
+msgstr "Aún no hay libros aquí."
+
+#: bookorbit_catalog.lua bookorbit_catalog_detail.lua
+#: bookorbit_catalog_lists.lua
+msgid "Opening %1…"
+msgstr "Abriendo %1…"
+
+#: bookorbit_catalog.lua
+msgid "Filter this list"
+msgstr "Filtrar esta lista"
+
+#: bookorbit_catalog.lua
+msgid "Part of a name"
+msgstr "Parte de un nombre"
+
+#: bookorbit_catalog.lua
+msgid "Filter"
+msgstr "Filtrar"
+
+#: bookorbit_catalog.lua bookorbit_text_entry.lua
+msgid "Or press Enter on the keyboard"
+msgstr "O pulsa Enter en el teclado"
+
+#: bookorbit_catalog.lua
+msgid "Filtered by: %1"
+msgstr "Filtrado por: %1"
+
+#: bookorbit_catalog.lua
+msgid "Show the whole list"
+msgstr "Mostrar la lista completa"
+
+#: bookorbit_catalog.lua bookorbit_list_pages.lua
+msgid "Libraries"
+msgstr "Bibliotecas"
+
+#: bookorbit_catalog.lua bookorbit_catalog_lists.lua
+msgid "Opening books…"
+msgstr "Abriendo libros…"
+
+#: bookorbit_catalog.lua
+msgid "No downloaded books are linked on this device yet"
+msgstr "Aún no hay libros descargados vinculados en este dispositivo"
+
+#: bookorbit_catalog.lua
+msgid "%1 search: %2"
+msgstr "%1 búsqueda: %2"
+
+#: bookorbit_catalog.lua bookorbit_catalog_lists.lua
+msgid "Search: %1"
+msgstr "Búsqueda: %1"
+
+#: bookorbit_catalog.lua
+msgid "Search BookOrbit"
+msgstr "Buscar BookOrbit"
+
+#: bookorbit_catalog.lua
+msgid "Search in %1"
+msgstr "Buscar en %1"
+
+#: bookorbit_catalog.lua
+msgid "Title, author, series or ISBN"
+msgstr "Título, autor, serie o ISBN"
+
+#: bookorbit_catalog.lua bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_view.lua
+msgid "All"
+msgstr "Todos"
+
+#: bookorbit_catalog.lua
+msgid "Order: %1"
+msgstr "Orden: %1"
+
+#: bookorbit_catalog.lua bookorbit_main_menu.lua
+msgid "%1 (%2)"
+msgstr "%1 (%2)"
+
+#: bookorbit_catalog.lua
+msgid "%1 book - Sort: %2"
+msgid_plural "%1 books - Sort: %2"
+msgstr[0] "%1 libro - Orden: %2"
+msgstr[1] "%1 libros - Ordenar: %2"
+
+#: bookorbit_catalog.lua
+msgid "Sort: %1"
+msgstr "Ordenar: %1"
+
+#. TRANSLATORS: %1 is the line so far (count and sort), %2 the active filters.
+#: bookorbit_catalog.lua
+msgid "%1 - Filter: %2"
+msgstr "%1 - Filtro: %2"
+
+#: bookorbit_catalog.lua
+msgid "Read %1/%2 - %3"
+msgstr "Leído %1/%2 - %3"
+
+#: bookorbit_catalog.lua
+msgid "Sort books"
+msgstr "Ordenar libros"
+
+#: bookorbit_catalog.lua
+msgid "%1 x %2"
+msgstr "%1 x %2"
+
+#: bookorbit_catalog.lua
+msgid "Grid (columns x rows)"
+msgstr "Rejilla (columnas x filas)"
+
+#: bookorbit_catalog.lua
+msgid "Read status"
+msgstr "Estado de lectura"
+
+#: bookorbit_catalog.lua
+msgid "The books you selected"
+msgstr "Los libros que seleccionaste"
+
+#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua
+#: bookorbit_catalog_lists.lua
+msgid "Selected books"
+msgstr "Libros seleccionados"
+
+#: bookorbit_catalog.lua
+msgid "This page"
+msgstr "Esta página"
+
+#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua
+msgid "Current page"
+msgstr "Página actual"
+
+#: bookorbit_catalog.lua
+msgid "Everything in this list"
+msgstr "Todo en esta lista"
+
+#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua
+msgid "Current list"
+msgstr "Lista actual"
+
+#: bookorbit_catalog.lua
+msgid "View: List"
+msgstr "Vista: Lista"
+
+#: bookorbit_catalog.lua
+msgid "View: Mosaic"
+msgstr "Vista: Mosaico"
+
+#: bookorbit_catalog.lua
+msgid "Titles: Hidden"
+msgstr "Títulos: Ocultos"
+
+#: bookorbit_catalog.lua
+msgid "Titles: Shown"
+msgstr "Títulos: Mostrados"
+
+#: bookorbit_catalog.lua
+msgid "Refresh"
+msgstr "Actualizar"
+
+#: bookorbit_catalog.lua
+msgid "Filter..."
+msgstr "Filtrar..."
+
+#: bookorbit_catalog.lua
+msgid "Clear filter"
+msgstr "Borrar filtro"
+
+#: bookorbit_catalog.lua bookorbit_catalog_bulk_download.lua
+#: bookorbit_catalog_lists.lua
+msgid "Select books"
+msgstr "Seleccionar libros"
+
+#: bookorbit_catalog.lua bookorbit_catalog_lists.lua
+msgid "Download..."
+msgstr "Descargar..."
+
+#: bookorbit_catalog.lua
+msgid "Status: %1"
+msgstr "Estado: %1"
+
+#: bookorbit_catalog.lua
+msgid "Format: %1"
+msgstr "Formato: %1"
+
+#: bookorbit_catalog.lua
+msgid "Grid: %1"
+msgstr "Rejilla: %1"
+
+#: bookorbit_catalog.lua bookorbit_catalog_dashboard.lua
+msgid "Dashboard"
+msgstr "Panel"
+
+#: bookorbit_catalog.lua bookorbit_menu_sheet.lua
+msgid "Close BookOrbit"
+msgstr "Cerrar BookOrbit"
+
+#: bookorbit_catalog.lua
+msgid "This BookOrbit server does not support catalog edits."
+msgstr "Este servidor de BookOrbit no admite ediciones del catálogo."
+
+#: bookorbit_catalog.lua
+msgid "Loading the next page…"
+msgstr "Cargando la siguiente página…"
+
+#: bookorbit_catalog_board.lua
+msgid "%1 widget does not fit at this interface size"
+msgid_plural "%1 widgets do not fit at this interface size"
+msgstr[0] "%1 widget no cabe en este tamaño de interfaz"
+msgstr[1] "%1 widgets no caben en este tamaño de interfaz"
+
+#: bookorbit_catalog_board.lua
+msgid "Tap a widget to move, resize or remove it"
+msgstr "Toca un widget para moverlo, redimensionarlo o quitarlo"
+
+#: bookorbit_catalog_board.lua
+msgid "Edit %1"
+msgstr "Editar %1"
+
+#: bookorbit_catalog_board.lua
+msgid "Add widget"
+msgstr "Añadir widget"
+
+#: bookorbit_catalog_board.lua bookorbit_catalog_lists.lua
+msgid "All books"
+msgstr "Todos los libros"
+
+#: bookorbit_catalog_board.lua
+msgid "Wide"
+msgstr "Ancho"
+
+#: bookorbit_catalog_board.lua
+msgid "Size"
+msgstr "Tamaño"
+
+#: bookorbit_catalog_board.lua
+msgid "Earlier"
+msgstr "Antes"
+
+#: bookorbit_catalog_board.lua bookorbit_update_sheet.lua
+msgid "Later"
+msgstr "Después"
+
+#: bookorbit_catalog_board.lua
+msgid "Page"
+msgstr "Página"
+
+#: bookorbit_catalog_board.lua
+msgid "Remove"
+msgstr "Quitar"
+
+#: bookorbit_catalog_board.lua
+msgid "Add a widget"
+msgstr "Añadir un widget"
+
+#: bookorbit_catalog_board.lua
+msgid "%1 widgets · %2 new"
+msgstr "Widgets: %1 · nuevos: %2"
+
+#: bookorbit_catalog_board.lua bookorbit_settings_page.lua
+msgid "Reader"
+msgstr "Lectura"
+
+#: bookorbit_catalog_board.lua
+msgid "Your book first, then your pile, highlight and shelves"
+msgstr "Tu libro primero, luego tu pila, destacados y estanterías"
+
+#: bookorbit_catalog_board.lua
+msgid "Year in reading, records and forecast up front"
+msgstr "Año de lectura, récords y pronóstico al frente"
+
+#: bookorbit_catalog_board.lua
+msgid "Pick back up, Up next and Want to read first"
+msgstr "Continuar lectura, siguiente y quiero leer primero"
+
+#: bookorbit_catalog_board.lua
+msgid "Set up your dashboard"
+msgstr "Configura tu panel"
+
+#: bookorbit_catalog_board.lua
+msgid "Pick a starting layout. Each comes with four pages, Home, Insights, Library and Decor, that you can change any time: hold a widget to edit it."
+msgstr "Elige un diseño inicial. Cada uno incluye cuatro páginas, Inicio, Estadísticas, Biblioteca y Decoración, que puedes cambiar en cualquier momento: mantén pulsado un widget para editarlo."
+
+#: bookorbit_catalog_board.lua
+msgid "%1 comes with four pages"
+msgstr "%1 incluye cuatro páginas"
+
+#: bookorbit_catalog_board.lua
+msgid "Start with %1"
+msgstr "Empezar con %1"
+
+#: bookorbit_catalog_board.lua
+msgid "Finding books..."
+msgstr "Buscando libros..."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "EPUB first"
+msgstr "EPUB primero"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "PDF first"
+msgstr "PDF primero"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Comics first"
+msgstr "Cómics primero"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Skip existing"
+msgstr "Omitir existentes"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Overwrite existing"
+msgstr "Sobrescribir existentes"
+
+#: bookorbit_catalog_bulk_download.lua bookorbit_catalog_lists.lua
+msgid "1 selected"
+msgid_plural "%1 selected"
+msgstr[0] "%1 seleccionado"
+msgstr[1] "%1 seleccionados"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "%1 book selected"
+msgid_plural "%1 books selected"
+msgstr[0] "%1 libro seleccionado"
+msgstr[1] "%1 libros seleccionados"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Download selected"
+msgstr "Descargar seleccionados"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Select this page"
+msgstr "Seleccionar esta página"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Clear the selection"
+msgstr "Borrar la selección"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Done selecting"
+msgstr "Finalizado"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "BookOrbit default"
+msgstr "Predeterminado de BookOrbit"
+
+#: bookorbit_catalog_bulk_download.lua bookorbit_detail_data.lua
+msgid "With narration"
+msgstr "Con narración"
+
+#: bookorbit_catalog_bulk_download.lua bookorbit_detail_data.lua
+msgid "Text only"
+msgstr "Solo texto"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Saved in BookOrbit for this device. Books already here stay as they are."
+msgstr "Guardado en BookOrbit para este dispositivo. Los libros que ya estén aquí se mantendrán como están."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Whatever your BookOrbit settings say"
+msgstr "Lo que digan tus ajustes de BookOrbit"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Narration taken out, so books stay small"
+msgstr "Se quita la narración para que los libros sigan siendo pequeños"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "The audio comes too"
+msgstr "El audio también viene incluido"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Which file to take when a book has several"
+msgstr "Qué archivo tomar cuando un libro tiene varios"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Can move a book's place and highlights"
+msgstr "Puede mover el lugar y los destacados de un libro"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Download %1 book"
+msgid_plural "Download %1 books"
+msgstr[0] "Descargar %1 libro"
+msgstr[1] "Descargar %1 libros"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "A bulk download is already running."
+msgstr "Ya se está ejecutando una descarga masiva."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "No books to download."
+msgstr "No hay libros para descargar."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Could not prepare bulk download."
+msgstr "No se pudo preparar la descarga masiva."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Resuming previous bulk download..."
+msgstr "Reanudando la descarga masiva anterior..."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Could not load the selected books."
+msgstr "No se pudieron cargar los libros seleccionados."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Loading list page %1..."
+msgstr "Cargando página de lista %1..."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Path conflict - using unique filename"
+msgstr "Conflicto de ruta - usando nombre de archivo único"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Checking book..."
+msgstr "Comprobando libro..."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Already on device - skipping"
+msgstr "Ya en el dispositivo - omitido"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "No supported format - skipping"
+msgstr "Formato no admitido - omitido"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Loading book details..."
+msgstr "Cargando detalles del libro..."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Could not load book details"
+msgstr "No se pudieron cargar los detalles del libro"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Already downloaded - skipping"
+msgstr "Ya descargado - omitido"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "File already exists - skipping"
+msgstr "El archivo ya existe - omitido"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Download failed"
+msgstr "Descarga fallida"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Download complete"
+msgstr "Descarga completa"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Downloading - %1"
+msgstr "Descargando - %1"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Downloading..."
+msgstr "Descargando..."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Bulk download complete"
+msgstr "Descarga masiva completa"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Bulk download stopped"
+msgstr "Descarga masiva detenida"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Linked for sync"
+msgstr "Vinculado para sincronizar"
+
+#: bookorbit_catalog_bulk_download.lua bookorbit_download_sheet.lua
+msgid "Already on this device"
+msgstr "Ya está en este dispositivo"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Already downloaded"
+msgstr "Ya descargado"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Kept a file not from BookOrbit"
+msgstr "Se mantuvo un archivo que no es de BookOrbit"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Saved under a new name"
+msgstr "Guardado con un nombre nuevo"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "No format this reader opens"
+msgstr "Este lector no abre este formato"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Stopped at the %1 page enumeration limit. Run it again to continue."
+msgstr "Detenido en el límite de enumeración de %1 páginas. Ejecútalo de nuevo para continuar."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "The book list could not be loaded to the end. Run it again to continue."
+msgstr "No se pudo cargar la lista de libros hasta el final. Ejecútala de nuevo para continuar."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Books whose file names clashed were saved with their BookOrbit ID added."
+msgstr "Los libros cuyos nombres de archivo coincidían se guardaron con su ID de BookOrbit añadido."
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Files not from BookOrbit were already there and were kept: %1"
+msgstr "Los archivos que no son de BookOrbit ya estaban allí y se mantuvieron: %1"
+
+#: bookorbit_catalog_bulk_download.lua
+msgid "Failed downloads"
+msgstr "Descargas fallidas"
+
+#: bookorbit_catalog_dashboard.lua
+msgid "Updating Home…"
+msgstr "Actualizando el panel…"
+
+#: bookorbit_catalog_dashboard.lua
+msgid "Home needs a newer BookOrbit server. Showing the catalog instead."
+msgstr "Home necesita un servidor de BookOrbit más reciente. Se muestra el catálogo en su lugar."
+
+#: bookorbit_catalog_detail.lua
+msgid "%1 #%2"
+msgstr "%1 #%2"
+
+#: bookorbit_catalog_detail.lua
+msgid "%1 (text only)"
+msgstr "%1 (solo texto)"
+
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+msgctxt "Book field"
+msgid "Series"
+msgstr "Serie"
+
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+msgid "Publisher"
+msgstr "Editorial"
+
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+msgid "Published"
+msgstr "Publicado"
+
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_main_menu.lua
+msgid "Language"
+msgstr "Idioma"
+
+#: bookorbit_catalog_detail.lua
+msgid "ISBN-13"
+msgstr "ISBN-13"
+
+#: bookorbit_catalog_detail.lua
+msgid "ISBN-10"
+msgstr "ISBN-10"
+
+#: bookorbit_catalog_detail.lua
+msgid "File"
+msgstr "Archivo"
+
+#: bookorbit_catalog_detail.lua bookorbit_catalog_lists.lua
+#: bookorbit_detail_data.lua
+msgid "Added"
+msgstr "Añadido"
+
+#: bookorbit_catalog_detail.lua
+msgid "Opening the book…"
+msgstr "Abriendo el libro…"
+
+#: bookorbit_catalog_detail.lua
+msgid "Saving the read status…"
+msgstr "Guardando el estado de lectura…"
+
+#: bookorbit_catalog_detail.lua
+msgid "Marked %1"
+msgstr "Marcado %1"
+
+#: bookorbit_catalog_detail.lua
+msgid "Saving your rating…"
+msgstr "Guardando tu calificación…"
+
+#: bookorbit_catalog_detail.lua
+msgid "Rating cleared"
+msgstr "Calificación borrada"
+
+#: bookorbit_catalog_detail.lua
+msgid "Rating saved"
+msgstr "Calificación guardada"
+
+#: bookorbit_catalog_detail.lua
+msgid "No supported format"
+msgstr "Formato no admitido"
+
+#: bookorbit_catalog_detail.lua
+msgid "Download %1 - %2"
+msgstr "Descargar %1 - %2"
+
+#: bookorbit_catalog_detail.lua
+msgid "Download (%1)"
+msgstr "Descargar (%1)"
+
+#: bookorbit_catalog_detail.lua
+msgid "unsupported"
+msgstr "no admitido"
+
+#: bookorbit_catalog_detail.lua bookorbit_highlight_sheet.lua
+msgid "Book details"
+msgstr "Detalles del libro"
+
+#: bookorbit_catalog_detail.lua
+msgid "Mark as unread"
+msgstr "Marcar como no leído"
+
+#: bookorbit_catalog_detail.lua
+msgid "Mark as read"
+msgstr "Marcar como leído"
+
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+#: bookorbit_detail_view.lua
+msgid "More by %1"
+msgstr "Más de %1"
+
+#: bookorbit_catalog_detail.lua bookorbit_detail_data.lua
+msgid "More by this author"
+msgstr "Más de este autor"
+
+#: bookorbit_catalog_detail.lua
+msgid "Open series"
+msgstr "Serie abierta"
+
+#: bookorbit_catalog_detail.lua
+msgid "Highlights (%1)"
+msgstr "Destacados (%1)"
+
+#: bookorbit_catalog_detail.lua
+msgid "Refresh from BookOrbit"
+msgstr "Actualizar desde BookOrbit"
+
+#: bookorbit_catalog_detail.lua
+msgid "Remove from device"
+msgstr "Quitar del dispositivo"
+
+#: bookorbit_catalog_detail.lua bookorbit_download_sheet.lua
+msgid "Download cancelled"
+msgstr "Descarga cancelada"
+
+#: bookorbit_catalog_detail.lua
+msgid "No highlights in this book yet"
+msgstr "Aún no hay destacados en este libro"
+
+#: bookorbit_catalog_download.lua
+msgid "Loading EPUB delivery preference..."
+msgstr "Cargando preferencia de entrega EPUB..."
+
+#: bookorbit_catalog_download.lua
+msgid "Saving EPUB delivery preference..."
+msgstr "Guardando preferencia de entrega EPUB..."
+
+#: bookorbit_catalog_download.lua
+msgid "Loading book..."
+msgstr "Cargando libro..."
+
+#: bookorbit_catalog_download.lua bookorbit_download_sheet.lua
+msgid "No file this reader can open"
+msgstr "Este lector no puede abrir este archivo"
+
+#: bookorbit_catalog_download.lua
+msgid ""
+"Downloading:\n"
+"%1\n"
+"\n"
+"%2"
+msgstr ""
+"Descargando:\n"
+"%1\n"
+"\n"
+"%2"
+
+#: bookorbit_catalog_download.lua bookorbit_catalog_lists.lua
+msgid "This book is not on this device. Connect to BookOrbit to download it."
+msgstr "Este libro no está en este dispositivo. Conéctate a BookOrbit para descargarlo."
+
+#: bookorbit_catalog_lists.lua
+msgid "Opening shelves…"
+msgstr "Abriendo estanterías…"
+
+#: bookorbit_catalog_lists.lua
+msgid "Shelves"
+msgstr "Estanterías"
+
+#: bookorbit_catalog_lists.lua
+msgid "Searching for “%1”…"
+msgstr "Buscando “%1”…"
+
+#: bookorbit_catalog_lists.lua
+msgid "Searching..."
+msgstr "Buscando..."
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+msgid "Series order"
+msgstr "Orden de serie"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+msgid "Publication date"
+msgstr "Publicación"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+msgid "Title"
+msgstr "Título"
+
+#: bookorbit_catalog_lists.lua bookorbit_detail_view.lua
+msgid "Last read"
+msgstr "Última lectura"
+
+#: bookorbit_catalog_lists.lua
+msgid "Added to library"
+msgstr "Añadido"
+
+#: bookorbit_catalog_lists.lua
+msgid "First to last"
+msgstr "Del primero al último"
+
+#: bookorbit_catalog_lists.lua
+msgid "Last to first"
+msgstr "Del último al primero"
+
+#: bookorbit_catalog_lists.lua
+msgid "Newest"
+msgstr "Más recientes"
+
+#: bookorbit_catalog_lists.lua
+msgid "Oldest"
+msgstr "Más antiguos"
+
+#: bookorbit_catalog_lists.lua
+msgid "A–Z"
+msgstr "A–Z"
+
+#: bookorbit_catalog_lists.lua
+msgid "Z–A"
+msgstr "Z–A"
+
+#: bookorbit_catalog_lists.lua
+msgid "Oldest first"
+msgstr "Más antiguos primero"
+
+#: bookorbit_catalog_lists.lua
+msgid "Recent first"
+msgstr "Más recientes primero"
+
+#: bookorbit_catalog_lists.lua
+msgid "Still checking which books are on this device"
+msgstr "Todavía se está comprobando qué libros hay en este dispositivo"
+
+#: bookorbit_catalog_lists.lua
+msgid "Sort and filter"
+msgstr "Ordenar y filtrar"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_view.lua
+msgid "Finished"
+msgstr "Terminado"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_list_data.lua
+msgid "Reading"
+msgstr "Leyendo"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_detail_data.lua
+msgid "Unread"
+msgstr "No leído"
+
+#: bookorbit_catalog_lists.lua
+msgid "Saved for this list"
+msgstr "Se guarda para esta lista"
+
+#: bookorbit_catalog_lists.lua
+msgid "All libraries"
+msgstr "Todas las bibliotecas"
+
+#: bookorbit_catalog_lists.lua
+msgid "Any"
+msgstr "Cualquiera"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+msgid "Author"
+msgstr "Autor"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+#: bookorbit_list_data.lua bookorbit_list_pages.lua
+msgid "Read"
+msgstr "Leído"
+
+#: bookorbit_catalog_lists.lua
+msgid "All series"
+msgstr "Todas las series"
+
+#: bookorbit_catalog_lists.lua
+msgid "Everyone"
+msgstr "Todos"
+
+#: bookorbit_catalog_lists.lua
+msgctxt "Series filter"
+msgid "Finished"
+msgstr "Terminadas"
+
+#: bookorbit_catalog_lists.lua
+msgctxt "Authors filter"
+msgid "Read"
+msgstr "Leídos"
+
+#: bookorbit_catalog_lists.lua
+msgid "Reading now"
+msgstr "Leyendo ahora"
+
+#: bookorbit_catalog_lists.lua
+msgid "Most books"
+msgstr "Más libros"
+
+#: bookorbit_catalog_lists.lua
+msgid "Name"
+msgstr "Nombre"
+
+#: bookorbit_catalog_lists.lua
+msgid "Loading libraries…"
+msgstr "Cargando bibliotecas…"
+
+#: bookorbit_catalog_lists.lua
+msgid "Marking %1 of %2 read…"
+msgstr "Marcando %1 de %2 como leído…"
+
+#: bookorbit_catalog_lists.lua
+msgid "Marked %1 read. %2 could not be updated."
+msgstr "Marcado %1 como leído. No se pudo actualizar %2."
+
+#: bookorbit_catalog_lists.lua
+msgid "Marked %1 read"
+msgstr "Marcado %1 como leído"
+
+#: bookorbit_catalog_lists.lua bookorbit_list_pages.lua
+msgid "Nothing matches “%1”"
+msgstr "No hay coincidencias con \"%1\""
+
+#: bookorbit_catalog_lists.lua
+msgid "Try fewer words, or search the whole library from the header."
+msgstr "Intenta usar menos palabras o busca en toda la biblioteca desde el encabezado."
+
+#: bookorbit_catalog_lists.lua
+msgid "Books you have not downloaded appear here."
+msgstr "Aquí aparecen los libros que no has descargado."
+
+#: bookorbit_catalog_lists.lua
+msgid "Clear filters"
+msgstr "Borrar filtros"
+
+#: bookorbit_catalog_lists.lua
+msgid "Every book here is on this device"
+msgstr "Todos los libros de aquí ya están en este dispositivo"
+
+#: bookorbit_catalog_lists.lua
+msgid "Clear a filter to see more."
+msgstr "Borra un filtro para ver más."
+
+#: bookorbit_catalog_lists.lua
+msgid "Nothing matches these filters"
+msgstr "No hay coincidencias con estos filtros"
+
+#: bookorbit_catalog_lists.lua
+msgid "Authors appear here as books are added to your libraries."
+msgstr "Los autores aparecerán aquí a medida que añadas libros a tus bibliotecas."
+
+#: bookorbit_catalog_lists.lua
+msgid "No authors yet"
+msgstr "Aún no hay autores"
+
+#: bookorbit_catalog_lists.lua
+msgid "No series yet"
+msgstr "Aún no hay series"
+
+#: bookorbit_catalog_lists.lua
+msgid "Series appear here as books that belong to one are added."
+msgstr "Las series aparecen aquí a medida que se añaden libros que pertenecen a una."
+
+#: bookorbit_catalog_lists.lua
+msgid "Books you add to BookOrbit appear here."
+msgstr "Los libros que añadas a BookOrbit aparecen aquí."
+
+#: bookorbit_catalog_lists.lua
+msgid "No books here yet"
+msgstr "Aún no hay libros aquí"
+
+#: bookorbit_catalog_lists.lua
+msgid "Author A–Z"
+msgstr "Autor A–Z"
+
+#: bookorbit_catalog_lists.lua
+msgid "Title A–Z"
+msgstr "Título A–Z"
+
+#: bookorbit_catalog_lists.lua bookorbit_catalog_util.lua
+msgid "Recently updated"
+msgstr "Actualizados recientemente"
+
+#: bookorbit_catalog_lists.lua
+msgid "Author Z–A"
+msgstr "Autor Z–A"
+
+#: bookorbit_catalog_lists.lua
+msgid "Reverse series order"
+msgstr "Invertir orden de serie"
+
+#: bookorbit_catalog_lists.lua
+msgid "Title Z–A"
+msgstr "Título Z–A"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 (oldest)"
+msgstr "%1 (más antigua)"
+
+#: bookorbit_catalog_lists.lua
+msgid "Publication date (oldest)"
+msgstr "Fecha de publicación (más antigua)"
+
+#: bookorbit_catalog_lists.lua
+msgid "Publication date (newest)"
+msgstr "Fecha de publicación (más reciente)"
+
+#: bookorbit_catalog_lists.lua
+msgid "Not on device"
+msgstr "No está en el dispositivo"
+
+#: bookorbit_catalog_lists.lua
+msgid "Name A–Z"
+msgstr "Nombre A–Z"
+
+#: bookorbit_catalog_lists.lua
+msgid "Name Z–A"
+msgstr "Nombre Z–A"
+
+#: bookorbit_catalog_lists.lua
+msgid "Tap books to add or remove"
+msgstr "Toca los libros para añadir o quitar"
+
+#: bookorbit_catalog_lists.lua
+msgid "Tap covers to add or remove"
+msgstr "Toca las portadas para añadir o quitar"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 · last read first"
+msgstr "%1 · lectura más reciente primero"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 · oldest read first"
+msgstr "%1 · lectura más antigua primero"
+
+#: bookorbit_catalog_lists.lua
+msgid "most books first"
+msgstr "más libros primero"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 author"
+msgid_plural "%1 authors"
+msgstr[0] "%1 autor"
+msgstr[1] "%1 autores"
+
+#: bookorbit_catalog_lists.lua
+msgid "1 series"
+msgid_plural "%1 series"
+msgstr[0] "%1 serie"
+msgstr[1] "%1 series"
+
+#: bookorbit_catalog_lists.lua
+msgid "Pick a series"
+msgstr "Elegir una serie"
+
+#: bookorbit_catalog_lists.lua
+msgid "Pick an author"
+msgstr "Elegir un autor"
+
+#: bookorbit_catalog_lists.lua
+msgid "Their books become a shelf on Home"
+msgstr "Sus libros se convierten en una estantería en Inicio"
+
+#: bookorbit_catalog_lists.lua
+msgid "Author · %1 in your library"
+msgstr "Autor · %1 en tu biblioteca"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 results for “%2”"
+msgstr "%1 resultados para “%2”"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 library"
+msgid_plural "%1 libraries"
+msgstr[0] "%1 biblioteca"
+msgstr[1] "%1 bibliotecas"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 collection"
+msgid_plural "%1 collections"
+msgstr[0] "%1 colección"
+msgstr[1] "%1 colecciones"
+
+#: bookorbit_catalog_lists.lua
+msgid "%1 scope"
+msgid_plural "%1 scopes"
+msgstr[0] "%1 alcance"
+msgstr[1] "%1 alcances"
+
+#: bookorbit_catalog_lists.lua
+msgid "Its books become a shelf on Home"
+msgstr "Sus libros se convierten en una estantería en Inicio"
+
+#: bookorbit_catalog_lists.lua
+msgid "Pick a shelf"
+msgstr "Elegir una estantería"
+
+#: bookorbit_catalog_lists.lua
+msgid "Standalone"
+msgstr "Independiente"
+
+#: bookorbit_catalog_lists.lua
+msgid "Books %1 – %2"
+msgstr "Libros %1 – %2"
+
+#: bookorbit_catalog_lists.lua
+msgid "saved list from %1. Books on this device open."
+msgstr "lista guardada de %1. Libros en este dispositivo abiertos."
+
+#: bookorbit_catalog_lists.lua bookorbit_list_view.lua
+msgid "saved list. Books on this device open."
+msgstr "lista guardada. Libros en este dispositivo abiertos."
+
+#: bookorbit_catalog_lists.lua
+msgid "Mark read"
+msgstr "Marcar como leído"
+
+#: bookorbit_catalog_util.lua
+msgid "Recently read"
+msgstr "Leídos recientemente"
+
+#: bookorbit_catalog_util.lua
+msgid "A-Z"
+msgstr "A-Z"
+
+#: bookorbit_catalog_util.lua
+msgid "Z-A"
+msgstr "Z-A"
+
+#: bookorbit_catalog_util.lua
+msgid "newest first"
+msgstr "más recientes primero"
+
+#: bookorbit_catalog_util.lua
+msgid "oldest first"
+msgstr "más antiguos primero"
+
+#: bookorbit_catalog_util.lua bookorbit_list_data.lua
+msgid "To read"
+msgstr "Para leer"
+
+#: bookorbit_catalog_util.lua
+msgid "On hold"
+msgstr "En espera"
+
+#: bookorbit_catalog_util.lua bookorbit_list_data.lua
+msgid "Rereading"
+msgstr "Releyendo"
+
+#: bookorbit_catalog_util.lua
+msgid "Skimmed"
+msgstr "Ojeado"
+
+#: bookorbit_catalog_util.lua
+msgid "Abandoned"
+msgstr "Abandonado"
+
+#: bookorbit_catalog_util.lua
+msgid "1 day ago"
+msgid_plural "%1 days ago"
+msgstr[0] "hace %1 día"
+msgstr[1] "hace %1 días"
+
+#: bookorbit_catalog_util.lua
+msgid "The download destination is outside the selected folder or contains a symbolic link."
+msgstr "El destino de la descarga está fuera de la carpeta seleccionada o contiene un enlace simbólico."
+
+#: bookorbit_catalog_util.lua
+msgid "Could not create a temporary download folder in the selected folder."
+msgstr "No se pudo crear una carpeta de descarga temporal en la carpeta seleccionada."
+
+#: bookorbit_catalog_util.lua
+msgid "The downloaded file failed its integrity check. Retry the download. The previous file was kept."
+msgstr "La comprobación de integridad del archivo descargado ha fallado. Reintenta la descarga. Se ha conservado el archivo anterior."
+
+#: bookorbit_catalog_util.lua
+msgid "The download was incomplete. Retry the download. The previous file was kept."
+msgstr "La descarga ha sido incompleta. Reintenta la descarga. Se ha conservado el archivo anterior."
+
+#: bookorbit_catalog_util.lua
+msgid "The download exceeded its expected size. The previous file was kept."
+msgstr "La descarga ha excedido el tamaño esperado. Se ha conservado el archivo anterior."
+
+#: bookorbit_catalog_util.lua
+msgid "Could not save the download. Check free space and folder permissions. The previous file was kept."
+msgstr "No se pudo guardar la descarga. Comprueba el espacio libre y los permisos de la carpeta. Se ha conservado el archivo anterior."
+
+#: bookorbit_catalog_widgets.lua
+msgid "No cover"
+msgstr "Sin portada"
+
+#: bookorbit_catalog_widgets.lua
+msgid "Loading cover"
+msgstr "Cargando portada"
+
+#: bookorbit_catalog_widgets.lua
+msgid "Cover unavailable"
+msgstr "Portada no disponible"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "February"
+msgstr "febrero"
+
+#. TRANSLATORS: each month as it reads inside a date, after a day number ("24 November"): use the form your language needs there, such as the genitive in Russian or lower case in Spanish.
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "January"
+msgstr "enero"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "April"
+msgstr "abril"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "March"
+msgstr "marzo"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "June"
+msgstr "junio"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "May"
+msgstr "mayo"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "August"
+msgstr "agosto"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "July"
+msgstr "julio"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "October"
+msgstr "octubre"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "September"
+msgstr "septiembre"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "December"
+msgstr "diciembre"
+
+#: bookorbit_dates.lua
+msgctxt "Month in a date"
+msgid "November"
+msgstr "noviembre"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Feb"
+msgstr "feb"
+
+#. TRANSLATORS: each short month as it reads inside a date ("24 Nov"), in the form your language needs there.
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Jan"
+msgstr "ene"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Apr"
+msgstr "abr"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Mar"
+msgstr "mar"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Jun"
+msgstr "jun"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "May"
+msgstr "may"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Aug"
+msgstr "ago"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Jul"
+msgstr "jul"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Oct"
+msgstr "oct"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Sep"
+msgstr "sept"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Dec"
+msgstr "dic"
+
+#: bookorbit_dates.lua
+msgctxt "Short month in a date"
+msgid "Nov"
+msgstr "nov"
+
+#. TRANSLATORS: %1 is the short month as it reads inside a date, %2 the day of the month.
+#: bookorbit_dates.lua
+msgctxt "Month and day"
+msgid "%1 %2"
+msgstr "%2 %1"
+
+#: bookorbit_delivery.lua
+msgid "The server returned an invalid EPUB delivery preference. Reconnect and retry."
+msgstr "El servidor ha devuelto una preferencia de entrega de EPUB no válida. Reconecta e inténtalo de nuevo."
+
+#: bookorbit_delivery.lua
+msgid "Could not load the EPUB delivery default from BookOrbit. Reconnect and retry, or choose a variant for this download."
+msgstr "No se pudo cargar el predeterminado de entrega de EPUB de BookOrbit. Reconecta e inténtalo de nuevo, o elige una variante para esta descarga."
+
+#: bookorbit_delivery.lua
+msgid "Could not migrate the EPUB delivery preference to BookOrbit. Reconnect and retry."
+msgstr "No se pudo migrar la preferencia de entrega de EPUB a BookOrbit. Vuelve a conectar e inténtalo."
+
+#: bookorbit_delivery.lua
+msgid "This server cannot confirm support for the requested EPUB variant. Reconnect to a compatible server and retry."
+msgstr "Este servidor no puede confirmar el soporte para la variante de EPUB solicitada. Vuelve a conectar con un servidor compatible e inténtalo."
+
+#: bookorbit_delivery.lua
+msgid "Could not save the EPUB delivery preference in BookOrbit. Reconnect and retry."
+msgstr "No se pudo guardar la preferencia de entrega de EPUB en BookOrbit. Vuelve a conectar e inténtalo."
+
+#: bookorbit_delivery.lua
+msgid "This server does not support a server default. Update BookOrbit first."
+msgstr "Este servidor no admite un predeterminado de servidor. Actualiza BookOrbit primero."
+
+#: bookorbit_detail_data.lua
+msgid "Audiobook"
+msgstr "Audiolibro"
+
+#: bookorbit_detail_data.lua
+msgid "Read-along edition"
+msgstr "Edición de lectura acompañada"
+
+#: bookorbit_detail_data.lua
+msgid "%1 file"
+msgstr "%1 archivo"
+
+#: bookorbit_detail_data.lua
+msgid "Another edition"
+msgstr "Otra edición"
+
+#: bookorbit_detail_data.lua
+msgid "Main edition"
+msgstr "Edición principal"
+
+#: bookorbit_detail_data.lua
+msgid "Main file"
+msgstr "Archivo principal"
+
+#: bookorbit_detail_data.lua
+msgid "Also available"
+msgstr "También disponible"
+
+#: bookorbit_detail_data.lua
+msgid "Text only here; narration plays in BookOrbit"
+msgstr "Solo texto aquí; la narración se reproduce en BookOrbit"
+
+#: bookorbit_detail_data.lua
+msgid "Text only; narration in BookOrbit"
+msgstr "Solo texto; narración en BookOrbit"
+
+#: bookorbit_detail_data.lua
+msgid "audiobook"
+msgstr "audiolibro"
+
+#: bookorbit_detail_data.lua
+msgid "audiobook, %1"
+msgstr "audiolibro, %1"
+
+#: bookorbit_detail_data.lua
+msgid "%1 format"
+msgstr "formato %1"
+
+#: bookorbit_detail_data.lua
+msgid "Not for KOReader: %1. In BookOrbit."
+msgstr "No para KOReader: %1. En BookOrbit."
+
+#: bookorbit_detail_data.lua
+msgid "Not for KOReader: %1"
+msgstr "No para KOReader: %1"
+
+#: bookorbit_detail_data.lua
+msgid "Not for KOReader"
+msgstr "No para KOReader"
+
+#: bookorbit_detail_data.lua
+msgid "Similar books"
+msgstr "Libros similares"
+
+#: bookorbit_detail_data.lua
+msgid "Book %1 of %2 · %3"
+msgstr "Libro %1 de %2 · %3"
+
+#: bookorbit_detail_data.lua
+msgid "Book %1 · %2"
+msgstr "Libro %1 · %2"
+
+#: bookorbit_detail_data.lua
+msgid "%1, %2 and %3 more"
+msgstr "%1, %2 y %3 más"
+
+#: bookorbit_detail_data.lua
+msgid "%1 and %2 more"
+msgstr "%1 y %2 más"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "English"
+msgstr "Inglés"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Japanese"
+msgstr "Japonés"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "French"
+msgstr "Francés"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "German"
+msgstr "Alemán"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Spanish"
+msgstr "Español"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Italian"
+msgstr "Italiano"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Portuguese"
+msgstr "Portugués"
+
+#: bookorbit_detail_data.lua
+msgctxt "Book language"
+msgid "Dutch"
+msgstr "Neerlandés"
+
+#. TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date, %3 the year.
+#: bookorbit_detail_data.lua
+msgctxt "Day, month and year"
+msgid "%1 %2 %3"
+msgstr "%1 %2 %3"
+
+#: bookorbit_detail_data.lua
+msgid "ISBN"
+msgstr "ISBN"
+
+#: bookorbit_detail_data.lua
+msgid "Collection"
+msgstr "Colección"
+
+#: bookorbit_detail_data.lua
+msgid "Not downloaded"
+msgstr "No descargado"
+
+#: bookorbit_detail_data.lua
+msgid "None"
+msgstr "Ninguno"
+
+#: bookorbit_detail_data.lua
+msgid "Readable file"
+msgstr "Archivo legible"
+
+#: bookorbit_detail_data.lua
+msgid "Read again"
+msgstr "Leer de nuevo"
+
+#: bookorbit_detail_data.lua bookorbit_list_pages.lua
+msgid "Continue"
+msgstr "Continuar"
+
+#: bookorbit_detail_data.lua
+msgid "Audiobook only"
+msgstr "Solo audiolibro"
+
+#: bookorbit_detail_data.lua
+msgid "Audiobook · listen in BookOrbit"
+msgstr "Audiolibro · escuchar en BookOrbit"
+
+#: bookorbit_detail_data.lua
+msgid "No file KOReader can open"
+msgstr "Sin archivo que KOReader pueda abrir"
+
+#: bookorbit_detail_data.lua
+msgid "Unavailable"
+msgstr "No disponible"
+
+#: bookorbit_detail_data.lua
+msgid "Download when online"
+msgstr "Descargar cuando haya conexión"
+
+#: bookorbit_detail_data.lua
+msgid "Download %1 · %2"
+msgstr "Descargar %1 · %2"
+
+#: bookorbit_detail_data.lua
+msgid "Download · %1"
+msgstr "Descargar · %1"
+
+#: bookorbit_detail_data.lua
+msgid "Download %1"
+msgstr "Descargar %1"
+
+#: bookorbit_detail_data.lua
+msgid "p. %1 of %2"
+msgstr "pág. %1 de %2"
+
+#: bookorbit_detail_data.lua
+msgid "%1 / 1 page"
+msgid_plural "%1 / %2 pages"
+msgstr[0] "%1 / %2 página"
+msgstr[1] "%1 / %2 páginas"
+
+#: bookorbit_detail_data.lua
+msgid "Previous"
+msgstr "Anterior"
+
+#: bookorbit_detail_data.lua bookorbit_detail_view.lua
+msgctxt "Next book"
+msgid "Next"
+msgstr "Siguiente"
+
+#: bookorbit_detail_data.lua
+msgid "1 page an hour"
+msgid_plural "%1 pages an hour"
+msgstr[0] "%1 página por hora"
+msgstr[1] "%1 páginas por hora"
+
+#: bookorbit_detail_data.lua
+msgid "%1 p/h"
+msgstr "%1 p/h"
+
+#: bookorbit_detail_view.lua bookorbit_download_sheet.lua
+#: bookorbit_update_sheet.lua
+msgid "Downloading"
+msgstr "Descargando"
+
+#: bookorbit_detail_view.lua bookorbit_list_pages.lua bookorbit_text_pages.lua
+msgid "Back"
+msgstr "Atrás"
+
+#: bookorbit_detail_view.lua
+msgid "Changes sync when you're back."
+msgstr "Cambios sincronizados al volver."
+
+#: bookorbit_detail_view.lua
+msgid "Author unknown"
+msgstr "Autor desconocido"
+
+#: bookorbit_detail_view.lua
+msgid "%1 over 1 day"
+msgid_plural "%1 over %2 days"
+msgstr[0] "%1 en %2 día"
+msgstr[1] "%1 en %2 días"
+
+#: bookorbit_detail_view.lua
+msgid "Finished %1"
+msgstr "Terminado %1"
+
+#: bookorbit_detail_view.lua
+msgid "about %1 at your pace"
+msgstr "sobre %1 a tu ritmo"
+
+#: bookorbit_detail_view.lua
+msgid "about %1"
+msgstr "sobre %1"
+
+#: bookorbit_detail_view.lua
+msgid "1 page"
+msgid_plural "%1 pages"
+msgstr[0] "%1 página"
+msgstr[1] "%1 páginas"
+
+#: bookorbit_detail_view.lua bookorbit_list_pages.lua
+msgid "Not started"
+msgstr "No iniciado"
+
+#: bookorbit_detail_view.lua
+msgid "Last read %1"
+msgstr "Última lectura %1"
+
+#: bookorbit_detail_view.lua
+msgid "Finish %1, %2"
+msgstr "Terminar %1, %2"
+
+#: bookorbit_detail_view.lua
+msgid "Finish %1"
+msgstr "Terminar %1"
+
+#: bookorbit_detail_view.lua
+msgid "Done %1"
+msgstr "Hecho %1"
+
+#: bookorbit_detail_view.lua bookorbit_main_menu.lua
+msgid "This book"
+msgstr "Este libro"
+
+#: bookorbit_detail_view.lua
+msgid "Next: Book %1, %2"
+msgstr "Siguiente: libro %1, %2"
+
+#: bookorbit_detail_view.lua bookorbit_list_data.lua bookorbit_list_pages.lua
+msgid "%1 of %2 read"
+msgstr "%1 de %2 leídos"
+
+#: bookorbit_detail_view.lua
+msgid "%1: %2 of %3 read"
+msgstr "%1: %2 de %3 leído"
+
+#: bookorbit_detail_view.lua
+msgid "Next: Book %1"
+msgstr "Siguiente: libro %1"
+
+#: bookorbit_detail_view.lua
+msgid "No description yet."
+msgstr "Aún no hay descripción."
+
+#: bookorbit_detail_view.lua
+msgid "Needs Wi-Fi"
+msgstr "Necesita Wi-Fi"
+
+#: bookorbit_detail_view.lua
+msgid "Get"
+msgstr "Obtener"
+
+#: bookorbit_detail_view.lua
+msgid "Also in BookOrbit"
+msgstr "También en BookOrbit"
+
+#: bookorbit_detail_view.lua
+msgid "Read the full description"
+msgstr "Leer la descripción completa"
+
+#: bookorbit_detail_view.lua
+msgid "Read all"
+msgstr "Leer todo"
+
+#: bookorbit_detail_view.lua
+msgid "Genres and tags"
+msgstr "Géneros y etiquetas"
+
+#: bookorbit_detail_view.lua
+msgid "Pace"
+msgstr "Ritmo"
+
+#: bookorbit_detail_view.lua
+msgid "Reading days"
+msgstr "Días de lectura"
+
+#: bookorbit_detail_view.lua
+msgid "Time read"
+msgstr "Tiempo de lectura"
+
+#: bookorbit_detail_view.lua
+msgid "Started"
+msgstr "Iniciado"
+
+#. TRANSLATORS: %1 is the time read, shown bold; %2 the number of reading days; %3 and %4 dates.
+#: bookorbit_detail_view.lua
+msgid "%1 over 1 day, finished %3"
+msgid_plural "%1 over %2 days, finished %3"
+msgstr[0] "%1 en %2 día, terminado el %3"
+msgstr[1] "%1 en %2 días, terminado el %3"
+
+#: bookorbit_detail_view.lua
+msgid "%1 over 1 day since %3"
+msgid_plural "%1 over %2 days since %3"
+msgstr[0] "%1 en %2 día desde el %3"
+msgstr[1] "%1 en %2 días desde el %3"
+
+#: bookorbit_detail_view.lua
+msgid "%1 over 1 day since %3, last read %4"
+msgid_plural "%1 over %2 days since %3, last read %4"
+msgstr[0] "%1 en %2 día desde el %3, última lectura: %4"
+msgstr[1] "%1 en %2 días desde el %3, última lectura: %4"
+
+#: bookorbit_detail_view.lua
+msgid "1 highlight"
+msgid_plural "%1 highlights"
+msgstr[0] "%1 destacado"
+msgstr[1] "%1 destacados"
+
+#: bookorbit_detail_view.lua
+msgid "Your highlights"
+msgstr "Tus destacados"
+
+#: bookorbit_detail_view.lua
+msgid "Your reading on this device"
+msgstr "Tu lectura en este dispositivo"
+
+#: bookorbit_detail_view.lua
+msgid "Formats"
+msgstr "Formatos"
+
+#: bookorbit_detail_view.lua bookorbit_text_entry.lua
+msgid "Clear"
+msgstr "Borrar"
+
+#: bookorbit_detail_view.lua
+msgid "Tap a star"
+msgstr "Toca una estrella"
+
+#: bookorbit_detail_view.lua
+msgid "Your verdict"
+msgstr "Tu veredicto"
+
+#: bookorbit_detail_view.lua
+msgid "Rating"
+msgstr "Calificación"
+
+#: bookorbit_detail_view.lua
+msgid "Status"
+msgstr "Estado"
+
+#: bookorbit_detail_view.lua
+msgid "Book"
+msgstr "Libro"
+
+#: bookorbit_detail_view.lua
+msgid "More details"
+msgstr "Más detalles"
+
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Testing…"
+msgstr "Probando…"
+
+#: bookorbit_diagnostics_page.lua bookorbit_main_menu.lua
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
+msgid "Connection works"
+msgstr "La conexión funciona"
+
+#: bookorbit_diagnostics_page.lua
+msgid "Failed: %1"
+msgstr "Fallido: %1"
+
+#: bookorbit_diagnostics_page.lua
+msgid "Rechecking…"
+msgstr "Revisando…"
+
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Done: every book was checked again"
+msgstr "Hecho: se ha vuelto a comprobar cada libro"
+
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Could not recheck: %1"
+msgstr "No se pudo revisar: %1"
+
+#: bookorbit_diagnostics_page.lua
+msgid "Run from here"
+msgstr "Ejecutar desde aquí"
+
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Everything the sync knows, for bug reports"
+msgstr "Todo lo que sabe la sincronización, para informes de errores"
+
+#: bookorbit_diagnostics_page.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Technical details"
+msgstr "Detalles técnicos"
+
+#: bookorbit_dialog_ui.lua bookorbit_download_sheet.lua bookorbit_main_menu.lua
+#: bookorbit_signin_page.lua
+msgid "Cancel"
+msgstr "Cancelar"
+
+#: bookorbit_dialog_ui.lua
+msgid "OK"
+msgstr "Aceptar"
+
+#: bookorbit_download_sheet.lua
+msgid "The ebook"
+msgstr "El ebook"
+
+#: bookorbit_download_sheet.lua
+msgid "The ebook, for Kobo"
+msgstr "El ebook, para Kobo"
+
+#: bookorbit_download_sheet.lua
+msgid "Fixed pages"
+msgstr "Páginas fijas"
+
+#: bookorbit_download_sheet.lua
+msgid "The comic"
+msgstr "El cómic"
+
+#: bookorbit_download_sheet.lua
+msgid "Scanned pages"
+msgstr "Páginas escaneadas"
+
+#: bookorbit_download_sheet.lua
+msgid "Read-along EPUB, text only"
+msgstr "EPUB de lectura acompañada, solo texto"
+
+#: bookorbit_download_sheet.lua
+msgid "Narration taken out, %1"
+msgstr "Narración eliminada, %1"
+
+#: bookorbit_download_sheet.lua
+msgid "Narration taken out, so it stays small"
+msgstr "Narración eliminada para que el tamaño sea pequeño"
+
+#: bookorbit_download_sheet.lua
+msgid "Read-along EPUB with narration"
+msgstr "EPUB de lectura acompañada con narración"
+
+#: bookorbit_download_sheet.lua
+msgid "Includes the audio"
+msgstr "Incluye el audio"
+
+#: bookorbit_download_sheet.lua
+msgid "Includes the audio, %1"
+msgstr "Incluye el audio, %1"
+
+#: bookorbit_download_sheet.lua
+msgid "Edition"
+msgstr "Edición"
+
+#: bookorbit_download_sheet.lua
+msgid "Save to"
+msgstr "Guardar en"
+
+#: bookorbit_download_sheet.lua
+msgid "File name"
+msgstr "Nombre de archivo"
+
+#: bookorbit_download_sheet.lua bookorbit_settings_page.lua
+msgid "Replace"
+msgstr "Reemplazar"
+
+#: bookorbit_download_sheet.lua
+msgid "Replacing it can move your place and highlights. The old copy stays until the new one is complete."
+msgstr "Reemplazarlo puede mover tu posición y destacados. La copia antigua se mantiene hasta que la nueva esté completa."
+
+#: bookorbit_download_sheet.lua bookorbit_sync_sheet.lua
+#: bookorbit_update_sheet.lua
+msgid "Starting…"
+msgstr "Iniciando…"
+
+#: bookorbit_download_sheet.lua bookorbit_update_sheet.lua
+msgid "%1%"
+msgstr "%1%"
+
+#: bookorbit_download_sheet.lua
+msgid "Linked to BookOrbit, so your place and highlights sync."
+msgstr "Vinculado a BookOrbit, así que tu posición y destacados se sincronizan."
+
+#: bookorbit_download_sheet.lua
+msgid "Saved, but not linked for sync yet. Open it, then use Sync now in the BookOrbit menu."
+msgstr "Guardado, pero aún no está vinculado para la sincronización. Ábrelo y luego usa Sincronizar ahora en el menú de BookOrbit."
+
+#: bookorbit_download_sheet.lua
+msgid "Saved to %1"
+msgstr "Guardado en %1"
+
+#: bookorbit_download_sheet.lua
+msgid "The download did not finish"
+msgstr "La descarga no se completó"
+
+#: bookorbit_download_sheet.lua bookorbit_update_sheet.lua
+msgid "Try again"
+msgstr "Inténtalo de nuevo"
+
+#: bookorbit_download_sheet.lua bookorbit_update_sheet.lua
+msgid "Close"
+msgstr "Cerrar"
+
+#: bookorbit_download_sheet.lua
+msgid "Getting that edition…"
+msgstr "Obteniendo esa edición…"
+
+#: bookorbit_download_sheet.lua
+msgid "Saved as .%1 in %2"
+msgstr "Guardado como .%1 en %2"
+
+#: bookorbit_download_sheet.lua bookorbit_main_menu.lua
+msgid "Save"
+msgstr "Guardar"
+
+#: bookorbit_highlight_diagnostics.lua bookorbit_main_menu.lua
+msgid "never"
+msgstr "nunca"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "%1 uploaded, %2 applied, %3 deleted, %4 failed, %5 skipped"
+msgstr "%1 subido, %2 aplicado, %3 eliminado, %4 fallido, %5 omitido"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "%1, %2 not synced (different copy)"
+msgstr "%1, %2 no sincronizados (copia diferente)"
+
+#: bookorbit_highlight_diagnostics.lua bookorbit_main_menu.lua
+msgid "%1 at %2"
+msgstr "%1 (%2)"
+
+#: bookorbit_highlight_diagnostics.lua bookorbit_highlight_summary.lua
+#: bookorbit_main_menu.lua
+msgid "none"
+msgstr "no hay"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "%1 uploaded, %2 applied, %3 deleted, %4 failed"
+msgstr "%1 subido, %2 aplicado, %3 eliminado, %4 fallido"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "pending"
+msgstr "pendiente"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "two-way sync off"
+msgstr "sincronización bidireccional desactivada"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "no reader book"
+msgstr "sin libro en el lector"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "not synced: this copy differs from BookOrbit's file"
+msgstr "no sincronizado: esta copia difiere del archivo de BookOrbit"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "matched, sync scheduled"
+msgstr "coincidido, sincronización programada"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "unmatched, retrying match"
+msgstr "sin coincidencia, reintentando coincidencia"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "unmatched, sync scheduled"
+msgstr "sin coincidencia, sincronización programada"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "matched, idle"
+msgstr "coincidido, inactivo"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "unmatched, skipped"
+msgstr "sin coincidencia, omitido"
+
+#: bookorbit_highlight_diagnostics.lua
+msgid "unmatched, idle"
+msgstr "sin coincidencia, inactivo"
+
+#: bookorbit_highlight_summary.lua
+msgid "Failed: %1. Skipped: %2."
+msgstr "Fallido: %1. Omitido: %2."
+
+#: bookorbit_highlight_summary.lua
+msgid "Bookmarks: %1 uploaded, %2 applied, %3 deleted."
+msgstr "Marcadores (subidos: %1; aplicados: %2; eliminados: %3)."
+
+#: bookorbit_highlight_summary.lua
+msgid "Bookmarks failed: %1."
+msgstr "Error en marcadores: %1."
+
+#: bookorbit_highlight_summary.lua
+msgid "%1 closed book(s) updated."
+msgstr "%1 libro(s) cerrado(s) actualizado(s)."
+
+#: bookorbit_highlight_summary.lua
+msgid "%1 book(s) skipped: the copy on this device is a different file from the one in BookOrbit."
+msgstr "%1 libro(s) omitido(s): la copia en este dispositivo es un archivo diferente al de BookOrbit."
+
+#: bookorbit_list_data.lua
+msgid "with audio"
+msgstr "con audio"
+
+#: bookorbit_list_data.lua
+msgctxt "Read status"
+msgid "rereading"
+msgstr "releyendo"
+
+#: bookorbit_list_data.lua
+msgid "%1 and others"
+msgstr "%1 y otros"
+
+#: bookorbit_list_data.lua
+msgid "All %1 read"
+msgstr "Todos leídos (%1)"
+
+#: bookorbit_list_data.lua
+msgctxt "Percent read"
+msgid "%1 read"
+msgstr "%1 leído"
+
+#: bookorbit_list_data.lua
+msgid "all %1"
+msgstr "todos los %1"
+
+#: bookorbit_list_data.lua
+msgctxt "Books read"
+msgid "read"
+msgstr "leídos"
+
+#: bookorbit_list_data.lua bookorbit_list_pages.lua
+msgid "%1 reading"
+msgstr "%1 leyendo"
+
+#: bookorbit_list_data.lua
+msgid "Reading %1 of %2"
+msgstr "Leyendo %1 de %2"
+
+#: bookorbit_list_data.lua bookorbit_list_pages.lua
+msgid "%1 read"
+msgstr "%1 leídos"
+
+#: bookorbit_list_pages.lua
+msgid "%1 in progress"
+msgstr "%1 en curso"
+
+#: bookorbit_list_pages.lua
+msgid "Up next"
+msgstr "Siguiente"
+
+#: bookorbit_list_pages.lua
+msgid "Up next · Book %1"
+msgstr "Siguiente · Libro %1"
+
+#: bookorbit_list_pages.lua
+msgid "Start book"
+msgstr "Empezar libro"
+
+#: bookorbit_list_pages.lua
+msgid "Start book %1"
+msgstr "Empezar libro %1"
+
+#: bookorbit_list_pages.lua
+msgid "Reading order"
+msgstr "Orden de lectura"
+
+#: bookorbit_list_pages.lua
+msgid "%1 on this device"
+msgstr "%1 en este dispositivo"
+
+#: bookorbit_list_pages.lua
+msgid "None on this device yet"
+msgstr "Aún ninguno en este dispositivo"
+
+#: bookorbit_list_pages.lua
+msgid "Born %1"
+msgstr "Nacido en %1"
+
+#: bookorbit_list_pages.lua
+msgid "born %1"
+msgstr "nacido en %1"
+
+#: bookorbit_list_pages.lua
+msgid "Download all %1"
+msgstr "Descargar todos los %1"
+
+#: bookorbit_list_pages.lua
+msgid "Full bio"
+msgstr "Biografía completa"
+
+#: bookorbit_list_pages.lua
+msgid "Everything %1"
+msgstr "Todo %1"
+
+#: bookorbit_list_pages.lua
+msgid "Authors %1"
+msgstr "Autores %1"
+
+#: bookorbit_list_pages.lua
+msgid "Series %1"
+msgstr "Serie %1"
+
+#: bookorbit_list_pages.lua
+msgid "Books %1"
+msgstr "Libros %1"
+
+#: bookorbit_list_pages.lua
+msgid "Check the spelling, or try fewer or different words."
+msgstr "Comprueba la ortografía o intenta con menos o diferentes palabras."
+
+#: bookorbit_list_pages.lua
+msgid "Sort by"
+msgstr "Ordenar por"
+
+#: bookorbit_list_pages.lua
+msgid "Show"
+msgstr "Mostrar"
+
+#: bookorbit_list_pages.lua
+msgid "Reset to defaults"
+msgstr "Restablecer los valores predeterminados"
+
+#: bookorbit_list_pages.lua
+msgid "Saved for every list"
+msgstr "Se guarda para cada lista"
+
+#: bookorbit_list_pages.lua
+msgid "Jump to"
+msgstr "Saltar a"
+
+#: bookorbit_list_view.lua
+msgid "Page %1"
+msgstr "Página %1"
+
+#: bookorbit_list_view.lua
+msgid "reading"
+msgstr "leyendo"
+
+#: bookorbit_list_view.lua
+msgid "Updates as books change"
+msgstr "Se actualiza cuando cambian los libros"
+
+#. TRANSLATORS: how many items are selected; %1 is the count, shown bold.
+#: bookorbit_list_view.lua
+msgid "%1 selected"
+msgid_plural "%1 selected"
+msgstr[0] "%1 seleccionado"
+msgstr[1] "%1 seleccionados"
+
+#: bookorbit_list_view.lua
+msgid "of %1"
+msgstr "de %1"
+
+#: bookorbit_list_view.lua
+msgid "First"
+msgstr "Primero"
+
+#: bookorbit_list_view.lua
+msgid "Last"
+msgstr "Último"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+msgid "Off"
+msgstr "Desactivado"
+
+#: bookorbit_main_menu.lua
+msgid "On"
+msgstr "Activado"
+
+#: bookorbit_main_menu.lua bookorbit_update_sheet.lua
+msgid "unknown"
+msgstr "desconocido"
+
+#: bookorbit_main_menu.lua
+msgid "%1, %2 string"
+msgid_plural "%1, %2 strings"
+msgstr[0] "%1, %2 cadena"
+msgstr[1] "%1, %2 cadenas"
+
+#: bookorbit_main_menu.lua
+msgid "English"
+msgstr "Inglés"
+
+#. TRANSLATORS: %1 is KOReader's language code, such as de or pt_BR.
+#: bookorbit_main_menu.lua
+msgid "%1, no plugin translation"
+msgstr "%1, sin traducción del plugin"
+
+#: bookorbit_main_menu.lua
+msgid "Device ID"
+msgstr "ID del dispositivo"
+
+#: bookorbit_main_menu.lua
+msgid "Plugin"
+msgstr "Plugin"
+
+#: bookorbit_main_menu.lua
+msgid "Latest plugin"
+msgstr "Último plugin"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+msgid "Account"
+msgstr "Cuenta"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+#: bookorbit_signin_page.lua
+msgid "Server"
+msgstr "Servidor"
+
+#: bookorbit_main_menu.lua
+msgid "not set"
+msgstr "no establecido"
+
+#: bookorbit_main_menu.lua bookorbit_signin_page.lua
+msgid "Username"
+msgstr "Nombre de usuario"
+
+#: bookorbit_main_menu.lua
+msgid "Login"
+msgstr "Credenciales"
+
+#: bookorbit_main_menu.lua
+msgid "configured"
+msgstr "configuradas"
+
+#: bookorbit_main_menu.lua
+msgid "not configured"
+msgstr "sin configurar"
+
+#: bookorbit_main_menu.lua
+msgid "Last error"
+msgstr "Último error"
+
+#: bookorbit_main_menu.lua
+msgid "Last results"
+msgstr "Últimos resultados"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Test connection"
+msgstr "Probar conexión"
+
+#: bookorbit_main_menu.lua
+msgid "Last sync"
+msgstr "Última sincronización"
+
+#: bookorbit_main_menu.lua
+msgid "Last sweep"
+msgstr "Último barrido"
+
+#: bookorbit_main_menu.lua
+msgid "Matched local books"
+msgstr "Libros locales coincidentes"
+
+#: bookorbit_main_menu.lua
+msgid "Unmatched local books"
+msgstr "Libros locales sin coincidencia"
+
+#: bookorbit_main_menu.lua
+msgid "Auto sync"
+msgstr "Sincronización automática"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+msgid "Two-way highlights & bookmarks"
+msgstr "Sincronización bidireccional de destacados y marcadores"
+
+#: bookorbit_main_menu.lua
+msgid "Skip offline auto-sync"
+msgstr "Omitir sincronización automática sin conexión"
+
+#: bookorbit_main_menu.lua
+msgid "Current sync"
+msgstr "Sincronización actual"
+
+#: bookorbit_main_menu.lua
+msgid "Current sync started"
+msgstr "Inicio de la sincronización actual"
+
+#: bookorbit_main_menu.lua
+msgid "Next sync"
+msgstr "Siguiente sincronización"
+
+#: bookorbit_main_menu.lua
+msgid "Pending syncs"
+msgstr "Sincronizaciones pendientes"
+
+#: bookorbit_main_menu.lua
+msgid "Pending lifecycle syncs"
+msgstr "Sincronizaciones de ciclo de vida pendientes"
+
+#: bookorbit_main_menu.lua
+msgid "Parked lifecycle syncs"
+msgstr "Sincronizaciones de ciclo de vida en pausa"
+
+#: bookorbit_main_menu.lua
+msgid "Lifecycle sync storage"
+msgstr "Almacenamiento de sincronización de ciclo de vida"
+
+#: bookorbit_main_menu.lua bookorbit_text_pages.lua
+msgid "Highlights"
+msgstr "Destacados"
+
+#: bookorbit_main_menu.lua
+msgid "Open highlights"
+msgstr "Destacados del libro abierto"
+
+#: bookorbit_main_menu.lua
+msgid "Highlight apply retry"
+msgstr "Reintento al aplicar destacados"
+
+#: bookorbit_main_menu.lua
+msgid "Last highlight sync"
+msgstr "Última sincronización de destacados"
+
+#: bookorbit_main_menu.lua
+msgid "Last bookmark sync"
+msgstr "Última sincronización de marcadores"
+
+#: bookorbit_main_menu.lua
+msgid "Retry highlight sync"
+msgstr "Reintentar sincronizar destacados"
+
+#: bookorbit_main_menu.lua
+msgid "Retry open-book match"
+msgstr "Reintentar coincidencia de libro abierto"
+
+#: bookorbit_main_menu.lua
+msgid "Recheck all book matches"
+msgstr "Revisar todas las coincidencias de libros"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+msgid "Check for update"
+msgstr "Buscar actualizaciones"
+
+#: bookorbit_main_menu.lua
+msgid "Run"
+msgstr "Ejecutar"
+
+#: bookorbit_main_menu.lua
+msgid "Set the BookOrbit server address first."
+msgstr "Configura primero la dirección del servidor de BookOrbit."
+
+#: bookorbit_main_menu.lua
+msgid "No server address"
+msgstr "Sin dirección de servidor"
+
+#: bookorbit_main_menu.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Not signed in"
+msgstr "No has iniciado sesión"
+
+#: bookorbit_main_menu.lua
+msgid "Testing the connection…"
+msgstr "Comprobando la conexión…"
+
+#: bookorbit_main_menu.lua bookorbit_settings_page.lua
+msgid "Connection failed: %1"
+msgstr "Error de conexión: %1"
+
+#: bookorbit_main_menu.lua
+msgid "Not reachable"
+msgstr "No alcanzable"
+
+#: bookorbit_main_menu.lua bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+msgid "Settings"
+msgstr "Ajustes"
+
+#: bookorbit_main_menu.lua
+msgid "Stopped"
+msgstr "Detenido"
+
+#: bookorbit_main_menu.lua
+msgid "Another sync is running"
+msgstr "Hay otra sincronización en curso"
+
+#: bookorbit_main_menu.lua
+msgid "Not in your BookOrbit library"
+msgstr "No está en tu biblioteca de BookOrbit"
+
+#: bookorbit_main_menu.lua
+msgid "Could not read this book"
+msgstr "No se ha podido leer este libro"
+
+#: bookorbit_main_menu.lua
+msgid "Stop syncing?"
+msgstr "¿Detener sincronización?"
+
+#: bookorbit_main_menu.lua
+msgid "What has synced so far is kept. The rest syncs next time."
+msgstr "Se conserva lo sincronizado hasta ahora. El resto se sincronizará la próxima vez."
+
+#: bookorbit_main_menu.lua
+msgid "Stop"
+msgstr "Parar"
+
+#: bookorbit_main_menu.lua bookorbit_sweep.lua
+msgid "Rechecking"
+msgstr "Revisando"
+
+#: bookorbit_main_menu.lua bookorbit_menu_sheet.lua bookorbit_sweep.lua
+msgid "Starting"
+msgstr "Iniciando"
+
+#: bookorbit_main_menu.lua
+msgid "Sync stopped: %1"
+msgstr "Sincronización detenida: %1"
+
+#: bookorbit_main_menu.lua bookorbit_sweep.lua
+msgid "Books rechecked"
+msgstr "Libros revisados"
+
+#: bookorbit_main_menu.lua bookorbit_sweep.lua
+msgid "Library synced"
+msgstr "Biblioteca sincronizada"
+
+#: bookorbit_main_menu.lua
+msgid "Turn on KOReader's Gestures plugin first: Settings, Taps and gestures."
+msgstr "Activa primero el plugin Gestos de KOReader: Configuración, Toques y gestos."
+
+#: bookorbit_main_menu.lua bookorbit_signin_page.lua
+msgid "Server address"
+msgstr "Dirección del servidor"
+
+#: bookorbit_main_menu.lua bookorbit_signin_page.lua
+msgid "Enter a valid http:// or https:// server address."
+msgstr "Introduce una dirección de servidor válida con http:// o https://."
+
+#: bookorbit_main_menu.lua bookorbit_signin_page.lua
+msgid "The address you open BookOrbit at in a browser."
+msgstr "La dirección donde abres BookOrbit en un navegador."
+
+#: bookorbit_main_menu.lua
+msgid "Server set to %1"
+msgstr "Servidor establecido en %1"
+
+#: bookorbit_main_menu.lua
+msgid "Logged in to BookOrbit."
+msgstr "Sesión iniciada en BookOrbit."
+
+#: bookorbit_main_menu.lua
+msgid "Login failed. Create or check your KOReader credentials in BookOrbit web settings."
+msgstr "Error de inicio de sesión. Crea o comprueba tus credenciales de KOReader en los ajustes web de BookOrbit."
+
+#: bookorbit_main_menu.lua
+msgid "Signed in to BookOrbit"
+msgstr "Sesión iniciada en BookOrbit"
+
+#: bookorbit_menu_sheet.lua
+msgid "This list"
+msgstr "Esta lista"
+
+#: bookorbit_menu_sheet.lua
+msgid "Here"
+msgstr "Aquí"
+
+#: bookorbit_menu_sheet.lua
+msgid ", changes saved here"
+msgstr ", cambios guardados aquí"
+
+#: bookorbit_menu_sheet.lua
+msgid "Just now"
+msgstr "Hace un momento"
+
+#: bookorbit_menu_sheet.lua
+msgid "1 waiting"
+msgid_plural "%1 waiting"
+msgstr[0] "%1 en espera"
+msgstr[1] "%1 en espera"
+
+#: bookorbit_menu_sheet.lua
+msgid "Wi-Fi is off"
+msgstr "Wi-Fi desactivado"
+
+#: bookorbit_menu_sheet.lua
+msgid "Nothing waiting"
+msgstr "Nada pendiente"
+
+#. TRANSLATORS: title of the sync tile at the top of the menu, which is narrow: keep it short, a noun is fine.
+#: bookorbit_menu_sheet.lua
+msgctxt "Menu tile"
+msgid "Sync now"
+msgstr "Sincronizar"
+
+#: bookorbit_menu_sheet.lua
+msgid "Customize"
+msgstr "Personalizar"
+
+#: bookorbit_menu_sheet.lua
+msgid "Edit Home"
+msgstr "Editar Inicio"
+
+#: bookorbit_menu_sheet.lua
+msgid "Your board"
+msgstr "Tu panel"
+
+#: bookorbit_menu_sheet.lua
+msgid "Back to book"
+msgstr "Volver al libro"
+
+#: bookorbit_menu_sheet.lua
+msgid "Files"
+msgstr "Archivos"
+
+#: bookorbit_menu_sheet.lua
+msgid "File browser"
+msgstr "Explorador de archivos"
+
+#: bookorbit_menu_sheet.lua
+msgid "Close this book and open KOReader files"
+msgstr "Cerrar este libro y abrir archivos de KOReader"
+
+#: bookorbit_menu_sheet.lua
+msgid "Sort, filter and view"
+msgstr "Ordenar, filtrar y ver"
+
+#: bookorbit_menu_sheet.lua
+msgid "Opening, sync, Home, downloads"
+msgstr "Apertura, sincronización, Inicio, descargas"
+
+#: bookorbit_menu_sheet.lua bookorbit_status_page.lua
+msgid "1 change waiting to send"
+msgid_plural "%1 changes waiting to send"
+msgstr[0] "%1 cambio pendiente de enviar"
+msgstr[1] "%1 cambios pendientes de enviar"
+
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "The last sync did not finish"
+msgstr "La última sincronización no terminó"
+
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+msgid "All synced"
+msgstr "Todo sincronizado"
+
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+#: bookorbit_status_page.lua
+msgid "Not synced yet"
+msgstr "Aún no sincronizado"
+
+#: bookorbit_menu_sheet.lua
+msgid "Help & about"
+msgstr "Ayuda y acerca de"
+
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+msgid "Version %1"
+msgstr "Versión %1"
+
+#: bookorbit_menu_sheet.lua bookorbit_settings_page.lua
+msgid "Version %1 is ready"
+msgstr "La versión %1 está lista"
+
+#: bookorbit_menu_sheet.lua
+msgid "Update"
+msgstr "Actualizar"
+
+#: bookorbit_menu_sheet.lua bookorbit_update_sheet.lua
+msgid "BookOrbit %1 is ready"
+msgstr "BookOrbit %1 está listo"
+
+#: bookorbit_menu_sheet.lua
+msgid "Takes a few seconds, then KOReader restarts"
+msgstr "Tarda unos segundos y luego KOReader se reinicia"
+
+#: bookorbit_menu_sheet.lua
+msgid "Go to"
+msgstr "Ir a"
+
+#: bookorbit_progress_sync.lua
+msgid "Could not sync progress with BookOrbit"
+msgstr "No se pudo sincronizar el progreso con BookOrbit"
+
+#: bookorbit_progress_sync.lua
+msgid "Now at %1, from %2"
+msgstr "Ahora en %1, desde %2"
+
+#: bookorbit_progress_sync.lua
+msgid "Now at %1"
+msgstr "Ahora en %1"
+
+#: bookorbit_progress_sync.lua main.lua
+msgid "No book is open"
+msgstr "No hay ningún libro abierto"
+
+#: bookorbit_progress_sync.lua main.lua
+msgid "The open book changed. Sync again"
+msgstr "El libro abierto ha cambiado. Sincroniza de nuevo"
+
+#: bookorbit_progress_sync.lua
+msgid "Could not check BookOrbit's position"
+msgstr "No se pudo comprobar la posición de BookOrbit"
+
+#: bookorbit_progress_sync.lua
+msgid "Kept your place. BookOrbit is further ahead."
+msgstr "Se ha mantenido tu posición. BookOrbit va más adelantado."
+
+#: bookorbit_progress_sync.lua
+msgid "Progress sent to BookOrbit"
+msgstr "Progreso enviado a BookOrbit"
+
+#: bookorbit_progress_sync.lua
+msgid "BookOrbit has no position for this book yet"
+msgstr "BookOrbit aún no tiene posición para este libro"
+
+#: bookorbit_progress_sync.lua
+msgid "Already in sync"
+msgstr "Ya sincronizado"
+
+#: bookorbit_progress_sync.lua
+msgid "Not available"
+msgstr "No disponible"
+
+#: bookorbit_progress_sync.lua
+msgid "Never"
+msgstr "Nunca"
+
+#: bookorbit_settings_page.lua
+msgid "no shortcut"
+msgstr "sin atajo"
+
+#: bookorbit_settings_page.lua
+msgid "At startup"
+msgstr "Al iniciar"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit is home"
+msgstr "BookOrbit es la página de inicio"
+
+#: bookorbit_settings_page.lua
+msgid "File browser first"
+msgstr "Explorador de archivos primero"
+
+#: bookorbit_settings_page.lua
+msgid "Automatic"
+msgstr "Automático"
+
+#: bookorbit_settings_page.lua
+msgid "By hand"
+msgstr "Manual"
+
+#: bookorbit_settings_page.lua
+msgid "ask before jumping"
+msgstr "preguntar antes de saltar"
+
+#: bookorbit_settings_page.lua
+msgid "jump to newer"
+msgstr "saltar a la posición más reciente"
+
+#: bookorbit_settings_page.lua
+msgid "stay put"
+msgstr "quedarse en su sitio"
+
+#: bookorbit_settings_page.lua
+msgid "%1 layout, %2 size"
+msgstr "Diseño de %1, tamaño %2"
+
+#: bookorbit_settings_page.lua
+msgid "Opening BookOrbit"
+msgstr "Al abrir BookOrbit"
+
+#: bookorbit_settings_page.lua
+msgid "Downloads"
+msgstr "Descargas"
+
+#: bookorbit_settings_page.lua
+msgid "About & updates"
+msgstr "Información y actualizaciones"
+
+#: bookorbit_settings_page.lua
+msgid "Shortcut"
+msgstr "Atajo"
+
+#: bookorbit_settings_page.lua
+msgid "1 change waiting"
+msgid_plural "%1 changes waiting"
+msgstr[0] "%1 cambio pendiente"
+msgstr[1] "%1 cambios pendientes"
+
+#: bookorbit_settings_page.lua
+msgid "Help"
+msgstr "Ayuda"
+
+#: bookorbit_settings_page.lua
+msgid "Open BookOrbit from the menu bar or your shortcut"
+msgstr "Abre BookOrbit desde la barra de menú o con tu atajo"
+
+#: bookorbit_settings_page.lua
+msgid "Show the file browser"
+msgstr "Mostrar el explorador de archivos"
+
+#: bookorbit_settings_page.lua
+msgid "Once, when KOReader starts"
+msgstr "Una vez, al iniciar KOReader"
+
+#: bookorbit_settings_page.lua
+msgid "At startup, and whenever you close a book"
+msgstr "Al iniciar y cada vez que cierres un libro"
+
+#: bookorbit_settings_page.lua
+msgid "Make BookOrbit home"
+msgstr "Hacer de BookOrbit la página de inicio"
+
+#: bookorbit_settings_page.lua
+msgid "This device has no touchscreen. KOReader's keyboard shortcuts can open BookOrbit: its action is \"BookOrbit: open\"."
+msgstr "Este dispositivo no tiene pantalla táctil. Los atajos de teclado de KOReader pueden abrir BookOrbit: su acción es \"BookOrbit: abrir\"."
+
+#: bookorbit_settings_page.lua
+msgid "Change"
+msgstr "Cambiar"
+
+#: bookorbit_settings_page.lua
+msgid "Pick one"
+msgstr "Elegir gesto"
+
+#: bookorbit_settings_page.lua
+msgid "Opens BookOrbit from any book"
+msgstr "Abre BookOrbit desde cualquier libro"
+
+#: bookorbit_settings_page.lua
+msgid "Opens BookOrbit from the file browser and from any book"
+msgstr "Abre BookOrbit desde el explorador de archivos y desde cualquier libro"
+
+#: bookorbit_settings_page.lua
+msgid "Pick a gesture to open BookOrbit"
+msgstr "Elige un gesto para abrir BookOrbit"
+
+#: bookorbit_settings_page.lua
+msgid "No shortcut"
+msgstr "Sin atajo"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit in the menu bar"
+msgstr "BookOrbit en la barra de menú"
+
+#: bookorbit_settings_page.lua
+msgid "One tap from KOReader's top menu"
+msgstr "Un toque desde el menú superior de KOReader"
+
+#: bookorbit_settings_page.lua
+msgid "Only under Tools in KOReader's menu"
+msgstr "Solo bajo herramientas en el menú de KOReader"
+
+#: bookorbit_settings_page.lua
+msgid "When KOReader starts"
+msgstr "Al iniciar KOReader"
+
+#: bookorbit_settings_page.lua
+msgid "KOReader menu bar"
+msgstr "Barra de menú de KOReader"
+
+#: bookorbit_settings_page.lua
+msgid "Pull when a book opens, push when it closes and on sleep"
+msgstr "Obtener al abrir un libro, enviar al cerrarlo y al suspender"
+
+#: bookorbit_settings_page.lua
+msgid "Every few page turns"
+msgstr "Cada pocas páginas"
+
+#: bookorbit_settings_page.lua
+msgid "Push while reading"
+msgstr "Enviar mientras lees"
+
+#: bookorbit_settings_page.lua
+msgid "pages"
+msgstr "páginas"
+
+#: bookorbit_settings_page.lua
+msgid "Never wake Wi-Fi just to sync"
+msgstr "No activar Wi-Fi solo para sincronizar"
+
+#: bookorbit_settings_page.lua
+msgid "Skip when offline"
+msgstr "Omitir cuando estés sin conexión"
+
+#: bookorbit_settings_page.lua
+msgid "Bring marks made elsewhere to this device"
+msgstr "Traer las marcas hechas en otros lugares a este dispositivo"
+
+#: bookorbit_settings_page.lua
+msgid "Jump"
+msgstr "Saltar"
+
+#: bookorbit_settings_page.lua
+msgid "Stay"
+msgstr "Quedarse"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit is ahead"
+msgstr "BookOrbit está por delante"
+
+#: bookorbit_settings_page.lua
+msgid "Read further elsewhere"
+msgstr "Leer más en otro lugar"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit is behind"
+msgstr "BookOrbit está atrasado"
+
+#: bookorbit_settings_page.lua
+msgid "This device read further"
+msgstr "Este dispositivo leyó más"
+
+#: bookorbit_settings_page.lua
+msgid "Read further on another device"
+msgstr "Leíste más en otro dispositivo"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit is further behind"
+msgstr "BookOrbit va por detrás"
+
+#: bookorbit_settings_page.lua
+msgid "When positions differ"
+msgstr "Cuando las posiciones difieren"
+
+#: bookorbit_settings_page.lua
+msgid "Customize Home"
+msgstr "Personalizar Inicio"
+
+#: bookorbit_settings_page.lua
+msgid "Move, resize, add and remove widgets"
+msgstr "Mover, redimensionar, añadir y quitar widgets"
+
+#: bookorbit_settings_page.lua
+msgid "Opens the book when it is on this device"
+msgstr "Abre el libro si está en este dispositivo"
+
+#: bookorbit_settings_page.lua
+msgid "Shows the book's details"
+msgstr "Muestra los detalles del libro"
+
+#: bookorbit_settings_page.lua
+msgid "Tap Continue reading"
+msgstr "Al tocar «Continuar leyendo»"
+
+#: bookorbit_settings_page.lua
+msgid "Ink"
+msgstr "Tinta"
+
+#: bookorbit_settings_page.lua
+msgid "Outline"
+msgstr "Contorno"
+
+#: bookorbit_settings_page.lua
+msgid "Soft"
+msgstr "Suave"
+
+#: bookorbit_settings_page.lua
+msgid "Accents"
+msgstr "Acentuado"
+
+#: bookorbit_settings_page.lua
+msgid "Tinted"
+msgstr "Teñido"
+
+#: bookorbit_settings_page.lua
+msgid "Colour"
+msgstr "Color"
+
+#: bookorbit_settings_page.lua
+msgid "Replaces your pages with a starter set"
+msgstr "Reemplaza tus páginas por un conjunto inicial"
+
+#: bookorbit_settings_page.lua
+msgid "Starting layout"
+msgstr "Diseño inicial"
+
+#: bookorbit_settings_page.lua
+msgid "Tile style"
+msgstr "Estilo de tarjeta"
+
+#: bookorbit_settings_page.lua
+msgid "Interface size"
+msgstr "Tamaño de la interfaz"
+
+#: bookorbit_settings_page.lua
+msgid "Text and controls across BookOrbit"
+msgstr "Texto y controles en BookOrbit"
+
+#: bookorbit_settings_page.lua
+msgid "Back to the starting layout and outline tiles"
+msgstr "Volver al diseño inicial y a las tarjetas con contorno"
+
+#: bookorbit_settings_page.lua
+msgid "Reset Home"
+msgstr "Restablecer Inicio"
+
+#: bookorbit_settings_page.lua
+msgid "Look"
+msgstr "Apariencia"
+
+#: bookorbit_settings_page.lua
+msgid "Download folder"
+msgstr "Carpeta de descarga"
+
+#: bookorbit_settings_page.lua
+msgid "Books you download from BookOrbit are saved here. KOReader uses the same folder for its own downloads."
+msgstr "Los libros que descargues de BookOrbit se guardan aquí. KOReader usa la misma carpeta para sus propias descargas."
+
+#: bookorbit_settings_page.lua
+msgid "Not set"
+msgstr "Sin establecer"
+
+#: bookorbit_settings_page.lua
+msgid "Nobody"
+msgstr "Nadie"
+
+#: bookorbit_settings_page.lua
+msgid "Signed in as"
+msgstr "Sesión iniciada como"
+
+#: bookorbit_settings_page.lua
+msgid "Sign out"
+msgstr "Cerrar sesión"
+
+#: bookorbit_settings_page.lua
+msgid "This device stops syncing until you sign in again"
+msgstr "Este dispositivo dejará de sincronizar hasta que inicies sesión de nuevo"
+
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
+msgid "Matches every book on this device again"
+msgstr "Comprueba de nuevo cada libro de este dispositivo"
+
+#: bookorbit_settings_page.lua bookorbit_status_page.lua
+msgid "Recheck all books"
+msgstr "Revisar todos los libros"
+
+#: bookorbit_settings_page.lua
+msgid "Update to %1"
+msgstr "Actualizar a %1"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit for KOReader"
+msgstr "BookOrbit para KOReader"
+
+#: bookorbit_settings_page.lua
+msgid "Version %1 is ready, you have %2"
+msgstr "La versión %1 está lista, tienes %2"
+
+#: bookorbit_settings_page.lua bookorbit_shortcut.lua
+msgid "another action"
+msgstr "otra acción"
+
+#: bookorbit_settings_page.lua
+msgid "Menu bar only"
+msgstr "Solo barra de menú"
+
+#: bookorbit_settings_page.lua
+msgid "Top-left hold and top-right tap work in books only. Other choices also work in the file browser. Existing actions are named before replacement."
+msgstr "Mantener en la parte superior izquierda y tocar en la superior derecha solo funciona en libros. Otras opciones también funcionan en el explorador de archivos. Las acciones existentes se nombran antes de ser reemplazadas."
+
+#: bookorbit_settings_page.lua
+msgid "Choose where to open BookOrbit"
+msgstr "Elige dónde abrir BookOrbit"
+
+#: bookorbit_settings_page.lua
+msgid "BookOrbit for KOReader %1"
+msgstr "BookOrbit para KOReader %1"
+
+#: bookorbit_settings_page.lua
+msgid "Start Home from this layout?"
+msgstr "¿Iniciar Home desde este diseño?"
+
+#: bookorbit_settings_page.lua
+msgid "Your pages are replaced by this layout's pages."
+msgstr "Tus páginas se sustituirán por las de este diseño."
+
+#: bookorbit_settings_page.lua
+msgid "Reset Home?"
+msgstr "¿Restablecer Inicio?"
+
+#: bookorbit_settings_page.lua
+msgid "Your pages and tile style go back to how they started."
+msgstr "Tus páginas y el estilo de mosaico volverán a como estaban al empezar."
+
+#: bookorbit_settings_page.lua
+msgid "Sign out of BookOrbit?"
+msgstr "¿Cerrar sesión en BookOrbit?"
+
+#: bookorbit_settings_page.lua
+msgid "This device stops syncing until you sign in again. Books already downloaded stay on it."
+msgstr "Este dispositivo dejará de sincronizar hasta que inicies sesión de nuevo. Los libros ya descargados permanecerán en él."
+
+#: bookorbit_settings_page.lua
+msgid "%1."
+msgstr "%1."
+
+#: bookorbit_settings_page.lua
+msgid "Use it"
+msgstr "Usarlo"
+
+#: bookorbit_settings_page.lua
+msgid "Use this gesture for BookOrbit?"
+msgstr "¿Usar este gesto para BookOrbit?"
+
+#: bookorbit_shortcut.lua
+msgid "In books: hold the top-left corner"
+msgstr "En libros: mantén presionada la esquina superior izquierda"
+
+#: bookorbit_shortcut.lua
+msgid "Tap the bottom-right corner"
+msgstr "Toca la esquina inferior derecha"
+
+#: bookorbit_shortcut.lua
+msgid "Two-finger tap, top right"
+msgstr "Toque con dos dedos, arriba a la derecha"
+
+#: bookorbit_shortcut.lua
+msgid "In books: tap the top-right corner"
+msgstr "En libros: toca la esquina superior derecha"
+
+#: bookorbit_shortcut.lua
+msgid "Free"
+msgstr "Libre"
+
+#: bookorbit_shortcut.lua
+msgid "Replaces %1"
+msgstr "Reemplaza %1"
+
+#: bookorbit_shortcut.lua
+msgid "Replaces %1 and %2"
+msgstr "Reemplaza %1 y %2"
+
+#: bookorbit_shortcut.lua
+msgid "In books, replaces %1"
+msgstr "En libros, reemplaza %1"
+
+#: bookorbit_shortcut.lua
+msgid "In the file browser, replaces %1"
+msgstr "En el explorador de archivos, reemplaza %1"
+
+#: bookorbit_shortcut.lua
+msgid "Opens BookOrbit"
+msgstr "Abre BookOrbit"
+
+#: bookorbit_signin_page.lua
+msgid "BookOrbit found"
+msgstr "BookOrbit encontrado"
+
+#: bookorbit_signin_page.lua
+msgid "No BookOrbit server answered there"
+msgstr "Ningún servidor de BookOrbit respondió allí"
+
+#: bookorbit_signin_page.lua
+msgid "Test"
+msgstr "Probar"
+
+#: bookorbit_signin_page.lua
+msgid "No KOReader login yet?"
+msgstr "¿Aún no tienes credenciales de KOReader?"
+
+#: bookorbit_signin_page.lua
+msgid "Scan to create one in BookOrbit on your phone, or open Settings, KOReader on the web."
+msgstr "Escanea el código para crear tus credenciales desde el teléfono, o abre Ajustes, KOReader en la web de BookOrbit."
+
+#: bookorbit_signin_page.lua
+msgid "Create one in BookOrbit on the web: Settings, KOReader."
+msgstr "Crea tus credenciales en la web de BookOrbit: Ajustes, KOReader."
+
+#: bookorbit_signin_page.lua
+msgid "KOReader login"
+msgstr "Credenciales de KOReader"
+
+#: bookorbit_signin_page.lua
+msgid "Password"
+msgstr "Contraseña"
+
+#: bookorbit_signin_page.lua
+msgid "Sign in"
+msgstr "Iniciar sesión"
+
+#: bookorbit_signin_page.lua
+msgid "Not now"
+msgstr "Ahora no"
+
+#: bookorbit_signin_page.lua
+msgid "Sign in to BookOrbit"
+msgstr "Iniciar sesión en BookOrbit"
+
+#: bookorbit_signin_page.lua
+msgid "Sync progress and highlights, and browse your library"
+msgstr "Sincroniza el progreso y los destacados, y explora tu biblioteca"
+
+#: bookorbit_signin_page.lua
+msgid "The BookOrbit icon stays in KOReader's menu bar, so you can sign in later."
+msgstr "El ícono de BookOrbit permanece en la barra de menú de KOReader, así que puedes iniciar sesión más tarde."
+
+#: bookorbit_signin_page.lua
+msgid "Your KOReader login, made in BookOrbit on the web: Settings, KOReader."
+msgstr "Tu usuario de KOReader, creado en la web de BookOrbit: Ajustes, KOReader."
+
+#: bookorbit_signin_page.lua
+msgid "Next"
+msgstr "Siguiente"
+
+#: bookorbit_signin_page.lua
+msgid "Type the server's address first"
+msgstr "Escribe primero la dirección del servidor"
+
+#: bookorbit_signin_page.lua
+msgid "Looking for BookOrbit…"
+msgstr "Buscando BookOrbit…"
+
+#: bookorbit_signin_page.lua
+msgid "Could not reach it: %1"
+msgstr "No se pudo alcanzar: %1"
+
+#: bookorbit_signin_page.lua
+msgid "That address is not a BookOrbit server"
+msgstr "Esa dirección no es un servidor de BookOrbit"
+
+#: bookorbit_signin_page.lua
+msgid "Signing in…"
+msgstr "Iniciando sesión…"
+
+#: bookorbit_signin_page.lua
+msgid "That username and password were not accepted. Check your KOReader login in BookOrbit on the web: Settings, KOReader."
+msgstr "No se aceptaron ese usuario y esa contraseña. Comprueba tus credenciales de KOReader en la web de BookOrbit: Ajustes, KOReader."
+
+#: bookorbit_status_page.lua
+msgid "Rechecking books…"
+msgstr "Revisando libros…"
+
+#: bookorbit_status_page.lua
+msgid "Offline: 1 change waiting"
+msgid_plural "Offline: %1 changes waiting"
+msgstr[0] "Sin conexión: %1 cambio pendiente"
+msgstr[1] "Sin conexión: %1 cambios pendientes"
+
+#: bookorbit_status_page.lua
+msgid "Kept on this device and sent when Wi-Fi is back"
+msgstr "Se mantienen en este dispositivo y se enviarán cuando el Wi-Fi vuelva"
+
+#: bookorbit_status_page.lua
+msgid "They go out with the next sync"
+msgstr "Se enviarán con la siguiente sincronización"
+
+#: bookorbit_status_page.lua
+msgid "Sync now to match the books on this device with your library"
+msgstr "Sincroniza ahora para asociar los libros de este dispositivo con tu biblioteca"
+
+#: bookorbit_status_page.lua
+msgid "Everything is synced"
+msgstr "Todo está sincronizado"
+
+#: bookorbit_status_page.lua
+msgid "Last sync %1"
+msgstr "Última sincronización %1"
+
+#: bookorbit_status_page.lua
+msgid "Last sync %1, %2"
+msgstr "Última sincronización %1, %2"
+
+#: bookorbit_status_page.lua bookorbit_sweep.lua
+msgid "books matched"
+msgstr "libros coincidentes"
+
+#: bookorbit_status_page.lua
+msgid "not in BookOrbit"
+msgstr "no están en BookOrbit"
+
+#: bookorbit_status_page.lua
+msgid "waiting to send"
+msgstr "pendientes de enviar"
+
+#: bookorbit_status_page.lua
+msgid "Sync events will show here."
+msgstr "Los eventos de sincronización se mostrarán aquí."
+
+#: bookorbit_status_page.lua bookorbit_sync_sheet.lua
+msgid "Stop syncing"
+msgstr "Detener sincronización"
+
+#: bookorbit_status_page.lua
+msgid "Connect and sync"
+msgstr "Conectar y sincronizar"
+
+#: bookorbit_status_page.lua
+msgid "Connection failed"
+msgstr "La conexión falló"
+
+#: bookorbit_status_page.lua
+msgid "%1 on %2"
+msgstr "%1 en %2"
+
+#: bookorbit_status_page.lua
+msgid "Recent activity"
+msgstr "Actividad reciente"
+
+#: bookorbit_status_page.lua
+msgid "Books not in BookOrbit"
+msgstr "Libros que no están en BookOrbit"
+
+#: bookorbit_status_page.lua
+msgid "Some books on this device are not in your BookOrbit library: files copied by hand, or edited since they were downloaded. Recheck all books to try matching them again."
+msgstr "Algunos libros de este dispositivo no están en tu biblioteca de BookOrbit: archivos copiados a mano o editados después de descargarlos. Usa «Revisar todos los libros» para intentar vincularlos de nuevo."
+
+#: bookorbit_sweep.lua
+msgid "Sync stopped"
+msgstr "Sincronización detenida"
+
+#: bookorbit_sweep.lua
+msgid "What synced so far is kept. The rest syncs next time."
+msgstr "Lo sincronizado hasta ahora se mantiene. El resto se sincronizará la próxima vez."
+
+#: bookorbit_sweep.lua
+msgid "Check your KOReader login in BookOrbit: Settings, KOReader."
+msgstr "Comprueba tus credenciales de KOReader en BookOrbit: Ajustes, KOReader."
+
+#: bookorbit_sweep.lua
+msgid "Sign-in failed"
+msgstr "Inicio de sesión fallido"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit sign-in failed"
+msgstr "Inicio de sesión en BookOrbit fallido"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit is not reachable"
+msgstr "BookOrbit no es alcanzable"
+
+#: bookorbit_sweep.lua
+msgid "Check the connection and try again."
+msgstr "Comprueba la conexión e inténtalo de nuevo."
+
+#: bookorbit_sweep.lua
+msgid "The server could not finish the sync"
+msgstr "El servidor no pudo terminar la sincronización"
+
+#: bookorbit_sweep.lua
+msgid "Try again in a moment."
+msgstr "Inténtalo de nuevo en un momento."
+
+#: bookorbit_sweep.lua
+msgid "Highlights updated: %1 applied, %2 deleted, %3 closed book(s)."
+msgstr "Destacados actualizados (aplicados: %1; eliminados: %2; libros cerrados: %3)."
+
+#: bookorbit_sweep.lua
+msgid "Some books failed and will retry on the next sync."
+msgstr "Algunos libros fallaron y se reintentarán en la próxima sincronización."
+
+#: bookorbit_sweep.lua
+msgid "reading events"
+msgstr "eventos de lectura"
+
+#: bookorbit_sweep.lua
+msgid "highlights"
+msgstr "aspectos más destacados"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit sync: reading local library (%1)"
+msgstr "Sincronización de BookOrbit: leyendo biblioteca local (%1)"
+
+#: bookorbit_sweep.lua
+msgid "Reading library"
+msgstr "Leyendo biblioteca"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit sync: matching books..."
+msgstr "Sincronización de BookOrbit: buscando coincidencias de libros..."
+
+#: bookorbit_sweep.lua
+msgid "Matching books"
+msgstr "Buscando coincidencias de libros"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit sync: uploading reading data (%1/%2)"
+msgstr "Sincronización BookOrbit: subiendo datos de lectura (%1/%2)"
+
+#: bookorbit_sweep.lua
+msgid "Reading data %1/%2"
+msgstr "Datos de lectura %1/%2"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit sync: checking books (%1/%2)"
+msgstr "Sincronización BookOrbit: comprobando libros (%1/%2)"
+
+#: bookorbit_sweep.lua
+msgid "Checking %1/%2"
+msgstr "Comprobando %1/%2"
+
+#: bookorbit_sweep.lua
+msgid "BookOrbit sync: syncing highlights (%1/%2)"
+msgstr "Sincronización BookOrbit: sincronizando destacados (%1/%2)"
+
+#: bookorbit_sweep.lua
+msgid "Highlights %1/%2"
+msgstr "Destacados %1/%2"
+
+#: bookorbit_sweep.lua
+msgid "A sync is already running"
+msgstr "Ya hay una sincronización en curso"
+
+#: bookorbit_sweep.lua
+msgid "Syncing this book first. Try again shortly."
+msgstr "Sincronizando este libro primero. Inténtalo de nuevo en breve."
+
+#: bookorbit_sweep.lua
+msgid "Sign in to BookOrbit first."
+msgstr "Inicia sesión en BookOrbit primero."
+
+#: bookorbit_sweep.lua
+msgid "Rechecking every book against BookOrbit. This may take a while."
+msgstr "Revisando cada libro con BookOrbit. Esto puede tardar un poco."
+
+#: bookorbit_sweep.lua
+msgid "Syncing to BookOrbit. This may take a while on first run."
+msgstr "Sincronizando con BookOrbit. Esto puede tardar un poco en la primera ejecución."
+
+#: bookorbit_sync_sheet.lua
+msgid "Rechecking books"
+msgstr "Revisando libros"
+
+#: bookorbit_sync_sheet.lua
+msgid "Syncing your library"
+msgstr "Sincronizando tu biblioteca"
+
+#: bookorbit_sync_sheet.lua
+msgid "Stopping…"
+msgstr "Deteniendo…"
+
+#: bookorbit_text_entry.lua
+msgid "Search books, authors and series"
+msgstr "Buscar libros, autores y series"
+
+#: bookorbit_text_entry.lua
+msgid "Recent"
+msgstr "Recientes"
+
+#: bookorbit_text_pages.lua
+msgid "Nothing to show."
+msgstr "No hay nada que mostrar."
+
+#: bookorbit_text_pages.lua
+msgid "%1 in this book"
+msgstr "%1 en este libro"
+
+#: bookorbit_text_pages.lua
+msgid "Genres"
+msgstr "Géneros"
+
+#: bookorbit_text_pages.lua
+msgid "Tags"
+msgstr "Etiquetas"
+
+#: bookorbit_text_pages.lua
+msgid "No tags on this book yet. Tags added in BookOrbit show here."
+msgstr "Aún no hay etiquetas en este libro. Las etiquetas añadidas en BookOrbit se muestran aquí."
+
+#: bookorbit_toast.lua
+msgid "Retry"
+msgstr "Reintentar"
+
+#: bookorbit_toast.lua
+msgid "Tap anywhere to stop"
+msgstr "Toca en cualquier lugar para detener"
+
+#: bookorbit_toast.lua
+msgid "Tap to stop"
+msgstr "Toca para detener"
+
+#: bookorbit_update_sheet.lua
+msgid "New version"
+msgstr "Nueva versión"
+
+#: bookorbit_update_sheet.lua
+msgid "BookOrbit server"
+msgstr "Servidor BookOrbit"
+
+#: bookorbit_update_sheet.lua
+msgid "An update for this plugin"
+msgstr "Una actualización para este plugin"
+
+#: bookorbit_update_sheet.lua
+msgid "It downloads from your BookOrbit server. KOReader then restarts to use it."
+msgstr "Se descarga desde tu servidor de BookOrbit. KOReader se reinicia después para usarlo."
+
+#: bookorbit_update_sheet.lua
+msgid "Update now"
+msgstr "Actualizar ahora"
+
+#: bookorbit_update_sheet.lua
+msgid "%1 KB"
+msgstr "%1 KB"
+
+#: bookorbit_update_sheet.lua
+msgid "Updating to %1"
+msgstr "Actualizando a %1"
+
+#: bookorbit_update_sheet.lua
+msgid "Keep KOReader open until it finishes."
+msgstr "Mantén KOReader abierto hasta que termine."
+
+#: bookorbit_update_sheet.lua
+msgid "BookOrbit %1 is installed"
+msgstr "BookOrbit %1 está instalado"
+
+#: bookorbit_update_sheet.lua
+msgid "KOReader restarts to use it."
+msgstr "KOReader se reinicia para usarlo."
+
+#: bookorbit_update_sheet.lua
+msgid "Restart now"
+msgstr "Reiniciar ahora"
+
+#: bookorbit_update_sheet.lua
+msgid "BookOrbit %1"
+msgstr "BookOrbit %1"
+
+#: bookorbit_update_sheet.lua
+msgid "The update did not finish"
+msgstr "La actualización no terminó"
+
+#: bookorbit_update_sheet.lua
+msgid "Nothing changed: this device still runs the version it had."
+msgstr "No ha cambiado nada: este dispositivo sigue usando la versión que tenía."
+
+#: bookorbit_update_sheet.lua
+msgid "Something went wrong."
+msgstr "Algo salió mal."
+
+#: bookorbit_updater.lua
+msgid "Plugin update available: v%1 -> v%2"
+msgstr "Actualización de plugin disponible: v%1 -> v%2"
+
+#: bookorbit_updater.lua
+msgid "Installed plugin: v%1 (Check for update)"
+msgstr "Plugin instalado: v%1 (Comprobar actualización)"
+
+#: bookorbit_updater.lua
+msgid "Installed plugin: v%1 (Login required)"
+msgstr "Plugin instalado: v%1 (Se requiere iniciar sesión)"
+
+#: bookorbit_updater.lua
+msgid "Could not check for update: %1"
+msgstr "No se pudo comprobar la actualización: %1"
+
+#: bookorbit_updater.lua
+msgid "Checking for an update…"
+msgstr "Comprobando si hay una actualización…"
+
+#: bookorbit_updater.lua
+msgid "latest plugin version unavailable"
+msgstr "versión más reciente del plugin no disponible"
+
+#: bookorbit_updater.lua
+msgid "Could not determine the latest plugin version from the server."
+msgstr "No se pudo determinar la versión más reciente del plugin en el servidor."
+
+#: bookorbit_updater.lua
+msgid "BookOrbit is up to date, v%1"
+msgstr "BookOrbit está actualizado, v%1"
+
+#: bookorbit_updater.lua
+msgid "An update is already in progress."
+msgstr "Ya hay una actualización en curso."
+
+#: bookorbit_updater.lua
+msgid "Cannot find where the plugin is installed."
+msgstr "No se puede encontrar dónde está instalado el plugin."
+
+#: bookorbit_updater.lua
+msgid "The server does not have the plugin package available."
+msgstr "El servidor no tiene disponible el paquete del plugin."
+
+#: bookorbit_updater.lua
+msgid "Update failed: %1"
+msgstr "Error al actualizar: %1"
+
+#: main.lua
+msgid "Login to BookOrbit"
+msgstr "Iniciar sesión en BookOrbit"
+
+#: main.lua
+msgid "BookOrbit is set up as %1"
+msgstr "BookOrbit está configurado como %1"
+
+#: main.lua
+msgid "Lifecycle sync storage is full. Open BookOrbit diagnostics and reconnect before closing more books."
+msgstr "El almacenamiento de la sincronización del ciclo de vida está lleno. Abre los diagnósticos de BookOrbit y vuelve a conectar antes de cerrar más libros."
+
+#: main.lua
+msgid "BookOrbit could not save a sync"
+msgstr "BookOrbit no pudo guardar una sincronización"
+
+#: main.lua
+msgid "BookOrbit has many pending lifecycle syncs. Reconnect soon to drain them."
+msgstr "BookOrbit tiene muchas sincronizaciones del ciclo de vida pendientes. Vuelve a conectar pronto para procesarlas."
+
+#: main.lua
+msgid "Many syncs are waiting. Reconnect soon"
+msgstr "Muchas sincronizaciones están esperando. Vuelve a conectar pronto"
+
+#: main.lua
+msgid "Lifecycle sync"
+msgstr "Sincronización del ciclo de vida"
+
+#: main.lua
+msgid "Remote book changes are pending until the local book is available."
+msgstr "Los cambios remotos del libro están pendientes hasta que el libro local esté disponible."
+
+#: main.lua
+msgid "A pending lifecycle sync keeps failing and was parked. Use \"Sync this book\" to retry it."
+msgstr "Una sincronización del ciclo de vida pendiente sigue fallando y se ha pausado. Usa \"Sincronizar este libro\" para reintentarlo."
+
+#: main.lua
+msgid "Highlight sync queued"
+msgstr "Sincronización de destacados en cola"
+
+#: main.lua
+msgid "Could not identify the open book"
+msgstr "No se pudo identificar el libro abierto"
+
+#: main.lua
+msgid "Match retry queued"
+msgstr "Reintento de coincidencia en cola"
+
+#: main.lua
+msgid "BookOrbit sync queued"
+msgstr "Sincronización de BookOrbit en cola"
+
+#: main.lua
+msgid "Progress push"
+msgstr "Envío de progreso"
+
+#: main.lua
+msgid "Progress pull"
+msgstr "Obtención de progreso"
+
+#: main.lua
+msgid "Highlight sync"
+msgstr "Sincronización de destacados"
+
+#: main.lua
+msgid "Open book match"
+msgstr "Coincidencia de libro abierto"
+
+#: main.lua
+msgid "Book match recheck"
+msgstr "Revisión de coincidencias de libros"
+
+#: main.lua
+msgid "Library sync"
+msgstr "Sincronizar biblioteca"
+
+#: main.lua
+msgid "Waiting for another sync"
+msgstr "Esperando otra sincronización"
+
+#: main.lua
+msgid "Book sync"
+msgstr "Sincronización del libro"
+
+#: main.lua
+msgid "Could not read this book's data"
+msgstr "No se pudieron leer los datos de este libro"
+
+#: main.lua
+msgid "BookOrbit: sync all books"
+msgstr "BookOrbit: sincronizar todos los libros"
+
+#: main.lua
+msgid "BookOrbit: sync this book"
+msgstr "BookOrbit: sincronizar este libro"
+
+#: main.lua
+msgid "BookOrbit: push progress"
+msgstr "BookOrbit: enviar progreso"
+
+#: main.lua
+msgid "BookOrbit: pull progress"
+msgstr "BookOrbit: obtener progreso"
+
+#: main.lua
+msgid "BookOrbit: this book"
+msgstr "BookOrbit: este libro"
+
+#: main.lua
+msgid "BookOrbit: open"
+msgstr "BookOrbit: abrir"
+
+#: main.lua
+msgid "%1 highlight(s) updated"
+msgstr "%1 destacado(s) actualizado(s)"
+
+#: main.lua
+msgid "%1 bookmark(s) updated"
+msgstr "%1 marcador(s) actualizado(s)"
+
+#: main.lua
+msgid "Auto sync needs Wi-Fi to turn on by itself"
+msgstr "La sincronización automática necesita Wi-Fi para activarse por sí sola"
+
+#: main.lua
+msgid "Open KOReader's Network settings, set 'Action when Wi-Fi is off' to 'Turn on', then turn Auto sync on again."
+msgstr "Abre los ajustes de red de KOReader, pon 'Acción con wifi desactivado' en 'Activar' y luego vuelve a activar la sincronización automática."
+
+#: main.lua
+msgid "Auto sync off"
+msgstr "Sincronización automática desactivada"
+
+#: main.lua
+msgid "Auto sync on"
+msgstr "Sincronización automática activada"

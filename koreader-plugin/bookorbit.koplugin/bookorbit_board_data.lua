@@ -14,7 +14,8 @@ local NetworkMgr = require("ui/network/manager")
 local datetime = require("datetime")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
+local Dates = require("bookorbit_dates")
 
 local BookOrbitStatsReader = require("bookorbit_stats_reader")
 local CatalogUtil = require("bookorbit_catalog_util")
@@ -50,6 +51,11 @@ function BoardData.shortWeekday(t)
     return datetime.shortDayOfWeekTranslation[short] or short
 end
 
+-- Its first letter, whole even where the language spells it with several bytes.
+function BoardData.weekdayInitial(t)
+    return BoardData.shortWeekday(t):match("^[%z\1-\127\194-\244][\128-\191]*")
+end
+
 function BoardData.longMonth(t)
     local long = os.date("%B", t)
     return datetime.longMonthTranslation[long] or long
@@ -61,7 +67,8 @@ function BoardData.shortMonth(t)
 end
 
 function BoardData.longDate(t)
-    return T(_("%1, %2 %3"), BoardData.longWeekday(t), tonumber(os.date("%d", t)), BoardData.longMonth(t))
+    -- TRANSLATORS: weekday, day of the month, then the month as it reads inside a date.
+    return T(_("%1, %2 %3"), BoardData.longWeekday(t), tonumber(os.date("%d", t)), Dates.monthInDate(os.date("%m", t), true))
 end
 
 function BoardData.greeting(name, t)
@@ -78,17 +85,24 @@ end
 
 function BoardData.formatDuration(min)
     min = math.floor((min or 0) + 0.5)
+    -- TRANSLATORS: minutes, abbreviated.
     if min < 60 then return T(_("%1 min"), min) end
     local h, m = math.floor(min / 60), min % 60
+    -- TRANSLATORS: hours, abbreviated.
     if m == 0 then return T(_("%1 h"), h) end
+    -- TRANSLATORS: hours and minutes, abbreviated.
     return T(_("%1 h %2 min"), h, m)
 end
 
+-- The tightest form, for small tiles: keep it as short as the language allows.
 function BoardData.formatShortDuration(min)
     min = math.floor((min or 0) + 0.5)
+    -- TRANSLATORS: minutes in the shortest form, for small tiles (5m).
     if min < 60 then return T(_("%1m"), min) end
     local h, m = math.floor(min / 60), min % 60
+    -- TRANSLATORS: hours in the shortest form, for small tiles (2h).
     if m == 0 then return T(_("%1h"), h) end
+    -- TRANSLATORS: hours and minutes in the shortest form, for small tiles (2h 5m).
     return T(_("%1h %2m"), h, m)
 end
 
@@ -105,7 +119,7 @@ function BoardData.relativeDay(iso, now)
     local days = math.floor((dayStart(now) - dayStart(t)) / DAY + 0.5)
     if days <= 1 then return _("yesterday") end
     if days < 7 then return BoardData.longWeekday(t) end
-    return T(_("%1 %2"), BoardData.shortMonth(t), tonumber(os.date("%d", t)))
+    return Dates.shortDayMonth(t)
 end
 
 -- "Late September 2025" for a YYYY-MM-DD date.
@@ -114,8 +128,9 @@ function BoardData.partOfMonth(date_key)
     local y, m, d = date_key:match("^(%d+)-(%d+)-(%d+)")
     if not y then return nil end
     local t = os.time({ year = tonumber(y), month = tonumber(m), day = tonumber(d), hour = 12 })
-    local month, year = BoardData.longMonth(t), tonumber(y)
+    local month, year = Dates.monthInDate(m, true), tonumber(y)
     local day = tonumber(d)
+    -- TRANSLATORS: %1 is the month as it reads inside a date, %2 the year.
     if day <= 10 then return T(_("Early %1 %2"), month, year) end
     if day <= 20 then return T(_("Mid %1 %2"), month, year) end
     return T(_("Late %1 %2"), month, year)
@@ -126,7 +141,8 @@ function BoardData.monthYear(iso)
     if type(iso) ~= "string" then return nil end
     local t = datetime.stringISO8601ToSeconds and datetime.stringISO8601ToSeconds(iso)
     if not t then return nil end
-    return T(_("%1 %2"), BoardData.shortMonth(t), tonumber(os.date("%Y", t)))
+    -- TRANSLATORS: %1 is the short month on its own (as in a calendar), %2 the year.
+    return T(_.pgettext("Month and year", "%1 %2"), BoardData.shortMonth(t), tonumber(os.date("%Y", t)))
 end
 
 -- Rounded, except that a started book never reads 0% and an unfinished one
@@ -221,7 +237,8 @@ function BoardData.forecast(book, md5, now)
         finish = finish,
         day = days_out == 0 and _("Today") or (days_out == 1 and _("Tomorrow") or BoardData.longWeekday(finish)),
         short = BoardData.shortWeekday(finish),
-        date = T(_("%1 %2"), tonumber(os.date("%d", finish)), BoardData.shortMonth(finish)),
+        -- TRANSLATORS: %1 is the day of the month, %2 the short month as it reads inside a date.
+        date = T(_.pgettext("Day and month", "%1 %2"), tonumber(os.date("%d", finish)), Dates.monthInDate(os.date("%m", finish), false)),
     }
 end
 
@@ -341,7 +358,7 @@ function BoardData.pageTurns(now)
     local value = nil
     if r then
         value = { total = r.total or 0, today = r.today or 0 }
-        if r.first then value.since = T(_("%1 %2"), BoardData.shortMonth(r.first), tonumber(os.date("%Y", r.first))) end
+        if r.first then value.since = T(_.pgettext("Month and year", "%1 %2"), BoardData.shortMonth(r.first), tonumber(os.date("%Y", r.first))) end
     end
     turns_cache = { at = now, day = today, value = value }
     return value
@@ -428,7 +445,7 @@ BoardData.GLYPHS = {
     { cp = 0xDF, name = function() return _("Sharp s") end, font = "NotoSerif-Italic.ttf", label = "Noto Serif Italic", sample = "Aa Bb Cc Dd" },
     { cp = 0x0915, name = function() return _("Ka") end, font = "NotoSansDevanagariUI-Bold.ttf", label = "Noto Sans Devanagari" },
     { cp = 0xA7, name = function() return _("Section sign") end, font = "NotoSerif-Regular.ttf", label = "Noto Serif", sample = "Aa Bb Cc Dd" },
-    { cp = 0x8AAD, name = function() return _("To read") end, font = "NotoSansCJKsc-Regular.otf", label = "Noto Sans CJK SC" },
+    { cp = 0x8AAD, name = function() return _.pgettext("Glyph meaning", "To read") end, font = "NotoSansCJKsc-Regular.otf", label = "Noto Sans CJK SC" },
     { cp = 0x0985, name = function() return _("A, in Bengali") end, font = "NotoSansBengaliUI-Bold.ttf", label = "Noto Sans Bengali" },
     { cp = 0x40, name = function() return _("At sign") end, font = "NotoSans-Bold.ttf", label = "Noto Sans Bold", sample = "Aa Bb Cc Dd" },
     { cp = 0x05D0, name = function() return _("Alef") end, font = "FreeSerif.ttf", label = "FreeSerif" },
@@ -483,9 +500,10 @@ end
 function BoardData.etaLabel(days)
     if not days or days ~= days or days <= 0 then return nil end
     if days < 1.5 then return _("About a day to go") end
-    if days < 10 then return T(_("About %1 days to go"), math.floor(days + 0.5)) end
-    if days < 60 then return T(_("About %1 weeks to go"), math.floor(days / 7 + 0.5)) end
-    if days < 730 then return T(_("About %1 months to go"), math.floor(days / 30 + 0.5)) end
+    local d, w, m = math.floor(days + 0.5), math.floor(days / 7 + 0.5), math.floor(days / 30 + 0.5)
+    if days < 10 then return T(_.ngettext("About 1 day to go", "About %1 days to go", d), d) end
+    if days < 60 then return T(_.ngettext("About 1 week to go", "About %1 weeks to go", w), w) end
+    if days < 730 then return T(_.ngettext("About 1 month to go", "About %1 months to go", m), m) end
     return nil
 end
 
@@ -640,7 +658,8 @@ function BoardData.build(catalog, context, now)
     d.date_long = BoardData.longDate(now)
     d.clock = datetime.secondsToHour(now, G_reader_settings:isTrue("twelve_hour_clock"))
     d.weekday = BoardData.longWeekday(now)
-    d.day_month = T(_("%1 %2"), tonumber(os.date("%d", now)), BoardData.longMonth(now))
+    -- TRANSLATORS: %1 is the day of the month, %2 the month as it reads inside a date.
+    d.day_month = T(_.pgettext("Day and month name", "%1 %2"), tonumber(os.date("%d", now)), Dates.monthInDate(os.date("%m", now), true))
     d.updated = BoardData.relativeDay(body.generatedAt, now)
     local last_sync = catalog.settings and catalog.settings.last_sync
     d.last_sync_at = type(last_sync) == "table" and last_sync.event ~= "connection_test" and tonumber(last_sync.at) or nil
@@ -715,7 +734,7 @@ function BoardData.build(catalog, context, now)
     d.week_initials = {}
     for i = 1, 7 do
         local t = now - (7 - i) * DAY
-        d.week_initials[i] = BoardData.shortWeekday(t):sub(1, 1)
+        d.week_initials[i] = BoardData.weekdayInitial(t)
     end
     d.today_min = week[7]
     d.week_min = 0

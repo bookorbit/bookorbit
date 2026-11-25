@@ -10,7 +10,7 @@ duplicating logic.
 local DocumentRegistry = require("document/documentregistry")
 local util = require("util")
 local T = require("ffi/util").template
-local _ = require("gettext")
+local _ = require("bookorbit_gettext")
 
 local CatalogUtil = {}
 
@@ -216,7 +216,7 @@ function CatalogUtil.formatRelativeTime(value, now)
     if days == 1 then
         return _("yesterday")
     end
-    return T(_("%1 days ago"), days)
+    return T(_.ngettext("1 day ago", "%1 days ago", days), days)
 end
 
 function CatalogUtil.readingStreakDays(dashboard, fallback)
