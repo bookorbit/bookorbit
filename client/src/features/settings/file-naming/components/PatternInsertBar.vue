@@ -70,11 +70,11 @@ function keepFieldFocus(event: Event) {
           <DropdownMenuItem
             v-for="token in tokens"
             :key="token.text"
-            class="grid grid-cols-[8.5rem_minmax(0,1fr)_auto] gap-3 text-xs"
+            class="grid grid-cols-[10rem_minmax(0,1fr)_auto] gap-3 text-xs"
             @select="insertText(token.text)"
           >
             <span class="font-mono font-semibold text-pattern-token">{{ token.text }}</span>
-            <span class="truncate">{{ token.description }}</span>
+            <span class="whitespace-normal">{{ token.description }}</span>
             <span class="max-w-36 truncate text-muted-foreground">{{ token.sample }}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -163,11 +163,11 @@ function keepFieldFocus(event: Event) {
         <DropdownMenuItem
           v-for="token in tokens"
           :key="token.text"
-          class="grid grid-cols-[8rem_minmax(0,1fr)] gap-3 text-xs"
+          class="grid grid-cols-[10rem_minmax(0,1fr)] gap-3 text-xs"
           @select="insertText(token.text)"
         >
           <span class="font-mono font-semibold text-pattern-token">{{ token.text }}</span>
-          <span class="truncate">{{ token.description }}</span>
+          <span class="whitespace-normal">{{ token.description }}</span>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel class="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{{

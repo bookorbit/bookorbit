@@ -3763,6 +3763,9 @@
         "tokenSubtitle": "Book subtitle",
         "tokenAuthors": "Author(s), comma-separated",
         "tokenNarrators": "Narrator(s), comma-separated",
+        "tokenFirstPublishedYear": "Year the work was first published",
+        "tokenIndexedSeries": "Series name by position. Use [0] for primary, [1] for second.",
+        "tokenIndexedSeriesIndex": "Book number in the selected series, zero-padded",
         "tokenYear": "Publication year",
         "tokenSeries": "Series name",
         "tokenSeriesIndex": "Series index (zero-padded)",
@@ -3907,6 +3910,7 @@
         "previewWithAria": "Preview with {title}",
         "previewBook": {
           "sample": "Sample book",
+          "multipleSeries": "Two series with different book numbers",
           "longTitle": "Long title and series",
           "longSubtitle": "Long subtitle",
           "manyAuthors": "Five authors",

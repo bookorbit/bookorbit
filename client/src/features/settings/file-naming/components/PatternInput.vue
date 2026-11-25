@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { File, Folder, FolderOpen } from '@lucide/vue'
-import type { OrganizationMode, PatternToken } from '@bookorbit/types'
+import { replacePlaceholders, type OrganizationMode } from '@bookorbit/types'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import PatternText from './PatternText.vue'
 import {
@@ -16,7 +16,7 @@ import {
   toggleOptionalLevel,
   type PatternLevel,
 } from '../lib/pattern-levels'
-import { completeToken, matchTokens, partialTokenAt, TOKEN_DESCRIPTION_KEYS } from '../lib/pattern-tokens'
+import { completeToken, matchTokens, partialTokenAt, suggestionDescriptionKey, type SuggestedToken } from '../lib/pattern-tokens'
 import type { NamingTarget } from '../lib/naming-rules'
 
 const props = withDefaults(
@@ -103,7 +103,7 @@ function commit(value: string, caret: number) {
 const suggestion = ref<{ start: number; query: string } | null>(null)
 const activeIndex = ref(0)
 const listboxId = computed(() => `${props.id}-tokens`)
-const suggestions = computed<PatternToken[]>(() => (suggestion.value ? matchTokens(suggestion.value.query) : []))
+const suggestions = computed<SuggestedToken[]>(() => (suggestion.value ? matchTokens(suggestion.value.query) : []))
 const suggestOpen = computed(() => suggestion.value !== null)
 const optionId = (index: number) => `${props.id}-token-${index}`
 
@@ -122,7 +122,7 @@ function closeSuggestions() {
   suggestion.value = null
 }
 
-function chooseSuggestion(token: PatternToken) {
+function chooseSuggestion(token: SuggestedToken) {
   const current = suggestion.value
   if (!current) return
   const completed = completeToken(props.modelValue, current.start, caretInPattern(), token)
@@ -130,7 +130,7 @@ function chooseSuggestion(token: PatternToken) {
   commit(completed.pattern, completed.caret)
 }
 
-function handleOptionDown(event: MouseEvent, token: PatternToken) {
+function handleOptionDown(event: MouseEvent, token: SuggestedToken) {
   // Keeps focus, and so the caret, in the field while the option is picked.
   event.preventDefault()
   chooseSuggestion(token)
@@ -306,13 +306,13 @@ defineExpose({ insertAtCaret, focus })
         :key="token"
         role="option"
         :aria-selected="index === activeIndex"
-        class="grid cursor-default grid-cols-[8.5rem_minmax(0,1fr)_auto] items-center gap-3 rounded-sm px-2 py-1.5 text-xs"
+        class="grid cursor-default grid-cols-[10rem_minmax(0,1fr)_auto] items-center gap-3 rounded-sm px-2 py-1.5 text-xs"
         :class="index === activeIndex ? 'bg-accent text-accent-foreground' : ''"
         @mousedown="handleOptionDown($event, token)"
       >
         <span class="font-mono font-semibold text-pattern-token">{{ tokenText(token) }}</span>
-        <span class="truncate text-foreground">{{ t(TOKEN_DESCRIPTION_KEYS[token]) }}</span>
-        <span class="max-w-40 truncate text-muted-foreground">{{ sampleValues[token] || '' }}</span>
+        <span class="whitespace-normal text-foreground">{{ t(suggestionDescriptionKey(token)) }}</span>
+        <span class="max-w-40 truncate text-muted-foreground">{{ replacePlaceholders(tokenText(token), sampleValues) }}</span>
       </li>
       <li v-if="suggestions.length === 0" class="px-2 py-1.5 text-xs text-muted-foreground">
         {{ t('settings.reader.fileNaming.noTokenMatch', { query: suggestion?.query ?? '' }) }}

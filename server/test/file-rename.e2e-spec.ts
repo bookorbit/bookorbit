@@ -281,6 +281,32 @@ describe('Bulk file rename (e2e)', { timeout: SUITE_TIMEOUT_MS }, () => {
   // ── 3. book_per_file — series pattern ────────────────────────────────────
 
   describe('book_per_file — series pattern', { timeout: TEST_TIMEOUT_MS }, () => {
+    it('previews and files a book by its secondary series number and first publication year', async () => {
+      const lib = await createLibrary(ctx, {
+        mode: 'book_per_file',
+        fileRenameEnabled: true,
+        fileNamingPattern: '{series[0]}/<{series[1]}/><{seriesIndex[1]} - >{title}< ({firstPublishedYear})| ({year})|>',
+      });
+      await createEpubFile(join(lib.folderPath, 'source.epub'));
+      await triggerAndWaitForScan(ctx, lib.libraryId);
+      const [book] = await findAllBooksInLibrary(ctx, lib.libraryId);
+      await setBookMetadata(ctx, book.bookId, {
+        title: 'Men at Arms',
+        publishedYear: 2013,
+        originalPublishedYear: 1993,
+        seriesMemberships: [
+          { seriesName: 'Discworld', seriesIndex: '15' },
+          { seriesName: 'City Watch', seriesIndex: '2' },
+        ],
+      });
+
+      const expected = join(lib.folderPath, 'Discworld', 'City Watch', '02 - Men at Arms (1993).epub');
+      const preview = await getBulkRenamePreview(ctx, lib.libraryId);
+      expect(preview.items[0]).toMatchObject({ status: 'will_rename', newPath: expected });
+      expect(getDoneEvent((await executeBulkRename(ctx, lib.libraryId)).events)).toMatchObject({ succeeded: 1, failed: 0 });
+      await expect(pathExists(expected)).resolves.toBe(true);
+    });
+
     it('organises books under series subfolder with index prefix', async () => {
       const lib = await createLibrary(ctx, {
         mode: 'book_per_file',

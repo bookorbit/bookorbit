@@ -8,7 +8,13 @@ import { mkdir } from 'fs/promises';
 import { asc, eq } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { DEFAULT_FORMAT_PRIORITY } from '@bookorbit/types';
-import type { BookWriteAndRenameResult, BulkRenamePreviewPage, BulkRenameProgressEvent, BulkRenameStatus } from '@bookorbit/types';
+import type {
+  BookWriteAndRenameResult,
+  BulkRenamePreviewPage,
+  BulkRenameProgressEvent,
+  BulkRenameStatus,
+  MetadataSeriesMembership,
+} from '@bookorbit/types';
 
 import { AppModule } from '../../../src/app.module';
 import { DB } from '../../../src/db';
@@ -245,6 +251,8 @@ export async function setBookMetadata(
     subtitle?: string | null;
     publisher?: string | null;
     publishedYear?: number | null;
+    originalPublishedYear?: number | null;
+    seriesMemberships?: MetadataSeriesMembership[];
     seriesName?: string | null;
     seriesIndex?: string | null;
     language?: string | null;
@@ -262,6 +270,8 @@ export async function setBookMetadata(
       ...(metadata.subtitle !== undefined && { subtitle: metadata.subtitle }),
       ...(metadata.publisher !== undefined && { publisher: metadata.publisher }),
       ...(metadata.publishedYear !== undefined && { publishedYear: metadata.publishedYear }),
+      ...(metadata.originalPublishedYear !== undefined && { originalPublishedYear: metadata.originalPublishedYear }),
+      ...(metadata.seriesMemberships !== undefined && { seriesMemberships: metadata.seriesMemberships }),
       ...(metadata.seriesName !== undefined && { seriesName: metadata.seriesName }),
       ...(metadata.seriesIndex !== undefined && { seriesIndex: metadata.seriesIndex }),
       ...(metadata.language !== undefined && { language: metadata.language }),

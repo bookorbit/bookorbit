@@ -7,7 +7,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { splitMetadataIsbn } from '../../common/text-match/isbn-normalize';
-import { buildPatternTokens, patternReferencesToken } from '../../common/utils/pattern-tokens.utils';
+import { buildPatternTokens, patternReferencesToken, type PatternTokenMetadata } from '../../common/utils/pattern-tokens.utils';
 import { selectPrimaryFileKeepingCurrent } from '../../common/utils/primary-file-selection.utils';
 
 import { DB } from '../../db';
@@ -505,19 +505,7 @@ export class UploadService {
     try {
       const fileSize = (await stat(tempPath)).size;
       if (FORMATS_WITH_UNBOUNDED_METADATA_READS.has(format) && fileSize > MAX_BUFFERED_METADATA_BYTES) return fallback;
-      let parsed: {
-        title?: string | null;
-        subtitle?: string | null;
-        publisher?: string | null;
-        publishedYear?: number | null;
-        language?: string | null;
-        seriesName?: string | null;
-        seriesIndex?: string | null;
-        isbn13?: string | null;
-        isbn10?: string | null;
-        authors: { name: string }[];
-        narrators?: string[];
-      } | null = null;
+      let parsed: (PatternTokenMetadata & { authors: { name: string }[]; narrators?: string[] }) | null = null;
 
       if (format === 'epub') {
         parsed = await extractEpubMetadata(tempPath);

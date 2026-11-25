@@ -7,7 +7,7 @@ import { EXAMPLE_PATTERN_METADATA } from '@bookorbit/types'
  *
  * Titles and names are bibliographic data and are never translated; only the note is.
  */
-export const PREVIEW_BOOK_IDS = ['sample', 'longTitle', 'longSubtitle', 'manyAuthors', 'audiobook', 'standalone'] as const
+export const PREVIEW_BOOK_IDS = ['sample', 'multipleSeries', 'longTitle', 'longSubtitle', 'manyAuthors', 'audiobook', 'standalone'] as const
 export type PreviewBookId = (typeof PREVIEW_BOOK_IDS)[number]
 
 export interface PreviewBook {
@@ -36,6 +36,22 @@ const book = (fields: Partial<Record<string, string>>): Record<string, string> =
 
 export const PREVIEW_BOOKS: Record<PreviewBookId, PreviewBook> = {
   sample: { id: 'sample', extension: 'epub', metadata: { ...EXAMPLE_PATTERN_METADATA } },
+  multipleSeries: {
+    id: 'multipleSeries',
+    extension: 'epub',
+    metadata: book({
+      title: 'Men at Arms',
+      authors: 'Terry Pratchett',
+      firstPublishedYear: '1993',
+      year: '2013',
+      series: 'Discworld',
+      seriesIndex: '15',
+      'series[1]': 'City Watch',
+      'seriesIndex[1]': '02',
+      originalFilename: 'men-at-arms',
+      extension: 'epub',
+    }),
+  },
   longTitle: {
     id: 'longTitle',
     extension: 'epub',
@@ -111,6 +127,7 @@ export const PREVIEW_BOOKS: Record<PreviewBookId, PreviewBook> = {
 /** Written out so a renamed message key fails the locale check instead of rendering raw. */
 export const PREVIEW_BOOK_NOTE_KEYS: Record<PreviewBookId, string> = {
   sample: 'settings.reader.fileNaming.previewBook.sample',
+  multipleSeries: 'settings.reader.fileNaming.previewBook.multipleSeries',
   longTitle: 'settings.reader.fileNaming.previewBook.longTitle',
   longSubtitle: 'settings.reader.fileNaming.previewBook.longSubtitle',
   manyAuthors: 'settings.reader.fileNaming.previewBook.manyAuthors',
@@ -121,6 +138,8 @@ export const PREVIEW_BOOK_NOTE_KEYS: Record<PreviewBookId, string> = {
 /** The book with some fields blanked, for previewing what a pattern does without them. */
 export function withoutFields(metadata: Record<string, string>, fields: readonly string[]): Record<string, string> {
   const copy = { ...metadata }
-  for (const field of fields) copy[field] = ''
+  for (const key of Object.keys(copy)) {
+    if (fields.includes(key.replace(/\[\d+\]$/, ''))) copy[key] = ''
+  }
   return copy
 }

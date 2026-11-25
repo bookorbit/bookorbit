@@ -30,7 +30,7 @@ export const metadataWithout = (...fields: string[]): Record<string, string> => 
 export const PREVIEW_CASES: PreviewCase[] = [
   { id: 'complete', omit: [], metadata: { ...EXAMPLE_PATTERN_METADATA } },
   { id: 'noSeries', omit: ['series', 'seriesIndex'], metadata: metadataWithout('series', 'seriesIndex') },
-  { id: 'noYear', omit: ['year'], metadata: metadataWithout('year') },
+  { id: 'noYear', omit: ['year', 'firstPublishedYear'], metadata: metadataWithout('year', 'firstPublishedYear') },
   { id: 'noAuthor', omit: ['authors'], metadata: metadataWithout('authors') },
 ]
 

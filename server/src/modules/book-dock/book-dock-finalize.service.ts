@@ -173,6 +173,7 @@ type NormalizedFinalizeMetadata = {
   publisher: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
+  originalPublishedYear: number | null;
   language: string | null;
   pageCount: number | null;
   seriesName: string | null;
@@ -1617,7 +1618,11 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     mediaOverlayAvailable = false,
   ): Record<string, string> {
     return buildPatternTokens({
-      metadata: meta,
+      metadata: {
+        ...meta,
+        originalPublishedYear: normalizePublishedYear(meta.originalPublishedYear),
+        seriesMemberships: finalizeSeriesMemberships(meta.seriesMemberships, meta.seriesName ?? null, meta.seriesIndex ?? null),
+      },
       authors: meta.authors,
       narrators: meta.narrators,
       originalStem: basename(fileName, extname(fileName)),
@@ -1783,6 +1788,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       publisher: meta.publisher ?? null,
       publishedDate: meta.publishedDate ?? null,
       publishedYear: meta.publishedYear ?? null,
+      originalPublishedYear: meta.originalPublishedYear ?? undefined,
       language: meta.language ?? null,
       seriesName: meta.seriesName ?? null,
       seriesIndex: meta.seriesIndex ?? null,
@@ -2036,6 +2042,7 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     publisher: normalizeText(normalizedMeta?.publisher, 500),
     publishedDate,
     publishedYear: publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(normalizedMeta?.publishedYear),
+    originalPublishedYear: normalizePublishedYear(normalizedMeta?.originalPublishedYear),
     language: normalizeLanguage(normalizedMeta?.language),
     pageCount: normalizeInteger(normalizedMeta?.pageCount),
     seriesName,
@@ -2057,7 +2064,7 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     ranobedbId: normalizeText(normalizedMeta?.ranobedbId, 50),
     lubimyczytacId: normalizeText(normalizedMeta?.lubimyczytacId, 512),
     aladinId: normalizeText(normalizedMeta?.aladinId, 20),
-    seriesMemberships: withPrimarySeries(normalizeSeriesMemberships(normalizedMeta?.seriesMemberships), seriesName, seriesIndex),
+    seriesMemberships: finalizeSeriesMemberships(normalizedMeta?.seriesMemberships, seriesName, seriesIndex),
     communityRatings: normalizeCommunityRatings(normalizedMeta?.communityRatings),
     externalProviderIds: normalizedMeta?.externalProviderIds ?? undefined,
     comicMetadata: normalizeComicMetadata(normalizedMeta?.comicMetadata),
@@ -2086,11 +2093,12 @@ function normalizeSeriesMemberships(value: BookDockMetadata['seriesMemberships']
  * the series name and number. The form's values replace that entry, so a corrected series is filed
  * instead of the provider's spelling.
  */
-function withPrimarySeries(
-  memberships: MetadataSeriesMembership[] | undefined,
+function finalizeSeriesMemberships(
+  value: BookDockMetadata['seriesMemberships'],
   seriesName: string | null,
   seriesIndex: string | null,
 ): MetadataSeriesMembership[] | undefined {
+  const memberships = normalizeSeriesMemberships(value);
   if (memberships === undefined || !seriesName) return memberships;
   const key = seriesName.toLowerCase();
   const others = memberships.slice(1).filter((membership) => membership.seriesName.toLowerCase() !== key);

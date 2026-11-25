@@ -25,7 +25,16 @@ const FILE_RENAME_EVENT = 'file.rename';
 const FILE_RENAME_ROLLBACK_EVENT = 'file.rename_rollback';
 const DEFAULT_RENAME_DEBOUNCE_MS = 3_000;
 
-export const RENAME_RELEVANT_FIELDS = new Set(['title', 'authors', 'seriesName', 'seriesIndex', 'publishedYear', 'isbn10', 'isbn13'] as const);
+export const RENAME_RELEVANT_FIELDS = new Set([
+  'title',
+  'authors',
+  'seriesName',
+  'seriesIndex',
+  'publishedYear',
+  'originalPublishedYear',
+  'isbn10',
+  'isbn13',
+] as const);
 
 type RenameBookFile = Awaited<ReturnType<FileRenameRepository['findAllBookFiles']>>[number];
 

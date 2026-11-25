@@ -125,6 +125,7 @@ export class BookDockMetadataFieldsDto {
   @IsOptional() @IsString() coverUrl?: string;
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) publishedDate?: string | null;
   @IsOptional() @IsInt() @Min(1000) @Max(2200) publishedYear?: number | null;
+  @IsOptional() @IsInt() @Min(1000) @Max(2200) originalPublishedYear?: number | null;
   @IsOptional() @IsInt() @Min(0) pageCount?: number | null;
   @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];

@@ -2294,6 +2294,7 @@ describe('BookDockFinalizeService', () => {
         selectedMetadata: {
           title: 'Dune',
           pageCount: 688,
+          originalPublishedYear: 1965,
           narrators: ['Simon Vance'],
           durationSeconds: 1200,
           abridged: false,
@@ -2324,6 +2325,7 @@ describe('BookDockFinalizeService', () => {
     expect(updateChain.set).toHaveBeenCalledWith(
       expect.objectContaining({
         pageCount: 688,
+        originalPublishedYear: 1965,
         durationSeconds: 1200,
         abridged: false,
         googleBooksId: 'google-id',

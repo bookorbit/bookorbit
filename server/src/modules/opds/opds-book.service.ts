@@ -1,3 +1,4 @@
+import { patternSeriesMemberships } from '../../db/book-pattern-series';
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { ForbiddenException, Inject, Injectable } from '@nestjs/common';
 import { SQL, type SQLWrapper, type Subquery, and, count, eq, exists, gt, inArray, not, notExists, or, sql } from 'drizzle-orm';
@@ -21,7 +22,7 @@ import {
   userBookStatus,
 } from '../../db/schema';
 import { BookQueryBuilder } from '../book/book-query-builder.service';
-import { isAudioFormat, type ContentFilterRules, type GroupRule } from '@bookorbit/types';
+import { isAudioFormat, type ContentFilterRules, type GroupRule, type MetadataSeriesMembership } from '@bookorbit/types';
 import { rankFileRowsByBook, rankFilesByFormatPriority } from '../../common/utils/primary-file-selection.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { excludeAudioOnlyBooks } from '../../common/utils/audio-only-book-sql.utils';
@@ -276,6 +277,8 @@ export interface OpdsManifestBookRow {
   language: string | null;
   publisher: string | null;
   publishedYear: number | null;
+  originalPublishedYear: number | null;
+  seriesMemberships: MetadataSeriesMembership[] | null;
   isbn10: string | null;
   isbn13: string | null;
   files: OpdsManifestFileRow[];
@@ -484,6 +487,8 @@ export class OpdsBookService {
           language: bookMetadata.language,
           publisher: bookMetadata.publisher,
           publishedYear: bookMetadata.publishedYear,
+          originalPublishedYear: bookMetadata.originalPublishedYear,
+          seriesMemberships: patternSeriesMemberships,
           isbn10: bookMetadata.isbn10,
           isbn13: bookMetadata.isbn13,
         })
@@ -550,6 +555,8 @@ export class OpdsBookService {
         language: row.language,
         publisher: row.publisher,
         publishedYear: row.publishedYear,
+        originalPublishedYear: row.originalPublishedYear,
+        seriesMemberships: row.seriesMemberships,
         isbn10: row.isbn10,
         isbn13: row.isbn13,
         files: filesByBook.get(row.id) ?? [],

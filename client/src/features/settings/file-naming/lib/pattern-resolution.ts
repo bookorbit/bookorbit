@@ -139,6 +139,6 @@ export function splitExtension(name: string, extension: string): [string, string
 
 /** The first token a level reads, so a skipped folder can say which value was missing. */
 export function firstToken(text: string): string | null {
-  const match = text.match(/\{([A-Za-z]+)/)
+  const match = text.match(/\{([A-Za-z]+(?:\[\d+\])?)/)
   return match?.[1] ?? null
 }

@@ -13,6 +13,15 @@ const FILE: ResolveOptions = { target: 'upload', mode: 'book_per_file', extensio
 const FOLDER: ResolveOptions = { ...FILE, mode: 'book_per_folder' }
 
 describe('resolvePreview', () => {
+  it('previews ordered series and the first publication year, including missing fields', () => {
+    const pattern = '<{series[0]}/><{series[1]}/><{seriesIndex[1]} - >{title}< ({firstPublishedYear})| ({year})|>'
+    const metadata = PREVIEW_BOOKS.multipleSeries.metadata
+    expect(resolvePreview(pattern, metadata, FILE).path).toBe('Discworld/City Watch/02 - Men at Arms (1993).epub')
+    const missing = withoutFields(metadata, ['series', 'seriesIndex', 'firstPublishedYear'])
+    expect(resolvePreview(pattern, missing, FILE).path).toBe('Men at Arms (2013).epub')
+    expect(firstToken('<{seriesIndex[1]:fixed2} - >')).toBe('seriesIndex[1]')
+  })
+
   it('names every level from the real resolver', () => {
     const preview = resolvePreview(DEFAULT_UPLOAD_PATTERN_BOOK_PER_FOLDER, EXAMPLE_PATTERN_METADATA, FOLDER)
 

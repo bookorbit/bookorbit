@@ -612,17 +612,7 @@ export class KoreaderCatalogService {
         resolveUploadPath(
           pattern,
           buildPatternTokens({
-            metadata: {
-              title: row.title,
-              subtitle: row.subtitle,
-              publisher: row.publisher,
-              language: row.language,
-              isbn13: row.isbn13,
-              isbn10: row.isbn10,
-              publishedYear: row.publishedYear,
-              seriesName: row.seriesName,
-              seriesIndex: row.seriesIndex,
-            },
+            metadata: row,
             authors: row.authors,
             originalStem: basename(file.filename ?? row.title, `.${extension}`),
             format: extension,
@@ -1215,6 +1205,7 @@ export class KoreaderCatalogService {
     userId?: number,
   ): KoreaderCatalogBookDetail {
     const title = detail.title ?? (basename(detail.folderPath) || `Book ${detail.id}`);
+    const metadata = { ...detail, title };
     const files = detail.files
       .filter((file) => file.role === 'primary' || file.role === 'content')
       .map<KoreaderCatalogFile>((file, _index, deliverable) => {
@@ -1230,17 +1221,7 @@ export class KoreaderCatalogService {
           resolveUploadPath(
             filePattern,
             buildPatternTokens({
-              metadata: {
-                title,
-                subtitle: detail.subtitle,
-                publisher: detail.publisher,
-                language: detail.language,
-                isbn13: detail.isbn13,
-                isbn10: detail.isbn10,
-                publishedYear: detail.publishedYear,
-                seriesName: detail.seriesName,
-                seriesIndex: detail.seriesIndex,
-              },
+              metadata,
               authors: detail.authors.map((author) => author.name),
               originalStem: basename(file.filename ?? title, `.${extension}`),
               format: extension,

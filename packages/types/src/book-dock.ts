@@ -270,6 +270,7 @@ export interface BookDockMetadata {
   publisher?: string | null;
   publishedDate?: string | null;
   publishedYear?: number | null;
+  originalPublishedYear?: number | null;
   language?: string | null;
   pageCount?: number | null;
   isbn10?: string | null;

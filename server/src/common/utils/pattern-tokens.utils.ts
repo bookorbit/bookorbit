@@ -1,4 +1,4 @@
-import { formatSeriesIndex } from './series-index-format.utils';
+import { formatSeriesIndex, type MetadataSeriesMembership } from '@bookorbit/types';
 
 /**
  * The metadata a naming pattern can draw on. Every consumer reads these same field names
@@ -13,6 +13,8 @@ export interface PatternTokenMetadata {
   isbn13?: string | null;
   isbn10?: string | null;
   publishedYear?: number | null;
+  originalPublishedYear?: number | null;
+  seriesMemberships?: readonly MetadataSeriesMembership[] | null;
   seriesName?: string | null;
   seriesIndex?: string | null;
 }
@@ -55,10 +57,18 @@ export function buildPatternTokens(input: PatternTokenInput): Record<string, str
   const isbn = metadata.isbn13?.trim() || metadata.isbn10?.trim();
   if (isbn) tokens['isbn'] = isbn;
   if (metadata.publishedYear) tokens['year'] = String(metadata.publishedYear);
-  if (metadata.seriesName) tokens['series'] = metadata.seriesName;
-
-  const seriesIndex = formatSeriesIndex(metadata.seriesIndex ?? null);
+  if (metadata.originalPublishedYear != null) tokens['firstPublishedYear'] = String(metadata.originalPublishedYear);
+  const memberships = metadata.seriesMemberships ?? [];
+  const primary = metadata.seriesName || metadata.seriesIndex != null ? metadata : memberships[0];
+  if (primary?.seriesName) tokens['series'] = primary.seriesName;
+  const seriesIndex = formatSeriesIndex(primary?.seriesIndex ?? null);
   if (seriesIndex) tokens['seriesIndex'] = seriesIndex;
+  for (let position = 1; position < memberships.length; position++) {
+    const membership = memberships[position];
+    tokens[`series[${position}]`] = membership.seriesName;
+    const index = formatSeriesIndex(membership.seriesIndex ?? null);
+    if (index) tokens[`seriesIndex[${position}]`] = index;
+  }
   if (authors.length > 0) tokens['authors'] = authors.join(', ');
   if (narrators.length > 0) tokens['narrators'] = narrators.join(', ');
   if (format.toLowerCase() === 'epub' && mediaOverlayAvailable === true) tokens['readaloud'] = 'readaloud';

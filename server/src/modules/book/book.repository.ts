@@ -1,3 +1,4 @@
+import { patternSeriesMemberships } from '../../db/book-pattern-series';
 import { recordBookFileHashHistory, deleteBookFilesWithHashInvalidation, deleteBooksWithHashInvalidation } from '../../db/book-file-hash-history';
 import { BadRequestException, Inject, Injectable, Optional } from '@nestjs/common';
 import { SQL, and, asc, count, eq, inArray, isNotNull, isNull, lt, lte, ne, or, sql } from 'drizzle-orm';
@@ -9,6 +10,7 @@ import type {
   CustomMetadataFieldTypeMap,
   JumpBucketKind,
   JumpBucketsResponse,
+  MetadataSeriesMembership,
   SortField,
   SortSpec,
   TemporalJumpBucketPrecision,
@@ -132,6 +134,8 @@ type PatternMetadataRow = {
   publisher: string | null;
   publishedDate: string | null;
   publishedYear: number | null;
+  originalPublishedYear: number | null;
+  seriesMemberships: MetadataSeriesMembership[] | null;
   language: string | null;
   seriesId: number | null;
   seriesName: string | null;
@@ -2277,6 +2281,8 @@ export class BookRepository {
           publisher: bookMetadata.publisher,
           publishedDate: bookMetadata.publishedDate,
           publishedYear: bookMetadata.publishedYear,
+          originalPublishedYear: bookMetadata.originalPublishedYear,
+          seriesMemberships: patternSeriesMemberships,
           language: bookMetadata.language,
           seriesId: bookMetadata.seriesId,
           seriesName: bookMetadata.seriesName,

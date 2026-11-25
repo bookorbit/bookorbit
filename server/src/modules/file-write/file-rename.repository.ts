@@ -1,3 +1,5 @@
+import type { PatternTokenMetadata } from '../../common/utils/pattern-tokens.utils';
+import { patternSeriesMemberships } from '../../db/book-pattern-series';
 import { Inject, Injectable } from '@nestjs/common';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -25,17 +27,7 @@ export interface BookRenameData {
   fileRenameEnabled: boolean;
   fileNamingPattern: string | null;
   bookFolderPath: string;
-  metadata: {
-    title: string | null;
-    subtitle: string | null;
-    publisher: string | null;
-    language: string | null;
-    isbn10: string | null;
-    isbn13: string | null;
-    publishedYear: number | null;
-    seriesName: string | null;
-    seriesIndex: string | null;
-  };
+  metadata: PatternTokenMetadata & { title: string | null };
   authors: string[];
   narrators: string[];
 }
@@ -82,6 +74,8 @@ export class FileRenameRepository {
         isbn10: bookMetadata.isbn10,
         isbn13: bookMetadata.isbn13,
         publishedYear: bookMetadata.publishedYear,
+        originalPublishedYear: bookMetadata.originalPublishedYear,
+        seriesMemberships: patternSeriesMemberships,
         seriesName: bookMetadata.seriesName,
         seriesIndex: bookMetadata.seriesIndex,
       })
@@ -134,6 +128,8 @@ export class FileRenameRepository {
         isbn10: row.isbn10,
         isbn13: row.isbn13,
         publishedYear: row.publishedYear,
+        originalPublishedYear: row.originalPublishedYear,
+        seriesMemberships: row.seriesMemberships,
         seriesName: row.seriesName,
         seriesIndex: row.seriesIndex,
       },

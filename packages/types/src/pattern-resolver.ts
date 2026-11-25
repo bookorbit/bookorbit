@@ -11,6 +11,7 @@ export const EXAMPLE_PATTERN_METADATA: Record<string, string> = {
   authors: "William Gibson",
   narrators: "Robertson Dean",
   year: "1984",
+  firstPublishedYear: "1984",
   series: "Sprawl",
   seriesIndex: "01",
   language: "English",
@@ -28,8 +29,11 @@ export const PATTERN_TOKENS = [
   { token: "authors", description: "Author(s), comma-separated" },
   { token: "narrators", description: "Narrator(s), comma-separated" },
   { token: "year", description: "Publication year" },
+  { token: "firstPublishedYear", description: "Year the work was first published" },
   { token: "series", description: "Series name" },
   { token: "seriesIndex", description: "Series index (zero-padded)" },
+  { token: "series[1]", description: "Second series name ([0] is the primary series)" },
+  { token: "seriesIndex[1]", description: "Book number in the second series ([2] selects the third)" },
   { token: "publisher", description: "Publisher" },
   { token: "isbn", description: "ISBN-13" },
   { token: "language", description: "Language" },
@@ -115,9 +119,20 @@ export function applyModifier(value: string, modifier: string, fieldName: string
   }
 }
 
+function patternValue(values: Record<string, string>, field: string): string {
+  if (field === "series[0]") return values.series ?? "";
+  if (field === "seriesIndex[0]") return values.seriesIndex ?? "";
+  const value = Object.hasOwn(values, field) ? (values[field] ?? "") : "";
+  // Each additional membership supplies one name, even when portable filename sanitization is off.
+  if (field.startsWith("series[")) {
+    return value === "." || value === ".." ? "_" : value.replace(/[/\\]/g, "_");
+  }
+  return value;
+}
+
 function resolveModifierPlaceholders(block: string, values: Record<string, string>): string {
   return block.replace(MODIFIER_PLACEHOLDER_REGEX, (_, fieldName: string, modifier?: string) => {
-    const val = values[fieldName] ?? "";
+    const val = patternValue(values, fieldName);
     return modifier ? applyModifier(val, modifier, fieldName) : val;
   });
 }
@@ -125,7 +140,7 @@ function resolveModifierPlaceholders(block: string, values: Record<string, strin
 function checkAllPlaceholdersPresent(block: string, values: Record<string, string>): boolean {
   const matches = [...block.matchAll(MODIFIER_PLACEHOLDER_REGEX)];
   return matches.every(([, fieldName, modifier]) => {
-    const raw = values[fieldName] ?? "";
+    const raw = patternValue(values, fieldName);
     if (!raw.trim()) return false;
     return (modifier ? applyModifier(raw, modifier, fieldName) : raw).trim().length > 0;
   });

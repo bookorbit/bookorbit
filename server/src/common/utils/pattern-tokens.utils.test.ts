@@ -1,3 +1,4 @@
+import { resolveUploadPath } from '@bookorbit/types';
 import { describe, expect, it } from 'vitest';
 
 import { buildPatternTokens, patternReferencesToken } from './pattern-tokens.utils';
@@ -38,6 +39,54 @@ describe('pattern-tokens.utils', () => {
         seriesIndex: '01',
         authors: 'Frank Herbert',
       });
+    });
+
+    it('resolves ordered memberships as pairs, including a missing number and a fractional number', () => {
+      const tokens = buildPatternTokens({
+        metadata: {
+          seriesMemberships: [
+            { seriesName: 'First', seriesIndex: '15' },
+            { seriesName: 'Second', seriesIndex: null },
+            { seriesName: 'Third', seriesIndex: '2.5' },
+          ],
+        },
+        originalStem: 'book',
+        format: 'epub',
+      });
+      const pattern = '{series[0]} {seriesIndex[0]}/<{series[1]}>< {seriesIndex[1]}>/{series[2]} {seriesIndex[2]:fixed2}<{series[3]}>';
+      expect(resolveUploadPath(pattern, tokens, 'epub')).toBe('First 15/Second/Third 02.50.epub');
+    });
+
+    it('keeps an additional series name within one folder with either sanitization setting', () => {
+      const tokens = buildPatternTokens({
+        metadata: { seriesMemberships: [{ seriesName: 'Primary' }, { seriesName: 'Science/Fantasy' }] },
+        originalStem: 'book',
+        format: 'epub',
+      });
+      for (const sanitizeForCrossPlatform of [false, true]) {
+        expect(resolveUploadPath('{series[1]}/{originalFilename}', tokens, 'epub', { sanitizeForCrossPlatform })).toBe('Science_Fantasy/book.epub');
+      }
+    });
+
+    it('resolves position zero for books with only legacy primary fields', () => {
+      const tokens = buildPatternTokens({ metadata, originalStem: 'book', format: 'epub' });
+      expect(resolveUploadPath('{series[0]} {seriesIndex[0]}<{series[1]}>', tokens, 'epub')).toBe('Dune Chronicles 01.epub');
+    });
+
+    it.each([
+      [1965, 2019, 'Dune (1965).epub'],
+      [null, 2019, 'Dune (2019).epub'],
+      [1965, null, 'Dune (1965).epub'],
+      [null, null, 'Dune.epub'],
+    ] as const)('resolves first year %s and edition year %s using explicit fallback', (first, edition, expected) => {
+      const tokens = buildPatternTokens({
+        metadata: { title: 'Dune', originalPublishedYear: first, publishedYear: edition },
+        originalStem: 'dune',
+        format: 'epub',
+      });
+      expect(tokens.firstPublishedYear).toBe(first?.toString());
+      expect(tokens.year).toBe(edition?.toString());
+      expect(resolveUploadPath('{title}< ({firstPublishedYear})| ({year})|>', tokens, 'epub')).toBe(expected);
     });
 
     it('joins multiple authors with comma', () => {

@@ -2105,6 +2105,33 @@ describe('KoreaderCatalogService', () => {
       await expect(detailDevicePath(seriesIndex)).resolves.toBe(expected);
     });
 
+    it('uses the same indexed membership and work year for both manifest and detail paths', async () => {
+      const metadata = {
+        title: 'Men at Arms',
+        seriesName: 'Discworld',
+        seriesIndex: '15',
+        seriesMemberships: [
+          { seriesName: 'Discworld', seriesIndex: '15' },
+          { seriesName: 'City Watch', seriesIndex: '2' },
+        ],
+        originalPublishedYear: 1993,
+        publishedYear: 2013,
+      };
+      const { service, opdsBookService, bookService } = makeService({
+        ...seriesPattern,
+        seriesFileNamingPattern: '{series}/<{series[1]}/><{seriesIndex[1]} - >{title}< ({firstPublishedYear})>',
+      });
+      opdsBookService.getBookManifestPage.mockResolvedValueOnce({ rows: [makeManifestRow(metadata)], hasNext: false });
+      bookService.getDetail.mockResolvedValue(makeDetail(metadata));
+
+      const user = makeUser({ id: 7 });
+      const manifest = await service.getBulkManifest(user, makeQuery({ deviceId: 'device-1' }));
+      const detail = await service.getBookDetail(user, 10, 'device-1');
+      const expected = 'Discworld/City Watch/02 - Men at Arms (1993).epub';
+      expect(manifest.items[0]!.files[0]!.devicePath).toBe(expected);
+      expect(detail.files[0]?.devicePath).toBe(expected);
+    });
+
     it('pads only the whole part of a fractional index', async () => {
       await expect(manifestDevicePath('5.10')).resolves.toBe('Dune/05.10 - Dune.epub');
       await expect(detailDevicePath('5.10')).resolves.toBe('Dune/05.10 - Dune.epub');
