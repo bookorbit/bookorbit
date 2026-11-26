@@ -85,7 +85,8 @@
       "unknownTitle": "İsimsiz kitap",
       "errors": {
         "load": "Paylaşım ayarları yüklenemedi.",
-        "save": "Paylaşım ayarları güncellenemedi."
+        "save": "Paylaşım ayarları güncellenemedi.",
+        "preview": "Paylaşılan profil önizlemesi yüklenemedi."
       }
     },
     "appearance": {
@@ -97,6 +98,8 @@
         "saveError": "Dil terchileri kaydedilemedi"
       },
       "pageTitle": "Ekran",
+      "pageSubtitle": "Temaları, kapakları, düzeni ve kitaplığınızın görünümünü kontrol edin.",
+      "mobileSummary": "Tema: {theme} • Vurgu: {accent} • Arka plan: {background}",
       "themeMode": {
         "light": "Aydınlık",
         "dark": "Karanlık",
@@ -106,11 +109,14 @@
         "title": "Tema",
         "style": {
           "label": "Stil",
+          "hint": "Uygulamanın genel görünümü. Mod, vurgu, köşeler ve arka plan kendi ayarlarını korur.",
           "bookorbit": {
-            "label": "BookOrbit"
+            "label": "BookOrbit",
+            "description": "Renkli yüzeyler, cam paneller ve tırnaklı başlıklar."
           },
           "nostalgia": {
-            "label": "Nostalji"
+            "label": "Nostalji",
+            "description": "Nötr zeminler, sistem türü, düz paneller ve üst parlama."
           }
         },
         "colorScheme": {
@@ -118,10 +124,65 @@
           "hint": "Aydınlık veya karanlık arayüz"
         },
         "surfacePalette": {
-          "label": "Yüzey"
+          "label": "Yüzey",
+          "hint": "Panellerin ve kartların arkasındaki nötr zemin.",
+          "palettes": {
+            "onyx": "Oniks",
+            "carbon": "Karbon",
+            "neutral": "Nötr",
+            "zinc": "Çinko",
+            "iron": "Demir",
+            "steel": "Çelik",
+            "ash": "Kül",
+            "smoke": "Duman",
+            "charcoal": "Kömür",
+            "slate": "Arduvaz",
+            "midnight-blue": "Gece yarısı mavisi",
+            "ocean": "Okyanus",
+            "pine": "Çam",
+            "olive": "Zeytin yeşili",
+            "stone": "Taş",
+            "sepia": "Sepya",
+            "crimson": "Koyu Kırmızı",
+            "plum": "Mürdüm"
+          }
+        },
+        "topGlow": {
+          "label": "Üst ışık",
+          "hint": "Vurgu ışığının sayfaya ne kadar yayıldığıdır. Kapatmak için tamamen sola kaydırın.",
+          "value": "{value}%",
+          "off": "Kapat"
         },
         "accents": {
+          "grey": "Gri",
+          "scarlet": "Kırmızı",
+          "vermilion": "Parlak Kırmızı",
+          "rose": "Gül",
+          "copper": "Bakır",
+          "orange": "Turuncu",
+          "chartreuse": "Açık Yeşil",
           "marigold": "Kadife",
+          "wasabi": "Vasabi",
+          "amber": "Kehribar",
+          "malachite": "Malakit",
+          "yellow": "Sarı",
+          "viridian": "Viridian",
+          "turquoise": "Turkuaz",
+          "lime": "Limon yeşili",
+          "green": "Yeşil",
+          "acid-green": "Asit yeşili",
+          "emerald": "Zümrüt",
+          "teal": "Deniz mavisi",
+          "electric-blue": "Elektrik Mavisi",
+          "cyan": "Camgöbeği",
+          "jade": "Yeşim",
+          "ultramarine": "Ultramarin",
+          "iris": "İris",
+          "purple": "Mor",
+          "blue": "Mavi",
+          "indigo": "Çivit",
+          "violet": "Menekşe",
+          "amethyst": "Ametist",
           "fuchsia": "Fuşya",
           "raspberry": "Ahududu",
           "pink": "Pembe",
@@ -163,7 +224,12 @@
         },
         "cornerRadius": {
           "label": "Köşe yuvarlaklığı",
-          "hint": "Kartların ve arayüz öğelerinin yuvarlaklığı"
+          "hint": "Kartların ve arayüz öğelerinin yuvarlaklığı",
+          "options": {
+            "sharp": "Keskin",
+            "default": "Varsayılan",
+            "rounded": "Yuvarlatılmış"
+          }
         },
         "surfaceBrightness": {
           "label": "Yüzey parlaklığı",
@@ -186,12 +252,34 @@
       },
       "storage": {
         "title": "Görünüş tercihlerini kaydetme yeri",
-        "active": "Aktif"
+        "active": "Aktif",
+        "notAvailable": "Mevcut değil",
+        "device": {
+          "title": "Yalnızca bu cihaz"
+        },
+        "account": {
+          "title": "Hesabım"
+        }
       },
       "bookCovers": {
+        "title": "Kitap kapağı",
+        "placeholderStyle": {
+          "options": {
+            "bauhaus": "Bauhaus",
+            "memphis": "Memphis",
+            "poster": "Poster",
+            "vista": "Manzara",
+            "paperback": "Ciltsiz"
+          }
+        },
         "displayMode": {
           "blurredFit": {
             "label": "Bulanık sığdır"
+          }
+        },
+        "spine": {
+          "off": {
+            "label": "Kapalı"
           }
         }
       }
