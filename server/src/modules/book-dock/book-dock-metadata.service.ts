@@ -79,6 +79,7 @@ export class BookDockMetadataService {
       pageCount: data.pageCount ?? undefined,
       authors: data.authors.length > 0 ? data.authors.map((a) => a.name) : undefined,
       genres: data.genres.length > 0 ? data.genres : undefined,
+      tags: data.tags?.length ? data.tags : undefined,
       narrators: data.narrators?.length ? data.narrators : undefined,
       durationSeconds: data.durationSeconds ?? undefined,
       chapters: data.chapters?.length ? data.chapters : undefined,

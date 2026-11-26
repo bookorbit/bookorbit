@@ -10707,6 +10707,7 @@
       "seriesIndex": "Series #",
       "genres": "Genres",
       "genresCommaSeparated": "Genres (comma-separated)",
+      "tags": "Tags",
       "description": "Description"
     },
     "upload": {

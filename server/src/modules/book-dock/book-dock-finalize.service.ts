@@ -180,6 +180,7 @@ type NormalizedFinalizeMetadata = {
   seriesIndex: string | null;
   authors: string[];
   genres: string[];
+  tags: string[];
   coverUrl: string | null;
   googleBooksId: string | null;
   goodreadsId: string | null;
@@ -1841,6 +1842,10 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
       await this.metadataService.replaceGenres(bookId, meta.genres);
     }
 
+    if (meta.tags.length > 0) {
+      await this.metadataService.replaceTags(bookId, meta.tags);
+    }
+
     if (audio.narrators.length > 0) {
       await this.metadataService.replaceNarrators(
         bookId,
@@ -2049,6 +2054,7 @@ function normalizeFinalizeMetadata(meta: BookDockMetadata | null | undefined): N
     seriesIndex,
     authors: normalizeStringArray(normalizedMeta?.authors, 500),
     genres: normalizeStringArray(normalizedMeta?.genres, 200),
+    tags: normalizeStringArray(normalizedMeta?.tags, 200),
     coverUrl: normalizeText(normalizedMeta?.coverUrl),
     googleBooksId: normalizeText(normalizedMeta?.googleBooksId, 50),
     goodreadsId: normalizeText(normalizedMeta?.goodreadsId, 50),

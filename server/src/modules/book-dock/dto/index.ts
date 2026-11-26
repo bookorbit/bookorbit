@@ -130,6 +130,7 @@ export class BookDockMetadataFieldsDto {
   @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
   @IsOptional() @IsArray() @IsString({ each: true }) authors?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) genres?: string[];
+  @IsOptional() @IsArray() @IsString({ each: true }) tags?: string[];
   @IsOptional() @IsArray() @IsString({ each: true }) narrators?: string[];
   @IsOptional() @IsInt() @Min(0) durationSeconds?: number | null;
   @IsOptional() @IsBoolean() abridged?: boolean | null;

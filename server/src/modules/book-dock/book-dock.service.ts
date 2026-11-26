@@ -287,8 +287,11 @@ export class BookDockService {
             skipped++;
             continue;
           }
+          const fetched = normalizeBookDockMetadata(row.fetchedMetadata) ?? {};
+          // Providers do not return tags, so taking the match whole would drop the file's own.
+          const tags = normalizeBookDockMetadata(row.selectedMetadata ?? row.embeddedMetadata)?.tags;
           await this.repo.update(row.id, {
-            selectedMetadata: normalizeBookDockMetadata(row.fetchedMetadata) ?? {},
+            selectedMetadata: tags && fetched.tags === undefined ? { ...fetched, tags } : fetched,
             metadataEditedAt: null,
             holdReason: null,
           });

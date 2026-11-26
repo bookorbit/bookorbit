@@ -103,6 +103,17 @@ describe('BookDockBulkEditDialog', () => {
     expect(fieldInput('ISBN-13').element.disabled).toBe(false)
   })
 
+  // Issue #1472: tags could only be set on a book after it left the dock.
+  it('applies tags as a list, merged into what each file has by default', async () => {
+    mountDialog()
+
+    await enableAndType('Tags', 'type:manga, Favourites')
+    await applyButton().trigger('click')
+    await flushPromises()
+
+    expect(sentBody()).toMatchObject({ fields: { tags: ['type:manga', 'Favourites'] }, enabledFields: ['tags'], mergeArrays: true })
+  })
+
   it('leaves text fields that are not identifiers untouched', async () => {
     mountDialog()
 

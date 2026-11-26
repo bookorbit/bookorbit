@@ -23,6 +23,7 @@ const PASSTHROUGH_FIELDS = [
   'isbn13',
   'seriesName',
   'genres',
+  'tags',
   'coverUrl',
   'abridged',
   'googleBooksId',

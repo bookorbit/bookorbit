@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatDateTime } from '@/i18n/formatters'
 import { X, BookOpen, Check, Trash2, Sparkles, ArrowLeft, Wand2, AlertCircle } from '@lucide/vue'
@@ -17,6 +17,7 @@ import {
   SERIES_INDEX_MAX_LENGTH,
 } from '@bookorbit/types'
 import BookDockStatusBadge from './BookDockStatusBadge.vue'
+import ChipInput from '@/components/ui/ChipInput.vue'
 import IdentifierInput from '@/components/ui/IdentifierInput.vue'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import MetadataMatchWorkspace from '@/features/book/components/metadata-match/MetadataMatchWorkspace.vue'
@@ -26,6 +27,7 @@ import { useBookDestination } from '@/features/library/composables/useBookDestin
 import BookDestinationFields from '@/features/library/components/BookDestinationFields.vue'
 import { useMetadataSearch } from '@/features/book/composables/useMetadataSearch'
 import { useSeriesNameSearch } from '@/features/book/composables/useMetadataFieldSearch'
+import { useGenreSearch, useTagSearch } from '@/features/book/composables/useTagSearch'
 import type { MetadataDiffApply } from '@/features/book/composables/useMetadataDiff'
 import { formatBytes } from '@/lib/formatting'
 import { toDisplayCoverUrl } from '@/features/book/lib/metadata-fetch'
@@ -44,6 +46,10 @@ const emit = defineEmits<{
 const { saved, saveError, saveMetadata, setTarget, coverUrl, fetchReadAlong } = useBookDockDetail()
 const destination = useBookDestination({ defaultToFirstLibrary: true })
 const { search: searchSeries } = useSeriesNameSearch()
+const { search: searchGenres } = useGenreSearch()
+const { search: searchTags } = useTagSearch()
+const genresInputId = useId()
+const tagsInputId = useId()
 const { libraryId: targetLibraryId, folderId: targetFolderId, hasDestination, fetchLibraries: fetchLibs } = destination
 
 const awaitingExtraction = computed(() => isAwaitingMetadataExtraction(props.file))
@@ -71,7 +77,8 @@ const form = reactive({
   isbn10: '',
   seriesName: '',
   seriesIndex: '',
-  genres: '',
+  genres: [] as string[],
+  tags: [] as string[],
 })
 const selectedCoverUrl = ref('')
 const passthroughMetadata = ref<BookDockMetadata>({})
@@ -100,7 +107,8 @@ watch(
     form.isbn10 = m.isbn10 ?? ''
     form.seriesName = m.seriesName ?? ''
     form.seriesIndex = m.seriesIndex != null ? String(m.seriesIndex) : ''
-    form.genres = m.genres?.join(', ') ?? ''
+    form.genres = [...(m.genres ?? [])]
+    form.tags = [...(m.tags ?? [])]
     selectedCoverUrl.value = m.coverUrl ?? ''
   },
   { immediate: true },
@@ -147,12 +155,9 @@ function buildMetadataPatchFromForm(): Partial<BookDockMetadata> {
     seriesIndex: normalizedSeriesIndex() ?? undefined,
     // A provider match keeps its whole series list; with the series cleared it would still be filed.
     seriesMemberships: form.seriesName.trim() ? passthroughMetadata.value.seriesMemberships : undefined,
-    genres: form.genres
-      ? form.genres
-          .split(',')
-          .map((g) => g.trim())
-          .filter(Boolean)
-      : undefined,
+    genres: form.genres.length > 0 ? [...form.genres] : undefined,
+    // Sent even when empty: filing falls back to the file's own tags wherever the edit has none.
+    tags: [...form.tags],
     coverUrl: selectedCoverUrl.value || undefined,
   }
 }
@@ -164,6 +169,16 @@ function onFieldChange() {
     const updated = await saveMetadata(props.file.id, buildMetadataPatchFromForm())
     if (updated) emit('updated', updated)
   }, 1000)
+}
+
+function onGenresChange(value: string[]) {
+  form.genres = value
+  onFieldChange()
+}
+
+function onTagsChange(value: string[]) {
+  form.tags = value
+  onFieldChange()
 }
 
 function onSeriesNameChange(value: string | null) {
@@ -271,12 +286,7 @@ const currentSource = computed<MetadataSource>(() => ({
         .map((a) => a.trim())
         .filter(Boolean)
     : [],
-  genres: form.genres
-    ? form.genres
-        .split(',')
-        .map((g) => g.trim())
-        .filter(Boolean)
-    : [],
+  genres: [...form.genres],
   narrators: passthroughMetadata.value.narrators ?? [],
   durationSeconds: passthroughMetadata.value.durationSeconds ?? null,
   abridged: passthroughMetadata.value.abridged ?? null,
@@ -382,7 +392,7 @@ async function handleApply(patch: MetadataDiffApply) {
   if ('seriesName' in p) form.seriesName = p.seriesName ?? ''
   if ('seriesIndex' in p) form.seriesIndex = p.seriesIndex == null ? '' : String(p.seriesIndex)
   if ('authors' in p) form.authors = (p.authors ?? []).join(', ')
-  if ('genres' in p) form.genres = (p.genres ?? []).join(', ')
+  if ('genres' in p) form.genres = [...(p.genres ?? [])]
 
   const coverUrl = patch.coverUrl ?? patch.audioCoverUrl
   if (coverUrl !== undefined) {
@@ -639,14 +649,28 @@ onMounted(() => {
                 {{ t('bookDock.invalidSeriesIndex') }}
               </span>
             </label>
-            <label class="sm:col-span-2">
-              <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.genresCommaSeparated') }}</span>
-              <input
-                v-model="form.genres"
-                class="mt-1 w-full h-8 rounded-lg border border-input bg-background px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
-                @input="onFieldChange"
+            <div class="sm:col-span-2">
+              <label :for="genresInputId" class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.genres') }}</label>
+              <ChipInput
+                :model-value="form.genres"
+                :search-fn="searchGenres"
+                :input-id="genresInputId"
+                class="mt-1"
+                control-class="min-h-8 rounded-lg py-1.5"
+                @update:model-value="onGenresChange"
               />
-            </label>
+            </div>
+            <div class="sm:col-span-2">
+              <label :for="tagsInputId" class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.tags') }}</label>
+              <ChipInput
+                :model-value="form.tags"
+                :search-fn="searchTags"
+                :input-id="tagsInputId"
+                class="mt-1"
+                control-class="min-h-8 rounded-lg py-1.5"
+                @update:model-value="onTagsChange"
+              />
+            </div>
             <label class="sm:col-span-2">
               <span class="text-xs font-medium text-muted-foreground">{{ t('bookDock.field.description') }}</span>
               <textarea

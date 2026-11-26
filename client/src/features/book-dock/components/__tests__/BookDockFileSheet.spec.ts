@@ -3,6 +3,7 @@ import { defineComponent, reactive, ref } from 'vue'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { BookDockFile, Library, MetadataCandidate } from '@bookorbit/types'
 import { i18n } from '@/i18n'
+import ChipInput from '@/components/ui/ChipInput.vue'
 import InputWithSuggestions from '@/components/ui/InputWithSuggestions.vue'
 import BookDockFileSheet from '../BookDockFileSheet.vue'
 
@@ -229,6 +230,63 @@ describe('BookDockFileSheet', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  describe('genres and tags', () => {
+    function mountWithFileTags() {
+      return mountSheet(makeFile({ embeddedMetadata: { title: 'Dune', genres: ['Science Fiction'], tags: ['Calibre Tag'] } }))
+    }
+
+    function chipInputLabelled(wrapper: ReturnType<typeof mountSheet>, name: string) {
+      const label = wrapper.findAll('label').find((item) => item.text() === name)
+      expect(label).toBeDefined()
+      const chips = wrapper.findAllComponents(ChipInput).find((item) => item.props('inputId') === label!.attributes('for'))
+      expect(chips).toBeDefined()
+      return chips!
+    }
+
+    it("fills both chip inputs from the file and offers the library's names as suggestions", () => {
+      const wrapper = mountWithFileTags()
+
+      const genres = chipInputLabelled(wrapper, 'Genres')
+      const tags = chipInputLabelled(wrapper, 'Tags')
+      expect(genres.props('modelValue')).toEqual(['Science Fiction'])
+      expect(tags.props('modelValue')).toEqual(['Calibre Tag'])
+      expect(genres.props('searchFn')).toBeTypeOf('function')
+      expect(tags.props('searchFn')).toBeTypeOf('function')
+      expect(genres.props('searchFn')).not.toBe(tags.props('searchFn'))
+    })
+
+    it('autosaves a genre moved into tags', async () => {
+      vi.useFakeTimers()
+      try {
+        const wrapper = mountWithFileTags()
+
+        chipInputLabelled(wrapper, 'Genres').vm.$emit('update:modelValue', [])
+        chipInputLabelled(wrapper, 'Tags').vm.$emit('update:modelValue', ['Calibre Tag', 'Science Fiction'])
+        await vi.advanceTimersByTimeAsync(1000)
+
+        const patch = mocks.saveMetadata.mock.lastCall?.[1] as Record<string, unknown>
+        expect(patch.genres).toBeUndefined()
+        expect(patch.tags).toEqual(['Calibre Tag', 'Science Fiction'])
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it("saves removed tags as an empty list, so filing does not bring back the file's own", async () => {
+      vi.useFakeTimers()
+      try {
+        const wrapper = mountWithFileTags()
+
+        chipInputLabelled(wrapper, 'Tags').vm.$emit('update:modelValue', [])
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(mocks.saveMetadata).toHaveBeenLastCalledWith(1, expect.objectContaining({ tags: [], genres: ['Science Fiction'] }))
+      } finally {
+        vi.useRealTimers()
+      }
+    })
   })
 
   describe('series', () => {

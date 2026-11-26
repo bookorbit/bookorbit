@@ -279,6 +279,8 @@ export interface BookDockMetadata {
   seriesIndex?: SeriesIndex | null;
   seriesMemberships?: MetadataSeriesMembership[] | null;
   genres?: string[];
+  /** Absent on older servers, which also reject it in an edit. */
+  tags?: string[];
   coverUrl?: string | null;
   durationSeconds?: number | null;
   abridged?: boolean | null;

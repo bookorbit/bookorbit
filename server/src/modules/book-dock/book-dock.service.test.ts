@@ -458,6 +458,26 @@ describe('BookDockService', () => {
     await expect(service.updateFile(1, {}, 1, false)).rejects.toBeInstanceOf(NotFoundException);
   });
 
+  it("bulkApplyFetched keeps the file's tags, which a provider match never carries", async () => {
+    const { service, repo } = makeService();
+    repo.findByIds.mockResolvedValue([
+      row({
+        id: 4,
+        embeddedMetadata: { title: 'Embedded', tags: ['type:manga'] },
+        fetchedMetadata: { title: 'Fetched', genres: ['Fantasy'] },
+        metadataEditedAt: null,
+      }),
+    ]);
+
+    await service.bulkApplyFetched([4]);
+
+    expect(repo.update).toHaveBeenCalledWith(4, {
+      selectedMetadata: { title: 'Fetched', genres: ['Fantasy'], tags: ['type:manga'] },
+      metadataEditedAt: null,
+      holdReason: null,
+    });
+  });
+
   it('bulkApplyFetched counts applied, skipped, and skipped-edited records', async () => {
     const { service, repo, finalizeService } = makeService();
     repo.findByIds.mockResolvedValue([

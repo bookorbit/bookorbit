@@ -20,7 +20,7 @@ import {
   type BookDockMetadata,
 } from '@bookorbit/types';
 import type { BookDockFileRow } from '../../db/schema/book-dock';
-import { BookDockFinalizeService } from './book-dock-finalize.service';
+import { BookDockFinalizeService, mergeBookDockMetadata } from './book-dock-finalize.service';
 import { joinError } from './book-dock-join.service';
 
 const mockAccess = vi.mocked(access);
@@ -80,6 +80,7 @@ function makeService() {
     coverSlotIsEmpty: vi.fn().mockResolvedValue(true),
     replaceAuthors: vi.fn().mockResolvedValue(undefined),
     replaceGenres: vi.fn().mockResolvedValue(undefined),
+    replaceTags: vi.fn().mockResolvedValue(undefined),
     replaceNarrators: vi.fn().mockResolvedValue(undefined),
     upsertComicMetadata: vi.fn().mockResolvedValue(undefined),
     measureMissingAudioDurations: vi.fn().mockResolvedValue({ measured: 0, failed: 0 }),
@@ -1405,6 +1406,7 @@ describe('BookDockFinalizeService', () => {
           selectedMetadata: {
             title: 'Dune (Unabridged)',
             authors: ['Simon Vance'],
+            tags: ['Favourites'],
             audibleId: 'B002V1OF70',
             goodreadsId: 'gr-1',
           } as BookDockMetadata,
@@ -1419,6 +1421,7 @@ describe('BookDockFinalizeService', () => {
         expect(patch).not.toHaveProperty('durationSeconds');
         expect(patch).not.toHaveProperty('title');
         expect(metadataService.replaceAuthors).not.toHaveBeenCalled();
+        expect(metadataService.replaceTags).not.toHaveBeenCalled();
         expect(metadataService.replaceNarrators).toHaveBeenCalledWith(42, [{ name: 'Simon Vance', sortName: null }]);
       });
 
@@ -2159,7 +2162,7 @@ describe('BookDockFinalizeService', () => {
     expect(destPath).toBe(`/library/${preview.newName}`);
   });
 
-  it('applyMetadata updates scalar metadata fields and related author/genre rows', async () => {
+  it('applyMetadata updates scalar metadata fields and related author/genre/tag rows', async () => {
     const { service, db, metadataService, metadataScoreService } = makeService();
     const updateChain = {
       set: vi.fn(),
@@ -2181,6 +2184,7 @@ describe('BookDockFinalizeService', () => {
         seriesIndex: '2.5',
         authors: ['Author A'],
         genres: ['Fantasy'],
+        tags: ['Favourites', ' type:lightnovel '],
       } as BookDockMetadata,
       coverPath: null,
     });
@@ -2203,7 +2207,38 @@ describe('BookDockFinalizeService', () => {
     );
     expect(metadataService.replaceAuthors).toHaveBeenCalledWith(15, [{ name: 'Author A', sortName: null }]);
     expect(metadataService.replaceGenres).toHaveBeenCalledWith(15, ['Fantasy']);
+    expect(metadataService.replaceTags).toHaveBeenCalledWith(15, ['Favourites', 'type:lightnovel']);
     expect(metadataScoreService.calculateAndSave).toHaveBeenCalledWith(15);
+  });
+
+  it("applyMetadata files the file's own tags when nothing was edited", async () => {
+    const { service, db, metadataService } = makeService();
+    const updateChain = { set: vi.fn(), where: vi.fn().mockResolvedValue(undefined) };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+
+    await (service as any).applyMetadata(
+      15,
+      makeRow({ selectedMetadata: null, embeddedMetadata: { title: 'Dune', tags: ['Calibre Tag'] } as BookDockMetadata, coverPath: null }),
+    );
+
+    expect(metadataService.replaceTags).toHaveBeenCalledWith(15, ['Calibre Tag']);
+  });
+
+  it('applyMetadata leaves tags alone when the file has none', async () => {
+    const { service, db, metadataService } = makeService();
+    const updateChain = { set: vi.fn(), where: vi.fn().mockResolvedValue(undefined) };
+    updateChain.set.mockReturnValue(updateChain);
+    db.update.mockReturnValue(updateChain);
+
+    await (service as any).applyMetadata(15, makeRow({ selectedMetadata: { title: 'Dune', tags: [] } as BookDockMetadata, coverPath: null }));
+
+    expect(metadataService.replaceTags).not.toHaveBeenCalled();
+  });
+
+  it('mergeBookDockMetadata keeps tags removed in an edit removed', () => {
+    expect(mergeBookDockMetadata({ title: 'Dune', tags: ['From File'] }, { title: 'Dune' }, { tags: [] })?.tags).toEqual([]);
+    expect(mergeBookDockMetadata({ title: 'Dune', tags: ['From File'] }, { title: 'Dune' }, { title: 'Dune' })?.tags).toEqual(['From File']);
   });
 
   it('applyMetadata propagates score persistence failures', async () => {

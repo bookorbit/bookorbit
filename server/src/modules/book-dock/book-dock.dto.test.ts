@@ -178,6 +178,22 @@ describe('BookDock DTO validation', () => {
     expect((await errorsFor(BulkSetTargetDto, { targetLibraryId: 'bad' })).length).toBeGreaterThan(0);
   });
 
+  it('takes tags in a single edit and a bulk edit through the production validation path', async () => {
+    const pipe = new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true });
+
+    await expect(
+      pipe.transform({ selectedMetadata: { tags: ['type:manga'] } }, { type: 'body', metatype: UpdateBookDockFileDto, data: undefined }),
+    ).resolves.toMatchObject({ selectedMetadata: { tags: ['type:manga'] } });
+    await expect(
+      pipe.transform(
+        { fields: { tags: ['type:manga'] }, enabledFields: ['tags'], mergeArrays: true },
+        { type: 'body', metatype: BulkEditBookDockDto, data: undefined },
+      ),
+    ).resolves.toMatchObject({ fields: { tags: ['type:manga'] } });
+    expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { tags: 'type:manga' } })).length).toBeGreaterThan(0);
+    expect((await errorsFor(UpdateBookDockFileDto, { selectedMetadata: { tags: [7] } })).length).toBeGreaterThan(0);
+  });
+
   it('BulkEditBookDockDto requires nested fields and explicit edit controls', async () => {
     expect(
       (

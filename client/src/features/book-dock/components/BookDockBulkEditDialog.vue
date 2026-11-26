@@ -37,6 +37,7 @@ const FIELDS = computed<{ key: keyof BookDockMetadata; label: string; type: 'tex
   { key: 'seriesName', label: t('bookDock.field.series'), type: 'text' },
   { key: 'seriesIndex', label: t('bookDock.field.seriesIndex'), type: 'text' },
   { key: 'genres', label: t('bookDock.field.genres'), type: 'array' },
+  { key: 'tags', label: t('bookDock.field.tags'), type: 'array' },
 ])
 
 const FIELD_INPUT_CLASS =
