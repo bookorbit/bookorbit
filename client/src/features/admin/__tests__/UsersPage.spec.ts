@@ -14,6 +14,7 @@ const { apiMock, authState, permState, policyState } = vi.hoisted(() => ({
 vi.mock('@/lib/api', () => ({ api: apiMock }))
 
 vi.mock('@/components/ui/sheet', () => ({
+  SheetTrigger: { template: '<div><slot /></div>' },
   Sheet: { template: '<div><slot /></div>' },
   SheetContent: { template: '<div><slot /></div>' },
   SheetTitle: { template: '<h2><slot /></h2>' },
@@ -94,6 +95,8 @@ function stubApi(overrides: StubOptions = {}) {
     if (input.startsWith('/api/v1/users?')) {
       return jsonResponse({ users: overrides.users ?? [USER], total: overrides.total ?? 1 })
     }
+    if (input === '/api/v1/app-settings/starting-permissions') return jsonResponse([])
+    if (input.endsWith('/kindle-recipients')) return jsonResponse([])
     if (input === '/api/v1/libraries') return jsonResponse({ libraries: [{ id: 1, name: 'Novels' }] })
     if (input === '/api/v1/app-settings/default-library-access') return jsonResponse({ libraryIds: [] })
     if (input === '/api/v1/app-settings') {

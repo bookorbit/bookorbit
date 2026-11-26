@@ -15,6 +15,8 @@ import { useUsers, type UserRow } from './composables/useUsers'
 import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
+import StartingPermissionsCard from './components/StartingPermissionsCard.vue'
+import { useStartingPermissions } from './composables/useStartingPermissions'
 import NewAccountDefaults from './components/NewAccountDefaults.vue'
 import UserAttentionBand from './components/UserAttentionBand.vue'
 import UserRosterCards from './components/UserRosterCards.vue'
@@ -57,6 +59,13 @@ const {
   markDefaultLibrariesSaved,
 } = useUsers()
 
+const {
+  saved: startingPermissions,
+  error: permissionsError,
+  busy: permissionsBusy,
+  load: loadPermissions,
+  save: savePermissions,
+} = useStartingPermissions()
 const drawerOpen = ref(false)
 const editingUser = ref<UserRow | null>(null)
 const resetUrl = ref<string | null>(null)
@@ -123,7 +132,7 @@ const superuserConfirmLabel = computed(() => {
 
 onMounted(async () => {
   headerSlotAvailable.value = document.getElementById(HEADER_ACTIONS_TARGET.slice(1)) !== null
-  await Promise.all([reload(), loadStatic(), fetchLoginOptions().catch(() => undefined)])
+  await Promise.all([reload(), loadStatic(), canManageUserDefaults.value ? loadPermissions() : undefined, fetchLoginOptions().catch(() => undefined)])
   if (canManageAppSettings.value) await loadSelfRegistration()
 })
 
@@ -365,7 +374,7 @@ async function saveDefaultLibraryAccess() {
   <div class="space-y-4">
     <Teleport :to="HEADER_ACTIONS_TARGET" defer :disabled="!headerSlotAvailable">
       <p class="hidden text-sm text-muted-foreground lg:block">{{ pageSubtitle }}</p>
-      <Button size="sm" type="button" @click="openCreate">
+      <Button size="sm" type="button" :disabled="!startingPermissions" @click="openCreate">
         <UserPlus :size="14" aria-hidden="true" />
         {{ passwordLoginEnabled ? t('adminFeature.usersPage.createUser') : t('adminFeature.userForm.createSharedAccount') }}
       </Button>
@@ -519,13 +528,24 @@ async function saveDefaultLibraryAccess() {
       @toggle-self-registration="toggleSelfRegistration"
       @toggle-library="toggleDefaultLibrary"
       @save-library-defaults="saveDefaultLibraryAccess"
-    />
+    >
+      <StartingPermissionsCard
+        v-if="canManageUserDefaults"
+        :saved="startingPermissions"
+        :save="savePermissions"
+        :busy="permissionsBusy"
+        :error="permissionsError"
+        @retry="loadPermissions"
+      />
+    </NewAccountDefaults>
 
     <UserFormDrawer
       v-if="drawerOpen"
       :user="editingUser"
       :libraries="libraries"
       :default-library-ids="defaultLibraryIdsArray"
+      :starting-permissions="startingPermissions ?? undefined"
+      :can-manage-recipients="canManageUserDefaults && (!editingUser?.isSuperuser || isSuperuser)"
       :can-manage-superuser="isSuperuser"
       :current-user-id="currentUser?.id"
       :can-delete="canDeleteEditingUser"

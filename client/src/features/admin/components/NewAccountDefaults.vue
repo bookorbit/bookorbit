@@ -47,11 +47,10 @@ function saveLibraryDefaults() {
     <div class="mb-3 flex items-center gap-3">
       <h3 id="new-account-defaults-heading" class="settings-group-label mb-0">{{ t('adminFeature.usersPage.defaults.title') }}</h3>
       <span class="h-px flex-1 bg-border" aria-hidden="true" />
-      <p class="text-xs text-muted-foreground">{{ t('adminFeature.usersPage.defaults.appliesTo') }}</p>
     </div>
 
     <div class="grid gap-3 lg:grid-cols-2">
-      <div v-if="showSelfRegistration" class="rounded-lg border border-border bg-card shadow-xs">
+      <div v-if="showSelfRegistration" class="rounded-lg border border-border bg-card shadow-xs lg:col-span-2">
         <div class="flex items-center gap-3 p-4">
           <div class="min-w-0">
             <p class="settings-label">{{ t('adminFeature.usersPage.selfRegistration.label') }}</p>
@@ -124,6 +123,7 @@ function saveLibraryDefaults() {
         <p v-else class="px-4 pb-4 text-sm text-muted-foreground">{{ t('adminFeature.usersPage.defaultLibraryAccess.noLibraries') }}</p>
         <p v-if="libraryDefaultsError" role="alert" class="px-4 pb-4 text-sm text-destructive">{{ libraryDefaultsError }}</p>
       </div>
+      <slot />
     </div>
   </section>
 </template>

@@ -43,6 +43,7 @@ function jsonResponse(body: unknown) {
 function stubApi(overrides: { grants?: UserLibraryGrant[]; filters?: unknown } = {}) {
   apiMock.mockImplementation(async (input: string) => {
     if (input === '/api/v1/api-keys/settings') return jsonResponse({ enabled: true, maxLifetimeDays: null })
+    if (input.endsWith('/kindle-recipients')) return jsonResponse([])
     if (input.endsWith('/api-keys')) return jsonResponse([])
     if (input.endsWith('/library-access')) return jsonResponse(overrides.grants ?? [{ libraryId: 1, accessLevel: 'viewer' }])
     if (input.endsWith('/content-filters')) {
@@ -286,17 +287,22 @@ describe('UserFormDrawer saving', () => {
     expect(wrapper.text()).toContain('2 unsaved changes')
   })
 
-  it('writes the profile, permissions, libraries and filters of an existing user', async () => {
-    const wrapper = await mountDrawer()
-    const save = wrapper.findAll('button').find((button) => button.text() === 'Save')
-    await save?.trigger('click')
+  it('adds a Kindle address without rewriting unrelated grants or filters', async () => {
+    const wrapper = await mountDrawer({ canManageRecipients: true })
+    await openSection(wrapper, 'Add Kindle recipient')
+    await wrapper.get('#user-kindle-email').setValue('reader@kindle.com')
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save')
+      ?.trigger('click')
     await flushPromises()
-
-    const calls = apiMock.mock.calls.map(([input, init]) => `${(init as RequestInit)?.method ?? 'GET'} ${input}`)
-    expect(calls).toContain('PATCH /api/v1/users/7')
-    expect(calls).toContain('PUT /api/v1/users/7/permissions')
-    expect(calls).toContain('PUT /api/v1/users/7/libraries')
-    expect(calls).toContain('PUT /api/v1/users/7/content-filters')
+    const writes = apiMock.mock.calls.filter(([, init]) => init?.method)
+    expect(writes).toEqual([
+      [
+        '/api/v1/users/7',
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ kindleEmail: 'reader@kindle.com' }) },
+      ],
+    ])
     expect(wrapper.emitted('saved')).toHaveLength(1)
   })
 
@@ -311,6 +317,8 @@ describe('UserFormDrawer saving', () => {
     })
 
     const wrapper = await mountDrawer()
+    await openSection(wrapper, 'Permissions')
+    await checkboxFor(wrapper, 'Download books')?.setValue(false)
     const save = wrapper.findAll('button').find((button) => button.text() === 'Save')
     await save?.trigger('click')
     await flushPromises()
@@ -331,6 +339,26 @@ describe('UserFormDrawer saving', () => {
     expect(wrapper.find('[role="alert"]').text()).toBe('Full name is required')
     expect(wrapper.text()).toContain('Full name')
     expect(apiMock).not.toHaveBeenCalled()
+  })
+
+  it('starts with the saved permissions and allows an explicit empty override on creation', async () => {
+    const wrapper = await mountDrawer({ user: null, startingPermissions: [Permission.EmailSend], canManageRecipients: true })
+    await wrapper.get('#user-form-name').setValue('Reader')
+    await wrapper.get('#user-form-username').setValue('reader')
+    await wrapper.get('#user-form-email').setValue('reader@example.org')
+    await openSection(wrapper, 'Add Kindle recipient')
+    await wrapper.get('#user-kindle-email').setValue('reader@kindle.com')
+    await openSection(wrapper, 'Permissions')
+    const email = checkboxFor(wrapper, 'Send by email')!
+    expect(email.element.checked).toBe(true)
+    await email.setValue(false)
+    await wrapper
+      .findAll('button')
+      .find((button) => button.text() === 'Save')
+      ?.trigger('click')
+    await flushPromises()
+    const create = apiMock.mock.calls.find(([path, init]) => path === '/api/v1/users' && init?.method === 'POST')
+    expect(JSON.parse(String(create?.[1]?.body))).toMatchObject({ permissionNames: [], kindleEmail: 'reader@kindle.com' })
   })
 
   it('creates a password account and hands back its reset link', async () => {

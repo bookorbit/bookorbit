@@ -16,6 +16,9 @@ import { UpdateOidcProviderDto } from './dto/update-oidc-provider.dto';
 import { CreateGroupMappingDto } from './dto/create-group-mapping.dto';
 import { UpdateGroupMappingDto } from './dto/update-group-mapping.dto';
 
+import { InteractiveOnly } from '../../common/decorators/api-key-policy.decorator';
+import { UpdateStartingPermissionsDto } from './dto/update-starting-permissions.dto';
+
 @Controller('app-settings')
 @RequirePermission(Permission.ManageAppSettings)
 export class AppSettingsController {
@@ -110,6 +113,24 @@ export class AppSettingsController {
   @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated API key settings' })
   updateApiKeySettings(@Body() dto: UpdateApiKeySettingsDto) {
     return this.appSettingsService.updateApiKeySettings({ enabled: dto.enabled, maxLifetimeDays: dto.maxLifetimeDays });
+  }
+
+  @Get('starting-permissions')
+  @RequirePermission(Permission.ManageUsers)
+  getStartingPermissions() {
+    return this.appSettingsService.getStartingPermissions();
+  }
+
+  @Put('starting-permissions')
+  @InteractiveOnly()
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({
+    action: AuditAction.AppSettingsUpdate,
+    resource: AuditResource.AppSettings,
+    description: 'Updated starting permissions for admin-created accounts',
+  })
+  setStartingPermissions(@Body() dto: UpdateStartingPermissionsDto) {
+    return this.appSettingsService.setStartingPermissions(dto.permissionNames);
   }
 
   @Get('default-library-access')

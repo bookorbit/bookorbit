@@ -1,7 +1,7 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import { PERMISSION_REQUIRES, type AccessLevel, type AuthUser, type Permission, type UserLibraryGrant } from '@bookorbit/types'
+import { type AccessLevel, type AuthUser, type Permission, type UserLibraryGrant } from '@bookorbit/types'
 import { api } from '@/lib/api'
-import { grantingPermissions, isRestrictionPermission, presetPermissions, type PermissionPreset } from '../lib/permission-presets'
+import { grantingPermissions, isRestrictionPermission, presetPermissions, toggledPermissions, type PermissionPreset } from '../lib/permission-presets'
 
 export type UserFormSection = 'profile' | 'libraries' | 'permissions' | 'restrictions' | 'apiKeys'
 
@@ -30,6 +30,7 @@ export interface UserFormSaveResult {
 interface FormSnapshot {
   name: string
   email: string
+  kindleEmail: string
   active: boolean
   permissions: string
   libraries: string
@@ -39,10 +40,15 @@ interface FormSnapshot {
 /** What the Restrictions section currently holds, for the summary beside its nav entry. */
 export type RestrictionState = 'none' | 'content' | 'demo' | 'both'
 
-export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds: Ref<number[] | undefined>) {
+export function useUserForm(
+  user: Ref<UserFormTarget | null>,
+  defaultLibraryIds: Ref<number[] | undefined>,
+  startingPermissions: Ref<Permission[] | undefined>,
+) {
   const name = ref('')
   const username = ref('')
   const email = ref('')
+  const kindleEmail = ref('')
   const active = ref(true)
   const isSharedAccount = ref(false)
   const selectedPermissionNames = ref<Set<string>>(new Set())
@@ -102,6 +108,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     return {
       name: name.value,
       email: email.value.trim(),
+      kindleEmail: kindleEmail.value.trim(),
       active: active.value,
       permissions: [...selectedPermissionNames.value].sort().join(','),
       libraries: [...selectedLibraryIds.value].sort((a, b) => a - b).join(','),
@@ -128,6 +135,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     const next = currentSnapshot()
     let changes = 0
     if (base.name !== next.name) changes++
+    if (base.kindleEmail !== next.kindleEmail) changes++
     if (base.email !== next.email) changes++
     if (base.active !== next.active) changes++
     if (base.libraries !== next.libraries) changes++
@@ -153,17 +161,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
    * Without this the checkboxes and the saved account disagree until the next reload.
    */
   function togglePermission(permissionName: string) {
-    const next = new Set(selectedPermissionNames.value)
-    if (next.has(permissionName)) {
-      next.delete(permissionName)
-      for (const [dependent, required] of Object.entries(PERMISSION_REQUIRES)) {
-        if ((required as readonly string[]).includes(permissionName)) next.delete(dependent)
-      }
-    } else {
-      next.add(permissionName)
-      for (const required of PERMISSION_REQUIRES[permissionName as Permission] ?? []) next.add(required)
-    }
-    selectedPermissionNames.value = next
+    selectedPermissionNames.value = toggledPermissions(selectedPermissionNames.value, permissionName)
   }
 
   /** Presets speak for granting permissions only, so a demo restriction survives applying one. */
@@ -186,9 +184,10 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     name.value = target?.name ?? ''
     username.value = target?.username ?? ''
     email.value = target?.email ?? ''
+    kindleEmail.value = ''
     active.value = target?.active ?? true
     isSharedAccount.value = target?.provisioningMethod === 'shared'
-    selectedPermissionNames.value = new Set(target?.permissions?.filter((permissionName) => permissionName !== '*') ?? [])
+    selectedPermissionNames.value = new Set(target?.id ? target.permissions?.filter((name) => name !== '*') : startingPermissions.value)
     selectedLibraryIds.value = target?.id ? new Set() : new Set(defaultLibraryIds.value ?? [])
     savedAccessLevels.value = new Map()
     includeTagItems.value = []
@@ -210,6 +209,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
       return
     }
 
+    const initial = currentSnapshot()
     const [librariesRes, filtersRes] = await Promise.all([
       api(`/api/v1/users/${target.id}/library-access`),
       target.isSuperuser ? Promise.resolve(null) : api(`/api/v1/users/${target.id}/content-filters`),
@@ -233,7 +233,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     }
 
     if (user.value?.id !== target.id) return
-    snapshot.value = currentSnapshot()
+    snapshot.value = { ...initial, libraries: currentSnapshot().libraries, filters: filterSignature() }
   }
 
   function fail(key: string, section: UserFormSection, message?: string): UserFormSaveResult {
@@ -247,6 +247,13 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     return typeof body?.message === 'string' ? body.message : undefined
   }
 
+  async function profileFailure(response: Response, fallback: string) {
+    const body = await response.json().catch(() => ({}))
+    if (body.errorCode === 'KINDLE_RECIPIENT_CONFLICT') return fail('kindleConflict', 'profile')
+    if (Array.isArray(body.message) && body.message.includes('INVALID_KINDLE_EMAIL')) return fail('invalidKindleEmail', 'profile')
+    return fail(fallback, 'profile', typeof body.message === 'string' ? body.message : undefined)
+  }
+
   function validate(): UserFormSaveResult | null {
     if (!name.value.trim()) return fail('nameRequired', 'profile')
     if (!isEdit.value && !username.value.trim()) return fail('usernameRequired', 'profile')
@@ -255,30 +262,43 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
   }
 
   async function saveExisting(userId: number): Promise<UserFormSaveResult> {
-    const trimmedEmail = email.value.trim()
-
-    const userRes = await api(`/api/v1/users/${userId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name.value, email: trimmedEmail || undefined, active: active.value }),
-    })
-    if (!userRes.ok) return fail('updateUser', 'profile', await readMessage(userRes))
-
-    const permissionsRes = await api(`/api/v1/users/${userId}/permissions`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ permissionNames: [...selectedPermissionNames.value] }),
-    })
-    if (!permissionsRes.ok) return fail('updatePermissions', 'permissions', await readMessage(permissionsRes))
-
-    const librariesRes = await api(`/api/v1/users/${userId}/libraries`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ libraryIds: [...selectedLibraryIds.value] }),
-    })
-    if (!librariesRes.ok) return fail('updateLibraryAccess', 'libraries', await readMessage(librariesRes))
-
-    if (!isSuperuserTarget.value) {
+    const base = snapshot.value
+    if (!base) return fail('updateUser', 'profile')
+    const next = currentSnapshot()
+    const profile = {
+      name: next.name !== base.name ? next.name : undefined,
+      email: next.email !== base.email ? next.email || undefined : undefined,
+      active: next.active !== base.active ? next.active : undefined,
+      kindleEmail: next.kindleEmail !== base.kindleEmail ? next.kindleEmail || undefined : undefined,
+    }
+    if (Object.values(profile).some((value) => value !== undefined)) {
+      const userRes = await api(`/api/v1/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile),
+      })
+      if (!userRes.ok) return profileFailure(userRes, 'updateUser')
+      Object.assign(base, { name: next.name, email: next.email, active: next.active, kindleEmail: next.kindleEmail })
+    }
+    if (base.permissions !== next.permissions) {
+      const permissionsRes = await api(`/api/v1/users/${userId}/permissions`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ permissionNames: [...selectedPermissionNames.value] }),
+      })
+      if (!permissionsRes.ok) return fail('updatePermissions', 'permissions', await readMessage(permissionsRes))
+      base.permissions = next.permissions
+    }
+    if (base.libraries !== next.libraries) {
+      const librariesRes = await api(`/api/v1/users/${userId}/libraries`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ libraryIds: [...selectedLibraryIds.value] }),
+      })
+      if (!librariesRes.ok) return fail('updateLibraryAccess', 'libraries', await readMessage(librariesRes))
+      base.libraries = next.libraries
+    }
+    if (!isSuperuserTarget.value && base.filters !== next.filters) {
       const filtersRes = await api(`/api/v1/users/${userId}/content-filters`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -302,6 +322,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
       name: name.value,
       username: username.value,
       email: trimmedEmail || undefined,
+      kindleEmail: kindleEmail.value.trim() || undefined,
       permissionNames: [...selectedPermissionNames.value],
       libraryIds: [...selectedLibraryIds.value],
     }
@@ -312,7 +333,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
-      if (!res.ok) return fail('createSharedAccount', 'profile', await readMessage(res))
+      if (!res.ok) return profileFailure(res, 'createSharedAccount')
       return { ok: true }
     }
 
@@ -321,7 +342,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ...payload, email: trimmedEmail }),
     })
-    if (!res.ok) return fail('createUser', 'profile', await readMessage(res))
+    if (!res.ok) return profileFailure(res, 'createUser')
     const data = await res.json()
     return { ok: true, resetUrl: data.resetUrl }
   }
@@ -339,6 +360,8 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
       const result = userId ? await saveExisting(userId) : await createNew()
       if (result.ok) snapshot.value = currentSnapshot()
       return result
+    } catch {
+      return fail('saveFailed', 'profile')
     } finally {
       loading.value = false
     }
@@ -357,6 +380,7 @@ export function useUserForm(user: Ref<UserFormTarget | null>, defaultLibraryIds:
     name,
     username,
     email,
+    kindleEmail,
     active,
     isSharedAccount,
     selectedPermissionNames,

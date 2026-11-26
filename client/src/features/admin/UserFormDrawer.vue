@@ -22,6 +22,7 @@ import Badge from '@/components/ui/badge/Badge.vue'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
 import { formatDate, formatDateTime, formatList, formatNumber } from '@/i18n/formatters'
 import StatusPill from './components/StatusPill.vue'
+import UserKindleRecipients from './components/UserKindleRecipients.vue'
 import UserPermissionsSection from './components/UserPermissionsSection.vue'
 import UserRestrictionsSection from './components/UserRestrictionsSection.vue'
 import ApiKeyManager from '@/features/api-keys/components/ApiKeyManager.vue'
@@ -37,6 +38,8 @@ const props = defineProps<{
   user: UserFormTarget | null
   libraries: LibraryOption[]
   defaultLibraryIds?: number[]
+  startingPermissions?: Permission[]
+  canManageRecipients?: boolean
   canManageSuperuser?: boolean
   currentUserId?: number
   canDelete?: boolean
@@ -58,6 +61,7 @@ const {
   name,
   username,
   email,
+  kindleEmail,
   active,
   isSharedAccount,
   selectedPermissionNames,
@@ -85,7 +89,7 @@ const {
   applyPreset,
   setContentFiltersEnabled,
   save,
-} = useUserForm(toRef(props, 'user'), toRef(props, 'defaultLibraryIds'))
+} = useUserForm(toRef(props, 'user'), toRef(props, 'defaultLibraryIds'), toRef(props, 'startingPermissions'))
 
 /** Below this the sheet is too narrow to carry the rail, so sections become a drill-in list. */
 const isWide = useMediaQuery('(min-width: 768px)')
@@ -340,7 +344,9 @@ async function handleSubmit() {
               <span class="shrink-0">{{ signInMethod }}</span>
             </template>
           </p>
-          <p v-else class="mt-0.5 text-xs text-muted-foreground">{{ t('adminFeature.userForm.createHint') }}</p>
+          <p v-else class="mt-0.5 text-xs text-muted-foreground">
+            {{ startingPermissions?.length ? t('adminFeature.userForm.startingPermissionsHint') : t('adminFeature.userForm.createHint') }}
+          </p>
         </div>
 
         <Button variant="ghost" size="icon-sm" type="button" :aria-label="t('common.close')" @click="handleClose">
@@ -447,6 +453,14 @@ async function handleSubmit() {
               />
               <p class="settings-hint">{{ t('adminFeature.userForm.emailHint') }}</p>
             </div>
+
+            <UserKindleRecipients
+              v-if="canManageRecipients"
+              v-model="kindleEmail"
+              :user-id="user?.id"
+              :can-send="isSuperuserTarget || selectedPermissionNames.has(Permission.EmailSend)"
+              :invalid="errorKey === 'invalidKindleEmail' || errorKey === 'kindleConflict'"
+            />
 
             <div v-if="isEdit">
               <h3 class="settings-group-label">{{ t('adminFeature.userForm.account') }}</h3>
@@ -625,7 +639,9 @@ async function handleSubmit() {
       </div>
 
       <footer class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-t border-border px-4 py-3 sm:px-5">
-        <p v-if="errorMessage" role="alert" class="min-w-0 flex-1 basis-full text-sm text-destructive md:basis-auto">{{ errorMessage }}</p>
+        <p v-if="errorMessage" id="user-form-error" role="alert" class="min-w-0 flex-1 basis-full text-sm text-destructive md:basis-auto">
+          {{ errorMessage }}
+        </p>
         <p v-else-if="changeCount > 0" class="flex min-w-0 flex-1 basis-full items-center gap-2 text-xs text-[var(--pill-warning)] md:basis-auto">
           <TriangleAlert :size="14" class="shrink-0" aria-hidden="true" />
           <span class="truncate">{{ t('adminFeature.userForm.unsavedChanges', { count: changeCount }) }}</span>

@@ -2,6 +2,9 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { ConfigService, type ConfigType } from '@nestjs/config';
 
 import {
+  Permission,
+  withRequiredPermissions,
+  RESTRICTIVE_PERMISSIONS,
   type ApiKeySettings,
   type BookRequestImportFormats,
   BOOK_REQUEST_AUTOMATION_SETTING_KEYS,
@@ -92,6 +95,9 @@ export class AppSettingsService {
   }
 
   async update(key: string, value: string) {
+    if (key === APP_SETTING_KEYS.STARTING_PERMISSIONS) {
+      throw new BadRequestException('Use the starting permissions endpoint to update this setting');
+    }
     if (BOOK_DOCK_MANAGED_SETTING_KEYS.includes(key)) {
       throw new BadRequestException(`Setting '${key}' is managed by the Library Dock endpoints and cannot be written here`);
     }
@@ -277,6 +283,21 @@ export class AppSettingsService {
     const merged = mergeOidcConfig(current, config);
     await this.repo.upsert(APP_SETTING_KEYS.OIDC_CONFIG, JSON.stringify(merged));
     return merged;
+  }
+
+  async getStartingPermissions(): Promise<Permission[]> {
+    const key = APP_SETTING_KEYS.STARTING_PERMISSIONS;
+    const row = await this.repo.findByKey(key);
+    const saved = parseSafe<unknown>(key, row?.value, [], this.logger);
+    if (!Array.isArray(saved)) return [];
+    const allowed = Object.values(Permission).filter((name) => !RESTRICTIVE_PERMISSIONS.includes(name));
+    return withRequiredPermissions(allowed.filter((name) => saved.includes(name)));
+  }
+
+  async setStartingPermissions(names: Permission[]): Promise<Permission[]> {
+    const permissions = withRequiredPermissions(names);
+    await this.repo.upsert(APP_SETTING_KEYS.STARTING_PERMISSIONS, JSON.stringify(permissions));
+    return permissions;
   }
 
   async getDefaultLibraryAccess(): Promise<DefaultLibraryAccessConfig> {

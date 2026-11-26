@@ -5539,6 +5539,48 @@
       "notShownAgain": "This link will not be shown again."
     },
     "userForm": {
+      "permissionLabels": {
+        "library_download": "Download books",
+        "library_upload": "Upload books",
+        "library_edit_metadata": "Edit metadata",
+        "library_delete_books": "Delete books",
+        "library_merge_books": "Merge books",
+        "library_generate_read_aloud": "Generate read-aloud books",
+        "library_generate_story_guide": "Build story guides",
+        "book_dock_access": "Library Dock",
+        "book_request_access": "Request books",
+        "demo_restricted": "Demo restricted",
+        "kobo_sync": "Kobo sync",
+        "koreader_sync": "KOReader sync",
+        "hardcover_sync": "Hardcover sync",
+        "readwise_sync": "Readwise sync",
+        "storygraph_sync": "StoryGraph sync",
+        "opds_access": "OPDS access",
+        "api_keys": "Create API keys",
+        "email_send": "Send by email",
+        "manage_email": "Manage email",
+        "manage_libraries": "Manage libraries",
+        "manage_metadata_config": "Metadata config",
+        "manage_icons": "Manage icons",
+        "manage_app_settings": "App settings",
+        "manage_book_dock": "Manage Library Dock",
+        "manage_book_requests": "Manage book requests",
+        "book_request_auto_approve": "Auto-approve requests",
+        "book_request_self_fulfill": "Download books directly",
+        "manage_users": "Manage users",
+        "view_audit_log": "View audit log",
+        "notification_access": "Notifications"
+      },
+      "kindle": {
+        "title": "Send to Kindle",
+        "hint": "Add a delivery address for this reader’s Kindle.",
+        "address": "Kindle email address",
+        "add": "Add Kindle recipient",
+        "discard": "Discard address",
+        "recent": "Recently added Kindle addresses",
+        "loadError": "The saved Kindle addresses could not be loaded.",
+        "permissionHint": "Enable Send by email in Permissions so this reader can send books."
+      },
       "editUser": "Edit User",
       "createUser": "Create User",
       "createSharedAccount": "Create Shared Account",
@@ -5624,6 +5666,9 @@
       "searchGenresPlaceholder": "Search genres...",
       "saving": "Saving...",
       "errors": {
+        "kindleConflict": "This address already belongs to a different type of recipient on this account.",
+        "invalidKindleEmail": "Enter a valid Kindle email address.",
+        "saveFailed": "The account could not be saved. Try again.",
         "updateUser": "Failed to update user",
         "updatePermissions": "Failed to update permissions",
         "updateLibraryAccess": "Failed to update library access",
@@ -5635,6 +5680,7 @@
         "usernameRequired": "Username is required"
       },
       "drawerDescription": "Edit this account's profile, library access, permissions and restrictions.",
+      "startingPermissionsHint": "Starting permissions are preselected. Adjust them in Permissions before saving.",
       "createHint": "New accounts hold no permissions until you grant them.",
       "sectionsLabel": "Account settings",
       "sections": {
@@ -5830,6 +5876,13 @@
       "defaults": {
         "title": "Defaults for new accounts",
         "appliesTo": "Applies to self-registration and OIDC",
+        "permissions": "Starting permissions",
+        "permissionsHint": "Preselected when an admin creates an account. Adjust them for each reader before saving.",
+        "editPermissions": "Edit permissions",
+        "savePermissions": "Save defaults",
+        "permissionsLoadError": "Starting permissions could not be loaded.",
+        "permissionsSaveError": "Starting permissions could not be saved.",
+        "more": "+{count} more",
         "startingLibraries": "Starting libraries",
         "startingLibrariesHint": "Viewer access granted automatically to every new account."
       }

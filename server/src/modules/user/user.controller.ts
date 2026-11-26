@@ -218,6 +218,12 @@ export class UserController {
     return this.userService.createSharedUser(dto);
   }
 
+  @Get(':id/kindle-recipients')
+  @RequirePermission(Permission.ManageUsers)
+  recentKindleRecipients(@Param('id', ParseIntPipe) id: number, @CurrentUser() requester: RequestUser) {
+    return this.userService.recentKindleRecipients(id, requester);
+  }
+
   @Patch(':id')
   @RequirePermission(Permission.ManageUsers)
   @Auditable({

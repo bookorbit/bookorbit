@@ -1,7 +1,9 @@
 import { Permission } from '@bookorbit/types';
 import { IsArray, IsEmail, IsEnum, IsInt, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-export class CreateUserDto {
+import { KindleRecipientDto } from './kindle-recipient.dto';
+
+export class CreateUserDto extends KindleRecipientDto {
   @IsString()
   @MinLength(3)
   @MaxLength(100)

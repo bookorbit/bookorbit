@@ -1,6 +1,8 @@
 import { IsBoolean, IsEmail, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 
-export class UpdateUserDto {
+import { KindleRecipientDto } from './kindle-recipient.dto';
+
+export class UpdateUserDto extends KindleRecipientDto {
   @IsString()
   @MinLength(1)
   @MaxLength(255)

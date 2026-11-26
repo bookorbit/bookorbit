@@ -134,68 +134,41 @@ export class UserService {
 
   async createUser(dto: CreateUserDto) {
     this.authenticationPolicy.assertPasswordLoginEnabled();
-    const existing = await this.userRepo.findByUsername(dto.username);
-    if (existing) throw new ConflictException('Username already taken');
-    const existingEmail = await this.userRepo.findByEmail(dto.email);
-    if (existingEmail) throw new ConflictException('Email already in use');
-
-    const passwordHash = await hash(randomBytes(16).toString('hex'), 12);
-    const user = await this.userRepo.create({
-      username: dto.username,
-      name: dto.name,
-      email: dto.email,
-      passwordHash,
-      isDefaultPassword: true,
-    });
-
-    const permissionNames = this.uniquePermissions(dto.permissionNames ?? []);
-    if (permissionNames.length > 0) {
-      await this.userRepo.setPermissions(user.id, permissionNames);
-    }
-
-    const libraryIds = await this.resolveNewUserLibraryIds(dto.libraryIds);
-    if (libraryIds.length > 0) {
-      await this.assertKnownLibraryIds(libraryIds);
-      await this.userRepo.assignViewerLibraries(user.id, libraryIds);
-    }
-
-    const appUrl = this.appConfiguration.appUrl;
-    const rawToken = await this.userRepo.generateResetToken(user.id);
-    const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
-
-    return { id: user.id, username: user.username, name: user.name, resetUrl };
+    const { resetToken, ...user } = await this.createManagedAccount(dto, false);
+    return { ...user, resetUrl: `${this.appConfiguration.appUrl}/reset-password?token=${resetToken}` };
   }
 
   async createSharedUser(dto: CreateSharedUserDto) {
-    const existing = await this.userRepo.findByUsername(dto.username);
-    if (existing) throw new ConflictException('Username already taken');
-    if (dto.email) {
-      const existingEmail = await this.userRepo.findByEmail(dto.email);
-      if (existingEmail) throw new ConflictException('Email already in use');
-    }
+    const { id, name, username } = await this.createManagedAccount(dto, true);
+    return { id, name, username };
+  }
 
-    const passwordHash = await hash(randomBytes(32).toString('hex'), 12);
-    const user = await this.userRepo.create({
-      username: dto.username,
-      name: dto.name,
-      email: dto.email ?? null,
-      passwordHash,
-      isDefaultPassword: false,
-      provisioningMethod: 'shared',
-    });
-
-    const permissionNames = this.uniquePermissions(dto.permissionNames ?? []);
-    if (permissionNames.length > 0) {
-      await this.userRepo.setPermissions(user.id, permissionNames);
-    }
-
+  private async createManagedAccount(dto: CreateUserDto | CreateSharedUserDto, shared: boolean) {
+    if (await this.userRepo.findByUsername(dto.username)) throw new ConflictException('Username already taken');
+    if (dto.email && (await this.userRepo.findByEmail(dto.email))) throw new ConflictException('Email already in use');
     const libraryIds = await this.resolveNewUserLibraryIds(dto.libraryIds);
-    if (libraryIds.length > 0) {
-      await this.assertKnownLibraryIds(libraryIds);
-      await this.userRepo.assignViewerLibraries(user.id, libraryIds);
-    }
+    await this.assertKnownLibraryIds(libraryIds);
+    const passwordHash = await hash(randomBytes(shared ? 32 : 16).toString('hex'), 12);
+    return this.userRepo.createManagedAccount(
+      {
+        username: dto.username,
+        name: dto.name,
+        email: dto.email ?? null,
+        passwordHash,
+        isDefaultPassword: !shared,
+        provisioningMethod: shared ? 'shared' : 'local',
+      },
+      this.uniquePermissions(dto.permissionNames ?? []),
+      libraryIds,
+      dto.kindleEmail,
+    );
+  }
 
-    return { id: user.id, username: user.username, name: user.name };
+  async recentKindleRecipients(targetUserId: number, requester: RequestUser): Promise<string[]> {
+    const rows = await this.userRepo.recentKindleRecipients(targetUserId, requester.isSuperuser);
+    if (!rows.length) throw new NotFoundException('User not found');
+    if (rows[0].isSuperuser && !requester.isSuperuser) throw new ForbiddenException('Only administrators can manage administrator accounts');
+    return rows.flatMap(({ email }) => (email ? [email] : []));
   }
 
   async updateUser(id: number, dto: UpdateUserDto, requestingUser: RequestUser) {
