@@ -120,6 +120,46 @@ describe('Annotation DTO validation', () => {
     expect((await errorsFor(CreateAnnotationDto, { cfi: null, pdf: null, text: 'ok' })).length).toBeGreaterThan(0);
   });
 
+  describe('page location', () => {
+    const constraintsOf = (errors: Awaited<ReturnType<typeof validate>>) => errors.flatMap((error) => Object.keys(error.constraints ?? {}));
+
+    it('accepts a comic page note with empty text, a note and a file', async () => {
+      const errors = await errorsFor(CreateAnnotationDto, {
+        page: { page: 11 },
+        bookFileId: 4,
+        text: '',
+        note: 'Gull Point, twice',
+        color: '#F472B6',
+      });
+
+      expect(errors).toHaveLength(0);
+    });
+
+    it('requires a file, a note that is not blank, and a whole non-negative page index', async () => {
+      expect(constraintsOf(await errorsFor(CreateAnnotationDto, { page: { page: 0 }, text: '', note: 'n' }))).toContain('pdfRequiresBookFile');
+      expect(constraintsOf(await errorsFor(CreateAnnotationDto, { page: { page: 0 }, bookFileId: 4, text: '', note: '   ' }))).toContain(
+        'noteRequiredForPage',
+      );
+      expect(constraintsOf(await errorsFor(CreateAnnotationDto, { page: { page: 0 }, bookFileId: 4, text: '' }))).toContain('noteRequiredForPage');
+      expect((await errorsFor(CreateAnnotationDto, { page: { page: -1 }, bookFileId: 4, text: '', note: 'n' })).length).toBeGreaterThan(0);
+      expect((await errorsFor(CreateAnnotationDto, { page: { page: 1.5 }, bookFileId: 4, text: '', note: 'n' })).length).toBeGreaterThan(0);
+    });
+
+    it('rejects a page combined with a cfi or a pdf position', async () => {
+      const pdf = { page: 0, rect: { x: 1, y: 2, width: 3, height: 4 }, rects: [{ x: 1, y: 2, width: 3, height: 4 }] };
+      expect(
+        constraintsOf(await errorsFor(CreateAnnotationDto, { page: { page: 0 }, cfi: 'epubcfi(/6/4)', bookFileId: 4, text: '', note: 'n' })),
+      ).toContain('exactlyOneAnnotationLocation');
+      expect(constraintsOf(await errorsFor(CreateAnnotationDto, { page: { page: 0 }, pdf, bookFileId: 4, text: '', note: 'n' }))).toContain(
+        'exactlyOneAnnotationLocation',
+      );
+    });
+
+    it('leaves cfi and pdf payloads without a note valid, as before page notes', async () => {
+      expect(await errorsFor(CreateAnnotationDto, { cfi: 'epubcfi(/6/4)', text: 'ok' })).toHaveLength(0);
+    });
+  });
+
   it('rejects a pdf create payload missing its bounding rect', async () => {
     expect(
       (await errorsFor(CreateAnnotationDto, { pdf: { page: 0, rects: [{ x: 1, y: 2, width: 3, height: 4 }] }, text: 'ok' })).length,
@@ -270,6 +310,10 @@ describe('AnnotationPositionRetryDto validation', () => {
   it('accepts a known format and rejects an unknown one', async () => {
     expect(await errorsFor(AnnotationPositionRetryDto, { format: 'cfi' })).toHaveLength(0);
     expect((await errorsFor(AnnotationPositionRetryDto, { format: 'mobi' })).length).toBeGreaterThan(0);
+  });
+
+  it('rejects a page position, which has nothing to rebuild', async () => {
+    expect((await errorsFor(AnnotationPositionRetryDto, { format: 'page' })).length).toBeGreaterThan(0);
   });
 });
 

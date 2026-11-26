@@ -25,6 +25,7 @@ import { AnnotationSyncRepository } from './annotation-sync.repository';
 import { AnnotationRepository, type HubAccess, type HubAnnotationRow, type HubFilters, type HubSort } from './annotation.repository';
 import { DevicePositionRebuilderRegistry } from './device-position-rebuilder';
 import type { AnnotationBulkDto, AnnotationExportQueryDto, AnnotationHubQueryDto } from './dto/annotation-hub.dto';
+import { parsePagePosition } from './dto/annotation-response.dto';
 
 const BULK_EVENT = 'annotation.bulk';
 const RETRY_EVENT = 'annotation.position_retry';
@@ -335,6 +336,7 @@ export class AnnotationHubService {
       jumpFileId: row.jumpFileId,
       jumpFileFormat: row.jumpFileFormat,
       pageno: row.pageno,
+      page: parsePagePosition(row.pagePos0),
       starredAt: row.starredAt ? row.starredAt.toISOString() : null,
     };
   }

@@ -27,6 +27,11 @@ export function useCbz(fileId: number, bookId: number, source: 'cbz' | 'djvu' = 
     return `/api/v1/${source}/files/${fileId}/pages/${n}${source === 'djvu' ? '?size=2560' : ''}`
   }
 
+  // DjVu pages are rendered on the server, so a thumbnail asks for its smallest render.
+  function thumbnailUrl(n: number): string {
+    return `/api/v1/${source}/files/${fileId}/pages/${n}${source === 'djvu' ? '?size=1280' : ''}`
+  }
+
   async function load(): Promise<void> {
     controller?.abort()
     const request = new AbortController()
@@ -56,5 +61,5 @@ export function useCbz(fileId: number, bookId: number, source: 'cbz' | 'djvu' = 
     }
   }
 
-  return { pageCount, bookTitle, seriesId, loading, error, pageUrl, load }
+  return { pageCount, bookTitle, seriesId, loading, error, pageUrl, thumbnailUrl, load }
 }

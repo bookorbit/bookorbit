@@ -134,6 +134,16 @@ describe('AnnotationListItem', () => {
     expect(iconButton(wrapper, 'lucide-copy')).toBeUndefined()
   })
 
+  it('names the page of a note on a comic page instead of a missing quote', () => {
+    const wrapper = mountItem({
+      annotation: makeHubAnnotation({ text: '', cfi: null, pageno: 4, page: { page: 3 }, jumpFileFormat: 'cbz' }),
+      mode: 'hub',
+    })
+    expect(wrapper.get('[data-testid="annotation-page-note"]').text()).toBe('Note on page 4')
+    expect(wrapper.text()).not.toContain('Text not available for this highlight')
+    expect(wrapper.text()).toContain('my note')
+  })
+
   it('toggles expansion for long quotes', async () => {
     const wrapper = mountItem({ annotation: makeAnnotation({ text: 'x'.repeat(300) }) })
     const expand = wrapper.findAll('button').find((button) => button.text().includes('Expand'))

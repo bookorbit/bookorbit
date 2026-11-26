@@ -5949,7 +5949,8 @@
         "webReader": "Web reader",
         "koreader": "KOReader",
         "pdf": "PDF",
-        "kobo": "Kobo"
+        "kobo": "Kobo",
+        "page": "Page"
       },
       "status": {
         "exact": "Exact",
@@ -6102,7 +6103,8 @@
       "cyan": "Cyan",
       "purple": "Purple",
       "gray": "Gray"
-    }
+    },
+    "pageNote": "Note on page {page}"
   },
   "apiKeys": {
     "errors": {
@@ -15136,7 +15138,8 @@
       "bookmarkSaveFailed": "Could not add the bookmark",
       "bookmarkDeleteFailed": "Could not remove the bookmark",
       "bookmarkUpdateFailed": "Could not save the bookmark",
-      "marksLoadFailed": "Could not load your highlights and bookmarks"
+      "marksLoadFailed": "Could not load your highlights and bookmarks",
+      "noteDeleteFailed": "Could not delete the note"
     },
     "newerPositionDialog": {
       "title": "Continue from another device?",
@@ -15407,6 +15410,31 @@
         "numbered": "#{index} {title}",
         "untitled": "Untitled",
         "autoAdvanceHint": "Turn the page again to continue"
+      },
+      "notes": {
+        "title": "Notes",
+        "button": "Notes",
+        "buttonOnPage": "{count, plural, one {Notes, # on this page} other {Notes, # on this page}}",
+        "buttonOnPages": "{count, plural, one {Notes, # on these pages} other {Notes, # on these pages}}",
+        "close": "Close notes",
+        "addToPage": "Add note to page {page}",
+        "addToPages": "Add note to pages {start}-{end}",
+        "empty": "No notes in this book yet",
+        "emptyHint": "Notes stay with the page they are added to.",
+        "loading": "Loading notes",
+        "loadError": "Could not load your notes",
+        "loadMore": "Load more notes",
+        "loadingMore": "Loading more notes…",
+        "page": "Page {page}",
+        "more": "More for the note on page {page}",
+        "edit": "Edit",
+        "delete": "Delete",
+        "addTitle": "Add note",
+        "editTitle": "Edit note",
+        "whichPage": "Which page",
+        "color": "Color",
+        "note": "Note",
+        "saveShortcut": "Press Ctrl+Enter or ⌘+Enter to save"
       }
     },
     "audiobook": {

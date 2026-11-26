@@ -158,6 +158,9 @@ function handlePurge() {
     <!-- WHAT -->
     <div class="col-start-3 min-w-0" :class="stacked ? 'row-start-2' : 'row-start-1'">
       <p v-if="annotation.text" class="whitespace-pre-line text-foreground" :class="quoteClass">{{ annotation.text }}</p>
+      <p v-else-if="annotation.page" class="font-medium text-muted-foreground" :class="quoteSizeClass" data-testid="annotation-page-note">
+        {{ t('annotations.pageNote', { page: annotation.page.page + 1 }) }}
+      </p>
       <p v-else class="italic text-muted-foreground" :class="quoteSizeClass">{{ t('annotations.textUnavailable') }}</p>
       <div v-if="annotation.note" class="mt-2 border-l-2 border-primary pl-2.5">
         <span class="mb-0.5 block text-[8.5px] font-bold uppercase tracking-[0.13em] text-primary">{{ t('annotations.hub.noteLabel') }}</span>

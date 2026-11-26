@@ -65,11 +65,11 @@ export class AnnotationExportService {
         currentChapter = chapter;
         if (chapter) lines.push(`### ${chapter}`, '');
       }
-      lines.push(
-        paragraphs(row.text)
-          .map((line) => `> ${line}`)
-          .join('\n>\n'),
-      );
+      const quote = paragraphs(row.text)
+        .map((line) => `> ${line}`)
+        .join('\n>\n');
+      // A note on a comic page has no text of its own, so its page stands in for the quote.
+      lines.push(quote || (row.pageno != null ? `Page ${row.pageno}` : ''));
       if (row.note) lines.push('', `Note: ${paragraphs(row.note).join('\n\n')}`);
       lines.push('', `<sub>${row.style}, ${row.color}, ${row.origin}, ${this.highlightedAt(row).toISOString().slice(0, 10)}</sub>`, '');
     }

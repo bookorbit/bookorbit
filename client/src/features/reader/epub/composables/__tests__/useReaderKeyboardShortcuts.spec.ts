@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { defineComponent } from 'vue'
 import { describe, expect, it, vi, afterEach } from 'vitest'
-import { useReaderKeyboardShortcuts, type ShortcutHandlers } from '../useReaderKeyboardShortcuts'
+import { useReaderKeyboardShortcuts, type ShortcutHandlers, type ShortcutOptions } from '../useReaderKeyboardShortcuts'
 
 function makeHandlers(): ShortcutHandlers {
   return {
@@ -20,12 +20,12 @@ function fireKey(key: string) {
   document.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }))
 }
 
-function mountWithShortcuts(handlers: ShortcutHandlers) {
+function mountWithShortcuts(handlers: ShortcutHandlers, options?: ShortcutOptions) {
   let result: ReturnType<typeof useReaderKeyboardShortcuts>
   const wrapper = mount(
     defineComponent({
       setup() {
-        result = useReaderKeyboardShortcuts(handlers)
+        result = useReaderKeyboardShortcuts(handlers, options)
         return result
       },
       template: '<div />',
@@ -163,5 +163,20 @@ describe('useReaderKeyboardShortcuts', () => {
 
     fireKey('t')
     expect(handlers.toggleSidebar).not.toHaveBeenCalled()
+  })
+
+  it('leaves every key alone when disabled for a reader that brings its own keys', () => {
+    handlers = makeHandlers()
+    const mounted = mountWithShortcuts(handlers, { enabled: false })
+    wrapper = mounted.wrapper
+    const events = ['t', 's', 'b', 'f', 'm', '?', 'Escape', 'Home', 'End'].map((key) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true })
+      document.dispatchEvent(event)
+      return event
+    })
+
+    expect(events.every((event) => !event.defaultPrevented)).toBe(true)
+    expect(Object.values(handlers).every((handler) => vi.mocked(handler).mock.calls.length === 0)).toBe(true)
+    expect(mounted.result.showHelpModal.value).toBe(false)
   })
 })

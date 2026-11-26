@@ -60,6 +60,8 @@ export type AnnotationWithCfi = AnnotationRow & {
   pageno: number | null;
   pdfPos0?: string | null;
   pdfStatus?: string | null;
+  /** The zero-based page index of a note on a comic or DjVu page, as stored in its `page` position. */
+  pagePos0?: string | null;
 };
 export type HubAnnotationRow = AnnotationWithCfi & {
   bookTitle: string | null;
@@ -159,7 +161,7 @@ export class AnnotationRepository {
   private hubColumns() {
     const jumpFileId = sql<number | null>`coalesce(
       ${annotationPositions.bookFileId},
-      (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1),
+      (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf', 'page') limit 1),
       ${books.primaryFileId}
     )`;
     return {
@@ -175,10 +177,13 @@ export class AnnotationRepository {
       jumpFileFormat: sql<string | null>`(select ${bookFiles.format} from ${bookFiles} where ${bookFiles.id} = ${jumpFileId} limit 1)`,
       pageno: sql<
         number | null
-      >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
+      >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf', 'page') limit 1)`,
       xpointer: sql<
         string | null
       >`(select ap4.pos0 from annotation_positions ap4 where ap4.annotation_id = ${annotations.id} and ap4.format = 'xpointer' limit 1)`,
+      pagePos0: sql<
+        string | null
+      >`(select ap6.pos0 from annotation_positions ap6 where ap6.annotation_id = ${annotations.id} and ap6.format = 'page' limit 1)`,
     };
   }
 
@@ -192,16 +197,19 @@ export class AnnotationRepository {
         cfiExtras: annotationPositions.extras,
         jumpFileId: sql<
           number | null
-        >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf') limit 1), ${books.primaryFileId})`,
+        >`coalesce(${annotationPositions.bookFileId}, (select ap2.book_file_id from annotation_positions ap2 where ap2.annotation_id = ${annotations.id} and ap2.format in ('xpointer', 'pdf', 'page') limit 1), ${books.primaryFileId})`,
         pageno: sql<
           number | null
-        >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf') limit 1)`,
+        >`(select (ap3.extras ->> 'pageno')::int from annotation_positions ap3 where ap3.annotation_id = ${annotations.id} and ap3.format in ('xpointer', 'pdf', 'page') limit 1)`,
         pdfPos0: sql<
           string | null
         >`(select ap4.pos0 from annotation_positions ap4 where ap4.annotation_id = ${annotations.id} and ap4.format = 'pdf' limit 1)`,
         pdfStatus: sql<
           string | null
         >`(select ap5.status from annotation_positions ap5 where ap5.annotation_id = ${annotations.id} and ap5.format = 'pdf' limit 1)`,
+        pagePos0: sql<
+          string | null
+        >`(select ap6.pos0 from annotation_positions ap6 where ap6.annotation_id = ${annotations.id} and ap6.format = 'page' limit 1)`,
       })
       .from(annotations)
       .leftJoin(annotationPositions, and(eq(annotationPositions.annotationId, annotations.id), eq(annotationPositions.format, 'cfi')))
@@ -386,6 +394,30 @@ export class AnnotationRepository {
         pdfPos0: pdf.pos0,
         pdfStatus: 'exact',
       };
+    });
+  }
+
+  /**
+   * Creates a note on a whole page of a comic or DjVu file and its `page` position in one
+   * transaction. pos0 holds the zero-based page index and `extras.pageno` the 1-based page, the
+   * same page field PDF positions carry, so jump links and page ordering treat both alike.
+   */
+  async createPage(data: NewAnnotation & { bookFileId: number }, page: number): Promise<AnnotationWithCfi> {
+    const { bookFileId, ...annotationData } = data;
+    const pageno = page + 1;
+    const pos0 = String(page);
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx.insert(annotations).values(annotationData).returning();
+      await tx.insert(annotationPositions).values({
+        annotationId: row.id,
+        userId: row.userId,
+        bookFileId,
+        format: 'page',
+        pos0,
+        status: 'exact',
+        extras: { pageno },
+      });
+      return { ...row, cfi: null, cfiStatus: null, cfiExtras: null, jumpFileId: bookFileId, pageno, pagePos0: pos0 };
     });
   }
 
@@ -889,8 +921,8 @@ export function cfiStepsSortKey(pos0: SQL | typeof annotationPositions.pos0): SQ
 }
 
 /**
- * Where a highlight sits in the book: PDF page, then the vertical offset on that page, then the
- * CFI steps. Requires the canonical `cfi` position joined as `annotation_positions`.
+ * Where a highlight sits in the book: PDF or comic page, then the vertical offset on a PDF page,
+ * then the CFI steps. Requires the canonical `cfi` position joined as `annotation_positions`.
  */
 export function readingPositionOrder(dir: 'asc' | 'desc'): SQL[] {
   const sqlDirection = sql.raw(dir === 'desc' ? 'desc' : 'asc');
@@ -900,7 +932,7 @@ export function readingPositionOrder(dir: 'asc' | 'desc'): SQL[] {
       else null
     end
     from ${annotationPositions} ap_pdf
-    where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format = 'pdf'
+    where ap_pdf.annotation_id = ${annotations.id} and ap_pdf.format in ('pdf', 'page')
     limit 1
   )`;
   const pdfY = sql`(

@@ -54,17 +54,21 @@ export class CreateAnnotationPdfDto {
   rects!: CreateAnnotationRectDto[];
 }
 
+export class CreateAnnotationPageDto {
+  @IsInt()
+  @Min(0)
+  page!: number;
+}
+
 @ValidatorConstraint({ name: 'exactlyOneAnnotationLocation', async: false })
 class ExactlyOneLocationConstraint implements ValidatorConstraintInterface {
   validate(_value: unknown, args: ValidationArguments): boolean {
     const dto = args.object as CreateAnnotationDto;
-    const hasCfi = dto.cfi !== undefined && dto.cfi !== null;
-    const hasPdf = dto.pdf !== undefined && dto.pdf !== null;
-    return hasCfi !== hasPdf;
+    return [dto.cfi, dto.pdf, dto.page].filter((location) => location !== undefined && location !== null).length === 1;
   }
 
   defaultMessage(): string {
-    return 'Provide exactly one of cfi or pdf';
+    return 'Provide exactly one of cfi, pdf or page';
   }
 }
 
@@ -72,25 +76,39 @@ class ExactlyOneLocationConstraint implements ValidatorConstraintInterface {
 class PdfRequiresBookFileConstraint implements ValidatorConstraintInterface {
   validate(_value: unknown, args: ValidationArguments): boolean {
     const dto = args.object as CreateAnnotationDto;
-    return dto.pdf == null || dto.bookFileId != null;
+    return (dto.pdf == null && dto.page == null) || dto.bookFileId != null;
   }
 
   defaultMessage(): string {
-    return 'bookFileId is required for pdf annotations';
+    return 'bookFileId is required for pdf and page annotations';
   }
 }
 
-// A PDF that denies text extraction still allows highlighting, so its highlights can have no text.
+// A PDF that denies text extraction still allows highlighting, so its highlights can have no text,
+// and a comic page has no text to quote at all.
 @ValidatorConstraint({ name: 'textRequiredForCfi', async: false })
 class TextRequiredForCfiConstraint implements ValidatorConstraintInterface {
   validate(value: unknown, args: ValidationArguments): boolean {
     const dto = args.object as CreateAnnotationDto;
-    if (dto.pdf != null) return true;
+    if (dto.pdf != null || dto.page != null) return true;
     return typeof value === 'string' && value !== '';
   }
 
   defaultMessage(): string {
     return 'text should not be empty';
+  }
+}
+
+// A page note has nothing but its note, so an empty one would be a blank row.
+@ValidatorConstraint({ name: 'noteRequiredForPage', async: false })
+class NoteRequiredForPageConstraint implements ValidatorConstraintInterface {
+  validate(_value: unknown, args: ValidationArguments): boolean {
+    const dto = args.object as CreateAnnotationDto;
+    return dto.page == null || (typeof dto.note === 'string' && dto.note.trim() !== '');
+  }
+
+  defaultMessage(): string {
+    return 'note is required for page annotations';
   }
 }
 
@@ -107,6 +125,11 @@ export class CreateAnnotationDto {
   pdf?: CreateAnnotationPdfDto;
 
   @IsOptional()
+  @ValidateNested()
+  @Type(() => CreateAnnotationPageDto)
+  page?: CreateAnnotationPageDto;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
@@ -117,6 +140,7 @@ export class CreateAnnotationDto {
   @Validate(ExactlyOneLocationConstraint)
   @Validate(PdfRequiresBookFileConstraint)
   @Validate(TextRequiredForCfiConstraint)
+  @Validate(NoteRequiredForPageConstraint)
   @IsString()
   text!: string;
 

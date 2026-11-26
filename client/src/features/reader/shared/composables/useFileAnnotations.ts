@@ -1,15 +1,14 @@
 import { computed, ref } from 'vue'
-import type { AnnotationItem, AnnotationListResponse, AnnotationPdfPosition } from '@bookorbit/types'
+import type { AnnotationItem, AnnotationListResponse, AnnotationPagePosition, AnnotationPdfPosition } from '@bookorbit/types'
 import { api, getValidToken } from '@/lib/api'
 
-export interface PdfAnnotationPatch {
+export interface FileAnnotationPatch {
   note?: string | null
   color?: string
   style?: string
 }
 
-export interface CreatePdfAnnotationInput {
-  pdf: AnnotationPdfPosition
+interface CreateFileAnnotationBase {
   bookFileId: number
   text: string
   color: string
@@ -17,14 +16,18 @@ export interface CreatePdfAnnotationInput {
   note?: string | null
 }
 
+/** A PDF highlight carries its geometry; a comic or DjVu page note carries only its page. */
+export type CreateFileAnnotationInput = CreateFileAnnotationBase & ({ pdf: AnnotationPdfPosition } | { page: AnnotationPagePosition })
+
 /**
- * REST client and reactive store for a book's annotations, scoped to the PDF
- * reader. Talks to the same `/books/:bookId/annotations` endpoints as the EPUB
- * reader; only the create payload carries a PDF position instead of a CFI.
+ * REST client and reactive store for the annotations made in one file of a book, for the
+ * page-based readers (PDF, comics and DjVu). Talks to the same `/books/:bookId/annotations`
+ * endpoints as the EPUB reader; only the create payload carries a page-based position
+ * instead of a CFI.
  */
 const PAGE_SIZE = 100
 
-export function usePdfAnnotations(bookId: number, bookFileId: number) {
+export function useFileAnnotations(bookId: number, bookFileId: number) {
   const annotations = ref<AnnotationItem[]>([])
   const total = ref(0)
   const loadError = ref(false)
@@ -110,7 +113,7 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
     return `/api/v1/books/${bookId}/annotations?${query.toString()}`
   }
 
-  async function create(input: CreatePdfAnnotationInput): Promise<AnnotationItem | null> {
+  async function create(input: CreateFileAnnotationInput): Promise<AnnotationItem | null> {
     try {
       const res = await api(`/api/v1/books/${bookId}/annotations`, {
         method: 'POST',
@@ -128,7 +131,7 @@ export function usePdfAnnotations(bookId: number, bookFileId: number) {
     }
   }
 
-  async function update(id: number, patch: PdfAnnotationPatch): Promise<AnnotationItem | null> {
+  async function update(id: number, patch: FileAnnotationPatch): Promise<AnnotationItem | null> {
     try {
       const res = await api(`/api/v1/books/${bookId}/annotations/${id}`, {
         method: 'PATCH',

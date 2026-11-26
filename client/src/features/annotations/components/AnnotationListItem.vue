@@ -264,6 +264,9 @@ function shouldSeparateMetadataItem(index: number): boolean {
 
     <div class="flex flex-1 min-w-0 flex-col self-stretch">
       <p v-if="annotation.text" class="whitespace-pre-line text-sm leading-relaxed text-foreground" :class="quoteClampClass">{{ annotation.text }}</p>
+      <p v-else-if="annotation.page" class="text-sm font-medium leading-relaxed text-muted-foreground" data-testid="annotation-page-note">
+        {{ t('annotations.pageNote', { page: annotation.page.page + 1 }) }}
+      </p>
       <p v-else class="text-sm italic leading-relaxed text-muted-foreground">{{ t('annotations.textUnavailable') }}</p>
 
       <button

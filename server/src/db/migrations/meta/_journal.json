@@ -1156,6 +1156,13 @@
       "when": 1795649105503,
       "tag": "0164_add_reading_session_file_format_snapshot",
       "breakpoints": true
+    },
+    {
+      "idx": 165,
+      "version": "7",
+      "when": 1795715481422,
+      "tag": "0165_add_annotation_page_position",
+      "breakpoints": true
     }
   ]
 }

@@ -64,6 +64,15 @@ describe('AnnotationExportService', () => {
     expect(result.content).not.toMatch(/\t|> {2}/);
   });
 
+  it('writes the page in place of the quote for a note on a comic page', () => {
+    const rows = [makeRow({ text: '', note: 'The splash mirrors issue 1.', cfi: null, cfiStatus: null, pageno: 7, chapterTitle: null })];
+
+    const result = service.export(rows, 'md', 'book-20');
+
+    expect(result.content).toContain('## Test Book\n\nPage 7\n\nNote: The splash mirrors issue 1.');
+    expect(result.content).not.toMatch(/^>/m);
+  });
+
   it('escapes CSV fields containing quotes, commas and newlines', () => {
     const rows = [makeRow({ text: 'He said "hi", twice\nand left', note: 'plain' })];
 

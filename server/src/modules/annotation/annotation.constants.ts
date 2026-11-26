@@ -6,8 +6,11 @@ export type AnnotationStyle = (typeof ANNOTATION_STYLES)[number];
 export const ANNOTATION_ORIGINS = ['web', 'koreader', 'kobo'] as const;
 export type AnnotationOrigin = (typeof ANNOTATION_ORIGINS)[number];
 
-export const ANNOTATION_POSITION_FORMATS = ['cfi', 'xpointer', 'pdf', 'kobo_span'] as const;
+// `page` is a web note on a whole page of an image-based file (a comic or DjVu). It has no device
+// counterpart and is never converted, so it is not one of the formats a position retry rebuilds.
+export const ANNOTATION_POSITION_FORMATS = ['cfi', 'xpointer', 'pdf', 'kobo_span', 'page'] as const;
 export type AnnotationPositionFormat = (typeof ANNOTATION_POSITION_FORMATS)[number];
+export const ANNOTATION_RETRYABLE_POSITION_FORMATS = ['cfi', 'xpointer', 'pdf', 'kobo_span'] as const satisfies readonly AnnotationPositionFormat[];
 
 export const ANNOTATION_POSITION_STATUSES = ['exact', 'repaired', 'failed', 'pending'] as const;
 export type AnnotationPositionStatus = (typeof ANNOTATION_POSITION_STATUSES)[number];

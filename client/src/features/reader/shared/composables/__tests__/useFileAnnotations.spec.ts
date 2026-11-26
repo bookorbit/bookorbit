@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AnnotationItem, AnnotationPdfPosition } from '@bookorbit/types'
-import { usePdfAnnotations } from '../composables/usePdfAnnotations'
+import { useFileAnnotations } from '../useFileAnnotations'
 
 interface ApiResponse {
   ok: boolean
@@ -47,7 +47,7 @@ function response(ok: boolean, payload: unknown = null): ApiResponse {
   return { ok, json: async () => payload }
 }
 
-describe('usePdfAnnotations', () => {
+describe('useFileAnnotations', () => {
   beforeEach(() => {
     apiMock.mockReset()
     fetchMock.mockReset()
@@ -66,7 +66,7 @@ describe('usePdfAnnotations', () => {
         stats: {},
       }),
     )
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
 
     await store.load()
 
@@ -82,7 +82,7 @@ describe('usePdfAnnotations', () => {
 
   it('records a load error without throwing', async () => {
     fetchMock.mockResolvedValueOnce(response(false))
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
 
     await store.load()
 
@@ -92,7 +92,7 @@ describe('usePdfAnnotations', () => {
   it('posts a pdf position and appends the created annotation', async () => {
     const created = makeAnnotation(42)
     apiMock.mockResolvedValueOnce(response(true, created))
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
 
     const result = await store.create({
       pdf: PDF_POSITION,
@@ -122,7 +122,7 @@ describe('usePdfAnnotations', () => {
   })
 
   it('patches an existing annotation in place', async () => {
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
     store.annotations.value = [makeAnnotation(1)]
     apiMock.mockResolvedValueOnce(
       response(true, {
@@ -143,7 +143,7 @@ describe('usePdfAnnotations', () => {
   })
 
   it('removes an annotation when the delete succeeds', async () => {
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
     store.annotations.value = [makeAnnotation(1), makeAnnotation(2)]
     apiMock.mockResolvedValueOnce(response(true))
 
@@ -155,7 +155,7 @@ describe('usePdfAnnotations', () => {
   })
 
   it('keeps the annotation when the delete fails', async () => {
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
     store.annotations.value = [makeAnnotation(1)]
     apiMock.mockResolvedValueOnce(response(false))
 
@@ -185,7 +185,7 @@ describe('usePdfAnnotations', () => {
           stats: {},
         }),
       )
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
 
     await store.load()
     expect(store.hasMore.value).toBe(true)
@@ -217,7 +217,7 @@ describe('usePdfAnnotations', () => {
       }),
     )
     apiMock.mockResolvedValueOnce(response(true, created))
-    const store = usePdfAnnotations(9, 33)
+    const store = useFileAnnotations(9, 33)
 
     const loading = store.load()
     await store.create({

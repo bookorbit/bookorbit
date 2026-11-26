@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, Logger, NotFoundException } from '@nes
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 
-import type { AnnotationListResponse } from '@bookorbit/types';
+import { PAGE_NOTE_FORMATS, type AnnotationListResponse } from '@bookorbit/types';
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_ANNOTATION_CREATED } from '../achievement/achievement-events.service';
@@ -83,6 +83,7 @@ export class AnnotationService {
           highlightedAt: dto.highlightedAt.toISOString(),
           createdAt: dto.createdAt instanceof Date ? dto.createdAt.toISOString() : String(dto.createdAt),
           pdf: dto.pdf,
+          page: dto.page,
           starredAt: dto.starredAt ? dto.starredAt.toISOString() : null,
         };
       }),
@@ -98,14 +99,18 @@ export class AnnotationService {
 
   async createAnnotation(bookId: number, user: RequestUser, dto: CreateAnnotationDto): Promise<AnnotationResponseDto> {
     await this.bookService.verifyBookAccess(bookId, user);
-    if (dto.pdf && dto.bookFileId == null) throw new BadRequestException('bookFileId is required for pdf annotations');
+    if ((dto.pdf || dto.page) && dto.bookFileId == null) throw new BadRequestException('bookFileId is required for pdf and page annotations');
     if (dto.bookFileId != null) {
       const file = await this.bookService.verifyFileAccess(dto.bookFileId, user);
       if (file.bookId !== bookId) throw new BadRequestException('The selected file does not belong to this book');
-      if (dto.pdf && file.format?.toLowerCase() !== 'pdf') throw new BadRequestException('PDF annotations require a PDF book file');
+      const fileFormat = file.format?.toLowerCase() ?? '';
+      if (dto.pdf && fileFormat !== 'pdf') throw new BadRequestException('PDF annotations require a PDF book file');
+      if (dto.page && !(PAGE_NOTE_FORMATS as readonly string[]).includes(fileFormat)) {
+        throw new BadRequestException('Page annotations require a comic or DjVu book file');
+      }
     }
     const startedAtMs = Date.now();
-    const format = dto.pdf ? 'pdf' : 'cfi';
+    const format = dto.pdf ? 'pdf' : dto.page ? 'page' : 'cfi';
     this.logger.log(`[annotation.create] [start] bookId=${bookId} userId=${user.id} format=${format} - create annotation started`);
     try {
       const base = {
@@ -122,7 +127,9 @@ export class AnnotationService {
             { ...base, bookFileId: dto.bookFileId! },
             { page: dto.pdf.page, pos0: JSON.stringify({ page: dto.pdf.page, rect: dto.pdf.rect, rects: dto.pdf.rects }) },
           )
-        : await this.annotationRepo.create({ ...base, cfi: dto.cfi!, bookFileId: dto.bookFileId ?? null });
+        : dto.page
+          ? await this.annotationRepo.createPage({ ...base, text: '', chapterTitle: null, bookFileId: dto.bookFileId! }, dto.page.page)
+          : await this.annotationRepo.create({ ...base, cfi: dto.cfi!, bookFileId: dto.bookFileId ?? null });
       this.achievementEvents.emit(ACHIEVEMENT_EVENT_ANNOTATION_CREATED, {
         userId: user.id,
         bookId,

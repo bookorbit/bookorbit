@@ -13,7 +13,13 @@ export interface ShortcutHandlers {
 
 const INTERACTIVE_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT'])
 
-export function useReaderKeyboardShortcuts(handlers: ShortcutHandlers) {
+export interface ShortcutOptions {
+  /** False leaves the keyboard to a reader that brings its own keys; the listener is never added. */
+  enabled?: boolean
+}
+
+export function useReaderKeyboardShortcuts(handlers: ShortcutHandlers, options: ShortcutOptions = {}) {
+  const enabled = options.enabled ?? true
   const showHelpModal = ref(false)
 
   function onKeyDown(e: KeyboardEvent) {
@@ -65,7 +71,7 @@ export function useReaderKeyboardShortcuts(handlers: ShortcutHandlers) {
   }
 
   onMounted(() => {
-    document.addEventListener('keydown', onKeyDown)
+    if (enabled) document.addEventListener('keydown', onKeyDown)
   })
 
   onUnmounted(() => {

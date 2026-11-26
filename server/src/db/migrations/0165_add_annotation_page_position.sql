@@ -1,0 +1,2 @@
+ALTER TABLE "annotation_positions" DROP CONSTRAINT "annotation_positions_format_chk";--> statement-breakpoint
+ALTER TABLE "annotation_positions" ADD CONSTRAINT "annotation_positions_format_chk" CHECK ("annotation_positions"."format" in ('cfi', 'xpointer', 'pdf', 'kobo_span', 'page'));

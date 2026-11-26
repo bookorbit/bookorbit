@@ -3,7 +3,7 @@ import { usePageList, type PageRef } from '@embedpdf/vue/runtime'
 import { useSelection, useSelectionEvent, type TextRange } from '@embedpdf/vue/selection'
 import { useStage } from '@embedpdf/vue/stage'
 import type { AnnotationItem, AnnotationRect } from '@bookorbit/types'
-import { usePdfAnnotations } from './usePdfAnnotations'
+import { useFileAnnotations } from '../../shared/composables/useFileAnnotations'
 import { boundingRect, findOverlappingAnnotation, toAnnotationRect, toPdfPosition } from '../lib/pdf-annotation-render'
 
 const DEFAULT_HIGHLIGHT_COLOR = '#FACC15'
@@ -25,12 +25,12 @@ function samePage(a: PageRef, b: PageRef) {
 }
 
 /**
- * Orchestrates PDF highlights: the database (via usePdfAnnotations) is the single source of
+ * Orchestrates PDF highlights: the database (via useFileAnnotations) is the single source of
  * truth, the page layer draws what it holds, and the selection feeds the popup. Nothing is
  * written into the PDF itself.
  */
 export function usePdfHighlights({ bookId, fileId }: UsePdfHighlightsOptions) {
-  const store = usePdfAnnotations(bookId, fileId)
+  const store = useFileAnnotations(bookId, fileId)
   const selection = useSelection()
   const stage = useStage()
   const pages = usePageList()

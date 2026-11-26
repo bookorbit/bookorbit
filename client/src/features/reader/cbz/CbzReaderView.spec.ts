@@ -4,7 +4,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import CbzReaderView from './CbzReaderView.vue'
 import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
+import ComicNoteDialog from './components/ComicNoteDialog.vue'
+import ComicNoteMarkers from './components/ComicNoteMarkers.vue'
+import ComicNotesPanel from './components/ComicNotesPanel.vue'
 import NextIssueCard from './components/NextIssueCard.vue'
+import ReaderBottomSheet from '../shared/components/ReaderBottomSheet.vue'
 
 const NEXT_BOOK = { bookId: 91, fileId: 501, format: 'cbz', title: 'Issue 10', seriesIndex: '10' }
 
@@ -26,12 +30,19 @@ const mocks = vi.hoisted(() => ({
   updateBookSettings: vi.fn<(patch: unknown) => void>(),
   resetBookSettings: vi.fn<() => void>(),
   sessionEndSnapshots: [] as Array<{ percentage: number; pageNumber?: number | null }>,
+  routeQuery: {} as Record<string, string>,
+  comicNotes: [] as Array<{ annotation: { id: number; color: string; note: string }; page: number }>,
+  loadComicNotes: vi.fn<() => Promise<boolean>>().mockResolvedValue(true),
+  addNote: vi.fn<(page: number, note: string, color: string) => Promise<unknown>>().mockResolvedValue({ id: 1 }),
+  editNote: vi.fn<(id: number, note: string, color: string) => Promise<unknown>>().mockResolvedValue({ id: 1 }),
+  removeNote: vi.fn<(id: number) => Promise<boolean>>().mockResolvedValue(true),
+  toastError: vi.fn<(message: string) => void>(),
 }))
 
 vi.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 
 vi.mock('vue-router', () => ({
-  useRoute: () => ({ params: { bookId: '11', fileId: '22' }, query: {} }),
+  useRoute: () => ({ params: { bookId: '11', fileId: '22' }, query: mocks.routeQuery }),
   useRouter: () => ({ back: vi.fn<() => void>(), push: mocks.routerPush, replace: vi.fn<() => Promise<void>>().mockResolvedValue(undefined) }),
   onBeforeRouteLeave: mocks.onBeforeRouteLeave,
 }))
@@ -70,12 +81,40 @@ vi.mock('./composables/useCbz', () => ({
       error: ref(null),
       seriesId: ref(mocks.seriesId),
       pageUrl: mocks.pageUrl,
+      thumbnailUrl: (page: number) => `/thumb/${page}`,
       load: async () => {
         pageCount.value = mocks.pageCount
       },
     }
   },
 }))
+
+vi.mock('vue-sonner', () => ({ toast: { error: mocks.toastError } }))
+
+vi.mock('./composables/useComicNotes', async () => {
+  const { computed, ref } = await import('vue')
+  return {
+    useComicNotes: () => {
+      const notes = ref(mocks.comicNotes)
+      return {
+        notes,
+        total: computed(() => notes.value.length),
+        loading: ref(false),
+        loadError: ref(false),
+        loadingMore: ref(false),
+        hasMore: ref(false),
+        markers: computed(() => notes.value.map((note) => ({ page: note.page, color: note.annotation.color }))),
+        lastColor: ref('#FACC15'),
+        load: mocks.loadComicNotes,
+        loadMore: vi.fn<() => Promise<boolean>>(),
+        notesOn: (pages: readonly number[]) => notes.value.filter((note) => pages.includes(note.page)),
+        addNote: mocks.addNote,
+        editNote: mocks.editNote,
+        removeNote: mocks.removeNote,
+      }
+    },
+  }
+})
 
 vi.mock('../shared/composables/useSeriesNextBook', () => ({
   useSeriesNextBook: () => ({ nextBook: computed(() => mocks.nextBook), load: mocks.loadNextBook }),
@@ -151,9 +190,36 @@ vi.mock('../shared/composables/useFullscreen', () => ({
   useFullscreen: () => ({ isFullscreen: ref(false), toggleFullscreen: vi.fn<() => void>() }),
 }))
 
+/** Answers media queries as a window of this width would, so the notes panel picks its layout. */
+function stubViewport(width: number) {
+  window.innerWidth = width
+  vi.stubGlobal('matchMedia', (query: string) => {
+    const min = /min-width:\s*([\d.]+)px/.exec(query)
+    const max = /max-width:\s*([\d.]+)px/.exec(query)
+    return {
+      matches: (!min || width >= Number(min[1])) && (!max || width <= Number(max[1])),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn<MediaQueryList['addEventListener']>(),
+      removeEventListener: vi.fn<MediaQueryList['removeEventListener']>(),
+      addListener: vi.fn<MediaQueryList['addListener']>(),
+      removeListener: vi.fn<MediaQueryList['removeListener']>(),
+      dispatchEvent: vi.fn<MediaQueryList['dispatchEvent']>(),
+    }
+  })
+}
+
+function mountWithControls(props: { bookId: number; fileId: number; source?: 'cbz' | 'djvu' } = { bookId: 11, fileId: 22 }) {
+  return shallowMount(CbzReaderView, { props, global: { renderStubDefaultSlot: true } })
+}
+
 describe('CbzReaderView', () => {
   beforeEach(() => {
+    vi.unstubAllGlobals()
     vi.clearAllMocks()
+    localStorage.clear()
+    mocks.routeQuery = {}
+    mocks.comicNotes = []
     mocks.savedMode = 'infinite'
     mocks.savedViewMode = 'single'
     mocks.savedSpreadGap = 0
@@ -478,5 +544,194 @@ describe('CbzReaderView', () => {
     expect(wrapper.findComponent(NextIssueCard).exists()).toBe(true)
 
     wrapper.unmount()
+  })
+  describe('page notes', () => {
+    it('opens the page a note link points at instead of the saved place, then loads the notes', async () => {
+      mocks.savedMode = 'paginated'
+      mocks.pageCount = 20
+      mocks.savedPageNumber = 3
+      mocks.routeQuery = { format: 'cbz', page: '12' }
+
+      const wrapper = shallowMount(CbzReaderView, { props: { bookId: 11, fileId: 22 } })
+      await flushPromises()
+
+      expect(wrapper.get('[data-testid="cbz-paginated-pages"] img').attributes('data-page')).toBe('11')
+      expect(mocks.loadComicNotes).toHaveBeenCalledOnce()
+      wrapper.unmount()
+    })
+
+    it('marks the Notes button and the slider when the page on screen has a note', async () => {
+      mocks.savedMode = 'paginated'
+      mocks.pageCount = 10
+      mocks.savedPageNumber = 3
+      mocks.comicNotes = [
+        { annotation: { id: 1, color: '#F472B6', note: 'Here' }, page: 2 },
+        { annotation: { id: 2, color: '#38BDF8', note: 'Later' }, page: 8 },
+      ]
+
+      const wrapper = mountWithControls()
+      await flushPromises()
+
+      const toggle = wrapper.get('[data-testid="comic-notes-toggle"]')
+      expect(toggle.attributes('aria-label')).toBe('reader.cbz.notes.buttonOnPage')
+      expect(toggle.attributes('aria-expanded')).toBe('false')
+      expect(toggle.get('span[aria-hidden="true"]').attributes('style')).toContain('background: rgb(244, 114, 182)')
+      expect(wrapper.findComponent(ComicNoteMarkers).props('markers')).toEqual([
+        { page: 2, color: '#F472B6' },
+        { page: 8, color: '#38BDF8' },
+      ])
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+      await nextTick()
+      expect(wrapper.get('[data-testid="comic-notes-toggle"]').attributes('aria-label')).toBe('reader.cbz.notes.button')
+      expect(wrapper.find('[data-testid="comic-notes-toggle"] span[aria-hidden="true"]').exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('docks the notes beside the page on a wide screen, narrowing a spread to one page until it closes', async () => {
+      stubViewport(1_200)
+      mocks.savedMode = 'paginated'
+      mocks.savedViewMode = 'two-page'
+      mocks.pageCount = 6
+      mocks.savedPageNumber = 2
+
+      const wrapper = mountWithControls()
+      await flushPromises()
+      expect(wrapper.findAll('[data-spread-side] img')).toHaveLength(2)
+
+      await wrapper.get('[data-testid="comic-notes-toggle"]').trigger('click')
+
+      expect(wrapper.get('[data-testid="comic-notes-aside"]').classes()).toContain('inset-y-0')
+      expect(wrapper.get('[data-testid="comic-notes-toggle"]').attributes('aria-expanded')).toBe('true')
+      expect(wrapper.findAll('[data-spread-side]')).toHaveLength(0)
+      expect(localStorage.getItem('reader:cbz:notesOpen')).toBe('true')
+
+      // Escape that a menu or dialog used to close itself must not close the panel too.
+      const menu = document.createElement('div')
+      menu.setAttribute('role', 'menu')
+      const item = menu.appendChild(document.createElement('button'))
+      document.body.append(menu)
+      item.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await nextTick()
+      expect(wrapper.find('[data-testid="comic-notes-aside"]').exists()).toBe(true)
+      menu.remove()
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }))
+      await nextTick()
+
+      expect(wrapper.find('[data-testid="comic-notes-aside"]').exists()).toBe(false)
+      expect(wrapper.findAll('[data-spread-side] img')).toHaveLength(2)
+      expect(localStorage.getItem('reader:cbz:notesOpen')).toBe('false')
+      wrapper.unmount()
+    })
+
+    it('reopens a docked panel on the next visit, but floats it over the page on a tablet', async () => {
+      localStorage.setItem('reader:cbz:notesOpen', 'true')
+      mocks.savedMode = 'paginated'
+      mocks.pageCount = 6
+      mocks.savedPageNumber = 2
+
+      stubViewport(1_300)
+      const docked = mountWithControls()
+      await flushPromises()
+      expect(docked.find('[data-testid="comic-notes-aside"]').exists()).toBe(true)
+      docked.unmount()
+
+      stubViewport(900)
+      const tablet = mountWithControls()
+      await flushPromises()
+      expect(tablet.find('[data-testid="comic-notes-aside"]').exists()).toBe(false)
+      await tablet.get('[data-testid="comic-notes-toggle"]').trigger('click')
+      const aside = tablet.get('[data-testid="comic-notes-aside"]')
+      expect(aside.classes()).toContain('shadow-2xl')
+      expect(tablet.findAll('[data-reader-controls]')[1]!.classes()).toContain('opacity-100')
+
+      await aside.trigger('keydown', { key: 'Escape' })
+      expect(tablet.find('[data-testid="comic-notes-aside"]').exists()).toBe(false)
+      tablet.unmount()
+    })
+
+    it('adds a note to the page on screen and keeps the dialog open when the save fails', async () => {
+      stubViewport(1_300)
+      mocks.savedMode = 'paginated'
+      mocks.pageCount = 10
+      mocks.savedPageNumber = 3
+
+      const wrapper = mountWithControls()
+      await flushPromises()
+      await wrapper.get('[data-testid="comic-notes-toggle"]').trigger('click')
+      wrapper.findComponent(ComicNotesPanel).vm.$emit('add')
+      await nextTick()
+
+      const dialog = wrapper.findComponent(ComicNoteDialog)
+      expect(dialog.props()).toMatchObject({ mode: 'add', pages: [2], initialPage: 2, initialColor: '#FACC15', bookTitle: 'Large comic' })
+
+      mocks.addNote.mockResolvedValueOnce(null)
+      dialog.vm.$emit('save', { page: 2, note: 'First try', color: '#4ADE80' })
+      await flushPromises()
+      expect(mocks.toastError).toHaveBeenCalledWith('reader.toast.noteSaveFailed')
+      expect(wrapper.findComponent(ComicNoteDialog).exists()).toBe(true)
+
+      wrapper.findComponent(ComicNoteDialog).vm.$emit('save', { page: 2, note: 'Second try', color: '#4ADE80' })
+      await flushPromises()
+      expect(mocks.addNote).toHaveBeenLastCalledWith(2, 'Second try', '#4ADE80')
+      expect(wrapper.findComponent(ComicNoteDialog).exists()).toBe(false)
+      wrapper.unmount()
+    })
+
+    it('edits and deletes a note from the list', async () => {
+      stubViewport(1_300)
+      mocks.savedMode = 'paginated'
+      mocks.pageCount = 10
+      mocks.savedPageNumber = 3
+      const note = { annotation: { id: 5, color: '#FF3300', note: 'From the device' }, page: 6 }
+      mocks.comicNotes = [note]
+      mocks.removeNote.mockResolvedValueOnce(false)
+
+      const wrapper = mountWithControls()
+      await flushPromises()
+      await wrapper.get('[data-testid="comic-notes-toggle"]').trigger('click')
+      const panel = wrapper.findComponent(ComicNotesPanel)
+
+      panel.vm.$emit('edit', note)
+      await nextTick()
+      expect(wrapper.findComponent(ComicNoteDialog).props()).toMatchObject({
+        mode: 'edit',
+        pages: [6],
+        initialPage: 6,
+        initialNote: 'From the device',
+        initialColor: '#FF3300',
+      })
+      wrapper.findComponent(ComicNoteDialog).vm.$emit('save', { page: 6, note: 'Rewritten', color: '#FF3300' })
+      await flushPromises()
+      expect(mocks.editNote).toHaveBeenCalledWith(5, 'Rewritten', '#FF3300')
+
+      panel.vm.$emit('delete', note)
+      await flushPromises()
+      expect(mocks.removeNote).toHaveBeenCalledWith(5)
+      expect(mocks.toastError).toHaveBeenCalledWith('reader.toast.noteDeleteFailed')
+      wrapper.unmount()
+    })
+
+    it('on a phone, opening a note turns to its page and puts the sheet away', async () => {
+      mocks.savedMode = 'paginated'
+      mocks.pageCount = 10
+      mocks.savedPageNumber = 1
+      const note = { annotation: { id: 3, color: '#38BDF8', note: 'Splash' }, page: 7 }
+      mocks.comicNotes = [note]
+
+      const wrapper = mountWithControls()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="comic-notes-aside"]').exists()).toBe(false)
+      await wrapper.get('[data-testid="comic-notes-toggle"]').trigger('click')
+      expect(wrapper.findComponent(ReaderBottomSheet).props('open')).toBe(true)
+
+      wrapper.findComponent(ComicNotesPanel).vm.$emit('open', note)
+      await nextTick()
+
+      expect(wrapper.get('[data-testid="cbz-paginated-pages"] img').attributes('data-page')).toBe('7')
+      expect(wrapper.findComponent(ReaderBottomSheet).props('open')).toBe(false)
+      wrapper.unmount()
+    })
   })
 })

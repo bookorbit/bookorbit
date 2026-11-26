@@ -3,7 +3,7 @@ import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsISO8601,
 
 import { ANNOTATION_BULK_ACTIONS, type AnnotationBulkAction } from '@bookorbit/types';
 
-import { ANNOTATION_POSITION_FORMATS, ANNOTATION_STYLES, type AnnotationPositionFormat } from '../annotation.constants';
+import { ANNOTATION_RETRYABLE_POSITION_FORMATS, ANNOTATION_STYLES, type AnnotationPositionFormat } from '../annotation.constants';
 
 export class AnnotationHubQueryDto {
   @IsOptional()
@@ -142,6 +142,6 @@ export class AnnotationBulkDto {
 }
 
 export class AnnotationPositionRetryDto {
-  @IsIn(ANNOTATION_POSITION_FORMATS)
+  @IsIn(ANNOTATION_RETRYABLE_POSITION_FORMATS)
   format!: AnnotationPositionFormat;
 }

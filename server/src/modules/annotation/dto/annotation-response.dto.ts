@@ -1,4 +1,4 @@
-import type { AnnotationPdfPosition } from '@bookorbit/types';
+import type { AnnotationPagePosition, AnnotationPdfPosition } from '@bookorbit/types';
 
 import type { AnnotationWithCfi } from '../annotation.repository';
 
@@ -19,6 +19,7 @@ export class AnnotationResponseDto {
   highlightedAt!: Date;
   createdAt!: Date;
   pdf!: AnnotationPdfPosition | null;
+  page!: AnnotationPagePosition | null;
   updatedAt!: Date | null;
   starredAt!: Date | null;
 
@@ -36,6 +37,7 @@ export class AnnotationResponseDto {
     dto.chapterTitle = row.chapterTitle ?? null;
     dto.origin = row.origin;
     dto.pdf = parsePdfPosition(row);
+    dto.page = parsePagePosition(row.pagePos0);
     dto.positionStatus = resolvePositionStatus(row, dto.pdf);
     const chapterIndex = (row.cfiExtras as { chapterIndex?: number } | null)?.chapterIndex;
     dto.chapterIndex = typeof chapterIndex === 'number' ? chapterIndex : null;
@@ -54,6 +56,11 @@ function resolvePositionStatus(row: AnnotationWithCfi, pdf: AnnotationPdfPositio
   if (row.pdfPos0 == null && row.pdfStatus == null) return null;
   const status = row.pdfStatus ?? 'exact';
   return pdf == null && status === 'exact' ? null : status;
+}
+
+export function parsePagePosition(pos0: string | null | undefined): AnnotationPagePosition | null {
+  if (pos0 == null || !/^[0-9]+$/.test(pos0)) return null;
+  return { page: Number(pos0) };
 }
 
 function parsePdfPosition(row: AnnotationWithCfi): AnnotationPdfPosition | null {

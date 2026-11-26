@@ -3,7 +3,8 @@ import { computed, nextTick, onBeforeUnmount, onMounted, onUnmounted, ref, watch
 import { useI18n } from 'vue-i18n'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { useVirtualizer } from '@tanstack/vue-virtual'
-import { useMediaQuery } from '@vueuse/core'
+import { breakpointsTailwind, useBreakpoints, useLocalStorage, useMediaQuery } from '@vueuse/core'
+import { toast } from 'vue-sonner'
 import {
   ArrowLeft,
   ChevronLeft,
@@ -18,6 +19,7 @@ import {
   Plus,
   Settings,
   FileText,
+  StickyNote,
 } from '@lucide/vue'
 import { useVisibility } from '../shared/composables/useVisibility'
 import { useReaderProgress } from '../shared/composables/useReaderProgress'
@@ -35,6 +37,11 @@ import ReaderSettingsSheet from '@/features/reader/shared/components/ReaderSetti
 import CbzSettingsPanel from './components/CbzSettingsPanel.vue'
 import NextIssueCard from './components/NextIssueCard.vue'
 import DjvuTextSheet from '../djvu/DjvuTextSheet.vue'
+import ReaderBottomSheet, { type ReaderSheetSnap } from '../shared/components/ReaderBottomSheet.vue'
+import ComicNotesPanel from './components/ComicNotesPanel.vue'
+import ComicNoteDialog, { type ComicNoteDraft } from './components/ComicNoteDialog.vue'
+import ComicNoteMarkers from './components/ComicNoteMarkers.vue'
+import { useComicNotes, type ComicNote } from './composables/useComicNotes'
 
 const TWO_PAGE_BREAKPOINT = 900
 // A page turn that only just landed on the last page must not carry through into the next book:
@@ -43,6 +50,8 @@ const AUTO_ADVANCE_ARM_DELAY_MS = 500
 const MIN_ZOOM_SCALE = 0.5
 const MAX_ZOOM_SCALE = 3
 const ZOOM_STEP = 0.25
+const NOTES_DOCK_WIDTH = 352
+const NOTES_OPEN_KEY = 'reader:cbz:notesOpen'
 
 const { t } = useI18n()
 
@@ -63,7 +72,7 @@ const { onActivity, elapsedMinutes } = useReadingSession(
   { trackingEnabled },
 )
 const progress = useReaderProgress(props.bookId, props.fileId, elapsedMinutes, 0, { trackingEnabled })
-const { pageCount, bookTitle, seriesId, loading, error, pageUrl, load } = useCbz(props.fileId, props.bookId, props.source ?? 'cbz')
+const { pageCount, bookTitle, seriesId, loading, error, pageUrl, thumbnailUrl, load } = useCbz(props.fileId, props.bookId, props.source ?? 'cbz')
 const {
   fitMode,
   viewMode,
@@ -133,6 +142,99 @@ const pageDimensions = ref<Array<{ width: number; height: number } | undefined>>
 const stripImagesReady = ref(false)
 const zoomScale = ref(1)
 
+// ── Page notes ─────────────────────────────────────────────────────────────────
+/**
+ * `sheet` is a phone bottom sheet, `overlay` floats over the page on tablets, `dock` sits beside the
+ * page on wide screens and narrows it.
+ */
+type NotesLayout = 'sheet' | 'overlay' | 'dock'
+
+interface NoteDialogState {
+  mode: 'add' | 'edit'
+  id: number | null
+  pages: number[]
+  page: number
+  note: string
+  color: string
+}
+
+const {
+  notes: comicNoteList,
+  total: comicNoteTotal,
+  loading: comicNotesLoading,
+  loadError: comicNotesLoadError,
+  loadingMore: comicNotesLoadingMore,
+  hasMore: comicNotesHasMore,
+  markers: comicNoteMarkers,
+  lastColor: lastNoteColor,
+  load: loadComicNotes,
+  loadMore: loadMoreComicNotes,
+  notesOn,
+  addNote,
+  editNote,
+  removeNote,
+} = useComicNotes(props.bookId, props.fileId)
+
+const breakpoints = useBreakpoints(breakpointsTailwind)
+const isTabletUp = breakpoints.greaterOrEqual('md')
+const isDesktopUp = breakpoints.greaterOrEqual('lg')
+const notesLayout = computed<NotesLayout>(() => {
+  if (!isTabletUp.value) return 'sheet'
+  return isDesktopUp.value ? 'dock' : 'overlay'
+})
+const storedNotesOpen = useLocalStorage(NOTES_OPEN_KEY, false)
+// A remembered open panel only comes back where it sits beside the page rather than over it.
+const notesOpen = ref(notesLayout.value === 'dock' && storedNotesOpen.value)
+const notesSheetSnap = ref<ReaderSheetSnap>('peek')
+const noteDialog = ref<NoteDialogState | null>(null)
+const savingNote = ref(false)
+
+const notesHoldControls = computed(() => noteDialog.value !== null || (notesOpen.value && notesLayout.value !== 'dock'))
+
+function setNotesOpen(open: boolean) {
+  notesOpen.value = open
+  if (notesLayout.value === 'dock') storedNotesOpen.value = open
+}
+
+function toggleNotes() {
+  setNotesOpen(!notesOpen.value)
+}
+
+function closeNotes() {
+  setNotesOpen(false)
+}
+
+const notesToggle = ref<HTMLButtonElement | null>(null)
+
+/** Closing from inside the panel hands focus back to the button that opened it. */
+function closeNotesFromPanel() {
+  setNotesOpen(false)
+  notesToggle.value?.focus()
+}
+
+// Escape from inside the panel also hands focus back to the Notes button, which closing from the
+// window handler cannot do once the focused row has gone.
+function onNotesPanelKeydown(event: KeyboardEvent) {
+  if (event.key !== 'Escape' || event.defaultPrevented) return
+  event.preventDefault()
+  event.stopPropagation()
+  closeNotesFromPanel()
+}
+
+function onNotesSheetSnapChange(snap: ReaderSheetSnap) {
+  notesSheetSnap.value = snap
+}
+
+// Narrowing the window must not strand an overlay over the page.
+watch(notesLayout, (next, previous) => {
+  if (next === previous) return
+  if (next === 'sheet') {
+    notesOpen.value = false
+    return
+  }
+  if (next === 'dock') notesOpen.value = storedNotesOpen.value
+})
+
 // Only keyboard focus holds the controls open; a clicked or tapped button keeps focus too, and
 // must not stop the bars from hiding.
 const controlsFocused = ref(false)
@@ -143,9 +245,10 @@ function onControlsBlur(event: FocusEvent) {
   const next = event.relatedTarget
   if (!(next instanceof HTMLElement && next.closest('[data-reader-controls]'))) controlsFocused.value = false
 }
-watch([showSettings, showPageText, controlsFocused], ([settings, text, focused]) => {
-  setVisibilityLock(settings || text || focused)
-  if (focused) footerVisible.value = true
+watch([showSettings, showPageText, controlsFocused, notesHoldControls], ([settings, text, focused, notes]) => {
+  setVisibilityLock(settings || text || focused || notes)
+  // The floating notes panel sits between the two bars, so it holds both on screen.
+  if (focused || notes) footerVisible.value = true
 })
 
 // The settings surface is one panel in two containers: an anchored popover where there
@@ -212,8 +315,15 @@ function resetBookViewSettings() {
 }
 
 // ── Layout engine ──────────────────────────────────────────────────────────────
+const notesAvailable = computed(() => !loading.value && error.value === null && pageCount.value > 0)
+const notesPanelOpen = computed(() => notesOpen.value && notesAvailable.value)
+const notesInset = computed(() => (notesPanelOpen.value && notesLayout.value === 'dock' ? NOTES_DOCK_WIDTH : 0))
+// The width the pages are laid out in: the window, less the docked notes panel.
+const layoutWidth = computed(() => Math.max(1, viewportWidth.value - notesInset.value))
+const dockInsetStyle = computed(() => (notesInset.value > 0 ? { insetInlineEnd: `${notesInset.value}px` } : undefined))
+
 const isTwoPagePreferred = computed(() => viewMode.value === 'two-page' && scrollMode.value === 'paginated')
-const isTwoPageEffective = computed(() => isTwoPagePreferred.value && (forceTwoPage.value || viewportWidth.value >= TWO_PAGE_BREAKPOINT))
+const isTwoPageEffective = computed(() => isTwoPagePreferred.value && (forceTwoPage.value || layoutWidth.value >= TWO_PAGE_BREAKPOINT))
 
 const spreadLayout = computed(() =>
   createCbzSpreadLayout({
@@ -300,7 +410,7 @@ const stripFrameClass = computed(() => {
 
 const stripGap = computed(() => (scrollMode.value === 'long-strip' ? 0 : 8))
 const stripPadding = computed(() => (scrollMode.value === 'long-strip' ? 0 : 16))
-const stripViewportWidth = computed(() => Math.max(1, viewportWidth.value - (scrollMode.value === 'long-strip' ? 0 : 16)))
+const stripViewportWidth = computed(() => Math.max(1, layoutWidth.value - (scrollMode.value === 'long-strip' ? 0 : 16)))
 
 const stripVirtualizer = useVirtualizer(
   computed(() => {
@@ -356,7 +466,7 @@ function stripFrameStyle(pageStart: number) {
   return {
     width: `${scaledWidth}px`,
     height: frameHeight === undefined ? undefined : `${frameHeight}px`,
-    insetInlineStart: `${Math.max(0, (viewportWidth.value - scaledWidth) / 2)}px`,
+    insetInlineStart: `${Math.max(0, (layoutWidth.value - scaledWidth) / 2)}px`,
     transform: `translateY(${pageStart}px)`,
   }
 }
@@ -382,6 +492,71 @@ const canGoNext = computed(() => {
   if (isTwoPageEffective.value) return spreadLayout.value.nextAnchor(currentPage.value) !== currentPage.value
   return currentPage.value < pageCount.value - 1
 })
+
+const visiblePages = computed<number[]>(() => {
+  if (pageCount.value <= 0) return []
+  const pages = scrollMode.value === 'paginated' ? (currentSpread.value?.pages ?? []) : [currentPage.value]
+  return [...pages].sort((a, b) => a - b)
+})
+const notesHere = computed(() => notesOn(visiblePages.value))
+const notesHereColor = computed(() => notesHere.value[0]?.annotation.color ?? null)
+const notesButtonLabel = computed(() => {
+  const count = notesHere.value.length
+  if (count === 0) return t('reader.cbz.notes.button')
+  return t(visiblePages.value.length > 1 ? 'reader.cbz.notes.buttonOnPages' : 'reader.cbz.notes.buttonOnPage', { count })
+})
+
+function openAddNote() {
+  const pages = visiblePages.value
+  const page = pages[pages.length - 1]
+  if (page === undefined) return
+  noteDialog.value = { mode: 'add', id: null, pages, page, note: '', color: lastNoteColor.value }
+}
+
+function openEditNote(note: ComicNote) {
+  noteDialog.value = {
+    mode: 'edit',
+    id: note.annotation.id,
+    pages: [note.page],
+    page: note.page,
+    note: note.annotation.note ?? '',
+    color: note.annotation.color,
+  }
+}
+
+function closeNoteDialog() {
+  if (!savingNote.value) noteDialog.value = null
+}
+
+async function saveNote(draft: ComicNoteDraft) {
+  const dialog = noteDialog.value
+  if (!dialog || savingNote.value) return
+  savingNote.value = true
+  try {
+    const saved = dialog.id === null ? await addNote(draft.page, draft.note, draft.color) : await editNote(dialog.id, draft.note, draft.color)
+    if (saved) noteDialog.value = null
+    else toast.error(t('reader.toast.noteSaveFailed'))
+  } finally {
+    savingNote.value = false
+  }
+}
+
+async function deleteNote(note: ComicNote) {
+  if (!(await removeNote(note.annotation.id))) toast.error(t('reader.toast.noteDeleteFailed'))
+}
+
+function openNote(note: ComicNote) {
+  goToPage(note.page)
+  if (notesLayout.value !== 'dock') setNotesOpen(false)
+}
+
+function retryComicNotes() {
+  void loadComicNotes()
+}
+
+function loadMoreNotes() {
+  void loadMoreComicNotes()
+}
 
 watch(renderKey, () => {
   imageError.value = false
@@ -529,7 +704,8 @@ function prevPage() {
 
 // ── Click zones (left / middle / right) ───────────────────────────────────────
 function handleImageClick(e: MouseEvent) {
-  const x = e.clientX / window.innerWidth
+  const bounds = e.currentTarget instanceof HTMLElement ? e.currentTarget.getBoundingClientRect() : null
+  const x = bounds && bounds.width > 0 ? (e.clientX - bounds.left) / bounds.width : e.clientX / window.innerWidth
   if (x < 0.25) {
     if (direction.value === 'rtl') nextPage()
     else prevPage()
@@ -630,7 +806,14 @@ function onKeyDown(e: KeyboardEvent) {
     if (e.key === 'Escape') showSettings.value = false
     return
   }
-  if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable=true], [role=dialog]')) return
+  if (noteDialog.value) return
+  // A dialog or menu has already closed itself on this key by the time it reaches the window.
+  if (target instanceof HTMLElement && target.closest('input, textarea, select, [contenteditable=true], [role=dialog], [role=menu]')) return
+  if (e.key === 'Escape' && notesPanelOpen.value && notesLayout.value !== 'sheet') {
+    e.preventDefault()
+    closeNotes()
+    return
+  }
   // A clicked button keeps focus, so arrows must still turn pages; only its own activation keys are left to it.
   if ((e.key === ' ' || e.key === 'Enter') && target instanceof HTMLElement && target.closest('button, a')) return
   const isRtl = direction.value === 'rtl'
@@ -804,6 +987,14 @@ async function startTrackedReading() {
 }
 
 // ── Mount / unmount ────────────────────────────────────────────────────────────
+/** A one-based `page` query, as a highlight or note link opens a page. */
+function parseDeepLinkPage(): number | null {
+  const value = Array.isArray(route.query.page) ? route.query.page[0] : route.query.page
+  if (typeof value !== 'string') return null
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) && parsed >= 1 ? parsed : null
+}
+
 async function initializeReader() {
   viewportWidth.value = window.innerWidth
   viewportHeight.value = window.innerHeight
@@ -819,8 +1010,11 @@ async function initializeReader() {
 
     await load()
     if (disposed || error.value || pageCount.value <= 0) return
+    const linkedPage = parseDeepLinkPage()
     const saved = progress.pageNumber.value
-    if (saved && saved > 1) {
+    if (linkedPage !== null) {
+      currentPage.value = Math.min(linkedPage - 1, pageCount.value - 1)
+    } else if (saved && saved > 1) {
       currentPage.value = Math.min(saved - 1, pageCount.value - 1)
     } else if (progress.percentage.value > 0 && pageCount.value > 1) {
       const estimated = Math.round((progress.percentage.value / 100) * pageCount.value)
@@ -832,6 +1026,7 @@ async function initializeReader() {
     }
 
     if (seriesFlowEnabled.value) void loadNextBook(seriesId.value, props.bookId)
+    void loadComicNotes()
 
     readerReady = true
     if (scrollMode.value !== 'paginated') {
@@ -882,6 +1077,7 @@ onUnmounted(() => {
       @focusout="onControlsBlur"
       class="absolute top-0 inset-x-0 z-50 transition-all duration-300"
       :class="headerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-full pointer-events-none'"
+      :style="dockInsetStyle"
     >
       <div class="h-12 flex items-center gap-1 px-3 bg-background/90 backdrop-blur-md border-b border-border">
         <button
@@ -933,6 +1129,30 @@ onUnmounted(() => {
             <TooltipContent>{{ t('reader.cbz.zoomIn') }}</TooltipContent>
           </Tooltip>
         </div>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <button
+              ref="notesToggle"
+              type="button"
+              class="viewer-btn relative focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2"
+              :class="notesPanelOpen ? '!bg-muted !text-primary' : ''"
+              :aria-label="notesButtonLabel"
+              :aria-expanded="notesPanelOpen"
+              :disabled="!notesAvailable"
+              data-testid="comic-notes-toggle"
+              @click="toggleNotes"
+            >
+              <StickyNote :size="15" />
+              <span
+                v-if="notesHereColor"
+                aria-hidden="true"
+                class="absolute end-1 top-1 size-2 rounded-full ring-2 ring-background"
+                :style="{ background: notesHereColor }"
+              />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>{{ notesButtonLabel }}</TooltipContent>
+        </Tooltip>
         <Tooltip>
           <TooltipTrigger as-child>
             <button
@@ -1027,6 +1247,7 @@ onUnmounted(() => {
       ref="paginatedViewport"
       data-testid="cbz-paginated-viewport"
       class="absolute inset-0 overflow-auto"
+      :style="dockInsetStyle"
       @click="handleImageClick"
       @touchstart.passive="onTouchStart"
       @touchend.passive="onTouchEnd"
@@ -1091,7 +1312,7 @@ onUnmounted(() => {
     </div>
 
     <!-- ── Infinite / long-strip view ─────────────────────────────────────── -->
-    <div v-else ref="scrollContainer" class="absolute inset-0 overflow-auto" @scroll.passive="onStripScroll" @wheel="onWheel">
+    <div v-else ref="scrollContainer" class="absolute inset-0 overflow-auto" :style="dockInsetStyle" @scroll.passive="onStripScroll" @wheel="onWheel">
       <div class="relative w-full" :style="{ height: `${virtualStripSize}px` }">
         <div
           v-for="page in renderedStripPages"
@@ -1122,7 +1343,11 @@ onUnmounted(() => {
     </div>
 
     <!-- ── End of book: next in series ─────────────────────────────────────── -->
-    <div v-if="showNextBookOverlay && nextBook" class="absolute inset-x-0 bottom-16 z-40 flex justify-center px-3 sm:bottom-20">
+    <div
+      v-if="showNextBookOverlay && nextBook"
+      class="absolute inset-x-0 bottom-16 z-40 flex justify-center px-3 sm:bottom-20"
+      :style="dockInsetStyle"
+    >
       <NextIssueCard :next-book="nextBook" :auto-advance="canAutoAdvance" @open="openNextBook" />
     </div>
 
@@ -1133,6 +1358,7 @@ onUnmounted(() => {
       @focusout="onControlsBlur"
       class="absolute bottom-0 inset-x-0 z-50 transition-all duration-300"
       :class="footerVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-full pointer-events-none'"
+      :style="dockInsetStyle"
     >
       <div class="h-12 sm:h-14 flex items-center gap-1.5 px-2 sm:gap-3 sm:px-4 bg-background/90 backdrop-blur-md border-t border-border">
         <div class="hidden sm:block">
@@ -1176,6 +1402,7 @@ onUnmounted(() => {
           <datalist id="cbz-ticks">
             <option v-for="t in sliderTicks" :key="t" :value="t" />
           </datalist>
+          <ComicNoteMarkers :markers="comicNoteMarkers" :page-count="pageCount" />
         </div>
 
         <button
@@ -1204,8 +1431,76 @@ onUnmounted(() => {
     </div>
 
     <!-- Hover zones to reveal header / footer -->
-    <div class="absolute top-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showHeader" />
-    <div class="absolute bottom-0 inset-x-0 h-16 z-40 pointer-events-auto" @mouseenter="showFooter" />
+    <div class="absolute top-0 inset-x-0 h-16 z-40 pointer-events-auto" :style="dockInsetStyle" @mouseenter="showHeader" />
+    <div class="absolute bottom-0 inset-x-0 h-16 z-40 pointer-events-auto" :style="dockInsetStyle" @mouseenter="showFooter" />
+
+    <!-- ── Page notes ───────────────────────────────────────────────────────── -->
+    <aside
+      v-if="notesPanelOpen && notesLayout !== 'sheet'"
+      :aria-label="t('reader.cbz.notes.title')"
+      class="absolute end-0 z-[45] flex w-[352px] max-w-full flex-col border-s border-border bg-card text-card-foreground"
+      :class="notesLayout === 'dock' ? 'inset-y-0' : 'top-12 bottom-12 shadow-2xl sm:bottom-14'"
+      data-testid="comic-notes-aside"
+      @keydown="onNotesPanelKeydown"
+    >
+      <ComicNotesPanel
+        :notes="comicNoteList"
+        :total="comicNoteTotal"
+        :current-pages="visiblePages"
+        :thumbnail-url="thumbnailUrl"
+        :show-close="true"
+        :loading="comicNotesLoading"
+        :load-error="comicNotesLoadError"
+        :loading-more="comicNotesLoadingMore"
+        :has-more="comicNotesHasMore"
+        @add="openAddNote"
+        @open="openNote"
+        @edit="openEditNote"
+        @delete="deleteNote"
+        @close="closeNotesFromPanel"
+        @retry="retryComicNotes"
+        @load-more="loadMoreNotes"
+      />
+    </aside>
+    <ReaderBottomSheet
+      v-if="notesLayout === 'sheet'"
+      :open="notesPanelOpen"
+      :label="t('reader.cbz.notes.title')"
+      :snap="notesSheetSnap"
+      @update:open="setNotesOpen"
+      @update:snap="onNotesSheetSnapChange"
+    >
+      <ComicNotesPanel
+        :notes="comicNoteList"
+        :total="comicNoteTotal"
+        :current-pages="visiblePages"
+        :thumbnail-url="thumbnailUrl"
+        :show-close="false"
+        :loading="comicNotesLoading"
+        :load-error="comicNotesLoadError"
+        :loading-more="comicNotesLoadingMore"
+        :has-more="comicNotesHasMore"
+        @add="openAddNote"
+        @open="openNote"
+        @edit="openEditNote"
+        @delete="deleteNote"
+        @retry="retryComicNotes"
+        @load-more="loadMoreNotes"
+      />
+    </ReaderBottomSheet>
+    <ComicNoteDialog
+      v-if="noteDialog"
+      :mode="noteDialog.mode"
+      :pages="noteDialog.pages"
+      :initial-page="noteDialog.page"
+      :initial-note="noteDialog.note"
+      :initial-color="noteDialog.color"
+      :book-title="bookTitle"
+      :thumbnail-url="thumbnailUrl"
+      :saving="savingNote"
+      @save="saveNote"
+      @cancel="closeNoteDialog"
+    />
 
     <!-- ── Loading / error overlays ─────────────────────────────────────────── -->
     <div v-if="loading" class="absolute inset-0 flex items-center justify-center z-50 bg-background">
@@ -1255,7 +1550,7 @@ onUnmounted(() => {
     />
 
     <!-- Progress bar -->
-    <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-30">
+    <div v-if="!loading && !error && pageCount > 0" class="absolute bottom-0 left-0 right-0 h-0.5 bg-border z-30" :style="dockInsetStyle">
       <div class="h-full bg-primary/60 transition-all duration-300" :style="{ width: `${progressPercent}%` }" />
     </div>
   </div>

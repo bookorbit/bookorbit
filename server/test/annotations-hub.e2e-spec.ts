@@ -3,7 +3,7 @@ import { and, eq } from 'drizzle-orm';
 
 import * as schema from '../src/db/schema';
 
-import { createEpubFixture, createPdfFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
+import { createCbzFixture, createEpubFixture, createPdfFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
   authHeader,
   closeReaderStateIsolationE2EContext,
@@ -145,6 +145,91 @@ describe('Annotations hub (e2e)', { timeout: 120_000 }, () => {
       payload: { pdf: geometry, bookFileId: epub.bookFileId, text: 'wrong format' },
     });
     expect(wrongFormat.statusCode).toBe(400);
+  });
+
+  it('keeps a note on a comic page and surfaces it with the fields a page deep link needs', async () => {
+    const marker = `pagemarker-${randomUUID()}`;
+    const comicPath = await createCbzFixture(library.folderPath, `hub-comic-${randomUUID()}.cbz`, { title: `Hub Comic ${randomUUID()}` });
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const comic = await locateBookByAbsolutePath(ctx, comicPath);
+
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${comic.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { page: { page: 2 }, bookFileId: comic.bookFileId, text: '', note: marker, color: '#F472B6' },
+    });
+    expect(created.statusCode).toBe(201);
+    const createdBody = created.json() as {
+      id: number;
+      cfi: string | null;
+      text: string;
+      pageno: number | null;
+      pdf: unknown;
+      page: { page: number } | null;
+    };
+    expect(createdBody).toMatchObject({ cfi: null, text: '', pageno: 3, pdf: null, page: { page: 2 } });
+
+    const [position] = await ctx.db
+      .select()
+      .from(schema.annotationPositions)
+      .where(and(eq(schema.annotationPositions.annotationId, createdBody.id), eq(schema.annotationPositions.format, 'page')));
+    expect(position).toMatchObject({ bookFileId: comic.bookFileId, pos0: '2', status: 'exact', extras: { pageno: 3 } });
+
+    const filePage = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${comic.bookId}/annotations?page=1&pageSize=100&bookFileId=${comic.bookFileId}&sortBy=position&sortDir=asc`,
+      headers: authHeader(owner.accessToken),
+    });
+    expect(filePage.statusCode).toBe(200);
+    const filePageBody = filePage.json() as {
+      items: { id: number; jumpFileId: number | null; page: { page: number } | null; positionStatus: string | null }[];
+    };
+    expect(filePageBody.items).toEqual([
+      expect.objectContaining({ id: createdBody.id, jumpFileId: comic.bookFileId, page: { page: 2 }, positionStatus: null }),
+    ]);
+
+    const hub = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/annotations?status=active&search=${marker}`,
+      headers: authHeader(owner.accessToken),
+    });
+    expect(hub.statusCode).toBe(200);
+    const hubBody = hub.json() as { items: Record<string, unknown>[]; total: number };
+    expect(hubBody.total).toBe(1);
+    // These are exactly the fields annotationReaderRoute() uses to build ?format=cbz&page=3.
+    expect(hubBody.items[0]).toMatchObject({ jumpFileId: comic.bookFileId, jumpFileFormat: 'cbz', cfi: null, pageno: 3, page: { page: 2 } });
+
+    const reviewNeeded = await ctx.app.inject({
+      method: 'GET',
+      url: `/api/v1/books/${comic.bookId}/annotations?page=1&pageSize=10&needsReview=true`,
+      headers: authHeader(owner.accessToken),
+    });
+    expect((reviewNeeded.json() as { total: number }).total).toBe(0);
+
+    const onEpub = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${epub.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { page: { page: 0 }, bookFileId: epub.bookFileId, text: '', note: 'not a comic' },
+    });
+    expect(onEpub.statusCode).toBe(400);
+
+    const blank = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${comic.bookId}/annotations`,
+      headers: authHeader(owner.accessToken),
+      payload: { page: { page: 0 }, bookFileId: comic.bookFileId, text: '', note: '  ' },
+    });
+    expect(blank.statusCode).toBe(400);
+
+    const byOutsider = await ctx.app.inject({
+      method: 'POST',
+      url: `/api/v1/books/${comic.bookId}/annotations`,
+      headers: authHeader(outsider.accessToken),
+      payload: { page: { page: 0 }, bookFileId: comic.bookFileId, text: '', note: 'no access' },
+    });
+    expect([403, 404]).toContain(byOutsider.statusCode);
   });
 
   it('is isolated per user', async () => {

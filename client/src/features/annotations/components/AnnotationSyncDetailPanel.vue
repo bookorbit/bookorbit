@@ -20,6 +20,7 @@ const FORMAT_LABELS = computed<Record<AnnotationPositionFormat, string>>(() => (
   xpointer: t('annotations.sync.format.koreader'),
   pdf: t('annotations.sync.format.pdf'),
   kobo_span: t('annotations.sync.format.kobo'),
+  page: t('annotations.sync.format.page'),
 }))
 
 const STATUS_LABELS = computed<Record<string, string>>(() => ({

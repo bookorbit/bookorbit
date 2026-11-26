@@ -69,6 +69,7 @@ async function makeService() {
     getDistinctChapters: vi.fn(),
     create: vi.fn(),
     createPdf: vi.fn(),
+    createPage: vi.fn(),
     update: vi.fn(),
     softDelete: vi.fn(),
   };
@@ -449,6 +450,65 @@ describe('AnnotationService', () => {
         }),
       ).rejects.toThrow('require a PDF');
       expect(annotationRepo.createPdf).not.toHaveBeenCalled();
+    });
+
+    describe('page notes', () => {
+      it.each(['cbz', 'CBR', 'cb7', 'djvu'])('creates a note on a page of a %s file with no text or chapter', async (format) => {
+        const { service, annotationRepo, bookService } = await makeService();
+        bookService.verifyFileAccess.mockResolvedValue({ id: 50, bookId: 5, format });
+        annotationRepo.createPage.mockResolvedValue(
+          makeAnnotationRow({ id: 81, cfi: null, cfiStatus: null, text: '', note: 'Gull Point, twice', jumpFileId: 50, pageno: 12, pagePos0: '11' }),
+        );
+
+        const result = await service.createAnnotation(5, makeUser(), {
+          page: { page: 11 },
+          bookFileId: 50,
+          text: 'ignored',
+          note: 'Gull Point, twice',
+          color: '#F472B6',
+          chapterTitle: 'ignored',
+        });
+
+        expect(annotationRepo.createPage).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: 1,
+            bookId: 5,
+            bookFileId: 50,
+            text: '',
+            chapterTitle: null,
+            note: 'Gull Point, twice',
+            color: '#F472B6',
+          }),
+          11,
+        );
+        expect(annotationRepo.create).not.toHaveBeenCalled();
+        expect(annotationRepo.createPdf).not.toHaveBeenCalled();
+        expect(result.page).toEqual({ page: 11 });
+        expect(result.pdf).toBeNull();
+        expect(result.pageno).toBe(12);
+        expect(result.positionStatus).toBeNull();
+      });
+
+      it('rejects a page note on a file whose pages are not images', async () => {
+        const { service, annotationRepo, bookService } = await makeService();
+        bookService.verifyFileAccess.mockResolvedValue({ id: 50, bookId: 5, format: 'pdf' });
+
+        await expect(service.createAnnotation(5, makeUser(), { page: { page: 0 }, bookFileId: 50, text: '', note: 'n' })).rejects.toThrow(
+          'require a comic or DjVu',
+        );
+        expect(annotationRepo.createPage).not.toHaveBeenCalled();
+      });
+
+      it('rejects a page note without a book file or with a file from another book', async () => {
+        const { service, annotationRepo, bookService } = await makeService();
+        await expect(service.createAnnotation(5, makeUser(), { page: { page: 0 }, text: '', note: 'n' })).rejects.toThrow(BadRequestException);
+
+        bookService.verifyFileAccess.mockResolvedValue({ id: 50, bookId: 6, format: 'cbz' });
+        await expect(service.createAnnotation(5, makeUser(), { page: { page: 0 }, bookFileId: 50, text: '', note: 'n' })).rejects.toThrow(
+          'does not belong',
+        );
+        expect(annotationRepo.createPage).not.toHaveBeenCalled();
+      });
     });
   });
 

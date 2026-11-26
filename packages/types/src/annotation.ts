@@ -82,6 +82,15 @@ export interface AnnotationPdfPosition {
   rects: AnnotationRect[];
 }
 
+/** File formats whose pages are images, so a note belongs to a whole page rather than to selected text. */
+export const PAGE_NOTE_FORMATS = ["cbz", "cbr", "cb7", "djvu"] as const;
+export type PageNoteFormat = (typeof PAGE_NOTE_FORMATS)[number];
+
+/** A note on a whole page of a comic or DjVu file. `page` is the zero-based page index. */
+export interface AnnotationPagePosition {
+  page: number;
+}
+
 export interface AnnotationItem {
   id: number;
   bookId: number;
@@ -101,6 +110,8 @@ export interface AnnotationItem {
   updatedAt?: string | null;
   /** Present for PDF highlights; null/absent for EPUB and device-synced formats. */
   pdf?: AnnotationPdfPosition | null;
+  /** Present for a note on a comic or DjVu page, which carries no text. Absent from servers older than page notes. */
+  page?: AnnotationPagePosition | null;
   /** When the reader starred it; null when not starred. Absent from servers older than stars. */
   starredAt?: string | null;
 }
@@ -257,7 +268,7 @@ export interface AnnotationColorNamePreferences {
 
 export const ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS: AnnotationColorNamePreferences = { names: {} };
 
-export type AnnotationPositionFormat = "cfi" | "xpointer" | "pdf" | "kobo_span";
+export type AnnotationPositionFormat = "cfi" | "xpointer" | "pdf" | "kobo_span" | "page";
 
 export interface AnnotationPositionInfo {
   format: AnnotationPositionFormat;

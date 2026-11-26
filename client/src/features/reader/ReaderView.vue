@@ -74,6 +74,8 @@ const isAudioFormat = getFormatGroup(fileFormat) === 'audio'
 const isPdfFormat = fileFormat === 'pdf'
 const isDjvuFormat = normalizedFileFormat === 'djvu'
 const isComicFormat = fileFormat === 'cbz' || fileFormat === 'cbr' || fileFormat === 'cb7' || isDjvuFormat
+// PDF, comic and audiobook files open in their own readers, which own their lifecycle and their keys.
+const isSpecializedReader = isAudioFormat || isPdfFormat || isComicFormat
 const pageImageSource = isDjvuFormat ? 'djvu' : 'cbz'
 const isPeekMode = computed(() => {
   const mode = route.query.mode
@@ -186,20 +188,23 @@ function closeAnyPanel() {
   }
 }
 
-const { showHelpModal } = useReaderKeyboardShortcuts({
-  toggleSidebar: () => {
-    showSidebar.value = !showSidebar.value
+const { showHelpModal } = useReaderKeyboardShortcuts(
+  {
+    toggleSidebar: () => {
+      showSidebar.value = !showSidebar.value
+    },
+    toggleSearch: () => {
+      showSearch.value = !showSearch.value
+    },
+    toggleBookmark: handleToggleBookmark,
+    toggleFullscreen,
+    cycleFooterMode,
+    closePanel: closeAnyPanel,
+    goToStart: () => navigateToFraction(0),
+    goToEnd: () => navigateToFraction(1),
   },
-  toggleSearch: () => {
-    showSearch.value = !showSearch.value
-  },
-  toggleBookmark: handleToggleBookmark,
-  toggleFullscreen,
-  cycleFooterMode,
-  closePanel: closeAnyPanel,
-  goToStart: () => navigateToFraction(0),
-  goToEnd: () => navigateToFraction(1),
-})
+  { enabled: !isSpecializedReader },
+)
 
 function toggleHelpModal() {
   showHelpModal.value = !showHelpModal.value
@@ -942,8 +947,7 @@ setAnnotationClickHandler(handleAnnotationClick)
 onUnmounted(clearFoliateSource)
 
 onMounted(async () => {
-  // Specialized readers own their own progress/settings/loading lifecycle.
-  if (isAudioFormat || isPdfFormat || isComicFormat) return
+  if (isSpecializedReader) return
 
   if (isTtsAvailable) void loadUserPreferences().catch(() => {})
 
