@@ -1118,6 +1118,38 @@ describe('HardcoverSyncService', () => {
       return mockRepo.linkReadingAttempt.mock.calls as Array<[number, number, number]>;
     }
 
+    it.each([null, '2024-01-01'])('sends the completed attempt dates with both shelf mutations (started %s)', async (startedOn) => {
+      const endedOn = '2024-01-05';
+      mockRepo.findBookSyncData.mockResolvedValue({
+        ...readingBook,
+        status: 'read',
+        startedAt: startedOn ? new Date(startedOn) : null,
+        finishedAt: new Date(endedOn),
+        progress: null,
+      });
+      mockRepo.findReadingAttempts.mockResolvedValue([attempt(2, { startedOn, endedOn, outcome: 'completed' })]);
+      arrange([
+        { id: 78, started_at: null, finished_at: '2024-02-01', progress_pages: null },
+        { id: 77, started_at: startedOn, finished_at: endedOn, progress_pages: null },
+      ]);
+      updateRead(77);
+
+      await expect(makeService().syncBook(1, 1)).resolves.toBe('synced');
+
+      const fields = { status_id: 3, privacy_setting_id: 3, edition_id: 20, user_date: endedOn, ...(startedOn && { user_start_date: startedOn }) };
+      expect(mockClient.query.mock.calls[0]?.[3]).toEqual({ object: { book_id: 10, ...fields } });
+      expect(mockClient.query.mock.calls[1]?.[3]).toEqual({ id: 55, object: fields });
+      expect(linkCalls()).toEqual([[1, 2, 77]]);
+      expect(mockClient.query).toHaveBeenNthCalledWith(
+        4,
+        1,
+        'tok',
+        expect.stringContaining('mutation UpdateUserBookRead'),
+        expect.objectContaining({ id: 77 }),
+      );
+      expect(mockClient.query).toHaveBeenCalledTimes(4);
+    });
+
     it("gives a reread its own read instead of stamping the finished attempt's id onto it", async () => {
       mockRepo.findBookSyncData.mockResolvedValue(rereadingBook);
       mockRepo.findBookState.mockResolvedValue({ hardcoverReadId: 555 });
