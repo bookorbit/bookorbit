@@ -5118,6 +5118,7 @@ describe('regex metadata scan integration', () => {
       [{ key: 'embedded', absolutePath: '/library/Author/Book/book.epub', format: 'epub' }],
       { seriesName: 'Book' },
       ['regex', 'embedded', 'opfFile'],
+      { units: false },
     );
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
   });
@@ -5154,7 +5155,9 @@ describe('regex metadata scan integration', () => {
     await service.startScan(1, 'manual', true);
     await done;
     expect(regexMetadata.evaluate).toHaveBeenCalledWith(regexConfig, file.relPath);
-    expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenCalledWith(1, expect.any(Array), { title: 'renamed' }, ['regex', 'embedded']);
+    expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenCalledWith(1, expect.any(Array), { title: 'renamed' }, ['regex', 'embedded'], {
+      units: false,
+    });
     expect(repo.failScanJob).not.toHaveBeenCalled();
   });
 
@@ -5203,11 +5206,14 @@ describe('regex metadata scan integration', () => {
     await service.startScan(1, 'manual');
     await done;
     expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenCalledTimes(2);
-    expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenNthCalledWith(2, 2, expect.any(Array), { title: 'Regex title' }, [
-      'regex',
-      'embedded',
-      'opfFile',
-    ]);
+    expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenNthCalledWith(
+      2,
+      2,
+      expect.any(Array),
+      { title: 'Regex title' },
+      ['regex', 'embedded', 'opfFile'],
+      { units: false },
+    );
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
     expect(repo.failScanJob).not.toHaveBeenCalled();
     expect(repo.completeScanJob).toHaveBeenCalled();
@@ -5290,11 +5296,13 @@ describe('regex metadata scan integration', () => {
     await service.startScan(1, 'manual');
     await done;
     expect(mockMetadata.extractAndSave).toHaveBeenCalledTimes(1);
-    expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenCalledWith(2, expect.any(Array), { seriesName: 'Book1' }, [
-      'regex',
-      'embedded',
-      'opfFile',
-    ]);
+    expect(mockMetadata.extractAndSaveWithRegex).toHaveBeenCalledWith(
+      2,
+      expect.any(Array),
+      { seriesName: 'Book1' },
+      ['regex', 'embedded', 'opfFile'],
+      { units: false },
+    );
   });
 
   it('skips regex for the rest of the scan as soon as the rules themselves fail', async () => {
@@ -5354,6 +5362,7 @@ describe('regex metadata outside a scan', () => {
       [{ key: 'embedded', absolutePath: '/library/Series/Book/book.epub', format: 'epub' }],
       { seriesName: 'Series' },
       ['regex', 'embedded'],
+      { units: false },
     );
     expect(mockMetadata.extractAndSave).not.toHaveBeenCalled();
   });
@@ -5390,6 +5399,7 @@ describe('regex metadata outside a scan', () => {
         [{ key: 'embedded', absolutePath: '/library/Series/Book/book.epub', format: 'epub' }],
         { seriesName: 'Series' },
         ['embedded', 'regex'],
+        { units: false },
       );
       expect(mockMetadata.extractAndSaveWithRegex).not.toHaveBeenCalled();
     });

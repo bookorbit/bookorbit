@@ -1,10 +1,14 @@
 import { basename } from 'path';
 
-import type { BookCard, BookMetadataLockField, CollapsedSeriesInfo, CustomMetadataBookValue, UserBookStatus } from '@bookorbit/types';
-import { BOOK_METADATA_LOCK_FIELDS, compareSeriesIndices, isContentBookFile, normalizeCoverAspectRatio } from '@bookorbit/types';
+import type { BookCard, BookMetadataLockField, CollapsedSeriesInfo, CustomMetadataBookValue, SeriesUnit, UserBookStatus } from '@bookorbit/types';
+import { BOOK_METADATA_LOCK_FIELDS, compareSeriesIndices, isContentBookFile, normalizeCoverAspectRatio, seriesUnitClass } from '@bookorbit/types';
 import { mediaOverlayCapabilityFromFields } from '../../reader/epub/epub-media-overlay-capability';
 
 const LOCK_FIELD_SET = new Set<string>(BOOK_METADATA_LOCK_FIELDS);
+
+function seriesUnitRankOf(unit: SeriesUnit | null | undefined): number {
+  return seriesUnitClass(unit) === 'chapter' ? 1 : 0;
+}
 
 function normalizeLockedFields(raw: string[] | null | undefined): BookMetadataLockField[] {
   if (!raw?.length) return [];
@@ -24,6 +28,7 @@ type BookRow = {
   seriesId?: number | null;
   seriesName: string | null;
   seriesIndex: string | null;
+  seriesUnit?: SeriesUnit | null;
   publishedDate: string | null;
   publishedYear: number | null;
   language: string | null;
@@ -68,6 +73,8 @@ type SeriesMembershipRow = {
   seriesId: number;
   seriesName: string;
   seriesIndex: string | null;
+  unit?: SeriesUnit | null;
+  volumeIndex?: string | null;
   displayOrder: number;
   expectedBookCount?: number | null;
 };
@@ -218,6 +225,7 @@ export function assembleBookCards(
       seriesId: row.seriesId ?? null,
       seriesName: row.seriesName ?? null,
       seriesIndex: row.seriesIndex ?? null,
+      seriesUnit: row.seriesUnit ?? null,
       seriesMemberships: (seriesMembershipsByBook.get(row.id) ?? [])
         .slice()
         .sort((a, b) => a.displayOrder - b.displayOrder || a.seriesId - b.seriesId)
@@ -225,6 +233,8 @@ export function assembleBookCards(
           seriesId: membership.seriesId,
           seriesName: membership.seriesName,
           seriesIndex: membership.seriesIndex,
+          unit: membership.unit ?? null,
+          volumeIndex: membership.volumeIndex ?? null,
           displayOrder: membership.displayOrder,
           expectedBookCount: membership.expectedBookCount ?? null,
         })),
@@ -329,6 +339,8 @@ export function collapseBookCards(cards: BookCard[]): BookCard[] {
 
   for (const [, { firstIndex, books: group }] of seriesGroups) {
     const sorted = [...group].sort((a, b) => {
+      const byClass = seriesUnitRankOf(a.seriesUnit) - seriesUnitRankOf(b.seriesUnit);
+      if (byClass !== 0) return byClass;
       if (a.seriesIndex !== null && b.seriesIndex !== null) return compareSeriesIndices(a.seriesIndex, b.seriesIndex);
       if (a.seriesIndex !== null) return -1;
       if (b.seriesIndex !== null) return 1;

@@ -6,18 +6,30 @@ import {
   resolveRegexMetadataConfig,
   SERIES_INDEX_MAX_LENGTH,
   SERIES_INDEX_PATTERN,
+  SERIES_UNIT_MARKERS,
 } from '@bookorbit/types';
 import { describe, expect, it } from 'vitest';
 
 import { evaluateRegexMetadata } from './regex-metadata-engine';
 import { prepareRegexMetadataPath } from './regex-metadata-path';
 
-const shared = { groups: REGEX_METADATA_GROUPS, seriesIndexPattern: SERIES_INDEX_PATTERN, seriesIndexMaxLength: SERIES_INDEX_MAX_LENGTH };
+const shared = {
+  groups: REGEX_METADATA_GROUPS,
+  seriesIndexPattern: SERIES_INDEX_PATTERN,
+  seriesIndexMaxLength: SERIES_INDEX_MAX_LENGTH,
+  seriesUnitMarkers: SERIES_UNIT_MARKERS,
+};
 
-function evaluate(relativePath: string) {
+function evaluateAll(relativePath: string) {
   const result = evaluateRegexMetadata({ config: FOLDER_SERIES_REGEX_METADATA, inputPath: prepareRegexMetadataPath(relativePath) }, shared);
   expect(result.diagnostics).toEqual([]);
   return result.matched ? result.metadata : null;
+}
+
+/** The series and number alone; units have their own table below. */
+function evaluate(relativePath: string) {
+  const metadata = evaluateAll(relativePath);
+  return metadata && Object.fromEntries(Object.entries(metadata).filter(([key]) => key !== 'seriesUnit' && key !== 'seriesVolumeIndex'));
 }
 
 // Layouts taken from Komga and Kavita documentation, Kavita's scanner fixtures and folder trees
@@ -155,6 +167,42 @@ describe('folder-as-series preset', () => {
       shared,
     );
     expect(result.metadata).toEqual({ seriesIndex: '1' });
+  });
+
+  it.each([
+    ['Saga/Saga #12.cbz', '12', 'issue', undefined],
+    ['Superman/Superman v1 024 (09-10 1943).cbz', '24', 'issue', '1'],
+    ['Batgirl/Batgirl Vol.2000 #57 (December, 2004).cbz', '57', 'issue', '2000'],
+    ['Supergirl/Volume 05 (2005)/Supergirl (2005) Volume 05 Issue 001.cbz', '1', 'issue', '5'],
+    ['Blake et Mortimer/Blake et Mortimer T01.cbz', '1', 'volume', undefined],
+    ['Les Tuniques Bleues/Les Tuniques Bleues - Tome 05 - Vol c2004.cbz', '5', 'volume', undefined],
+    ['Berserk/Berserk v01.cbz', '1', 'volume', undefined],
+    ['Kaiji/01. Part 1/Volume 1.cbz', '1', 'volume', undefined],
+    ['My Dress-Up Darling/My Dress-Up Darling ch 10.cbz', '10', 'chapter', undefined],
+    ['One Piece/One Piece c1001.cbz', '1001', 'chapter', undefined],
+    ['Berserk/Berserk v03 c012.cbz', '12', 'chapter', '3'],
+    ['Spice and Wolf/Spice and Wolf Vol. 3/Spice and Wolf Vol. 3 Ch. 0011.cbz', '11', 'chapter', '3'],
+    ['나 혼자만 레벨업/나 혼자만 레벨업 01화.cbz', '1', 'chapter', undefined],
+    ['원피스/원피스 3권.cbz', '3', 'volume', undefined],
+    ['ワンピース/ワンピース 第1話.cbz', '1', 'chapter', undefined],
+    ['ワンピース/ワンピース 第12巻.cbz', '12', 'volume', undefined],
+  ])('reads the unit from the marker before the number: %s', (path, index, unit, volumeIndex) => {
+    const metadata = evaluateAll(path);
+    expect(metadata).toMatchObject({ seriesIndex: index, seriesUnit: unit });
+    expect(metadata?.seriesVolumeIndex).toBe(volumeIndex);
+  });
+
+  it.each([
+    '100 Bullets/100 Bullets 050.cbz',
+    'Dragon Ball/01 - Dragon Ball - Bulma et Son Goku.cbz',
+    'Space Adventures/Space_Adventures_001.cbz',
+    'Harry Potter/Harry Potter Book 3.cbz',
+    'Series/Series - 01 (v2).cbz',
+  ])('leaves a bare number, or a book or part marker, unclassified: %s', (path) => {
+    const metadata = evaluateAll(path);
+    expect(metadata?.seriesIndex).toBeDefined();
+    expect(metadata).not.toHaveProperty('seriesUnit');
+    expect(metadata).not.toHaveProperty('seriesVolumeIndex');
   });
 
   it.each(['Watchmen.cbz', '_oneshots/A oneshot.cbz', 'Specials/Annual.cbz', '1986/Heavy Metal 04.cbz'])(

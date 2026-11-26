@@ -7,6 +7,7 @@ import {
   REGEX_METADATA_LIMITS,
   SERIES_INDEX_MAX_LENGTH,
   SERIES_INDEX_PATTERN,
+  SERIES_UNIT_MARKERS,
   type RegexMetadataConfig,
   type RegexMetadataDiagnosticCode,
   type RegexMetadataPreview,
@@ -41,6 +42,11 @@ export class RegexMetadataService implements OnModuleDestroy {
   private readonly slots = new Set<Slot>();
   private readonly queue: Task[] = [];
   private stopped = false;
+
+  /** Whether the pool has shut down; every evaluation now answers `worker_failed` without running. */
+  get stopping(): boolean {
+    return this.stopped;
+  }
 
   /** Rejects rules that cannot be saved; a pool failure is reported as unavailable, never as invalid rules. */
   async validate(config: RegexMetadataConfig | null | undefined): Promise<void> {
@@ -128,6 +134,7 @@ export class RegexMetadataService implements OnModuleDestroy {
       groups: REGEX_METADATA_GROUPS,
       seriesIndexPattern: SERIES_INDEX_PATTERN,
       seriesIndexMaxLength: SERIES_INDEX_MAX_LENGTH,
+      seriesUnitMarkers: SERIES_UNIT_MARKERS,
     };
     const worker = new Worker(workerPath, {
       workerData,

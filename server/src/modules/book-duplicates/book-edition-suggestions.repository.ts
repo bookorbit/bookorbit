@@ -13,6 +13,7 @@ export type EditionSuggestionRow = EditionFactsRow & {
   title: string | null;
   series_id: number | null;
   series_index: string | null;
+  series_unit: string | null;
   authors: string[];
   /** Authors and narrators in the spelling the candidate search compares, so it finds the same people. */
   person_keys: string[];
@@ -50,6 +51,7 @@ const ROW_COLUMNS = sql`
   COALESCE(extract(year FROM ${bookMetadata.publishedDate})::integer, ${bookMetadata.publishedYear}) AS published_year,
   ${bookMetadata.seriesId} AS series_id,
   ${bookMetadata.seriesIndex} AS series_index,
+  ${bookMetadata.seriesUnit} AS series_unit,
   ARRAY(
     SELECT DISTINCT lower(f.format)
     FROM book_files f

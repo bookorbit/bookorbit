@@ -1,4 +1,4 @@
-import type { RegexMetadataConfig, RegexMetadataDiagnostic, RegexMetadataFields, RegexMetadataPreview } from '@bookorbit/types';
+import type { RegexMetadataConfig, RegexMetadataDiagnostic, RegexMetadataFields, RegexMetadataPreview, SeriesUnit } from '@bookorbit/types';
 import { isPublishedDateKey, parsePublishedYear } from '../../../common/utils/published-date.utils';
 
 export interface RegexMetadataTask {
@@ -15,6 +15,8 @@ export interface RegexMetadataWorkerData {
   groups: readonly string[];
   seriesIndexPattern: RegExp;
   seriesIndexMaxLength: number;
+  /** `SERIES_UNIT_MARKERS`, keyed the way `seriesUnitMarkerKey` keys them. */
+  seriesUnitMarkers: ReadonlyMap<string, SeriesUnit>;
 }
 
 interface CompiledRules {
@@ -91,13 +93,14 @@ function normalizeGroups(
     if (value.length > limit) diagnostics.push({ code: 'invalid_value', ruleIndex, field: group });
     else metadata[field] = value;
   }
-  const seriesIndex = groups.seriesIndex?.trim();
+  const seriesIndex = readSeriesNumber(groups.seriesIndex, 'seriesIndex', ruleIndex, diagnostics, shared);
   if (seriesIndex) {
-    // The column only accepts plain decimals; a decimal comma is the one spelling worth repairing.
-    const candidate = seriesIndex.replace(/^(\d+),(\d+)$/, '$1.$2');
-    if (candidate.length > shared.seriesIndexMaxLength || !shared.seriesIndexPattern.test(candidate)) {
-      diagnostics.push({ code: 'invalid_value', ruleIndex, field: 'seriesIndex' });
-    } else metadata.seriesIndex = candidate;
+    metadata.seriesIndex = seriesIndex;
+    const volumeIndex = readSeriesNumber(groups.volumeIndex, 'volumeIndex', ruleIndex, diagnostics, shared);
+    // A number after a volume number with no marker of its own is that volume's issue ("v1 024").
+    const unit = classifyMarker(groups.unit, shared) ?? (volumeIndex ? 'issue' : undefined);
+    if (unit) metadata.seriesUnit = unit;
+    if (volumeIndex && (unit === 'chapter' || unit === 'issue')) metadata.seriesVolumeIndex = volumeIndex;
   }
   const author = groups.author?.trim();
   const authors = author
@@ -125,4 +128,31 @@ function normalizeGroups(
     }
   }
   return metadata;
+}
+
+function readSeriesNumber(
+  raw: string | undefined,
+  field: 'seriesIndex' | 'volumeIndex',
+  ruleIndex: number,
+  diagnostics: RegexMetadataDiagnostic[],
+  shared: RegexMetadataWorkerData,
+): string | undefined {
+  const value = raw?.trim();
+  if (!value) return undefined;
+  // The column only accepts plain decimals; a decimal comma is the one spelling worth repairing.
+  const candidate = value.replace(/^(\d+),(\d+)$/, '$1.$2');
+  if (candidate.length <= shared.seriesIndexMaxLength && shared.seriesIndexPattern.test(candidate)) return candidate;
+  diagnostics.push({ code: 'invalid_value', ruleIndex, field });
+  return undefined;
+}
+
+// Mirrors seriesUnitMarkerKey: the worker cannot import values from @bookorbit/types.
+function classifyMarker(marker: string | undefined, shared: RegexMetadataWorkerData): SeriesUnit | undefined {
+  if (!marker) return undefined;
+  return shared.seriesUnitMarkers.get(
+    marker
+      .trim()
+      .toLowerCase()
+      .replace(/[.\s_-]+$/u, ''),
+  );
 }

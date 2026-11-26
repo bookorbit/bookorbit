@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MetadataProviderKey, type BookDetail } from '@bookorbit/types'
-import { useMetadataEditor } from '../useMetadataEditor'
+import { normalizeSeriesMemberships, useMetadataEditor } from '../useMetadataEditor'
 
 const apiMock = vi.hoisted(() => vi.fn<(input: RequestInfo | URL, init?: RequestInit) => Promise<unknown>>())
 
@@ -215,6 +215,91 @@ describe('useMetadataEditor', () => {
     expect(payload).toEqual({
       metadata: { publisher: 'Updated Publisher' },
       lockedFields: [],
+    })
+  })
+
+  describe('series unit', () => {
+    const memberships = [
+      {
+        seriesId: 7,
+        seriesName: 'Harbor of Lanterns',
+        seriesIndex: '87',
+        unit: 'chapter' as const,
+        volumeIndex: '9',
+        displayOrder: 0,
+        expectedBookCount: null,
+      },
+      { seriesId: 8, seriesName: 'Lantern Tales', seriesIndex: '2', unit: null, volumeIndex: null, displayOrder: 1, expectedBookCount: 4 },
+    ]
+
+    async function savedMemberships(edit: (form: ReturnType<typeof useMetadataEditor>['form']) => void) {
+      const book = makeBook({ seriesName: 'Harbor of Lanterns', seriesIndex: '87', seriesMemberships: memberships })
+      apiMock.mockResolvedValue({ ok: true, json: async () => book })
+      const editor = useMetadataEditor()
+      editor.load(book)
+      edit(editor.form)
+      await editor.save(book.id, [])
+      const [, req] = apiMock.mock.calls[0] as [string, RequestInit]
+      return (JSON.parse(String(req.body)) as { metadata: Record<string, unknown> }).metadata.seriesMemberships
+    }
+
+    it('loads each membership with its unit', () => {
+      const editor = useMetadataEditor()
+      editor.load(makeBook({ seriesName: 'Harbor of Lanterns', seriesIndex: '87', seriesMemberships: memberships }))
+
+      expect(editor.form.seriesMemberships.map((membership) => membership.unit)).toEqual(['chapter', null])
+    })
+
+    it('sends a changed unit with every membership, keeping the unchanged ones', async () => {
+      const sent = await savedMemberships((form) => {
+        form.seriesMemberships = form.seriesMemberships.map((membership, index) => (index === 1 ? { ...membership, unit: 'volume' } : membership))
+      })
+
+      expect(sent).toEqual([
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: 'volume' },
+      ])
+    })
+
+    it('sends null to clear a unit', async () => {
+      const sent = await savedMemberships((form) => {
+        form.seriesMemberships = form.seriesMemberships.map((membership, index) => (index === 0 ? { ...membership, unit: null } : membership))
+      })
+
+      expect(sent).toEqual([
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: null },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null },
+      ])
+    })
+
+    it('carries the unit when only the position changes', async () => {
+      const sent = await savedMemberships((form) => {
+        form.seriesMemberships = form.seriesMemberships.map((membership, index) => (index === 0 ? { ...membership, seriesIndex: '88' } : membership))
+      })
+
+      expect(sent).toEqual([
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '88', expectedBookCount: null, unit: 'chapter' },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null },
+      ])
+    })
+
+    it('sends no memberships when nothing about them changed', async () => {
+      const sent = await savedMemberships((form) => {
+        form.title = 'Embers'
+      })
+
+      expect(sent).toBeUndefined()
+    })
+  })
+
+  describe('normalizeSeriesMemberships', () => {
+    it('leaves out a unit nothing set, so bulk edit keeps each saved unit', () => {
+      expect(normalizeSeriesMemberships([{ seriesName: ' Dune ', seriesIndex: '1', expectedBookCount: null }])).toEqual([
+        { seriesName: 'Dune', seriesIndex: '1', expectedBookCount: null },
+      ])
+      expect(normalizeSeriesMemberships([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: null, unit: null }])).toEqual([
+        { seriesName: 'Dune', seriesIndex: '1', expectedBookCount: null, unit: null },
+      ])
     })
   })
 

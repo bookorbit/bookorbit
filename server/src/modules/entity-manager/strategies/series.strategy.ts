@@ -408,6 +408,8 @@ export class SeriesStrategy implements EntityStrategy {
       SET series_id = bsm.series_id,
           series_name = bs.name,
           series_index = bsm.series_index,
+          series_unit = bsm.series_unit,
+          series_volume_index = bsm.series_volume_index,
           updated_at = now()
       FROM book_series_memberships bsm
       JOIN book_series bs ON bs.id = bsm.series_id
@@ -421,6 +423,8 @@ export class SeriesStrategy implements EntityStrategy {
       SET series_id = NULL,
           series_name = NULL,
           series_index = NULL,
+          series_unit = NULL,
+          series_volume_index = NULL,
           updated_at = now()
       WHERE bm.book_id IN (${bookIdList})
         AND NOT EXISTS (

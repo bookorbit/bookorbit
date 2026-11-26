@@ -1,5 +1,5 @@
 import { api } from '@/lib/api'
-import type { SeriesBooksPage, SeriesPage } from '@bookorbit/types'
+import type { SeriesBooksPage, SeriesPage, SeriesUnitClass } from '@bookorbit/types'
 import type { CompletionStatus, SeriesBookSort, SeriesListSort, SortDirection } from '../types/series'
 
 type ListSeriesParams = {
@@ -21,6 +21,8 @@ type ListSeriesBooksParams = {
   libraryId?: number | null
   /** Folds linked editions into one card. Servers without editions support reject it. */
   collapseLinked?: boolean
+  /** Volumes (with unclassified books) or chapters (with issues); omitted lists every book. */
+  unit?: SeriesUnitClass | null
 }
 
 function toQuery(params: Record<string, unknown>): string {

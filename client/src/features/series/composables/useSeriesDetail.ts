@@ -1,7 +1,8 @@
-import { computed, ref, type Ref } from 'vue'
+import { computed, ref, watch, type Ref } from 'vue'
 
-import type { BookCard, SeriesDetail } from '@bookorbit/types'
+import type { BookCard, SeriesDetail, SeriesUnitClass } from '@bookorbit/types'
 import { fetchSeriesBooks } from '../api/series'
+import { seriesHasMixedUnits } from '../lib/series-unit-label'
 import type { SeriesBookSort, SortDirection } from '../types/series'
 
 const PAGE_SIZE = 50
@@ -21,9 +22,23 @@ export function useSeriesDetail(seriesId: Ref<number | null>) {
   const sort = ref<SeriesBookSort>('seriesIndex')
   const order = ref<SortDirection>('asc')
   const libraryId = ref<number | null>(null)
+  /** The kind tab: volumes or chapters, or null for every book. */
+  const unit = ref<SeriesUnitClass | null>(null)
 
   const page = ref(0)
   const hasMore = computed(() => items.value.length < total.value)
+  const unitCounts = computed(() => seriesInfo.value?.unitCounts ?? null)
+  const hasUnitTabs = computed(() => seriesHasMixedUnits(unitCounts.value))
+
+  watch(seriesId, () => {
+    unit.value = null
+  })
+
+  // The counts ignore the kind filter, so they still say when a library switch has left the series
+  // with one kind; a filter on a tab that no longer shows would hide books with no way back.
+  watch(seriesInfo, (info) => {
+    if (info && unit.value !== null && !seriesHasMixedUnits(info.unitCounts)) unit.value = null
+  })
 
   let requestToken = 0
 
@@ -68,6 +83,7 @@ export function useSeriesDetail(seriesId: Ref<number | null>) {
         order: order.value,
         libraryId: libraryId.value,
         collapseLinked: true,
+        unit: unit.value,
       })
 
       if (token !== requestToken) return
@@ -99,6 +115,9 @@ export function useSeriesDetail(seriesId: Ref<number | null>) {
     sort,
     order,
     libraryId,
+    unit,
+    unitCounts,
+    hasUnitTabs,
     load,
   }
 }

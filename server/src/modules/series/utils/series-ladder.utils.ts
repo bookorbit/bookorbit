@@ -1,8 +1,8 @@
-import type { SeriesIndex, SeriesVolumeSlot, SeriesVolumeStatus } from '@bookorbit/types';
-import { SERIES_VOLUME_SLOT_LIMIT } from '@bookorbit/types';
+import type { SeriesIndex, SeriesUnit, SeriesVolumeSlot, SeriesVolumeStatus } from '@bookorbit/types';
+import { SERIES_VOLUME_SLOT_LIMIT, seriesUnitClass } from '@bookorbit/types';
 
 import type { SeriesMemberRow, SeriesVolumeMember } from '../series.repository';
-import { computeSeriesGaps, resolveLadderRange } from './series-gaps.utils';
+import { computeSeriesClassGaps, computeSeriesGaps, resolveLadderRange } from './series-gaps.utils';
 
 export type SeriesVolumeCounts = {
   ownedVolumeCount: number;
@@ -14,7 +14,9 @@ export type SeriesLadder = {
   volumes: SeriesVolumeSlot[];
   truncated: boolean;
   gaps: number[];
-  next: { bookId: number; index: SeriesIndex | null; title: string | null } | null;
+  /** Chapter or issue numbers missing between the lowest and highest owned. */
+  chapterGaps: number[];
+  next: { bookId: number; index: SeriesIndex | null; title: string | null; unit: SeriesUnit | null } | null;
   /** Logical volumes across the whole series, not just the capped slots; null when the members could not all be read. */
   counts: SeriesVolumeCounts | null;
 };
@@ -76,15 +78,37 @@ function tallyVolumes(grouped: { byIndex: ReadonlyMap<number, SeriesVolumeMember
 }
 
 /**
+ * The members the ladder and its counts run on. Volumes and chapters are separate number lines, so
+ * a series with volumes draws those (chapters are counted apart); one with only chapters or issues
+ * draws them. A provider total counts volumes, so it never applies to a chapter line. A series with
+ * nothing classified keeps its own book count, exactly as before units existed.
+ */
+function ladderInput<T extends SeriesVolumeMember>(params: {
+  members: T[];
+  bookCount: number;
+  expectedBookCount: number | null;
+}): {
+  members: T[];
+  bookCount: number;
+  expectedBookCount: number | null;
+} {
+  const volumes = params.members.filter((member) => seriesUnitClass(member.unit) === 'volume');
+  if (volumes.length === params.members.length) return params;
+  if (volumes.length > 0) return { members: volumes, bookCount: volumes.length, expectedBookCount: params.expectedBookCount };
+  return { members: params.members, bookCount: params.members.length, expectedBookCount: null };
+}
+
+/**
  * Counts logical volumes rather than book records. Numbered copies share one volume and keep the
  * furthest reading state, while books without a usable whole-numbered position stay independent.
+ * Chapters are not volumes: a series that has volumes counts only those.
  */
 export function countSeriesVolumes(params: {
   members: SeriesVolumeMember[];
   bookCount: number;
   expectedBookCount: number | null;
 }): SeriesVolumeCounts {
-  return tallyVolumes(groupSeriesMembers(params));
+  return tallyVolumes(groupSeriesMembers(ladderInput(params)));
 }
 
 /**
@@ -104,16 +128,17 @@ export function buildVolumeLadder(params: {
   const { members, bookCount, expectedBookCount } = params;
 
   if (members.length === 0) {
-    return { volumes: [], truncated: params.truncated, gaps: [], next: null, counts: null };
+    return { volumes: [], truncated: params.truncated, gaps: [], chapterGaps: [], next: null, counts: null };
   }
 
   // A series we could not read in full can still be counted, but naming a volume missing needs
   // every sibling in hand, so a truncated one draws no ladder rather than a wrong one.
   if (params.truncated) {
-    return { volumes: [], truncated: true, gaps: [], next: firstOpenMember(members), counts: null };
+    return { volumes: [], truncated: true, gaps: [], chapterGaps: [], next: firstOpenMember(members), counts: null };
   }
 
-  const grouped = groupSeriesMembers({ members, bookCount, expectedBookCount });
+  const { chapterGaps } = computeSeriesClassGaps(members, expectedBookCount);
+  const grouped = groupSeriesMembers(ladderInput({ members, bookCount, expectedBookCount }));
   const { gaps, range, byIndex, unnumbered } = grouped;
 
   const volumes: SeriesVolumeSlot[] = [];
@@ -142,7 +167,7 @@ export function buildVolumeLadder(params: {
     volumes.push({ index: null, bookId: member.bookId, title: member.title, status: memberStatus(member.status) });
   }
 
-  return { volumes, truncated, gaps, next: nextFromSlots(volumes, members), counts: tallyVolumes(grouped) };
+  return { volumes, truncated, gaps, chapterGaps, next: nextFromSlots(volumes, members), counts: tallyVolumes(grouped) };
 }
 
 /**
@@ -151,10 +176,15 @@ export function buildVolumeLadder(params: {
  * 4.5 keeps its number even though the ladder itself only has whole-numbered rungs.
  */
 function nextFromSlots(volumes: SeriesVolumeSlot[], members: SeriesMemberRow[]): SeriesLadder['next'] {
-  const slot = volumes.find((s) => s.status === 'reading' && s.bookId !== null) ?? volumes.find((s) => s.status === 'unread' && s.bookId !== null);
+  const reading = volumes.find((s) => s.status === 'reading' && s.bookId !== null);
+  // A chapter in progress is off the volume ladder but still what the reader is on.
+  const readingChapter = reading ? undefined : members.find((m) => m.status === 'reading' && seriesUnitClass(m.unit) === 'chapter');
+  if (readingChapter)
+    return { bookId: readingChapter.bookId, index: readingChapter.seriesIndex, title: readingChapter.title, unit: readingChapter.unit };
+  const slot = reading ?? volumes.find((s) => s.status === 'unread' && s.bookId !== null);
   if (slot?.bookId != null) {
     const member = members.find((m) => m.bookId === slot.bookId);
-    return { bookId: slot.bookId, index: member?.seriesIndex ?? null, title: slot.title };
+    return { bookId: slot.bookId, index: member?.seriesIndex ?? null, title: slot.title, unit: member?.unit ?? null };
   }
   // Nothing open inside the drawn ladder; a capped one may still have something past its end.
   return firstOpenMember(members);
@@ -162,5 +192,5 @@ function nextFromSlots(volumes: SeriesVolumeSlot[], members: SeriesMemberRow[]):
 
 function firstOpenMember(members: SeriesMemberRow[]): SeriesLadder['next'] {
   const open = members.find((m) => m.status === 'reading') ?? members.find((m) => m.status !== 'read');
-  return open ? { bookId: open.bookId, index: open.seriesIndex, title: open.title } : null;
+  return open ? { bookId: open.bookId, index: open.seriesIndex, title: open.title, unit: open.unit } : null;
 }

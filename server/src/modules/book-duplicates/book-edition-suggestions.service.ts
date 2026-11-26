@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BookEditionSuggestion, BookEditionSuggestions, EditionSuggestionReason } from '@bookorbit/types';
+import { type BookEditionSuggestion, type BookEditionSuggestions, type EditionSuggestionReason, seriesUnitClass } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
@@ -23,12 +23,13 @@ function onlyOneMedium(facts: { ebook: boolean; audio: boolean }): boolean {
  * Judges one candidate the way a duplicate scan would. An ebook and an audiobook of one work are
  * another format. Two records of one medium are another edition only when a fact both carry
  * differs; a shared ISBN, or nothing that differs, is a duplicate copy, which is not offered. Two
- * positions in one series are different volumes whatever their titles say.
+ * positions in one series are different volumes whatever their titles say; so are volume 1 and chapter 1.
  */
 export function judgeEditionSuggestion(source: EditionSuggestionRow, candidate: EditionSuggestionRow): EditionSuggestionVerdict | null {
   const sourceIndex = canonicalSeriesIndex(source.series_index);
   const candidateIndex = canonicalSeriesIndex(candidate.series_index);
-  if (source.series_id !== null && source.series_id === candidate.series_id && sourceIndex && candidateIndex && sourceIndex !== candidateIndex) {
+  const differentPosition = sourceIndex !== candidateIndex || seriesUnitClass(source.series_unit) !== seriesUnitClass(candidate.series_unit);
+  if (source.series_id !== null && source.series_id === candidate.series_id && sourceIndex && candidateIndex && differentPosition) {
     return null;
   }
 

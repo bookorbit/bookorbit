@@ -117,8 +117,8 @@ export class SeriesIdentityService implements OnModuleInit {
 
   async backfillMissingSeriesMemberships(executor: Pick<Db, 'execute'> = this.db): Promise<void> {
     await executor.execute(sql`
-      INSERT INTO ${bookSeriesMemberships} (book_id, series_id, series_index, display_order)
-      SELECT ${bookMetadata.bookId}, ${bookMetadata.seriesId}, ${bookMetadata.seriesIndex}, 0
+      INSERT INTO ${bookSeriesMemberships} (book_id, series_id, series_index, series_unit, series_volume_index, display_order)
+      SELECT ${bookMetadata.bookId}, ${bookMetadata.seriesId}, ${bookMetadata.seriesIndex}, ${bookMetadata.seriesUnit}, ${bookMetadata.seriesVolumeIndex}, 0
       FROM ${bookMetadata}
       WHERE ${bookMetadata.seriesId} IS NOT NULL
         AND NOT EXISTS (

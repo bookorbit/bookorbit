@@ -1,3 +1,5 @@
+import { type SeriesUnit, type SeriesUnitClass, seriesUnitClass } from '@bookorbit/types';
+
 import { MAX_SERIES_TOTAL_BOOKS, normalizeSeriesTotalBooks } from '../../../common/utils/series-total-books.utils';
 
 /**
@@ -79,4 +81,31 @@ export function resolveLadderRange(indices: string[], bookCount: number, expecte
 
   const expectedMax = resolveTrustedExpectedMax(indices, bookCount, integerIndices, expectedBookCount);
   return expectedMax === undefined ? { from: min, to: max } : { from: 1, to: expectedMax };
+}
+
+export type SeriesClassGaps = {
+  /** The class the volume ladder runs on: volumes, or chapters in a series that has no volumes. */
+  ladderClass: SeriesUnitClass;
+  /** Missing numbers of the ladder class; only volumes use the expected total. */
+  gaps: number[];
+  /** Missing chapter or issue numbers between the lowest and highest owned. */
+  chapterGaps: number[];
+};
+
+/**
+ * Gaps per unit class. A volume and a chapter never share a number line, so v1-10 with c80-100
+ * misses nothing. Mirrors `seriesHasGapsSql`: a series has gaps when either list is non-empty.
+ */
+export function computeSeriesClassGaps(members: readonly SeriesGapMember[], expectedBookCount: number | null): SeriesClassGaps {
+  const volumes = members.filter((member) => seriesUnitClass(member.unit) === 'volume');
+  const chapters = members.filter((member) => seriesUnitClass(member.unit) === 'chapter');
+  const chapterGaps = computeSeriesGaps(numberedIndices(chapters), chapters.length, null);
+  if (volumes.length === 0) return { ladderClass: 'chapter', gaps: chapterGaps, chapterGaps };
+  return { ladderClass: 'volume', gaps: computeSeriesGaps(numberedIndices(volumes), volumes.length, expectedBookCount), chapterGaps };
+}
+
+export type SeriesGapMember = { seriesIndex: string | null; unit: SeriesUnit | null };
+
+function numberedIndices(members: readonly SeriesGapMember[]): string[] {
+  return members.map((member) => member.seriesIndex).filter((index): index is string => index !== null);
 }

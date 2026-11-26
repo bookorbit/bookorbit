@@ -1,3 +1,5 @@
+import type { SeriesUnit } from '@bookorbit/types';
+
 import type { ParsedCbzComicMetadata } from '../lib/cbz-metadata';
 
 export interface ParsedBookData {
@@ -12,6 +14,13 @@ export interface ParsedBookData {
   language?: string | null;
   seriesName?: string | null;
   seriesIndex?: string | null;
+  /**
+   * Set only by path rules on a comic file, alongside the number they decided; null clears a stored
+   * unit. Undefined leaves the stored one alone, which is what every file extractor does.
+   */
+  seriesUnit?: SeriesUnit | null;
+  /** The volume a chapter or issue belongs to; written with `seriesUnit`. */
+  seriesVolumeIndex?: string | null;
   /** Series length declared by the file itself; annotates the series, never the book row. */
   seriesTotalBooks?: number | null;
   authors: { name: string; sortName: string | null }[];

@@ -1,3 +1,5 @@
+import { seriesUnitClass } from '@bookorbit/types';
+
 import { canonicalSeriesIndex } from './book-duplicate-normalize';
 
 export type DuplicateGroupingPair = {
@@ -11,6 +13,8 @@ export type DuplicateGroupingSeriesPosition = {
   bookId: number;
   seriesId: number;
   seriesIndex: string | null;
+  /** Volume 1 and chapter 1 are different positions. Absent counts as a volume. */
+  seriesUnit?: string | null;
 };
 
 const REASON_STRENGTH: Record<string, number> = { file_hash: 4, isbn: 3, exact_metadata: 2, fuzzy_metadata: 1 };
@@ -33,8 +37,9 @@ export function groupDuplicatePairs(
   const seriesByRoot = new Map<number, Map<number, Set<string>>>();
 
   for (const position of positions) {
-    const index = canonicalSeriesIndex(position.seriesIndex);
-    if (index === null) continue;
+    const number = canonicalSeriesIndex(position.seriesIndex);
+    if (number === null) continue;
+    const index = `${seriesUnitClass(position.seriesUnit)}:${number}`;
     let series = seriesByRoot.get(position.bookId);
     if (!series) seriesByRoot.set(position.bookId, (series = new Map()));
     let indexes = series.get(position.seriesId);

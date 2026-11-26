@@ -9,6 +9,7 @@ import {
   type BookMetadataSaveResult,
   type CustomMetadataBookValue,
   type CustomMetadataBookValueInput,
+  type SeriesUnit,
 } from '@bookorbit/types'
 import { hasAudioFile, hasReadAlongFile } from '@/features/book/lib/file-capabilities'
 
@@ -17,6 +18,11 @@ export type EditableSeriesMembership = {
   seriesIndex: string | null
   /** Series-level: saving it changes the total for every book in the series and every user. */
   expectedBookCount: number | null
+  /**
+   * Volume, chapter or issue, null for none. Left undefined where nothing edits it, such as bulk
+   * edit, so the payload omits it and the server keeps each book's saved unit.
+   */
+  unit?: SeriesUnit | null
 }
 
 const ROOT_FIELDS = [
@@ -85,7 +91,12 @@ export function normalizeSeriesMemberships(values: readonly EditableSeriesMember
     const key = seriesName.toLowerCase()
     if (seen.has(key)) continue
     seen.add(key)
-    out.push({ seriesName, seriesIndex: value.seriesIndex ?? null, expectedBookCount: value.expectedBookCount ?? null })
+    out.push({
+      seriesName,
+      seriesIndex: value.seriesIndex ?? null,
+      expectedBookCount: value.expectedBookCount ?? null,
+      ...(value.unit !== undefined ? { unit: value.unit } : {}),
+    })
   }
   return out
 }
@@ -98,10 +109,11 @@ function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[]
         seriesName: membership.seriesName,
         seriesIndex: membership.seriesIndex,
         expectedBookCount: membership.expectedBookCount ?? null,
+        unit: membership.unit ?? null,
       })),
     )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null }] : []
+  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null, unit: null }] : []
 }
 
 function changedCustomMetadataPayload(

@@ -398,6 +398,29 @@ describe('SeriesService', () => {
       });
     });
 
+    it('counts the chapters read beside the volumes', async () => {
+      seriesRepo.findDetail.mockResolvedValue({
+        id: 42,
+        name: 'Mixed',
+        bookCount: 4,
+        readCount: 3,
+        authors: [],
+        indices: ['1', '2', '80', '81'],
+        expectedBookCount: null,
+        members: [
+          { seriesIndex: '1', unit: 'volume', status: 'read' },
+          { seriesIndex: '2', unit: 'volume', status: null },
+          { seriesIndex: '80', unit: 'chapter', status: 'read' },
+          { seriesIndex: '81', unit: 'issue', status: 'read' },
+        ],
+      });
+      seriesRepo.findBookIds.mockResolvedValue({ bookIds: [], total: 4 });
+
+      const result = await service.findBooks(reqUser(), 42, {});
+
+      expect(result.seriesInfo).toMatchObject({ ownedVolumeCount: 2, readVolumeCount: 1, chapterReadCount: 2 });
+    });
+
     it('preserves book order from repository', async () => {
       seriesRepo.findDetail.mockResolvedValue({ id: 42, name: 'Test', bookCount: 2, readCount: 0, authors: [], indices: ['1', '2'] });
       seriesRepo.findBookIds.mockResolvedValue({ bookIds: [20, 10], total: 2 });
@@ -714,7 +737,7 @@ describe('SeriesService', () => {
       seriesRepo.findNextReadableBook.mockResolvedValue(row);
 
       await expect(service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx' })).resolves.toEqual({
-        next: { bookId: 91, fileId: 501, format: 'cbr', title: 'Issue 10', seriesIndex: '10' },
+        next: { bookId: 91, fileId: 501, format: 'cbr', title: 'Issue 10', seriesIndex: '10', seriesUnit: null },
       });
     });
 

@@ -1,10 +1,22 @@
+import type { SeriesUnit } from "./series-unit";
+
 export const REGEX_METADATA_LIMITS = {
   rules: 20,
   patternLength: 2048,
   pathLength: 4096,
 } as const;
 
-export const REGEX_METADATA_GROUPS = ["title", "author", "authors", "series", "seriesIndex", "publishedYear", "publishedDate"] as const;
+export const REGEX_METADATA_GROUPS = [
+  "title",
+  "author",
+  "authors",
+  "series",
+  "seriesIndex",
+  "unit",
+  "volumeIndex",
+  "publishedYear",
+  "publishedDate",
+] as const;
 
 export interface RegexMetadataRule {
   pattern: string;
@@ -28,6 +40,10 @@ export interface RegexMetadataFields {
   authors?: string[];
   seriesName?: string;
   seriesIndex?: string;
+  /** From the `unit` group: the marker before the number (`v`, `Ch.`, `#`), classified. */
+  seriesUnit?: SeriesUnit;
+  /** From the `volumeIndex` group: the volume a chapter or issue belongs to (`v03 c012` gives 3). */
+  seriesVolumeIndex?: string;
   publishedYear?: number;
   publishedDate?: string;
 }
@@ -100,11 +116,15 @@ const RUN_YEAR_FILE_SERIES = String.raw`^(?:.*?/)??(?<runParent>[^/]+)/(?:vol(?:
 // Also skips markers inside brackets, where "(v2)" is a release version and "(c2004)" a copyright year.
 const BEFORE_MARKER = String.raw`(?<![\p{L}\p{N}(\[])`;
 const NUMBER = String.raw`0*(?<seriesIndex>\d+(?:[.,]\d+)?)(?![\p{L}\p{N}])`;
-const CHAPTER_OR_ISSUE = String.raw`[^/]*?(?:${BEFORE_MARKER}(?:c|ch|chap|chapter|chapitre|cap|capitulo|issue|no|nr|n°)\.?[\s_-]*(?!(?:19|20)\d{2}(?!\d))|#\s*|第\s*)${NUMBER}[^/]*$`;
-const VOLUME_THEN_ISSUE = String.raw`[^/]*?${BEFORE_MARKER}(?:v|vol|volume)\.?[\s_-]*\d+[\s_]+(?:#\s*)?${NUMBER}[^/]*$`;
-const VOLUME = String.raw`[^/]*?${BEFORE_MARKER}(?:t|tome|tomo|v|vol|volume|band|book|livre|libro)\.?[\s_-]*${NUMBER}[^/]*$`;
-const CJK_CHAPTER = String.raw`[^/]*?(?<!\p{N})0*(?<seriesIndex>\d+(?:\.\d+)?)\s*(?:話|话|화|회|章)[^/]*$`;
-const CJK_VOLUME = String.raw`[^/]*?(?<!\p{N})0*(?<seriesIndex>\d+(?:\.\d+)?)\s*(?:巻|卷|권|冊|册)[^/]*$`;
+// The marker before the number lands in `unit`; a volume number ahead of it ("v03 c012") in `volumeIndex`.
+const VOLUME_BEFORE_MARKER = String.raw`(?:${BEFORE_MARKER}(?:v|vol|volume|t|tome)\.?[\s_-]*0*(?<volumeIndex>\d+(?:\.\d+)?)[\s_-]+)?`;
+// "第3巻" is volume 3: that 第 is left to the CJK volume rule.
+const CHAPTER_OR_ISSUE = String.raw`[^/]*?${VOLUME_BEFORE_MARKER}(?<unit>${BEFORE_MARKER}(?:c|ch|chap|chapter|chapitre|cap|capitulo|issue|no|nr|n°)\.?[\s_-]*(?!(?:19|20)\d{2}(?!\d))|#\s*|第\s*(?!\d+(?:[.,]\d+)?\s*(?:巻|卷|권|冊|册)))${NUMBER}[^/]*$`;
+// No marker before the second number: a captured volume number makes it an issue.
+const VOLUME_THEN_ISSUE = String.raw`[^/]*?${BEFORE_MARKER}(?:v|vol|volume)\.?[\s_-]*0*(?<volumeIndex>\d+)[\s_]+(?<unit>#\s*)?${NUMBER}[^/]*$`;
+const VOLUME = String.raw`[^/]*?${BEFORE_MARKER}(?<unit>t|tome|tomo|v|vol|volume|band|book|livre|libro)\.?[\s_-]*${NUMBER}[^/]*$`;
+const CJK_CHAPTER = String.raw`[^/]*?(?<!\p{N})0*(?<seriesIndex>\d+(?:\.\d+)?)\s*(?<unit>話|话|화|회|章)[^/]*$`;
+const CJK_VOLUME = String.raw`[^/]*?(?<!\p{N})0*(?<seriesIndex>\d+(?:\.\d+)?)\s*(?<unit>巻|卷|권|冊|册)[^/]*$`;
 // Needs punctuation after the number, so "100 Bullets 050" is not read as number 100.
 const LEADING_NUMBER = String.raw`0*(?<seriesIndex>(?!(?:19|20)\d{2}(?!\d))\d{1,4}(?:\.\d+)?)(?:\s*[-\u2013_.)\]]\s*(?!\d)[^/]*)?$`;
 const TRAILING_NUMBER = String.raw`[^/]*?[\s_]0*(?<seriesIndex>(?!(?:19|20)\d{2}(?!\d))\d{1,4}(?:\.\d+)?)(?![\p{L}\p{N}])(?:\s*[\[(][^\]()/]*[\])])*(?:\s+-\s[^/]*)?\s*$`;

@@ -31,7 +31,7 @@ export const BOOK_MERGE_FIELD_SPECS: Record<BookMergeField, FieldSpec> = {
   originalPublishedYear: { columns: ['originalPublishedYear'], locks: ['originalPublishedYear'] },
   language: { columns: ['language'], locks: ['language'] },
   pageCount: { columns: ['pageCount'], locks: ['pageCount'] },
-  series: { columns: ['seriesId', 'seriesName', 'seriesIndex'], locks: ['seriesName', 'seriesIndex'] },
+  series: { columns: ['seriesId', 'seriesName', 'seriesIndex', 'seriesUnit', 'seriesVolumeIndex'], locks: ['seriesName', 'seriesIndex'] },
   isbn: { columns: ['isbn10', 'isbn13'], locks: ['isbn13', 'isbn10'] },
   narrators: { columns: [], locks: ['narrators'], followsAudio: true },
   googleBooksId: { columns: ['googleBooksId'], locks: ['googleBooksId'] },

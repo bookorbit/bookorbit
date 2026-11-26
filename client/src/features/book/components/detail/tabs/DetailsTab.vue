@@ -102,6 +102,7 @@ import BookCoverStack from '@/features/book/components/detail/details/BookCoverS
 import ReadAloudInviteChip from '@/features/read-aloud/components/ReadAloudInviteChip.vue'
 import ReadAloudSparkles from '@/features/read-aloud/components/ReadAloudSparkles.vue'
 import { useReadAloudInvite } from '@/features/read-aloud/composables/useReadAloudInvite'
+import { seriesNameWithPosition } from '@/features/series/lib/series-unit-label'
 
 type FileProgress = {
   percentage: number
@@ -1060,11 +1061,6 @@ const koboAnomaly = computed(() => {
   return null
 })
 
-function formatSeriesLabel(seriesName: string, seriesIndex: string | null): string {
-  if (seriesIndex == null) return seriesName
-  return `${seriesName} #${seriesIndex}`
-}
-
 const seriesLinks = computed<SeriesDisplayLink[]>(() => {
   const memberships = props.book.seriesMemberships ?? []
   if (memberships.length > 0) {
@@ -1075,7 +1071,7 @@ const seriesLinks = computed<SeriesDisplayLink[]>(() => {
       .map((membership) => ({
         key: `${membership.seriesId}-${membership.displayOrder}`,
         seriesId: membership.seriesId,
-        label: formatSeriesLabel(membership.seriesName, membership.seriesIndex),
+        label: seriesNameWithPosition(t, membership.seriesName, membership.seriesIndex, membership.unit),
       }))
   }
 
@@ -1084,7 +1080,7 @@ const seriesLinks = computed<SeriesDisplayLink[]>(() => {
     {
       key: `primary-${props.book.seriesId ?? 'unknown'}`,
       seriesId: props.book.seriesId ?? null,
-      label: formatSeriesLabel(props.book.seriesName, props.book.seriesIndex),
+      label: seriesNameWithPosition(t, props.book.seriesName, props.book.seriesIndex, null),
     },
   ]
 })

@@ -211,8 +211,8 @@ export class BookConsolidationRepository {
   async replaceSeries(tx: ConsolidationTx, targetBookId: number, sourceBookId: number): Promise<void> {
     await tx.delete(schema.bookSeriesMemberships).where(eq(schema.bookSeriesMemberships.bookId, targetBookId));
     await tx.execute(sql`
-      insert into book_series_memberships (book_id, series_id, series_index, display_order, created_at, updated_at)
-      select ${targetBookId}::int, series_id, series_index, display_order, created_at, now()
+      insert into book_series_memberships (book_id, series_id, series_index, series_unit, series_volume_index, display_order, created_at, updated_at)
+      select ${targetBookId}::int, series_id, series_index, series_unit, series_volume_index, display_order, created_at, now()
       from book_series_memberships where book_id = ${sourceBookId}
     `);
   }

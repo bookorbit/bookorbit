@@ -1,5 +1,5 @@
-import type { RegexMetadataFields } from '@bookorbit/types';
-import { decideRegexFields, mergeRegexMetadata } from './regex/merge-regex-metadata';
+import { type RegexMetadataFields, seriesUnitClass } from '@bookorbit/types';
+import { decideRegexFields, mergeRegexMetadata, type RegexDecisionOptions } from './regex/merge-regex-metadata';
 import { stat } from 'fs/promises';
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
@@ -164,12 +164,18 @@ export class MetadataService {
     }
   }
 
-  async extractAndSaveWithRegex(bookId: number, sources: MetadataSourceFile[], regex: RegexMetadataFields, precedence: string[]): Promise<void> {
+  async extractAndSaveWithRegex(
+    bookId: number,
+    sources: MetadataSourceFile[],
+    regex: RegexMetadataFields,
+    precedence: string[],
+    options: RegexDecisionOptions = { units: false },
+  ): Promise<void> {
     const startedAt = Date.now();
     this.logger.debug(`[metadata.extract_with_regex] [start] bookId=${bookId} sourceCount=${sources.length} - metadata extraction started`);
     try {
       const { base, selected } = await this.readFirstMetadataSource(bookId, sources);
-      const data = mergeRegexMetadata(base, regex, regexLeads(precedence, selected?.key));
+      const data = mergeRegexMetadata(base, regex, regexLeads(precedence, selected?.key), options);
       await this.persistMetadata(bookId, data, selected?.format ?? 'regex', true);
       if (selected) {
         if (base?.cover) await this.persistSourceCover(bookId, selected.format, base.cover);
@@ -197,12 +203,13 @@ export class MetadataService {
     sources: MetadataSourceFile[],
     regex: RegexMetadataFields,
     precedence: string[],
+    options: RegexDecisionOptions = { units: false },
   ): Promise<RegexRulesWriteResult> {
     const { base, selected, readFailed } = await this.readFirstMetadataSource(bookId, sources, { cover: false });
     // A file that exists but cannot be read right now is not a file without metadata: letting the
     // rules lead would replace what it says, and an unchanged file is never re-read to repair that.
     if (!base && readFailed) return 'unreadable';
-    const decided = decideRegexFields(base, regex, regexLeads(precedence, selected?.key));
+    const decided = decideRegexFields(base, regex, regexLeads(precedence, selected?.key), options);
     if (Object.keys(decided).length === 0) return 'unchanged';
 
     const [current] = await this.db
@@ -210,6 +217,8 @@ export class MetadataService {
         title: bookMetadata.title,
         seriesName: bookMetadata.seriesName,
         seriesIndex: bookMetadata.seriesIndex,
+        seriesUnit: bookMetadata.seriesUnit,
+        seriesVolumeIndex: bookMetadata.seriesVolumeIndex,
         publishedYear: bookMetadata.publishedYear,
         publishedDate: bookMetadata.publishedDate,
       })
@@ -223,6 +232,15 @@ export class MetadataService {
     const seriesName = normalizeMetadataText(decided.seriesName);
     if (seriesName && seriesName !== current.seriesName) update.seriesName = seriesName;
     if (decided.seriesIndex !== undefined && decided.seriesIndex !== current.seriesIndex) update.seriesIndex = decided.seriesIndex;
+    // The unit describes the rule's number, so it only lands on a book that keeps that number.
+    const numberAfter = decided.seriesIndex ?? current.seriesIndex;
+    const unitChanged =
+      decided.seriesUnit !== undefined &&
+      numberAfter !== null &&
+      Number(numberAfter) === Number(regex.seriesIndex) &&
+      (decided.seriesUnit !== current.seriesUnit || (decided.seriesVolumeIndex ?? null) !== current.seriesVolumeIndex);
+    // The unit shares the series lock; sending the number with it lets the lock filter decide both.
+    if (unitChanged) update.seriesIndex = numberAfter;
     if (Object.prototype.hasOwnProperty.call(decided, 'publishedYear')) {
       const publishedDate = normalizePublishedDate(decided.publishedDate) ?? null;
       const publishedYear = publishedDate ? publishedYearFromDateKey(publishedDate) : normalizePublishedYear(decided.publishedYear);
@@ -248,6 +266,10 @@ export class MetadataService {
     if (filtered.title !== undefined) scalarFields.title = filtered.title;
     if (filtered.seriesName !== undefined) scalarFields.seriesName = filtered.seriesName;
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
+    if (unitChanged && filtered.seriesIndex !== undefined) {
+      scalarFields.seriesUnit = decided.seriesUnit;
+      scalarFields.seriesVolumeIndex = decided.seriesVolumeIndex ?? null;
+    }
     if (filtered.publishedYear !== undefined) {
       scalarFields.publishedYear = filtered.publishedYear;
       scalarFields.publishedDate = filtered.publishedDate ?? null;
@@ -1092,6 +1114,13 @@ export class MetadataService {
     this.logger.debug(`[metadata.persist_audio] [end] bookId=${bookId} title="${sanitizeLogValue(data.title ?? '')}" - audio metadata persisted`);
   }
 
+  /** The unit class the book holds once this write lands: the one written, else the one stored. */
+  private async unitClassAfterWrite(bookId: number, data: ParsedBookData): Promise<'volume' | 'chapter'> {
+    if (data.seriesUnit !== undefined) return seriesUnitClass(data.seriesUnit);
+    const [row] = await this.db.select({ seriesUnit: bookMetadata.seriesUnit }).from(bookMetadata).where(eq(bookMetadata.bookId, bookId)).limit(1);
+    return seriesUnitClass(row?.seriesUnit);
+  }
+
   private async persistBookMetadata(bookId: number, data: ParsedBookData, format: string, preserveAbsentRelations = false): Promise<void> {
     const { dto: filtered } = await this.bookMetadataLockService.filterAutomatedBookUpdate(bookId, {
       title: data.title,
@@ -1152,6 +1181,11 @@ export class MetadataService {
     if (filtered.language !== undefined) scalarFields.language = filtered.language;
     if (filtered.seriesName !== undefined) scalarFields.seriesName = normalizeMetadataText(filtered.seriesName);
     if (filtered.seriesIndex !== undefined) scalarFields.seriesIndex = filtered.seriesIndex;
+    // Path rules set a unit only beside a number, so a number the lock kept out keeps the unit out too.
+    if (data.seriesUnit !== undefined && filtered.seriesIndex !== undefined) {
+      scalarFields.seriesUnit = data.seriesUnit;
+      scalarFields.seriesVolumeIndex = data.seriesVolumeIndex ?? null;
+    }
     if (filtered.rating !== undefined) scalarFields.rating = filtered.rating;
     if (filtered.pageCount !== undefined) scalarFields.pageCount = filtered.pageCount;
     if (filtered.googleBooksId !== undefined) scalarFields.googleBooksId = filtered.googleBooksId;
@@ -1197,7 +1231,10 @@ export class MetadataService {
 
     // ComicInfo Count describes the series the file names, so it is read from the parsed file
     // rather than the lock-filtered patch: a locked seriesName still leaves the count truthful.
-    await this.seriesExpectedCount?.record(data.seriesName, data.seriesTotalBooks);
+    // A chapter's or an issue's Count totals the run's chapters, not the volumes the series counts.
+    if (data.seriesTotalBooks == null || (await this.unitClassAfterWrite(bookId, data)) === 'volume') {
+      await this.seriesExpectedCount?.record(data.seriesName, data.seriesTotalBooks);
+    }
 
     this.logger.debug(
       `[metadata.persist_book] [end] bookId=${bookId} format=${format} title="${sanitizeLogValue(data.title ?? '')}" - book metadata persisted`,

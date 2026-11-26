@@ -16,6 +16,7 @@ import { formatNumber, formatPercent } from '@/i18n/formatters'
 import { useCommandPalette } from '../composables/useCommandPalette'
 import { useCommandPaletteResults, type PaletteItem, type PaletteTab } from '../composables/useCommandPaletteResults'
 import { highlightSegments } from '../lib/highlight'
+import { seriesNameWithPosition } from '@/features/series/lib/series-unit-label'
 
 const { t } = useI18n()
 const router = useRouter()
@@ -198,7 +199,7 @@ function bookSubtitle(item: PaletteItem) {
 
 function seriesLabel(item: PaletteItem) {
   if (item.kind !== 'book' || !item.book.seriesName) return ''
-  return item.book.seriesIndex ? `${item.book.seriesName} #${item.book.seriesIndex}` : item.book.seriesName
+  return item.book.seriesIndex ? seriesNameWithPosition(t, item.book.seriesName, item.book.seriesIndex, item.book.seriesUnit) : item.book.seriesName
 }
 
 /** A result that stands for several editions says so; its format chips show only the edition it opens. */

@@ -138,6 +138,16 @@ export const SERVER_FEATURES = [
   "series-gaps-filter",
   /** Book filters accept `storyArc` and `GET /metadata/story-arcs` suggests visible arc names. */
   "story-arc-filter",
+  /**
+   * Series books carry a unit (volume, chapter, issue or null). Series orders list volumes and
+   * unclassified books before chapters and issues; next-in-series stays within the unit class of the
+   * book being read. `GET /series/:id/books` accepts `unit=volume|chapter` (chapter includes issue);
+   * `seriesInfo` carries `unitCounts` and `chapterGaps`, and `possibleGaps` covers volumes only.
+   * Book cards carry `seriesUnit`, memberships carry `unit` and `volumeIndex`, series summaries carry
+   * `unitCounts`, `chapterReadCount`, `chapterGaps`, `chapterGapCount` and `nextUnit`, and
+   * `SeriesNextBook` carries `seriesUnit`. Metadata updates accept `unit` on each series membership.
+   */
+  "series-units",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

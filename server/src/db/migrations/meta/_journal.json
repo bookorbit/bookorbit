@@ -1163,6 +1163,13 @@
       "when": 1795715481422,
       "tag": "0165_add_annotation_page_position",
       "breakpoints": true
+    },
+    {
+      "idx": 166,
+      "version": "7",
+      "when": 1795728272528,
+      "tag": "0166_add_series_units",
+      "breakpoints": true
     }
   ]
 }

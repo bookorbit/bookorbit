@@ -70,6 +70,7 @@ export * from "./app-info";
 export * from "./release-notes";
 export * from "./series";
 export * from "./series-index";
+export * from "./series-unit";
 export * from "./table-layout";
 export * from "./series-collapse";
 export * from "./taxonomy";

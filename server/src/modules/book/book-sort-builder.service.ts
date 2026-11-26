@@ -173,7 +173,7 @@ export class BookSortBuilder {
         result.push(sql`${bookMetadata.publishedYear} ${sql.raw(D)} NULLS LAST`);
         break;
       case 'seriesIndex':
-        result.push(...seriesIndexOrderBy(bookMetadata.seriesIndex, D));
+        result.push(...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, D));
         if (!allSorts.some((s) => s.field === 'series')) {
           result.push(sql`${bookMetadata.seriesName} ${sql.raw(D)} NULLS LAST`);
         }

@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { ref } from 'vue'
-import type { BookCard, SeriesBooksPage } from '@bookorbit/types'
+import { nextTick, ref } from 'vue'
+import type { BookCard, SeriesBooksPage, SeriesDetail } from '@bookorbit/types'
 
 vi.mock('../api/series', () => ({
   fetchSeriesBooks: vi.fn<typeof import('../api/series').fetchSeriesBooks>(),
@@ -258,6 +258,84 @@ describe('useSeriesDetail', () => {
       order: 'desc',
       libraryId: 3,
       collapseLinked: true,
+      unit: null,
+    })
+  })
+
+  describe('kind tabs', () => {
+    function page(seriesInfo: Partial<SeriesDetail> = {}): SeriesBooksPage {
+      return {
+        items: [],
+        total: 0,
+        page: 0,
+        size: 50,
+        seriesInfo: { id: 42, name: 'Harbor', bookCount: 30, readCount: 0, authors: [], possibleGaps: [], expectedBookCount: null, ...seriesInfo },
+      }
+    }
+
+    it('sends the chosen kind', async () => {
+      mockFetchSeriesBooks.mockResolvedValue(page({ unitCounts: { volume: 10, chapter: 20, issue: 0 } }))
+      const { unit, load } = useSeriesDetail(ref(42))
+
+      unit.value = 'chapter'
+      await load(true)
+
+      expect(mockFetchSeriesBooks).toHaveBeenLastCalledWith(42, expect.objectContaining({ page: 0, unit: 'chapter' }))
+    })
+
+    it('offers the tabs only while the series holds both kinds', async () => {
+      mockFetchSeriesBooks.mockResolvedValueOnce(page({ unitCounts: { volume: 10, chapter: 0, issue: 16 } }))
+      const { hasUnitTabs, unitCounts, load } = useSeriesDetail(ref(42))
+
+      await load(true)
+      expect(hasUnitTabs.value).toBe(true)
+      expect(unitCounts.value).toEqual({ volume: 10, chapter: 0, issue: 16 })
+
+      mockFetchSeriesBooks.mockResolvedValueOnce(page({ unitCounts: { volume: 10, chapter: 0, issue: 0 } }))
+      await load(true)
+      expect(hasUnitTabs.value).toBe(false)
+    })
+
+    it('hides the tabs for a server that sends no unit counts', async () => {
+      mockFetchSeriesBooks.mockResolvedValueOnce(page())
+      const { hasUnitTabs, load } = useSeriesDetail(ref(42))
+
+      await load(true)
+
+      expect(hasUnitTabs.value).toBe(false)
+    })
+
+    it('drops the filter once the series no longer holds both kinds', async () => {
+      mockFetchSeriesBooks.mockResolvedValueOnce(page({ unitCounts: { volume: 10, chapter: 0, issue: 0 } }))
+      const { unit, load } = useSeriesDetail(ref(42))
+
+      unit.value = 'chapter'
+      await load(true)
+      await nextTick()
+
+      expect(unit.value).toBeNull()
+    })
+
+    it('keeps the filter while both kinds remain', async () => {
+      mockFetchSeriesBooks.mockResolvedValueOnce(page({ unitCounts: { volume: 10, chapter: 20, issue: 0 } }))
+      const { unit, load } = useSeriesDetail(ref(42))
+
+      unit.value = 'volume'
+      await load(true)
+      await nextTick()
+
+      expect(unit.value).toBe('volume')
+    })
+
+    it('goes back to every book when the series changes', async () => {
+      const seriesId = ref(42)
+      const { unit } = useSeriesDetail(seriesId)
+
+      unit.value = 'chapter'
+      seriesId.value = 43
+      await nextTick()
+
+      expect(unit.value).toBeNull()
     })
   })
 

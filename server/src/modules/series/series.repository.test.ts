@@ -96,8 +96,30 @@ describe('SeriesRepository', () => {
 
     it('returns items with authors and coverBookIds when rows found', async () => {
       const seriesRows = [
-        { id: 10, name: 'Dune', bookCount: 6, readCount: 3, readingCount: 1, expectedBookCount: 6, lastAddedAt: '2024-01-01' },
-        { id: 11, name: 'Foundation', bookCount: 7, readCount: 0, readingCount: 0, expectedBookCount: null, lastAddedAt: '2023-06-15' },
+        {
+          id: 10,
+          name: 'Dune',
+          bookCount: 6,
+          readCount: 3,
+          readingCount: 1,
+          chapterCount: 2,
+          issueCount: 0,
+          chapterReadCount: 1,
+          expectedBookCount: 6,
+          lastAddedAt: '2024-01-01',
+        },
+        {
+          id: 11,
+          name: 'Foundation',
+          bookCount: 7,
+          readCount: 0,
+          readingCount: 0,
+          chapterCount: 0,
+          issueCount: 0,
+          chapterReadCount: 0,
+          expectedBookCount: null,
+          lastAddedAt: '2023-06-15',
+        },
       ];
       const { select } = makeFindPageDb([{ ...NO_FACETS, all: 2 }], seriesRows);
       db.select = select;
@@ -127,6 +149,9 @@ describe('SeriesRepository', () => {
         workCount: 5,
         readCount: 3,
         readingCount: 1,
+        chapterCount: 2,
+        issueCount: 0,
+        chapterReadCount: 1,
         expectedBookCount: 6,
         authors: ['Frank Herbert'],
         coverBookIds: [100, 101],
@@ -142,6 +167,9 @@ describe('SeriesRepository', () => {
         workCount: 7,
         readCount: 0,
         readingCount: 0,
+        chapterCount: 0,
+        issueCount: 0,
+        chapterReadCount: 0,
         expectedBookCount: null,
         authors: ['Isaac Asimov'],
         coverBookIds: [200],

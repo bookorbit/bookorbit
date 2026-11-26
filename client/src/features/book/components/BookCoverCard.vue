@@ -61,6 +61,7 @@ import BookCoverSurface from './BookCoverSurface.vue'
 import { fetchAuthors } from '@/features/author/api/author'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
+import { seriesNameWithPosition, seriesPositionToken } from '@/features/series/lib/series-unit-label'
 import ActivateLink from '@/components/ActivateLink.vue'
 import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 
@@ -178,7 +179,7 @@ const showSeriesPositionBadge = computed(
 const seriesPositionLabel = computed(() => {
   const index = props.book.seriesIndex
   if (index == null) return ''
-  return `#${index}`
+  return seriesPositionToken(t, index, props.book.seriesUnit)
 })
 /** Other editions this viewer can see stand behind the card; the pill says how many in all. */
 const editionCount = computed(() => cardEditionCount(props.book))
@@ -483,7 +484,7 @@ function resolveBookLabel(field: GridCardLabelField): string | null {
   if (field === 'series-title-position') {
     const name = props.book.seriesName?.trim()
     if (!name) return null
-    return props.book.seriesIndex != null ? `${name} #${props.book.seriesIndex}` : name
+    return seriesNameWithPosition(t, name, props.book.seriesIndex, props.book.seriesUnit)
   }
   if (field === 'author') return props.book.authors.length > 0 ? props.book.authors.join(', ') : null
   return null

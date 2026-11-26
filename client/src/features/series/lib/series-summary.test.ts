@@ -69,6 +69,39 @@ describe('seriesRowFacts', () => {
     expect(seriesRowFacts(summary({ ownedVolumeCount: 2, readVolumeCount: 2 })).isComplete).toBe(true)
     expect(seriesRowFacts(summary({ ownedVolumeCount: 0, readVolumeCount: 0, bookCount: 0 })).isComplete).toBe(false)
   })
+
+  it('adds chapters to the volumes they sit beside', () => {
+    const facts = seriesRowFacts(
+      summary({
+        ownedVolumeCount: 3,
+        readVolumeCount: 1,
+        unitCounts: { volume: 3, chapter: 3, issue: 0 },
+        chapterReadCount: 2,
+        gapCount: 1,
+        gaps: [4],
+      }),
+    )
+
+    expect(facts).toMatchObject({ ownedVolumes: 3, chapters: 3, ownedTotal: 6, readTotal: 3, volumeGapCount: 1 })
+  })
+
+  it('reads the ladder of a series with no volumes as its chapters, counted once', () => {
+    const facts = seriesRowFacts(
+      summary({
+        ownedVolumeCount: 3,
+        readVolumeCount: 1,
+        unitCounts: { volume: 0, chapter: 0, issue: 3 },
+        chapterReadCount: 1,
+        gaps: [3],
+        gapCount: 1,
+        chapterGaps: [3],
+        chapterGapCount: 1,
+      }),
+    )
+
+    expect(facts).toMatchObject({ ownedVolumes: 0, readVolumes: 0, chapters: 3, readChapters: 1, ownedTotal: 3, readTotal: 1, volumeGapCount: 0 })
+    expect(facts.hasGaps).toBe(true)
+  })
 })
 
 describe('seriesCoverSlots', () => {

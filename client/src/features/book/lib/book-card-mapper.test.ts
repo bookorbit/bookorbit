@@ -119,6 +119,19 @@ describe('mergeBookCardWithDetail', () => {
     expect(result.metadataScore).toBe(95)
   })
 
+  it('takes the series unit from the primary membership', () => {
+    const book = makeBook({ seriesUnit: 'volume' })
+    const memberships = [
+      { seriesId: 8, seriesName: 'Side Stories', seriesIndex: '2', unit: 'volume' as const, displayOrder: 1, expectedBookCount: null },
+      { seriesId: 7, seriesName: 'Harbor of Lanterns', seriesIndex: '87', unit: 'chapter' as const, displayOrder: 0, expectedBookCount: null },
+    ]
+
+    expect(mergeBookCardWithDetail(book, makeDetail({ seriesId: 7, seriesMemberships: memberships })).seriesUnit).toBe('chapter')
+    expect(mergeBookCardWithDetail(book, makeDetail({ seriesMemberships: memberships })).seriesUnit).toBe('chapter')
+    expect(mergeBookCardWithDetail(book, makeDetail({ seriesMemberships: [] })).seriesUnit).toBeNull()
+    expect(mergeBookCardWithDetail(book, makeDetail({ seriesMemberships: undefined })).seriesUnit).toBe('volume')
+  })
+
   it("takes the detail's cover frame, keeping the card's when the detail has none", () => {
     const book = makeBook({ coverAspectRatio: '2/3' })
 

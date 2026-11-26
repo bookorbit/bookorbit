@@ -233,6 +233,59 @@ describe('EditMetadataTab cover tiles', () => {
     expect(body.metadata).toMatchObject({ isbn10: '0306406152', isbn13: '9780306406157' })
   })
 
+  it('offers the series kind menu and keeps each kind through an auto-filled series', async () => {
+    vi.mocked(api).mockImplementation(async (url, init) => {
+      if (String(url).includes('/refresh-metadata?preview=true')) {
+        return json({
+          metadata: {
+            seriesName: 'Harbor of Lanterns',
+            seriesIndex: '88',
+            seriesMemberships: [
+              { seriesName: 'Harbor of Lanterns', seriesIndex: '88' },
+              { seriesName: 'Lantern Tales', seriesIndex: '1' },
+            ],
+          },
+          diagnostics: { candidateProviders: ['google'], enabledUnreferencedProviders: [] },
+        })
+      }
+      if (init?.method === 'PATCH') return json({ book: savedBook, write: null, libraryAutoWriteEnabled: false })
+      if (String(url).includes('/metadata-fetch/providers')) return json([])
+      return json({})
+    })
+    const wrapper = mountTab(
+      makeBook({
+        seriesName: 'Harbor of Lanterns',
+        seriesIndex: '87',
+        seriesMemberships: [
+          {
+            seriesId: 3,
+            seriesName: 'Harbor of Lanterns',
+            seriesIndex: '87',
+            unit: 'chapter',
+            volumeIndex: null,
+            displayOrder: 0,
+            expectedBookCount: null,
+          },
+        ],
+      }),
+    )
+    await flushPromises()
+
+    expect(wrapper.findComponent({ name: 'SeriesMembershipEditor' }).props('unitEditable')).toBe(true)
+
+    const autoFillButton = wrapper.findAll('button').find((button) => button.text().includes('book.detail.editMetadata.autoFill'))!
+    await autoFillButton.trigger('click')
+    await flushPromises()
+    await saveButton(wrapper).trigger('click')
+    await flushPromises()
+
+    const body = JSON.parse(patchCalls()[0]![1]!.body as string)
+    expect(body.metadata.seriesMemberships).toEqual([
+      { seriesName: 'Harbor of Lanterns', seriesIndex: '88', expectedBookCount: null, unit: 'chapter' },
+      { seriesName: 'Lantern Tales', seriesIndex: '1', expectedBookCount: null, unit: null },
+    ])
+  })
+
   it('fills both ISBN fields from a printed ISBN and saves them only after Save', async () => {
     vi.mocked(api).mockImplementation(async (url, init) => {
       if (init?.method === 'PATCH') return json({ book: savedBook, write: null, libraryAutoWriteEnabled: false })

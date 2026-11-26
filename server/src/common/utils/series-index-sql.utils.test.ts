@@ -4,6 +4,7 @@ import { compareSeriesIndexSql, seriesIndexOrderBy, seriesIndexSortKeySql } from
 
 const records = pgTable('records', {
   seriesIndex: varchar('series_index', { length: 20 }),
+  seriesUnit: varchar('series_unit', { length: 10 }),
 });
 
 describe('series index SQL', () => {
@@ -12,9 +13,10 @@ describe('series index SQL', () => {
   });
 
   it('keeps null labels last for descending hierarchical ordering', () => {
-    const [sortKey, literalTieBreak] = seriesIndexOrderBy(records.seriesIndex, 'DESC');
+    const [unitRank, sortKey, literalTieBreak] = seriesIndexOrderBy(records.seriesIndex, records.seriesUnit, 'DESC');
     const dialect = new PgDialect();
 
+    expect(dialect.sqlToQuery(unitRank).sql).toBe(`(CASE WHEN "records"."series_unit" IN ('chapter', 'issue') THEN 1 ELSE 0 END) DESC`);
     expect(dialect.sqlToQuery(sortKey).sql).toContain('CASE WHEN "records"."series_index" IS NULL THEN NULL ELSE ARRAY[');
     expect(dialect.sqlToQuery(sortKey).sql).toContain('DESC NULLS LAST');
     expect(dialect.sqlToQuery(literalTieBreak).sql).toContain('COLLATE "C" DESC NULLS LAST');

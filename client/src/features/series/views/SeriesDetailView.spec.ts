@@ -34,6 +34,7 @@ const mocks = vi.hoisted(() => ({
   sort: null as unknown as { value: 'seriesIndex' | 'title' | 'addedAt' },
   order: null as unknown as { value: 'asc' | 'desc' },
   libraryId: null as unknown as { value: number | null },
+  unit: null as unknown as { value: 'volume' | 'chapter' | null },
   fetchSeriesBooks: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   api: vi.fn<(...args: unknown[]) => Promise<unknown>>(),
   readOnlyLibraryIds: new Set<number>(),
@@ -101,21 +102,27 @@ vi.mock('@/lib/api', () => ({
   api: (...args: unknown[]) => mocks.api(...args),
 }))
 
-vi.mock('../composables/useSeriesDetail', () => ({
-  useSeriesDetail: () => ({
-    seriesInfo: mocks.seriesInfo,
-    items: mocks.items,
-    total: mocks.total,
-    loading: mocks.loading,
-    error: mocks.error,
-    notFound: mocks.notFound,
-    hasMore: mocks.hasMore,
-    sort: mocks.sort,
-    order: mocks.order,
-    libraryId: mocks.libraryId,
-    load: mocks.loadBooks,
-  }),
-}))
+vi.mock('../composables/useSeriesDetail', async () => {
+  const { seriesHasMixedUnits } = await import('../lib/series-unit-label')
+  return {
+    useSeriesDetail: () => ({
+      seriesInfo: mocks.seriesInfo,
+      items: mocks.items,
+      total: mocks.total,
+      loading: mocks.loading,
+      error: mocks.error,
+      notFound: mocks.notFound,
+      hasMore: mocks.hasMore,
+      sort: mocks.sort,
+      order: mocks.order,
+      libraryId: mocks.libraryId,
+      unit: mocks.unit,
+      unitCounts: computed(() => mocks.seriesInfo.value?.unitCounts ?? null),
+      hasUnitTabs: computed(() => seriesHasMixedUnits(mocks.seriesInfo.value?.unitCounts)),
+      load: mocks.loadBooks,
+    }),
+  }
+})
 
 function makeBook(overrides: Partial<BookCard> = {}): BookCard {
   return {
@@ -291,6 +298,7 @@ describe('SeriesDetailView', () => {
     mocks.sort = ref('seriesIndex')
     mocks.order = ref('asc')
     mocks.libraryId = ref<number | null>(null)
+    mocks.unit = ref<'volume' | 'chapter' | null>(null)
 
     mocks.readOnlyLibraryIds.clear()
     mocks.routerPush.mockReset()
@@ -367,6 +375,151 @@ describe('SeriesDetailView', () => {
     expect(ownership.attributes('aria-valuenow')).toBe('2')
     expect(ownership.attributes('aria-valuemax')).toBe('7')
     expect(wrapper.text()).toContain('2 of 7')
+  })
+
+  describe('series units', () => {
+    it('keeps the volume count and offers no kind tabs for a series of volumes alone', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 3, ownedVolumeCount: 3, unitCounts: { volume: 3, chapter: 0, issue: 0 } }))
+
+      const wrapper = mountView()
+      await nextTick()
+
+      expect(wrapper.get('[data-testid="series-unit-count"]').text()).toBe('3 volumes')
+      expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
+    })
+
+    it('offers no kind tabs to a server without unit counts', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 3, ownedVolumeCount: 3 }))
+
+      const wrapper = mountView()
+      await nextTick()
+
+      expect(wrapper.find('[role="tablist"]').exists()).toBe(false)
+    })
+
+    it('counts both kinds and offers All, Volumes and Chapters tabs', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 30, ownedVolumeCount: 10, unitCounts: { volume: 10, chapter: 20, issue: 0 } }))
+
+      const wrapper = mountView()
+      await nextTick()
+
+      expect(wrapper.get('[data-testid="series-unit-count"]').text()).toBe('10 volumes · 20 chapters')
+      const tabs = wrapper.findAll('[role="tab"]')
+      expect(tabs.map((tab) => tab.text().replace(/\s+/g, ' '))).toEqual(['All 30', 'Volumes 10', 'Chapters 20'])
+      expect(tabs[0]!.attributes('aria-selected')).toBe('true')
+    })
+
+    it('counts read chapters beside read volumes in the reading progress', async () => {
+      mocks.seriesInfo = ref(
+        makeSeriesInfo({
+          bookCount: 6,
+          ownedVolumeCount: 3,
+          readVolumeCount: 1,
+          unitCounts: { volume: 3, chapter: 3, issue: 0 },
+          chapterReadCount: 2,
+        }),
+      )
+
+      const wrapper = mountView()
+      await nextTick()
+
+      const completion = wrapper.getComponent(SeriesCompletionBar)
+      expect(completion.props('readCount')).toBe(3)
+      expect(completion.props('totalCount')).toBe(6)
+    })
+
+    it('reads an issue-only ladder once and leaves the volume total out', async () => {
+      mocks.seriesInfo = ref(
+        makeSeriesInfo({
+          bookCount: 3,
+          ownedVolumeCount: 3,
+          readVolumeCount: 1,
+          expectedBookCount: 7,
+          unitCounts: { volume: 0, chapter: 0, issue: 3 },
+          chapterReadCount: 1,
+        }),
+      )
+
+      const wrapper = mountView()
+      await nextTick()
+
+      const completion = wrapper.getComponent(SeriesCompletionBar)
+      expect(completion.props('readCount')).toBe(1)
+      expect(completion.props('totalCount')).toBe(3)
+      expect(wrapper.find('[role="progressbar"]').exists()).toBe(false)
+    })
+
+    it('calls the chapter tab Issues when the series holds more issues', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 18, ownedVolumeCount: 2, unitCounts: { volume: 2, chapter: 0, issue: 16 } }))
+
+      const wrapper = mountView()
+      await nextTick()
+
+      expect(wrapper.get('[data-testid="series-unit-count"]').text()).toBe('2 volumes · 16 issues')
+      expect(wrapper.get('[data-testid="series-unit-tab-chapter"]').text()).toContain('Issues')
+    })
+
+    it('reloads the first page for the chosen kind, and every book for All', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ bookCount: 30, unitCounts: { volume: 10, chapter: 20, issue: 0 } }))
+
+      const wrapper = mountView()
+      await flushPromises()
+      mocks.loadBooks.mockClear()
+
+      await wrapper.get('[data-testid="series-unit-tab-chapter"]').trigger('click')
+      await flushPromises()
+
+      expect(mocks.unit.value).toBe('chapter')
+      expect(mocks.loadBooks).toHaveBeenCalledWith({ reset: true, keepPreviousData: true })
+      expect(wrapper.get('[data-testid="series-unit-tab-chapter"]').attributes('aria-selected')).toBe('true')
+
+      mocks.loadBooks.mockClear()
+      await wrapper.get('[data-testid="series-unit-tab-all"]').trigger('click')
+      await flushPromises()
+
+      expect(mocks.unit.value).toBeNull()
+      expect(mocks.loadBooks).toHaveBeenCalledWith({ reset: true, keepPreviousData: true })
+    })
+
+    it('names the first volume with its token', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ unitCounts: { volume: 10, chapter: 20, issue: 0 } }))
+      mocks.fetchSeriesBooks.mockResolvedValueOnce({
+        items: [makeBook({ id: 7, title: 'Harbor of Lanterns', seriesIndex: '1', seriesUnit: 'volume' })],
+        total: 1,
+        page: 0,
+        size: 8,
+        seriesInfo: makeSeriesInfo(),
+      })
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Harbor of Lanterns Vol. 1')
+    })
+
+    it('drops the token when the first title already says it', async () => {
+      mocks.seriesInfo = ref(makeSeriesInfo({ unitCounts: { volume: 2, chapter: 0, issue: 16 } }))
+      mocks.fetchSeriesBooks.mockResolvedValueOnce({
+        items: [makeBook({ id: 8, title: 'Vol. 1: Long Shadow', seriesIndex: '1', seriesUnit: 'volume' })],
+        total: 1,
+        page: 0,
+        size: 8,
+        seriesInfo: makeSeriesInfo(),
+      })
+
+      const wrapper = mountView()
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Vol. 1: Long Shadow')
+      expect(wrapper.text()).not.toContain('Long Shadow Vol. 1')
+    })
+
+    it('keeps the bare number for an unclassified first book', async () => {
+      const wrapper = mountView()
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Series Book #1')
+    })
   })
 
   it('hides the ownership bar when no provider total is known', async () => {

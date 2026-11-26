@@ -109,8 +109,16 @@ const OPDS_SORT_MAP: Record<Exclude<OpdsSortOrder, LastReadSortOrder>, SQL[]> = 
     sql`${bookMetadata.title} ASC NULLS LAST`,
     sql`${books.id} ASC`,
   ],
-  series_asc: [sql`${bookMetadata.seriesName} ASC NULLS LAST`, ...seriesIndexOrderBy(bookMetadata.seriesIndex, 'ASC'), sql`${books.id} ASC`],
-  series_desc: [sql`${bookMetadata.seriesName} DESC NULLS LAST`, ...seriesIndexOrderBy(bookMetadata.seriesIndex, 'DESC'), sql`${books.id} ASC`],
+  series_asc: [
+    sql`${bookMetadata.seriesName} ASC NULLS LAST`,
+    ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, 'ASC'),
+    sql`${books.id} ASC`,
+  ],
+  series_desc: [
+    sql`${bookMetadata.seriesName} DESC NULLS LAST`,
+    ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, 'DESC'),
+    sql`${books.id} ASC`,
+  ],
 };
 
 const READ_STATUS_BUCKETS = {
@@ -979,7 +987,7 @@ export class OpdsBookService {
   ): Promise<Map<number, { authorNames: string[]; memberStates: CatalogReadBucket[]; previews: OpdsPreviewBookRow[] }>> {
     if (seriesIds.length === 0) return new Map();
     const memberOrder = [
-      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, 'ASC'),
+      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, 'ASC'),
       sql`${bookMetadata.title} ASC NULLS LAST`,
       sql`${books.id} ASC`,
     ];
@@ -1645,7 +1653,11 @@ export class OpdsBookService {
 
   private buildContextSeriesOrder(sortOrder: OpdsSortOrder): SQL[] {
     const direction = sortOrder === 'series_desc' ? 'DESC' : 'ASC';
-    return [...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, direction), sql`${bookMetadata.title} ASC NULLS LAST`, sql`${books.id} ASC`];
+    return [
+      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, direction),
+      sql`${bookMetadata.title} ASC NULLS LAST`,
+      sql`${books.id} ASC`,
+    ];
   }
 
   private fetchContextSeriesRows(bookIds: number[], filter: SeriesFilter): Promise<ContextSeriesRow[]> {

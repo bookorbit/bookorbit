@@ -492,7 +492,7 @@ function applyPrimarySeriesPatch(field: 'seriesName' | 'seriesIndex', value: unk
   }
 
   const next = [...form.seriesMemberships]
-  const primary = next[0] ?? { seriesName: form.seriesName ?? '', seriesIndex: form.seriesIndex ?? null, expectedBookCount: null }
+  const primary = next[0] ?? { seriesName: form.seriesName ?? '', seriesIndex: form.seriesIndex ?? null, expectedBookCount: null, unit: null }
   const patched =
     field === 'seriesName'
       ? { ...primary, seriesName: typeof value === 'string' ? value : value == null ? '' : String(value) }
@@ -515,9 +515,10 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
     return 0
   }
 
-  // Providers do not report series length in this patch, so carry the current value across
-  // rather than letting an applied suggestion silently clear a total someone entered.
+  // Providers report neither series length nor unit in this patch, so carry the current values
+  // across rather than letting an applied suggestion silently clear what someone entered.
   const totalsByName = new Map(form.seriesMemberships.map((m) => [m.seriesName.trim().toLowerCase(), m.expectedBookCount ?? null]))
+  const unitsByName = new Map(form.seriesMemberships.map((m) => [m.seriesName.trim().toLowerCase(), m.unit ?? null]))
 
   setSeriesMemberships(
     normalizeSeriesMemberships(
@@ -525,6 +526,7 @@ function applySeriesMembershipPatch(formPatch: MetadataPatch, skippedFields: Boo
         seriesName: membership.seriesName,
         seriesIndex: normalizeSeriesIndex(membership.seriesIndex),
         expectedBookCount: totalsByName.get(membership.seriesName.trim().toLowerCase()) ?? null,
+        unit: unitsByName.get(membership.seriesName.trim().toLowerCase()) ?? null,
       })),
     ),
   )
@@ -1227,6 +1229,7 @@ function handleCoverChanged(medium: CoverMedium | null) {
                   :model-value="form.seriesMemberships"
                   :search-fn="searchSeriesName"
                   :disabled="isSeriesLocked"
+                  unit-editable
                   @update:model-value="handleSeriesMembershipsUpdate"
                 />
               </MetadataFieldLabel>

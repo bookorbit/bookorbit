@@ -4,6 +4,7 @@ import { ConflictException, Injectable, Logger, NotFoundException, OnApplication
 import { createHash } from 'crypto';
 import { mapWithConcurrency, pipelineWithConcurrency } from '../../common/utils/batch.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
+import { seriesUnitsApplyToPath } from '../../common/utils/series-unit.utils';
 import { audioBookPercentageAt, compareBookFilePaths, remapAudioBookPosition, type AudioTrackSpan } from '../../common/utils/audio-track-order.utils';
 import { compareAudioTracks } from '../../common/utils/book-media.utils';
 import { isInsideRoot } from '../../common/utils/file-move.utils';
@@ -2579,6 +2580,7 @@ export class ScannerService implements OnApplicationBootstrap {
       sources.map((source) => ({ key: source.key, absolutePath: source.file.absolutePath, format: source.format })),
       result.metadata,
       rules.precedence,
+      { units: seriesUnitsApplyToPath(relativePath) },
     );
     return written === 'unreadable' ? 'file_unavailable' : written;
   }
@@ -2636,6 +2638,7 @@ export class ScannerService implements OnApplicationBootstrap {
       sources.map((source) => ({ key: source.key, absolutePath: source.file.absolutePath, format: source.format })),
       result.metadata,
       precedence,
+      { units: seriesUnitsApplyToPath(relativePath) },
     );
     return true;
   }

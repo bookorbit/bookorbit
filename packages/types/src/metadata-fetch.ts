@@ -2,6 +2,7 @@ import type { AudiobookChapter, NarratorRef } from "./audiobook";
 import type { ConcreteBookMediaKind, CoverMedium } from "./book";
 import type { MetadataCacheServedProvider, MetadataCandidateCacheInfo } from "./metadata-cache";
 import type { SeriesIndex } from "./series-index";
+import type { SeriesUnit } from "./series-unit";
 
 /**
  * Every provider key BookOrbit has a dedicated id field for. Most are built in; the ones in
@@ -165,6 +166,11 @@ export function isMetadataProviderKeySyntax(key: unknown): key is MetadataProvid
 export interface MetadataSeriesMembership {
   seriesName: string;
   seriesIndex?: SeriesIndex | null;
+  /**
+   * Volume, chapter or issue. Omitted leaves a saved membership's unit unchanged; null clears it.
+   * Send it only to servers with `series-units`, which older servers reject. Providers never set it.
+   */
+  unit?: SeriesUnit | null;
 }
 
 export interface BookCommunityRating {

@@ -4,6 +4,7 @@ import { useI18n } from 'vue-i18n'
 import { ChevronRight } from '@lucide/vue'
 import type { SeriesNextBook } from '@bookorbit/types'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
+import { seriesPositionToken, titleContainsPositionToken } from '@/features/series/lib/series-unit-label'
 
 const { t } = useI18n()
 
@@ -30,9 +31,14 @@ watch(
 )
 
 const title = computed(() => props.nextBook.title ?? t('reader.cbz.nextIssue.untitled'))
-const label = computed(() =>
-  props.nextBook.seriesIndex ? t('reader.cbz.nextIssue.numbered', { index: props.nextBook.seriesIndex, title: title.value }) : title.value,
-)
+const label = computed(() => {
+  const { seriesIndex, seriesUnit } = props.nextBook
+  if (!seriesIndex) return title.value
+  if (!seriesUnit) return t('reader.cbz.nextIssue.numbered', { index: seriesIndex, title: title.value })
+  const position = seriesPositionToken(t, seriesIndex, seriesUnit)
+  if (titleContainsPositionToken(title.value, position)) return title.value
+  return t('reader.cbz.nextIssue.positioned', { position, title: title.value })
+})
 
 function handleCoverError() {
   coverFailed.value = true

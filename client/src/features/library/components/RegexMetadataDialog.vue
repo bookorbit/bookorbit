@@ -48,8 +48,17 @@ const FIELD_LABEL_KEYS: Record<string, string> = {
   series: 'series',
   seriesName: 'series',
   seriesIndex: 'seriesIndex',
+  unit: 'seriesUnit',
+  seriesUnit: 'seriesUnit',
+  volumeIndex: 'seriesVolumeIndex',
+  seriesVolumeIndex: 'seriesVolumeIndex',
   publishedYear: 'publishedYear',
   publishedDate: 'publishedDate',
+}
+const UNIT_LABEL_KEYS: Record<string, string> = {
+  volume: 'book.detail.seriesMembership.kindVolume',
+  chapter: 'book.detail.seriesMembership.kindChapter',
+  issue: 'book.detail.seriesMembership.kindIssue',
 }
 const diagnosticParams = {
   count: formatNumber(REGEX_METADATA_LIMITS.patternLength),
@@ -60,6 +69,11 @@ const diagnosticParams = {
 function fieldLabel(field: string) {
   const key = FIELD_LABEL_KEYS[field]
   return key ? t(`library.creator.metadata.regex.fields.${key}`) : field
+}
+function fieldValueLabel(field: string, value: unknown) {
+  if (Array.isArray(value)) return value.join('; ')
+  const unitKey = field === 'seriesUnit' && typeof value === 'string' ? UNIT_LABEL_KEYS[value] : undefined
+  return unitKey ? t(unitKey) : String(value)
 }
 function diagnosticMessage(code: string) {
   return t(`library.creator.metadata.regex.diagnostics.${code}`, diagnosticParams)
@@ -233,7 +247,7 @@ function apply() {
           <dl v-if="result.matched" class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
             <template v-for="(fieldValue, field) in result.metadata" :key="field"
               ><dt class="text-xs text-muted-foreground">{{ fieldLabel(field) }}</dt>
-              <dd class="break-all">{{ Array.isArray(fieldValue) ? fieldValue.join('; ') : fieldValue }}</dd></template
+              <dd class="break-all">{{ fieldValueLabel(field, fieldValue) }}</dd></template
             >
           </dl>
           <p v-for="(diagnostic, index) in result.diagnostics" :key="index" class="text-destructive">

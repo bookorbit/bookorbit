@@ -1,12 +1,14 @@
 import type { BooksPage } from "./book";
 import type { SeriesIndex } from "./series-index";
+import type { SeriesUnit, SeriesUnitCounts } from "./series-unit";
 
 export type SeriesVolumeStatus = "read" | "reading" | "unread" | "missing";
 
 /**
  * One position on a series' volume ladder. A `missing` slot is a number the series should
  * have and the library does not; every other slot has a book behind it. Slots with no usable
- * index sit at the end with `index: null`.
+ * index sit at the end with `index: null`. The ladder holds volumes and unclassified books only;
+ * chapters and issues are counted in `SeriesSummary.unitCounts`.
  */
 export type SeriesVolumeSlot = {
   index: number | null;
@@ -59,6 +61,18 @@ export type SeriesSummary = {
   nextBookId: number | null;
   nextIndex: SeriesIndex | null;
   nextTitle: string | null;
+  /** The unit of the next book, so a client can say "Ch. 93". Absent from servers without `series-units`. */
+  nextUnit?: SeriesUnit | null;
+  /** Books per unit. Absent from servers without `series-units`. */
+  unitCounts?: SeriesUnitCounts;
+  /** Chapters and issues the user has read. Absent from servers without `series-units`. */
+  chapterReadCount?: number;
+  /**
+   * Chapter or issue numbers missing between the lowest and highest owned, capped at
+   * {@link SERIES_GAP_PREVIEW_LIMIT}. `gaps` covers volumes only. Absent from servers without `series-units`.
+   */
+  chapterGaps?: number[];
+  chapterGapCount?: number;
 };
 
 /** Counts for the whole result set, ignoring the active completion filter. */
@@ -90,9 +104,16 @@ export type SeriesDetail = {
   /** Owned logical volumes whose furthest status is read. */
   readVolumeCount?: number;
   authors: string[];
+  /** Missing volume numbers. Chapters and issues are in `chapterGaps` on servers with `series-units`. */
   possibleGaps: number[];
   /** Total books a metadata provider reports for the series, or null when no provider has told us. */
   expectedBookCount: number | null;
+  /** Books per unit in the listed libraries. Absent from servers without `series-units`. */
+  unitCounts?: SeriesUnitCounts;
+  /** Chapter or issue numbers missing between the lowest and highest owned. Absent from servers without `series-units`. */
+  chapterGaps?: number[];
+  /** Chapter and issue books the user has read. Absent from servers without `series-units`. */
+  chapterReadCount?: number;
 };
 
 export type SeriesBooksPage = BooksPage & {
@@ -106,6 +127,8 @@ export type SeriesNextBook = {
   format: string;
   title: string | null;
   seriesIndex: SeriesIndex | null;
+  /** Absent from servers without `series-units`. */
+  seriesUnit?: SeriesUnit | null;
 };
 
 export type SeriesNextBookResponse = {

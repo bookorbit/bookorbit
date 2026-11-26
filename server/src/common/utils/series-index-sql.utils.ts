@@ -1,5 +1,7 @@
 import { type SQL, type SQLWrapper, sql } from 'drizzle-orm';
 
+import { seriesUnitRank, seriesUnitRankSql } from './series-unit.utils';
+
 export type SqlSortDirection = 'ASC' | 'DESC';
 export type SeriesIndexComparisonOperator = '>' | '>=' | '<' | '<=';
 
@@ -17,8 +19,21 @@ export function seriesIndexSortKey(value: SQLWrapper | string): SQL {
     ] END`;
 }
 
-export function seriesIndexOrderBy(value: SQLWrapper, direction: SqlSortDirection): SQL[] {
-  return [sql`${seriesIndexSortKey(value)} ${sql.raw(direction)} NULLS LAST`, sql`${value}::text COLLATE "C" ${sql.raw(direction)} NULLS LAST`];
+/**
+ * Series order: volumes and unclassified books first, then chapters and issues, each by number.
+ * `unit` is the series unit column beside `value`; every series index leads on the same rank.
+ */
+export function seriesIndexOrderBy(value: SQLWrapper, unit: SQLWrapper, direction: SqlSortDirection): SQL[] {
+  return [
+    sql`${seriesUnitRank(unit)} ${sql.raw(direction)}`,
+    sql`${seriesIndexSortKey(value)} ${sql.raw(direction)} NULLS LAST`,
+    sql`${value}::text COLLATE "C" ${sql.raw(direction)} NULLS LAST`,
+  ];
+}
+
+/** `seriesIndexOrderBy` for hand-written SQL, without the literal tie break. */
+export function seriesOrderKeySql(indexColumnSql: string, unitColumnSql: string, direction: SqlSortDirection): string {
+  return `${seriesUnitRankSql(unitColumnSql)} ${direction}, ${seriesIndexSortKeySql(indexColumnSql)} ${direction} NULLS LAST`;
 }
 
 export function compareSeriesIndexSql(column: SQLWrapper, operator: SeriesIndexComparisonOperator, value: string): SQL {

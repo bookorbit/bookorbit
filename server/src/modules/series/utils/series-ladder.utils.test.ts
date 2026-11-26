@@ -1,11 +1,26 @@
+import type { SeriesUnit } from '@bookorbit/types';
 import { describe, expect, it } from 'vitest';
 
 import type { SeriesMemberRow } from '../series.repository';
 import { computeSeriesGaps, resolveLadderRange } from './series-gaps.utils';
 import { buildVolumeLadder, countSeriesVolumes } from './series-ladder.utils';
 
-function member(bookId: number, seriesIndex: string | null, status: string | null = null, title = `Book ${bookId}`): SeriesMemberRow {
-  return { bookId, seriesIndex, title, status };
+function member(
+  bookId: number,
+  seriesIndex: string | null,
+  status: string | null = null,
+  title = `Book ${bookId}`,
+  unit: SeriesUnit | null = null,
+): SeriesMemberRow {
+  return { bookId, seriesIndex, unit, title, status };
+}
+
+function chapter(bookId: number, seriesIndex: string, status: string | null = null): SeriesMemberRow {
+  return member(bookId, seriesIndex, status, `Chapter ${seriesIndex}`, 'chapter');
+}
+
+function volume(bookId: number, seriesIndex: string, status: string | null = null): SeriesMemberRow {
+  return member(bookId, seriesIndex, status, `Volume ${seriesIndex}`, 'volume');
 }
 
 function build(members: SeriesMemberRow[], opts: { expected?: number | null; truncated?: boolean; bookCount?: number } = {}) {
@@ -113,7 +128,7 @@ describe('buildVolumeLadder', () => {
   describe('next volume', () => {
     it('prefers the one already in progress over an earlier unread one', () => {
       const ladder = build([member(1, '1'), member(2, '2', 'reading')]);
-      expect(ladder.next).toEqual({ bookId: 2, index: '2', title: 'Book 2' });
+      expect(ladder.next).toEqual({ bookId: 2, index: '2', title: 'Book 2', unit: null });
     });
 
     it('falls back to the first unread in series order', () => {
@@ -123,7 +138,7 @@ describe('buildVolumeLadder', () => {
 
     it('keeps a half number rather than rounding it onto a rung', () => {
       const ladder = build([member(1, '1', 'read'), member(2, '1.5')]);
-      expect(ladder.next).toEqual({ bookId: 2, index: '1.5', title: 'Book 2' });
+      expect(ladder.next).toEqual({ bookId: 2, index: '1.5', title: 'Book 2', unit: null });
     });
 
     it('is null once every volume is read', () => {
@@ -180,5 +195,47 @@ describe('countSeriesVolumes', () => {
       readVolumeCount: 0,
       readingVolumeCount: 0,
     });
+  });
+});
+
+describe('buildVolumeLadder with volumes and chapters', () => {
+  const mixed = [volume(1, '1', 'read'), volume(2, '2', 'read'), volume(3, '3'), chapter(10, '80'), chapter(11, '81'), chapter(12, '83')];
+
+  it('draws only the volumes and counts only them as volumes', () => {
+    const ladder = build(mixed, { expected: 3 });
+
+    expect(ladder.volumes.map((slot) => slot.index)).toEqual([1, 2, 3]);
+    expect(ladder.counts).toEqual({ ownedVolumeCount: 3, readVolumeCount: 2, readingVolumeCount: 0 });
+    expect(ladder.gaps).toEqual([]);
+  });
+
+  it('names a missing chapter between owned ones, never the volumes in between', () => {
+    expect(build(mixed).chapterGaps).toEqual([82]);
+  });
+
+  it('never lets a missing volume hide behind a chapter of the same number', () => {
+    const ladder = build([volume(1, '1'), volume(3, '3'), chapter(10, '2')]);
+
+    expect(ladder.gaps).toEqual([2]);
+    expect(ladder.chapterGaps).toEqual([]);
+  });
+
+  it('does not apply the series total to chapters', () => {
+    const ladder = build([chapter(10, '3'), chapter(11, '4')], { expected: 10 });
+
+    expect(ladder.volumes.map((slot) => slot.index)).toEqual([3, 4]);
+    expect(ladder.gaps).toEqual([]);
+  });
+
+  it('offers a chapter in progress before an unread volume', () => {
+    const ladder = build([volume(1, '1'), chapter(10, '80', 'reading')]);
+
+    expect(ladder.next).toEqual({ bookId: 10, index: '80', title: 'Chapter 80', unit: 'chapter' });
+  });
+
+  it('moves on to the first unread chapter once every volume is read', () => {
+    const ladder = build([volume(1, '1', 'read'), volume(2, '2', 'read'), chapter(10, '80'), chapter(11, '81')]);
+
+    expect(ladder.next).toMatchObject({ bookId: 10, unit: 'chapter' });
   });
 });

@@ -1,6 +1,13 @@
-import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
+import { IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { SERIES_INDEX_MAX_LENGTH, SERIES_INDEX_PATTERN, type MetadataProviderKey, type SeriesIndex } from '@bookorbit/types';
+import {
+  SERIES_INDEX_MAX_LENGTH,
+  SERIES_INDEX_PATTERN,
+  SERIES_UNITS,
+  type MetadataProviderKey,
+  type SeriesIndex,
+  type SeriesUnit,
+} from '@bookorbit/types';
 import { IsExternalProviderMap } from '../../../common/decorators/is-external-provider-map.decorator';
 import { IsMetadataProviderKey } from '../../../common/decorators/is-metadata-provider-key.decorator';
 import { MAX_SERIES_TOTAL_BOOKS } from '../../../common/utils/series-total-books.utils';
@@ -38,6 +45,8 @@ export class ComicMetadataDto {
 export class BookSeriesMembershipDto {
   @IsString() @MaxLength(500) seriesName!: string;
   @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
+  // Omitted keeps the stored unit: released iOS builds save memberships without it. Null clears it.
+  @IsOptional() @IsIn(SERIES_UNITS) unit?: SeriesUnit | null;
   // Series-level rather than book-level: writing it changes the total for every book in the
   // series and for every user. Bounds mirror the book_series range constraint.
   @IsOptional() @IsInt() @Min(1) @Max(MAX_SERIES_TOTAL_BOOKS) expectedBookCount?: number | null;

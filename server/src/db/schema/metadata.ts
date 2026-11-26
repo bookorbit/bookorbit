@@ -33,7 +33,14 @@ const embedding256 = customType<{ data: number[]; driverData: string }>({
   },
 });
 
-import type { AudiobookChapter, AudiobookChapterSource, AuthorGender, ChapterLookupQueueStatus, ChapterLookupReviewSummary } from '@bookorbit/types';
+import type {
+  AudiobookChapter,
+  AudiobookChapterSource,
+  AuthorGender,
+  ChapterLookupQueueStatus,
+  ChapterLookupReviewSummary,
+  SeriesUnit,
+} from '@bookorbit/types';
 
 import { users } from './auth';
 import { books } from './books';
@@ -62,6 +69,9 @@ export const bookMetadata = pgTable(
     seriesId: integer('series_id').references(() => bookSeries.id, { onDelete: 'set null' }),
     seriesName: varchar('series_name', { length: 500 }),
     seriesIndex: varchar('series_index', { length: 20 }),
+    /** Mirrors the primary membership's unit; null is unclassified and behaves as a volume. */
+    seriesUnit: varchar('series_unit', { length: 10 }).$type<SeriesUnit>(),
+    seriesVolumeIndex: varchar('series_volume_index', { length: 20 }),
     rating: integer('rating'),
     coverSource: varchar('cover_source', { length: 9 }),
     googleBooksId: varchar('google_books_id', { length: 50 }),
@@ -127,11 +137,13 @@ export const bookMetadata = pgTable(
       .where(sql`${t.chaptersUpdatedBy} is not null`),
     index('bm_series_id_index_book_id_idx').on(
       t.seriesId,
+      sql`(CASE WHEN ${t.seriesUnit} IN ('chapter', 'issue') THEN 1 ELSE 0 END)`,
       sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
       sql`${t.seriesIndex} COLLATE "C"`,
       t.bookId,
     ),
     index('bm_series_index_sort_idx').on(
+      sql`(CASE WHEN ${t.seriesUnit} IN ('chapter', 'issue') THEN 1 ELSE 0 END)`,
       sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
       sql`${t.seriesIndex} COLLATE "C"`,
       t.bookId,
@@ -149,6 +161,7 @@ export const bookMetadata = pgTable(
     index('bm_published_date_sort_idx').on(sql`coalesce(${t.publishedDate}, make_date(${t.publishedYear}, 1, 1))`),
     index('bm_series_name_index_idx').on(
       t.seriesName,
+      sql`(CASE WHEN ${t.seriesUnit} IN ('chapter', 'issue') THEN 1 ELSE 0 END)`,
       sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
       sql`${t.seriesIndex} COLLATE "C"`,
     ),
@@ -186,6 +199,8 @@ export const bookMetadata = pgTable(
     ),
     check('book_metadata_page_count_nonnegative_chk', sql`${t.pageCount} is null or ${t.pageCount} >= 0`),
     check('book_metadata_series_index_format_chk', sql`${t.seriesIndex} is null or ${t.seriesIndex} ~ '^[0-9]+([.][0-9]+)?$'`),
+    check('book_metadata_series_unit_chk', sql`${t.seriesUnit} is null or ${t.seriesUnit} in ('volume', 'chapter', 'issue')`),
+    check('book_metadata_series_volume_index_format_chk', sql`${t.seriesVolumeIndex} is null or ${t.seriesVolumeIndex} ~ '^[0-9]+([.][0-9]+)?$'`),
     check('book_metadata_duration_seconds_nonnegative_chk', sql`${t.durationSeconds} is null or ${t.durationSeconds} >= 0`),
     check('book_metadata_cover_source_chk', sql`${t.coverSource} is null or ${t.coverSource} in ('extracted', 'custom')`),
   ],

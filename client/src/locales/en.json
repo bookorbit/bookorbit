@@ -9769,7 +9769,14 @@
         "invalidSeriesIndex": "Enter digits with at most one decimal point, such as 5.10.",
         "totalLabel": "Books in series",
         "totalPlaceholder": "of",
-        "totalHint": "Total books in this series. Shared with everyone who has this series."
+        "totalHint": "Total books in this series. Shared with everyone who has this series.",
+        "kindLabel": "Kind",
+        "kindButtonLabel": "Kind: {kind}",
+        "kindNone": "None",
+        "kindVolume": "Volume",
+        "kindChapter": "Chapter",
+        "kindIssue": "Issue",
+        "kindNoneHint": "None sorts with volumes."
       },
       "storyGuide": {
         "title": "Story guide",
@@ -13946,6 +13953,8 @@
             "authors": "Authors",
             "series": "Series",
             "seriesIndex": "Series number",
+            "seriesUnit": "Series kind",
+            "seriesVolumeIndex": "Volume number",
             "publishedYear": "Published year",
             "publishedDate": "Published date"
           },
@@ -15411,6 +15420,7 @@
         "action": "Read next",
         "open": "Read next: {title}",
         "numbered": "#{index} {title}",
+        "positioned": "{position} {title}",
         "untitled": "Untitled",
         "autoAdvanceHint": "Turn the page again to continue"
       },
@@ -15883,6 +15893,27 @@
       "complete": "Complete",
       "moreVolumes": "{count, plural, one {# more volume} other {# more volumes}}",
       "label": "{name}, {read} of {total} volumes read"
+    },
+    "units": {
+      "volumeToken": "Vol. {index}",
+      "chapterToken": "Ch. {index}",
+      "issueToken": "#{index}",
+      "chapterCount": "{count, plural, one {# chapter} other {# chapters}}",
+      "issueCount": "{count, plural, one {# issue} other {# issues}}",
+      "volumesAndChapters": "{volumes, plural, one {# volume} other {# volumes}} · {chapters, plural, one {# chapter} other {# chapters}}",
+      "volumesAndIssues": "{volumes, plural, one {# volume} other {# volumes}} · {issues, plural, one {# issue} other {# issues}}",
+      "chaptersRead": "{count, plural, one {# chapter} other {# chapters}} · {read} read",
+      "issuesRead": "{count, plural, one {# issue} other {# issues}} · {read} read",
+      "missingList": "missing {list}",
+      "countChip": "{volumes} + {chapters}",
+      "cardLabel": "{name}, {read} of {total} read",
+      "tabs": {
+        "label": "Filter books by kind",
+        "all": "All",
+        "volumes": "Volumes",
+        "chapters": "Chapters",
+        "issues": "Issues"
+      }
     }
   },
   "smartScope": {

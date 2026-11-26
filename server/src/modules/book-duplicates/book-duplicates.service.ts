@@ -12,7 +12,7 @@ import type {
   ReadStatus,
   ReadStatusSource,
 } from '@bookorbit/types';
-import { editionLabels } from '@bookorbit/types';
+import { editionLabels, seriesUnitClass } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { postgresErrorCode, queryFailureReason } from '../../common/utils/db-error.utils';
@@ -69,7 +69,9 @@ export function otherFormatKeys(scanId: number, row: OtherFormatBookRow): ScanKe
   }
 
   const seriesIndex = canonicalSeriesIndex(row.series_index);
-  if (row.series_id !== null && seriesIndex !== null) push('of_series', `${row.series_id}|${seriesIndex}`);
+  // Chapter 1 never pairs with volume 1; unclassified books keep the key they always had.
+  const chapterLine = seriesUnitClass(row.series_unit) === 'chapter' ? 'c' : '';
+  if (row.series_id !== null && seriesIndex !== null) push('of_series', `${row.series_id}|${chapterLine}${seriesIndex}`);
   return keys;
 }
 function toCandidate(row: PreviewRow): BookDuplicateCandidate {

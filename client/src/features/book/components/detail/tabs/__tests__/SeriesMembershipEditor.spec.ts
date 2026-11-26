@@ -4,15 +4,30 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EditableSeriesMembership } from '../../../../composables/useMetadataEditor'
 import SeriesMembershipEditor from '../SeriesMembershipEditor.vue'
 
-function mountHost(initialMemberships: EditableSeriesMembership[] = []) {
+const passthrough = { template: '<div><slot /></div>' }
+
+/** The menu's own open and focus handling belongs to reka; these specs only need its items. */
+const menuStubs = {
+  DropdownMenu: passthrough,
+  DropdownMenuTrigger: passthrough,
+  DropdownMenuContent: passthrough,
+  DropdownMenuRadioGroup: {
+    props: ['modelValue'],
+    emits: ['update:modelValue'],
+    template: `<div class="radio-group" :data-current="modelValue" @click="$emit('update:modelValue', $event.target.closest('[data-value]').dataset.value)"><slot /></div>`,
+  },
+  DropdownMenuRadioItem: { props: ['value'], template: '<button type="button" class="radio-item" :data-value="value"><slot /></button>' },
+}
+
+function mountHost(initialMemberships: EditableSeriesMembership[] = [], options: { unitEditable?: boolean; disabled?: boolean } = {}) {
   const Host = defineComponent({
     components: { SeriesMembershipEditor },
     setup() {
       const memberships = ref<EditableSeriesMembership[]>(initialMemberships)
       const searchFn = vi.fn<(query: string) => Promise<string[]>>().mockResolvedValue([])
-      return { memberships, searchFn }
+      return { memberships, searchFn, unitEditable: options.unitEditable ?? false, disabled: options.disabled ?? false }
     },
-    template: '<SeriesMembershipEditor v-model="memberships" :search-fn="searchFn" />',
+    template: '<SeriesMembershipEditor v-model="memberships" :search-fn="searchFn" :unit-editable="unitEditable" :disabled="disabled" />',
   })
 
   const attachTo = document.createElement('div')
@@ -23,6 +38,7 @@ function mountHost(initialMemberships: EditableSeriesMembership[] = []) {
     global: {
       stubs: {
         teleport: true,
+        ...(options.unitEditable ? menuStubs : {}),
       },
     },
   })
@@ -145,6 +161,90 @@ describe('SeriesMembershipEditor', () => {
       await totals[1]!.setValue('3')
 
       expect(membershipsOf(wrapper).map((m) => m.expectedBookCount)).toEqual([6, 3])
+    })
+  })
+
+  describe('kind', () => {
+    function membershipsOf(wrapper: ReturnType<typeof mountHost>): EditableSeriesMembership[] {
+      return (wrapper.vm as { memberships: EditableSeriesMembership[] }).memberships
+    }
+
+    function menuItems(wrapper: ReturnType<typeof mountHost>, row = 0) {
+      return wrapper.findAll('.radio-group')[row]!.findAll('.radio-item')
+    }
+
+    it('is left out where units are not edited', () => {
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: null }])
+
+      expect(wrapper.find('[data-testid="series-unit-menu"]').exists()).toBe(false)
+    })
+
+    it('sits before the position and names the current kind', () => {
+      const wrapper = mountHost([{ seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' }], {
+        unitEditable: true,
+      })
+
+      const trigger = wrapper.get('[data-testid="series-unit-menu"]')
+      expect(trigger.text()).toBe('Chapter')
+      expect(trigger.attributes('aria-label')).toBe('Kind: Chapter')
+      const position = wrapper.get('input[aria-label="Position in series"]')
+      expect(trigger.element.compareDocumentPosition(position.element) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    })
+
+    it('reads None for an unclassified membership', () => {
+      const wrapper = mountHost([{ seriesName: 'Dune', seriesIndex: '1', expectedBookCount: null, unit: null }], { unitEditable: true })
+
+      expect(wrapper.get('[data-testid="series-unit-menu"]').text()).toBe('None')
+      expect(wrapper.get('.radio-group').attributes('data-current')).toBe('none')
+    })
+
+    it('offers None, Volume, Chapter and Issue with the note on None', async () => {
+      const wrapper = mountHost([{ seriesName: 'Harbor', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' }], { unitEditable: true })
+
+      const items = menuItems(wrapper)
+      expect(items.map((item) => item.text())).toEqual(['None', 'Volume', 'Chapter', 'Issue'])
+      expect(wrapper.get('.radio-group').attributes('data-current')).toBe('chapter')
+      expect(items.map((item) => item.find('svg').exists())).toEqual([false, false, true, false])
+      expect(wrapper.text()).toContain('None sorts with volumes.')
+    })
+
+    it('records the picked kind on its own row', async () => {
+      const wrapper = mountHost(
+        [
+          { seriesName: 'Harbor', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' },
+          { seriesName: 'Tales', seriesIndex: '2', expectedBookCount: null, unit: null },
+        ],
+        { unitEditable: true },
+      )
+
+      await menuItems(wrapper, 1)[1]!.trigger('click')
+
+      expect(membershipsOf(wrapper).map((membership) => membership.unit)).toEqual(['chapter', 'volume'])
+    })
+
+    it('clears the kind with None', async () => {
+      const wrapper = mountHost([{ seriesName: 'Harbor', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' }], { unitEditable: true })
+
+      await menuItems(wrapper)[0]!.trigger('click')
+
+      expect(membershipsOf(wrapper)[0]?.unit).toBeNull()
+    })
+
+    it('is locked with the series', () => {
+      const wrapper = mountHost([{ seriesName: 'Harbor', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' }], {
+        unitEditable: true,
+        disabled: true,
+      })
+
+      expect(wrapper.get('[data-testid="series-unit-menu"]').attributes('disabled')).toBeDefined()
+    })
+
+    it('starts an added series with no kind', async () => {
+      const wrapper = mountHost([{ seriesName: 'Harbor', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' }], { unitEditable: true })
+
+      await wrapper.get('button[title="Add series"]').trigger('click')
+
+      expect(membershipsOf(wrapper)[1]).toEqual({ seriesName: '', seriesIndex: null, expectedBookCount: null, unit: null })
     })
   })
 })

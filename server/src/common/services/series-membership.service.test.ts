@@ -12,7 +12,9 @@ function makeSeriesIdentity(ids: Record<string, number>) {
   };
 }
 
-function makeMutationDb() {
+function makeMutationDb(currentUnits: { seriesId: number; unit: string | null; volumeIndex: string | null }[] = []) {
+  const selectWhere = vi.fn().mockResolvedValue(currentUnits);
+  const select = vi.fn().mockReturnValue({ from: vi.fn().mockReturnValue({ where: selectWhere }) });
   const deleteWhere = vi.fn().mockResolvedValue(undefined);
   const deleteFrom = vi.fn().mockReturnValue({ where: deleteWhere });
   const insertValues = vi.fn().mockResolvedValue(undefined);
@@ -22,7 +24,8 @@ function makeMutationDb() {
   const update = vi.fn().mockReturnValue({ set: updateSet });
 
   return {
-    db: { delete: deleteFrom, insert: insertInto, update } as never,
+    db: { delete: deleteFrom, insert: insertInto, update, select } as never,
+    select,
     deleteFrom,
     deleteWhere,
     insertInto,
@@ -62,19 +65,21 @@ describe('SeriesMembershipService', () => {
     );
 
     expect(result).toEqual([
-      { seriesId: 101, seriesName: 'Dune', seriesIndex: 1, displayOrder: 0, expectedBookCount: null },
-      { seriesId: 202, seriesName: 'The Expanse', seriesIndex: 5, displayOrder: 1, expectedBookCount: null },
+      { seriesId: 101, seriesName: 'Dune', seriesIndex: 1, unit: null, volumeIndex: null, displayOrder: 0, expectedBookCount: null },
+      { seriesId: 202, seriesName: 'The Expanse', seriesIndex: 5, unit: null, volumeIndex: null, displayOrder: 1, expectedBookCount: null },
     ]);
     expect(deleteFrom).toHaveBeenCalledTimes(1);
     expect(identity.resolveSeriesId).toHaveBeenCalledTimes(2);
     expect(insertValues).toHaveBeenCalledWith([
-      { bookId: 10, seriesId: 101, seriesIndex: 1, displayOrder: 0 },
-      { bookId: 10, seriesId: 202, seriesIndex: 5, displayOrder: 1 },
+      { bookId: 10, seriesId: 101, seriesIndex: 1, seriesUnit: null, seriesVolumeIndex: null, displayOrder: 0 },
+      { bookId: 10, seriesId: 202, seriesIndex: 5, seriesUnit: null, seriesVolumeIndex: null, displayOrder: 1 },
     ]);
     expect(updateSet).toHaveBeenNthCalledWith(1, {
       seriesId: 101,
       seriesName: 'Dune',
       seriesIndex: 1,
+      seriesUnit: null,
+      seriesVolumeIndex: null,
       updatedAt: expect.any(Date),
     });
     expect(updateSet).toHaveBeenNthCalledWith(2, { updatedAt: expect.any(Date) });
@@ -92,16 +97,52 @@ describe('SeriesMembershipService', () => {
       seriesId: null,
       seriesName: null,
       seriesIndex: null,
+      seriesUnit: null,
+      seriesVolumeIndex: null,
       updatedAt: expect.any(Date),
     });
   });
 
+  it('keeps the stored unit when a save omits it, as released iOS builds do', async () => {
+    const identity = makeSeriesIdentity({ berserk: 5 });
+    const { db, insertValues } = makeMutationDb([{ seriesId: 5, unit: 'chapter', volumeIndex: '3' }]);
+    const service = new SeriesMembershipService(db, identity as never);
+
+    const result = await service.replaceForBook(10, [{ seriesName: 'Berserk', seriesIndex: '12' }], db);
+
+    expect(result[0]).toMatchObject({ unit: 'chapter', volumeIndex: '3' });
+    expect(insertValues).toHaveBeenCalledWith([
+      { bookId: 10, seriesId: 5, seriesIndex: '12', seriesUnit: 'chapter', seriesVolumeIndex: '3', displayOrder: 0 },
+    ]);
+  });
+
+  it('clears the unit on null and drops the volume number from anything but a chapter or issue', async () => {
+    const identity = makeSeriesIdentity({ berserk: 5, saga: 6 });
+    const { db, select, insertValues } = makeMutationDb([{ seriesId: 5, unit: 'chapter', volumeIndex: '3' }]);
+    const service = new SeriesMembershipService(db, identity as never);
+
+    await service.replaceForBook(
+      10,
+      [
+        { seriesName: 'Berserk', seriesIndex: '12', unit: null, volumeIndex: '3' },
+        { seriesName: 'Saga', seriesIndex: '2', unit: 'volume', volumeIndex: '9' },
+      ],
+      db,
+    );
+
+    expect(select).not.toHaveBeenCalled();
+    expect(insertValues).toHaveBeenCalledWith([
+      { bookId: 10, seriesId: 5, seriesIndex: '12', seriesUnit: null, seriesVolumeIndex: null, displayOrder: 0 },
+      { bookId: 10, seriesId: 6, seriesIndex: '2', seriesUnit: 'volume', seriesVolumeIndex: null, displayOrder: 1 },
+    ]);
+  });
+
   it('promotes remaining memberships when legacy scalar metadata is cleared', async () => {
     const identity = makeSeriesIdentity({});
-    const metadataChain = makeSelectChain([{ seriesName: null, seriesIndex: null, seriesId: null }]);
+    const metadataChain = makeSelectChain([{ seriesName: null, seriesIndex: null, seriesId: null, seriesUnit: null, seriesVolumeIndex: null }]);
     const membershipChain = makeSelectChain([
-      { bookId: 7, seriesId: 1, seriesName: 'Primary', seriesIndex: 1, displayOrder: 0 },
-      { bookId: 7, seriesId: 2, seriesName: 'Rest', seriesIndex: 2, displayOrder: 1 },
+      { bookId: 7, seriesId: 1, seriesName: 'Primary', seriesIndex: 1, unit: null, volumeIndex: null, displayOrder: 0 },
+      { bookId: 7, seriesId: 2, seriesName: 'Rest', seriesIndex: 2, unit: 'chapter', volumeIndex: null, displayOrder: 1 },
     ]);
     const db = {
       select: vi.fn().mockReturnValueOnce(metadataChain).mockReturnValueOnce(membershipChain),
@@ -111,6 +152,6 @@ describe('SeriesMembershipService', () => {
 
     await service.syncPrimaryFromMetadata(7, db as never);
 
-    expect(replaceForBook).toHaveBeenCalledWith(7, [{ seriesName: 'Rest', seriesIndex: 2 }], db);
+    expect(replaceForBook).toHaveBeenCalledWith(7, [{ seriesName: 'Rest', seriesIndex: 2, unit: 'chapter', volumeIndex: null }], db);
   });
 });

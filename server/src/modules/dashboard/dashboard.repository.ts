@@ -10,6 +10,7 @@ import { audiobookProgress, bookFiles, bookMetadata, books, readingProgress, use
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { excludeAudioOnlyBooks } from '../../common/utils/audio-only-book-sql.utils';
 import { seriesIndexSortKey } from '../../common/utils/series-index-sql.utils';
+import { seriesUnitRank } from '../../common/utils/series-unit.utils';
 
 type Db = NodePgDatabase<typeof schema>;
 type UpNextInSeriesRow = { id: number };
@@ -330,6 +331,7 @@ export class DashboardRepository {
           ${books.libraryId} as library_id,
 	          ${bookMetadata.seriesId} as series_id,
           ${bookMetadata.seriesIndex} as series_index,
+          ${seriesUnitRank(bookMetadata.seriesUnit)} as unit_rank,
           ${books.addedAt} as added_at,
           ${workKeySql(books.id)} as work_key,
           ${mergedProgress} as current_progress,
@@ -378,25 +380,27 @@ export class DashboardRepository {
           ssb.library_id,
 	          ssb.series_id,
           ssb.series_index,
+          ssb.unit_rank,
           ssb.added_at,
           ssb.current_progress,
           ssb.read_status,
           ssb.work_completed as is_completed,
           ssb.work_completion_updated_at as completion_updated_at,
           lag(ssb.work_completed) over (
-	            partition by ssb.library_id, ssb.series_id
+	            partition by ssb.library_id, ssb.series_id, ssb.unit_rank
             order by ${seriesIndexSortKey(sql.raw('ssb.series_index'))} asc,
               ssb.series_index collate "C" asc, ssb.added_at asc, ssb.id asc
           ) as previous_is_completed,
           lag(ssb.work_completion_updated_at) over (
-	            partition by ssb.library_id, ssb.series_id
+	            partition by ssb.library_id, ssb.series_id, ssb.unit_rank
             order by ${seriesIndexSortKey(sql.raw('ssb.series_index'))} asc,
               ssb.series_index collate "C" asc, ssb.added_at asc, ssb.id asc
           ) as previous_completion_updated_at
         from work_series_books ssb
       ),
       next_candidates as (
-	        select distinct on (os.library_id, os.series_id)
+	        -- Volumes and chapters are separate reading lines: finishing v3 offers v4, never c4.
+	        select distinct on (os.library_id, os.series_id, os.unit_rank)
           os.id,
           os.work_key,
           os.previous_completion_updated_at
@@ -406,7 +410,7 @@ export class DashboardRepository {
           and os.work_progress = 0
           and os.work_unstarted
           ${candidateSql}
-	        order by os.library_id, os.series_id, ${seriesIndexSortKey(sql.raw('os.series_index'))} asc,
+	        order by os.library_id, os.series_id, os.unit_rank, ${seriesIndexSortKey(sql.raw('os.series_index'))} asc,
             os.series_index collate "C" asc, os.added_at asc, os.id asc
       ),
       work_candidates as (
@@ -463,7 +467,8 @@ export class DashboardRepository {
       select 1
       from ${bookMetadata} candidate_metadata
       inner join ${bookMetadata} earlier_metadata on earlier_metadata.series_id = candidate_metadata.series_id
-        and ${seriesIndexSortKey(sql.raw('earlier_metadata.series_index'))} < ${seriesIndexSortKey(sql.raw('candidate_metadata.series_index'))}
+        and (${seriesUnitRank(sql.raw('earlier_metadata.series_unit'))}, ${seriesIndexSortKey(sql.raw('earlier_metadata.series_index'))})
+          < (${seriesUnitRank(sql.raw('candidate_metadata.series_unit'))}, ${seriesIndexSortKey(sql.raw('candidate_metadata.series_index'))})
       inner join ${books} earlier_book on earlier_book.id = earlier_metadata.book_id
       where candidate_metadata.book_id = ${books.id}
         and earlier_book.library_id = ${books.libraryId}

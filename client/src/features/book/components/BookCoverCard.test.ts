@@ -898,6 +898,31 @@ describe('BookCoverCard', () => {
       expect(wrapper.text()).toContain('#3')
     })
 
+    it('names the unit of a classified position', () => {
+      mockCardOverlays.value = ['series-position']
+
+      expect(mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Harbor', seriesUnit: 'volume' }) }).text()).toContain('Vol. 3')
+      expect(mountCard({ book: makeBook({ seriesIndex: '84', seriesName: 'Harbor', seriesUnit: 'chapter' }) }).text()).toContain('Ch. 84')
+      expect(mountCard({ book: makeBook({ seriesIndex: '12', seriesName: 'Night Warden', seriesUnit: 'issue' }) }).text()).toContain('#12')
+    })
+
+    it('keeps the bare number when the position has no unit', () => {
+      mockCardOverlays.value = ['series-position']
+      const wrapper = mountCard({ book: makeBook({ seriesIndex: '3', seriesName: 'Sprawl', seriesUnit: null }) })
+
+      expect(wrapper.text()).toContain('Sprawl #3')
+      expect(wrapper.text()).not.toContain('Vol.')
+    })
+
+    it('puts the unit in the series name and position label', () => {
+      mockCardOverlays.value = []
+      mockCardInfoMode.value = 'below-cover'
+      mockGridCardPrimaryLabel.value = 'series-title-position'
+      const wrapper = mountCard({ book: makeBook({ seriesId: 42, seriesIndex: '84', seriesName: 'Harbor', seriesUnit: 'chapter' }), showLabel: true })
+
+      expect(wrapper.get('[data-testid="grid-card-label-primary"]').text()).toBe('Harbor Ch. 84')
+    })
+
     it('does not open the reader when the series badge is clicked', async () => {
       setTouchMode(false)
       mockCardOverlays.value = ['series-position']

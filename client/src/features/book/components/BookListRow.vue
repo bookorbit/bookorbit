@@ -43,6 +43,7 @@ import { bookFormatEntries, formatKeyCode, type BookFormatEntry } from '@/featur
 import { formatChipStyle } from '@/features/book/lib/format-colors'
 import ActivateLink from '@/components/ActivateLink.vue'
 import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
+import { seriesNameWithPosition } from '@/features/series/lib/series-unit-label'
 
 const COLLAPSED_SERIES_COVER_LIMIT = 3
 
@@ -97,8 +98,7 @@ const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
-  const idx = props.book.seriesIndex
-  return idx != null ? `${props.book.seriesName} #${idx}` : props.book.seriesName
+  return seriesNameWithPosition(t, props.book.seriesName, props.book.seriesIndex, props.book.seriesUnit)
 })
 
 const isMissing = computed(() => props.book.status === 'missing')

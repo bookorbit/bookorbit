@@ -363,6 +363,120 @@ describe('MetadataService', () => {
       });
     });
 
+    describe('series units from path rules', () => {
+      const comic = [{ key: 'embedded', absolutePath: '/comics/Berserk/Berserk v03 c012.cbz', format: 'cbz' }];
+      const chapter = { seriesName: 'Berserk', seriesIndex: '12', seriesUnit: 'chapter' as const, seriesVolumeIndex: '3' };
+
+      afterEach(() => vi.restoreAllMocks());
+
+      it('writes the unit and volume number with the number the rule read', async () => {
+        const { db, updateSet } = makeDb();
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ authors: [], genres: [], cover: null });
+
+        await service.extractAndSaveWithRegex(9, comic, chapter, ['regex', 'embedded'], { units: true });
+
+        expect(updateSet).toHaveBeenCalledWith(expect.objectContaining({ seriesIndex: '12', seriesUnit: 'chapter', seriesVolumeIndex: '3' }));
+      });
+
+      it('keeps the unit when ComicInfo supplied the same number, and drops it when the numbers differ', async () => {
+        for (const [fileNumber, expectUnit] of [
+          ['12', true],
+          ['5', false],
+        ] as const) {
+          const { db, updateSet } = makeDb();
+          const service = makeService(db);
+          vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({
+            seriesName: 'Berserk',
+            seriesIndex: fileNumber,
+            authors: [],
+            genres: [],
+            cover: null,
+          });
+
+          await service.extractAndSaveWithRegex(9, comic, chapter, ['embedded', 'regex'], { units: true });
+
+          const written = updateSet.mock.calls.map((call) => call[0]).find((patch) => 'seriesIndex' in patch);
+          expect(written).toMatchObject({ seriesIndex: fileNumber });
+          if (expectUnit) expect(written).toMatchObject({ seriesUnit: 'chapter' });
+          else expect(written).not.toHaveProperty('seriesUnit');
+          vi.restoreAllMocks();
+        }
+      });
+
+      it('never writes a unit for a file that is not a comic', async () => {
+        const { db, updateSet } = makeDb();
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ authors: [], genres: [], cover: null });
+
+        await service.extractAndSaveWithRegex(9, comic, chapter, ['regex', 'embedded'], { units: false });
+
+        const written = updateSet.mock.calls.map((call) => call[0]).find((patch) => 'seriesIndex' in patch);
+        expect(written).not.toHaveProperty('seriesUnit');
+      });
+
+      it('keeps the unit out when the series number is locked', async () => {
+        const { db, updateSet } = makeDb();
+        const filter = vi
+          .fn()
+          .mockImplementation((_bookId, dto) =>
+            Promise.resolve({ dto: { ...dto, seriesName: undefined, seriesIndex: undefined }, skippedFields: ['seriesName', 'seriesIndex'] }),
+          );
+        const service = makeService(db, undefined, { bookMetadataLockService: { isFieldLocked: vi.fn(), filterAutomatedBookUpdate: filter } });
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ title: 'Kept', authors: [], genres: [], cover: null });
+
+        await service.extractAndSaveWithRegex(9, comic, chapter, ['regex', 'embedded'], { units: true });
+
+        for (const [patch] of updateSet.mock.calls) expect(patch).not.toHaveProperty('seriesUnit');
+      });
+
+      it('re-applying rules sets a unit on a book that already has the number', async () => {
+        const { db, updateSet, selectLimit } = makeDb();
+        selectLimit.mockResolvedValueOnce([
+          {
+            title: 'Berserk',
+            seriesName: 'Berserk',
+            seriesIndex: '12',
+            seriesUnit: null,
+            seriesVolumeIndex: null,
+            publishedYear: null,
+            publishedDate: null,
+          },
+        ]);
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({ authors: [], genres: [], cover: null });
+
+        expect(await service.applyRegexMetadataRules(9, comic, chapter, ['regex', 'embedded'], { units: true })).toBe('updated');
+        expect(updateSet.mock.calls[0][0]).toMatchObject({ seriesIndex: '12', seriesUnit: 'chapter', seriesVolumeIndex: '3' });
+      });
+
+      it('re-applying rules leaves a unit alone on a book whose number was changed by hand', async () => {
+        const { db, updateSet, selectLimit } = makeDb();
+        selectLimit.mockResolvedValueOnce([
+          {
+            title: 'Berserk',
+            seriesName: 'Berserk',
+            seriesIndex: '40',
+            seriesUnit: null,
+            seriesVolumeIndex: null,
+            publishedYear: null,
+            publishedDate: null,
+          },
+        ]);
+        const service = makeService(db);
+        vi.spyOn(MetadataExtractionService.prototype, 'extract').mockResolvedValueOnce({
+          seriesName: 'Berserk',
+          seriesIndex: '40',
+          authors: [],
+          genres: [],
+          cover: null,
+        });
+
+        expect(await service.applyRegexMetadataRules(9, comic, chapter, ['embedded', 'regex'], { units: true })).toBe('unchanged');
+        expect(updateSet).not.toHaveBeenCalled();
+      });
+    });
+
     describe('applying path rules to books already in a library', () => {
       const sources = [{ key: 'embedded', absolutePath: '/comics/Saga/Saga #12.cbz', format: 'cbz' }];
       const precedence = ['embedded', 'opfFile', 'regex'];

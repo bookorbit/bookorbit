@@ -5,6 +5,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { BookDuplicateGroupSort, BookDuplicateKind, BookDuplicateMatchReason, BookDuplicateSortOrder } from '@bookorbit/types';
 
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
+import { seriesUnitRank } from '../../common/utils/series-unit.utils';
 import type { RequestUser } from '../../common/types/request-user';
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
@@ -107,6 +108,7 @@ export type OtherFormatBookRow = {
   open_library_id: string | null;
   series_id: number | null;
   series_index: string | null;
+  series_unit: string | null;
   formats: string[];
   authors: string[];
   narrators: string[];
@@ -492,7 +494,8 @@ export class BookDuplicatesRepository {
 
   /**
    * Removes pairs whose books hold different positions in one series: they are different volumes,
-   * not copies, whatever their titles, ISBNs or work ids say. A matching file hash is the one exception.
+   * not copies, whatever their titles, ISBNs or work ids say. Volume 1 and chapter 1 are different
+   * positions too. A matching file hash is the one exception.
    */
   async deleteSeriesConflictPairs(scanId: number): Promise<number> {
     const result = await this.withScanBudget((db) =>
@@ -508,7 +511,10 @@ export class BookDuplicatesRepository {
             AND membership_b.book_id = pair.book_id_b
             AND membership_a.series_index IS NOT NULL
             AND membership_b.series_index IS NOT NULL
-            AND membership_a.series_index::numeric <> membership_b.series_index::numeric
+            AND (
+              membership_a.series_index::numeric <> membership_b.series_index::numeric
+              OR ${seriesUnitRank(sql.raw('membership_a.series_unit'))} <> ${seriesUnitRank(sql.raw('membership_b.series_unit'))}
+            )
         )
     `),
     );
@@ -523,8 +529,8 @@ export class BookDuplicatesRepository {
         FROM ${bookDuplicatePairs}
         WHERE scan_id = ${scanId} AND kind = 'duplicate'
       `);
-      const positions = await tx.execute<{ book_id: number; series_id: number; series_index: string | null }>(sql`
-        SELECT membership.book_id, membership.series_id, membership.series_index
+      const positions = await tx.execute<{ book_id: number; series_id: number; series_index: string | null; series_unit: string | null }>(sql`
+        SELECT membership.book_id, membership.series_id, membership.series_index, membership.series_unit
         FROM ${bookSeriesMemberships} membership
         WHERE membership.series_index IS NOT NULL
           AND membership.book_id IN (
@@ -540,7 +546,7 @@ export class BookDuplicatesRepository {
           reasons: row.reasons,
           titleSimilarity: row.title_similarity === null ? null : Number(row.title_similarity),
         })),
-        positions.rows.map((row) => ({ bookId: row.book_id, seriesId: row.series_id, seriesIndex: row.series_index })),
+        positions.rows.map((row) => ({ bookId: row.book_id, seriesId: row.series_id, seriesIndex: row.series_index, seriesUnit: row.series_unit })),
       );
 
       await tx.execute(sql`CREATE TEMP TABLE tmp_book_duplicate_components (book_id integer PRIMARY KEY, root_id integer NOT NULL) ON COMMIT DROP`);
@@ -655,6 +661,7 @@ export class BookDuplicatesRepository {
         ${bookMetadata.openLibraryId} AS open_library_id,
         ${bookMetadata.seriesId} AS series_id,
         ${bookMetadata.seriesIndex} AS series_index,
+        ${bookMetadata.seriesUnit} AS series_unit,
         ARRAY(
           SELECT DISTINCT lower(f.format)
           FROM book_files f
