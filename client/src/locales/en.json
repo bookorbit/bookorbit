@@ -8036,7 +8036,8 @@
         "onDisk": "On disk",
         "detailsHeading": "Details",
         "percentUnderOne": "<1%",
-        "percentOverNinetyNine": ">99%"
+        "percentOverNinetyNine": ">99%",
+        "heroProgress": "{percent} read"
       },
       "editMetadata": {
         "fieldCount": "{count, plural, =0 {no fields} one {one field} other {# fields}}",
@@ -14544,7 +14545,9 @@
     }
   },
   "metadataScore": {
-    "missingFields": "{count, plural, =0 {no fields missing - edit metadata} one {# field missing - edit metadata} other {# fields missing - edit metadata}}"
+    "missingFields": "{count, plural, =0 {no fields missing - edit metadata} one {# field missing - edit metadata} other {# fields missing - edit metadata}}",
+    "chipLabel": "Metadata",
+    "chipAria": "Metadata score: {score}"
   },
   "migration": {
     "sidebarTitle": "Booklore Import",

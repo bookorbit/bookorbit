@@ -11,7 +11,7 @@ const props = defineProps<{
   loading?: boolean
 }>()
 
-/** The bands MetadataScoreBadge already paints on every book card. */
+/** Quality bands drawn behind the score distribution. */
 const BANDS = [
   { key: 'poor', from: 0, to: 50, fill: 'color-mix(in oklch, var(--destructive) 26%, transparent)', ink: 'var(--destructive)' },
   { key: 'fair', from: 50, to: 70, fill: 'color-mix(in oklch, var(--warning) 26%, transparent)', ink: 'var(--warning)' },

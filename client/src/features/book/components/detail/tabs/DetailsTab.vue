@@ -89,6 +89,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import HardcoverBookSyncGridItem from '@/features/hardcover/components/HardcoverBookSyncGridItem.vue'
 import StorygraphBookSyncGridItem from '@/features/storygraph/components/StorygraphBookSyncGridItem.vue'
 import BookEditionsCard, { type EditionProgress } from '@/features/book/components/detail/details/BookEditionsCard.vue'
+import HeroReadingProgress from '@/features/book/components/detail/details/HeroReadingProgress.vue'
 import BookReadingActivityCard from '@/features/book/components/detail/details/BookReadingActivityCard.vue'
 import ReadAloudSyncMeter from '@/features/book/components/detail/details/ReadAloudSyncMeter.vue'
 import StoryGuideCard from '@/features/story-guide/components/StoryGuideCard.vue'
@@ -157,7 +158,6 @@ const linkSeedBooks = ref<LinkSeedBook[]>([])
 const linkBookIds = computed(() => linkSeedIds.value ?? [props.book.id])
 const linkExcludedIds = computed(() => linkedBooks.value.map((book) => book.bookId))
 const scoreBreakdownOpen = ref(false)
-const mobileScoreBreakdownOpen = ref(false)
 const moreMenuOpen = ref(false)
 const mobileMoreMenuOpen = ref(false)
 const readMenuOpen = ref(false)
@@ -409,10 +409,6 @@ function measureCoverLayout() {
 
 function toggleDescription() {
   descriptionExpanded.value = !descriptionExpanded.value
-}
-
-function handleMobileScoreOpen(open: boolean) {
-  mobileScoreBreakdownOpen.value = open
 }
 
 onMounted(() => {
@@ -1021,6 +1017,13 @@ const editionProgress = computed<EditionProgress[]>(() => {
   return [...byKey.values()]
 })
 
+/** The furthest part-read edition, shown beside the reading status. A book marked read or skimmed shows none. */
+const heroProgress = computed<number | null>(() => {
+  if (localReadStatus.value === 'read' || localReadStatus.value === 'skimmed') return null
+  const partial = editionProgress.value.filter((entry) => !entry.finished && entry.percentage > 0)
+  return partial.length ? Math.max(...partial.map((entry) => entry.percentage)) : null
+})
+
 function handleEditionReset(key: string) {
   const row = editionProgress.value.find((entry) => entry.key === key)
   if (row) void handleResetFileProgress(row)
@@ -1586,15 +1589,6 @@ watch(
             </template>
           </div>
           <div class="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <Popover :open="mobileScoreBreakdownOpen" @update:open="handleMobileScoreOpen">
-              <PopoverTrigger as-child>
-                <MetadataScoreBadge :score="book.metadataScore" />
-              </PopoverTrigger>
-              <PopoverContent class="w-72 p-4" align="start">
-                <p class="mb-3 text-sm font-semibold">{{ t('book.detail.details.metadataScore') }}</p>
-                <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
-              </PopoverContent>
-            </Popover>
             <DropdownMenu>
               <DropdownMenuTrigger as-child>
                 <button class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
@@ -1611,6 +1605,7 @@ watch(
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            <HeroReadingProgress v-if="heroProgress !== null" :percentage="heroProgress" />
           </div>
         </div>
       </div>
@@ -1813,18 +1808,7 @@ watch(
     >
       <div class="hidden @min-[46rem]/book-detail:block">
         <!-- Identity block -->
-        <div class="flex items-center flex-wrap gap-x-3 gap-y-2 -mt-1">
-          <h1 class="text-2xl font-bold leading-tight">{{ book.title ?? t('book.detail.details.untitled') }}</h1>
-          <Popover :open="scoreBreakdownOpen" @update:open="(v) => (scoreBreakdownOpen = v)">
-            <PopoverTrigger as-child>
-              <MetadataScoreBadge :score="book.metadataScore" />
-            </PopoverTrigger>
-            <PopoverContent class="w-72 p-4" align="start">
-              <p class="text-sm font-semibold mb-3">{{ t('book.detail.details.metadataScore') }}</p>
-              <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
-            </PopoverContent>
-          </Popover>
-        </div>
+        <h1 class="-mt-1 text-2xl font-bold leading-tight">{{ book.title ?? t('book.detail.details.untitled') }}</h1>
         <p v-if="book.subtitle" class="text-base text-muted-foreground mt-1 leading-snug">{{ book.subtitle }}</p>
         <EditionStrip v-if="editions.length > 1" :editions="editions" class="mt-2" @show-all="handleShowAllEditions" />
 
@@ -1915,6 +1899,7 @@ watch(
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <HeroReadingProgress v-if="heroProgress !== null" :percentage="heroProgress" class="ms-2" />
 
           <div class="w-px h-3.5 bg-border mx-1.5" />
 
@@ -2271,9 +2256,20 @@ watch(
         class="flex min-h-0 flex-col rounded-xl border border-border bg-card px-4 pt-3 pb-2"
         :aria-label="t('book.detail.details.detailsHeading')"
       >
-        <h3 class="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {{ t('book.detail.details.detailsHeading') }}
-        </h3>
+        <div class="mb-1 flex items-center justify-between gap-3">
+          <h3 class="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            {{ t('book.detail.details.detailsHeading') }}
+          </h3>
+          <Popover v-if="book.metadataScore !== null" v-model:open="scoreBreakdownOpen">
+            <PopoverTrigger as-child>
+              <MetadataScoreBadge :score="book.metadataScore" class="-me-1.5" />
+            </PopoverTrigger>
+            <PopoverContent class="w-72 p-4" align="end">
+              <p class="mb-3 text-sm font-semibold">{{ t('book.detail.details.metadataScore') }}</p>
+              <MetadataScoreBreakdown :book="book" :weights="scoreWeights" @edit-metadata="handleEditMetadataFromScore" />
+            </PopoverContent>
+          </Popover>
+        </div>
 
         <dl class="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div class="flex items-baseline justify-between gap-3 border-b border-border py-[6px] last:border-b-0">

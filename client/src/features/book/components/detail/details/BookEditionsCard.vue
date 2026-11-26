@@ -4,9 +4,10 @@ import { RotateCcw } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
 import type { BookDetail } from '@bookorbit/types'
 import { formatBytes } from '@/lib/formatting'
-import { formatNumber, formatPercent } from '@/i18n/formatters'
+import { formatNumber } from '@/i18n/formatters'
 import BookFormatChip from '@/features/book/components/BookFormatChip.vue'
 import { bookFormatEntries, formatKeyName, type BookFormatEntry } from '@/features/book/lib/book-formats'
+import { progressPercentLabel } from '@/features/book/lib/progress-percent'
 
 export interface EditionProgress {
   /** The edition's format key, as `bookFormatEntries` gives it. */
@@ -57,12 +58,8 @@ function formatDuration(seconds: number): string {
   return hours > 0 ? t('book.detail.details.durationHm', { hours, minutes }) : t('book.detail.details.durationM', { minutes })
 }
 
-/** Mirrors the detail tab's rule: never round a live position down to 0% or up to 100%. */
 function progressLabel(percentage: number): string {
-  const clamped = Math.max(0, Math.min(100, percentage))
-  if (clamped > 0 && clamped < 1) return t('book.detail.details.percentUnderOne')
-  if (clamped > 99 && clamped < 100) return t('book.detail.details.percentOverNinetyNine')
-  return formatPercent(Math.round(clamped) / 100)
+  return progressPercentLabel(percentage, t)
 }
 
 function rowMeasure(row: BookFormatEntry): string {

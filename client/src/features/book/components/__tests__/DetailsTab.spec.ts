@@ -688,6 +688,86 @@ describe('DetailsTab - present state', () => {
   })
 })
 
+describe('DetailsTab - metadata score and hero progress', () => {
+  const EPUB_FILE = {
+    id: 101,
+    format: 'epub',
+    role: 'primary',
+    sizeBytes: 1234,
+    absolutePath: '/books/test.epub',
+    createdAt: '2024-01-01T00:00:00.000Z',
+    filename: 'test.epub',
+    durationSeconds: null,
+  } as const
+
+  function readStatus(status: 'reading' | 'read') {
+    return { status, source: 'manual' as const, startedAt: null, finishedAt: null, updatedAt: '2026-01-01T00:00:00.000Z' }
+  }
+
+  function serveProgress(percentage: number) {
+    vi.mocked(api).mockImplementation(async (input) => {
+      if (input === '/api/v1/reading-progress?bookId=1') return makeApiResponse(progressList([{ fileId: 101, percentage }]))
+      if (input === '/api/v1/collections/membership') return makeApiResponse([])
+      return makeApiResponse({}, false)
+    })
+  }
+
+  it('shows the metadata score in the Details header, labelled and without a percent sign', () => {
+    const wrapper = mount(DetailsTab, { props: { book: makeBook({ metadataScore: 81 }) }, global: globalStubs })
+
+    const chip = wrapper.get('section[aria-label="Details"] button[aria-label="Metadata score: 81"]')
+    expect(chip.text()).toBe('Metadata81')
+    expect(wrapper.text()).not.toContain('81%')
+  })
+
+  it('leaves the score out when the book has none', () => {
+    const wrapper = mount(DetailsTab, { props: { book: makeBook({ metadataScore: null }) }, global: globalStubs })
+
+    expect(wrapper.find('button[aria-label^="Metadata score"]').exists()).toBe(false)
+  })
+
+  it('shows the part-read progress beside the reading status', async () => {
+    serveProgress(42)
+
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook({ files: [EPUB_FILE], readStatus: readStatus('reading') }) },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    const meters = wrapper.findAll('[data-test="hero-progress"]')
+    expect(meters.length).toBeGreaterThan(0)
+    for (const meter of meters) {
+      expect(meter.text()).toBe('42%42% read')
+      expect(meter.get('.sr-only').text()).toBe('42% read')
+    }
+  })
+
+  it('shows no hero progress once the book is marked read', async () => {
+    serveProgress(42)
+
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook({ files: [EPUB_FILE], readStatus: readStatus('read') }) },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="hero-progress"]').exists()).toBe(false)
+  })
+
+  it('shows no hero progress for a finished edition', async () => {
+    serveProgress(100)
+
+    const wrapper = mount(DetailsTab, {
+      props: { book: makeBook({ files: [EPUB_FILE], readStatus: readStatus('reading') }) },
+      global: globalStubs,
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-test="hero-progress"]').exists()).toBe(false)
+  })
+})
+
 describe('DetailsTab - reading dates compact display', () => {
   it('shows date fields when both dates are null and status is reading', () => {
     const wrapper = mount(DetailsTab, {

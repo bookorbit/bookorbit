@@ -1,41 +1,32 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
+
+import { formatNumber } from '@/i18n/formatters'
+import { metadataScoreColor } from '@/lib/metadata-score-color'
 
 const props = defineProps<{
   score: number | null
 }>()
 
-const emit = defineEmits<{
-  click: []
-}>()
+const { t } = useI18n()
 
-function handleClick() {
-  emit('click')
-}
-
-const label = computed(() => {
-  if (props.score === null) return null
-  return `${props.score}%`
-})
-
-const colorClass = computed(() => {
-  const s = props.score
-  if (s === null) return 'bg-muted text-muted-foreground'
-  if (s >= 90) return 'bg-green-500/15 text-green-600 dark:text-green-400'
-  if (s >= 70) return 'bg-lime-500/15 text-lime-600 dark:text-lime-400'
-  if (s >= 50) return 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-  return 'bg-red-500/15 text-red-600 dark:text-red-400'
-})
+const display = computed(() => (props.score === null ? null : Math.round(Math.min(100, Math.max(0, props.score)))))
+const scoreColor = computed(() => (display.value === null ? undefined : metadataScoreColor(display.value)))
 </script>
 
 <template>
+  <!-- Labelled and without a percent sign, so the score never reads as reading progress. -->
   <button
-    v-if="label !== null"
+    v-if="display !== null"
     type="button"
-    class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-all duration-200 hover:opacity-80"
-    :class="colorClass"
-    @click="handleClick"
+    class="group -my-1 inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    :aria-label="t('metadataScore.chipAria', { score: formatNumber(display) })"
   >
-    {{ label }}
+    <span
+      class="text-[10px] leading-none font-semibold uppercase tracking-wider text-muted-foreground transition-colors group-hover:text-foreground group-focus-visible:text-foreground"
+      >{{ t('metadataScore.chipLabel') }}</span
+    >
+    <span class="text-xs leading-none font-bold tabular-nums" :style="{ color: scoreColor }">{{ formatNumber(display) }}</span>
   </button>
 </template>
