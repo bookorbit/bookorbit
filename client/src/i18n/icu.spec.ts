@@ -187,76 +187,52 @@ describe('ICU message compilation', () => {
     expect(testI18n.global.t('books', { count: 5 })).toBe('5 knjig')
   })
 
-  it('renders reviewed Italian and Polish count messages with the correct grammar', () => {
-    const italianI18n = createCatalogI18n('it', italian)
-    const polishI18n = createCatalogI18n('pl', polish)
-
-    expect(italianI18n.global.t('settings.appearance.icons.selectedCount', { count: 1 })).toBe('1 icona selezionata')
-    expect(italianI18n.global.t('settings.appearance.icons.selectedCount', { count: 2 })).toBe('2 icone selezionate')
-    expect(italianI18n.global.t('annotations.bulk.countSelected', { count: 1 })).toBe('1 annotazione selezionata')
-    expect(italianI18n.global.t('annotations.bulk.countSelected', { count: 2 })).toBe('2 annotazioni selezionate')
-
-    expect([1, 2, 5].map((count) => polishI18n.global.t('settings.privacySharing.durationHours', { count }))).toEqual([
-      '1 godzina',
-      '2 godziny',
-      '5 godzin',
-    ])
-    expect([1, 2, 5].map((count) => polishI18n.global.t('settings.metadata.autoFetch.lastRun.daysAgo', { count }))).toEqual([
-      '1 dzień temu',
-      '2 dni temu',
-      '5 dni temu',
-    ])
-    expect([1, 2, 5].map((count) => polishI18n.global.t('reader.audiobook.minutes', { count }))).toEqual(['1 minuta', '2 minuty', '5 minut'])
-  })
-
-  it('keeps reviewed technical terms in their software context', () => {
-    expect(spanish.settings.metadata.autoFetch.runNow).toBe('Ejecutar ahora')
-    expect(french.settings.metadata.autoFetch.runNow).toBe('Exécuter maintenant')
-    expect(italian.settings.metadata.autoFetch.runNow).toBe('Esegui ora')
-    expect(polish.settings.metadata.autoFetch.runNow).toBe('Uruchom teraz')
-    expect(italian.settings.admin.migration.host).toBe('Host')
-    expect(italian.settings.admin.migration.port).toBe('Porta')
-  })
-
-  it('preserves spacing around collection names in reviewed Italian messages', () => {
-    const testI18n = createCatalogI18n('it', italian)
-
-    expect(testI18n.global.t('collection.addToSheet.createdAndAdded', { count: 2, name: 'Preferiti' })).toBe('Creata "Preferiti" e aggiunti 2 libri')
-    expect(testI18n.global.t('collection.addToSheet.addedToCollection', { count: 2, name: 'Preferiti' })).toBe('Aggiunti 2 libri a "Preferiti"')
-  })
-
+  // Grammar the compiler must get right, checked on fixed messages. The shipped catalogs belong to
+  // Crowdin, and the translation sync runs this spec on a fresh export of them.
   it.each([
-    ['en', en, [0, 1, 2], ['No books deleted', 'One duplicate book deleted', '2 duplicate books deleted']],
-    ['de', de, [0, 1, 2], ['Keine Bücher gelöscht', 'Ein doppeltes Buch gelöscht', '2 doppelte Bücher gelöscht']],
-    ['es', spanish, [0, 1, 1_000_000], ['No se eliminaron libros', 'Se ha eliminado un libro duplicado.', '1.000.000 libros duplicados eliminados']],
-    ['fr', french, [0, 1, 1_000_000], ['Aucun livre supprimé', 'Un livre en double supprimé', '1 000 000 livres en double supprimés']],
-    ['it', italian, [0, 1, 1_000_000], ['Nessun libro eliminato', 'Un libro duplicato eliminato', '1.000.000 libri duplicati eliminati']],
-    ['nl', nl, [0, 1, 2], ['No books deleted', 'One duplicate book deleted', '2 duplicate books deleted']],
-    [
-      'pl',
-      polish,
-      [0, 1, 2, 5, 1_000_000],
-      [
-        'Żadne książki nie zostały usunięte',
-        'Usunięto jedną zduplikowaną książkę',
-        'Usunięto 2 zduplikowane książki',
-        'Usunięto 5 zduplikowanych książek',
-        'Usunięto 1 000 000 zduplikowanych książek',
-      ],
-    ],
-    ['pt', pt, [0, 1, 1_000_000], ['No books deleted', 'One duplicate book deleted', '1.000.000 duplicate books deleted']],
-    [
-      'sl',
-      sl,
-      [0, 1, 2, 3, 5],
-      ['No books deleted', 'One duplicate book deleted', '2 duplicate books deleted', '3 duplicate books deleted', '5 duplicate books deleted'],
-    ],
-  ] as const)('renders migrated Book Duplicates messages for %s', (locale, catalog, counts, expectedDeletions) => {
+    ['es', [0, 1, 2, 1_000_000], ['none 0', 'one 1', 'other 2', 'many 1.000.000']],
+    ['fr', [0, 1, 1.5, 2, 1_000_000], ['none 0', 'one 1', 'one 1,5', 'other 2', 'many 1\u202f000\u202f000']],
+    ['it', [0, 1, 2, 1_000_000], ['none 0', 'one 1', 'other 2', 'many 1.000.000']],
+    ['pl', [0, 1, 2, 5, 22, 1.5, 1_000_000], ['none 0', 'one 1', 'few 2', 'many 5', 'few 22', 'other 1,5', 'many 1\u00a0000\u00a0000']],
+  ] as const)('selects exact, plural-category and grouped-count branches in %s', (locale, counts, expected) => {
+    const message = '{count, plural, =0 {none #} one {one #} few {few #} many {many #} other {other #}}'
+    const testI18n = createI18n({ legacy: false, locale, messages: { [locale]: compileIcuCatalog({ books: message }, locale) } })
+
+    expect(counts.map((count) => testI18n.global.t('books', { count }))).toEqual(expected)
+  })
+
+  it('keeps spacing and punctuation around other arguments in a plural branch', () => {
+    const messages = compileIcuCatalog(
+      {
+        added: '{count, plural, one {Aggiunto un libro a "{name}"} other {Aggiunti # libri a "{name}"}}',
+        failed: '{count, plural, one {{failed} non riusciti (# duplicato)} other {{failed} non riusciti (# duplicati)}}',
+      },
+      'it',
+    )
+    const testI18n = createI18n({ legacy: false, locale: 'it', messages: { it: messages } })
+
+    expect(testI18n.global.t('added', { count: 1, name: 'Preferiti' })).toBe('Aggiunto un libro a "Preferiti"')
+    expect(testI18n.global.t('added', { count: 2, name: 'Preferiti' })).toBe('Aggiunti 2 libri a "Preferiti"')
+    expect(testI18n.global.t('failed', { count: 1, failed: 2 })).toBe('2 non riusciti (1 duplicato)')
+  })
+
+  // The Crowdin translation sync runs this spec on a fresh export, so a translator rewording one of
+  // these messages must not fail it. Assert that each message renders, not what it says.
+  it.each([
+    ['en', en, [0, 1, 2]],
+    ['de', de, [0, 1, 2]],
+    ['es', spanish, [0, 1, 1_000_000]],
+    ['fr', french, [0, 1, 1_000_000]],
+    ['it', italian, [0, 1, 1_000_000]],
+    ['nl', nl, [0, 1, 2]],
+    ['pl', polish, [0, 1, 2, 5, 1_000_000]],
+    ['pt', pt, [0, 1, 1_000_000]],
+    ['sl', sl, [0, 1, 2, 3, 5]],
+  ] as const)('renders migrated Book Duplicates messages for %s', (locale, catalog, counts) => {
     const testI18n = createCatalogI18n(locale, catalog)
 
-    expect(counts.map((count) => testI18n.global.t('tools.bookDuplicates.deleteDialog.success', { count }, count))).toEqual(expectedDeletions)
-
     for (const key of [
+      'tools.bookDuplicates.deleteDialog.success',
       'tools.bookDuplicates.deleteDialog.confirm',
       'tools.bookDuplicates.review.title',
       'tools.bookDuplicates.selection.review',
@@ -269,57 +245,6 @@ describe('ICU message compilation', () => {
         expect(result).not.toContain('plural')
       }
     }
-  })
-
-  it.each([
-    ['en', en, [1, 2], ['1 failure', '2 failures']],
-    ['de', de, [1, 2], ['1 Fehler', '2 Fehler']],
-    ['es', spanish, [1, 1_000_000], ['1 fracaso', '1.000.000 fracasos']],
-    ['fr', french, [1, 1_000_000], ['1 échec', '1 000 000 échecs']],
-    ['it', italian, [1, 1_000_000], ['1 fallimento', '1.000.000 fallimenti']],
-    ['nl', nl, [1, 2], ['1 fout', '2 fouten']],
-    ['pl', polish, [1, 2, 5, 1_000_000], ['1 porażka', '2 niepowodzenia', '5 niepowodzeń', '1 000 000 niepowodzeń']],
-    ['pt', pt, [1, 1_000_000], ['1 falha', '1.000.000 falhas']],
-    ['sl', sl, [1, 2, 3, 5], ['1 napaka', '2 napaki', '3 napak', '5 napak']],
-  ] as const)('renders migrated Kobo activity plurals for %s', (locale, catalog, counts, expected) => {
-    const testI18n = createCatalogI18n(locale, catalog)
-
-    expect(counts.map((count) => testI18n.global.t('settings.reader.kobo.activity.failureCount', { count }))).toEqual(expected)
-  })
-
-  it.each([
-    ['en', en, [0, 1, 2], ['no files ready', '1 file ready', '2 files ready']],
-    ['de', de, [0, 1, 2], ['keine Dateien bereit', '1 Datei bereit', '2 Dateien bereit']],
-    ['es', spanish, [0, 1, 1_000_000], ['no hay archivos listos', '1 archivo listo', '1.000.000 archivos listos']],
-    ['fr', french, [0, 1, 1_000_000], ["aucun fichier n'est prêt", '1 fichier prêt', '1 000 000 fichiers prêts']],
-    ['it', italian, [0, 1, 1_000_000], ['nessun file pronto', '1 file pronto', '1.000.000 file pronti']],
-    ['nl', nl, [0, 1, 2], ['geen bestanden gereed', '1 bestand gereed', '2 bestanden gereed']],
-    [
-      'pl',
-      polish,
-      [0, 1, 2, 5, 1_000_000],
-      ['brak gotowych plików', '1 plik gotowy', '2 pliki gotowe', '5 plików gotowych', '1 000 000 plików gotowych'],
-    ],
-    ['pt', pt, [0, 1, 1_000_000], ['nenhum arquivo pronto', '1 arquivo pronto', '1.000.000 arquivos prontos']],
-    [
-      'sl',
-      sl,
-      [0, 1, 2, 3, 5],
-      ['0 datotek pripravljenih', '1 datoteka pripravljena', '2 datoteki pripravljeni', '3 datoteke pripravljene', '5 datotek pripravljenih'],
-    ],
-  ] as const)('renders migrated finalize-dialog counts for %s', (locale, catalog, counts, expected) => {
-    const testI18n = createCatalogI18n(locale, catalog)
-
-    expect(counts.map((count) => testI18n.global.t('bookDock.finalizeDialog.readyCount', { count }))).toEqual(expected)
-  })
-
-  it('uses the reviewed Slovenian zero/one/other mappings in the finalize dialog', () => {
-    const testI18n = createCatalogI18n('sl', sl)
-
-    expect(testI18n.global.t('bookDock.finalizeDialog.title', { count: 0 })).toBe('Zaključi brez datotek')
-    expect(testI18n.global.t('bookDock.finalizeDialog.title', { count: 1 })).toBe('Zaključi 1 datoteko')
-    expect(testI18n.global.t('bookDock.finalizeDialog.needDestination', { count: 1, without: 0 })).toBe('0 od 1 izbrane datoteke potrebuje cilj')
-    expect(testI18n.global.t('bookDock.finalizeDialog.failedWithDuplicates', { count: 1, failed: 2 })).toBe('2 neuspešna (1 podvojena)')
   })
 
   it.each([

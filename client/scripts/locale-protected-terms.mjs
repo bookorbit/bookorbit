@@ -4,6 +4,7 @@
 export const PROTECTED_SOURCE_TERMS = [
   { key: 'settings.oidc.form.slug', locales: ['es', 'fr', 'it', 'pl'] },
   { key: 'annotations.hub.exportMarkdown', locales: ['es', 'fr', 'it', 'pl'] },
+  { key: 'settings.admin.migration.host', locales: ['it'] },
 ]
 
 export function findProtectedTermDrift({ catalogs, terms = PROTECTED_SOURCE_TERMS }) {

@@ -28,6 +28,7 @@ const reference = {
 const temporaryDirectories = []
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
 })
 
@@ -296,6 +297,31 @@ describe('Crowdin translation synchronization', () => {
       storageId: 9,
       updateOption: 'keep_translations',
     })
+  })
+
+  it('gives Crowdin longer to process a source file update than any other request', async () => {
+    const catalogDirectory = await createCatalogFixture([], new Map(), { common: { save: 'Save now' } })
+    const fetchImpl = createSynchronizationFetch({ sourceCatalog: { common: { save: 'Save' } } })
+    const timeout = vi.spyOn(AbortSignal, 'timeout')
+
+    await syncCrowdinSource({
+      token: 'secret',
+      fetchImpl,
+      catalogDirectory,
+      assertTargetConfiguration: async () => {},
+    })
+
+    const timeoutFor = (signal) => timeout.mock.calls[timeout.mock.results.findIndex(({ value }) => value === signal)][0]
+    const timeouts = fetchImpl.mock.calls.map(([input, init]) => [`${init.method ?? 'GET'} ${new URL(input).pathname}`, timeoutFor(init.signal)])
+    expect(timeouts.filter(([, timeoutMs]) => timeoutMs !== 30_000)).toEqual([['PUT /api/v2/projects/912891/files/7', 180_000]])
+  })
+
+  it('names the Crowdin request that timed out', async () => {
+    const fetchImpl = vi.fn().mockRejectedValue(new DOMException('The operation was aborted due to timeout', 'TimeoutError'))
+    const client = createCrowdinClient({ token: 'secret', projectId: '42', fetchImpl })
+
+    await expect(client.sourceFileId()).rejects.toThrow('Crowdin API /projects/42/files?limit=500&offset=0 timed out after 30s')
+    await expect(client.updateSourceFile(7, 9)).rejects.toThrow('Crowdin API /projects/42/files/7 timed out after 180s')
   })
 
   it('rejects non-HTTPS export URLs returned by Crowdin', () => {
@@ -610,14 +636,18 @@ describe('Crowdin translation synchronization', () => {
         new Map([
           ['settings.oidc.form.slug', 'Slug'],
           ['annotations.hub.exportMarkdown', 'Markdown'],
+          ['settings.admin.migration.host', 'Host'],
         ]),
       ],
       ['es', new Map([['settings.oidc.form.slug', 'Nombre corto de URL']])],
       ['da', new Map([['settings.oidc.form.slug', 'Snegl']])],
+      ['fr', new Map([['settings.admin.migration.host', 'Hôte']])],
+      ['it', new Map([['settings.admin.migration.host', 'Ospite']])],
     ])
 
     expect(findProtectedTermDrift({ catalogs })).toEqual([
       { locale: 'es', key: 'settings.oidc.form.slug', message: 'Nombre corto de URL', source: 'Slug' },
+      { locale: 'it', key: 'settings.admin.migration.host', message: 'Ospite', source: 'Host' },
     ])
   })
 
@@ -628,6 +658,7 @@ describe('Crowdin translation synchronization', () => {
         new Map([
           ['settings.oidc.form.slug', 'Slug'],
           ['annotations.hub.exportMarkdown', 'Markdown'],
+          ['settings.admin.migration.host', 'Host'],
         ]),
       ],
       ['es', new Map()],
@@ -654,7 +685,10 @@ describe('Crowdin translation synchronization', () => {
   it('restores a protected term Crowdin translated instead of failing the run', async () => {
     const key = 'settings.oidc.form.slug'
     const translated = { settings: { oidc: { form: { slug: 'Slug' } } } }
-    const referenceCatalog = { ...translated, annotations: { hub: { exportMarkdown: 'Markdown' } } }
+    const referenceCatalog = {
+      settings: { ...translated.settings, admin: { migration: { host: 'Host' } } },
+      annotations: { hub: { exportMarkdown: 'Markdown' } },
+    }
     const targetCatalogs = TARGET_CATALOGS.filter(({ locale }) => locale === 'es')
     const currentCatalogs = new Map([['es', translated]])
     const catalogDirectory = await createCatalogFixture(targetCatalogs, currentCatalogs, referenceCatalog)

@@ -14,6 +14,9 @@ const SOURCE_PATH_SUFFIX = '/client/src/locales/en.json'
 const MAX_API_RESPONSE_BYTES = 2 * 1024 * 1024
 const MAX_CATALOG_BYTES = 10 * 1024 * 1024
 const REQUEST_TIMEOUT_MS = 30_000
+// Crowdin parses the whole source file before it answers a file update. For the English catalog
+// that already takes close to REQUEST_TIMEOUT_MS, and it grows with every new message.
+const SOURCE_UPDATE_TIMEOUT_MS = 180_000
 const SOURCE_SYNC_RETRY_DELAYS_MS = [0, 1_000, 2_000, 5_000, 10_000, 20_000, 30_000]
 const scriptDirectory = import.meta.dirname ?? path.join(process.cwd(), 'scripts')
 const clientRoot = path.resolve(scriptDirectory, '..')
@@ -153,14 +156,23 @@ async function downloadCatalog(fetchImpl, value) {
 }
 
 export function createCrowdinClient({ token, projectId, fetchImpl = fetch }) {
-  async function request(endpoint, init = {}) {
-    const response = await fetchImpl(`${API}${endpoint}`, {
-      ...init,
-      headers: { Authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
-      redirect: 'error',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    })
-    const body = await responseText(response, MAX_API_RESPONSE_BYTES)
+  async function request(endpoint, init = {}, timeoutMs = REQUEST_TIMEOUT_MS) {
+    let response
+    let body
+    try {
+      response = await fetchImpl(`${API}${endpoint}`, {
+        ...init,
+        headers: { Authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
+        redirect: 'error',
+        signal: AbortSignal.timeout(timeoutMs),
+      })
+      body = await responseText(response, MAX_API_RESPONSE_BYTES)
+    } catch (error) {
+      if (error?.name === 'TimeoutError') {
+        throw new Error(`Crowdin API ${endpoint} timed out after ${timeoutMs / 1000}s`, { cause: error })
+      }
+      throw error
+    }
     if (!response.ok) throw new Error(`Crowdin API ${endpoint} failed with HTTP ${response.status}: ${body.slice(0, 300)}`)
     return body ? parseJson(body, `Crowdin API ${endpoint}`) : null
   }
@@ -194,11 +206,15 @@ export function createCrowdinClient({ token, projectId, fetchImpl = fetch }) {
     },
 
     async updateSourceFile(fileId, storageId) {
-      await request(`/projects/${projectId}/files/${fileId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ storageId, updateOption: 'keep_translations' }),
-      })
+      await request(
+        `/projects/${projectId}/files/${fileId}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ storageId, updateOption: 'keep_translations' }),
+        },
+        SOURCE_UPDATE_TIMEOUT_MS,
+      )
     },
 
     async exportedCatalog(fileId, languageId) {
