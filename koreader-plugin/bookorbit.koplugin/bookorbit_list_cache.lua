@@ -70,4 +70,33 @@ function ListCache.get(key)
     return { body = body, saved_at = store:readSetting("saved_at") }
 end
 
+-- The books one account's saved pages hold, for the ids in want ({ [id] =
+-- true }): { [id] = book }, each from the newest page that has it. Reads at
+-- most MAX small files.
+function ListCache.books(account, want)
+    local found = {}
+    local ok, iter, state = pcall(lfs.dir, dir())
+    if not ok then return found end
+    local prefix = tostring(account) .. "|"
+    local pages = {}
+    for name in iter, state do
+        if name:match("%.lua$") then
+            local store = LuaSettings:open(dir() .. "/" .. name)
+            local key = store:readSetting("key")
+            local body = store:readSetting("body")
+            if type(key) == "string" and key:sub(1, #prefix) == prefix and type(body) == "table" then
+                table.insert(pages, { body = body, saved_at = tonumber(store:readSetting("saved_at")) or 0 })
+            end
+        end
+    end
+    table.sort(pages, function(a, b) return a.saved_at > b.saved_at end)
+    for _i, page in ipairs(pages) do
+        for _j, book in ipairs(type(page.body.items) == "table" and page.body.items or {}) do
+            local id = type(book) == "table" and tonumber(book.id) or nil
+            if id and want[id] and not found[id] then found[id] = book end
+        end
+    end
+    return found
+end
+
 return ListCache

@@ -1150,6 +1150,8 @@ function BookOrbitCatalog:fetchBookPage(params, title, push)
             if saved then
                 body = saved.body
                 offline_saved_at = saved.saved_at or 0
+            elseif query.on_device_filter and type(err) ~= "number" then
+                return self:showOnDeviceOffline(params, title, push)
             else
                 self:showRetry(err, function()
                     self:loadBooks(params, title, push)
@@ -1178,10 +1180,31 @@ function BookOrbitCatalog:fetchBookPage(params, title, push)
         offline_saved_at and { offline_saved_at = offline_saved_at } or { complete = complete_series })
 end
 
-function BookOrbitCatalog:loadBooks(params, title, push)
+-- opts.connect: the reader asked to reach the server, so even On device waits
+-- for a connection.
+function BookOrbitCatalog:loadBooks(params, title, push, opts)
+    if params and params.on_device_filter and not (opts and opts.connect) and not NetworkMgr:isConnected() then
+        return self:showOnDeviceOffline(params, title, push)
+    end
     self:runConnected(function()
         self:fetchBookPage(params, title, push)
     end)
+end
+
+-- On device built from this device alone, with the offline band in place of
+-- the toolbar; the band's tap is what reaches the server. The device cannot
+-- apply the server's filters (library, status, format), so offline the list
+-- is every book here, by title, and says so.
+function BookOrbitCatalog:showOnDeviceOffline(params, title, push)
+    local query = {
+        ids = params.ids,
+        on_device_filter = true,
+        sort = "title",
+        order = "asc",
+        page = params.page or 1,
+        offset = params.offset,
+    }
+    self:showBookPage(self:listOnDeviceOfflineBody(query), query, title or _("On device"), push ~= false, { offline_saved_at = 0 })
 end
 
 function BookOrbitCatalog:loadOnDevice()

@@ -27,6 +27,7 @@ local ListCache = require("bookorbit_list_cache")
 local ListData = require("bookorbit_list_data")
 local ListPages = require("bookorbit_list_pages")
 local ListView = require("bookorbit_list_view")
+local OnDeviceOffline = require("bookorbit_on_device_offline")
 
 local Screen = Device.screen
 local cloneParams = CatalogUtil.cloneParams
@@ -171,6 +172,44 @@ function CatalogLists:listSavedPage(query, err)
     local ok, saved = pcall(ListCache.get, ListCache.key(cacheAccount(self), query))
     if ok and saved then logger.warn("BookOrbit: server unreachable, showing the saved list page", err) end
     return ok and saved or nil
+end
+
+local function fileProps(path)
+    local ok, props = pcall(function()
+        local DocSettings = require("docsettings")
+        if not DocSettings:hasSidecarFile(path) then return nil end
+        return DocSettings:open(path):readSetting("doc_props")
+    end)
+    return ok and props or nil
+end
+
+-- The On device page for query (its ids, page or offset) built on this device:
+-- each book from the newest saved page that holds it, otherwise from its file.
+-- Sized for the offline band, which takes the toolbar's place.
+function CatalogLists:listOnDeviceOfflineBody(query)
+    local paths, want = {}, {}
+    for _i, id in ipairs(OnDeviceOffline.parseIds(query.ids)) do
+        local path = self:onDeviceBookPath({ id = id })
+        if path then
+            paths[id] = path
+            want[id] = true
+        end
+    end
+    local ok, saved = pcall(ListCache.books, cacheAccount(self), want)
+    if not ok then
+        logger.warn("BookOrbit: reading saved list pages failed", saved)
+        saved = {}
+    end
+    local entries = {}
+    for id, path in pairs(paths) do
+        table.insert(entries, saved[id] or OnDeviceOffline.fileEntry(id, path, fileProps(path)))
+    end
+    local kind = self:listKind({ kind = "books", params = query })
+    local size = math.min(100, self:listCapacity(kind, self:listView(kind), query, { offline = true }))
+    local body = OnDeviceOffline.body(entries, query, size)
+    -- The letter rail is drawn only for a server whose lists page by letter.
+    if not self:listsSupported() then body.buckets = nil end
+    return body
 end
 
 -- A series is drawn as one local list, while the API deliberately caps each
@@ -375,7 +414,7 @@ function CatalogLists:listReload(opts)
         else
             params.page = opts.page or 1
         end
-        self:loadBooks(params, context.title or _("Books"), false)
+        self:loadBooks(params, context.title or _("Books"), false, { connect = opts.connect })
     elseif kind == "authors" or kind == "series" then
         local page = opts.page or 1
         local offset
@@ -901,7 +940,7 @@ function CatalogLists:listRun(action, region, hold)
         if context.kind == "search" then list = { books = context.books, label = _("Search") } end
         return self:loadBookDetail(action.book.id, list and { list = list } or nil)
     elseif kind == "reconnect" then
-        return self:listReload({ page = context.page })
+        return self:listReload({ page = context.page, connect = true })
     elseif (kind == "open-author" or kind == "open-series" or kind == "open-shelf") and context.dashboard_source_index then
         -- Picking for a Home shelf: the row is the pick.
         local e = action.entry or action.shelf

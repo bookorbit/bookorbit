@@ -95,5 +95,18 @@ local newest = ListCache.key(account, { page = 5 })
 ListCache.put(newest, "not a page", 6)
 assertEqual(type(ListCache.get(newest).body), "table", "a malformed body is not saved over a page")
 
+-- What the saved pages know about given books, for On device offline: each
+-- book from the newest page that has it, for this account and these ids only.
+ListCache.MAX = 24
+ListCache.put(ListCache.key(account, { ids = "1,2", page = 1 }), { items = { { id = 1, title = "Old Dune" }, { id = 2, title = "Emma" } } }, 10)
+ListCache.put(ListCache.key(account, { sort = "title", page = 1 }), { items = { { id = 1, title = "Dune" }, { id = 3, title = "Ulysses" } } }, 20)
+ListCache.put(ListCache.key("https://books.example|other", { page = 1 }), { items = { { id = 4, title = "Not mine" } } }, 30)
+local books = ListCache.books(account, { [1] = true, [2] = true, [4] = true, [5] = true })
+assertEqual(books[1] and books[1].title, "Dune", "the newest page that holds a book wins")
+assertEqual(books[2] and books[2].title, "Emma", "an older page fills in a book newer ones lack")
+assertEqual(books[3], nil, "a book that was not asked for is left out")
+assertEqual(books[4], nil, "another account's pages are never read")
+assertEqual(books[5], nil, "a book no page holds is missing")
+
 os.remove = real_remove
 print("bookorbit_list_cache_test.lua: ok")
