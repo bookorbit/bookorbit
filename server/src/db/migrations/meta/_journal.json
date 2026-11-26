@@ -1149,6 +1149,13 @@
       "when": 1795625666494,
       "tag": "0163_add_download_client_medium_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 164,
+      "version": "7",
+      "when": 1795649105503,
+      "tag": "0164_add_reading_session_file_format_snapshot",
+      "breakpoints": true
     }
   ]
 }

@@ -299,8 +299,11 @@ export const readingSessions = pgTable(
     userId: integer('user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    // Nullable: manual sessions are book-level and have no file.
+    // Nullable: manual sessions are book-level and have no file, and a deleted file's sessions are
+    // kept book-level when its delete retains them (see `deleteBookFilesWithHashInvalidation`).
     bookFileId: integer('book_file_id').references(() => bookFiles.id, { onDelete: 'cascade' }),
+    // The deleted file's format, written when the session outlives its file.
+    fileFormatSnapshot: varchar('file_format_snapshot', { length: 20 }),
     bookId: integer('book_id')
       .notNull()
       .references(() => books.id, { onDelete: 'cascade' }),

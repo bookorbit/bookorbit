@@ -1,7 +1,7 @@
 import { inArray, sql, type SQL } from 'drizzle-orm';
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { koboEntitlementsOfBooks, koboTombstoneCtes } from './kobo-entitlement-tombstones';
-import { dropReads, retainFinishedReads } from './reading-attempt-retention';
+import { dropReads, retainFileReadingSessions, retainFinishedReads } from './reading-attempt-retention';
 import * as schema from './schema';
 
 export async function recordBookFileHashHistory(
@@ -49,7 +49,17 @@ export async function bumpKoreaderHashRevisions(db: Pick<NodePgDatabase<typeof s
   `);
 }
 
-export async function deleteBookFilesWithHashInvalidation(db: Pick<NodePgDatabase<typeof schema>, 'execute'>, filter: SQL): Promise<void> {
+/**
+ * `keepReadingSessions` is for files leaving a book that stays (a user's delete, a file gone from
+ * disk): their reading sessions stay in each reader's history. Merges move sessions to the kept copy
+ * first, and rollbacks leave it off. With it on, call this in a transaction so both commit together.
+ */
+export async function deleteBookFilesWithHashInvalidation(
+  db: Pick<NodePgDatabase<typeof schema>, 'execute'>,
+  filter: SQL,
+  options: { keepReadingSessions?: boolean } = {},
+): Promise<void> {
+  if (options.keepReadingSessions) await retainFileReadingSessions(db, filter);
   await db.execute(sql`
     with deleted as (
       delete from ${schema.bookFiles} where ${filter} returning book_id

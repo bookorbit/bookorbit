@@ -42,6 +42,27 @@ export async function retainFinishedReads(db: Executor, booksFilter: SQL): Promi
 }
 
 /**
+ * Keeps the reading sessions recorded on the files matching `filesFilter` when those files are
+ * deleted from a book that stays. Each session becomes book-level and keeps the file's format, so
+ * timelines and totals still show it.
+ *
+ * KOReader sessions still go with their file: they are re-derived from the device's page
+ * statistics, and their ids name the file, so a kept copy would be counted twice if the file
+ * came back. Call it in the same transaction as the delete, before it.
+ */
+export async function retainFileReadingSessions(db: Executor, filesFilter: SQL): Promise<void> {
+  await db.execute(sql`
+    update ${schema.readingSessions}
+    set book_file_id = null,
+        file_format_snapshot = nullif(${schema.bookFiles.format}, '')
+    from ${schema.bookFiles}
+    where ${schema.readingSessions.bookFileId} = ${schema.bookFiles.id}
+      and ${schema.readingSessions.source} is distinct from 'koreader'
+      and ${filesFilter}
+  `);
+}
+
+/**
  * Drops every read of the books matching `booksFilter`. For deletes that fold one book into
  * another (merges, rolled-back uploads), where a read of the discarded copy is not history.
  */

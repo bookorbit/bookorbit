@@ -5,6 +5,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import { workKeySql } from '../../db/book-work-key';
+import { readingSessionFormatSql } from '../../db/reading-session-format';
 import * as schema from '../../db/schema';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -106,13 +107,13 @@ export class SharedReadingInsightsRepository {
         .where(eq(schema.userBookStatus.userId, userId)),
       this.db
         .select({
-          name: sql<string>`coalesce(upper(${schema.bookFiles.format}), 'UNKNOWN')`,
+          name: sql<string>`coalesce(upper(${readingSessionFormatSql()}), 'UNKNOWN')`,
           readingSeconds: sql<number>`sum(${schema.readingSessions.durationSeconds})::int`,
         })
         .from(schema.readingSessions)
         .leftJoin(schema.bookFiles, eq(schema.bookFiles.id, schema.readingSessions.bookFileId))
         .where(and(eq(schema.readingSessions.userId, userId), gte(schema.readingSessions.startedAt, since)))
-        .groupBy(sql`coalesce(upper(${schema.bookFiles.format}), 'UNKNOWN')`)
+        .groupBy(sql`coalesce(upper(${readingSessionFormatSql()}), 'UNKNOWN')`)
         .orderBy(desc(sql`sum(${schema.readingSessions.durationSeconds})`))
         .limit(10),
       this.db

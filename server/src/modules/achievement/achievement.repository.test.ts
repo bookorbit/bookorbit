@@ -756,6 +756,18 @@ describe('AchievementRepository', () => {
       expect(boundValues(db.execute.mock.calls[0]![0])).toContain('Pacific/Auckland');
     });
 
+    it('getMaxPagesInADay counts sessions kept after their file was deleted, and still leaves out manual ones', async () => {
+      const db = { execute: vi.fn().mockResolvedValue({ rows: [{ max_pages: 10 }] }) };
+      const repo = makeRepo(db);
+
+      await repo.getMaxPagesInADay(1, 'UTC');
+
+      const sql = flattenSql(db.execute.mock.calls[0]![0]);
+      expect(sql).toContain('LEFT JOIN book_files bf ON bf.id = rs.book_file_id');
+      expect(sql).toContain('JOIN book_metadata bm ON bm.book_id = COALESCE(bf.book_id, rs.book_id)');
+      expect(sql).toContain('AND (bf.id IS NOT NULL OR rs.file_format_snapshot IS NOT NULL)');
+    });
+
     it("getPagesOnDay windows the day in the reader's timezone", async () => {
       const chain = makeSelectChain([{ value: 42 }]);
       const repo = makeRepo({ select: vi.fn().mockReturnValue(chain) });

@@ -1,8 +1,12 @@
 import { type SQL, eq } from 'drizzle-orm';
 import { PgDialect } from 'drizzle-orm/pg-core';
 
-import { deleteBooksWithHashInvalidation, deleteLibraryFoldersWithHashInvalidation } from './book-file-hash-history';
-import { books, libraryFolders } from './schema';
+import {
+  deleteBookFilesWithHashInvalidation,
+  deleteBooksWithHashInvalidation,
+  deleteLibraryFoldersWithHashInvalidation,
+} from './book-file-hash-history';
+import { bookFiles, books, libraryFolders } from './schema';
 
 const dialect = new PgDialect();
 
@@ -48,5 +52,26 @@ describe('book deletion and reading history', () => {
     );
     expect(statements[1]).toMatch(/^update "reading_attempts"/);
     expect(statements[2]).toMatch(/^with deleted as \( delete from "library_folders"/);
+  });
+});
+
+describe('book file deletion and reading sessions', () => {
+  it('keeps the sessions read on a file a book loses, book-level with the file format, before the delete', async () => {
+    const { db, statements } = recorder();
+    await deleteBookFilesWithHashInvalidation(db as never, eq(bookFiles.id, 9), { keepReadingSessions: true });
+    expect(statements).toHaveLength(2);
+    expect(statements[0]).toBe(
+      'update "reading_sessions" set book_file_id = null, file_format_snapshot = nullif("book_files"."format", \'\') ' +
+        'from "book_files" where "reading_sessions"."book_file_id" = "book_files"."id" ' +
+        'and "reading_sessions"."source" is distinct from \'koreader\' and "book_files"."id" = $1',
+    );
+    expect(statements[1]).toMatch(/^with deleted as \( delete from "book_files"/);
+  });
+
+  it('leaves sessions to the cascade when the delete does not keep them, as merges and rollbacks do', async () => {
+    const { db, statements } = recorder();
+    await deleteBookFilesWithHashInvalidation(db as never, eq(bookFiles.id, 9));
+    expect(statements).toHaveLength(1);
+    expect(statements[0]).not.toContain('reading_sessions');
   });
 });

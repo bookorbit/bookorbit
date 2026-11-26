@@ -822,7 +822,7 @@ export class ScannerRepository {
         .set({ orphaned: true, orphanedHash: file.fileHash })
         .where(and(eq(koreaderDeviceProgress.bookFileId, id), eq(koreaderDeviceProgress.orphaned, false)));
     }
-    await deleteBookFilesWithHashInvalidation(this.db, eq(bookFiles.id, id));
+    await this.db.transaction((tx) => deleteBookFilesWithHashInvalidation(tx, eq(bookFiles.id, id), { keepReadingSessions: true }));
   }
 
   async findBookFileWithContextByIno(ino: bigint, libraryId?: number) {

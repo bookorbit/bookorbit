@@ -331,7 +331,9 @@ describe('ScannerRepository', () => {
     await repo.deleteBookFile(21);
     await repo.updateBookFolderPath(4, '/books/D');
 
-    expect(db.execute).toHaveBeenCalledTimes(1);
+    // Keeping the file's reading sessions and deleting it commit in one transaction.
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+    expect(db.execute).toHaveBeenCalledTimes(2);
     expect(db.update).toHaveBeenCalledTimes(1);
   });
 

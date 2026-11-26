@@ -22,6 +22,7 @@ import { parseKoreaderSessionId } from '../../common/utils/koreader-session-id.u
 import { resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import { bookLastReadSql } from '../../db/book-last-read';
+import { readingSessionFormatSql } from '../../db/reading-session-format';
 import * as schema from '../../db/schema';
 import { bookFiles, books, koreaderSessionTombstones, readingSessionSyncCursors, readingSessions, userReadingDailyStats } from '../../db/schema';
 
@@ -497,7 +498,7 @@ export class ReadingSessionRepository {
     const conditions = [eq(readingSessions.bookId, bookId), eq(readingSessions.userId, userId)];
     if (dateFrom) conditions.push(gte(readingSessions.startedAt, new Date(dateFrom)));
     if (dateTo) conditions.push(lte(readingSessions.startedAt, new Date(dateTo)));
-    if (format) conditions.push(eq(sql`upper(${bookFiles.format})`, format.toUpperCase()));
+    if (format) conditions.push(eq(sql`upper(${readingSessionFormatSql()})`, format.toUpperCase()));
 
     const whereClause = and(...conditions);
 
@@ -528,7 +529,7 @@ export class ReadingSessionRepository {
           durationSeconds: readingSessions.durationSeconds,
           progressDelta: readingSessions.progressDelta,
           endProgress: readingSessions.endProgress,
-          format: sql<string | null>`nullif(${bookFiles.format}, '')`,
+          format: sql<string | null>`nullif(${readingSessionFormatSql()}, '')`,
           source: readingSessions.source,
           attemptId: readingSessions.attemptId,
           sessionType: readingSessions.sessionType,

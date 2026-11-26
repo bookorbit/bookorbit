@@ -1,11 +1,21 @@
 import { randomUUID } from 'crypto';
 import { hash } from 'bcryptjs';
 import { and, eq } from 'drizzle-orm';
-import type { ReadingHistoryItem, ReadingHistoryMarks, ReadingHistoryPage, ReadingHistorySummary } from '@bookorbit/types';
+import type {
+  BookReadingSessionListResponse,
+  ReadingHistoryItem,
+  ReadingHistoryMarks,
+  ReadingHistoryPage,
+  ReadingHistorySummary,
+} from '@bookorbit/types';
 
+import { deleteBookFilesWithHashInvalidation } from '../src/db/book-file-hash-history';
 import * as schema from '../src/db/schema';
+import { AchievementRepository } from '../src/modules/achievement/achievement.repository';
 import { BookRepository } from '../src/modules/book/book.repository';
 import { DashboardWidgetRepository } from '../src/modules/dashboard/dashboard-widget.repository';
+import { ScannerRepository } from '../src/modules/scanner/scanner.repository';
+import { UserStatisticsRepository } from '../src/modules/user-statistics/user-statistics.repository';
 import { YearReviewRepository } from '../src/modules/year-review/year-review.repository';
 import { closeE2EContext, createE2EContext, seedLibrary, type E2EContext } from './e2e/app-harness';
 
@@ -290,5 +300,80 @@ describe('Reading history (docker e2e)', { timeout: TIMEOUT }, () => {
     ]);
     expect(split.summary.records.mostReread).toBeNull();
     expect((await finishedInYear()).map((book) => book.bookId)).toEqual([ebook, audiobook]);
+  });
+
+  it('keeps the sessions read on a deleted file, with its format, but lets KOReader and merge deletes take theirs', async () => {
+    const bookId = await createBook('Read-Aloud Edition', [], 320);
+    const addFile = async (name: string, format: string) => {
+      sequence++;
+      const [file] = await ctx.db
+        .insert(schema.bookFiles)
+        .values({
+          bookId,
+          libraryFolderId,
+          absolutePath: `${E2E_ROOT}/${name}`,
+          relPath: name,
+          ino: BigInt(300_000 + sequence),
+          sizeBytes: 2048,
+          format,
+          role: 'content',
+        })
+        .returning({ id: schema.bookFiles.id });
+      return file.id;
+    };
+    const readAloud = await addFile('read-aloud.epub', 'epub');
+    const goneFromDisk = await addFile('gone.pdf', 'pdf');
+    const mergedAway = await addFile('duplicate.mobi', 'mobi');
+    const session = (bookFileId: number, sessionId: string, source: 'web' | 'koreader', startedAt: string) => ({
+      userId: reader.id,
+      bookId,
+      bookFileId,
+      sessionId,
+      source,
+      startedAt: new Date(startedAt),
+      endedAt: new Date(Date.parse(startedAt) + 30 * 60_000),
+      durationSeconds: 1800,
+      progressDelta: 5,
+    });
+    await ctx.db
+      .insert(schema.readingSessions)
+      .values([
+        session(readAloud, randomUUID(), 'web', '2026-06-01T10:00:00Z'),
+        session(readAloud, `kor:device:${readAloud}:1780394400`, 'koreader', '2026-06-02T10:00:00Z'),
+        session(goneFromDisk, randomUUID(), 'web', '2026-06-03T10:00:00Z'),
+        session(mergedAway, randomUUID(), 'web', '2026-06-04T10:00:00Z'),
+      ]);
+    const pagesBefore = await ctx.app.get(AchievementRepository).getMaxSessionPages(reader.id);
+
+    await ctx.app.get(BookRepository).deleteBookFile(readAloud);
+    await ctx.app.get(ScannerRepository).deleteBookFile(goneFromDisk);
+    await deleteBookFilesWithHashInvalidation(ctx.db, eq(schema.bookFiles.id, mergedAway));
+
+    const kept = await ctx.db
+      .select({
+        source: schema.readingSessions.source,
+        bookFileId: schema.readingSessions.bookFileId,
+        fileFormatSnapshot: schema.readingSessions.fileFormatSnapshot,
+      })
+      .from(schema.readingSessions)
+      .where(eq(schema.readingSessions.bookId, bookId))
+      .orderBy(schema.readingSessions.startedAt);
+    expect(kept).toEqual([
+      { source: 'web', bookFileId: null, fileFormatSnapshot: 'epub' },
+      { source: 'web', bookFileId: null, fileFormatSnapshot: 'pdf' },
+    ]);
+
+    const { status, body } = await get<BookReadingSessionListResponse>(reader.token, `/books/${bookId}/sessions?format=EPUB`);
+    expect(status).toBe(200);
+    expect(body.items).toEqual([expect.objectContaining({ bookFileId: null, format: 'epub', source: 'web' })]);
+
+    const timeline = await ctx.app
+      .get(UserStatisticsRepository)
+      .getSessionTimelineItems(reader.id, null, undefined, new Date('2026-06-01T00:00:00Z'), new Date('2026-06-05T00:00:00Z'));
+    expect(timeline.filter((item) => item.bookId === bookId).map((item) => item.bookFormat)).toEqual(['epub', 'pdf']);
+
+    // 5% of 320 pages: the kept session still counts toward page achievements.
+    expect(pagesBefore).toBe(16);
+    await expect(ctx.app.get(AchievementRepository).getMaxSessionPages(reader.id)).resolves.toBe(16);
   });
 });

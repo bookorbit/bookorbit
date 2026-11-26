@@ -1,0 +1,1 @@
+ALTER TABLE "reading_sessions" ADD COLUMN "file_format_snapshot" varchar(20);

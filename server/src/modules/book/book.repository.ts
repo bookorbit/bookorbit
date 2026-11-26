@@ -1802,7 +1802,7 @@ export class BookRepository {
   }
 
   async deleteBookFile(fileId: number): Promise<void> {
-    await deleteBookFilesWithHashInvalidation(this.db, eq(bookFiles.id, fileId));
+    await this.db.transaction((tx) => deleteBookFilesWithHashInvalidation(tx, eq(bookFiles.id, fileId), { keepReadingSessions: true }));
   }
 
   async updateBookFile(

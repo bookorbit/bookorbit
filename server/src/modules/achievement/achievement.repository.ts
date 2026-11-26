@@ -40,6 +40,14 @@ export interface ClaimedAchievementRow {
 
 export type CelebrationAcknowledgementResult = 'acknowledged' | 'foreign' | 'missing';
 
+/**
+ * Sessions read from a file, including ones kept after their file was deleted. Manual sessions have
+ * neither, and page counts leave them out. Needs `book_files` left joined on the session's file.
+ */
+function readFromFile() {
+  return or(isNotNull(bookFiles.id), isNotNull(readingSessions.fileFormatSnapshot));
+}
+
 @Injectable()
 export class AchievementRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
@@ -1084,11 +1092,12 @@ export class AchievementRepository {
         value: sql<number>`coalesce(max(${bookMetadata.pageCount} * least(greatest(${readingSessions.progressDelta}, 0), 100) / 100.0), 0)::float`,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, sql`coalesce(${bookFiles.bookId}, ${readingSessions.bookId})`))
       .where(
         and(
           eq(readingSessions.userId, userId),
+          readFromFile(),
           isNotNull(bookMetadata.pageCount),
           gt(bookMetadata.pageCount, 0),
           isNotNull(readingSessions.progressDelta),
@@ -1109,11 +1118,12 @@ export class AchievementRepository {
         value: sql<number>`coalesce(sum(${bookMetadata.pageCount} * least(greatest(${readingSessions.progressDelta}, 0), 100) / 100.0), 0)::float`,
       })
       .from(readingSessions)
-      .innerJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
-      .innerJoin(bookMetadata, eq(bookMetadata.bookId, bookFiles.bookId))
+      .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
+      .innerJoin(bookMetadata, eq(bookMetadata.bookId, sql`coalesce(${bookFiles.bookId}, ${readingSessions.bookId})`))
       .where(
         and(
           eq(readingSessions.userId, userId),
+          readFromFile(),
           gte(readingSessions.startedAt, dayStart),
           lt(readingSessions.startedAt, dayEnd),
           isNotNull(bookMetadata.pageCount),
@@ -1132,9 +1142,10 @@ export class AchievementRepository {
       SELECT COALESCE(MAX(day_pages), 0)::float AS max_pages FROM (
         SELECT SUM(bm.page_count * LEAST(GREATEST(rs.progress_delta, 0), 100) / 100.0) AS day_pages
         FROM reading_sessions rs
-        JOIN book_files bf ON bf.id = rs.book_file_id
-        JOIN book_metadata bm ON bm.book_id = bf.book_id
+        LEFT JOIN book_files bf ON bf.id = rs.book_file_id
+        JOIN book_metadata bm ON bm.book_id = COALESCE(bf.book_id, rs.book_id)
         WHERE rs.user_id = ${userId}
+          AND (bf.id IS NOT NULL OR rs.file_format_snapshot IS NOT NULL)
           AND bm.page_count IS NOT NULL AND bm.page_count > 0
           AND rs.progress_delta IS NOT NULL AND rs.progress_delta > 0 AND rs.progress_delta <= 100
           AND rs.duration_seconds > 0

@@ -26,6 +26,7 @@ import {
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { DB } from '../../db';
 import { workKeySql } from '../../db/book-work-key';
+import { readingSessionFormatSql } from '../../db/reading-session-format';
 import * as schema from '../../db/schema';
 import {
   bookFiles,
@@ -158,7 +159,7 @@ export class UserStatisticsRepository {
         bookTitle: bookMetadata.title,
         coverSource: bookMetadata.coverSource,
         metadataUpdatedAt: bookMetadata.updatedAt,
-        format: bookFiles.format,
+        format: readingSessionFormatSql(),
         source: readingSessions.source,
         sessionType: readingSessions.sessionType,
         startedAt: readingSessions.startedAt,
@@ -300,7 +301,7 @@ export class UserStatisticsRepository {
         on all_sessions.book_id = first_completions.book_id
        and all_sessions.user_id = ${userId}
       left join lateral (
-        select upper(coalesce(${bookFiles.format}, 'UNKNOWN')) as format
+        select upper(coalesce(${bookFiles.format}, completion_session.file_format_snapshot, 'UNKNOWN')) as format
         from ${readingSessions} completion_session
         left join ${bookFiles} on ${bookFiles.id} = completion_session.book_file_id
         where completion_session.user_id = ${userId}
@@ -403,7 +404,7 @@ export class UserStatisticsRepository {
     format?: string,
     media?: 'reading' | 'listening',
   ): Promise<{ availableFormats: string[]; bands: ActivityPaceBandRow[] }> {
-    const formatExpr = sql<string>`upper(coalesce(${bookFiles.format}, 'UNKNOWN'))`;
+    const formatExpr = sql<string>`upper(coalesce(${readingSessionFormatSql()}, 'UNKNOWN'))`;
     const mediaExpr = sql<'reading' | 'listening'>`case when ${readingSessions.sessionType} in ('tts', 'listen') then 'listening' else 'reading' end`;
     const eligible = and(
       eq(readingSessions.userId, userId),
@@ -543,7 +544,7 @@ export class UserStatisticsRepository {
     const since = this.sinceDateForDays(days);
     const resolvedTimeZone = resolveTimeZone(timeZone, 'UTC');
     const hourExpr = sql<number>`extract(hour from (${readingSessions.startedAt} AT TIME ZONE ${resolvedTimeZone}))::int`;
-    const formatExpr = sql<string>`upper(coalesce(${bookFiles.format}, 'UNKNOWN'))`;
+    const formatExpr = sql<string>`upper(coalesce(${readingSessionFormatSql()}, 'UNKNOWN'))`;
 
     const sessionBuckets = this.db
       .select({
@@ -586,7 +587,7 @@ export class UserStatisticsRepository {
         sessionId: readingSessions.id,
         bookId: readingSessions.bookId,
         bookTitle: bookMetadata.title,
-        bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
+        bookFormat: sql<string | null>`nullif(${readingSessionFormatSql()}, '')`,
         source: readingSessions.source,
         startedAt: readingSessions.startedAt,
         endedAt: readingSessions.endedAt,
@@ -622,7 +623,7 @@ export class UserStatisticsRepository {
         libraryId: books.libraryId,
         bookId: readingSessions.bookId,
         bookTitle: bookMetadata.title,
-        bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
+        bookFormat: sql<string | null>`nullif(${readingSessionFormatSql()}, '')`,
         source: readingSessions.source,
         startedAt: readingSessions.startedAt,
         endedAt: readingSessions.endedAt,
@@ -696,7 +697,7 @@ export class UserStatisticsRepository {
           libraryId: books.libraryId,
           bookId: readingSessions.bookId,
           bookTitle: bookMetadata.title,
-          bookFormat: sql<string | null>`nullif(${bookFiles.format}, '')`,
+          bookFormat: sql<string | null>`nullif(${readingSessionFormatSql()}, '')`,
           source: readingSessions.source,
           startedAt: readingSessions.startedAt,
           endedAt: readingSessions.endedAt,
@@ -804,7 +805,7 @@ export class UserStatisticsRepository {
     const libraryFilter = this.libraryFilter(this.intersectLibraryIds(accessibleLibraryIds, filterLibraryIds));
     const since = this.sinceDateForDays(days);
     const dayOfWeekExpr = sql<number>`extract(dow from ${readingSessions.startedAt})::int`;
-    const formatExpr = sql<string>`upper(coalesce(${bookFiles.format}, 'UNKNOWN'))`;
+    const formatExpr = sql<string>`upper(coalesce(${readingSessionFormatSql()}, 'UNKNOWN'))`;
 
     return this.db
       .select({
@@ -995,7 +996,7 @@ export class UserStatisticsRepository {
         durationSeconds: readingSessions.durationSeconds,
         progressDelta: readingSessions.progressDelta,
         source: readingSessions.source,
-        format: sql<string>`upper(coalesce(${bookFiles.format}, 'UNKNOWN'))`,
+        format: sql<string>`upper(coalesce(${readingSessionFormatSql()}, 'UNKNOWN'))`,
       })
       .from(readingSessions)
       .leftJoin(bookFiles, eq(bookFiles.id, readingSessions.bookFileId))
