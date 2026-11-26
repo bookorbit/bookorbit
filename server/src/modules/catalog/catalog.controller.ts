@@ -19,6 +19,11 @@ export class CatalogController {
     return this.catalogService.searchGenres(user, query.q);
   }
 
+  @Get('story-arcs')
+  searchStoryArcs(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
+    return this.catalogService.searchStoryArcs(user, query.q);
+  }
+
   @Get('tags')
   searchTags(@CurrentUser() user: RequestUser, @Query() query: SearchCatalogQueryDto) {
     return this.catalogService.searchTags(user, query.q);

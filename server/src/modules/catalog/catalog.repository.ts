@@ -21,6 +21,7 @@ import {
   bookTags,
   books,
   collections,
+  comicMetadata,
   genres,
   narrators,
   tags,
@@ -64,6 +65,22 @@ export class CatalogRepository {
 
   searchGenres(q: string, scope: CatalogSearchScope): Promise<SearchResultWithId[]> {
     return this.searchByNameWithId(q, genres, GENRE_JUNCTION, scope);
+  }
+
+  searchStoryArcs(q: string, scope: CatalogSearchScope): Promise<SearchResult[]> {
+    const term = normalizeMetadataText(q);
+    if (!term) return Promise.resolve([]);
+
+    const name = sql<string>`arc.name`;
+    return this.db
+      .select({ name })
+      .from(comicMetadata)
+      .innerJoin(books, eq(books.id, comicMetadata.bookId))
+      .crossJoin(sql`unnest(${comicMetadata.storyArcs}) as arc(name)`)
+      .where(and(accentInsensitiveIlike(name, buildSearchPattern(term)), ...this.visibilityClauses(scope)))
+      .groupBy(name)
+      .orderBy(accentInsensitiveExactMatchRank(name, term), name)
+      .limit(DEFAULT_SEARCH_LIMIT);
   }
 
   searchTags(q: string, scope: CatalogSearchScope): Promise<SearchResultWithId[]> {

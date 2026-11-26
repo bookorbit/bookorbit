@@ -43,6 +43,7 @@ interface ValueOption {
 
 const ENDPOINTS: Partial<Record<RuleField, string>> = {
   author: '/api/v1/metadata/authors',
+  storyArc: '/api/v1/metadata/story-arcs',
   genre: '/api/v1/metadata/genres',
   tag: '/api/v1/metadata/tags',
   series: '/api/v1/metadata/series',

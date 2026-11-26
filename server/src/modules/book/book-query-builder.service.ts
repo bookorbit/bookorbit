@@ -1,5 +1,5 @@
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
-import { AnyColumn, SQL, and, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
+import { AnyColumn, SQL, and, arrayContains, arrayOverlaps, eq, gt, gte, inArray, isNotNull, isNull, lt, lte, ne, not, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import {
@@ -49,6 +49,7 @@ import {
   bookTags,
   collectionBooks,
   collections,
+  comicMetadata,
   readingProgress,
   userBookRatings,
   userBookStatus,
@@ -226,6 +227,8 @@ export class BookQueryBuilder {
         return this.authorRuleToSql(operator, value as string[]);
       case 'authorGender':
         return this.authorGenderRuleToSql(operator, value as AuthorGender[]);
+      case 'storyArc':
+        return this.storyArcRuleToSql(operator, value as string[]);
       case 'genre':
         return this.genreRuleToSql(operator, value as string[]);
       case 'tag':
@@ -697,6 +700,28 @@ export class BookQueryBuilder {
         return not(hasStoryGuide);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for storyGuide field`);
+    }
+  }
+
+  private storyArcRuleToSql(operator: string, values: string[]): SQL {
+    const arcs = comicMetadata.storyArcs;
+    const hasArcs = (condition: SQL) => sql`exists (
+      select 1 from ${comicMetadata} where ${comicMetadata.bookId} = ${books.id} and ${condition}
+    )`;
+
+    switch (operator) {
+      case 'includesAny':
+        return hasArcs(arrayOverlaps(arcs, values));
+      case 'includesAll':
+        return hasArcs(arrayContains(arcs, values));
+      case 'excludesAll':
+        return not(hasArcs(arrayOverlaps(arcs, values)));
+      case 'isEmpty':
+        return not(hasArcs(sql`cardinality(${arcs}) > 0`));
+      case 'isNotEmpty':
+        return hasArcs(sql`cardinality(${arcs}) > 0`);
+      default:
+        throw new BadRequestException(`Invalid operator '${operator}' for storyArc field`);
     }
   }
 

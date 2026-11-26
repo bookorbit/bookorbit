@@ -121,6 +121,11 @@ const ruleSchema: z.ZodType<Rule> = z
       checkCustomFieldValue(rule, ctx);
       return;
     }
+    if (rule.field === 'storyArc' && ['includesAny', 'includesAll', 'excludesAll'].includes(rule.operator)) {
+      if (!Array.isArray(rule.value) || rule.value.some((value) => typeof value !== 'string' || !value.trim())) {
+        ctx.addIssue({ code: 'custom', message: 'Story arc rules require a list of names', path: ['value'] });
+      }
+    }
     if (rule.field === 'authorGender' && (rule.operator === 'includesAny' || rule.operator === 'excludesAll')) {
       if (!Array.isArray(rule.value) || rule.value.some((value) => typeof value !== 'string' || !AUTHOR_GENDER_SET.has(value))) {
         ctx.addIssue({ code: 'custom', message: 'Unknown author gender', path: ['value'] });

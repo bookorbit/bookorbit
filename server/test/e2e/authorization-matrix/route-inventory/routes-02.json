@@ -1094,6 +1094,19 @@
   {
     "file": "server/src/modules/catalog/catalog.controller.ts",
     "className": "CatalogController",
+    "methodName": "searchStoryArcs",
+    "httpMethod": "GET",
+    "path": "/metadata/story-arcs",
+    "permissions": [],
+    "libraryAccess": [],
+    "isPublic": false,
+    "allowDefault": false,
+    "useGuards": [],
+    "apiKey": "read"
+  },
+  {
+    "file": "server/src/modules/catalog/catalog.controller.ts",
+    "className": "CatalogController",
     "methodName": "searchTags",
     "httpMethod": "GET",
     "path": "/metadata/tags",

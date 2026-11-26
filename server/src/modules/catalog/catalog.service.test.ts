@@ -19,6 +19,7 @@ function makeService(libraryIds: number[] = [1, 2]) {
     searchAuthors: vi.fn(),
     searchGenres: vi.fn(),
     searchTags: vi.fn(),
+    searchStoryArcs: vi.fn(),
     searchNarrators: vi.fn(),
     searchPublishers: vi.fn(),
     searchSeries: vi.fn(),
@@ -93,6 +94,7 @@ describe('CatalogService', () => {
   it.each([
     ['authors', 'searchAuthors'],
     ['tags', 'searchTags'],
+    ['story arcs', 'searchStoryArcs'],
     ['narrators', 'searchNarrators'],
     ['publishers', 'searchPublishers'],
     ['series', 'searchSeries'],

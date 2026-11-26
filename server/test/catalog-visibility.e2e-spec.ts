@@ -18,6 +18,7 @@ const SCENARIO_TIMEOUT_MS = 60_000;
 interface CatalogNames {
   authors: string;
   genres: string;
+  'story-arcs': string;
   tags: string;
   narrators: string;
   publishers: string;
@@ -41,6 +42,7 @@ async function seedCatalogBook(
   const names: CatalogNames = {
     authors: `${queryToken} ${label} Author`,
     genres: `${queryToken} ${label} Genre`,
+    'story-arcs': `${queryToken} ${label} Arc`,
     tags: `${queryToken} ${label} Tag`,
     narrators: `${queryToken} ${label} Narrator`,
     publishers: `${queryToken} ${label} Publisher`,
@@ -74,6 +76,7 @@ async function seedCatalogBook(
     language: names.languages,
   });
   await Promise.all([
+    ctx.db.insert(schema.comicMetadata).values({ bookId: book!.id, storyArcs: [names['story-arcs'], 'Another Arc'] }),
     ctx.db.insert(schema.bookAuthors).values({ bookId: book!.id, authorId: author!.id }),
     ctx.db.insert(schema.bookGenres).values({ bookId: book!.id, genreId: genre!.id }),
     ctx.db.insert(schema.bookTags).values({ bookId: book!.id, tagId: tag!.id }),
@@ -191,6 +194,77 @@ describe('Catalog visibility (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
     });
     expect(cleared.statusCode).toBe(200);
     expect(cleared.json()).toEqual(expect.objectContaining({ id: scope.id, filter: null, bookCount: 0 }));
+  });
+
+  it('matches exact arc names and treats missing metadata, null arrays, and empty arrays alike', async () => {
+    const library = await createLibraryWithFolder(ctx, { name: `${queryToken} Arcs` });
+    const arc = 'Event "A", Part II';
+    const other = 'Another event';
+    const arcs = [[arc, other], [arc], [`${arc}: Aftermath`], [], null, undefined];
+    const ids: number[] = [];
+    for (const [index, storyArcs] of arcs.entries()) {
+      const [book] = await ctx.db
+        .insert(schema.books)
+        .values({
+          libraryId: library.libraryId,
+          libraryFolderId: library.libraryFolderId,
+          folderPath: `${library.folderPath}/issue-${index}`,
+          status: 'present',
+        })
+        .returning({ id: schema.books.id });
+      const id = book!.id;
+      ids.push(id);
+      await ctx.db.insert(schema.bookMetadata).values({ bookId: id, title: `Issue ${index}` });
+      if (storyArcs !== undefined) await ctx.db.insert(schema.comicMetadata).values({ bookId: id, storyArcs });
+    }
+
+    for (const [operator, value, expected] of [
+      ['includesAny', [arc], ids.slice(0, 2)],
+      ['includesAll', [arc, other], ids.slice(0, 1)],
+      ['excludesAll', [arc, other], ids.slice(2)],
+      ['isEmpty', undefined, ids.slice(3)],
+      ['isNotEmpty', undefined, ids.slice(0, 3)],
+    ] as const) {
+      const filter = { type: 'group', join: 'AND', rules: [{ type: 'rule', field: 'storyArc', operator, value }] };
+      const page = await ctx.app.inject({
+        method: 'POST',
+        url: `/api/v1/libraries/${library.libraryId}/books`,
+        headers: authHeader(superuser.accessToken),
+        payload: { filter },
+      });
+      expect(page.statusCode, page.body).toBe(201);
+      expect(
+        page
+          .json<{ items: { id: number }[] }>()
+          .items.map(({ id }) => id)
+          .sort((a, b) => a - b),
+        operator,
+      ).toEqual(expected);
+    }
+  });
+
+  it('uses the same multi-arc membership for book queries and saved scopes', async () => {
+    const rule = { type: 'rule', field: 'storyArc', operator: 'includesAll', value: ['Another Arc', visible.names['story-arcs']] };
+    const filter = { type: 'group', join: 'AND', rules: [rule] };
+    const headers = authHeader(scopedReader.accessToken);
+    const created = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/smart-scopes',
+      headers,
+      payload: { name: `${queryToken} Story Arcs`, icon: 'BookMarked', defaultSort: [], filter },
+    });
+    expect(created.statusCode).toBe(201);
+    const scope = created.json();
+    expect(scope).toMatchObject({ bookCount: 1, filter });
+
+    for (const [url, payload] of [
+      ['/api/v1/books/query', { filter }],
+      [`/api/v1/smart-scopes/${scope.id}/books/query`, {}],
+    ] as const) {
+      const page = await ctx.app.inject({ method: 'POST', url, headers, payload });
+      expect(page.statusCode).toBe(201);
+      expect(page.json()).toMatchObject({ total: 1, items: [{ id: visible.bookId }] });
+    }
   });
 
   it('returns no suggestions when the reader cannot access a library', async () => {

@@ -34,6 +34,7 @@ import {
   bookTags,
   books,
   collections,
+  comicMetadata,
   genres,
   narrators,
   tags,
@@ -44,6 +45,7 @@ interface QueryChain {
   from: ReturnType<typeof vi.fn>;
   innerJoin: ReturnType<typeof vi.fn>;
   where: ReturnType<typeof vi.fn>;
+  crossJoin: ReturnType<typeof vi.fn>;
   groupBy: ReturnType<typeof vi.fn>;
   orderBy: ReturnType<typeof vi.fn>;
   limit: ReturnType<typeof vi.fn>;
@@ -54,6 +56,7 @@ function createQueryChain(rows: unknown[]): QueryChain {
     from: vi.fn(),
     innerJoin: vi.fn(),
     where: vi.fn(),
+    crossJoin: vi.fn(),
     groupBy: vi.fn(),
     orderBy: vi.fn(),
     limit: vi.fn().mockResolvedValue(rows),
@@ -63,6 +66,7 @@ function createQueryChain(rows: unknown[]): QueryChain {
   chain.innerJoin.mockReturnValue(chain);
   chain.where.mockReturnValue(chain);
   chain.groupBy.mockReturnValue(chain);
+  chain.crossJoin.mockReturnValue(chain);
   chain.orderBy.mockReturnValue(chain);
   return chain;
 }
@@ -146,6 +150,22 @@ describe('CatalogRepository', () => {
     expect(selectDistinctChain.innerJoin).toHaveBeenCalledWith(books, expect.anything());
     expect(isNotNull).toHaveBeenCalledWith(column);
     expect(inArray).toHaveBeenCalledWith(books.libraryId, [4, 9]);
+  });
+
+  it('suggests distinct visible arc names with literal matching, exact matches first and a result limit', async () => {
+    const { repository, selectChain } = makeRepository();
+    await repository.searchStoryArcs(' Event_1% ', filteredScope);
+
+    expect(selectChain.from).toHaveBeenCalledWith(comicMetadata);
+    expect(selectChain.innerJoin).toHaveBeenCalledWith(books, expect.anything());
+    expect(selectChain.crossJoin).toHaveBeenCalledWith(expect.objectContaining({ values: [comicMetadata.storyArcs] }));
+    expect(inArray).toHaveBeenCalledWith(books.libraryId, filteredScope.libraryIds);
+    expect(buildContentFilterClauses).toHaveBeenCalledWith(filteredScope.contentFilters, expect.anything());
+    const [name] = selectChain.groupBy.mock.calls[0]!;
+    expect(accentInsensitiveIlike).toHaveBeenCalledWith(name, '%Event\\_1\\%%');
+    expect(accentInsensitiveExactMatchRank).toHaveBeenCalledWith(name, 'Event_1%');
+    expect(selectChain.orderBy).toHaveBeenCalledWith(expect.objectContaining({ type: 'rank' }), name);
+    expect(selectChain.limit).toHaveBeenCalledWith(15);
   });
 
   it('lists every visible language, most common first, without a search term', async () => {

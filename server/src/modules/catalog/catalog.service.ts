@@ -19,6 +19,10 @@ export class CatalogService {
     return this.searchVisible(user, q, (scope) => this.catalogRepository.searchGenres(q, scope));
   }
 
+  searchStoryArcs(user: RequestUser, q: string) {
+    return this.searchVisible(user, q, (scope) => this.catalogRepository.searchStoryArcs(q, scope));
+  }
+
   searchTags(user: RequestUser, q: string) {
     return this.searchVisible(user, q, (scope) => this.catalogRepository.searchTags(q, scope));
   }

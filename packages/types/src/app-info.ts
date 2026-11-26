@@ -136,6 +136,8 @@ export const SERVER_FEATURES = [
    * Series page lists under Gaps.
    */
   "series-gaps-filter",
+  /** Book filters accept `storyArc` and `GET /metadata/story-arcs` suggests visible arc names. */
+  "story-arc-filter",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

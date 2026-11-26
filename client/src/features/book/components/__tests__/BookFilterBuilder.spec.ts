@@ -44,7 +44,12 @@ const stubs = {
     },
     template: `<div class="picker" :data-title="title"><slot name="trigger" /><button v-for="option in options" :key="option.value" type="button" class="pick" :data-value="option.value" @click="$emit('pick', option.value)">{{ option.label }}</button></div>`,
   },
-  FilterListValues: { props: ['field', 'modelValue'], template: '<div class="list-values" />' },
+  FilterListValues: {
+    name: 'FilterListValues',
+    emits: ['update:modelValue'],
+    props: ['field', 'modelValue'],
+    template: '<div class="list-values" />',
+  },
   Popover: passthrough,
   PopoverTrigger: passthrough,
   PopoverContent: passthrough,
@@ -120,6 +125,16 @@ describe('BookFilterBuilder', () => {
     await rows(wrapper)[0]!.get('input[aria-label="Title value"]').setValue('Dune')
 
     expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'title', operator: 'contains', value: 'Dune' }))
+  })
+
+  it('builds a Story Arc rule from the selected names', async () => {
+    const wrapper = mountBuilder()
+    await addField(wrapper, 'storyArc')
+    expect(wrapper.emitted('update:modelValue')).toBeUndefined()
+    expect(rowOperators(rows(wrapper)[0]!)).toEqual(['includesAny', 'includesAll', 'excludesAll', 'isNotEmpty', 'isEmpty'])
+    const values = ['Civil War', 'Secret Invasion']
+    wrapper.getComponent({ name: 'FilterListValues' }).vm.$emit('update:modelValue', values)
+    expect(lastUpdate(wrapper)).toEqual(group({ type: 'rule', field: 'storyArc', operator: 'includesAny', value: values }))
   })
 
   it('leaves a row without a value on screen but out of what it sends', async () => {

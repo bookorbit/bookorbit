@@ -7357,6 +7357,7 @@
         "pageCount": "Page Count",
         "author": "Author",
         "authorGender": "Author Gender",
+        "storyArc": "Story Arc",
         "genre": "Genre",
         "tag": "Tag",
         "collection": "Collection",
@@ -7489,6 +7490,7 @@
       "valueSearch": {
         "author": "Search authors",
         "series": "Search series",
+        "storyArc": "Search story arcs",
         "genre": "Search genres",
         "tag": "Search tags",
         "publisher": "Search publishers",

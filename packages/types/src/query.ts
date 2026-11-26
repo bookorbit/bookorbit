@@ -43,6 +43,7 @@ export type StaticRuleField =
   | "pageCount"
   | "author"
   | "authorGender"
+  | "storyArc"
   | "genre"
   | "tag"
   | "collection"
@@ -120,6 +121,7 @@ export const FIELD_OPERATORS: Record<StaticRuleField, RuleOperator[]> = {
   series: ["contains", "notContains", "eq", "notEq", "includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
   author: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   authorGender: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],
+  storyArc: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   genre: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   tag: ["includesAny", "includesAll", "excludesAll", "isEmpty", "isNotEmpty"],
   collection: ["includesAny", "excludesAll", "isEmpty", "isNotEmpty"],

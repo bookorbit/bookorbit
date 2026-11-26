@@ -11,6 +11,8 @@ vi.mock('drizzle-orm', () => {
   return {
     and: vi.fn((...clauses: unknown[]) => ({ type: 'and', clauses })),
     or: vi.fn((...clauses: unknown[]) => ({ type: 'or', clauses })),
+    arrayOverlaps: vi.fn((column: unknown, values: unknown[]) => ({ type: 'arrayOverlaps', column, values })),
+    arrayContains: vi.fn((column: unknown, values: unknown[]) => ({ type: 'arrayContains', column, values })),
     eq: vi.fn((left: unknown, right: unknown) => ({ type: 'eq', left, right })),
     ne: vi.fn((left: unknown, right: unknown) => ({ type: 'ne', left, right })),
     gt: vi.fn((left: unknown, right: unknown) => ({ type: 'gt', left, right })),

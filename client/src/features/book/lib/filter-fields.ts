@@ -51,6 +51,7 @@ export const FILTER_FIELD_KINDS: Record<StaticRuleField, FilterKind> = {
   authorGender: 'list',
   series: 'list',
   seriesIndex: 'number',
+  storyArc: 'list',
   genre: 'list',
   tag: 'list',
   publisher: 'list',
@@ -88,6 +89,7 @@ export const FILTER_FIELD_ICONS: Record<StaticRuleField, Component> = {
   authorGender: VenusAndMars,
   series: Library,
   seriesIndex: ListOrdered,
+  storyArc: BookMarked,
   genre: Shapes,
   tag: Tag,
   publisher: Building,
@@ -122,7 +124,7 @@ export const FILTER_FIELD_ICONS: Record<StaticRuleField, Component> = {
 export const FILTER_FIELD_GROUPS: { key: Exclude<FilterGroupKey, 'custom'>; fields: StaticRuleField[] }[] = [
   {
     key: 'book',
-    fields: ['title', 'author', 'authorGender', 'series', 'seriesIndex', 'genre', 'tag', 'publisher', 'language', 'description', 'isbn'],
+    fields: ['title', 'author', 'authorGender', 'series', 'seriesIndex', 'storyArc', 'genre', 'tag', 'publisher', 'language', 'description', 'isbn'],
   },
   { key: 'reading', fields: ['readStatus', 'readProgress', 'rating', 'startedAt', 'finishedAt', 'seriesStatus'] },
   {
