@@ -10,6 +10,7 @@
     "loading": "Chargement...",
     "search": "Rechercher",
     "back": "Retour",
+    "openInNewTab": "Ouvrir dans un nouvel onglet",
     "next": "Suivant",
     "previous": "Précédent",
     "retry": "Réessayer",
@@ -395,7 +396,11 @@
           "hint": "Comment le badge montre qu'un livre a plusieurs formats. Un livre avec un seul format a une pilule unie.",
           "options": {
             "primary": {
-              "label": "Format principal"
+              "label": "Format principal",
+              "hint": "Un badge avec le format d'ouverture de la carte."
+            },
+            "bubble": {
+              "label": "Compter les bulles"
             }
           }
         }
@@ -553,6 +558,13 @@
           "bulkDelete": "Échec de la suppression des icônes"
         }
       },
+      "libraryVisibility": {
+        "places": {
+          "shelves": {
+            "short": "Étagères"
+          }
+        }
+      },
       "tabs": {
         "theme": "Thème",
         "book-covers": "Couvertures de livres",
@@ -570,7 +582,8 @@
         "profile": "Profil",
         "privacy": "Confidentialité et partage",
         "notifications": "Notifications",
-        "restrictions": "Restrictions"
+        "restrictions": "Restrictions",
+        "apiKeys": "Clés API"
       },
       "demoRestricted": {
         "cannotEdit": "Le compte restreint à la démo ne peut pas modifier les paramètres du compte",
@@ -1496,6 +1509,7 @@
         "magic-links": "Liens magiques",
         "oidc": "OIDC / SSO",
         "tts": "Synthèse vocale",
+        "ai": "IA",
         "server-fonts": "Polices du serveur"
       },
       "tts": {
@@ -1590,6 +1604,9 @@
           "stopPreview": "Arrêter l'écoute de {name}",
           "saveVoices": "{count, plural, one {Enregistrer # voix} many {Enregistrer # voix} other {Enregistrer # voix}}"
         }
+      },
+      "ai": {
+        "loading": "Chargement"
       },
       "serverFonts": {
         "title": "Polices du serveur",

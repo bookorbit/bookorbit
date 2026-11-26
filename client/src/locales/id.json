@@ -178,7 +178,13 @@
         "surfaceBrightness": {
           "label": "Surface brightness",
           "hint": "Lighten dark mode surfaces"
+        },
+        "backgroundGroups": {
+          "structural": "Struktural"
         }
+      },
+      "storage": {
+        "active": "Aktif"
       }
     }
   }

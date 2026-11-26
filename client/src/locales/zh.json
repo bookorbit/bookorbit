@@ -10,6 +10,7 @@
     "loading": "加载中……",
     "search": "搜索",
     "back": "返回",
+    "openInNewTab": "在新标签页中打开",
     "next": "下一个",
     "previous": "上一个",
     "retry": "重试",
@@ -389,6 +390,40 @@
             "label": "锁定状态",
             "hint": "右上角的元数据锁图标，锁定状态下为橙色，解锁后为绿色"
           }
+        },
+        "formatBadgeStyle": {
+          "title": "徽章样式",
+          "hint": "徽章会显示这本书包含哪几种格式。如果这本书只有一种格式，那就始终只显示普通的胶囊标签。",
+          "options": {
+            "primary": {
+              "label": "首选格式形",
+              "hint": "胶囊标签显示首选格式，点击该卡片后将直接打开。"
+            },
+            "bubble": {
+              "label": "计数气泡形",
+              "hint": "胶囊标签显示主要格式，其他格式显示为计数气泡。"
+            },
+            "underline": {
+              "label": "下划线形",
+              "hint": "胶囊标签显示主要格式，其他格式显示为下方彩色线条。"
+            },
+            "pips": {
+              "label": "骰子点形",
+              "hint": "胶囊标签显示主要格式，其他格式显示为上方骰子点。"
+            },
+            "seal": {
+              "label": "印章形",
+              "hint": "中间显示计数，外环线段显示格式。"
+            },
+            "dots": {
+              "label": "圆点形",
+              "hint": "每种格式一个彩色圆点，鼠标悬停封面时显示完整列表。"
+            },
+            "kinds": {
+              "label": "阅读与收听形",
+              "hint": "胶囊标签显示主要格式，其他格式显示为图标。"
+            }
+          }
         }
       },
       "layout": {
@@ -485,6 +520,10 @@
           "openDetails": "打开详情",
           "openDetailsHint": "从网格和列表的缩略图进入书籍详情页"
         },
+        "highlightPeek": {
+          "label": "使用一瞥模式打开高亮",
+          "hint": "跳转到高亮，不改变阅读进度及状态"
+        },
         "filterPreview": {
           "label": "默认显示过滤器预览",
           "hint": "打开智能书架时展开当前的筛选与排序摘要"
@@ -543,6 +582,29 @@
           "delete": "删除图标失败",
           "bulkDelete": "删除图标失败"
         }
+      },
+      "libraryVisibility": {
+        "intro": "在任意位置中隐藏某个书库。该书库仍会保留在侧边栏、搜索功能及其专属页面中；并且在按书库筛选丛书或统计时，它依然会显示出来。",
+        "librariesLabel": "书库",
+        "showEverywhere": "所有地方可见",
+        "shownAgain": "每个书库重新设置为可见",
+        "saveFailed": "无法将书库设置为可见",
+        "tableLabel": "书库可见性",
+        "libraryColumn": "书库",
+        "noLibraries": "尚无要显示的书库。",
+        "shown": "可见",
+        "hidden": "隐藏",
+        "toggleLabel": "在 {place} 中隐藏 {library}",
+        "books": "{count, plural, one {# 本书} other {# 本书}}",
+        "hiddenFrom": "从 {places} 中隐藏",
+        "hiddenInOne": "在 {place} 中隐藏",
+        "hiddenInMany": "在 {count} 处地方隐藏",
+        "hiddenEverywhere": "在所有地方隐藏",
+        "legendLabel": "{place}：",
+        "newLibraries": "后期添加的书库自动显示，除非在这里手动设置隐藏。",
+        "syncLabel": "同步",
+        "syncHint": "每个服务商页面都有独立的未同步书库列表。",
+        "syncHintOne": "其设置页面有独立的未同步书库列表。"
       },
       "tabs": {
         "theme": "主题",
