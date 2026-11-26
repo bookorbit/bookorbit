@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onActivated, onMounted, ref, shallowRef, watch } from 'vue'
+import { computed, onActivated, onMounted, ref, shallowRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useMediaQuery } from '@vueuse/core'
@@ -13,6 +13,7 @@ import BrowseLibraryPicker from '@/components/browse-header/BrowseLibraryPicker.
 import BrowsePageMenu from '@/components/browse-header/BrowsePageMenu.vue'
 import { outlineButton } from '@/components/browse-header/browse-header'
 import { DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { useLibraryQueryParam } from '@/composables/useLibraryQueryParam'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
 import BookListContent from '@/features/book/components/list-page/BookListContent.vue'
@@ -45,12 +46,7 @@ const isTag = props.kind === 'tag'
 const segment = taxonomyRouteSegment(props.kind)
 const routeNames = taxonomyRouteNames(props.kind)
 
-function parseLibraryId(value: unknown): number | null {
-  const raw = typeof value === 'string' ? Number(value) : NaN
-  return Number.isInteger(raw) && raw > 0 ? raw : null
-}
-
-const libraryId = ref<number | null>(parseLibraryId(route.query.libraryId))
+const libraryId = useLibraryQueryParam()
 const { detail, similar, loaded, notFound, error: detailError, load } = useTaxonomyDetail(props.kind, entityId)
 
 function scoped(path: string): string {
@@ -100,10 +96,6 @@ function handleUp(event: MouseEvent) {
 function setLibraryId(value: number | null) {
   libraryId.value = value
 }
-
-watch(libraryId, (value) => {
-  void router.replace({ query: { ...route.query, libraryId: value ? String(value) : undefined } })
-})
 
 /* ---------- Save as Smart Scope ---------- */
 

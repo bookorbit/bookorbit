@@ -1,18 +1,30 @@
 <script setup lang="ts">
-import { shallowRef, watchEffect } from 'vue'
+import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AppChart from '@/components/charts/AppChart.vue'
 import { Layers } from '@lucide/vue'
 
 import { useChartTokens } from '@/composables/useChartTokens'
 import { useTopSeries } from '../../composables/useTopSeries'
+import { useStatisticsConfig } from '../../composables/useStatisticsConfig'
+import { drillDownLibraryQuery, type ChartDrillDownTarget } from '../../lib/chart-drill-down'
 import ChartCard from '../ChartCard.vue'
+import ChartDrillDown from '../ChartDrillDown.vue'
 
 const chartTokens = useChartTokens()
 const { t } = useI18n()
+const { filters } = useStatisticsConfig()
 
 const { data, loading, error } = useTopSeries()
+const sortedItems = computed(() => [...data.value.items].sort((a, b) => b.count - a.count))
 const option = shallowRef({})
+
+const targets = computed<ChartDrillDownTarget[]>(() =>
+  sortedItems.value.map((item, position) => ({
+    dataIndex: position,
+    text: t('statistics.drillDown.entryBooks', { name: item.name, count: item.count }),
+    to: { name: 'series-detail', params: { seriesId: item.id }, query: drillDownLibraryQuery(filters.value.libraryIds) },
+  })),
+)
 
 function withAlpha(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16)
@@ -24,7 +36,7 @@ function withAlpha(hex: string, alpha: number): string {
 watchEffect(() => {
   if (!data.value.items.length) return
 
-  const items = [...data.value.items].sort((a, b) => b.count - a.count)
+  const items = sortedItems.value
   const total = items.reduce((s, d) => s + d.count, 0)
 
   let running = 0
@@ -107,6 +119,7 @@ watchEffect(() => {
       type: 'category',
       data: items.map((d) => d.name),
       inverse: true,
+      triggerEvent: true,
       axisTick: { show: false },
       axisLabel: {
         fontSize: 11,
@@ -148,6 +161,6 @@ watchEffect(() => {
 
 <template>
   <ChartCard :title="t('statistics.charts.topSeries.title')" :icon="Layers" :color-index="8" :loading :error :empty="!data.items.length">
-    <AppChart :option autoresize style="height: 100%" />
+    <ChartDrillDown :option :targets :label="t('statistics.charts.topSeries.title')" hit="category" />
   </ChartCard>
 </template>

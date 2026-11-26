@@ -307,7 +307,7 @@ export class StatisticsService {
         user.contentFilters,
         query.libraryIds,
       );
-      const items = raw.slice(0, TOP_LIST_LIMIT).map((r) => ({ name: r.name, count: r.count }));
+      const items = raw.slice(0, TOP_LIST_LIMIT).map((r) => ({ id: r.id, name: r.name, count: r.count }));
       return { items, unknownCount: 0 };
     });
   }
@@ -336,7 +336,7 @@ export class StatisticsService {
         user.contentFilters,
         query.libraryIds,
       );
-      const items = raw.slice(0, TOP_LIST_LIMIT).map((r) => ({ genre: r.genre, count: r.count }));
+      const items = raw.slice(0, TOP_LIST_LIMIT).map((r) => ({ id: r.id, genre: r.genre, count: r.count }));
       return { items, unknownCount };
     });
   }
@@ -462,7 +462,7 @@ export class StatisticsService {
         user.contentFilters,
         query.libraryIds,
       );
-      const items = raw.flatMap((r) => (r.name ? [{ name: r.name, count: r.count }] : []));
+      const items = raw.flatMap((r) => (r.id !== null && r.name ? [{ id: r.id, name: r.name, count: r.count }] : []));
       return { items, unknownCount: 0 };
     });
   }

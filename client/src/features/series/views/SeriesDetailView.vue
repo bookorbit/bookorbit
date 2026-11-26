@@ -18,6 +18,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useBookNavigation } from '@/features/book/composables/useBookNavigation'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
+import { useLibraryQueryParam } from '@/composables/useLibraryQueryParam'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useSafeHtml } from '@/features/book/composables/useSafeHtml'
 import ToggleSwitch from '@/components/ui/ToggleSwitch.vue'
@@ -79,6 +80,7 @@ const {
   libraryId,
   load: loadBooks,
 } = useSeriesDetail(seriesId)
+useLibraryQueryParam(libraryId)
 
 const pageTitle = computed(() => {
   if (seriesInfo.value?.name) return t('series.detail.pageTitleNamed', { name: seriesInfo.value.name })

@@ -1,20 +1,33 @@
 <script setup lang="ts">
 import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AppChart from '@/components/charts/AppChart.vue'
 import { Tag } from '@lucide/vue'
 
 import { useChartTokens } from '@/composables/useChartTokens'
 import { useGenreDistribution } from '../../composables/useGenreDistribution'
+import { useStatisticsConfig } from '../../composables/useStatisticsConfig'
+import { drillDownLibraryQuery, type ChartDrillDownTarget } from '../../lib/chart-drill-down'
 import ChartCard from '../ChartCard.vue'
+import ChartDrillDown from '../ChartDrillDown.vue'
 
 const chartTokens = useChartTokens()
 const { t } = useI18n()
+const { filters } = useStatisticsConfig()
 
 const { data, loading, error } = useGenreDistribution()
 
 const total = computed(() => data.value.items.reduce((s, d) => s + d.count, 0))
+const sortedItems = computed(() => [...data.value.items].sort((a, b) => b.count - a.count))
 const option = shallowRef({})
+
+// The treemap numbers its virtual root 0, so the tiles start at 1.
+const targets = computed<ChartDrillDownTarget[]>(() =>
+  sortedItems.value.map((item, position) => ({
+    dataIndex: position + 1,
+    text: t('statistics.drillDown.entryBooks', { name: item.genre, count: item.count }),
+    to: { name: 'genre-detail', params: { id: item.id }, query: drillDownLibraryQuery(filters.value.libraryIds) },
+  })),
+)
 
 watchEffect(() => {
   if (!data.value.items.length) return
@@ -36,22 +49,21 @@ watchEffect(() => {
         type: 'treemap',
         roam: false,
         nodeClick: false,
+        cursor: 'pointer',
         breadcrumb: { show: false },
         top: 10,
         bottom: 10,
         left: 10,
         right: 10,
-        data: [...data.value.items]
-          .sort((a, b) => b.count - a.count)
-          .map((item, i) => ({
-            name: item.genre,
-            value: item.count,
-            itemStyle: {
-              color: palette[i % palette.length],
-              borderWidth: 2,
-              borderColor: background,
-            },
-          })),
+        data: sortedItems.value.map((item, i) => ({
+          name: item.genre,
+          value: item.count,
+          itemStyle: {
+            color: palette[i % palette.length],
+            borderWidth: 2,
+            borderColor: background,
+          },
+        })),
         label: {
           show: true,
           fontSize: 12,
@@ -82,6 +94,6 @@ watchEffect(() => {
     :empty="!data.items.length"
     :unknown-count="data.unknownCount"
   >
-    <AppChart :option autoresize style="height: 100%" />
+    <ChartDrillDown :option :targets :label="t('statistics.charts.genreDistribution.title')" hit="item" />
   </ChartCard>
 </template>

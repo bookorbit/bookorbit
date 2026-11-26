@@ -118,6 +118,14 @@ export function useStatisticsConfig() {
     filters.value = normalizeFilters(saved?.filters)
   }
 
+  // `init` reads the signed-in user's copy on every visit, so keep that copy current; otherwise
+  // leaving Statistics and coming back undoes every change until the next reload.
+  function save() {
+    const statisticsConfig: StatisticsSettings = { charts: config.value, filters: filters.value }
+    if (user.value) user.value = { ...user.value, settings: { ...user.value.settings, statisticsConfig } }
+    scheduleSave()
+  }
+
   const orderedCharts = computed(() => [...config.value].sort((a, b) => a.order - b.order))
   const visibleCharts = computed(() => orderedCharts.value.filter((c) => c.visible))
 
@@ -135,7 +143,7 @@ export function useStatisticsConfig() {
     const entry = config.value.find((c) => c.id === id)
     if (!entry) return
     entry.visible = !entry.visible
-    scheduleSave()
+    save()
   }
 
   function reorder(newOrder: ChartConfigEntry[]) {
@@ -160,28 +168,28 @@ export function useStatisticsConfig() {
       }))
 
     config.value = [...reorderedVisible, ...reorderedHidden]
-    scheduleSave()
+    save()
   }
 
   function setLibraryFilter(ids: number[]) {
     filters.value = { ...filters.value, libraryIds: ids }
-    scheduleSave()
+    save()
   }
 
   function setGranularity(g: StatisticsGranularity) {
     filters.value = { ...filters.value, booksOverTimeGranularity: g }
-    scheduleSave()
+    save()
   }
 
   function setDateRange(r: StatisticsDateRange) {
     filters.value = { ...filters.value, booksOverTimeRange: r }
-    scheduleSave()
+    save()
   }
 
   function resetToDefaults() {
     config.value = KNOWN_CHART_IDS.map((id, i) => ({ id, visible: true, order: i }))
     filters.value = { ...DEFAULT_FILTERS }
-    scheduleSave()
+    save()
   }
 
   function chartCategory(id: StatisticsChartId) {

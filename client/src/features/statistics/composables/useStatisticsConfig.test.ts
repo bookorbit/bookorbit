@@ -102,6 +102,21 @@ describe('useStatisticsConfig - persist', () => {
     expect(body.settings.statisticsConfig).toHaveProperty('filters')
   })
 
+  it('keeps a library choice when Statistics is opened again before a reload', async () => {
+    const { userRef } = setupAuth()
+
+    const { useStatisticsConfig } = await import('./useStatisticsConfig')
+    const first = useStatisticsConfig()
+    first.init()
+    first.setLibraryFilter([3])
+
+    const again = useStatisticsConfig()
+    again.init()
+
+    expect(again.filters.value.libraryIds).toEqual([3])
+    expect(userRef.value?.settings?.statisticsConfig?.filters.libraryIds).toEqual([3])
+  })
+
   it('shows error toast when API call throws', async () => {
     setupAuth()
     mockApi.mockRejectedValueOnce(new Error('network error'))

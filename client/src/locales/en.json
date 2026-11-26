@@ -15887,6 +15887,11 @@
       "emptyDescription": "No data available for this chart",
       "unknownField": "{count, plural, =0 {no data for this field} one {# book has no data for this field} other {# books have no data for this field}}"
     },
+    "drillDown": {
+      "entryBooks": "{name}, {count, plural, one {# book} other {# books}}",
+      "entrySize": "{name}, {size}",
+      "tapAgain": "Tap again to open"
+    },
     "breakdown": {
       "ariaLabel": "Break down by source or format"
     },

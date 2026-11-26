@@ -531,6 +531,7 @@ export class StatisticsRepository {
 
     return this.db
       .select({
+        id: authors.id,
         name: authors.name,
         count: sql<number>`count(distinct ${bookAuthors.bookId})::int`,
       })
@@ -538,7 +539,7 @@ export class StatisticsRepository {
       .innerJoin(authors, eq(authors.id, bookAuthors.authorId))
       .innerJoin(books, eq(books.id, bookAuthors.bookId))
       .where(and(filter, ...cfClauses))
-      .groupBy(authors.name)
+      .groupBy(authors.id, authors.name)
       .orderBy(desc(sql<number>`count(distinct ${bookAuthors.bookId})`));
   }
 
@@ -609,6 +610,7 @@ export class StatisticsRepository {
 
     const items = await this.db
       .select({
+        id: genres.id,
         genre: genres.name,
         count: sql<number>`count(distinct ${bookGenres.bookId})::int`,
       })
@@ -616,7 +618,7 @@ export class StatisticsRepository {
       .innerJoin(genres, eq(genres.id, bookGenres.genreId))
       .innerJoin(books, eq(books.id, bookGenres.bookId))
       .where(and(filter, ...cfClauses))
-      .groupBy(genres.name)
+      .groupBy(genres.id, genres.name)
       .orderBy(desc(sql<number>`count(distinct ${bookGenres.bookId})`));
 
     const [{ unknownCount }] = await this.db
@@ -942,6 +944,7 @@ export class StatisticsRepository {
 
     return this.db
       .select({
+        id: bookMetadata.seriesId,
         name: bookMetadata.seriesName,
         count: sql<number>`count(*)::int`,
       })

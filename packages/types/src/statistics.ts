@@ -169,6 +169,7 @@ export interface PublicationYearPoint {
 }
 
 export interface TopAuthorItem {
+  id: number;
   name: string;
   count: number;
 }
@@ -180,6 +181,7 @@ export interface MetadataCompletenessItem {
 }
 
 export interface GenreDistributionItem {
+  id: number;
   genre: string;
   count: number;
 }
@@ -258,6 +260,7 @@ export interface LargestBookItem {
 }
 
 export interface TopSeriesItem {
+  id: number;
   name: string;
   count: number;
 }

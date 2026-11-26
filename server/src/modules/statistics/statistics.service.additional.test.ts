@@ -125,8 +125,8 @@ describe('StatisticsService additional coverage', () => {
     const { service, repo } = makeService();
     repo.publicationDecade.mockResolvedValue({ items: [{ decade: 2000, count: 2 }], unknownCount: 1 });
     repo.publicationYearTimeline.mockResolvedValue({ items: [{ year: 2020, count: 3, topTitles: ['A'] }], unknownCount: 2 });
-    repo.topAuthors.mockResolvedValue([{ name: 'Author A', count: 5 }]);
-    repo.genreDistribution.mockResolvedValue({ items: [{ genre: 'Sci-Fi', count: 7 }], unknownCount: 3 });
+    repo.topAuthors.mockResolvedValue([{ id: 11, name: 'Author A', count: 5 }]);
+    repo.genreDistribution.mockResolvedValue({ items: [{ id: 21, genre: 'Sci-Fi', count: 7 }], unknownCount: 3 });
     repo.acquisitionLagScatter.mockResolvedValue({ items: [{ addedYear: 2024, lagYears: 5, count: 3 }], unknownCount: 4 });
 
     await expect(service.getPublicationDecade(makeUser(), {})).resolves.toEqual({
@@ -138,11 +138,11 @@ describe('StatisticsService additional coverage', () => {
       unknownCount: 2,
     });
     await expect(service.getTopAuthors(makeUser(), {})).resolves.toEqual({
-      items: [{ name: 'Author A', count: 5 }],
+      items: [{ id: 11, name: 'Author A', count: 5 }],
       unknownCount: 0,
     });
     await expect(service.getGenreDistribution(makeUser(), {})).resolves.toEqual({
-      items: [{ genre: 'Sci-Fi', count: 7 }],
+      items: [{ id: 21, genre: 'Sci-Fi', count: 7 }],
       unknownCount: 3,
     });
     await expect(service.getAcquisitionLagScatter(makeUser(), {})).resolves.toEqual({
@@ -194,8 +194,9 @@ describe('StatisticsService additional coverage', () => {
       { id: 2, title: 'Book', sizeBytes: 456, format: 'pdf' },
     ]);
     repo.topSeries.mockResolvedValue([
-      { name: null, count: 8 },
-      { name: 'Saga', count: 7 },
+      { id: 30, name: null, count: 8 },
+      { id: null, name: 'Orphan', count: 6 },
+      { id: 31, name: 'Saga', count: 7 },
     ]);
 
     await expect(service.getLargestBooks(makeUser(), {})).resolves.toEqual({
@@ -203,7 +204,7 @@ describe('StatisticsService additional coverage', () => {
       unknownCount: 0,
     });
     await expect(service.getTopSeries(makeUser(), {})).resolves.toEqual({
-      items: [{ name: 'Saga', count: 7 }],
+      items: [{ id: 31, name: 'Saga', count: 7 }],
       unknownCount: 0,
     });
   });

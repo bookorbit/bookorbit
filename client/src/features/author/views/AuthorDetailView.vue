@@ -19,6 +19,7 @@ import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { useLibraries } from '@/features/library/composables/useLibraries'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import { usePermissions } from '@/features/auth/composables/usePermissions'
+import { useLibraryQueryParam } from '@/composables/useLibraryQueryParam'
 import { usePageTitle } from '@/composables/usePageTitle'
 import { useDeleteBook } from '@/features/book/composables/useDeleteBook'
 import AuthorHeader from '../components/AuthorHeader.vue'
@@ -76,6 +77,7 @@ const {
   collapseSeries,
   load: loadBooks,
 } = useAuthorBooks(authorId)
+useLibraryQueryParam(libraryId)
 
 // One flag for every author page, so the state carries from one author to the next rather than
 // being re-chosen per author; the toggle below writes it back. Tracked rather than read once,

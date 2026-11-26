@@ -1,24 +1,36 @@
 <script setup lang="ts">
-import { shallowRef, watchEffect } from 'vue'
+import { computed, shallowRef, watchEffect } from 'vue'
 import { useI18n } from 'vue-i18n'
-import AppChart from '@/components/charts/AppChart.vue'
 import { HardDrive } from '@lucide/vue'
 
 import { formatBytes } from '@/lib/formatting'
 import { getFormatColor } from '@/features/book/lib/format-colors'
 import { useLargestBooks } from '../../composables/useLargestBooks'
+import type { ChartDrillDownTarget } from '../../lib/chart-drill-down'
 import ChartCard from '../ChartCard.vue'
+import ChartDrillDown from '../ChartDrillDown.vue'
 
 const { t } = useI18n()
 
 const { data, loading, error } = useLargestBooks()
+// Ascending, because the category axis draws its first entry at the bottom: the largest sits on top.
+const ascendingItems = computed(() => [...data.value.items].sort((a, b) => a.sizeBytes - b.sizeBytes))
 const option = shallowRef({})
+
+const targets = computed<ChartDrillDownTarget[]>(() =>
+  ascendingItems.value
+    .map((item, dataIndex) => ({
+      dataIndex,
+      text: t('statistics.drillDown.entrySize', { name: item.title, size: formatBytes(item.sizeBytes) }),
+      to: { name: 'book-detail', params: { bookId: item.id } },
+    }))
+    .reverse(),
+)
 
 watchEffect(() => {
   if (!data.value.items.length) return
 
-  // Sort by size ascending for horizontal bar chart (top is largest)
-  const sortedItems = [...data.value.items].sort((a, b) => a.sizeBytes - b.sizeBytes)
+  const sortedItems = ascendingItems.value
 
   option.value = {
     tooltip: {
@@ -64,6 +76,7 @@ watchEffect(() => {
     yAxis: {
       type: 'category',
       data: sortedItems.map((d) => d.title),
+      triggerEvent: true,
       axisTick: { show: false },
       axisLabel: {
         fontSize: 11,
@@ -89,6 +102,6 @@ watchEffect(() => {
 
 <template>
   <ChartCard :title="t('statistics.charts.largestBooks.title')" :icon="HardDrive" :color-index="2" :loading :error :empty="!data.items.length">
-    <AppChart :option autoresize style="height: 100%" />
+    <ChartDrillDown :option :targets :label="t('statistics.charts.largestBooks.title')" hit="category" />
   </ChartCard>
 </template>

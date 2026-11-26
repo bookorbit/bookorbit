@@ -209,13 +209,13 @@ describe('StatisticsService', () => {
   it('filters invalid top-series rows with null names', async () => {
     const { service, repo } = makeService();
     repo.topSeries.mockResolvedValue([
-      { name: null, count: 5 },
-      { name: 'Saga', count: 4 },
+      { id: 40, name: null, count: 5 },
+      { id: 41, name: 'Saga', count: 4 },
     ]);
 
     const result = await service.getTopSeries(makeUser(), {});
 
-    expect(result.items).toEqual([{ name: 'Saga', count: 4 }]);
+    expect(result.items).toEqual([{ id: 41, name: 'Saga', count: 4 }]);
   });
 
   it('reuses cached metadata score distribution for identical scope', async () => {
