@@ -1,21 +1,14 @@
 import { UploadErrorCode } from '@bookorbit/types'
 
 import { formatBytes } from '@/lib/formatting'
+import type { UploadFailure } from '@/lib/upload-session'
 
 export type BookDockUploadFailure =
   | { kind: 'unsupported'; extension: string }
   /** The dock's library does not take this format, so the file was never sent. */
   | { kind: 'notAllowed'; extension: string; library: string }
   | { kind: 'tooLarge'; limitBytes: number }
-  | {
-      kind: 'server'
-      status: number
-      errorCode: string | null
-      message: string | null
-      /** False when the error page came from something in front of BookOrbit, such as a reverse proxy. */
-      fromBookOrbit: boolean
-    }
-  | { kind: 'network' }
+  | UploadFailure
 
 /** A translation key, or server-authored text shown as-is when no translated reason fits. */
 export type UploadFailureReason = { key: string; params?: Record<string, string> } | { text: string }

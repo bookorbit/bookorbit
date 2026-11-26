@@ -1,8 +1,20 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SessionUploadOptions } from '@/lib/upload-session'
 import { ref } from 'vue'
 import { useBookUpload, SUPPORTED_FORMATS_ACCEPT } from '../useBookUpload'
 
+const sessionMocks = vi.hoisted(() => ({
+  uploadWithSession: vi.fn<(options: SessionUploadOptions) => Promise<unknown>>(),
+  cancelUploadSession: vi.fn<(sessionId: string) => void>(),
+}))
+
 vi.mock('@/lib/api', () => ({ getValidToken: vi.fn<() => Promise<string>>().mockResolvedValue('test-token') }))
+vi.mock('@/lib/upload-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/upload-session')>()),
+  needsUploadSession: (file: File) => file.name.startsWith('big'),
+  uploadWithSession: sessionMocks.uploadWithSession,
+  cancelUploadSession: sessionMocks.cancelUploadSession,
+}))
 vi.mock('@/features/settings/composables/useAppInfo', () => ({ useAppInfo: () => ({ maxUploadSizeMb: ref(500) }) }))
 
 describe('library DjVu upload', () => {
@@ -74,5 +86,72 @@ describe('library upload formats and docks', () => {
     expect(FakeXhr.sent.map((xhr) => xhr.url)).toEqual(['/api/v1/book-dock/upload?libraryId=3'])
     expect(upload.files.value[0]).toMatchObject({ status: 'done', dockFileId: 41 })
     expect(upload.uploadedBookIds.value).toEqual([])
+  })
+})
+
+describe('library upload of a large file', () => {
+  beforeEach(() => {
+    sessionMocks.uploadWithSession.mockReset()
+    sessionMocks.cancelUploadSession.mockReset()
+  })
+
+  it('sends it as a session to the library and folder, and keeps the book it made', async () => {
+    sessionMocks.uploadWithSession.mockImplementation(async ({ onProgress }) => {
+      onProgress(0.5)
+      return { ok: true, session: { bookId: 41, bookDockFileId: null } }
+    })
+    const upload = useBookUpload()
+    upload.addFiles([new File(['a'], 'big.m4b')])
+
+    await upload.startUpload(3, 9)
+
+    expect(sessionMocks.uploadWithSession).toHaveBeenCalledWith(
+      expect.objectContaining({ target: { kind: 'library', libraryId: 3, folderId: 9 }, resumeKey: upload.files.value[0]!.resumeKey }),
+    )
+    expect(upload.files.value[0]).toMatchObject({ status: 'done', progress: 100, bookId: 41 })
+    expect(upload.uploadedBookIds.value).toEqual([41])
+  })
+
+  it("sends a review upload to the library's dock", async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({ ok: true, session: { bookId: null, bookDockFileId: 12 } })
+    const upload = useBookUpload()
+    upload.addFiles([new File(['a'], 'big.m4b')])
+
+    await upload.startDockUpload(3)
+
+    expect(sessionMocks.uploadWithSession).toHaveBeenCalledWith(expect.objectContaining({ target: { kind: 'book_dock', libraryId: 3 } }))
+    expect(upload.files.value[0]).toMatchObject({ status: 'done', dockFileId: 12 })
+  })
+
+  it('resumes a retry under the same key, and cancels the session when the file is removed', async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({ ok: false, sessionId: 'session-1', failure: { kind: 'network' } })
+    const upload = useBookUpload()
+    upload.addFiles([new File(['a'], 'big.m4b')])
+    const item = upload.files.value[0]!
+
+    await upload.startUpload(3)
+    expect(item).toMatchObject({ status: 'error', error: 'Network error', uploadSessionId: 'session-1' })
+
+    upload.retryFile(item.id)
+    await upload.startUpload(3)
+    const keys = sessionMocks.uploadWithSession.mock.calls.map(([options]) => options.resumeKey)
+    expect(new Set(keys).size).toBe(1)
+
+    upload.removeFile(item.id)
+    expect(sessionMocks.cancelUploadSession).toHaveBeenCalledWith('session-1')
+  })
+
+  it("shows the server's reason for a refused file", async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({
+      ok: false,
+      sessionId: 'session-1',
+      failure: { kind: 'server', status: 422, errorCode: 'UPLOAD_CONTENT_INVALID', message: 'Not an audiobook', fromBookOrbit: true },
+    })
+    const upload = useBookUpload()
+    upload.addFiles([new File(['a'], 'big.m4b')])
+
+    await upload.startUpload(3)
+
+    expect(upload.files.value[0]).toMatchObject({ status: 'error', error: 'Not an audiobook' })
   })
 })

@@ -47,11 +47,6 @@ const GUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['DELETE', `/books/1/journal/${ID}/permanent`],
   ['GET', '/user-preferences/annotation-colors'],
   ['PUT', '/user-preferences/annotation-colors'],
-  ['GET', '/uploads/capabilities'],
-  ['POST', '/uploads'],
-  ['GET', `/uploads/${ID}`],
-  ['POST', `/uploads/${ID}/complete`],
-  ['DELETE', `/uploads/${ID}`],
   ['POST', '/achievements/celebrations/claim'],
   ['POST', `/achievements/celebrations/${ID}/acknowledge`],
   ['POST', '/tts/synthesize/captioned'],
@@ -93,6 +88,19 @@ const UNGUARDED_ROUTES: Array<[method: string, path: string]> = [
   ['GET', '/search?q=dune'],
   ['GET', '/notebook/trash'],
   ['GET', '/reading-history/summary'],
+];
+
+/**
+ * Upload sessions, which the web client uses for large files. The apps keep signing them: an older
+ * server still guards them.
+ */
+const SHARED_UPLOAD_ROUTES: Array<[method: string, path: string]> = [
+  ['GET', '/uploads/capabilities'],
+  ['POST', '/uploads'],
+  ['GET', `/uploads/${ID}`],
+  ['POST', `/uploads/${ID}/chunks`],
+  ['POST', `/uploads/${ID}/complete`],
+  ['DELETE', `/uploads/${ID}`],
 ];
 
 const THIRD_PARTY_PROGRESS_ROUTES: Array<[method: string, path: string]> = [
@@ -153,6 +161,14 @@ describe('App Attest enforcement (e2e)', { timeout: TIMEOUT }, () => {
   it('leaves the routes the web client shares open', async () => {
     for (const [method, path] of UNGUARDED_ROUTES) {
       expect((await send(method, path)).statusCode, `${method} ${path}`).toBe(200);
+    }
+  });
+
+  it('leaves upload sessions open to the web client', async () => {
+    for (const [method, path] of SHARED_UPLOAD_ROUTES) {
+      const response = await send(method, path);
+      const errorCode = (response.json() as { errorCode?: string }).errorCode ?? '';
+      expect({ method, path, appAttest: errorCode.startsWith('APP_ATTEST') }).toEqual({ method, path, appAttest: false });
     }
   });
 

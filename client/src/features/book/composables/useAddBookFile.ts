@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
 import { getValidToken } from '@/lib/api'
+import { cancelUploadSession, needsUploadSession, uploadWithSession, type UploadFailure } from '@/lib/upload-session'
+import { createUuid } from '@/lib/uuid'
 import { UPLOAD_SUPPORTED_FORMATS, type AddBookFileResult } from '@bookorbit/types'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
@@ -17,6 +19,10 @@ export interface BookFileUploadItem {
   error?: string
   result?: AddBookFileResult
   validationError?: boolean
+  /** Kept across retries, so a retried large file carries on from the bytes the server already has. */
+  resumeKey: string
+  /** A large file's unfinished session, cancelled when the file is removed from the list. */
+  uploadSessionId?: string
 }
 
 const UPLOAD_CONCURRENCY = 3
@@ -34,7 +40,41 @@ function validateFile(file: File): string | null {
   return null
 }
 
+function failureMessage(failure: UploadFailure): string {
+  if (failure.kind === 'network') return 'Network error'
+  return failure.message ?? `Upload failed (${failure.status})`
+}
+
+async function uploadInSession(item: BookFileUploadItem, bookId: number): Promise<void> {
+  item.status = 'uploading'
+  item.progress = 0
+  const outcome = await uploadWithSession({
+    file: item.file,
+    target: { kind: 'existing_book', bookId },
+    resumeKey: item.resumeKey,
+    onProgress: (fraction) => {
+      item.progress = Math.round(fraction * 100)
+    },
+  })
+  if (outcome.ok) {
+    item.status = 'done'
+    item.progress = 100
+    item.uploadSessionId = undefined
+    return
+  }
+  item.status = 'error'
+  item.error = failureMessage(outcome.failure)
+  item.uploadSessionId = outcome.sessionId ?? undefined
+}
+
+function releaseSessions(items: BookFileUploadItem[]) {
+  for (const item of items) {
+    if (item.status === 'error' && item.uploadSessionId) cancelUploadSession(item.uploadSessionId)
+  }
+}
+
 async function uploadSingle(item: BookFileUploadItem, bookId: number): Promise<void> {
+  if (needsUploadSession(item.file)) return uploadInSession(item, bookId)
   const token = await getValidToken()
   return new Promise((resolve) => {
     const formData = new FormData()
@@ -113,11 +153,13 @@ export function useAddBookFile() {
         progress: 0,
         error: error ?? undefined,
         validationError: error !== null,
+        resumeKey: createUuid(),
       })
     }
   }
 
   function removeFile(id: string) {
+    releaseSessions(files.value.filter((f) => f.id === id))
     files.value = files.value.filter((f) => f.id !== id)
   }
 
@@ -130,6 +172,7 @@ export function useAddBookFile() {
   }
 
   function reset() {
+    releaseSessions(files.value)
     files.value = []
   }
 

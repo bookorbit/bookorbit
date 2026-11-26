@@ -1,11 +1,24 @@
 import { flushPromises } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SessionUploadOptions } from '@/lib/upload-session'
 
 const { getValidTokenMock } = vi.hoisted(() => ({ getValidTokenMock: vi.fn<() => Promise<string | null>>() }))
 
 vi.mock('@/lib/api', () => ({
   api: vi.fn<() => Promise<Response>>(),
   getValidToken: getValidTokenMock,
+}))
+
+const sessionMocks = vi.hoisted(() => ({
+  uploadWithSession: vi.fn<(options: SessionUploadOptions) => Promise<unknown>>(),
+  cancelUploadSession: vi.fn<(sessionId: string) => void>(),
+}))
+
+vi.mock('@/lib/upload-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/upload-session')>()),
+  needsUploadSession: (file: File) => file.name.startsWith('large'),
+  uploadWithSession: sessionMocks.uploadWithSession,
+  cancelUploadSession: sessionMocks.cancelUploadSession,
 }))
 
 const MB = 1024 * 1024
@@ -475,5 +488,49 @@ describe('useBookDockUpload into a library dock', () => {
     await flushPromises()
 
     expect(FakeXhr.sent[0]?.url).toBe('/api/v1/book-dock/upload')
+  })
+})
+
+describe('useBookDockUpload with a large file', () => {
+  beforeEach(() => {
+    sessionMocks.uploadWithSession.mockReset()
+    sessionMocks.cancelUploadSession.mockReset()
+  })
+
+  it('sends it as a session to Unsorted or to the library dock it was dropped on', async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({ ok: true, session: { status: 'completed', bookDockFileId: 12 } })
+    const { upload } = await loadComposable()
+
+    upload.addFiles([book('large-unsorted.m4b')])
+    upload.addFiles([book('large-dock.m4b')], { dockId: 7, libraryId: 3, libraryName: 'Main', allowedFormats: [] })
+    await flushPromises()
+
+    expect(sessionMocks.uploadWithSession.mock.calls.map(([options]) => options.target)).toEqual([
+      { kind: 'book_dock' },
+      { kind: 'book_dock', libraryId: 3 },
+    ])
+    expect(FakeXhr.sent).toHaveLength(0)
+    expect(upload.files.value).toEqual([])
+    expect(upload.isUploading.value).toBe(false)
+  })
+
+  it('lists a failed session with its reason, retries it, and cancels it when dismissed', async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({ ok: false, sessionId: 'session-1', failure: { kind: 'network' } })
+    const { upload } = await loadComposable()
+
+    upload.addFiles([book('large.m4b')])
+    await flushPromises()
+    const failed = upload.failures.value[0]!
+    expect(failed).toMatchObject({ failure: { kind: 'network' }, uploadSessionId: 'session-1' })
+
+    upload.retryFailure(failed.id)
+    await flushPromises()
+    expect(sessionMocks.uploadWithSession).toHaveBeenCalledTimes(2)
+    const keys = sessionMocks.uploadWithSession.mock.calls.map(([options]) => options.resumeKey)
+    expect(keys[0]).toBe(keys[1])
+
+    upload.dismissFailure(failed.id)
+    expect(sessionMocks.cancelUploadSession).toHaveBeenCalledWith('session-1')
+    expect(upload.failures.value).toEqual([])
   })
 })

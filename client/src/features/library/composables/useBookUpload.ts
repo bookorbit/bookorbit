@@ -1,6 +1,8 @@
 import { computed, ref } from 'vue'
 import { getValidToken } from '@/lib/api'
-import { UPLOAD_SUPPORTED_FORMATS, type BookDockFile, type UploadResult } from '@bookorbit/types'
+import { cancelUploadSession, needsUploadSession, uploadWithSession, type UploadFailure } from '@/lib/upload-session'
+import { createUuid } from '@/lib/uuid'
+import { UPLOAD_SUPPORTED_FORMATS, type BookDockFile, type UploadResult, type UploadTarget } from '@bookorbit/types'
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
 
 export const SUPPORTED_FORMATS: readonly string[] = UPLOAD_SUPPORTED_FORMATS
@@ -21,6 +23,10 @@ export interface FileUploadItem {
   validationError?: boolean
   /** The chosen library does not take this format; it is held back and named in the list. */
   refusedFormat?: boolean
+  /** Kept across retries, so a retried large file carries on from the bytes the server already has. */
+  resumeKey: string
+  /** A large file's unfinished session, cancelled when the file is removed from the list. */
+  uploadSessionId?: string
 }
 
 function fileFormat(name: string): string {
@@ -42,7 +48,43 @@ function validateFile(file: File): string | null {
   return null
 }
 
-async function uploadSingle(item: FileUploadItem, url: string): Promise<void> {
+function failureMessage(failure: UploadFailure): string {
+  if (failure.kind === 'network') return 'Network error'
+  return failure.message ?? `Upload failed (${failure.status})`
+}
+
+async function uploadInSession(item: FileUploadItem, target: UploadTarget): Promise<void> {
+  item.status = 'uploading'
+  item.progress = 0
+  const outcome = await uploadWithSession({
+    file: item.file,
+    target,
+    resumeKey: item.resumeKey,
+    onProgress: (fraction) => {
+      item.progress = Math.round(fraction * 100)
+    },
+  })
+  if (outcome.ok) {
+    item.status = 'done'
+    item.progress = 100
+    item.uploadSessionId = undefined
+    if (outcome.session.bookId != null) item.bookId = outcome.session.bookId
+    if (outcome.session.bookDockFileId != null) item.dockFileId = outcome.session.bookDockFileId
+    return
+  }
+  item.status = 'error'
+  item.error = failureMessage(outcome.failure)
+  item.uploadSessionId = outcome.sessionId ?? undefined
+}
+
+function releaseSessions(items: FileUploadItem[]) {
+  for (const item of items) {
+    if (item.status === 'error' && item.uploadSessionId) cancelUploadSession(item.uploadSessionId)
+  }
+}
+
+async function uploadSingle(item: FileUploadItem, url: string, target: UploadTarget): Promise<void> {
+  if (needsUploadSession(item.file)) return uploadInSession(item, target)
   const token = await getValidToken()
   return new Promise((resolve) => {
     const formData = new FormData()
@@ -111,11 +153,13 @@ export function useBookUpload() {
         progress: 0,
         error,
         validationError: error !== undefined,
+        resumeKey: createUuid(),
       })
     }
   }
 
   function removeFile(id: string) {
+    releaseSessions(files.value.filter((f) => f.id === id))
     files.value = files.value.filter((f) => f.id !== id)
   }
 
@@ -128,6 +172,7 @@ export function useBookUpload() {
   }
 
   function reset() {
+    releaseSessions(files.value)
     files.value = []
   }
 
@@ -147,15 +192,18 @@ export function useBookUpload() {
 
   async function startUpload(libraryId: number, folderId?: number) {
     const baseUrl = `/api/v1/libraries/${libraryId}/upload`
-    await uploadPending(folderId !== undefined ? `${baseUrl}?folderId=${folderId}` : baseUrl)
+    await uploadPending(
+      folderId !== undefined ? `${baseUrl}?folderId=${folderId}` : baseUrl,
+      folderId !== undefined ? { kind: 'library', libraryId, folderId } : { kind: 'library', libraryId },
+    )
   }
 
   /** Sends the files to the library's dock, where metadata is fetched and they wait to be filed. */
   async function startDockUpload(libraryId: number) {
-    await uploadPending(`/api/v1/book-dock/upload?libraryId=${libraryId}`)
+    await uploadPending(`/api/v1/book-dock/upload?libraryId=${libraryId}`, { kind: 'book_dock', libraryId })
   }
 
-  async function uploadPending(url: string) {
+  async function uploadPending(url: string, target: UploadTarget) {
     const pending = files.value.filter((f) => f.status === 'pending')
     if (pending.length === 0) return
 
@@ -164,7 +212,7 @@ export function useBookUpload() {
     async function runNext(): Promise<void> {
       const item = pending[index++]
       if (!item) return
-      await uploadSingle(item, url)
+      await uploadSingle(item, url, target)
       await runNext()
     }
 

@@ -1,5 +1,7 @@
 import { computed, ref } from 'vue'
 import { getValidToken } from '@/lib/api'
+import { cancelUploadSession, needsUploadSession, parseUploadFailure, uploadWithSession } from '@/lib/upload-session'
+import { createUuid } from '@/lib/uuid'
 import { UPLOAD_SUPPORTED_FORMATS, type BookDockFile, type BookDockUploadTarget } from '@bookorbit/types'
 
 import { useAppInfo } from '@/features/settings/composables/useAppInfo'
@@ -19,6 +21,10 @@ export interface UploadItem {
   bookDockFile?: BookDockFile
   /** The library dock it goes into; absent for Unsorted. */
   libraryId?: number
+  /** Kept across retries, so a retried large file carries on from the bytes the server already has. */
+  resumeKey: string
+  /** A large file's unfinished session, cancelled when the failure is dismissed. */
+  uploadSessionId?: string
 }
 
 const CONCURRENCY = 3
@@ -40,26 +46,6 @@ function validateFile(file: File, target: BookDockUploadTarget | null): BookDock
   return null
 }
 
-function responseFailure(xhr: XMLHttpRequest): BookDockUploadFailure {
-  if (xhr.status === 0) return { kind: 'network' }
-  let body: unknown = null
-  try {
-    body = JSON.parse(xhr.responseText)
-  } catch {
-    // A proxy's HTML error page carries no structured reason.
-  }
-  const record = typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : null
-  const rawMessage = Array.isArray(record?.message) ? record.message[0] : record?.message
-  const message = typeof rawMessage === 'string' && rawMessage.trim() ? rawMessage.trim() : null
-  return {
-    kind: 'server',
-    status: xhr.status,
-    errorCode: typeof record?.errorCode === 'string' ? record.errorCode : null,
-    message,
-    fromBookOrbit: typeof record?.statusCode === 'number' && typeof record?.requestId === 'string',
-  }
-}
-
 function fail(item: UploadItem, failure: BookDockUploadFailure) {
   item.status = 'error'
   item.failure = failure
@@ -68,6 +54,7 @@ function fail(item: UploadItem, failure: BookDockUploadFailure) {
 async function uploadSingle(item: UploadItem): Promise<void> {
   item.status = 'uploading'
   item.progress = 0
+  if (needsUploadSession(item.file)) return uploadInSession(item)
 
   let token: string | null
   try {
@@ -99,7 +86,7 @@ async function uploadSingle(item: UploadItem): Promise<void> {
             // response parsing optional
           }
         } else {
-          fail(item, responseFailure(xhr))
+          fail(item, parseUploadFailure(xhr.status, xhr.responseText))
         }
         resolve()
       }
@@ -112,6 +99,31 @@ async function uploadSingle(item: UploadItem): Promise<void> {
       resolve()
     }
   })
+}
+
+async function uploadInSession(item: UploadItem): Promise<void> {
+  const outcome = await uploadWithSession({
+    file: item.file,
+    target: item.libraryId === undefined ? { kind: 'book_dock' } : { kind: 'book_dock', libraryId: item.libraryId },
+    resumeKey: item.resumeKey,
+    onProgress: (fraction) => {
+      item.progress = Math.round(fraction * 100)
+    },
+  })
+  if (outcome.ok) {
+    item.status = 'done'
+    item.progress = 100
+    item.uploadSessionId = undefined
+    return
+  }
+  item.uploadSessionId = outcome.sessionId ?? undefined
+  fail(item, outcome.failure)
+}
+
+function releaseSessions(items: UploadItem[]) {
+  for (const item of items) {
+    if (item.status === 'error' && item.uploadSessionId) cancelUploadSession(item.uploadSessionId)
+  }
 }
 
 const files = ref<UploadItem[]>([])
@@ -129,6 +141,7 @@ export function useBookDockUpload() {
         status: failure ? 'error' : 'pending',
         progress: 0,
         failure: failure ?? undefined,
+        resumeKey: createUuid(),
         ...(target ? { libraryId: target.libraryId } : {}),
       }
       files.value.push(item)
@@ -167,14 +180,17 @@ export function useBookDockUpload() {
   }
 
   function dismissFailure(id: string) {
+    releaseSessions(files.value.filter((f) => f.id === id))
     files.value = files.value.filter((f) => f.id !== id || f.status !== 'error')
   }
 
   function dismissAllFailures() {
+    releaseSessions(files.value)
     files.value = files.value.filter((f) => f.status !== 'error')
   }
 
   function clearAll() {
+    releaseSessions(files.value)
     files.value = []
   }
 

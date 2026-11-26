@@ -1,7 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import type { SessionUploadOptions } from '@/lib/upload-session'
 
 vi.mock('@/lib/api', () => ({
   getValidToken: vi.fn<() => Promise<string>>().mockResolvedValue('test-token'),
+}))
+
+const sessionMocks = vi.hoisted(() => ({
+  uploadWithSession: vi.fn<(options: SessionUploadOptions) => Promise<unknown>>(),
+  cancelUploadSession: vi.fn<(sessionId: string) => void>(),
+}))
+
+vi.mock('@/lib/upload-session', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/upload-session')>()),
+  needsUploadSession: (file: File) => file.name.startsWith('large'),
+  uploadWithSession: sessionMocks.uploadWithSession,
+  cancelUploadSession: sessionMocks.cancelUploadSession,
 }))
 
 vi.mock('@/features/settings/composables/useAppInfo', () => ({
@@ -419,5 +432,42 @@ describe('useAddBookFile', () => {
 
       await expect(uploadPromise).resolves.toBeUndefined()
     })
+  })
+})
+
+describe('useAddBookFile with a large file', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockXhrInstances.length = 0
+    vi.stubGlobal('fetch', vi.fn<() => Promise<{ ok: boolean }>>().mockResolvedValue({ ok: true }))
+  })
+
+  it('sends it as a session to the book, then renames the files once it is in place', async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({ ok: true, session: { status: 'completed', bookId: 8 } })
+    const { files, addFiles, startUpload } = useAddBookFile()
+    addFiles([makeFile('large.m4b')])
+
+    await startUpload(8, { renameAfter: true })
+
+    expect(sessionMocks.uploadWithSession).toHaveBeenCalledWith(expect.objectContaining({ target: { kind: 'existing_book', bookId: 8 } }))
+    expect(mockXhrInstances).toHaveLength(0)
+    expect(files.value[0]).toMatchObject({ status: 'done', progress: 100 })
+    expect(vi.mocked(fetch)).toHaveBeenCalledWith('/api/v1/books/8/rename-files', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('keeps the session of a failed file for a retry, and cancels it when the list is cleared', async () => {
+    sessionMocks.uploadWithSession.mockResolvedValue({
+      ok: false,
+      sessionId: 'session-1',
+      failure: { kind: 'server', status: 502, errorCode: null, message: null, fromBookOrbit: false },
+    })
+    const { files, addFiles, startUpload, reset } = useAddBookFile()
+    addFiles([makeFile('large.m4b')])
+
+    await startUpload(8)
+    expect(files.value[0]).toMatchObject({ status: 'error', error: 'Upload failed (502)', uploadSessionId: 'session-1' })
+
+    reset()
+    expect(sessionMocks.cancelUploadSession).toHaveBeenCalledWith('session-1')
   })
 })

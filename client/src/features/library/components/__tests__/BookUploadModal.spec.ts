@@ -69,7 +69,7 @@ beforeEach(() => {
   dockTargetsMock.mockReset().mockResolvedValue([{ dockId: 7, libraryId: 3, libraryName: 'Main Library', allowedFormats: [] }])
   permissions.dockAccess = false
   localStorage.clear()
-  files.value = [{ id: 'book', file: new File(['book'], 'book.epub'), status: 'pending', progress: 0 }]
+  files.value = [{ id: 'book', file: new File(['book'], 'book.epub'), status: 'pending', progress: 0, resumeKey: 'book-key' }]
 })
 afterEach(() => wrapper?.unmount())
 

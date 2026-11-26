@@ -22,6 +22,9 @@ export const UPLOAD_SUPPORTED_FORMATS = [
 
 export type UploadSupportedFormat = (typeof UPLOAD_SUPPORTED_FORMATS)[number];
 
+/** Bytes in each upload-session chunk. The web client sends a larger file as a session, in chunks this size. */
+export const UPLOAD_CHUNK_SIZE_BYTES = 16 * 1_024 * 1_024;
+
 export const UploadErrorCode = {
   TooLarge: "UPLOAD_TOO_LARGE",
   Empty: "UPLOAD_EMPTY",
