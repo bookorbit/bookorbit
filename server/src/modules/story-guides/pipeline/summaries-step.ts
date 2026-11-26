@@ -2,7 +2,7 @@ import type { AiRunContext, AiStep, AiStepContext, AiStepRequest } from '../../a
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson, parseJsonReply } from './json-reply';
 import { isPlaceholder, laterNames, linesUnits, namedLater, type LineNames, type LinesUnit } from './lines-step';
-import { storyLexicon } from './story-lexicon';
+import { ENGLISH_STORY_LEXICON, storyLexicon, writingIn, type StoryLexicon } from './story-lexicon';
 import { splitWords } from './name-text';
 import { unitText } from './profiles-step';
 import { mergeResult, textResult } from './step-context';
@@ -46,9 +46,9 @@ export function summariesUser(chapter: string, previous: string | null): string 
   return `${before}<chapter>\n${chapter}\n</chapter>`;
 }
 
-export function summariesRequest(chapter: string, previous: string | null): AiStepRequest {
+export function summariesRequest(chapter: string, previous: string | null, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): AiStepRequest {
   return {
-    system: SUMMARIES_SYSTEM,
+    system: writingIn(SUMMARIES_SYSTEM, lexicon, 'the summary'),
     user: summariesUser(chapter, previous),
     schema: SUMMARIES_SCHEMA,
     maxOutputTokens: SUMMARIES_MAX_OUTPUT_TOKENS,
@@ -74,9 +74,13 @@ export function summaryProblem(summary: string, names: LineNames): { reason: Sto
 }
 
 /** The one rewrite of a summary that failed a check. It needs no chapter: it only cuts or renames. */
-export function summariesRewriteRequest(summary: string, detail: string): AiStepRequest {
+export function summariesRewriteSystem(lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): string {
+  return writingIn(SUMMARIES_REWRITE_SYSTEM, lexicon, 'the summary');
+}
+
+export function summariesRewriteRequest(summary: string, detail: string, lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): AiStepRequest {
   return {
-    system: SUMMARIES_REWRITE_SYSTEM,
+    system: summariesRewriteSystem(lexicon),
     user: `"${summary}" (${detail})`,
     schema: SUMMARIES_SCHEMA,
     maxOutputTokens: SUMMARIES_MAX_OUTPUT_TOKENS,
@@ -97,13 +101,14 @@ export async function writeSummary(
 ): Promise<StorySummaryResult> {
   const result: StorySummaryResult = { through, text: null, dropped: null, rewritten: false };
   if (!chapter.trim()) return result;
-  const summary = await askForJson(ctx, summariesRequest(chapter, previous), readSummaryAnswer);
+  const lexicon = later.lexicon ?? ENGLISH_STORY_LEXICON;
+  const summary = await askForJson(ctx, summariesRequest(chapter, previous, lexicon), readSummaryAnswer);
   if (!summary || isPlaceholder(summary, later.lexicon)) return result;
   const problem = summaryProblem(summary, later);
   if (!problem) return { ...result, text: summary };
 
   result.rewritten = true;
-  const reply = await ctx.complete(summariesRewriteRequest(summary, problem.detail));
+  const reply = await ctx.complete(summariesRewriteRequest(summary, problem.detail, lexicon));
   const parsed = parseJsonReply(reply.text);
   const rewritten = parsed ? readSummaryAnswer(parsed) : null;
   const usable = rewritten && !isPlaceholder(rewritten, later.lexicon) ? rewritten : null;
@@ -146,8 +151,9 @@ export function summariesAiStep(): AiStep<StoryGuideSubject> {
     units: (ctx) => linesUnits(textResult(ctx)).units.map((unit) => ({ id: unit.id })),
     fingerprint: (ctx, unit) => {
       const { chapter, previous } = prepare(ctx, unit.id);
-      const request = summariesRequest(chapter, previous);
-      return hashOf('summaries', unit.id, request.system, request.user, SUMMARIES_REWRITE_SYSTEM, SUMMARIES_SCHEMA);
+      const lexicon = storyLexicon(ctx.subject.text.language);
+      const request = summariesRequest(chapter, previous, lexicon);
+      return hashOf('summaries', unit.id, request.system, request.user, summariesRewriteSystem(lexicon), SUMMARIES_SCHEMA);
     },
     async run(ctx, unit) {
       const { unit: summaryUnit, text, chapter, previous } = prepare(ctx, unit.id);

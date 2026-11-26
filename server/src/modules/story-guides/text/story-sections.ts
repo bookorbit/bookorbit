@@ -12,7 +12,7 @@ export const STORY_MIN_WORDS = 5000;
 /**
  * The app index's matter titles (`StoryLexicon.matterSections`), plus Dune's appendices, which
  * end its story range: "appendix", "terminology of" and "cartographic notes", and the Spanish
- * titles of the same pages. Titles are compared folded, so they are written without accents.
+ * and Hungarian titles of the same pages. Titles are compared folded, so they are written without accents.
  */
 const MATTER_TITLES = new Set([
   'contents',
@@ -76,6 +76,29 @@ const MATTER_TITLES = new Set([
   'personajes',
   'lista de personajes',
   'indice de personajes',
+  'tartalom',
+  'tartalomjegyzek',
+  'ajanlas',
+  'motto',
+  'impresszum',
+  'kolofon',
+  'cimlap',
+  'borito',
+  'hatso borito',
+  'terkep',
+  'terkepek',
+  'jegyzetek',
+  'jegyzet',
+  'targymutato',
+  'nevmutato',
+  'bibliografia',
+  'irodalomjegyzek',
+  'forrasok',
+  'szojegyzek',
+  'glosszarium',
+  'szereplok',
+  'a szereplok',
+  'szereplok listaja',
 ]);
 
 const MATTER_PHRASES = [
@@ -127,6 +150,13 @@ const MATTER_PHRASES = [
   'otros libros de',
   'guia de lectura',
   'indice onomastico',
+  'koszonetnyilvanitas',
+  'a szerzorol',
+  'a szerzo tovabbi',
+  'a szerzo mas',
+  'a forditorol',
+  'a fordito megjegyzese',
+  'olvasoi kerdesek',
   'appendix',
   'terminology of',
   'cartographic notes',

@@ -128,7 +128,7 @@ describe('mergeAiStep', () => {
     const results = Object.fromEntries(syntheticNames(text, { c1p1: [['Mary']], c1p2: [['Mary']] }));
     const ctx = fakeStepContext({ text: { book: text }, names: results });
     const step = mergeAiStep();
-    expect(step).toMatchObject({ id: 'merge', version: 2, slot: null, dependsOn: ['text', 'names'] });
+    expect(step).toMatchObject({ id: 'merge', version: 3, slot: null, dependsOn: ['text', 'names'] });
     expect(step.units(ctx)).toEqual([{ id: 'book' }]);
     expect(await step.run(ctx, { id: 'book' })).toEqual(mergeNames(text.passages, new Map(Object.entries(results))));
     expect(ctx.requests).toHaveLength(0);

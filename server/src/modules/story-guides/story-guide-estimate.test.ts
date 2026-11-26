@@ -114,6 +114,14 @@ describe('estimateStoryGuide', () => {
     expect(spanish.words).toBe(english.words);
   });
 
+  it('cuts Hungarian into more passages and more tokens than Spanish of the same word count', () => {
+    const spanish = estimateStoryGuide({ sections, language: 'es', steps: ALL_STEPS, prices: PRICES, rates: RATES });
+    const hungarian = estimateStoryGuide({ sections, language: 'hu', steps: ALL_STEPS, prices: PRICES, rates: RATES });
+    expect(estimatedPassages(sections, 'hu')).toBeGreaterThan(estimatedPassages(sections, 'es'));
+    expect(hungarian.cost!).toBeGreaterThan(spanish.cost!);
+    expect(hungarian.words).toBe(spanish.words);
+  });
+
   it('leaves the time unknown when a step that runs has no learned speed, and still prices it', () => {
     const unknown = estimateStoryGuide({ sections, steps: ALL_STEPS, prices: PRICES, rates: { ...RATES, ties: null } });
     expect(unknown.minutes).toBeNull();

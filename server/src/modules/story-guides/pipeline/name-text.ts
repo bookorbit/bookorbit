@@ -213,19 +213,34 @@ export function ownWords(
   return lexicon.nameFold ? words.map(lexicon.nameFold) : words;
 }
 
+function variants(a: string, b: string): boolean {
+  return a.startsWith(b) || b.startsWith(a) || (a.length >= 4 && a.slice(0, 4) === b.slice(0, 4));
+}
+
 /**
  * Two names' own words name two people: neither holds the other, and the first names differ.
  * Variants of one first name ("Pat" and "Patrick") and a middle name used as the first count as one.
+ * Where a book writes names in either order ("Boka János", "Sherlock Holmes"), no word is known to be
+ * the first name: the words the two do not share must then be variants of one name.
  */
-export function namesConflict(a: readonly string[], b: readonly string[]): boolean {
+export function namesConflict(a: readonly string[], b: readonly string[], eitherOrder = false): boolean {
   if (a.every((word) => b.includes(word)) || b.every((word) => a.includes(word))) return false;
-  const sameFirst =
-    a[0].startsWith(b[0]) ||
-    b[0].startsWith(a[0]) ||
-    (a[0].length >= 4 && a[0].slice(0, 4) === b[0].slice(0, 4)) ||
-    b.includes(a[0]) ||
-    a.includes(b[0]);
+  if (eitherOrder) {
+    const onlyB = b.filter((word) => !a.includes(word));
+    return !a.some((word) => !b.includes(word) && onlyB.some((other) => variants(word, other)));
+  }
+  const sameFirst = variants(a[0], b[0]) || b.includes(a[0]) || a.includes(b[0]);
   return !sameFirst;
+}
+
+/** The words a person can be called by alone: the first name, or either end of a name written in either order. */
+export function callingWords(words: readonly string[], eitherOrder: boolean): string[] {
+  return eitherOrder ? [...new Set([words[0], words[words.length - 1]])] : [words[0]];
+}
+
+/** What sets a person apart from others called by `calledBy`: the surname, or every other word where names come in either order. */
+export function familyPart(words: readonly string[], calledBy: string, eitherOrder: boolean): string | undefined {
+  return eitherOrder ? words.filter((word) => word !== calledBy).join(' ') : words.at(-1);
 }
 
 const NUMBER_WORDS =
@@ -241,16 +256,29 @@ export function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&');
 }
 
+type NameInflection = StoryLexicon['nameInflection'];
+
+/**
+ * A name as a whole word, apostrophes folded, with the case endings it can take in a language
+ * whose names inflect.
+ */
+export function namePattern(name: string, inflection: NameInflection = null, flags = 'gu'): RegExp {
+  const escaped = escapeRegExp(name.replace(/’/g, "'"));
+  return new RegExp(`(?<!${WORD_CHAR})${inflection ? inflection(escaped) : escaped}(?!${WORD_CHAR})`, flags);
+}
+
 /**
  * Where a name first occurs in a text, comparing apostrophes as one: the first whole-word
- * occurrence, else the first anywhere. Null when the text does not hold it.
+ * occurrence, else the first anywhere, else, where names inflect, the first with an ending that
+ * changes the name itself ("Boká" in "Bokát"). Null when the text does not hold it.
  */
-export function locateName(text: string, name: string): { offset: number; text: string } | null {
+export function locateName(text: string, name: string, inflection: NameInflection = null): { offset: number; text: string } | null {
   const target = name.replace(/’/g, "'");
   if (!target) return null;
   const folded = text.replace(/’/g, "'");
-  const bounded = new RegExp(`(?<!${WORD_CHAR})${escapeRegExp(target)}(?!${WORD_CHAR})`, 'u').exec(folded);
-  const offset = bounded ? bounded.index : folded.indexOf(target);
+  const bounded = namePattern(target, null, 'u').exec(folded);
+  let offset = bounded ? bounded.index : folded.indexOf(target);
+  if (offset < 0 && inflection) offset = namePattern(target, inflection, 'u').exec(folded)?.index ?? -1;
   return offset < 0 ? null : { offset, text: text.slice(offset, offset + target.length) };
 }
 

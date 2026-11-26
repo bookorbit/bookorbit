@@ -1,5 +1,5 @@
 /** Languages a story guide can be built in. */
-export const STORY_GUIDE_LANGUAGES: readonly string[] = ['en', 'es'];
+export const STORY_GUIDE_LANGUAGES: readonly string[] = ['en', 'es', 'hu'];
 
 /** Stored for a book whose language neither its metadata nor its text decides. */
 export const UNDETERMINED_LANGUAGE = 'und';
@@ -81,6 +81,7 @@ const COMMON_WORDS: Record<string, readonly string[]> = {
   it: 'il la di che e è non un una per con del della si le gli da ma come era sono io lui lei'.split(' '),
   nl: 'de het een en van is niet dat die ik je hij zij op te in met voor maar was er aan ook'.split(' '),
   pt: 'o a os as de e que não um uma do da em para com se por mais era ele ela'.split(' '),
+  hu: 'az és hogy nem egy meg már még csak volt van mint ez azt ezt sem vagy úgy mert akkor aki ami amit amikor ő neki itt ott nagyon'.split(' '),
 };
 
 const SAMPLE_SECTIONS = 3;

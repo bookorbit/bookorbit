@@ -274,10 +274,11 @@ export function checkTies(
       if (me.size > 0 && overlaps(me, ta)) ta = new Set([...ta, ...lexicon.firstPersonWords]);
       if (me.size > 0 && overlaps(me, tb)) tb = new Set([...tb, ...lexicon.firstPersonWords]);
       const wideWords = textWords(text.slice(Math.max(0, span[0] - TIE_WINDOW), paragraphEnd));
-      if (overlaps(ta, quoteWords) && overlaps(tb, quoteWords)) evidence = 'quote';
-      else if (overlaps(ta, paragraphWords) && overlaps(tb, paragraphWords)) evidence = 'paragraph';
-      else if ((overlaps(ta, paragraphWords) && overlaps(tb, wideWords)) || (overlaps(tb, paragraphWords) && overlaps(ta, wideWords)))
-        evidence = 'nearby';
+      const inA = namedBy(ta, lexicon.nameInflection);
+      const inB = namedBy(tb, lexicon.nameInflection);
+      if (inA(quoteWords) && inB(quoteWords)) evidence = 'quote';
+      else if (inA(paragraphWords) && inB(paragraphWords)) evidence = 'paragraph';
+      else if ((inA(paragraphWords) && inB(wideWords)) || (inB(paragraphWords) && inA(wideWords))) evidence = 'nearby';
       else reason = 'a side is not named near the quote';
       const shown = straight(text.slice(span[0], span[1]));
       if (
@@ -326,6 +327,17 @@ function entityOf(name: string, cast: TiesCast, placement: Readonly<Record<strin
 function overlaps(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
   for (const item of a) if (b.has(item)) return true;
   return false;
+}
+
+/** Whether words name a side: one of its tokens as a word, or with a case ending where names inflect ("bokát" for "boka"). */
+function namedBy(tokens: ReadonlySet<string>, inflection: StoryLexicon['nameInflection']): (words: ReadonlySet<string>) => boolean {
+  if (!inflection) return (words) => overlaps(tokens, words);
+  const patterns = [...tokens].filter((token) => token.length >= 3).map((token) => new RegExp(`^${inflection(escapeRegExp(token))}$`, 'u'));
+  return (words) => {
+    if (overlaps(tokens, words)) return true;
+    for (const word of words) if (patterns.some((pattern) => pattern.test(word))) return true;
+    return false;
+  };
 }
 
 /** A tie placed on the cast: `a` and `b` are the keys a payload names. */

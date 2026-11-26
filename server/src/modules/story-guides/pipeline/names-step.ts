@@ -4,7 +4,7 @@ import type { AiStep, AiStepRequest } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { splitWhileTooLong } from '../../ai-jobs/ai-split';
 import { askForJson } from './json-reply';
-import { locateName, splitWords, startsUpper, stripChars } from './name-text';
+import { locateName, namePattern, splitWords, startsUpper, stripChars } from './name-text';
 import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
 import { passageById, textResult } from './step-context';
@@ -133,7 +133,8 @@ export function namesRequest(book: NamesBook, text: string, lexicon: StoryLexico
   const by = book.authors.filter((author) => author.trim()).join(' and ');
   const user =
     `Book: ${book.title}${by ? `, by ${by}` : ''}\n\nChapter:\n` + text + '\n\nChecklist:\n' + nameCandidates(text, lexicon).join('\n') + NAMES_SHAPE;
-  return { system: NAMES_SYSTEM, user, maxOutputTokens: NAMES_MAX_OUTPUT_TOKENS, effort: 'medium' };
+  const system = lexicon.namesRule ? `${NAMES_SYSTEM}\n\n${lexicon.namesRule}` : NAMES_SYSTEM;
+  return { system, user, maxOutputTokens: NAMES_MAX_OUTPUT_TOKENS, effort: 'medium' };
 }
 
 /** The answer's narrator and entries, or null when it has no list of entries. */
@@ -165,7 +166,9 @@ export function validateEntries(
   lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
 ): RawNameEntry[] {
   const inText = passageText.replace(/’/g, "'");
-  const present = (name: string) => inText.includes(name.replace(/’/g, "'"));
+  const inflection = lexicon.nameInflection;
+  const present = (name: string) =>
+    inText.includes(name.replace(/’/g, "'")) || (inflection !== null && namePattern(name, inflection, 'u').test(inText));
   const checked: RawNameEntry[] = [];
   for (const source of entries) {
     const entry = { ...source, aliases: [...source.aliases] };
@@ -174,12 +177,15 @@ export function validateEntries(
       const parts = splitWords(alias);
       if (!startsUpper(alias) || !present(alias)) continue;
       if (parts.every((word) => lexicon.familyAndRoleWords.has(stripChars(word.toLowerCase(), ".’'")))) continue;
-      if (parts.length === 2 && lexicon.honorifics.has(stripChars(parts[0].toLowerCase(), '.'))) {
+      const honorific = (word: string) => lexicon.honorifics.has(stripChars(word.toLowerCase(), '.'));
+      // "Mr. Drebber", or "Kovács úr" where the title follows the name.
+      const titled = parts.length !== 2 ? -1 : honorific(parts[0]) ? 1 : lexicon.eitherNameOrder && honorific(parts[1]) ? 0 : -1;
+      if (titled >= 0) {
         const nameWords = new Set(splitWords(entry.name).map((word) => stripChars(word.toLowerCase(), '.')));
         const others = new Set(
           entry.aliases.filter((other) => other !== alias).flatMap((other) => splitWords(other).map((word) => stripChars(word.toLowerCase(), '.'))),
         );
-        const surname = parts[1].toLowerCase();
+        const surname = parts[titled].toLowerCase();
         if (!nameWords.has(surname) && !others.has(surname)) continue;
       }
       kept.push(alias);
@@ -260,7 +266,7 @@ export function checkNames(
   const entries = kept.flatMap((entry): StoryNameEntry[] => {
     const at: Record<string, PassageSpan> = {};
     for (const name of [entry.name, ...entry.aliases]) {
-      const found = locateName(passage.text, name);
+      const found = locateName(passage.text, name, lexicon.nameInflection);
       if (found) at[name] = { passage: passage.id, offset: found.offset, text: found.text };
     }
     if (!at[entry.name]) return [];
