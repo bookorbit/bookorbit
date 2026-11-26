@@ -23,6 +23,7 @@ import type {
 } from '@bookorbit/types';
 import { DB } from '../../db';
 import { bookLastReadAtSql } from '../../db/book-last-read';
+import { seriesHasGapsSql } from '../../db/series-gaps-sql';
 import { isDateKey, resolveTimeZone, toDateKeyInTimeZone } from '../../common/utils/timezone.utils';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern, escapeLikePattern } from '../../common/utils/accent-insensitive-search.utils';
@@ -59,6 +60,15 @@ import {
 
 type Db = NodePgDatabase<typeof schema>;
 
+/** What a rule can see beyond its own fields: who is asking and which books the query is limited to. */
+type RuleContext = {
+  userId?: number;
+  timeZone: string;
+  accessibleLibraryIds: number[];
+  implicitLibraryId?: number;
+  contentFilters?: ContentFilterRules;
+};
+
 @Injectable()
 export class BookQueryBuilder {
   constructor(
@@ -89,7 +99,15 @@ export class BookQueryBuilder {
     }
 
     if (filter) {
-      clauses.push(this.groupToSql(filter, 0, ctx.userId, timeZone));
+      clauses.push(
+        this.groupToSql(filter, 0, {
+          userId: ctx.userId,
+          timeZone,
+          accessibleLibraryIds: ctx.accessibleLibraryIds,
+          implicitLibraryId: ctx.implicitLibraryId,
+          contentFilters: ctx.contentFilters,
+        }),
+      );
     }
 
     if (ctx.q?.trim()) {
@@ -147,15 +165,14 @@ export class BookQueryBuilder {
     return this.sortBuilder.build(sort, userId, customFieldTypes, context);
   }
 
-  private groupToSql(node: GroupRule, depth: number, userId?: number, timeZone = 'UTC'): SQL {
+  private groupToSql(node: GroupRule, depth: number, ctx: RuleContext): SQL {
     if (depth > 5) throw new BadRequestException('Filter nesting exceeds maximum depth of 5');
-    const clauses = node.rules.map((r) =>
-      r.type === 'group' ? this.groupToSql(r, depth + 1, userId, timeZone) : this.ruleToSql(r, userId, timeZone),
-    );
+    const clauses = node.rules.map((r) => (r.type === 'group' ? this.groupToSql(r, depth + 1, ctx) : this.ruleToSql(r, ctx)));
     return node.join === 'AND' ? and(...clauses)! : or(...clauses)!;
   }
 
-  private ruleToSql(rule: Rule, userId?: number, timeZone = 'UTC'): SQL {
+  private ruleToSql(rule: Rule, ctx: RuleContext): SQL {
+    const { userId, timeZone } = ctx;
     const { field, operator, value, valueTo } = rule;
     const customFieldId = parseCustomRuleFieldId(field);
     if (customFieldId !== null) {
@@ -252,7 +269,7 @@ export class BookQueryBuilder {
       case 'lockStatus':
         return this.lockStatusRuleToSql(operator);
       case 'seriesStatus':
-        return this.seriesStatusRuleToSql(operator, userId);
+        return this.seriesStatusRuleToSql(operator, ctx);
       default:
         throw new BadRequestException(`Unknown filter field: ${String(field)}`);
     }
@@ -964,14 +981,44 @@ export class BookQueryBuilder {
     }
   }
 
-  private seriesStatusRuleToSql(operator: string, userId?: number): SQL {
-    if (userId === undefined) throw new BadRequestException('Series status filter requires an authenticated user');
+  private seriesStatusRuleToSql(operator: string, ctx: RuleContext): SQL {
     switch (operator) {
       case 'isUpNext':
-        return this.upNextInSeriesSql(userId);
+        if (ctx.userId === undefined) throw new BadRequestException('Series status filter requires an authenticated user');
+        return this.upNextInSeriesSql(ctx.userId);
+      case 'hasGaps':
+        return this.inSeriesWithGapsSql(ctx);
       default:
         throw new BadRequestException(`Invalid operator '${operator}' for seriesStatus field`);
     }
+  }
+
+  /**
+   * Books in a series the Series page lists under Gaps, decided by the same `seriesHasGapsSql`.
+   * A series is judged on every member the query is allowed to see (its libraries and content
+   * filters), not only the books the rest of the filter keeps: "by this author and has gaps" must
+   * still count a volume by a co-author, or it would name a gap the Series page does not. Books
+   * outside the user's libraries are left out for the same reason, and so they cannot fill a gap
+   * or reveal one.
+   */
+  private inSeriesWithGapsSql(ctx: RuleContext): SQL {
+    const scope: SQL[] = [inArray(books.libraryId, ctx.accessibleLibraryIds)];
+    if (ctx.implicitLibraryId !== undefined) scope.push(eq(books.libraryId, ctx.implicitLibraryId));
+    if (ctx.contentFilters) scope.push(...buildContentFilterClauses(ctx.contentFilters, this.db));
+
+    return sql`${books.id} in (
+      select ${bookSeriesMemberships.bookId} from ${bookSeriesMemberships}
+      where ${bookSeriesMemberships.seriesId} in (
+        select ${bookSeries.id}
+        from ${books}
+        inner join ${bookMetadata} on ${bookMetadata.bookId} = ${books.id}
+        inner join ${bookSeriesMemberships} on ${bookSeriesMemberships.bookId} = ${books.id}
+        inner join ${bookSeries} on ${bookSeries.id} = ${bookSeriesMemberships.seriesId}
+        where ${and(...scope)}
+        group by ${bookSeries.id}, ${bookSeries.expectedBookCount}
+        having ${seriesHasGapsSql(sql<number>`count(distinct ${books.id})::int`)}
+      )
+    )`;
   }
 
   /**

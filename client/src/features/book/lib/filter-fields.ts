@@ -155,6 +155,7 @@ export const NO_VALUE_OPERATORS: readonly RuleOperator[] = [
   'isLocked',
   'isUnlocked',
   'isUpNext',
+  'hasGaps',
   'isTrue',
   'isFalse',
 ]
@@ -189,6 +190,7 @@ const OPERATOR_RANK: readonly RuleOperator[] = [
   'isUnlocked',
   'isLocked',
   'isUpNext',
+  'hasGaps',
   'isTrue',
   'isFalse',
   'isNotEmpty',

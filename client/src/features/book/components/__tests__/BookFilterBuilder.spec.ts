@@ -292,7 +292,7 @@ describe('BookFilterBuilder', () => {
     const [lock, series, cover] = rows(wrapper)
     for (const row of [lock!, series!, cover!]) expect(row.find('[data-testid="filter-builder-value"]').exists()).toBe(false)
     expect(new Set(rowOperators(lock!))).toEqual(new Set(['isLocked', 'isUnlocked']))
-    expect(series!.find('.radio-group').exists()).toBe(false)
+    expect(rowOperators(series!)).toEqual(['isUpNext', 'hasGaps'])
     expect(rowOperators(cover!)).toEqual(expect.arrayContaining(['isMissing', 'isPresent']))
   })
 

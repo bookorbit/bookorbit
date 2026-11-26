@@ -184,6 +184,11 @@ describe('ruleToParts', () => {
     expect(ruleToParts(rule)).toEqual({ field: 'Series Status', operator: 'is up next', value: null })
   })
 
+  it('renders a has-gaps rule with no value', () => {
+    const rule: Rule = { type: 'rule', field: 'seriesStatus', operator: 'hasGaps' }
+    expect(ruleToParts(rule)).toEqual({ field: 'Series Status', operator: 'has gaps', value: null })
+  })
+
   it('renders withinLast rules with a days suffix', () => {
     const rule: Rule = { type: 'rule', field: 'addedAt', operator: 'withinLast', value: 7 }
     expect(ruleToParts(rule)).toEqual({ field: 'Date Added', operator: 'within last', value: '7 days' })

@@ -5,11 +5,11 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { ContentFilterRules } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
-import { MAX_SERIES_TOTAL_BOOKS } from '../../common/utils/series-total-books.utils';
 import { compareSeriesIndexSql, seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 import { DB } from '../../db';
 import { workKeySql } from '../../db/book-work-key';
 import { LINK_FOLDED_BY_PREFERENCE_SQL, LINK_FOLDED_COUNT_SQL, linkMembersCte } from '../../db/link-collapse-sql';
+import { seriesHasGapsSql } from '../../db/series-gaps-sql';
 import * as schema from '../../db/schema';
 import { authors, bookAuthors, bookFiles, bookMetadata, books, bookSeries, bookSeriesMemberships, libraries, userBookStatus } from '../../db/schema';
 import type { SeriesListSort, SortDirection } from './dto/list-series.dto';
@@ -136,7 +136,7 @@ export class SeriesRepository {
       END`;
     const nameExpr = sql<string>`${bookSeries.name}`;
 
-    const hasGapsExpr = this.buildHasGapsExpression(bookCountExpr);
+    const hasGapsExpr = seriesHasGapsSql(bookCountExpr);
     const completionHaving = this.buildCompletionHaving(params.completionStatus, bookCountExpr, readCountExpr, hasGapsExpr);
     const sortExpr = this.buildSortExpression(params.sort, params.order, nameExpr, bookCountExpr, lastAddedExpr, readProgressExpr, params.q);
 
@@ -581,48 +581,6 @@ export class SeriesRepository {
       default:
         return undefined;
     }
-  }
-
-  /**
-   * "This series is missing a volume", decided in SQL so the filter and its facet count can run
-   * over the whole library instead of a page. It mirrors `computeSeriesGaps` branch for branch:
-   * a provider total is only trusted when every book is numbered with a plain integer and none
-   * of them runs past the total, and without a trusted total only interior holes are knowable.
-   *
-   * Indices of ten digits or more are treated as unusable rather than cast, which is where this
-   * is fractionally stricter than the TypeScript: that function drops them for exceeding the
-   * safe-integer range, and either way the series reports no gaps.
-   */
-  private buildHasGapsExpression(bookCountExpr: SQL<number>): SQL<boolean> {
-    const idx = bookSeriesMemberships.seriesIndex;
-    const intIdx = sql`CASE WHEN ${idx} ~ '^[0-9]{1,9}$' THEN ${idx}::int END`;
-
-    const numberedCount = sql`count(distinct CASE WHEN ${idx} IS NOT NULL THEN ${books.id} END)`;
-    const integerCount = sql`count(distinct CASE WHEN ${idx} ~ '^[0-9]{1,9}$' THEN ${books.id} END)`;
-    const oversizedCount = sql`count(distinct CASE WHEN ${idx} ~ '^[0-9]{10,}$' THEN ${books.id} END)`;
-    const minIdx = sql`min(${intIdx})`;
-    const maxIdx = sql`max(${intIdx})`;
-    const distinctIdx = sql`count(distinct ${intIdx})`;
-    const expected = sql`${bookSeries.expectedBookCount}`;
-
-    const trusted = sql`(
-      ${expected} IS NOT NULL
-      AND ${expected} BETWEEN 1 AND ${MAX_SERIES_TOTAL_BOOKS}
-      AND ${numberedCount} = ${bookCountExpr}
-      AND ${integerCount} = ${numberedCount}
-      AND ${maxIdx} <= ${expected}
-    )`;
-
-    return sql<boolean>`(
-      ${integerCount} > 0
-      AND ${oversizedCount} = 0
-      AND ${minIdx} >= 1
-      AND ${maxIdx} <= ${MAX_SERIES_TOTAL_BOOKS}
-      AND CASE
-        WHEN ${trusted} THEN ${distinctIdx} < ${expected}
-        ELSE ${integerCount} >= 2 AND ${distinctIdx} < (${maxIdx} - ${minIdx} + 1)
-      END
-    )`;
   }
 
   /**

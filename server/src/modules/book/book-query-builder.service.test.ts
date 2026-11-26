@@ -170,6 +170,7 @@ function buildValueFor(operator: RuleOperator, field: RuleField): { value?: unkn
     case 'isLocked':
     case 'isUnlocked':
     case 'isUpNext':
+    case 'hasGaps':
     case 'isTrue':
     case 'isFalse':
       return {};
@@ -2091,6 +2092,46 @@ describe('seriesStatusRuleToSql', () => {
     expect(() => builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'isUpNext' }) as never, BASE_CTX)).toThrow(
       'Series status filter requires an authenticated user',
     );
+  });
+
+  it('hasGaps keeps books whose series the shared gap expression flags, with no user needed', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'hasGaps' }) as never, BASE_CTX) as any;
+    const text = collectSqlText(getRuleSql(where)).join(' ').replaceAll(/\s+/g, ' ').toLowerCase();
+
+    expect(text).toContain(' in ( select ');
+    expect(text).toContain('group by');
+    expect(text).toContain('having');
+    expect(text).toContain("~ '^[0-9]{1,9}$'");
+    expect(text).toContain('between 1 and');
+  });
+
+  it('hasGaps judges a series over the libraries and content filters the query may see', () => {
+    const { builder } = makeBuilder();
+    const contentFilters = { ...EMPTY_CONTENT_FILTER_RULES, excludeTagIds: [7] };
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'hasGaps' }) as never, {
+      accessibleLibraryIds: [1, 2],
+      implicitLibraryId: 2,
+      contentFilters,
+    }) as any;
+
+    // Shape: and(libraryScope, implicitLibrary, and(ruleSql), ...contentFilters)
+    const rule = where.clauses[2].clauses[0];
+    const scope = (rule.values as any[]).find((value) => value?.type === 'and');
+    expect(scope.clauses[0]).toMatchObject({ type: 'inArray', right: [1, 2] });
+    expect(scope.clauses[0].left).toBe(books.libraryId);
+    expect(scope.clauses[1]).toMatchObject({ type: 'eq', right: 2 });
+    expect(scope.clauses[1].left).toBe(books.libraryId);
+    expect(scope.clauses).toHaveLength(3);
+  });
+
+  it('hasGaps leaves content filters out of the gap scope when the query has none', () => {
+    const { builder } = makeBuilder();
+    const where = builder.buildWhere(wrapRule({ type: 'rule', field: 'seriesStatus', operator: 'hasGaps' }) as never, BASE_CTX) as any;
+    const scope = (getRuleSql(where).values as any[]).find((value) => value?.type === 'and');
+
+    expect(scope.clauses).toHaveLength(1);
+    expect(scope.clauses[0]).toMatchObject({ type: 'inArray', right: [1] });
   });
 
   it('rejects an invalid operator for seriesStatus', () => {

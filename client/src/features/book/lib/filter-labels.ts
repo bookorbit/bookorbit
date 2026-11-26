@@ -43,6 +43,7 @@ const NO_VALUE_OPS: RuleOperator[] = [
   'isLocked',
   'isUnlocked',
   'isUpNext',
+  'hasGaps',
   'isTrue',
   'isFalse',
 ]

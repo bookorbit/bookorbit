@@ -7410,6 +7410,7 @@
         "isLocked": "is locked",
         "isUnlocked": "is unlocked",
         "isUpNext": "is up next",
+        "hasGaps": "has gaps",
         "isTrue": "is yes",
         "isFalse": "is no"
       },

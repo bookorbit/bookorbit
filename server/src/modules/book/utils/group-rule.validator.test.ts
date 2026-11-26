@@ -37,6 +37,7 @@ function validRuleValue(operator: RuleOperator, field: RuleField): { value?: unk
     case 'isLocked':
     case 'isUnlocked':
     case 'isUpNext':
+    case 'hasGaps':
     case 'isTrue':
     case 'isFalse':
       return {};

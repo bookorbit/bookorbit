@@ -131,6 +131,11 @@ export const SERVER_FEATURES = [
    * `collapseLinked`; series and author summaries carry `workCount`.
    */
   "book-editions",
+  /**
+   * Book filters accept the `hasGaps` operator on the `seriesStatus` field: books in a series the
+   * Series page lists under Gaps.
+   */
+  "series-gaps-filter",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];
