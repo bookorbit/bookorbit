@@ -110,6 +110,12 @@ export const GLOW_REACH_MIN = 0;
 export const GLOW_REACH_MAX = 200;
 export const GLOW_REACH_DEFAULT = 50;
 
+/** The drawing under the top glow, for styles that lay one there (Nostalgia). "none" leaves the glow plain;
+ *  "squares" is the grid Nostalgia first shipped with. */
+export const GLOW_TEXTURE_IDS = ["galaxy", "warp", "starfield", "constellations", "star-trails", "milky-way", "squares", "none"] as const;
+export type GlowTexture = (typeof GLOW_TEXTURE_IDS)[number];
+export const DEFAULT_GLOW_TEXTURE: GlowTexture = "galaxy";
+
 /** A whole visual style: surfaces, type, shell material and component accents. Independent of
  *  mode, accent, radius and background, which keep their values when the style changes. */
 export const STYLE_IDS = ["bookorbit", "nostalgia"] as const;
@@ -156,4 +162,6 @@ export interface ThemePreferences {
   /** How far the accent glow reaches down the page, as a percent of the style's own reach; 0 turns it off.
    *  Optional for the same reason; absent means GLOW_REACH_DEFAULT. */
   glowReach?: number;
+  /** Optional for the same reason; absent means DEFAULT_GLOW_TEXTURE. */
+  glowTexture?: GlowTexture;
 }

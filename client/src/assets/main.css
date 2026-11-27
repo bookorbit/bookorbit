@@ -9,6 +9,7 @@
 @import './theme/radius.css';
 @import './theme/surfaces.css';
 @import './theme/styles/nostalgia.css';
+@import './theme/styles/nostalgia-glow.css';
 @import './theme/bridge.css';
 @import './theme/cover-effects.css';
 
@@ -279,6 +280,7 @@
   background-image: var(--glow-texture);
   background-position: top center;
   background-size: var(--glow-texture-size);
+  background-repeat: var(--glow-texture-repeat);
   -webkit-mask-image: radial-gradient(ellipse 62% 100% at 50% 0%, #000 0%, transparent 100%);
   mask-image: radial-gradient(ellipse 62% 100% at 50% 0%, #000 0%, transparent 100%);
 }
@@ -290,6 +292,55 @@
 
 html[data-glow='off'] .shell-glow {
   display: none;
+}
+
+/* A glow texture picker tile: the top of the main column in miniature. Both layers are drawn at page scale
+   and shrunk, so a drawing keeps its proportions. The page's fade would leave too little of a drawing to
+   tell them apart at this size, so a tile fades straight down and dims the glow. Warp is pulled back to
+   show its streaks running out from the centre, and Starfield brought closer so single stars show. */
+.glow-texture-tile {
+  --glow-tile-scale: 0.3;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background-color: var(--background);
+}
+
+.glow-texture-tile::before,
+.glow-texture-tile::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  z-index: -1;
+  width: calc(100% / var(--glow-tile-scale));
+  height: calc(100% / var(--glow-tile-scale));
+  transform: translateX(-50%) scale(var(--glow-tile-scale));
+  transform-origin: top center;
+  pointer-events: none;
+}
+
+.glow-texture-tile::before {
+  background-image: var(--glow-texture);
+  background-position: top center;
+  background-size: var(--glow-texture-size);
+  background-repeat: var(--glow-texture-repeat);
+  -webkit-mask-image: linear-gradient(#000 40%, transparent);
+  mask-image: linear-gradient(#000 40%, transparent);
+}
+
+.glow-texture-tile::after {
+  background-image: var(--glow-image);
+  background-repeat: no-repeat;
+  opacity: 0.55;
+}
+
+.glow-texture-tile[data-glow-texture='warp'] {
+  --glow-tile-scale: 0.16;
+}
+
+.glow-texture-tile[data-glow-texture='starfield'] {
+  --glow-tile-scale: 0.4;
 }
 
 @layer base {

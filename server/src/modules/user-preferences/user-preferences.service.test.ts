@@ -12,6 +12,7 @@ import type {
 import {
   ANNOTATION_COLOR_NAME_MAX_ENTRIES,
   ANNOTATION_COLOR_NAME_PREFERENCES_DEFAULTS,
+  GLOW_TEXTURE_IDS,
   MAX_SERVER_FONTS,
   STYLE_IDS,
   SUPPORTED_LOCALES,
@@ -369,6 +370,18 @@ describe('UserPreferencesService', () => {
 
   it.each([-10, 201, 50.5, 'off'])('upsertThemePreferences rejects glowReach %s', async (glowReach) => {
     await expect(service.upsertThemePreferences(11, { ...validThemePreferences, glowReach } as never)).rejects.toBeInstanceOf(BadRequestException);
+    expect(repo.upsert).not.toHaveBeenCalled();
+  });
+
+  it.each(GLOW_TEXTURE_IDS)('upsertThemePreferences accepts the %s glow texture', async (glowTexture) => {
+    const preferences = { ...validThemePreferences, glowTexture };
+
+    await expect(service.upsertThemePreferences(11, preferences)).resolves.toBeUndefined();
+    expect(repo.upsert).toHaveBeenCalledWith(11, 'theme', preferences);
+  });
+
+  it.each(['checkers', 'Warp', 1])('upsertThemePreferences rejects glowTexture %s', async (glowTexture) => {
+    await expect(service.upsertThemePreferences(11, { ...validThemePreferences, glowTexture } as never)).rejects.toBeInstanceOf(BadRequestException);
     expect(repo.upsert).not.toHaveBeenCalled();
   });
 

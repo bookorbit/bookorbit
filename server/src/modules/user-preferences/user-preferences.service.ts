@@ -23,6 +23,7 @@ import {
   FORMAT_BADGE_STYLES,
   GLOW_REACH_MAX,
   GLOW_REACH_MIN,
+  GLOW_TEXTURE_IDS,
   GRID_CARD_LABEL_FIELDS,
   MAX_SERVER_FONTS,
   PLACEHOLDER_COVER_STYLES,
@@ -63,6 +64,7 @@ const THEME_PREFERENCES_SCHEMA = z
     style: z.enum(STYLE_IDS).optional(),
     surfacePalette: z.enum(SURFACE_PALETTE_IDS).optional(),
     glowReach: z.number().int().min(GLOW_REACH_MIN).max(GLOW_REACH_MAX).optional(),
+    glowTexture: z.enum(GLOW_TEXTURE_IDS).optional(),
   })
   .strict();
 

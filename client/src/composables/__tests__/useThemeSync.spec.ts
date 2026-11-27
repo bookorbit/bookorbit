@@ -17,6 +17,7 @@ function createThemeStore() {
     style: 'bookorbit' as NonNullable<ThemePreferences['style']>,
     surfacePalette: 'ash' as NonNullable<ThemePreferences['surfacePalette']>,
     glowReach: 100,
+    glowTexture: 'galaxy' as NonNullable<ThemePreferences['glowTexture']>,
     setTheme(nextTheme: ThemePreferences['theme']) {
       this.theme = nextTheme
     },
@@ -43,6 +44,9 @@ function createThemeStore() {
     },
     setGlowReach(reach: number) {
       this.glowReach = reach
+    },
+    setGlowTexture(texture: NonNullable<ThemePreferences['glowTexture']>) {
+      this.glowTexture = texture
     },
   })
 }
@@ -296,6 +300,7 @@ describe('useThemeSync', () => {
             style: 'bookorbit',
             surfacePalette: 'ash',
             glowReach: 100,
+            glowTexture: 'galaxy',
           },
         }),
       }),
@@ -354,6 +359,37 @@ describe('useThemeSync', () => {
     )
     await loadFromServer()
     expect(themeStore.glowReach).toBe(40)
+  })
+
+  it('saves a glow texture change and applies a synchronized one, ignoring one it does not know', async () => {
+    user.value = { settings: { syncThemePreferences: true } }
+    apiMock.mockResolvedValue(mockJsonResponse({}, true))
+
+    const { initThemeSync, loadFromServer } = await import('../useThemeSync')
+    initThemeSync()
+
+    themeStore.setGlowTexture('warp')
+    await vi.advanceTimersByTimeAsync(1600)
+
+    expect(apiMock).toHaveBeenCalledTimes(1)
+    const body = JSON.parse((apiMock.mock.calls[0]![1] as { body: string }).body) as { settings: ThemePreferences }
+    expect(body.settings).toMatchObject({ glowTexture: 'warp' })
+
+    apiMock.mockResolvedValueOnce(
+      mockJsonResponse({
+        settings: { theme: 'dark', accent: 'blue', radius: 'rounded', background: 'vinyl', brightness: 35, glowTexture: 'star-trails' },
+      }),
+    )
+    await loadFromServer()
+    expect(themeStore.glowTexture).toBe('star-trails')
+
+    apiMock.mockResolvedValueOnce(
+      mockJsonResponse({
+        settings: { theme: 'dark', accent: 'blue', radius: 'rounded', background: 'vinyl', brightness: 35, glowTexture: 'nebula' },
+      }),
+    )
+    await loadFromServer()
+    expect(themeStore.glowTexture).toBe('star-trails')
   })
 
   it('loadFromServer keeps the local style when the server value is unknown or absent', async () => {

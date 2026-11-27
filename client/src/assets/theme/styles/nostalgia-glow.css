@@ -1,0 +1,69 @@
+/* ── Nostalgia glow textures ──────────────────────────────────
+   The drawing under the accent glow, chosen by data-glow-texture
+   on <html>. Each texture's image is a token of its own, so a
+   picker tile can paint any of them while another is applied.
+
+   Galaxy is the default: a page without the attribute, or with
+   an id this build does not know, still gets it. Light mode takes
+   the negative plate of each drawing. Everything but Starfield
+   and Squares is one image centred on the main column, so it
+   must not repeat; on a phone only its middle shows.
+────────────────────────────────────────────────────────────── */
+html[data-style='nostalgia'] {
+  --glow-texture-starfield: url('../../glow/starfield-light.svg');
+  --glow-texture-constellations: url('../../glow/constellations-light.svg');
+  --glow-texture-star-trails: url('../../glow/star-trails-light.svg');
+  --glow-texture-milky-way: url('../../glow/milky-way-light.svg');
+  --glow-texture-galaxy: url('../../glow/galaxy-light.svg');
+  --glow-texture-warp: url('../../glow/warp-light.svg');
+  --glow-texture-squares: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 84' fill='%23000'%3E%3Crect x='1' y='1' width='19' height='19' fill-opacity='0.044'/%3E%3Crect x='22' y='1' width='19' height='19' fill-opacity='0.058'/%3E%3Crect x='43' y='1' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='64' y='1' width='19' height='19' fill-opacity='0.035'/%3E%3Crect x='1' y='22' width='19' height='19' fill-opacity='0.059'/%3E%3Crect x='22' y='22' width='19' height='19' fill-opacity='0.02'/%3E%3Crect x='43' y='22' width='19' height='19' fill-opacity='0.054'/%3E%3Crect x='64' y='22' width='19' height='19' fill-opacity='0.03'/%3E%3Crect x='1' y='43' width='19' height='19' fill-opacity='0.024'/%3E%3Crect x='22' y='43' width='19' height='19' fill-opacity='0.023'/%3E%3Crect x='43' y='43' width='19' height='19' fill-opacity='0.031'/%3E%3Crect x='64' y='43' width='19' height='19' fill-opacity='0.052'/%3E%3Crect x='1' y='64' width='19' height='19' fill-opacity='0.026'/%3E%3Crect x='22' y='64' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='43' y='64' width='19' height='19' fill-opacity='0.045'/%3E%3Crect x='64' y='64' width='19' height='19' fill-opacity='0.034'/%3E%3C/svg%3E");
+}
+
+html[data-style='nostalgia'].dark {
+  --glow-texture-starfield: url('../../glow/starfield-dark.svg');
+  --glow-texture-constellations: url('../../glow/constellations-dark.svg');
+  --glow-texture-star-trails: url('../../glow/star-trails-dark.svg');
+  --glow-texture-milky-way: url('../../glow/milky-way-dark.svg');
+  --glow-texture-galaxy: url('../../glow/galaxy-dark.svg');
+  --glow-texture-warp: url('../../glow/warp-dark.svg');
+  --glow-texture-squares: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 84 84' fill='%23fff'%3E%3Crect x='1' y='1' width='19' height='19' fill-opacity='0.056'/%3E%3Crect x='22' y='1' width='19' height='19' fill-opacity='0.042'/%3E%3Crect x='43' y='1' width='19' height='19' fill-opacity='0.082'/%3E%3Crect x='64' y='1' width='19' height='19' fill-opacity='0.036'/%3E%3Crect x='1' y='22' width='19' height='19' fill-opacity='0.073'/%3E%3Crect x='22' y='22' width='19' height='19' fill-opacity='0.059'/%3E%3Crect x='43' y='22' width='19' height='19' fill-opacity='0.035'/%3E%3Crect x='64' y='22' width='19' height='19' fill-opacity='0.071'/%3E%3Crect x='1' y='43' width='19' height='19' fill-opacity='0.033'/%3E%3Crect x='22' y='43' width='19' height='19' fill-opacity='0.065'/%3E%3Crect x='43' y='43' width='19' height='19' fill-opacity='0.036'/%3E%3Crect x='64' y='43' width='19' height='19' fill-opacity='0.037'/%3E%3Crect x='1' y='64' width='19' height='19' fill-opacity='0.064'/%3E%3Crect x='22' y='64' width='19' height='19' fill-opacity='0.096'/%3E%3Crect x='43' y='64' width='19' height='19' fill-opacity='0.04'/%3E%3Crect x='64' y='64' width='19' height='19' fill-opacity='0.048'/%3E%3C/svg%3E");
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile) {
+  --glow-texture: var(--glow-texture-galaxy);
+  --glow-texture-size: 2400px 720px;
+  --glow-texture-repeat: no-repeat;
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='warp'] {
+  --glow-texture: var(--glow-texture-warp);
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='starfield'] {
+  --glow-texture: var(--glow-texture-starfield);
+  --glow-texture-size: 720px 720px;
+  --glow-texture-repeat: repeat;
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='constellations'] {
+  --glow-texture: var(--glow-texture-constellations);
+  --glow-texture-size: 2400px 600px;
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='star-trails'] {
+  --glow-texture: var(--glow-texture-star-trails);
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='milky-way'] {
+  --glow-texture: var(--glow-texture-milky-way);
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='squares'] {
+  --glow-texture: var(--glow-texture-squares);
+  --glow-texture-size: 107px 107px;
+  --glow-texture-repeat: repeat;
+}
+
+:is(html[data-style='nostalgia'], .glow-texture-tile)[data-glow-texture='none'] {
+  --glow-texture: none;
+}

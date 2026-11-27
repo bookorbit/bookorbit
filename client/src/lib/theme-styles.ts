@@ -1,4 +1,13 @@
-import { DEFAULT_STYLE, STYLE_IDS, SURFACE_PALETTE_IDS, type Background, type Style, type SurfacePalette } from '@bookorbit/types'
+import {
+  DEFAULT_STYLE,
+  GLOW_TEXTURE_IDS,
+  STYLE_IDS,
+  SURFACE_PALETTE_IDS,
+  type Background,
+  type GlowTexture,
+  type Style,
+  type SurfacePalette,
+} from '@bookorbit/types'
 
 export interface ThemeStyleDefinition {
   id: Style
@@ -7,6 +16,8 @@ export interface ThemeStyleDefinition {
   /** Pickers this style adds to the appearance controls. Everything else is shared by every style. */
   controls: {
     surfacePalette: boolean
+    /** Whether the style lays a texture under the top glow that the user may choose. */
+    glowTexture: boolean
   }
   /**
    * Shared settings this style fixes. While it is applied the pinned value is used and its control
@@ -23,13 +34,13 @@ const STYLE_DEFINITIONS: Record<Style, Omit<ThemeStyleDefinition, 'id'>> = {
   bookorbit: {
     labelKey: 'settings.appearance.theme.style.bookorbit.label',
     descriptionKey: 'settings.appearance.theme.style.bookorbit.description',
-    controls: { surfacePalette: false },
+    controls: { surfacePalette: false, glowTexture: false },
     pinned: {},
   },
   nostalgia: {
     labelKey: 'settings.appearance.theme.style.nostalgia.label',
     descriptionKey: 'settings.appearance.theme.style.nostalgia.description',
-    controls: { surfacePalette: true },
+    controls: { surfacePalette: true, glowTexture: true },
     // No pattern behind the glow, solid panels, and no lift: the dark ladder in styles/nostalgia.css is the
     // classic ash ladder as is.
     pinned: { background: 'none', brightness: 0, surfaceOpacity: 100 },
@@ -44,6 +55,7 @@ export function getThemeStyle(id: Style): ThemeStyleDefinition {
 
 export interface AppearanceControls {
   surfacePalette: boolean
+  glowTexture: boolean
   background: boolean
   surfaceOpacity: boolean
   brightness: boolean
@@ -54,6 +66,7 @@ export function getAppearanceControls(style: Style): AppearanceControls {
   const definition = getThemeStyle(style)
   return {
     surfacePalette: definition.controls.surfacePalette,
+    glowTexture: definition.controls.glowTexture,
     background: definition.pinned.background === undefined,
     surfaceOpacity: definition.pinned.surfaceOpacity === undefined,
     brightness: definition.pinned.brightness === undefined,
@@ -68,6 +81,16 @@ export interface SurfacePaletteOption {
 export const SURFACE_PALETTES: readonly SurfacePaletteOption[] = SURFACE_PALETTE_IDS.map((id) => ({
   id,
   labelKey: `settings.appearance.theme.surfacePalette.palettes.${id}`,
+}))
+
+export interface GlowTextureOption {
+  id: GlowTexture
+  labelKey: string
+}
+
+export const GLOW_TEXTURES: readonly GlowTextureOption[] = GLOW_TEXTURE_IDS.map((id) => ({
+  id,
+  labelKey: `settings.appearance.theme.glowTexture.options.${id}`,
 }))
 
 /**

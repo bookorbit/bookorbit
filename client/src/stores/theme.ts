@@ -5,11 +5,14 @@ import {
   type Background,
   ACCENT_IDS,
   type Accent,
+  DEFAULT_GLOW_TEXTURE,
   DEFAULT_STYLE,
   DEFAULT_SURFACE_PALETTE,
   GLOW_REACH_DEFAULT,
   GLOW_REACH_MAX,
   GLOW_REACH_MIN,
+  GLOW_TEXTURE_IDS,
+  type GlowTexture,
   RADIUS_IDS,
   type Radius,
   STYLE_IDS,
@@ -140,6 +143,7 @@ export const useThemeStore = defineStore('theme', () => {
   const style = ref<Style>(storedChoice('style', STYLE_IDS, DEFAULT_STYLE))
   const surfacePalette = ref<SurfacePalette>(storedChoice('surfacePalette', SURFACE_PALETTE_IDS, DEFAULT_SURFACE_PALETTE))
   const glowReach = ref<number>(clampGlowReach(storage.get<unknown>('glowReach', GLOW_REACH_DEFAULT)))
+  const glowTexture = ref<GlowTexture>(storedChoice('glowTexture', GLOW_TEXTURE_IDS, DEFAULT_GLOW_TEXTURE))
 
   /** A style dresses the app shell only; sign-in pages and readers always paint as BookOrbit. */
   const styleScopeActive = ref(isAppShellPath(window.location.pathname))
@@ -232,6 +236,10 @@ export const useThemeStore = defineStore('theme', () => {
     glowReach.value = clampGlowReach(reach)
   }
 
+  function setGlowTexture(texture: GlowTexture) {
+    glowTexture.value = texture
+  }
+
   function applyGlowReach(reach: number) {
     root.style.setProperty('--glow-reach', String(reach / 100))
     root.setAttribute('data-glow', reach > 0 ? 'on' : 'off')
@@ -253,6 +261,7 @@ export const useThemeStore = defineStore('theme', () => {
   watch(appliedStyle, (s) => root.setAttribute('data-style', s), SYNC)
   watch(surfacePalette, (palette) => root.setAttribute('data-surface', palette), SYNC)
   watch(glowReach, applyGlowReach, SYNC)
+  watch(glowTexture, (texture) => root.setAttribute('data-glow-texture', texture), SYNC)
   watch(appearanceKey, applyThemeColorMeta, { immediate: true, flush: 'post' })
 
   watch(theme, (t) => storage.set('theme', t), { immediate: true })
@@ -264,6 +273,7 @@ export const useThemeStore = defineStore('theme', () => {
   watch(style, (s) => storage.set('style', s), { immediate: true })
   watch(surfacePalette, (palette) => storage.set('surfacePalette', palette), { immediate: true })
   watch(glowReach, (reach) => storage.set('glowReach', reach), { immediate: true })
+  watch(glowTexture, (texture) => storage.set('glowTexture', texture), { immediate: true })
 
   return {
     theme,
@@ -276,6 +286,7 @@ export const useThemeStore = defineStore('theme', () => {
     style,
     surfacePalette,
     glowReach,
+    glowTexture,
     appliedStyle,
     styleDefinition,
     appearanceControls,
@@ -291,6 +302,7 @@ export const useThemeStore = defineStore('theme', () => {
     setStyle,
     setSurfacePalette,
     setGlowReach,
+    setGlowTexture,
     setStyleScopeActive,
   }
 })

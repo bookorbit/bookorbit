@@ -25,8 +25,20 @@ describe('theme styles', () => {
 
   it('pins no pattern, solid panels and no lift for Nostalgia, and hides those controls', () => {
     expect(getThemeStyle('nostalgia').pinned).toEqual({ background: 'none', brightness: 0, surfaceOpacity: 100 })
-    expect(getAppearanceControls('nostalgia')).toEqual({ surfacePalette: true, background: false, surfaceOpacity: false, brightness: false })
-    expect(getAppearanceControls('bookorbit')).toEqual({ surfacePalette: false, background: true, surfaceOpacity: true, brightness: true })
+    expect(getAppearanceControls('nostalgia')).toEqual({
+      surfacePalette: true,
+      glowTexture: true,
+      background: false,
+      surfaceOpacity: false,
+      brightness: false,
+    })
+    expect(getAppearanceControls('bookorbit')).toEqual({
+      surfacePalette: false,
+      glowTexture: false,
+      background: true,
+      surfaceOpacity: true,
+      brightness: true,
+    })
   })
 })
 

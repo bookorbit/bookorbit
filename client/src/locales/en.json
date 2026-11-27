@@ -154,6 +154,20 @@
           "value": "{value}%",
           "off": "Off"
         },
+        "glowTexture": {
+          "label": "Glow texture",
+          "hint": "The drawing under the top glow. It fades out with the glow, so a longer reach shows more of it.",
+          "options": {
+            "warp": "Warp",
+            "starfield": "Starfield",
+            "constellations": "Constellations",
+            "star-trails": "Star trails",
+            "milky-way": "Milky Way",
+            "galaxy": "Galaxy",
+            "squares": "Squares",
+            "none": "None"
+          }
+        },
         "accents": {
           "grey": "Grey",
           "scarlet": "Scarlet",
@@ -12417,6 +12431,7 @@
       "style": "Style",
       "surfacePalette": "Surface",
       "topGlow": "Top glow",
+      "glowTexture": "Glow texture",
       "theme": "Theme",
       "accent": "Accent",
       "radius": "Radius",

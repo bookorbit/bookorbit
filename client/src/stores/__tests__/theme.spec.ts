@@ -1,7 +1,7 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { nextTick } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { GLOW_REACH_DEFAULT } from '@bookorbit/types'
+import { DEFAULT_GLOW_TEXTURE, GLOW_REACH_DEFAULT } from '@bookorbit/types'
 import { useThemeStore } from '../theme'
 
 function createColorSchemeQuery(matches: boolean) {
@@ -340,7 +340,13 @@ describe('useThemeStore', () => {
       expect(root.style.getPropertyValue('--shell-surface-opacity')).toBe('100%')
       expect(store.brightness).toBe(80)
       expect(store.surfaceOpacity).toBe(85)
-      expect(store.appearanceControls).toEqual({ surfacePalette: true, background: false, surfaceOpacity: false, brightness: false })
+      expect(store.appearanceControls).toEqual({
+        surfacePalette: true,
+        glowTexture: true,
+        background: false,
+        surfaceOpacity: false,
+        brightness: false,
+      })
 
       const pinnedKey = store.appearanceKey
       store.setBrightness(20)
@@ -408,6 +414,30 @@ describe('useThemeStore', () => {
       expect(store.glowReach).toBe(200)
       store.setGlowReach(-20)
       expect(store.glowReach).toBe(0)
+    })
+
+    it('paints Galaxy by default and stores the chosen glow texture', async () => {
+      setActivePinia(createPinia())
+      const store = useThemeStore()
+      const root = document.documentElement
+
+      expect(store.glowTexture).toBe(DEFAULT_GLOW_TEXTURE)
+      expect(DEFAULT_GLOW_TEXTURE).toBe('galaxy')
+      expect(root.getAttribute('data-glow-texture')).toBe('galaxy')
+
+      store.setGlowTexture('milky-way')
+      expect(root.getAttribute('data-glow-texture')).toBe('milky-way')
+      await nextTick()
+      expect(localStorage.getItem('glowTexture')).toBe('"milky-way"')
+    })
+
+    it('falls back to the default glow texture for one this build does not know', () => {
+      localStorage.setItem('glowTexture', '"checkers"')
+      setActivePinia(createPinia())
+      const store = useThemeStore()
+
+      expect(store.glowTexture).toBe(DEFAULT_GLOW_TEXTURE)
+      expect(document.documentElement.getAttribute('data-glow-texture')).toBe(DEFAULT_GLOW_TEXTURE)
     })
   })
 })

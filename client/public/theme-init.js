@@ -31,6 +31,7 @@
   var rawReach = localStorage.getItem('glowReach')
   var storedReach = rawReach === null ? 50 : Number(rawReach)
   var glowReach = isFinite(storedReach) ? Math.min(200, Math.max(0, storedReach)) : 50
+  var glowTexture = readStoredValue('glowTexture', 'galaxy')
   var systemDark = typeof window.matchMedia === 'function' && window.matchMedia('(prefers-color-scheme: dark)').matches
   var isDark = theme === 'dark' || (theme !== 'light' && systemDark)
   if (isDark) root.classList.add('dark')
@@ -40,4 +41,5 @@
   root.setAttribute('data-surface', surfacePalette)
   root.style.setProperty('--glow-reach', String(glowReach / 100))
   root.setAttribute('data-glow', glowReach > 0 ? 'on' : 'off')
+  root.setAttribute('data-glow-texture', glowTexture)
 })()

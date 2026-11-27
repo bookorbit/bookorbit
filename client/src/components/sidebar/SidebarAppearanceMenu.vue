@@ -9,6 +9,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import AccentPicker from '@/components/AccentPicker.vue'
 import BackgroundPicker from '@/components/BackgroundPicker.vue'
 import GlowReachPicker from '@/components/GlowReachPicker.vue'
+import GlowTexturePicker from '@/components/GlowTexturePicker.vue'
 import RadiusPicker from '@/components/RadiusPicker.vue'
 import StylePicker from '@/components/StylePicker.vue'
 import SurfaceBrightnessPicker from '@/components/SurfaceBrightnessPicker.vue'
@@ -16,6 +17,7 @@ import SurfaceOpacityPicker from '@/components/SurfaceOpacityPicker.vue'
 import SurfacePalettePicker from '@/components/SurfacePalettePicker.vue'
 import ThemePicker from '@/components/ThemePicker.vue'
 import { ACCENT_OPTIONS } from '@/lib/theme-accent-meta'
+import { GLOW_TEXTURES } from '@/lib/theme-styles'
 import { BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 
 defineProps<{
@@ -38,6 +40,10 @@ const accentLabel = computed(() => {
 })
 const backgroundLabel = computed(() => {
   const option = BACKGROUND_OPTIONS.find((candidate) => candidate.id === themeStore.background)
+  return option ? t(option.labelKey) : ''
+})
+const glowTextureLabel = computed(() => {
+  const option = GLOW_TEXTURES.find((candidate) => candidate.id === themeStore.glowTexture)
   return option ? t(option.labelKey) : ''
 })
 const radiusLabel = computed(() => {
@@ -92,6 +98,13 @@ function openSheet() {
           <div v-if="themeStore.appearanceControls.surfacePalette" class="space-y-2">
             <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.surfacePalette') }}</span>
             <SurfacePalettePicker />
+          </div>
+          <div v-if="themeStore.appearanceControls.glowTexture" class="space-y-2">
+            <div class="flex items-baseline justify-between gap-2">
+              <span class="text-[13px] text-muted-foreground">{{ t('components.appHeader.glowTexture') }}</span>
+              <span class="truncate text-[13px] font-medium text-foreground">{{ glowTextureLabel }}</span>
+            </div>
+            <GlowTexturePicker compact />
           </div>
           <div v-if="themeStore.appearanceControls.background" class="space-y-2">
             <div class="flex items-baseline justify-between gap-2">
@@ -154,6 +167,13 @@ function openSheet() {
           <div v-if="themeStore.appearanceControls.surfacePalette" class="space-y-2 border-t border-border pt-3">
             <h3 class="text-sm font-medium text-foreground">{{ t('components.appHeader.surfacePalette') }}</h3>
             <SurfacePalettePicker touch />
+          </div>
+          <div v-if="themeStore.appearanceControls.glowTexture" class="space-y-2 border-t border-border pt-3">
+            <div class="flex items-baseline justify-between gap-2">
+              <h3 class="text-sm font-medium text-foreground">{{ t('components.appHeader.glowTexture') }}</h3>
+              <span class="truncate text-[13px] text-muted-foreground">{{ glowTextureLabel }}</span>
+            </div>
+            <GlowTexturePicker compact touch />
           </div>
         </section>
 

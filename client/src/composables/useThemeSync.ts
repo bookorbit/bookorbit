@@ -3,6 +3,7 @@ import {
   BACKGROUND_IDS,
   GLOW_REACH_MAX,
   GLOW_REACH_MIN,
+  GLOW_TEXTURE_IDS,
   RADIUS_IDS,
   STYLE_IDS,
   SURFACE_OPACITY_MAX,
@@ -36,6 +37,7 @@ function getCurrentPrefs(): ThemePreferences {
     style: store.style,
     surfacePalette: store.surfacePalette,
     glowReach: store.glowReach,
+    glowTexture: store.glowTexture,
   }
 }
 
@@ -71,6 +73,9 @@ function sanitizeServerPrefs(raw: unknown): Partial<ThemePreferences> {
   }
   if (typeof obj.glowReach === 'number' && Number.isInteger(obj.glowReach) && obj.glowReach >= GLOW_REACH_MIN && obj.glowReach <= GLOW_REACH_MAX) {
     out.glowReach = obj.glowReach
+  }
+  if (GLOW_TEXTURE_IDS.includes(obj.glowTexture as NonNullable<ThemePreferences['glowTexture']>)) {
+    out.glowTexture = obj.glowTexture as ThemePreferences['glowTexture']
   }
 
   return out
@@ -119,6 +124,7 @@ export async function loadFromServer(): Promise<void> {
       if (prefs.style !== undefined) store.setStyle(prefs.style)
       if (prefs.surfacePalette !== undefined) store.setSurfacePalette(prefs.surfacePalette)
       if (prefs.glowReach !== undefined) store.setGlowReach(prefs.glowReach)
+      if (prefs.glowTexture !== undefined) store.setGlowTexture(prefs.glowTexture)
     } finally {
       isApplyingServerPrefs = false
     }
@@ -180,6 +186,7 @@ export function initThemeSync(): void {
         store.style,
         store.surfacePalette,
         store.glowReach,
+        store.glowTexture,
       ] as const,
     () => {
       if (isApplyingServerPrefs || !isSyncEnabled()) return

@@ -3,7 +3,7 @@ import { resolve } from 'node:path'
 import { runInThisContext } from 'node:vm'
 import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_STYLE, DEFAULT_SURFACE_PALETTE, GLOW_REACH_DEFAULT } from '@bookorbit/types'
+import { DEFAULT_GLOW_TEXTURE, DEFAULT_STYLE, DEFAULT_SURFACE_PALETTE, GLOW_REACH_DEFAULT } from '@bookorbit/types'
 import { DEFAULT_ACCENT } from '@/lib/theme-accent-meta'
 import { STANDALONE_ROUTE_PREFIXES, isAppShellPath } from '@/lib/theme-styles'
 import { routes } from '@/router'
@@ -31,6 +31,7 @@ describe('theme-init', () => {
     document.documentElement.className = ''
     document.documentElement.removeAttribute('data-style')
     document.documentElement.removeAttribute('data-surface')
+    document.documentElement.removeAttribute('data-glow-texture')
   })
 
   it.each([
@@ -80,6 +81,7 @@ describe('theme-init', () => {
       accent: document.documentElement.className,
       style: document.documentElement.getAttribute('data-style'),
       surface: document.documentElement.getAttribute('data-surface'),
+      glowTexture: document.documentElement.getAttribute('data-glow-texture'),
     }
 
     document.documentElement.className = ''
@@ -92,6 +94,8 @@ describe('theme-init', () => {
     expect(painted.accent).not.toContain('radius-')
     expect(painted.style).toBe(DEFAULT_STYLE)
     expect(painted.surface).toBe(DEFAULT_SURFACE_PALETTE)
+    expect(store.glowTexture).toBe(DEFAULT_GLOW_TEXTURE)
+    expect(painted.glowTexture).toBe(DEFAULT_GLOW_TEXTURE)
   })
 
   it('paints a saved style and surface palette inside the app shell', () => {
@@ -124,6 +128,15 @@ describe('theme-init', () => {
     localStorage.setItem('glowReach', JSON.stringify(0))
     runThemeInit(false)
     expect(document.documentElement.getAttribute('data-glow')).toBe('off')
+  })
+
+  it('paints the stored glow texture, the default when none is stored', () => {
+    runThemeInit(false)
+    expect(document.documentElement.getAttribute('data-glow-texture')).toBe(DEFAULT_GLOW_TEXTURE)
+
+    localStorage.setItem('glowTexture', JSON.stringify('galaxy'))
+    runThemeInit(false)
+    expect(document.documentElement.getAttribute('data-glow-texture')).toBe('galaxy')
   })
 
   it('ignores stored values that are not strings', () => {

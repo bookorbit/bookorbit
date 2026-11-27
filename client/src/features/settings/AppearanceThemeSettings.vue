@@ -8,6 +8,7 @@ import { THEME_STYLES, type ThemeStyleDefinition } from '@/lib/theme-styles'
 import { ACCENT_ROWS, BACKGROUND_OPTIONS, RADIUS_OPTIONS, useThemeStore } from '@/stores/theme'
 import SurfacePalettePicker from '@/components/SurfacePalettePicker.vue'
 import GlowReachPicker from '@/components/GlowReachPicker.vue'
+import GlowTexturePicker from '@/components/GlowTexturePicker.vue'
 import AppearancePreferenceStorage from './AppearancePreferenceStorage.vue'
 
 const { t } = useI18n()
@@ -111,6 +112,16 @@ function handleBrightnessInput(event: Event) {
             {{ t('settings.appearance.theme.topGlow.hint') }}
           </p>
           <GlowReachPicker />
+        </div>
+
+        <div v-if="themeStore.appearanceControls.glowTexture" class="px-4 py-3.5 md:px-5 md:py-4 bg-card">
+          <p class="settings-label mb-0.5">
+            {{ t('settings.appearance.theme.glowTexture.label') }}
+          </p>
+          <p class="settings-hint mb-3">
+            {{ t('settings.appearance.theme.glowTexture.hint') }}
+          </p>
+          <GlowTexturePicker />
         </div>
 
         <div class="settings-row">

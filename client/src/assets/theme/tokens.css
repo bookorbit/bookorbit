@@ -168,6 +168,7 @@
   --glow-band: 20rem;
   --glow-texture: none;
   --glow-texture-size: auto;
+  --glow-texture-repeat: repeat;
 
   /* How a grid cover answers the pointer. */
   --cover-hover-transform: scale(1.02);
@@ -362,7 +363,7 @@
 
 .dark {
   /* Every style shares one glow reach and strength, so a percentage looks the same in each; only
-     Nostalgia lays its square texture over it. */
+     Nostalgia lays a texture under it. */
   --glow-image: radial-gradient(50% 50% at center -25px, color-mix(in oklch, var(--primary) 60%, transparent) 0%, transparent 100%);
 
   color-scheme: dark;
