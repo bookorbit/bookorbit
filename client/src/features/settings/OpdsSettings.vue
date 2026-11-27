@@ -357,32 +357,41 @@ function cancelDelete() {
         </p>
       </div>
       <div v-else-if="opdsUsers.length > 0" class="settings-card">
-        <div v-for="user in opdsUsers" :key="user.id" class="px-4 py-3.5 bg-card space-y-3 md:flex md:items-center md:gap-3 md:space-y-0 md:px-5">
-          <div class="flex-1 min-w-0">
-            <p class="settings-label truncate">{{ user.username }}</p>
-            <p class="settings-hint" :class="userDetailsOpen(user.id) ? '' : 'line-clamp-1'">
-              {{ sortOrderLabel(user.sortOrder) }}
-            </p>
+        <div v-for="user in opdsUsers" :key="user.id" class="px-4 py-3.5 bg-card space-y-3 md:px-5">
+          <div class="space-y-3 md:flex md:items-center md:gap-3 md:space-y-0">
+            <div class="flex-1 min-w-0">
+              <p class="settings-label truncate">{{ user.username }}</p>
+              <p class="settings-hint" :class="userDetailsOpen(user.id) ? '' : 'line-clamp-1'">
+                {{ sortOrderLabel(user.sortOrder) }}
+              </p>
+            </div>
+            <div class="flex items-center gap-2">
+              <select
+                :value="user.sortOrder"
+                :aria-label="t('settings.reader.opds.sortLabel')"
+                class="select-field text-xs h-9 md:h-auto py-1 w-full md:w-auto"
+                @change="updateSortOrder(user, ($event.target as HTMLSelectElement).value as OpdsSortOrder)"
+              >
+                <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">
+                  {{ opt.label }}
+                </option>
+              </select>
+              <Button
+                variant="destructive-ghost"
+                size="icon-sm"
+                class="hidden md:flex"
+                :aria-label="t('common.delete')"
+                @click="requestDeleteUser(user)"
+              >
+                <Trash2 :size="14" />
+              </Button>
+            </div>
           </div>
-          <div class="flex items-center gap-2">
-            <select
-              :value="user.sortOrder"
-              class="select-field text-xs h-9 md:h-auto py-1 w-full md:w-auto"
-              @change="updateSortOrder(user, ($event.target as HTMLSelectElement).value as OpdsSortOrder)"
-            >
-              <option v-for="opt in sortOrderOptions" :key="opt.value" :value="opt.value">
-                {{ opt.label }}
-              </option>
-            </select>
-            <ReadAloudDeliverySelect
-              v-if="deliverySupported"
-              :model-value="user.readAloudDelivery"
-              @update:model-value="updateDelivery(user, $event)"
-            />
-            <Button variant="destructive-ghost" size="icon-sm" class="hidden md:flex" @click="requestDeleteUser(user)">
-              <Trash2 :size="14" />
-            </Button>
-          </div>
+          <ReadAloudDeliverySelect
+            v-if="deliverySupported"
+            :model-value="user.readAloudDelivery"
+            @update:model-value="updateDelivery(user, $event)"
+          />
           <div class="md:hidden flex items-center gap-3 text-xs">
             <Button variant="link" size="sm" class="h-auto p-0" @click="toggleUserDetails(user.id)">
               {{ userDetailsOpen(user.id) ? t('settings.reader.opds.hideDetails') : t('settings.reader.opds.showDetails') }}
