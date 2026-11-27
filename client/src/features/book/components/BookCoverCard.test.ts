@@ -516,9 +516,14 @@ describe('BookCoverCard', () => {
   // ── book metadata display ─────────────────────────────────────────────────
 
   describe('text metadata', () => {
-    it('shows book title', () => {
-      const wrapper = mountCard({ book: makeBook({ title: 'Foundation' }) })
-      expect(wrapper.text()).toContain('Foundation')
+    it.each([
+      ['2/3', 'line-clamp-2'],
+      ['1/1', 'truncate'],
+    ] as const)('shows the hover title with the clamp for a %s cover', (coverAspectRatio, clampClass) => {
+      const wrapper = mountCard({ book: makeBook({ title: 'Foundation', hasCover: false }), coverAspectRatio })
+      const title = wrapper.get('[data-testid="grid-card-hover-title"]')
+      expect(title.text()).toBe('Foundation')
+      expect(title.get('span').classes()).toContain(clampClass)
     })
 
     it('does not render hover title when no cover is loaded yet', () => {

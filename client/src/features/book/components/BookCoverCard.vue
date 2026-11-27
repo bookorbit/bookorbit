@@ -3,6 +3,7 @@ import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } f
 import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import BookCardFormatBadges from './BookCardFormatBadges.vue'
 import BookCardFormatList from './BookCardFormatList.vue'
+import BookCardLabel from './BookCardLabel.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
 import { cardEditionCount } from '../lib/book-editions'
@@ -62,7 +63,6 @@ import { fetchAuthors } from '@/features/author/api/author'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { seriesNameWithPosition, seriesPositionToken } from '@/features/series/lib/series-unit-label'
-import ActivateLink from '@/components/ActivateLink.vue'
 import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
 
 const { t } = useI18n()
@@ -424,8 +424,7 @@ function openAuthorBrowse() {
 const showHoverTitle = computed(
   () => (cardInfoMode.value === 'hover-overlay' || !props.showLabel) && (coverLoaded.value || !props.book.hasCover || coverFailed.value),
 )
-const showAuthorOnHover = computed(() => showHoverTitle.value && !!authorLine.value)
-const hoverTitleClampClass = computed(() => (effectiveCoverAspectRatio.value === '1/1' ? 'line-clamp-1' : 'line-clamp-2'))
+const hoverTitleLines = computed(() => (effectiveCoverAspectRatio.value === '1/1' ? 1 : 2))
 
 const overlayBackground = computed(() => (cardInfoMode.value === 'hover-overlay' || !props.showLabel ? 'bg-black/70' : 'bg-black/20'))
 const overlayFadeClass = computed(() => (cardInfoMode.value === 'hover-overlay' || !props.showLabel ? 'group-hover:opacity-0' : ''))
@@ -666,7 +665,9 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
             class="absolute inset-0 flex flex-col p-2 transition-opacity duration-150"
             :class="[
               overlayBackground,
-              showMobileOverlay ? 'opacity-100' : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+              showMobileOverlay
+                ? 'opacity-100'
+                : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100',
             ]"
           >
             <!-- Top row: Quick View + explicit Read (when thumbnail click prefers details) -->
@@ -699,7 +700,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
 
             <!-- Center: primary thumbnail action -->
             <div class="flex-1 flex items-center justify-center">
-              <Tooltip v-if="showPrimaryOverlayAction">
+              <Tooltip v-if="showPrimaryOverlayAction" :disabled="thumbnailClickAction === 'details'">
                 <TooltipTrigger as-child>
                   <button
                     data-testid="grid-card-primary-action"
@@ -719,16 +720,19 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
             <div class="shrink-0 flex flex-col pr-10">
               <BookCardFormatList v-if="showFormatList" class="mb-1" :own-keys="ownFormatKeys" :linked="book.linked" />
               <div class="flex items-start justify-between gap-2">
-                <p v-if="showHoverTitle" class="text-xs font-semibold text-white leading-tight min-w-0 flex-1" :class="hoverTitleClampClass">
-                  {{ book.title ?? '-' }}
-                </p>
+                <BookCardLabel
+                  v-if="showHoverTitle"
+                  as="p"
+                  :text="book.title ?? '-'"
+                  :lines="hoverTitleLines"
+                  class="min-w-0 flex-1 text-xs leading-tight font-semibold text-cover-chip-foreground"
+                  data-testid="grid-card-hover-title"
+                />
                 <div v-else class="flex-1" />
               </div>
 
-              <div v-if="showAuthorOnHover" class="min-w-0">
-                <button class="text-[10px] text-white/70 truncate hover:underline text-left block w-full" @click.stop="openAuthorBrowse">
-                  {{ authorLine }}
-                </button>
+              <div v-if="showHoverTitle && authorLine" class="min-w-0">
+                <BookCardLabel :text="authorLine" class="w-full text-[10px] text-cover-chip-foreground" @activate="openAuthorBrowse" />
               </div>
             </div>
 
@@ -874,24 +878,14 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
     <!-- Below-cover label row (below-cover mode only) -->
     <div v-if="showBelowCoverLabelArea" class="grid-card-label" data-testid="grid-card-label">
       <div class="grid-card-label__primary-row">
-        <ActivateLink
-          v-if="primaryLabelText && primaryLabelLocation"
+        <BookCardLabel
+          v-if="primaryLabelText"
+          :text="primaryLabelText"
           :to="primaryLabelLocation"
-          class="grid-card-label__button grid-card-label__primary min-w-0 flex-1 truncate"
+          class="min-w-0 flex-1 text-xs/5 font-medium text-foreground"
           data-testid="grid-card-label-primary"
           @activate="handlePrimaryLabelClick"
-        >
-          {{ primaryLabelText }}
-        </ActivateLink>
-        <button
-          v-else-if="primaryLabelText"
-          type="button"
-          class="grid-card-label__button grid-card-label__primary min-w-0 flex-1 truncate"
-          data-testid="grid-card-label-primary"
-          @click.stop="handlePrimaryLabelClick"
-        >
-          {{ primaryLabelText }}
-        </button>
+        />
         <div v-else class="flex-1" />
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
@@ -1017,24 +1011,14 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <ActivateLink
-        v-if="secondaryLabelText && secondaryLabelLocation"
+      <BookCardLabel
+        v-if="secondaryLabelText"
+        :text="secondaryLabelText"
         :to="secondaryLabelLocation"
-        class="grid-card-label__button grid-card-label__secondary w-full"
+        class="mt-0.5 w-full text-[0.675rem]/3.5 text-muted-foreground hover:text-foreground focus-visible:text-foreground"
         data-testid="grid-card-label-secondary"
         @activate="handleSecondaryLabelClick"
-      >
-        {{ secondaryLabelText }}
-      </ActivateLink>
-      <button
-        v-else-if="secondaryLabelText"
-        type="button"
-        class="grid-card-label__button grid-card-label__secondary w-full"
-        data-testid="grid-card-label-secondary"
-        @click.stop="handleSecondaryLabelClick"
-      >
-        {{ secondaryLabelText }}
-      </button>
+      />
     </div>
   </div>
 
@@ -1070,45 +1054,5 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
   align-items: center;
   gap: 2px;
   min-width: 0;
-}
-
-.grid-card-label__button {
-  display: block;
-  appearance: none;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  text-align: left;
-  cursor: pointer;
-}
-
-.grid-card-label__button:hover {
-  text-decoration-line: underline;
-}
-
-.grid-card-label__button:focus-visible {
-  outline: 2px solid var(--ring);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-.grid-card-label__primary {
-  font-size: 0.75rem;
-  line-height: 1.25rem;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--foreground);
-}
-
-.grid-card-label__secondary {
-  font-size: 0.675rem;
-  line-height: 0.875rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-  margin-top: 2px;
 }
 </style>
