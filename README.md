@@ -41,9 +41,9 @@ A self-hosted library and reading platform for ebooks, PDFs, audiobooks, and com
 
 ## 📚 What is BookOrbit?
 
-**[BookOrbit](https://bookorbit.app)** organizes your books and lets you enjoy them anywhere: on iPhone, Apple Watch, the web, Kobo, or KOReader. Your reading progress, highlights, and status stay synchronized, so you can start a chapter in one place and continue in another.
+**[BookOrbit](https://bookorbit.app)** organizes your books and lets you enjoy them anywhere: on iPhone, iPad, Apple Watch, Android, the web, Kobo, or KOReader. Your reading progress, highlights, and status stay synchronized, so you can start a chapter in one place and continue in another.
 
-Around that core sit 14 metadata providers, reading statistics and achievements, OPDS and Send-to-Kindle delivery, multi-user accounts with OIDC/SSO, and automatic sync out to Hardcover, Readwise, and StoryGraph. All of it runs on infrastructure you control.
+Around that core sit read-along books built from an ebook and its audiobook, book requests that download and file new titles for you, a spoiler-free AI reading companion, 12 metadata providers, reading statistics and achievements, OPDS and Send-to-Kindle delivery, multi-user accounts with OIDC/SSO, and automatic sync out to Hardcover, Readwise, and StoryGraph. All of it runs on infrastructure you control.
 
 [![Visit Website](https://img.shields.io/badge/Visit%20Website-bookorbit.app-4169E1?style=for-the-badge&logo=googlechrome&logoColor=white)](https://bookorbit.app)
 
@@ -93,26 +93,64 @@ Take your library anywhere with the official native BookOrbit app. Read ebooks, 
 
 ### Reading Experience & Sync
 
-- **Built-in Web Readers**: Ebooks (EPUB, KEPUB, MOBI, AZW3, AZW, FB2), PDFs, comics (CBZ, CBR, CB7), and audiobooks (M4B, MP3, M4A, OPUS, OGG, FLAC), with no extra plugins required.
-- **Native iPhone & Apple Watch Apps**: Read, listen, download, upload, and synchronize with your BookOrbit server from a native, offline-capable iPhone app. Send audiobooks to Apple Watch for independent offline playback and later progress reconciliation.
-- **Three-Way Sync (Kobo + KOReader + BookOrbit)**: Progress and annotations flow bidirectionally between Kobo devices, KOReader, and the BookOrbit web reader. Pick up on any surface where you left off on another, including highlights and deletions.
+- **Built-in Web Readers**: Ebooks (EPUB, KEPUB, MOBI, AZW3, AZW, FB2), PDFs and DjVu, comics (CBZ, CBR, CB7), and audiobooks (M4B, MP3, M4A, OPUS, OGG, FLAC), with no extra plugins required.
+- **Native iPhone, iPad, Apple Watch & Android Apps**: Read, listen, download, upload, and synchronize with your BookOrbit server from native, offline-capable apps for iPhone, iPad, and Android. Send audiobooks to Apple Watch for independent offline playback and later progress reconciliation.
+- **Four-Way Sync (Kobo + KOReader + Web + Mobile Apps)**: Progress and annotations flow bidirectionally between Kobo devices, KOReader, the BookOrbit web reader, and the mobile apps. Pick up on any surface where you left off on another, including highlights and deletions.
+- **Read-Along Books**: Turn an EPUB and its audiobook into one synchronized read-along, so you can listen on a walk and carry on reading from the same sentence that evening, with each word highlighted as it is spoken. Your place stays in step across the web reader, the apps, Kobo, and KOReader, and books without audio can be read aloud by a text-to-speech voice.
+- **Spoiler-Free Reading Companion**: Back in a long novel after a break? The mobile apps recap the story so far, remind you who a character is, and answer your questions using only the pages you have already read. It runs on the AI provider you choose (OpenAI, Anthropic, Gemini, OpenRouter, or a local Ollama, LM Studio, or vLLM) with a monthly spending cap, and stays off until an admin turns it on.
 - **KOReader Plugin**: An on-device catalog browser with search, download, and status and rating management, alongside full progress and annotation sync.
-- **Annotations & Highlights**: Highlights from the web reader, KOReader, and Kobo merge into one searchable hub. Filter by color, style, and source; export as Markdown, CSV, or JSON.
+- **Annotations & Highlights**: Highlights from the web reader, the mobile apps, KOReader, and Kobo merge into one searchable hub. Filter by color, style, and source; export as Markdown, CSV, or JSON.
 - **Hardcover, Readwise & StoryGraph Sync**: Push status, progress, reading dates, and ratings to Hardcover on configurable triggers; status and progress to The StoryGraph; and new highlights and notes to Readwise as you create them, from both the web reader and synced devices. Hardcover read history can be pulled back to backfill blank BookOrbit entries.
-- **Statistics, Goals & Achievements**: Daily reading time, heatmaps, streaks, and library health, plus yearly goals, monthly challenges, and 50+ achievements across five categories. Reading DNA profiles your reading style from your actual session history.
+- **Statistics, Goals & Achievements**: Daily reading time, heatmaps, streaks, and library health, plus yearly goals, monthly challenges, and 80+ achievements across five categories, plus a history of every finished read and reread. Reading DNA profiles your reading style from your actual session history.
 
 ### Library Management
 
-- **Multiple Libraries**: Isolate content with per-library folders, custom scan rules, and format priorities.
-- **12 Metadata Providers**: Google Books, Open Library, Amazon, Goodreads, Kobo, Hardcover, Audible, Audnexus, Libro.fm, and iTunes, plus ComicVine for comics and RanobeDB for light novels. [External providers](docs/METADATA_PROVIDERS.md) add more, such as Douban, FantLab, J-Novel Club, Libris, LubimyCzytac and MangaBaka. Cover art is sourced separately from iTunes, DuckDuckGo, and AudiobookCovers.
-- **Smart Scopes & Collections**: Organize your collection with curated lists and dynamic, rule-based saved filters.
+- **Multiple Libraries**: Isolate content with per-library folders, custom scan rules, and format priorities, built to stay fast with tens of thousands of books.
+- **12 Metadata Providers**: Google Books, Open Library, Amazon, Goodreads, Kobo, Hardcover, Audible, Audnexus, Libro.fm, and iTunes, plus ComicVine for comics and RanobeDB for light novels. [External providers](docs/METADATA_PROVIDERS.md) add more, such as Douban, FantLab, J-Novel Club, Libris, LubimyCzytac and MangaBaka. Cover art is sourced separately from iTunes, DuckDuckGo, and AudiobookCovers. Edits and covers are written back into the book files (EPUB, PDF, CBZ, MOBI, AZW, FB2, and audiobooks), so they travel with the book to any reader.
+- **Smart Scopes & Collections**: Organize your collection with curated lists and dynamic, rule-based saved filters, such as "unread science fiction over 400 pages", that keep themselves up to date and can sync to Kobo as collections.
+- **Book Requests**: Ask for an ebook, an audiobook, or both, and BookOrbit searches your Torznab and Newznab indexers or Prowlarr, downloads through qBittorrent, Transmission, Deluge, rTorrent, NZBGet, SABnzbd, or TorBox, and files the finished book into the right library. Others on your server can request too, with an approval step you control.
+- **Editions & Duplicate Merging**: The ebook, the audiobook, and a translation of the same book show once in lists, series, and author pages, opened at the edition you read last, while each keeps its own files and progress. Accidental duplicates merge into one record with progress, highlights, and notes carried over.
 
 ### Platform & Delivery
 
 - **Multi-User & SSO**: Granular per-user permissions and isolated reading data, with native support for Authentik, Keycloak, and Authelia via OIDC.
-- **Multilingual Interface**: Community translations are managed on [Crowdin](https://crowdin.com/project/bookorbit). See the [localization guide](docs/LOCALIZATION.md) for current language support and contributor instructions.
+- **Multilingual Interface**: Available in 25 languages. Community translations are managed on [Crowdin](https://crowdin.com/project/bookorbit). See the [localization guide](docs/LOCALIZATION.md) for current language support and contributor instructions.
 - **Content Delivery**: OPDS support for compatible apps, Send-to-Kindle via email, and browser drag-and-drop uploads.
 - **Automated Ingestion**: Drop files into the Library Dock folder to review them before they reach a library. Each library can have its own dock, where incoming files get metadata and, with auto-file on, are named and filed into that library.
+- **Migration from Other Apps**: Coming from Booklore, Grimmory, Audiobookshelf, or Calibre-Web Automated? Bring over book details, reading status, and progress, plus bookmarks, highlights, and collections where the source has them, instead of starting over.
+
+<details>
+<summary><strong>More features</strong></summary>
+
+**Reading**
+
+- **A notebook for every book**: In the mobile apps, highlights, notes, bookmarks, reviews and a reading journal sit together for each book and across the library.
+- **Read in your own fonts**: Upload fonts, including CJK and variable fonts, and tune paragraph spacing and indents while publisher styling stays intact by default.
+- **Comics and manga that read naturally**: Series folders laid out the Kavita or Komga way are recognised on their own, the last page opens the next issue, and the iPhone app can frame each panel in turn.
+- **Audiobooks with the right chapters**: Fix missing or wrong chapters by pulling them from Audible or the ebook, with cuts that snap to the pauses in the audio.
+- **Words worth keeping**: On iPhone, look words up in your own dictionaries, save them to a vocabulary list and review them as flashcards.
+
+**Your library**
+
+- **See which volumes you are missing**: Every series shows what you have read, what you own and the gaps in between.
+- **Find any book in seconds**: Sort on any field with a second level, filter on anything, open a page for every genre and tag, switch to a sortable table, or press Command-K to search from anywhere.
+- **Track what matters to you**: Add your own fields, such as a date, a number, a link or a yes/no, then sort and filter by them; their values are saved into EPUB, PDF and CBZ files.
+
+**On your devices**
+
+- **Point your camera at a bookshelf**: On iPhone, photograph a shelf to see which books you already own and request the rest, or photograph a printed page to open the ebook at the same passage.
+- **Request from the bookshop**: On iPhone, scan a book's barcode to request it, and approvers can approve and pick the download from their phone.
+- **An audiobook player built for long listens**: On iPhone, an Up Next queue, a sleep timer that stops at the end of a chapter, speeds up to 4x, CarPlay, and offline listening on Apple Watch.
+- **Your Kobo store books too**: Books bought from the Kobo store and Kobo Plus titles arrive on the device alongside your BookOrbit library.
+- **Your year, as a story**: Year in Review turns the year's reading into a story to share, in the mobile apps.
+
+**Running the server**
+
+- **Works behind your login proxy**: Kobo, KOReader and OPDS keep syncing when Cloudflare Access, Authelia or another login proxy sits in front of BookOrbit.
+- **Automate with API keys**: Give scripts and automations their own keys, limited to read-only access, chosen permissions or chosen libraries.
+- **Every long task in view**: The Jobs page shows what is running, waiting or failed, with pause, resume, reorder and cancel, and bulk actions keep going after you close the tab.
+
+</details>
 
 <a id="quick-start-docker"></a>
 
