@@ -15,6 +15,7 @@ export interface KoreaderPageEvent {
 
 export interface DerivedKoreaderSession {
   sessionId: string;
+  startsAtOpeningPage: boolean;
   startedAt: Date;
   endedAt: Date;
   durationSeconds: number;
@@ -62,6 +63,7 @@ export function computeClusterMetrics(cluster: KoreaderPageEvent[], deviceId: st
   const progressDelta = last.totalPages > 0 ? clamp(round2(((last.page - first.page) / last.totalPages) * 100), -100, 100) : null;
 
   return {
+    startsAtOpeningPage: first.page <= 1,
     sessionId: buildSessionId(deviceId, bookFileId, first.startTime),
     startedAt: new Date(first.startTime * 1000),
     endedAt: new Date(endEpoch * 1000),

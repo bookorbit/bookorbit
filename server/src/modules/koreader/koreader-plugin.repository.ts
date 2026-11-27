@@ -71,8 +71,8 @@ function copiedFromAnotherDevice(tx: Tx, userId: number, bookFileId: number) {
 export interface IngestPageStatsResult {
   accepted: number;
   duplicates: number;
-  insertedSessions: DerivedKoreaderSession[];
-  updatedSessions: DerivedKoreaderSession[];
+  insertedSessions: (DerivedKoreaderSession & { priorAttemptId?: number })[];
+  updatedSessions: (DerivedKoreaderSession & { priorAttemptId?: number })[];
   deletedSessions: number;
 }
 
@@ -92,62 +92,63 @@ export interface CopiedStatsRepairBatch {
 export class KoreaderPluginRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  async ingestAndDeriveForBook(params: {
-    userId: number;
-    bookFileId: number;
-    bookId: number;
-    libraryId: number;
-    deviceId: string;
-    events: KoreaderPageEvent[];
-    timeZone: string;
-  }): Promise<IngestPageStatsResult> {
+  async ingestAndDeriveForBook(
+    tx: Tx,
+    params: {
+      userId: number;
+      bookFileId: number;
+      bookId: number;
+      libraryId: number;
+      deviceId: string;
+      events: KoreaderPageEvent[];
+      timeZone: string;
+    },
+  ): Promise<IngestPageStatsResult> {
     const { userId, bookFileId, deviceId, events } = params;
 
-    return this.db.transaction(async (tx) => {
-      await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`koreader-stats:${userId}:${bookFileId}`}, 0))`);
-      const inserted = await tx
-        .insert(schema.koreaderPageStats)
-        .values(
-          events.map((event) => ({
-            userId,
-            bookFileId,
-            deviceId,
-            page: event.page,
-            startTime: event.startTime,
-            durationSeconds: event.durationSeconds,
-            totalPages: event.totalPages,
-          })),
-        )
-        .onConflictDoNothing({
-          target: [
-            schema.koreaderPageStats.userId,
-            schema.koreaderPageStats.bookFileId,
-            schema.koreaderPageStats.deviceId,
-            schema.koreaderPageStats.page,
-            schema.koreaderPageStats.startTime,
-          ],
-        })
-        .returning({ startTime: schema.koreaderPageStats.startTime });
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${`koreader-stats:${userId}:${bookFileId}`}, 0))`);
+    const inserted = await tx
+      .insert(schema.koreaderPageStats)
+      .values(
+        events.map((event) => ({
+          userId,
+          bookFileId,
+          deviceId,
+          page: event.page,
+          startTime: event.startTime,
+          durationSeconds: event.durationSeconds,
+          totalPages: event.totalPages,
+        })),
+      )
+      .onConflictDoNothing({
+        target: [
+          schema.koreaderPageStats.userId,
+          schema.koreaderPageStats.bookFileId,
+          schema.koreaderPageStats.deviceId,
+          schema.koreaderPageStats.page,
+          schema.koreaderPageStats.startTime,
+        ],
+      })
+      .returning({ startTime: schema.koreaderPageStats.startTime });
 
-      const accepted = inserted.length;
-      const duplicates = events.length - accepted;
-      if (accepted === 0) {
-        return { accepted, duplicates, insertedSessions: [], updatedSessions: [], deletedSessions: 0 };
-      }
+    const accepted = inserted.length;
+    const duplicates = events.length - accepted;
+    if (accepted === 0) {
+      return { accepted, duplicates, insertedSessions: [], updatedSessions: [], deletedSessions: 0 };
+    }
 
-      // Only the clusters the new events belong to can change, so derivation reads and
-      // rewrites that window instead of the book's whole history on every batch.
-      const window = await this.findAffectedWindow(tx, {
-        userId,
-        bookFileId,
-        deviceId,
-        firstInsertedStart: Math.min(...inserted.map((row) => row.startTime)),
-        lastInsertedStart: Math.max(...inserted.map((row) => row.startTime)),
-      });
-
-      await this.migrateLegacySessions(tx, params, window);
-      return { accepted, duplicates, ...(await this.deriveStoredWindow(tx, params, window)) };
+    // Only the clusters the new events belong to can change, so derivation reads and
+    // rewrites that window instead of the book's whole history on every batch.
+    const window = await this.findAffectedWindow(tx, {
+      userId,
+      bookFileId,
+      deviceId,
+      firstInsertedStart: Math.min(...inserted.map((row) => row.startTime)),
+      lastInsertedStart: Math.max(...inserted.map((row) => row.startTime)),
     });
+
+    await this.migrateLegacySessions(tx, params, window);
+    return { accepted, duplicates, ...(await this.deriveStoredWindow(tx, { ...params, legacyAttemptId: null }, window)) };
   }
 
   /**
@@ -325,6 +326,7 @@ export class KoreaderPluginRepository {
     const existing = await tx
       .select({
         id: schema.readingSessions.id,
+        attemptId: schema.readingSessions.attemptId,
         sessionId: schema.readingSessions.sessionId,
         startedAt: schema.readingSessions.startedAt,
         endedAt: schema.readingSessions.endedAt,
@@ -341,7 +343,8 @@ export class KoreaderPluginRepository {
           lte(schema.readingSessions.startedAt, new Date(window.endSeconds * 1000)),
           gte(schema.readingSessions.endedAt, new Date(window.firstStart * 1000)),
         ),
-      );
+      )
+      .orderBy(schema.readingSessions.startedAt);
 
     const desiredById = new Map(desired.map((session) => [session.sessionId, session]));
     const existingById = new Map(existing.map((session) => [session.sessionId, session]));
@@ -358,6 +361,21 @@ export class KoreaderPluginRepository {
         (current.endProgress ?? null) !== (session.endProgress ?? null)
       );
     });
+
+    // Earlier events can change the cluster id. Carry a link across that replacement only
+    // when the overlapping sessions agree about the read they belonged to.
+    const priorAttempts = new Map<string, number>();
+    let firstOverlap = 0;
+    for (const session of desired) {
+      while (firstOverlap < existing.length && existing[firstOverlap]!.endedAt < session.startedAt) firstOverlap++;
+      const owners = new Set<number>();
+      for (let index = firstOverlap; index < existing.length && existing[index]!.startedAt <= session.endedAt; index++) {
+        const prior = existing[index]!;
+        if (prior.endedAt >= session.startedAt && prior.attemptId !== null) owners.add(prior.attemptId);
+      }
+      const owner = existingById.get(session.sessionId)?.attemptId ?? (owners.size === 1 ? [...owners][0] : undefined);
+      if (owner !== undefined) priorAttempts.set(session.sessionId, owner);
+    }
 
     if (toDelete.length > 0) {
       await tx.delete(schema.readingSessions).where(
@@ -378,9 +396,10 @@ export class KoreaderPluginRepository {
             bookFileId,
             bookId,
             attemptId:
-              params.legacyAttemptId !== undefined
+              priorAttempts.get(session.sessionId) ??
+              (params.legacyAttemptId !== undefined
                 ? params.legacyAttemptId
-                : sql`(select id from reading_attempts where user_id = ${userId} and book_id = ${bookId} and outcome is null and deleted_at is null limit 1)`,
+                : sql`(select id from reading_attempts where user_id = ${userId} and book_id = ${bookId} and outcome is null and deleted_at is null limit 1)`),
             sessionId: session.sessionId,
             source: 'koreader' as const,
             startedAt: session.startedAt,
@@ -397,7 +416,7 @@ export class KoreaderPluginRepository {
             durationSeconds: sql`excluded.duration_seconds`,
             progressDelta: sql`excluded.progress_delta`,
             endProgress: sql`excluded.end_progress`,
-            attemptId: sql`coalesce(excluded.attempt_id, ${schema.readingSessions.attemptId})`,
+            attemptId: sql`coalesce(${schema.readingSessions.attemptId}, excluded.attempt_id)`,
           },
         });
     }
@@ -427,8 +446,8 @@ export class KoreaderPluginRepository {
     }
 
     return {
-      insertedSessions: toInsert,
-      updatedSessions: toUpdate,
+      insertedSessions: toInsert.map((session) => ({ ...session, priorAttemptId: priorAttempts.get(session.sessionId) })),
+      updatedSessions: toUpdate.map((session) => ({ ...session, priorAttemptId: priorAttempts.get(session.sessionId) })),
       deletedSessions: toDelete.length,
     };
   }

@@ -71,7 +71,7 @@ export class ReadingAttemptService {
     options: ManualStatusOptions = {},
   ): Promise<UserBookStatus> {
     let changed = false;
-    const result = await this.repo.transaction<UserBookStatus>(async (tx) => {
+    const result = await this.repo.bookTransaction<UserBookStatus>(userId, bookId, async (tx) => {
       let active: Awaited<ReturnType<ReadingAttemptRepository['findActive']>> | null = await this.repo.findActive(tx, userId, bookId);
       let latest = active ?? (await this.repo.findLatest(tx, userId, bookId));
       const hasStartedOn = startedOn !== undefined;
@@ -281,7 +281,7 @@ export class ReadingAttemptService {
     timeZone?: string;
   }): Promise<UserBookStatus | null> {
     let changed = false;
-    const result = await this.repo.transaction<UserBookStatus | null>(async (tx) => {
+    const result = await this.repo.bookTransaction<UserBookStatus | null>(input.userId, input.bookId, async (tx) => {
       let active: Awaited<ReturnType<ReadingAttemptRepository['findActive']>> | null = await this.repo.findActive(tx, input.userId, input.bookId);
       let latest = active ?? (await this.repo.findLatest(tx, input.userId, input.bookId));
       const hasCompleted = await this.repo.hasCompleted(tx, input.userId, input.bookId);

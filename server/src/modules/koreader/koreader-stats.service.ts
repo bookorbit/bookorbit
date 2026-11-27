@@ -1,3 +1,4 @@
+import { KoreaderReadingAttemptService } from '../user-book-status/koreader-reading-attempt.service';
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 
@@ -41,6 +42,7 @@ export class KoreaderStatsService {
     private readonly achievementEvents: AchievementEventsService,
     private readonly bookService: BookService,
     private readonly libraryScope: LibraryScopeService,
+    private readonly attempts: KoreaderReadingAttemptService,
   ) {}
 
   async uploadPageStats(user: RequestUser, dto: PageStatsUploadDto): Promise<PageStatsUploadResult> {
@@ -91,15 +93,20 @@ export class KoreaderStatsService {
           continue;
         }
 
-        const result = await this.pluginRepo.ingestAndDeriveForBook({
+        const scope = {
           userId: user.id,
-          bookFileId: match.bookFileId,
           bookId: match.bookId,
           libraryId: match.libraryId,
+          bookFileId: match.bookFileId,
           deviceId: dto.deviceId,
-          events: book.events,
           timeZone,
-        });
+        };
+        const result = await this.attempts.recordUpload(scope, (tx) =>
+          this.pluginRepo.ingestAndDeriveForBook(tx, {
+            ...scope,
+            events: book.events,
+          }),
+        );
 
         acceptedTotal += result.accepted;
         insertedSessionCount += result.insertedSessions.length;

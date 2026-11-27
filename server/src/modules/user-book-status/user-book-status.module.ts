@@ -1,3 +1,4 @@
+import { KoreaderReadingAttemptService } from './koreader-reading-attempt.service';
 import { Module } from '@nestjs/common';
 
 import { AchievementModule } from '../achievement/achievement.module';
@@ -16,9 +17,10 @@ import { ReadingAttemptEventsModule } from './reading-attempt-events.module';
     UserBookStatusRepository,
     KoboStatusProjectionRepository,
     ReadingAttemptService,
+    KoreaderReadingAttemptService,
     ReadingAttemptRepository,
     ReadingAttemptBackfillService,
   ],
-  exports: [UserBookStatusService, ReadingAttemptService, ReadingAttemptEventsModule],
+  exports: [KoreaderReadingAttemptService, UserBookStatusService, ReadingAttemptService, ReadingAttemptEventsModule],
 })
 export class UserBookStatusModule {}

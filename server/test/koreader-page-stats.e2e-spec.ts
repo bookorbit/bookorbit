@@ -7,6 +7,7 @@ import * as schema from '../src/db/schema';
 import { Permission } from '@bookorbit/types';
 import { buildSessionId, buildSessionIdPrefix, koreaderSessionDeviceKey } from '../src/common/utils/koreader-session-id.utils';
 import { KOREADER_SESSION_GAP_SECONDS, deriveKoreaderSessions, type KoreaderPageEvent } from '../src/modules/koreader/koreader-stats.util';
+import { ReadingAttemptRepository } from '../src/modules/user-book-status/reading-attempt.repository';
 import { KoreaderPluginRepository } from '../src/modules/koreader/koreader-plugin.repository';
 import { createEpubFixture } from './e2e/reader-state-isolation/reader-state-isolation-fixture-builder';
 import {
@@ -53,8 +54,8 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     return { 'x-auth-user': KOREADER_USERNAME, 'x-auth-key': KOREADER_PASSWORD };
   }
 
-  async function uploadPageStats(events: KoreaderPageEvent[], bookFileId?: number, deviceId = DEVICE_ID) {
-    const response = await ctx.app.inject({
+  function postPageStats(events: KoreaderPageEvent[], bookFileId?: number, deviceId = DEVICE_ID, hash = fileHash) {
+    return ctx.app.inject({
       method: 'POST',
       url: '/api/v1/koreader/plugin/page-stats',
       headers: deviceHeaders(),
@@ -62,9 +63,13 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
         deviceId,
         deviceModel: 'E2E',
         pluginVersion: '0.4.0',
-        books: [{ hash: fileHash, bookFileId, events }],
+        books: [{ hash, bookFileId, events }],
       },
     });
+  }
+
+  async function uploadPageStats(events: KoreaderPageEvent[], bookFileId?: number, deviceId = DEVICE_ID, hash = fileHash) {
+    const response = await postPageStats(events, bookFileId, deviceId, hash);
     expect(response.statusCode).toBe(201);
     return response.json() as { results: { hash: string; accepted: number; duplicates: number }[]; unmatched: string[] };
   }
@@ -847,5 +852,154 @@ describe('KOReader page stats derivation (e2e)', { timeout: 180_000 }, () => {
     });
     expect(otherLog.statusCode).toBe(200);
     expect(otherLog.json().items).toEqual([]);
+  });
+
+  async function getApi(url: string) {
+    const response = await ctx.app.inject({ method: 'GET', url: `/api/v1/${url}`, headers: authHeader(ctx.adminToken) });
+    expect(response.statusCode).toBe(200);
+    return response.json();
+  }
+  async function countGoal() {
+    const response = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/dashboard/widgets/batch',
+      headers: authHeader(ctx.adminToken),
+      payload: { widgets: ['reading-goal'] },
+    });
+    expect(response.statusCode).toBe(200);
+    return response.json().items[0].data.completedBooks as number;
+  }
+
+  async function createRereadBook(label: string) {
+    const path = await createEpubFixture(library.folderPath, `reread-${label}.epub`, { title: `Reread ${label}`, uid: randomUUID() });
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const { bookId, bookFileId } = await locateBookByAbsolutePath(ctx, path);
+    const [file] = await ctx.db.select({ hash: schema.bookFiles.fileHash }).from(schema.bookFiles).where(eq(schema.bookFiles.id, bookFileId));
+    const upload = (events: KoreaderPageEvent[], device = DEVICE_ID) => uploadPageStats(events, bookFileId, device, file!.hash!);
+    const oldFinish = `${new Date().getUTCFullYear() - 1}-01-10`;
+    const original = await ctx.app.inject({
+      method: 'PATCH',
+      url: `/api/v1/books/${bookId}/status`,
+      headers: authHeader(ctx.adminToken),
+      payload: { status: 'read', finishedAt: oldFinish },
+    });
+    expect(original.statusCode).toBe(200);
+    return { bookId, bookFileId, hash: file!.hash!, upload, oldFinish };
+  }
+
+  it.each(['chronological', 'reversed', 'together', 'one sitting', 'concurrent', 'opening last'])(
+    'records one KOReader reread when sessions arrive %s',
+    async (order) => {
+      const { bookId, hash, oldFinish, upload } = await createRereadBook(order);
+      const year = new Date().getUTCFullYear();
+      const beginning = Date.UTC(year, 0, 2, 14) / 1000;
+      const first = cluster(beginning, 50, 1).map((event) => ({ ...event, totalPages: 100 }));
+      const ending = beginning + (order === 'one sitting' ? 50 * 60 : order === 'opening last' ? 2 * 86400 : 86400);
+      const last = cluster(ending, order === 'opening last' ? 25 : 50, order === 'opening last' ? 76 : 51).map((event) => ({
+        ...event,
+        totalPages: 100,
+      }));
+      const goalBefore = await countGoal();
+      const historyBefore = (await getApi(`reading-history?year=${year}`)).total;
+      if (order === 'reversed') {
+        await upload(last);
+        expect((await getApi(`books/${bookId}/reading-attempts`)).total).toBe(1);
+        await upload(first);
+      } else if (order === 'concurrent') {
+        await Promise.all([upload(first), upload(last), upload(first)]);
+      } else if (order === 'opening last') {
+        await upload(cluster(beginning + 86400, 25, 51).map((event) => ({ ...event, totalPages: 100 })));
+        await upload(last);
+        await upload(first);
+      } else if (order === 'chronological') {
+        await upload(first);
+        expect((await getApi(`books/${bookId}`)).readStatus.status).toBe('rereading');
+        const early = await getApi(`books/${bookId}/reading-attempts`);
+        expect(early.items[0]).toMatchObject({ outcome: null, totalSessions: 1 });
+        // A delayed final-page visit from the original read cannot finish the active reread.
+        await upload([{ page: 100, totalPages: 100, durationSeconds: 60, startTime: Date.parse(oldFinish + 'T12:00:00Z') / 1000 }]);
+        expect((await getApi(`books/${bookId}`)).readStatus.status).toBe('rereading');
+        await upload(last);
+      } else {
+        await upload([...last, ...first]);
+      }
+      await upload([...first, ...last]);
+      await upload([...first, ...last], 'reread-copy');
+      const complete = await ctx.app.inject({
+        method: 'POST',
+        url: '/api/v1/koreader/plugin/book-states',
+        headers: deviceHeaders(),
+        payload: {
+          deviceId: DEVICE_ID,
+          deviceModel: 'E2E',
+          pluginVersion: '1.7.0',
+          books: [{ hash, status: 'complete', statusModified: dayKey(ending) }],
+        },
+      });
+      expect(complete.statusCode).toBe(201);
+      const attempts = await getApi(`books/${bookId}/reading-attempts`);
+      expect(attempts.total).toBe(2);
+      expect(attempts.items[0]).toMatchObject({
+        origin: 'koreader',
+        outcome: 'completed',
+        startedOn: dayKey(beginning),
+        endedOn: dayKey(ending),
+        totalSessions: order === 'one sitting' ? 1 : order === 'opening last' ? 3 : 2,
+      });
+      expect(attempts.items[1]).toMatchObject({ endedOn: oldFinish, startedOn: null });
+      const sessions = await getApi(`books/${bookId}/sessions`);
+      for (const session of sessions.items.filter((item: { startedAt: string }) => item.startedAt >= new Date(beginning * 1000).toISOString())) {
+        expect(session.attemptId).toBe(attempts.items[0].id);
+      }
+      expect((await getApi(`books/${bookId}`)).readStatus).toMatchObject({ status: 'read', finishedAt: dayKey(ending) + 'T00:00:00.000Z' });
+      expect((await getApi(`reading-history?year=${year}`)).total).toBe(historyBefore + 1);
+      expect(await countGoal()).toBe(goalBefore + 1);
+    },
+  );
+  it.each([false, true])('needs corroborating pages before a brief opening becomes a reread (finish first: %s)', async (finishFirst) => {
+    const { bookId, upload } = await createRereadBook(`brief-opening-${finishFirst}`);
+    const start = Date.UTC(new Date().getUTCFullYear(), 0, 2, 14) / 1000;
+    const opening = cluster(start, 1, 1);
+    const finish = cluster(start + 86400, TOTAL_PAGES - 1, 2);
+    await upload(finishFirst ? finish : opening);
+    expect((await getApi(`books/${bookId}/reading-attempts`)).total).toBe(1);
+    await upload(finishFirst ? opening : finish);
+    expect((await getApi(`books/${bookId}/reading-attempts`)).items).toMatchObject([
+      { startedOn: dayKey(start), endedOn: dayKey(start + 86400), outcome: 'completed', totalSessions: 2 },
+      { startedOn: null, outcome: 'completed', totalSessions: 0 },
+    ]);
+  });
+
+  it('rolls back accepted pages and an opened reread together when session linking fails', async () => {
+    const { bookId, bookFileId, hash, upload } = await createRereadBook('retry');
+    const pages = cluster(Math.floor(Date.now() / 1000) - 3600, 10, 1);
+    const failure = vi.spyOn(ctx.app.get(ReadingAttemptRepository), 'linkDatedStats').mockRejectedValueOnce(new Error('simulated link failure'));
+    try {
+      expect((await postPageStats(pages, bookFileId, DEVICE_ID, hash)).statusCode).toBe(500);
+    } finally {
+      failure.mockRestore();
+    }
+    expect((await getApi(`books/${bookId}/sessions`)).total).toBe(0);
+    expect((await getApi(`books/${bookId}/reading-attempts`)).total).toBe(1);
+    expect((await upload(pages)).results[0]?.accepted).toBe(pages.length);
+    expect((await getApi(`books/${bookId}/reading-attempts`)).items[0]).toMatchObject({ outcome: null, totalSessions: 1 });
+  });
+
+  it('separates consecutive rereads even when one batch finishes an open attempt and contains the entire next read', async () => {
+    const { bookId, upload } = await createRereadBook('two rereads');
+    const day = 86400;
+    const start = Date.UTC(new Date().getUTCFullYear(), 0, 2, 14) / 1000;
+    const opening = (offset: number) => cluster(start + offset * day, 10, 1);
+    const finish = (offset: number) => cluster(start + offset * day, 10, TOTAL_PAGES - 9);
+    const goalBefore = await countGoal();
+    await upload(opening(0));
+    await upload([...finish(1), ...opening(10), ...finish(11)]);
+    const reads = await getApi(`books/${bookId}/reading-attempts`);
+    expect(reads.total).toBe(3);
+    expect(reads.items.slice(0, 2)).toMatchObject([
+      { startedOn: dayKey(start + 10 * day), endedOn: dayKey(start + 11 * day), totalSessions: 2, outcome: 'completed' },
+      { startedOn: dayKey(start), endedOn: dayKey(start + day), totalSessions: 2, outcome: 'completed' },
+    ]);
+    expect(await countGoal()).toBe(goalBefore + 2);
   });
 });

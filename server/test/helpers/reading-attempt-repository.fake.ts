@@ -36,8 +36,10 @@ export function makeFakeRepo() {
     }
   }
 
+  const transaction = vi.fn((callback: (tx: object) => Promise<unknown>) => callback(transactionContext));
   const repo = {
-    transaction: vi.fn((callback: (tx: object) => Promise<unknown>) => callback(transactionContext)),
+    bookTransaction: vi.fn((_userId: number, _bookId: number, callback: (tx: object) => Promise<unknown>) => transaction(callback)),
+    transaction,
     findActive: vi.fn((_tx: object, userId: number, bookId: number) =>
       Promise.resolve(rows.find((row) => row.userId === userId && row.bookId === bookId && row.outcome === null && row.deletedAt === null)),
     ),

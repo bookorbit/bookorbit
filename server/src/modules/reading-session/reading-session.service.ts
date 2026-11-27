@@ -11,6 +11,7 @@ import type {
 } from '@bookorbit/types';
 import { KoreaderDeviceDirectoryService } from '../../common/koreader-devices/koreader-device-directory.service';
 import type { RequestUser } from '../../common/types/request-user';
+import { isMeaningfulReadingSession } from '../../common/utils/progress-threshold.utils';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import { resolveTimeZone } from '../../common/utils/timezone.utils';
 import { BookService } from '../book/book.service';
@@ -93,7 +94,7 @@ export class ReadingSessionService {
 
       if (result.kind === 'saved') {
         this.userStatistics.invalidateUser(user.id);
-        const meaningfulActivity = durationSeconds >= 300 || (dto.progressDelta ?? 0) >= 1;
+        const meaningfulActivity = isMeaningfulReadingSession(durationSeconds, dto.progressDelta);
         if (meaningfulActivity && file && dto.endProgress != null) {
           await this.bookService.autoUpdateReadStatusForProgress(user.id, file, dto.endProgress, {
             origin: source === 'koreader' ? 'koreader' : 'bookorbit',

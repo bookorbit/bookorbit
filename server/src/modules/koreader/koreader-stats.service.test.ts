@@ -28,6 +28,7 @@ function makeDto(books: PageStatsUploadDto['books']): PageStatsUploadDto {
 
 function makeSession(startEpoch: number): DerivedKoreaderSession {
   return {
+    startsAtOpeningPage: true,
     sessionId: `kor:abcdef12:10:${startEpoch}`,
     startedAt: new Date(startEpoch * 1000),
     endedAt: new Date((startEpoch + 60) * 1000),
@@ -74,6 +75,7 @@ describe('KoreaderStatsService', () => {
       achievementEvents as unknown as AchievementEventsService,
       bookService as unknown as BookService,
       libraryScopeStub() as never,
+      { recordUpload: (_scope: unknown, persist: (tx: object) => unknown) => persist({}) } as never,
     );
   });
 
@@ -94,15 +96,18 @@ describe('KoreaderStatsService', () => {
     expect(result.unmatched).toEqual([HASH_B]);
     expect(result.results).toHaveLength(1);
     expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledTimes(1);
-    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith({
-      userId: 7,
-      bookFileId: 10,
-      bookId: 20,
-      libraryId: 1,
-      deviceId: DEVICE_ID,
-      events: dto.books[0]!.events,
-      timeZone: 'Asia/Kolkata',
-    });
+    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith(
+      {},
+      {
+        userId: 7,
+        bookFileId: 10,
+        bookId: 20,
+        libraryId: 1,
+        deviceId: DEVICE_ID,
+        events: dto.books[0]!.events,
+        timeZone: 'Asia/Kolkata',
+      },
+    );
   });
 
   it('returns the max submitted startTime as watermark even when everything is a duplicate', async () => {
@@ -149,7 +154,7 @@ describe('KoreaderStatsService', () => {
     const result = await service.uploadPageStats(makeUser(), dto);
 
     expect(bookService.verifyFileAccess).toHaveBeenCalledWith(11, makeUser());
-    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 11, bookId: 21, libraryId: 1 }));
+    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith({}, expect.objectContaining({ bookFileId: 11, bookId: 21, libraryId: 1 }));
     expect(result.unmatched).toEqual([]);
   });
 
@@ -161,7 +166,7 @@ describe('KoreaderStatsService', () => {
       makeDto([{ hash: HASH_A, bookFileId: 11, events: [{ page: 1, startTime: 1000, durationSeconds: 30, totalPages: 100 }] }]),
     );
     expect(result.unmatched).toEqual([]);
-    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith(expect.objectContaining({ bookFileId: 11, bookId: 21 }));
+    expect(pluginRepo.ingestAndDeriveForBook).toHaveBeenCalledWith({}, expect.objectContaining({ bookFileId: 11, bookId: 21 }));
   });
 
   it('refuses an explicit statistics target whose server hash does not match', async () => {
