@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { BookDetail, CoverMedium } from '@bookorbit/types'
+import type { BookDetail, CoverMedium, MetadataProviderInfo } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import MetadataSearchDrawer from '../MetadataSearchDrawer.vue'
 
@@ -10,8 +10,8 @@ const authUser = ref({ id: 3 })
 vi.mock('@/features/auth/composables/useAuth', () => ({ useAuth: () => ({ user: authUser }) }))
 
 const WorkspaceStub = defineComponent({
-  props: ['searchDefaults', 'hasSearched'],
-  emits: ['search'],
+  props: ['searchDefaults', 'hasSearched', 'secondCover'],
+  emits: ['search', 'searchFresh', 'selectFieldRules'],
   template: '<div><slot name="search-options" /></div>',
 })
 
@@ -75,6 +75,49 @@ describe('MetadataSearchDrawer automatic search', () => {
     expect(searchCalls()).toHaveLength(2)
     expect(searchCalls()[0]![0]).toContain('title=Dune+revised')
     expect(searchCalls()[1]![0]).toContain('mediaKind=audiobook')
+    wrapper.unmount()
+  })
+
+  it('offers covers from selected manual sources in the audiobook row while keeping the cover rule priority', async () => {
+    const providers: MetadataProviderInfo[] = [
+      { key: 'audible', label: 'Audible', identifiable: true, selectedByFieldRules: true, audioCoverPriority: 0 },
+      { key: 'audnexus', label: 'AudNexus', identifiable: false, selectedByFieldRules: false },
+    ]
+    const audnexus = {
+      provider: 'audnexus',
+      providerId: 'B002V1OF70',
+      title: 'Dune',
+      coverUrl: 'https://example.com/square.jpg',
+    }
+    vi.mocked(api).mockImplementation(async (input) => {
+      const url = new URL(String(input), location.origin)
+      if (url.pathname.endsWith('/metadata-fetch/providers')) return new Response(JSON.stringify(providers))
+      const query = url.searchParams
+      return new Response(query.get('providers')?.split(',').includes('audnexus') ? `data: ${JSON.stringify(audnexus)}\n\n` : '')
+    })
+    const wrapper = mountDrawer(['ebook', 'audio'])
+    await flushPromises()
+    const workspace = wrapper.getComponent(WorkspaceStub)
+
+    workspace.vm.$emit('search', { title: 'Dune', author: 'Frank Herbert', isbn: '9780441172719' })
+    await flushPromises()
+
+    expect(searchCalls()).toHaveLength(2)
+    const query = new URL(String(searchCalls()[1]![0]), location.origin).searchParams
+    expect(query.get('mediaKind')).toBe('audiobook')
+    expect(query.get('providers')).toBe('audible,audnexus')
+    expect(query.has('isbn')).toBe(false)
+    expect(workspace.props('secondCover')).toMatchObject({ priority: ['audible'], candidates: [audnexus] })
+
+    workspace.vm.$emit('selectFieldRules')
+    await flushPromises()
+    expect(workspace.props('secondCover').candidates).toEqual([])
+
+    workspace.vm.$emit('searchFresh')
+    await flushPromises()
+    expect(searchCalls()).toHaveLength(4)
+    const refreshedQuery = new URL(String(searchCalls()[3]![0]), location.origin).searchParams
+    expect(refreshedQuery.get('providers')).toBe('audible')
     wrapper.unmount()
   })
 

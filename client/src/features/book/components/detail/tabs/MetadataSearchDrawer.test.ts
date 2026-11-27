@@ -36,7 +36,6 @@ vi.mock('../../../composables/useMetadataSearch', async () => {
     useMetadataSearch: () => {
       const first = metadataSearchMocks.instances++ % 2 === 0
       return {
-        results: vue.ref([]),
         filteredResults: vue.ref([]),
         providerCounts: vue.reactive({}),
         interruptedProviders: vue.ref([]),
@@ -210,7 +209,7 @@ describe('MetadataSearchDrawer', () => {
     expect(wrapper.getComponent(WorkspaceStub).props('coverPriority')).toEqual(['audible', 'itunes'])
   })
 
-  it('searches the other medium too for a book with both, without the ISBN and with its cover rule providers', async () => {
+  it('searches the other medium without the primary edition ISBN and keeps its cover rule priority', async () => {
     const wrapper = mountDrawer([makeFile('epub', 'primary'), makeFile('m4b', 'content')])
 
     await wrapper.find('[data-testid="search"]').trigger('click')
@@ -220,7 +219,6 @@ describe('MetadataSearchDrawer', () => {
       author: 'Frank Herbert',
       bookId: 42,
       mediaKind: 'audiobook',
-      providers: ['audible', 'itunes'],
     })
     expect(wrapper.getComponent(WorkspaceStub).props('secondCover')).toMatchObject({ medium: 'audio', priority: ['audible', 'itunes'] })
   })
@@ -230,7 +228,8 @@ describe('MetadataSearchDrawer', () => {
 
     await wrapper.find('[data-testid="search"]').trigger('click')
 
-    expect(metadataSearchMocks.secondSearch).toHaveBeenCalledWith(expect.objectContaining({ mediaKind: 'ebook', providers: ['amazon', 'itunes'] }))
+    expect(metadataSearchMocks.secondSearch).toHaveBeenCalledWith(expect.objectContaining({ mediaKind: 'ebook' }))
+    expect(wrapper.getComponent(WorkspaceStub).props('secondCover')).toMatchObject({ medium: 'ebook', priority: ['amazon', 'itunes'] })
   })
 
   it('makes no second search for a book with one medium', async () => {

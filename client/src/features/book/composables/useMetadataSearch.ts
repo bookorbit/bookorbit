@@ -34,7 +34,7 @@ export interface SearchParams {
   resultsPerProvider?: number
 }
 
-export function useMetadataSearch() {
+export function useMetadataSearch(selectedProviders = ref<MetadataProviderKey[]>([])) {
   const results = ref<MetadataCandidate[]>([])
   // Keyed by candidate rather than stored on it: the marker must never reach a form or request body.
   const candidateCache = shallowReactive(new Map<string, MetadataCandidateCacheInfo>())
@@ -44,7 +44,6 @@ export function useMetadataSearch() {
   const isStreaming = ref(false)
   const hasSearched = ref(false)
   const providers = ref<MetadataProviderInfo[]>([])
-  const selectedProviders = ref<MetadataProviderKey[]>([])
 
   // Providers asked again on their own after they stopped early, while the answer is on its way.
   const retryingProviders = ref<MetadataProviderKey[]>([])

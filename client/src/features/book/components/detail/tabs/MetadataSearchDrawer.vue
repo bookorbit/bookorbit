@@ -98,8 +98,8 @@ const {
   cacheSummary,
   cacheInfoFor,
 } = useMetadataSearch()
-const secondSearch = useMetadataSearch()
-const { results: secondResults, isStreaming: secondSearching } = secondSearch
+const secondSearch = useMetadataSearch(selectedProviders)
+const { filteredResults: secondResults, isStreaming: secondSearching } = secondSearch
 
 const secondCoverPriority = computed(() => (secondCoverMedium.value === 'audio' ? audioCoverProviderOrder.value : coverProviderOrder.value))
 const mainCoverPriority = computed(() => (mainCoverMedium.value === 'audio' ? audioCoverProviderOrder.value : coverProviderOrder.value))
@@ -152,7 +152,6 @@ function runMetadataSearch(params: MetadataQuery) {
     author: params.author,
     bookId: props.book.id,
     mediaKind: medium === 'audio' ? 'audiobook' : 'ebook',
-    ...(secondCoverPriority.value.length ? { providers: secondCoverPriority.value } : {}),
   })
 }
 
