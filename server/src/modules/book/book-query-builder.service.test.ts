@@ -480,10 +480,10 @@ describe('BookQueryBuilder', () => {
 
     const result = builder.buildOrderBy([{ field: 'seriesIndex', dir: 'desc' }]);
 
-    // Unit rank, number, literal tie break, then the series name.
-    expect(result).toHaveLength(5);
-    expect(raw).toHaveBeenCalledTimes(4);
-    for (const call of [1, 2, 3, 4]) expect(raw).toHaveBeenNthCalledWith(call, 'DESC');
+    // Unit rank, run, number, literal tie break, then the series name.
+    expect(result).toHaveLength(6);
+    expect(raw).toHaveBeenCalledTimes(5);
+    for (const call of [1, 2, 3, 4, 5]) expect(raw).toHaveBeenNthCalledWith(call, 'DESC');
   });
 
   it('falls back to default order when runtime direction is invalid', () => {

@@ -214,7 +214,11 @@ export class RecommendationRepository {
       .leftJoin(bookMetadata, eq(bookMetadata.bookId, books.id))
       .leftJoin(bookFiles, eq(bookFiles.id, books.primaryFileId))
       .where(and(inArray(books.libraryId, libraryIds), eq(bookMetadata.seriesId, seriesId), ...filterClauses))
-      .orderBy(...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, 'ASC'), asc(bookMetadata.title), asc(books.id))
+      .orderBy(
+        ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, bookMetadata.seriesVolumeIndex, 'ASC'),
+        asc(bookMetadata.title),
+        asc(books.id),
+      )
       .limit(viewer ? SERIES_BOOKS_LIMIT * WORK_FOLD_OVERFETCH : SERIES_BOOKS_LIMIT);
     const rows = viewer ? foldWorks(fetched, SERIES_BOOKS_LIMIT, viewer.openBookId) : fetched;
 

@@ -244,7 +244,45 @@ describe('SeriesMembershipEditor', () => {
 
       await wrapper.get('button[title="Add series"]').trigger('click')
 
-      expect(membershipsOf(wrapper)[1]).toEqual({ seriesName: '', seriesIndex: null, expectedBookCount: null, unit: null })
+      expect(membershipsOf(wrapper)[1]).toEqual({ seriesName: '', seriesIndex: null, expectedBookCount: null, unit: null, volumeIndex: null })
+    })
+  })
+
+  describe('volume number', () => {
+    function membershipsOf(wrapper: ReturnType<typeof mountHost>): EditableSeriesMembership[] {
+      return (wrapper.vm as { memberships: EditableSeriesMembership[] }).memberships
+    }
+
+    it('is offered for a chapter or issue only', () => {
+      const wrapper = mountHost(
+        [
+          { seriesName: 'Doom Patrol', seriesIndex: '1', expectedBookCount: null, unit: 'issue', volumeIndex: '2' },
+          { seriesName: 'Berserk', seriesIndex: '3', expectedBookCount: null, unit: 'volume', volumeIndex: null },
+        ],
+        { unitEditable: true },
+      )
+
+      const inputs = wrapper.findAll('[data-testid="series-volume-index"]')
+      expect(inputs).toHaveLength(1)
+      expect((inputs[0]!.element as HTMLInputElement).value).toBe('2')
+    })
+
+    it('is not offered where several books are edited at once', () => {
+      const wrapper = mountHost([{ seriesName: 'Doom Patrol', seriesIndex: '1', expectedBookCount: null, unit: 'issue', volumeIndex: '2' }])
+
+      expect(wrapper.find('[data-testid="series-volume-index"]').exists()).toBe(false)
+    })
+
+    it('updates the run, and clears it when emptied', async () => {
+      const wrapper = mountHost([{ seriesName: 'Doom Patrol', seriesIndex: '1', expectedBookCount: null, unit: 'issue', volumeIndex: '2' }], {
+        unitEditable: true,
+      })
+      const input = wrapper.get('[data-testid="series-volume-index"]')
+
+      await input.setValue('3')
+      expect(membershipsOf(wrapper)[0]?.volumeIndex).toBe('3')
+      await input.setValue('')
+      expect(membershipsOf(wrapper)[0]?.volumeIndex).toBeNull()
     })
   })
 })

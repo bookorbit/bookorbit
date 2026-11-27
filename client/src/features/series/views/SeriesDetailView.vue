@@ -6,7 +6,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ChevronLeft, Pencil } from '@lucide/vue'
 import { toast } from 'vue-sonner'
 
-import type { BookCard, BookDetail, SeriesUnit, SeriesUnitClass } from '@bookorbit/types'
+import type { BookCard, BookDetail, SeriesIndex, SeriesUnit, SeriesUnitClass } from '@bookorbit/types'
 import VirtualBookGrid from '@/features/book/components/VirtualBookGrid.vue'
 import SingleSortControl from '@/features/book/components/sort-filter/SingleSortControl.vue'
 import LibraryMenuButton from '@/components/browse-header/LibraryMenuButton.vue'
@@ -108,6 +108,7 @@ const leadBook = ref<{
   title: string | null
   seriesIndex: string | null
   seriesUnit: SeriesUnit | null
+  seriesVolumeIndex: SeriesIndex | null
   publishedYear: number | null
   language: string | null
   rating: number | null
@@ -136,7 +137,12 @@ const unitProgress = computed(() =>
   }),
 )
 const seriesCountLabel = computed(() => seriesUnitCountsLabel(t, unitCounts.value) ?? t('series.card.volumeCount', { count: ownedVolumeCount.value }))
-const hasGaps = computed(() => (seriesInfo.value?.possibleGaps.length ?? 0) > 0 || (seriesInfo.value?.chapterGaps?.length ?? 0) > 0)
+const hasGaps = computed(
+  () =>
+    (seriesInfo.value?.possibleGaps.length ?? 0) > 0 ||
+    (seriesInfo.value?.chapterGaps?.length ?? 0) > 0 ||
+    (seriesInfo.value?.chapterGapPositions?.length ?? 0) > 0,
+)
 const addToCollectionOpen = ref(false)
 const addToCollectionBookId = ref<number | null>(null)
 const leadFallbackStyle = computed(() => {
@@ -169,7 +175,7 @@ const leadMetaItems = computed(() => {
 const leadPositionLabel = computed(() => {
   const lead = leadBook.value
   if (lead?.seriesIndex == null) return null
-  const token = seriesPositionToken(t, lead.seriesIndex, lead.seriesUnit)
+  const token = seriesPositionToken(t, lead.seriesIndex, lead.seriesUnit, lead.seriesVolumeIndex)
   return lead.seriesUnit && lead.title && titleContainsPositionToken(lead.title, token) ? null : token
 })
 
@@ -373,6 +379,7 @@ async function loadLeadBookPreview(preserveCurrent = false) {
       title: firstBook.title,
       seriesIndex: firstBook.seriesIndex,
       seriesUnit: firstBook.seriesUnit ?? null,
+      seriesVolumeIndex: firstBook.seriesVolumeIndex ?? null,
       publishedYear: firstBook.publishedYear,
       language: firstBook.language,
       rating: firstBook.rating,
@@ -392,6 +399,7 @@ async function loadLeadBookPreview(preserveCurrent = false) {
       title: detail.title ?? firstBook.title,
       seriesIndex: firstBook.seriesIndex,
       seriesUnit: firstBook.seriesUnit ?? null,
+      seriesVolumeIndex: firstBook.seriesVolumeIndex ?? null,
       publishedYear: detail.publishedYear ?? firstBook.publishedYear,
       language: detail.language ?? firstBook.language,
       rating: detail.rating ?? firstBook.rating,
@@ -628,6 +636,7 @@ defineOptions({ name: 'SeriesDetailView' })
                 v-if="hasGaps"
                 :gaps="seriesInfo.possibleGaps"
                 :chapter-gaps="seriesInfo.chapterGaps"
+                :chapter-gap-positions="seriesInfo.chapterGapPositions"
                 :unit-counts="unitCounts"
                 class="mt-3"
               />

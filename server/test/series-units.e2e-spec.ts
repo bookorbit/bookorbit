@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import {
   FOLDER_SERIES_REGEX_METADATA,
   type BookDetail,
+  type DashboardScrollerResponse,
   type SeriesBooksPage,
   type SeriesNextBookResponse,
   type SeriesPage,
@@ -59,6 +60,7 @@ describe('Series units (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
     fileName: string,
     seriesIndex: string | null,
     unit: SeriesUnit | null,
+    volumeIndex: string | null = null,
   ): Promise<number> {
     const slug = `${seriesName.toLowerCase().replaceAll(' ', '-')}-${randomUUID()}`;
     const [book] = await ctx.db
@@ -68,7 +70,7 @@ describe('Series units (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
     const bookId = book!.id;
     await ctx.db
       .insert(schema.bookMetadata)
-      .values({ bookId, title: fileName, seriesId, seriesName, seriesIndex, seriesUnit: unit, lockedFields: [] });
+      .values({ bookId, title: fileName, seriesId, seriesName, seriesIndex, seriesUnit: unit, seriesVolumeIndex: volumeIndex, lockedFields: [] });
     inoSequence += 1;
     const [file] = await ctx.db
       .insert(schema.bookFiles)
@@ -84,7 +86,9 @@ describe('Series units (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
       })
       .returning({ id: schema.bookFiles.id });
     await ctx.db.update(schema.books).set({ primaryFileId: file!.id }).where(eq(schema.books.id, bookId));
-    await ctx.db.insert(schema.bookSeriesMemberships).values({ bookId, seriesId, seriesIndex, seriesUnit: unit, displayOrder: 0 });
+    await ctx.db
+      .insert(schema.bookSeriesMemberships)
+      .values({ bookId, seriesId, seriesIndex, seriesUnit: unit, seriesVolumeIndex: volumeIndex, displayOrder: 0 });
     return bookId;
   }
 
@@ -254,5 +258,141 @@ describe('Series units (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () => {
       .from(schema.bookMetadata)
       .where(eq(schema.bookMetadata.bookId, volume));
     expect(metadata?.unit).toBeNull();
+  });
+
+  describe('runs whose issue numbers restart (#2043)', () => {
+    let runsLibrary!: CreatedLibrary;
+    let doomPatrol = 0;
+    let restartSeries = 0;
+    const issue: Record<string, number> = {};
+
+    beforeAll(async () => {
+      runsLibrary = await createLibraryWithFolder(ctx, { name: `series-runs-${randomUUID()}` });
+      doomPatrol = await createSeries('Doom Patrol Runs');
+      // Seeded out of order, so only the run can put them right.
+      issue.v4n1 = await seedBook(runsLibrary, doomPatrol, 'Doom Patrol Runs', 'Doom Patrol v04 001 (2004).cbz', '1', 'issue', '4');
+      issue.v3n1 = await seedBook(runsLibrary, doomPatrol, 'Doom Patrol Runs', 'Doom Patrol v03 001 (2001).cbz', '1', 'issue', '3');
+      issue.v2n1 = await seedBook(runsLibrary, doomPatrol, 'Doom Patrol Runs', 'Doom Patrol v02 001 (1987).cbz', '1', 'issue', '2');
+      issue.loose = await seedBook(runsLibrary, doomPatrol, 'Doom Patrol Runs', 'Doom Patrol 005.cbz', '5', 'issue');
+      issue.v3n3 = await seedBook(runsLibrary, doomPatrol, 'Doom Patrol Runs', 'Doom Patrol v03 003 (2001).cbz', '3', 'issue', '3');
+      issue.v2n2 = await seedBook(runsLibrary, doomPatrol, 'Doom Patrol Runs', 'Doom Patrol v02 002 (1987).cbz', '2', 'issue', '2');
+
+      // Every run is whole: #2 of v2 must not be read as filling a hole in v3, nor the reverse.
+      restartSeries = await createSeries('Restart Runs');
+      await seedBook(runsLibrary, restartSeries, 'Restart Runs', 'Restart v01 001.cbz', '1', 'issue', '1');
+      await seedBook(runsLibrary, restartSeries, 'Restart Runs', 'Restart v01 002.cbz', '2', 'issue', '1');
+      await seedBook(runsLibrary, restartSeries, 'Restart Runs', 'Restart v02 001.cbz', '1', 'issue', '2');
+    });
+
+    it('lists each run in turn, issues that name no run last', async () => {
+      const page = await seriesBooks(doomPatrol);
+
+      expect(page.items.map((item) => item.id)).toEqual([issue.v2n1, issue.v2n2, issue.v3n1, issue.v3n3, issue.v4n1, issue.loose]);
+      expect(page.items.map((item) => item.seriesVolumeIndex)).toEqual(['2', '2', '3', '3', '4', null]);
+    });
+
+    it('reads on from the last issue of one run into the first of the next', async () => {
+      const next = async (bookId: number) => (await get<SeriesNextBookResponse>(`/series/${doomPatrol}/books/${bookId}/next?formatGroup=cbx`)).next;
+
+      expect(await next(issue.v2n1)).toMatchObject({ bookId: issue.v2n2, seriesVolumeIndex: '2' });
+      expect(await next(issue.v2n2)).toMatchObject({ bookId: issue.v3n1, seriesVolumeIndex: '3' });
+      expect(await next(issue.v4n1)).toMatchObject({ bookId: issue.loose, seriesVolumeIndex: null });
+      expect(await next(issue.loose)).toBeNull();
+    });
+
+    it('counts every issue and names gaps by run, keeping bare numbers out of fields older apps read', async () => {
+      const { seriesInfo } = await seriesBooks(doomPatrol);
+      const list = await get<SeriesPage>(`/series?size=100&libraryId=${runsLibrary.libraryId}`);
+      const summary = list.items.find((item) => item.id === doomPatrol)!;
+
+      expect(seriesInfo.ownedVolumeCount).toBe(6);
+      expect(seriesInfo.possibleGaps).toEqual([]);
+      expect(seriesInfo.chapterGaps).toEqual([]);
+      expect(seriesInfo.chapterGapPositions).toEqual([{ index: 2, volumeIndex: '3' }]);
+      expect(summary.ownedVolumeCount).toBe(6);
+      expect(summary.gaps).toEqual([]);
+      expect(summary.chapterGapPositions).toEqual([{ index: 2, volumeIndex: '3' }]);
+      expect(summary.chapterGapPositionCount).toBe(1);
+      expect(summary.volumes.map((slot) => `${slot.volumeIndex ?? '-'}:${slot.index}:${slot.status}`)).toEqual([
+        '2:1:unread',
+        '2:2:unread',
+        '3:1:unread',
+        '3:2:missing',
+        '3:3:unread',
+        '4:1:unread',
+        '-:5:unread',
+      ]);
+    });
+
+    it('lists a series under Gaps only when one of its runs has a hole', async () => {
+      const gapsTab = await get<SeriesPage>(`/series?completionStatus=has_gaps&size=100&libraryId=${runsLibrary.libraryId}`);
+
+      expect(gapsTab.items.map((item) => item.id)).toEqual([doomPatrol]);
+      expect(gapsTab.facets.hasGaps).toBe(1);
+    });
+
+    it('offers the next issue of the run being read in Up Next', async () => {
+      await ctx.db.insert(schema.userBookStatus).values({ userId: admin.userId, bookId: issue.v2n1, status: 'read', source: 'manual' });
+      try {
+        const shelf = await get<DashboardScrollerResponse>('/dashboard/scrollers/up-next-in-series?limit=100');
+        const offered = shelf.books.map((book) => book.id).filter((id) => Object.values(issue).includes(id));
+        expect(offered).toEqual([issue.v2n2]);
+      } finally {
+        await ctx.db.delete(schema.userBookStatus).where(eq(schema.userBookStatus.bookId, issue.v2n1));
+      }
+    });
+
+    it('moves an issue into a run when its volume number is edited, and keeps it when a save leaves it out', async () => {
+      const patch = async (membership: Record<string, unknown>) => {
+        const response = await ctx.app.inject({
+          method: 'PATCH',
+          url: `/api/v1/books/${issue.loose}/metadata`,
+          headers: authHeader(admin.accessToken),
+          payload: { seriesMemberships: [{ seriesName: 'Doom Patrol Runs', seriesIndex: '5', ...membership }] },
+        });
+        expect(response.statusCode, response.body).toBe(200);
+        return (await get<BookDetail>(`/books/${issue.loose}`)).seriesMemberships?.[0];
+      };
+
+      expect(await patch({ volumeIndex: '02' })).toMatchObject({ unit: 'issue', volumeIndex: '2' });
+      expect(await patch({})).toMatchObject({ unit: 'issue', volumeIndex: '2' });
+      expect((await seriesBooks(doomPatrol)).items.map((item) => item.id)).toEqual([
+        issue.v2n1,
+        issue.v2n2,
+        issue.loose,
+        issue.v3n1,
+        issue.v3n3,
+        issue.v4n1,
+      ]);
+      // A volume never sits in a run.
+      expect(await patch({ unit: 'volume' })).toMatchObject({ unit: 'volume', volumeIndex: null });
+      expect(await patch({ unit: 'issue', volumeIndex: null })).toMatchObject({ unit: 'issue', volumeIndex: null });
+    });
+
+    it('gives existing books the run their volume folder names', async () => {
+      const rulesLibrary = await createLibraryWithFolder(ctx, { name: `series-runs-rules-${randomUUID()}` });
+      await ctx.db
+        .update(schema.libraries)
+        .set({ regexMetadata: FOLDER_SERIES_REGEX_METADATA })
+        .where(eq(schema.libraries.id, rulesLibrary.libraryId));
+      const seriesId = await createSeries('Doom Patrol');
+      const bare = await seedBook(rulesLibrary, seriesId, 'Doom Patrol', 'Doom Patrol v2 (1987)/Doom Patrol 001 (1987).cbz', '1', null);
+      const classified = await seedBook(rulesLibrary, seriesId, 'Doom Patrol', 'Volume 03/Doom Patrol c012.cbz', '12', 'chapter');
+      const noYear = await seedBook(rulesLibrary, seriesId, 'Doom Patrol', 'Vol. 01/Doom Patrol 01.cbz', '1', null);
+      await ctx.db.delete(schema.appSettings).where(eq(schema.appSettings.key, APP_SETTING_KEYS.SERIES_UNITS_BACKFILLED));
+
+      await ctx.app.get(SeriesUnitBackfillService).runOnce();
+
+      const membership = async (bookId: number) => {
+        const [row] = await ctx.db
+          .select({ unit: schema.bookSeriesMemberships.seriesUnit, volumeIndex: schema.bookSeriesMemberships.seriesVolumeIndex })
+          .from(schema.bookSeriesMemberships)
+          .where(eq(schema.bookSeriesMemberships.bookId, bookId));
+        return row;
+      };
+      expect(await membership(bare)).toEqual({ unit: 'issue', volumeIndex: '2' });
+      expect(await membership(classified)).toEqual({ unit: 'chapter', volumeIndex: '3' });
+      expect(await membership(noYear)).toEqual({ unit: null, volumeIndex: null });
+    });
   });
 });

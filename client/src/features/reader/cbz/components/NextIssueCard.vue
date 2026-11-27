@@ -32,10 +32,10 @@ watch(
 
 const title = computed(() => props.nextBook.title ?? t('reader.cbz.nextIssue.untitled'))
 const label = computed(() => {
-  const { seriesIndex, seriesUnit } = props.nextBook
+  const { seriesIndex, seriesUnit, seriesVolumeIndex } = props.nextBook
   if (!seriesIndex) return title.value
   if (!seriesUnit) return t('reader.cbz.nextIssue.numbered', { index: seriesIndex, title: title.value })
-  const position = seriesPositionToken(t, seriesIndex, seriesUnit)
+  const position = seriesPositionToken(t, seriesIndex, seriesUnit, seriesVolumeIndex)
   if (titleContainsPositionToken(title.value, position)) return title.value
   return t('reader.cbz.nextIssue.positioned', { position, title: title.value })
 })

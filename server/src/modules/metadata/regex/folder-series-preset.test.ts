@@ -193,6 +193,29 @@ describe('folder-as-series preset', () => {
   });
 
   it.each([
+    ['Doom Patrol/Doom Patrol v2 (1987)/Doom Patrol v02 001 (1987).cbz', 'Doom Patrol', '1', 'issue', '2'],
+    ['Doom Patrol/Doom Patrol v2 (1987)/Doom Patrol 002 (1987).cbz', 'Doom Patrol', '2', 'issue', '2'],
+    ['Doom Patrol/Doom Patrol v3 (2001)/Doom Patrol #001 (2001).cbz', 'Doom Patrol', '1', 'issue', '3'],
+    ['Batman/Volume 2 (2011)/Batman 001 (2011).cbz', 'Batman', '1', 'issue', '2'],
+    ['X-Men/X-Men v2 (1991)/001 - Rubicon (1991).cbz', 'X-Men', '1', 'issue', '2'],
+    ['X-Men/X-Men v2 (1991)/X-Men v3 #004 (1991).cbz', 'X-Men', '4', 'issue', '3'],
+    ['Berserk/Volume 03/Berserk c012.cbz', 'Berserk', '12', 'chapter', '3'],
+  ])('reads the run a file sits in from its volume folder: %s', (path, series, index, unit, volumeIndex) => {
+    expect(evaluateAll(path)).toMatchObject({ seriesName: series, seriesIndex: index, seriesUnit: unit, seriesVolumeIndex: volumeIndex });
+  });
+
+  it.each([
+    ['Berserk/Vol. 01/Berserk 01.cbz', 'Berserk', '1'],
+    ['Batman/Vol. 02/Batman 001.cbz', 'Batman', '1'],
+    ['Batman/2011/Batman 001.cbz', 'Batman', '1'],
+  ])('leaves a bare number in a volume folder without a run year unclassified: %s', (path, series, index) => {
+    const metadata = evaluateAll(path);
+    expect(metadata).toMatchObject({ seriesName: series, seriesIndex: index });
+    expect(metadata).not.toHaveProperty('seriesUnit');
+    expect(metadata).not.toHaveProperty('seriesVolumeIndex');
+  });
+
+  it.each([
     '100 Bullets/100 Bullets 050.cbz',
     'Dragon Ball/01 - Dragon Ball - Bulma et Son Goku.cbz',
     'Space Adventures/Space_Adventures_001.cbz',

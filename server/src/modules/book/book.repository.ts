@@ -32,7 +32,7 @@ import { accentInsensitiveIlike } from '../../common/utils/accent-insensitive-se
 import { advanceIsoTimestamp } from '../../common/utils/iso-timestamp.utils';
 import { parsePgTimestamptz } from '../../common/utils/pg-timestamp.utils';
 import { scanStateInvalidationPaths } from '../../common/utils/scan-state-paths.utils';
-import { seriesIndexSortKeySql } from '../../common/utils/series-index-sql.utils';
+import { seriesIndexSortKeySql, seriesVolumeSortKeySql } from '../../common/utils/series-index-sql.utils';
 import { seriesUnitRankSql } from '../../common/utils/series-unit.utils';
 import { hasReachedProgressThreshold } from '../../common/utils/progress-threshold.utils';
 import { SeriesIdentityService } from '../../common/services/series-identity.service';
@@ -174,6 +174,7 @@ const PROGRESS_EPSILON = 0.0001;
 const COLLAPSE_GROUP_KEY_SQL = `base.library_id, COALESCE(base.series_id::text, 'book_' || base.id::text)`;
 const COLLAPSE_REPRESENTATIVE_PICK_SQL = `${COLLAPSE_GROUP_KEY_SQL},
           ${seriesUnitRankSql('base.series_unit')} ASC,
+          ${seriesVolumeSortKeySql('base.series_volume_index')} ASC,
           ${seriesIndexSortKeySql('base.series_index')} ASC NULLS LAST,
           base.series_index COLLATE "C" ASC NULLS LAST,
           base.added_at ASC,
@@ -593,6 +594,7 @@ export class BookRepository {
         seriesName: bookMetadata.seriesName,
         seriesIndex: bookMetadata.seriesIndex,
         seriesUnit: bookMetadata.seriesUnit,
+        seriesVolumeIndex: bookMetadata.seriesVolumeIndex,
         publishedDate: bookMetadata.publishedDate,
         publishedYear: bookMetadata.publishedYear,
         language: bookMetadata.language,
@@ -1107,6 +1109,7 @@ export class BookRepository {
           book_metadata.series_name,
           book_metadata.series_index,
           book_metadata.series_unit,
+          book_metadata.series_volume_index,
           book_metadata.published_date,
           book_metadata.published_year,
           book_metadata.original_published_year,
@@ -1148,10 +1151,12 @@ export class BookRepository {
           base.id,
           base.series_index,
           base.series_unit,
+          base.series_volume_index,
           base.added_at,
           ROW_NUMBER() OVER (
             PARTITION BY base.series_id, base.library_id
-            ORDER BY ${sql.raw(seriesUnitRankSql('base.series_unit'))} ASC, ${sql.raw(seriesIndexSortKeySql('base.series_index'))} ASC NULLS LAST,
+            ORDER BY ${sql.raw(seriesUnitRankSql('base.series_unit'))} ASC, ${sql.raw(seriesVolumeSortKeySql('base.series_volume_index'))} ASC,
+              ${sql.raw(seriesIndexSortKeySql('base.series_index'))} ASC NULLS LAST,
               base.series_index COLLATE "C" ASC NULLS LAST, base.added_at ASC, base.id ASC
           ) AS rn
         FROM base_rows base
@@ -1162,7 +1167,8 @@ export class BookRepository {
           scc.series_id,
           scc.library_id,
           COALESCE(
-            ARRAY_AGG(scc.id ORDER BY ${sql.raw(seriesUnitRankSql('scc.series_unit'))} ASC, ${sql.raw(seriesIndexSortKeySql('scc.series_index'))} ASC NULLS LAST,
+            ARRAY_AGG(scc.id ORDER BY ${sql.raw(seriesUnitRankSql('scc.series_unit'))} ASC, ${sql.raw(seriesVolumeSortKeySql('scc.series_volume_index'))} ASC,
+              ${sql.raw(seriesIndexSortKeySql('scc.series_index'))} ASC NULLS LAST,
               scc.series_index COLLATE "C" ASC NULLS LAST, scc.added_at ASC, scc.id ASC) FILTER (WHERE scc.rn <= 4),
             ARRAY[]::int[]
           ) AS cover_book_ids
@@ -1183,7 +1189,8 @@ export class BookRepository {
             base.id,
             ROW_NUMBER() OVER (
               PARTITION BY base.series_id, base.library_id
-              ORDER BY ${sql.raw(seriesUnitRankSql('base.series_unit'))} ASC, ${sql.raw(seriesIndexSortKeySql('base.series_index'))} DESC NULLS LAST,
+              ORDER BY ${sql.raw(seriesUnitRankSql('base.series_unit'))} ASC, ${sql.raw(seriesVolumeSortKeySql('base.series_volume_index'))} DESC,
+              ${sql.raw(seriesIndexSortKeySql('base.series_index'))} DESC NULLS LAST,
                 base.series_index COLLATE "C" DESC NULLS LAST, base.added_at DESC, base.id DESC
             ) AS rn
           FROM base_rows base
@@ -1200,7 +1207,8 @@ export class BookRepository {
             base.id,
             ROW_NUMBER() OVER (
               PARTITION BY base.series_id, base.library_id
-              ORDER BY ${sql.raw(seriesUnitRankSql('base.series_unit'))} ASC, ${sql.raw(seriesIndexSortKeySql('base.series_index'))} ASC NULLS LAST,
+              ORDER BY ${sql.raw(seriesUnitRankSql('base.series_unit'))} ASC, ${sql.raw(seriesVolumeSortKeySql('base.series_volume_index'))} ASC,
+              ${sql.raw(seriesIndexSortKeySql('base.series_index'))} ASC NULLS LAST,
                 base.series_index COLLATE "C" ASC NULLS LAST, base.added_at ASC, base.id ASC
             ) AS rn
           FROM base_rows base
@@ -1251,6 +1259,7 @@ export class BookRepository {
           base.series_name,
           base.series_index,
           base.series_unit,
+          base.series_volume_index,
           base.published_date,
           base.published_year,
           base.original_published_year,
@@ -1484,6 +1493,7 @@ export class BookRepository {
           book_metadata.series_name,
           book_metadata.series_index,
           book_metadata.series_unit,
+          book_metadata.series_volume_index,
           book_metadata.published_date,
           book_metadata.published_year,
           book_metadata.original_published_year,
@@ -1513,6 +1523,7 @@ export class BookRepository {
           base.updated_at,
           base.series_index,
           base.series_unit,
+          base.series_volume_index,
           base.published_date,
           base.published_year,
           base.original_published_year,
@@ -1588,6 +1599,7 @@ export class BookRepository {
           ${bookMetadata.seriesId} AS series_id,
           ${bookMetadata.seriesIndex} AS series_index,
           ${bookMetadata.seriesUnit} AS series_unit,
+          ${bookMetadata.seriesVolumeIndex} AS series_volume_index,
           ${bookMetadata.publishedDate} AS published_date,
           ${bookMetadata.publishedYear} AS published_year
           ${source.baseExtraSelect}

@@ -1071,7 +1071,7 @@ const seriesLinks = computed<SeriesDisplayLink[]>(() => {
       .map((membership) => ({
         key: `${membership.seriesId}-${membership.displayOrder}`,
         seriesId: membership.seriesId,
-        label: seriesNameWithPosition(t, membership.seriesName, membership.seriesIndex, membership.unit),
+        label: seriesNameWithPosition(t, membership.seriesName, membership.seriesIndex, membership.unit, membership.volumeIndex),
       }))
   }
 

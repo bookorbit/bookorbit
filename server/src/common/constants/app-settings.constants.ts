@@ -29,7 +29,8 @@ export const APP_SETTING_KEYS = {
   AUDIT_RETENTION_DAYS: 'audit_retention_days',
   AUDIT_TARGET_LABELS_BACKFILLED: 'audit_target_labels_backfilled',
   SERIES_HARDCOVER_TOTALS_RESET: 'series_hardcover_totals_reset_v1',
-  SERIES_UNITS_BACKFILLED: 'series_units_backfilled_v1',
+  // v2 runs again where v1 already ran, to pick up the run a volume folder names (#2043).
+  SERIES_UNITS_BACKFILLED: 'series_units_backfilled_v2',
   INITIAL_SETUP_COMPLETED_AT: 'initial_setup_completed_at',
   UPDATE_CHECK_ENABLED: 'update_check_enabled',
   MAX_UPLOAD_SIZE_MB: 'max_upload_size_mb',

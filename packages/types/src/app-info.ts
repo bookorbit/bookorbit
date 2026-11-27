@@ -148,6 +148,16 @@ export const SERVER_FEATURES = [
    * `SeriesNextBook` carries `seriesUnit`. Metadata updates accept `unit` on each series membership.
    */
   "series-units",
+  /**
+   * Chapters and issues are ordered run by run: by `volumeIndex`, then number, with chapters that
+   * name no volume after every run, so v2 #1, v2 #2, v3 #1. Next-in-series, counts, the ladder and
+   * gaps follow runs; a chapter line with several runs reports its gaps only in
+   * `chapterGapPositions`. Book cards carry `seriesVolumeIndex`, ladder slots `volumeIndex`, series
+   * summaries `nextVolumeIndex`, `chapterGapPositions` and `chapterGapPositionCount`, `seriesInfo`
+   * `chapterGapPositions`, and `SeriesNextBook` `seriesVolumeIndex`. Metadata updates accept
+   * `volumeIndex` on each series membership; leaving it out keeps the stored one.
+   */
+  "series-runs",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

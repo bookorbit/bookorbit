@@ -10,8 +10,8 @@ import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import ActivateLink from '@/components/ActivateLink.vue'
 import SeriesVolumeTrack from './SeriesVolumeTrack.vue'
 import SeriesLibraryChip from './SeriesLibraryChip.vue'
-import { parseAddedAt, seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
-import { chapterGroupUnit, chapterNumberToken, gapListPreview, seriesPositionWithTitle, volumeNumberToken } from '../lib/series-unit-label'
+import { chapterGapTotal, parseAddedAt, seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
+import { chapterGapTokens, chapterGroupUnit, gapListPreview, seriesPositionWithTitle, volumeNumberToken } from '../lib/series-unit-label'
 
 const props = defineProps<{ series: SeriesSummary }>()
 
@@ -52,9 +52,9 @@ const chapterCaption = computed<CaptionPart[] | null>(() => {
       ? t('series.units.issuesRead', { count: facts.value.chapters, read: facts.value.readChapters })
       : t('series.units.chaptersRead', { count: facts.value.chapters, read: facts.value.readChapters })
   parts.push({ key: 'chapters', text: summary, missing: false })
-  const chapterGapCount = series.chapterGapCount ?? 0
+  const chapterGapCount = chapterGapTotal(series)
   if (chapterGapCount > 0) {
-    const tokens = (series.chapterGaps ?? []).map((gap) => chapterNumberToken(t, gap, series.unitCounts))
+    const tokens = chapterGapTokens(t, series.chapterGaps ?? [], series.chapterGapPositions, series.unitCounts)
     parts.push({ key: 'chapter-gaps', text: t('series.units.missingList', { list: gapListPreview(t, tokens, chapterGapCount) }), missing: true })
   }
   return parts
@@ -82,7 +82,7 @@ const nextKicker = computed(() => {
 
 const nextValue = computed(() => {
   if (facts.value.isComplete || !props.series.nextTitle) return null
-  return seriesPositionWithTitle(t, props.series.nextIndex, props.series.nextUnit, props.series.nextTitle)
+  return seriesPositionWithTitle(t, props.series.nextIndex, props.series.nextUnit, props.series.nextTitle, props.series.nextVolumeIndex)
 })
 
 const addedLabel = computed(() => {

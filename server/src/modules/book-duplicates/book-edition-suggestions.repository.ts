@@ -14,6 +14,7 @@ export type EditionSuggestionRow = EditionFactsRow & {
   series_id: number | null;
   series_index: string | null;
   series_unit: string | null;
+  series_volume_index: string | null;
   authors: string[];
   /** Authors and narrators in the spelling the candidate search compares, so it finds the same people. */
   person_keys: string[];
@@ -52,6 +53,7 @@ const ROW_COLUMNS = sql`
   ${bookMetadata.seriesId} AS series_id,
   ${bookMetadata.seriesIndex} AS series_index,
   ${bookMetadata.seriesUnit} AS series_unit,
+  ${bookMetadata.seriesVolumeIndex} AS series_volume_index,
   ARRAY(
     SELECT DISTINCT lower(f.format)
     FROM book_files f

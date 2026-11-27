@@ -109,6 +109,7 @@ export type OtherFormatBookRow = {
   series_id: number | null;
   series_index: string | null;
   series_unit: string | null;
+  series_volume_index: string | null;
   formats: string[];
   authors: string[];
   narrators: string[];
@@ -514,6 +515,8 @@ export class BookDuplicatesRepository {
             AND (
               membership_a.series_index::numeric <> membership_b.series_index::numeric
               OR ${seriesUnitRank(sql.raw('membership_a.series_unit'))} <> ${seriesUnitRank(sql.raw('membership_b.series_unit'))}
+              OR (CASE WHEN ${seriesUnitRank(sql.raw('membership_a.series_unit'))} = 1 THEN membership_a.series_volume_index::numeric END)
+                IS DISTINCT FROM (CASE WHEN ${seriesUnitRank(sql.raw('membership_b.series_unit'))} = 1 THEN membership_b.series_volume_index::numeric END)
             )
         )
     `),
@@ -529,8 +532,14 @@ export class BookDuplicatesRepository {
         FROM ${bookDuplicatePairs}
         WHERE scan_id = ${scanId} AND kind = 'duplicate'
       `);
-      const positions = await tx.execute<{ book_id: number; series_id: number; series_index: string | null; series_unit: string | null }>(sql`
-        SELECT membership.book_id, membership.series_id, membership.series_index, membership.series_unit
+      const positions = await tx.execute<{
+        book_id: number;
+        series_id: number;
+        series_index: string | null;
+        series_unit: string | null;
+        series_volume_index: string | null;
+      }>(sql`
+        SELECT membership.book_id, membership.series_id, membership.series_index, membership.series_unit, membership.series_volume_index
         FROM ${bookSeriesMemberships} membership
         WHERE membership.series_index IS NOT NULL
           AND membership.book_id IN (
@@ -546,7 +555,13 @@ export class BookDuplicatesRepository {
           reasons: row.reasons,
           titleSimilarity: row.title_similarity === null ? null : Number(row.title_similarity),
         })),
-        positions.rows.map((row) => ({ bookId: row.book_id, seriesId: row.series_id, seriesIndex: row.series_index, seriesUnit: row.series_unit })),
+        positions.rows.map((row) => ({
+          bookId: row.book_id,
+          seriesId: row.series_id,
+          seriesIndex: row.series_index,
+          seriesUnit: row.series_unit,
+          seriesVolumeIndex: row.series_volume_index,
+        })),
       );
 
       await tx.execute(sql`CREATE TEMP TABLE tmp_book_duplicate_components (book_id integer PRIMARY KEY, root_id integer NOT NULL) ON COMMIT DROP`);
@@ -662,6 +677,7 @@ export class BookDuplicatesRepository {
         ${bookMetadata.seriesId} AS series_id,
         ${bookMetadata.seriesIndex} AS series_index,
         ${bookMetadata.seriesUnit} AS series_unit,
+        ${bookMetadata.seriesVolumeIndex} AS series_volume_index,
         ARRAY(
           SELECT DISTINCT lower(f.format)
           FROM book_files f

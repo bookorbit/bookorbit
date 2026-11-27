@@ -1,6 +1,6 @@
 import type { BookCard, BookDetail, BookFileRef } from '@bookorbit/types'
 import type { ColumnId } from '@/features/book/composables/useTableColumns'
-import { primarySeriesUnit } from '@/features/series/lib/series-unit-label'
+import { primarySeriesUnit, primarySeriesVolumeIndex } from '@/features/series/lib/series-unit-label'
 
 function toBookFileRef(file: BookDetail['files'][number]): BookFileRef {
   return {
@@ -30,6 +30,7 @@ export function mergeBookCardWithDetail(book: BookCard, detail: BookDetail): Boo
     seriesName: detail.seriesName,
     seriesIndex: detail.seriesIndex,
     seriesUnit: detail.seriesMemberships ? primarySeriesUnit(detail) : book.seriesUnit,
+    seriesVolumeIndex: detail.seriesMemberships ? primarySeriesVolumeIndex(detail) : book.seriesVolumeIndex,
     seriesMemberships: detail.seriesMemberships,
     rating: detail.rating,
     authors: detail.authors.map((author) => author.name),

@@ -1,5 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { type BookEditionSuggestion, type BookEditionSuggestions, type EditionSuggestionReason, seriesUnitClass } from '@bookorbit/types';
+import {
+  type BookEditionSuggestion,
+  type BookEditionSuggestions,
+  type EditionSuggestionReason,
+  seriesRunOf,
+  seriesUnitClass,
+} from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { BookService } from '../book/book.service';
@@ -28,7 +34,11 @@ function onlyOneMedium(facts: { ebook: boolean; audio: boolean }): boolean {
 export function judgeEditionSuggestion(source: EditionSuggestionRow, candidate: EditionSuggestionRow): EditionSuggestionVerdict | null {
   const sourceIndex = canonicalSeriesIndex(source.series_index);
   const candidateIndex = canonicalSeriesIndex(candidate.series_index);
-  const differentPosition = sourceIndex !== candidateIndex || seriesUnitClass(source.series_unit) !== seriesUnitClass(candidate.series_unit);
+  const differentPosition =
+    sourceIndex !== candidateIndex ||
+    seriesUnitClass(source.series_unit) !== seriesUnitClass(candidate.series_unit) ||
+    canonicalSeriesIndex(seriesRunOf(source.series_unit, source.series_volume_index)) !==
+      canonicalSeriesIndex(seriesRunOf(candidate.series_unit, candidate.series_volume_index));
   if (source.series_id !== null && source.series_id === candidate.series_id && sourceIndex && candidateIndex && differentPosition) {
     return null;
   }

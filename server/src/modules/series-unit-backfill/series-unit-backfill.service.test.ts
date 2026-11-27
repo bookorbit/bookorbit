@@ -22,7 +22,7 @@ function candidate(
   seriesIndex: string,
   overrides: Partial<SeriesUnitBackfillCandidate> = {},
 ): SeriesUnitBackfillCandidate {
-  return { bookId, libraryId: 1, relPath, seriesIndex, lockedFields: [], rules: RULES, ...overrides };
+  return { bookId, libraryId: 1, relPath, seriesIndex, unit: null, lockedFields: [], rules: RULES, ...overrides };
 }
 
 function matched(metadata: RegexMetadataPreview['metadata']): RegexMetadataPreview {
@@ -110,6 +110,20 @@ describe('SeriesUnitBackfillService', () => {
     await service.runOnce();
 
     expect(written()).toEqual([{ bookId: 1, seriesIndex: '4', unit: 'volume', volumeIndex: null }]);
+  });
+
+  it('gives a chapter classified without a run the run its folder names, and nothing else', async () => {
+    batches = [
+      [
+        candidate(1, 'Berserk/v03/Berserk c012.cbz', '12', { unit: 'chapter' }),
+        candidate(2, 'Berserk/Berserk c013.cbz', '13', { unit: 'chapter' }),
+        candidate(3, 'Saga/v02/Saga c004.cbz', '4', { unit: 'issue' }),
+      ],
+    ];
+
+    await service.runOnce();
+
+    expect(written()).toEqual([{ bookId: 1, seriesIndex: '12', unit: 'chapter', volumeIndex: '3' }]);
   });
 
   it('leaves locked books, bare numbers and numbers the book does not keep alone', async () => {

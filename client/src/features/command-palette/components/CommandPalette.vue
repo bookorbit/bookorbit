@@ -199,7 +199,9 @@ function bookSubtitle(item: PaletteItem) {
 
 function seriesLabel(item: PaletteItem) {
   if (item.kind !== 'book' || !item.book.seriesName) return ''
-  return item.book.seriesIndex ? seriesNameWithPosition(t, item.book.seriesName, item.book.seriesIndex, item.book.seriesUnit) : item.book.seriesName
+  return item.book.seriesIndex
+    ? seriesNameWithPosition(t, item.book.seriesName, item.book.seriesIndex, item.book.seriesUnit, item.book.seriesVolumeIndex)
+    : item.book.seriesName
 }
 
 /** A result that stands for several editions says so; its format chips show only the edition it opens. */

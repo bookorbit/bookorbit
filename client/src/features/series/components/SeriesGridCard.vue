@@ -10,7 +10,7 @@ import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import ActivateLink from '@/components/ActivateLink.vue'
 import SeriesVolumeTrack from './SeriesVolumeTrack.vue'
 import SeriesLibraryChip from './SeriesLibraryChip.vue'
-import { seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
+import { chapterGapTotal, seriesAuthorLine, seriesExtraAuthorCount, seriesRowFacts, seriesCoverSlots } from '../lib/series-summary'
 import { STACK_MAX_VISIBLE, coverStackLayout, orderForStack } from '../lib/cover-stack-layout'
 import { chapterCountLabel, gapListPreview, seriesGapTokens, seriesUnitCountsLabel, volumeNumberToken } from '../lib/series-unit-label'
 
@@ -62,9 +62,9 @@ const chapterReadLabel = computed(() => t('series.track.readCount', { count: fac
 /** Every missing number in one list, "missing Vol. 11, Ch. 93", since the card has one line for it. */
 const chapterGapNote = computed(() => {
   const series = props.series
-  const total = facts.value.volumeGapCount + (series.chapterGapCount ?? 0)
+  const total = facts.value.volumeGapCount + chapterGapTotal(series)
   if (total === 0) return null
-  const tokens = seriesGapTokens(t, series.gaps, series.chapterGaps ?? [], series.unitCounts)
+  const tokens = seriesGapTokens(t, series.gaps, series.chapterGaps ?? [], series.unitCounts, series.chapterGapPositions)
   return t('series.units.missingList', { list: gapListPreview(t, tokens, total) })
 })
 

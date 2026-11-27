@@ -128,7 +128,7 @@ describe('buildVolumeLadder', () => {
   describe('next volume', () => {
     it('prefers the one already in progress over an earlier unread one', () => {
       const ladder = build([member(1, '1'), member(2, '2', 'reading')]);
-      expect(ladder.next).toEqual({ bookId: 2, index: '2', title: 'Book 2', unit: null });
+      expect(ladder.next).toEqual({ bookId: 2, index: '2', title: 'Book 2', unit: null, volumeIndex: null });
     });
 
     it('falls back to the first unread in series order', () => {
@@ -138,7 +138,7 @@ describe('buildVolumeLadder', () => {
 
     it('keeps a half number rather than rounding it onto a rung', () => {
       const ladder = build([member(1, '1', 'read'), member(2, '1.5')]);
-      expect(ladder.next).toEqual({ bookId: 2, index: '1.5', title: 'Book 2', unit: null });
+      expect(ladder.next).toEqual({ bookId: 2, index: '1.5', title: 'Book 2', unit: null, volumeIndex: null });
     });
 
     it('is null once every volume is read', () => {
@@ -230,12 +230,64 @@ describe('buildVolumeLadder with volumes and chapters', () => {
   it('offers a chapter in progress before an unread volume', () => {
     const ladder = build([volume(1, '1'), chapter(10, '80', 'reading')]);
 
-    expect(ladder.next).toEqual({ bookId: 10, index: '80', title: 'Chapter 80', unit: 'chapter' });
+    expect(ladder.next).toEqual({ bookId: 10, index: '80', title: 'Chapter 80', unit: 'chapter', volumeIndex: null });
   });
 
   it('moves on to the first unread chapter once every volume is read', () => {
     const ladder = build([volume(1, '1', 'read'), volume(2, '2', 'read'), chapter(10, '80'), chapter(11, '81')]);
 
     expect(ladder.next).toMatchObject({ bookId: 10, unit: 'chapter' });
+  });
+});
+
+describe('buildVolumeLadder with runs whose issue numbers restart', () => {
+  function issue(bookId: number, run: string | null, seriesIndex: string, status: string | null = null): SeriesMemberRow {
+    return { bookId, seriesIndex, unit: 'issue', volumeIndex: run, title: `Issue ${run ?? '-'}/${seriesIndex}`, status };
+  }
+
+  const doomPatrol = [
+    issue(1, '2', '1', 'read'),
+    issue(2, '2', '2', 'read'),
+    issue(3, '3', '1'),
+    issue(4, '3', '2'),
+    issue(5, '4', '1'),
+    issue(6, '4', '2'),
+  ];
+
+  it('counts v2 #1 and v3 #1 as two books', () => {
+    expect(countSeriesVolumes({ members: doomPatrol, bookCount: 6, expectedBookCount: null })).toEqual({
+      ownedVolumeCount: 6,
+      readVolumeCount: 2,
+      readingVolumeCount: 0,
+    });
+  });
+
+  it('draws each run in run order, every rung naming its run', () => {
+    const ladder = build(doomPatrol);
+    expect(ladder.volumes.map((slot) => `${slot.volumeIndex}:${slot.index}`)).toEqual(['2:1', '2:2', '3:1', '3:2', '4:1', '4:2']);
+    expect(ladder.next).toMatchObject({ bookId: 3, index: '1', unit: 'issue', volumeIndex: '3' });
+  });
+
+  it('names a gap with its run, never by a bare number another run fills', () => {
+    const ladder = build([issue(1, '2', '1'), issue(2, '2', '2'), issue(3, '2', '3'), issue(4, '3', '1'), issue(5, '3', '3')]);
+    expect(ladder.gaps).toEqual([]);
+    expect(ladder.chapterGaps).toEqual([]);
+    expect(ladder.chapterGapPositions).toEqual([{ index: 2, volumeIndex: '3' }]);
+    expect(ladder.volumes.filter((slot) => slot.status === 'missing')).toEqual([
+      { index: 2, volumeIndex: '3', bookId: null, title: null, status: 'missing' },
+    ]);
+  });
+
+  it('puts chapters that name no volume after every run, as a run of their own', () => {
+    const ladder = build([issue(1, null, '7'), issue(2, '2', '1'), issue(3, null, '9')]);
+    expect(ladder.volumes.map((slot) => `${slot.volumeIndex ?? '-'}:${slot.index}`)).toEqual(['2:1', '-:7', '-:8', '-:9']);
+    expect(ladder.chapterGapPositions).toEqual([{ index: 8, volumeIndex: null }]);
+  });
+
+  it('keeps one run exactly as before, its gaps in the bare-number fields too', () => {
+    const ladder = build([issue(1, '2', '1'), issue(2, '2', '3')]);
+    expect(ladder.gaps).toEqual([2]);
+    expect(ladder.chapterGaps).toEqual([2]);
+    expect(ladder.chapterGapPositions).toEqual([{ index: 2, volumeIndex: '2' }]);
   });
 });

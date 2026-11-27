@@ -111,12 +111,12 @@ const OPDS_SORT_MAP: Record<Exclude<OpdsSortOrder, LastReadSortOrder>, SQL[]> = 
   ],
   series_asc: [
     sql`${bookMetadata.seriesName} ASC NULLS LAST`,
-    ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, 'ASC'),
+    ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, bookMetadata.seriesVolumeIndex, 'ASC'),
     sql`${books.id} ASC`,
   ],
   series_desc: [
     sql`${bookMetadata.seriesName} DESC NULLS LAST`,
-    ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, 'DESC'),
+    ...seriesIndexOrderBy(bookMetadata.seriesIndex, bookMetadata.seriesUnit, bookMetadata.seriesVolumeIndex, 'DESC'),
     sql`${books.id} ASC`,
   ],
 };
@@ -987,7 +987,7 @@ export class OpdsBookService {
   ): Promise<Map<number, { authorNames: string[]; memberStates: CatalogReadBucket[]; previews: OpdsPreviewBookRow[] }>> {
     if (seriesIds.length === 0) return new Map();
     const memberOrder = [
-      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, 'ASC'),
+      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, bookSeriesMemberships.seriesVolumeIndex, 'ASC'),
       sql`${bookMetadata.title} ASC NULLS LAST`,
       sql`${books.id} ASC`,
     ];
@@ -1654,7 +1654,7 @@ export class OpdsBookService {
   private buildContextSeriesOrder(sortOrder: OpdsSortOrder): SQL[] {
     const direction = sortOrder === 'series_desc' ? 'DESC' : 'ASC';
     return [
-      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, direction),
+      ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, bookSeriesMemberships.seriesVolumeIndex, direction),
       sql`${bookMetadata.title} ASC NULLS LAST`,
       sql`${books.id} ASC`,
     ];

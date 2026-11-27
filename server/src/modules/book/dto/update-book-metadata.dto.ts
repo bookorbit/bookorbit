@@ -47,6 +47,14 @@ export class BookSeriesMembershipDto {
   @IsOptional() @IsString() @MaxLength(SERIES_INDEX_MAX_LENGTH) @Matches(SERIES_INDEX_PATTERN) seriesIndex?: SeriesIndex | null;
   // Omitted keeps the stored unit: released iOS builds save memberships without it. Null clears it.
   @IsOptional() @IsIn(SERIES_UNITS) unit?: SeriesUnit | null;
+  // The run a chapter or issue sits in. Omitted keeps the stored one, as for `unit`; null clears it.
+  // Leading zeros go, so "02" and "2" are one run. A volume or unclassified book never keeps one.
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim().replace(/^0+(?=\d)/, '') : value))
+  @IsString()
+  @MaxLength(SERIES_INDEX_MAX_LENGTH)
+  @Matches(SERIES_INDEX_PATTERN)
+  volumeIndex?: SeriesIndex | null;
   // Series-level rather than book-level: writing it changes the total for every book in the
   // series and for every user. Bounds mirror the book_series range constraint.
   @IsOptional() @IsInt() @Min(1) @Max(MAX_SERIES_TOTAL_BOOKS) expectedBookCount?: number | null;

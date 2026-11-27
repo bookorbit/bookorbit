@@ -91,10 +91,18 @@ export function seriesRowFacts(series: SeriesSummary): SeriesRowFacts {
     isComplete: ownedTotal > 0 && readTotal === ownedTotal,
     isStarted: readTotal > 0 || reading > 0,
     isSingleVolume: owned === 1 && chapters === 0,
-    hasGaps: series.gapCount > 0 || (series.chapterGapCount ?? 0) > 0,
+    hasGaps: series.gapCount > 0 || chapterGapTotal(series) > 0,
     volumeGapCount: chapterLadder ? 0 : series.gapCount,
     isNumbered: series.volumes.some((slot) => slot.index !== null),
   }
+}
+
+/**
+ * Missing chapters and issues in all. A series whose issue numbers restart in several runs sends its
+ * gaps only as positions; older servers send only the bare count.
+ */
+export function chapterGapTotal(series: Pick<SeriesSummary, 'chapterGapCount' | 'chapterGapPositionCount'>): number {
+  return series.chapterGapPositionCount ?? series.chapterGapCount ?? 0
 }
 
 /** Volumes that have a cover to show, in series order. Missing rungs hold no book. */

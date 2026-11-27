@@ -200,7 +200,10 @@ export type BookSeriesMembership = {
   seriesIndex: SeriesIndex | null;
   /** Volume, chapter or issue; null when unclassified. Absent from servers without `series-units`. */
   unit?: SeriesUnit | null;
-  /** The volume a chapter or issue belongs to, read from its file name. Absent from servers without `series-units`. */
+  /**
+   * The volume a chapter or issue belongs to, its run, read from its file or folder name. Absent from
+   * servers without `series-units`; editable on servers with `series-runs`.
+   */
   volumeIndex?: SeriesIndex | null;
   displayOrder: number;
   /** Series-level, shared by every book in the series and by every user. */
@@ -223,6 +226,8 @@ export type BookCard = {
    * Absent from servers without `series-units`.
    */
   seriesUnit?: SeriesUnit | null;
+  /** The run of a chapter or issue in `seriesIndex`'s series. Absent from servers without `series-runs`. */
+  seriesVolumeIndex?: SeriesIndex | null;
   seriesMemberships?: BookSeriesMembership[];
   files: BookFileRef[];
   publishedDate: string | null;

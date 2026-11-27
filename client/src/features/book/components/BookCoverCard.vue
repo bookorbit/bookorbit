@@ -179,7 +179,7 @@ const showSeriesPositionBadge = computed(
 const seriesPositionLabel = computed(() => {
   const index = props.book.seriesIndex
   if (index == null) return ''
-  return seriesPositionToken(t, index, props.book.seriesUnit)
+  return seriesPositionToken(t, index, props.book.seriesUnit, props.book.seriesVolumeIndex)
 })
 /** Other editions this viewer can see stand behind the card; the pill says how many in all. */
 const editionCount = computed(() => cardEditionCount(props.book))
@@ -484,7 +484,7 @@ function resolveBookLabel(field: GridCardLabelField): string | null {
   if (field === 'series-title-position') {
     const name = props.book.seriesName?.trim()
     if (!name) return null
-    return seriesNameWithPosition(t, name, props.book.seriesIndex, props.book.seriesUnit)
+    return seriesNameWithPosition(t, name, props.book.seriesIndex, props.book.seriesUnit, props.book.seriesVolumeIndex)
   }
   if (field === 'author') return props.book.authors.length > 0 ? props.book.authors.join(', ') : null
   return null

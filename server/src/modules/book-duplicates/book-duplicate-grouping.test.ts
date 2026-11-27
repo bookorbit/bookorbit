@@ -26,6 +26,19 @@ describe('groupDuplicatePairs', () => {
     expect(Object.fromEntries(roots)).toEqual({ 4: 4, 9: 4, 12: 4 });
   });
 
+  it('keeps issue 1 of two runs apart, and joins two copies of one run', () => {
+    const roots = groupDuplicatePairs(
+      [exact(1, 2), exact(1, 3)],
+      [
+        { bookId: 1, seriesId: 1, seriesIndex: '1', seriesUnit: 'issue', seriesVolumeIndex: '2' },
+        { bookId: 2, seriesId: 1, seriesIndex: '1', seriesUnit: 'issue', seriesVolumeIndex: '3' },
+        { bookId: 3, seriesId: 1, seriesIndex: '001', seriesUnit: 'issue', seriesVolumeIndex: '02' },
+      ],
+    );
+
+    expect(Object.fromEntries(roots)).toEqual({ 1: 1, 3: 1 });
+  });
+
   it('never lets a copy without series data bridge two volumes, keeping its strongest match', () => {
     const positions = [
       { bookId: 1, seriesId: 7, seriesIndex: '1' },

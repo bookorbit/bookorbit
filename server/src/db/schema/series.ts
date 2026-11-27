@@ -61,9 +61,10 @@ export const bookSeriesMemberships = pgTable(
   (t) => [
     primaryKey({ columns: [t.bookId, t.seriesId] }),
     uniqueIndex('book_series_memberships_book_display_uidx').on(t.bookId, t.displayOrder),
-    index('book_series_memberships_series_index_book_idx').on(
+    index('book_series_memberships_series_order_book_idx').on(
       t.seriesId,
       sql`(CASE WHEN ${t.seriesUnit} IN ('chapter', 'issue') THEN 1 ELSE 0 END)`,
+      sql`(ARRAY[split_part(${t.seriesVolumeIndex}, '.', 1)::numeric, CASE WHEN ${t.seriesVolumeIndex} IS NULL THEN NULL WHEN strpos(${t.seriesVolumeIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesVolumeIndex}, '.', 2)::numeric END])`,
       sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
       sql`${t.seriesIndex} COLLATE "C"`,
       t.bookId,

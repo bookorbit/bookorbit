@@ -12,9 +12,20 @@ export type SeriesVolumeStatus = "read" | "reading" | "unread" | "missing";
  */
 export type SeriesVolumeSlot = {
   index: number | null;
+  /**
+   * The run a chapter or issue slot belongs to, in a series whose numbers restart in each volume.
+   * Absent from servers without `series-runs`.
+   */
+  volumeIndex?: SeriesIndex | null;
   bookId: number | null;
   title: string | null;
   status: SeriesVolumeStatus;
+};
+
+/** A missing chapter or issue, with the run it is missing from (null for chapters that name no volume). */
+export type SeriesGapPosition = {
+  index: number;
+  volumeIndex: SeriesIndex | null;
 };
 
 /**
@@ -63,6 +74,8 @@ export type SeriesSummary = {
   nextTitle: string | null;
   /** The unit of the next book, so a client can say "Ch. 93". Absent from servers without `series-units`. */
   nextUnit?: SeriesUnit | null;
+  /** The run of the next chapter or issue, so a client can say "v2 #3". Absent from servers without `series-runs`. */
+  nextVolumeIndex?: SeriesIndex | null;
   /** Books per unit. Absent from servers without `series-units`. */
   unitCounts?: SeriesUnitCounts;
   /** Chapters and issues the user has read. Absent from servers without `series-units`. */
@@ -70,9 +83,17 @@ export type SeriesSummary = {
   /**
    * Chapter or issue numbers missing between the lowest and highest owned, capped at
    * {@link SERIES_GAP_PREVIEW_LIMIT}. `gaps` covers volumes only. Absent from servers without `series-units`.
+   * Empty when the chapters' numbers restart in more than one run, where a bare number cannot say
+   * which run it is missing from: `chapterGapPositions` names those.
    */
   chapterGaps?: number[];
   chapterGapCount?: number;
+  /**
+   * Missing chapters or issues with their run, capped at {@link SERIES_GAP_PREVIEW_LIMIT}; set whether
+   * the series has one run or several. Absent from servers without `series-runs`.
+   */
+  chapterGapPositions?: SeriesGapPosition[];
+  chapterGapPositionCount?: number;
 };
 
 /** Counts for the whole result set, ignoring the active completion filter. */
@@ -110,8 +131,13 @@ export type SeriesDetail = {
   expectedBookCount: number | null;
   /** Books per unit in the listed libraries. Absent from servers without `series-units`. */
   unitCounts?: SeriesUnitCounts;
-  /** Chapter or issue numbers missing between the lowest and highest owned. Absent from servers without `series-units`. */
+  /**
+   * Chapter or issue numbers missing between the lowest and highest owned. Absent from servers without
+   * `series-units`. Empty when the numbers restart in more than one run; see `chapterGapPositions`.
+   */
   chapterGaps?: number[];
+  /** Missing chapters or issues with their run. Absent from servers without `series-runs`. */
+  chapterGapPositions?: SeriesGapPosition[];
   /** Chapter and issue books the user has read. Absent from servers without `series-units`. */
   chapterReadCount?: number;
 };
@@ -129,6 +155,8 @@ export type SeriesNextBook = {
   seriesIndex: SeriesIndex | null;
   /** Absent from servers without `series-units`. */
   seriesUnit?: SeriesUnit | null;
+  /** The run of a chapter or issue. Absent from servers without `series-runs`. */
+  seriesVolumeIndex?: SeriesIndex | null;
 };
 
 export type SeriesNextBookResponse = {

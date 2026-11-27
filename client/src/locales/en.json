@@ -9776,7 +9776,11 @@
         "kindVolume": "Volume",
         "kindChapter": "Chapter",
         "kindIssue": "Issue",
-        "kindNoneHint": "None sorts with volumes."
+        "kindNoneHint": "None sorts with volumes.",
+        "volumeIndexLabel": "Volume this belongs to",
+        "volumeIndexPlaceholder": "Vol.",
+        "volumeIndexHint": "The volume this chapter or issue belongs to. Issue numbers that restart in each volume sort volume by volume.",
+        "invalidVolumeIndex": "Enter the volume number as digits, such as 2."
       },
       "storyGuide": {
         "title": "Story guide",
@@ -15898,6 +15902,8 @@
       "volumeToken": "Vol. {index}",
       "chapterToken": "Ch. {index}",
       "issueToken": "#{index}",
+      "issueInVolumeToken": "v{volume} #{index}",
+      "chapterInVolumeToken": "Vol. {volume} Ch. {index}",
       "chapterCount": "{count, plural, one {# chapter} other {# chapters}}",
       "issueCount": "{count, plural, one {# issue} other {# issues}}",
       "volumesAndChapters": "{volumes, plural, one {# volume} other {# volumes}} · {chapters, plural, one {# chapter} other {# chapters}}",

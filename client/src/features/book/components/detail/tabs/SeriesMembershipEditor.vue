@@ -23,7 +23,7 @@ const NO_UNIT = 'none'
 
 function emptyMembership(): EditableSeriesMembership {
   return props.unitEditable
-    ? { seriesName: '', seriesIndex: null, expectedBookCount: null, unit: null }
+    ? { seriesName: '', seriesIndex: null, expectedBookCount: null, unit: null, volumeIndex: null }
     : { seriesName: '', seriesIndex: null, expectedBookCount: null }
 }
 
@@ -46,6 +46,15 @@ function unitButtonLabel(unit: SeriesUnit | null | undefined): string {
 
 function isUnitSelected(membership: EditableSeriesMembership, value: SeriesUnit | typeof NO_UNIT): boolean {
   return (membership.unit ?? NO_UNIT) === value
+}
+
+/** Only a chapter or issue sits in a volume; issue numbers restart in each one. */
+function showsVolumeIndex(membership: EditableSeriesMembership): boolean {
+  return !!props.unitEditable && (membership.unit === 'chapter' || membership.unit === 'issue')
+}
+
+function volumeIndexHintId(index: number): string {
+  return `${idPrefix}-${getRowKey(index)}-volume-hint`
 }
 
 const idPrefix = useId()
@@ -102,8 +111,13 @@ function updateUnit(index: number, value: unknown) {
   updateMembership(index, { unit: parseSeriesUnit(value) })
 }
 
-function isSeriesIndexInvalid(value: string | null) {
-  return value !== null && !isValidSeriesIndex(value)
+function updateVolumeIndex(index: number, event: Event) {
+  const raw = (event.target as HTMLInputElement).value.trim()
+  updateMembership(index, { volumeIndex: raw === '' ? null : raw })
+}
+
+function isSeriesIndexInvalid(value: string | null | undefined) {
+  return value != null && !isValidSeriesIndex(value)
 }
 
 function updateExpectedBookCount(index: number, event: Event) {
@@ -203,6 +217,26 @@ function moveMembership(index: number, offset: -1 | 1) {
           </DropdownMenuContent>
         </DropdownMenu>
         <input
+          v-if="showsVolumeIndex(membership)"
+          data-testid="series-volume-index"
+          :value="membership.volumeIndex ?? ''"
+          type="text"
+          inputmode="decimal"
+          :maxlength="SERIES_INDEX_MAX_LENGTH"
+          class="h-8 min-w-14 max-w-16 flex-1 rounded-lg border border-input bg-background px-2 text-sm outline-none transition-shadow focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          :class="isSeriesIndexInvalid(membership.volumeIndex) ? 'border-destructive' : ''"
+          :disabled="disabled"
+          :placeholder="t('book.detail.seriesMembership.volumeIndexPlaceholder')"
+          :aria-label="t('book.detail.seriesMembership.volumeIndexLabel')"
+          :aria-describedby="volumeIndexHintId(index)"
+          :aria-invalid="isSeriesIndexInvalid(membership.volumeIndex)"
+          :title="t('book.detail.seriesMembership.volumeIndexHint')"
+          @input="updateVolumeIndex(index, $event)"
+        />
+        <span v-if="showsVolumeIndex(membership)" :id="volumeIndexHintId(index)" class="sr-only">
+          {{ t('book.detail.seriesMembership.volumeIndexHint') }}
+        </span>
+        <input
           :value="membership.seriesIndex ?? ''"
           type="text"
           inputmode="decimal"
@@ -261,6 +295,13 @@ function moveMembership(index: number, offset: -1 | 1) {
       </div>
       <p v-if="isSeriesIndexInvalid(membership.seriesIndex)" class="w-full ps-10 text-xs text-destructive" role="alert">
         {{ t('book.detail.seriesMembership.invalidSeriesIndex') }}
+      </p>
+      <p
+        v-if="showsVolumeIndex(membership) && isSeriesIndexInvalid(membership.volumeIndex)"
+        class="w-full ps-10 text-xs text-destructive"
+        role="alert"
+      >
+        {{ t('book.detail.seriesMembership.invalidVolumeIndex') }}
       </p>
     </div>
   </div>

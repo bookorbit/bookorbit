@@ -4,6 +4,7 @@ import type { BooksPage, SeriesBooksPage, SeriesDetail, SeriesNextBookResponse, 
 import {
   READER_OPENABLE_FORMATS,
   SERIES_GAP_PREVIEW_LIMIT,
+  seriesRunOf,
   getOpenableFormatsForGroup,
   isOptInReaderFormat,
   seriesUnitClass,
@@ -95,6 +96,7 @@ export class SeriesService {
         nextIndex: ladder.next?.index ?? null,
         nextTitle: ladder.next?.title ?? null,
         nextUnit: ladder.next?.unit ?? null,
+        nextVolumeIndex: ladder.next?.volumeIndex ?? null,
         unitCounts: {
           volume: row.bookCount - row.chapterCount - row.issueCount,
           chapter: row.chapterCount,
@@ -103,6 +105,8 @@ export class SeriesService {
         chapterReadCount: row.chapterReadCount,
         chapterGaps: ladder.chapterGaps.slice(0, SERIES_GAP_PREVIEW_LIMIT),
         chapterGapCount: ladder.chapterGaps.length,
+        chapterGapPositions: ladder.chapterGapPositions.slice(0, SERIES_GAP_PREVIEW_LIMIT),
+        chapterGapPositionCount: ladder.chapterGapPositions.length,
       };
     });
 
@@ -176,6 +180,7 @@ export class SeriesService {
             expectedBookCount: existsInAnyLibrary.expectedBookCount ?? null,
             unitCounts: { volume: 0, chapter: 0, issue: 0 },
             chapterGaps: [],
+            chapterGapPositions: [],
             chapterReadCount: 0,
           };
           return { items: [], total: 0, page, size, seriesInfo: emptyInfo };
@@ -186,9 +191,13 @@ export class SeriesService {
 
     const members = detail.members ?? [];
     // A series with nothing classified keeps exactly the gaps it always had.
-    const { gaps: possibleGaps, chapterGaps } = members.some((member) => seriesUnitClass(member.unit) === 'chapter')
+    const {
+      gaps: possibleGaps,
+      chapterGaps,
+      chapterGapPositions,
+    } = members.some((member) => seriesUnitClass(member.unit) === 'chapter')
       ? computeSeriesClassGaps(members, detail.expectedBookCount)
-      : { gaps: computeSeriesGaps(detail.indices, detail.bookCount, detail.expectedBookCount), chapterGaps: [] };
+      : { gaps: computeSeriesGaps(detail.indices, detail.bookCount, detail.expectedBookCount), chapterGaps: [], chapterGapPositions: [] };
     const volumeCounts = detail.members
       ? countSeriesVolumes({ members: detail.members, bookCount: detail.bookCount, expectedBookCount: detail.expectedBookCount })
       : { ownedVolumeCount: detail.bookCount, readVolumeCount: detail.readCount };
@@ -226,6 +235,7 @@ export class SeriesService {
                 seriesName: contextualSeries.seriesName,
                 seriesIndex: contextualSeries.seriesIndex,
                 seriesUnit: contextualSeries.unit ?? null,
+                seriesVolumeIndex: seriesRunOf(contextualSeries.unit, contextualSeries.volumeIndex),
               }
             : card;
         })
@@ -245,6 +255,7 @@ export class SeriesService {
       expectedBookCount: detail.expectedBookCount ?? null,
       unitCounts: countUnits(detail.bookCount, members),
       chapterGaps,
+      chapterGapPositions,
       chapterReadCount: members.filter((member) => member.status === 'read' && seriesUnitClass(member.unit) === 'chapter').length,
     };
 
@@ -280,6 +291,7 @@ export class SeriesService {
         title: row.title,
         seriesIndex: row.seriesIndex,
         seriesUnit: row.seriesUnit ?? null,
+        seriesVolumeIndex: seriesRunOf(row.seriesUnit, row.seriesVolumeIndex),
       },
     };
   }

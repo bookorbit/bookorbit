@@ -367,7 +367,13 @@ const comicWideFields = computed(
 const hasLockedFields = computed(() => lockedFields.value.length > 0)
 const hasPendingChanges = computed(() => isDirty.value || locksDirty.value || Boolean(coverPanel.value?.hasPending))
 const hasInvalidSeriesIndex = computed(() =>
-  form.seriesMemberships.some((membership) => membership.seriesIndex !== null && !isValidSeriesIndex(membership.seriesIndex)),
+  form.seriesMemberships.some(
+    (membership) =>
+      (membership.seriesIndex !== null && !isValidSeriesIndex(membership.seriesIndex)) ||
+      (membership.volumeIndex != null &&
+        (membership.unit === 'chapter' || membership.unit === 'issue') &&
+        !isValidSeriesIndex(membership.volumeIndex)),
+  ),
 )
 const isSeriesLocked = computed(() => isLocked('seriesName') || isLocked('seriesIndex'))
 const communityRatingLines = computed(() =>

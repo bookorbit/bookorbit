@@ -3,9 +3,11 @@ import type { SeriesUnitCounts } from '@bookorbit/types'
 import { i18n } from '@/i18n'
 import {
   chapterCountLabel,
+  chapterGapTokens,
   chapterGroupUnit,
   gapListPreview,
   ladderNumberToken,
+  runPositionToken,
   seriesGapTokens,
   seriesHasChapters,
   seriesHasMixedUnits,
@@ -146,5 +148,44 @@ describe('gapListPreview', () => {
   it('counts what the preview left out', () => {
     expect(gapListPreview(t, ['Ch. 93', 'Ch. 95'], 2)).toBe('Ch. 93, Ch. 95')
     expect(gapListPreview(t, ['Ch. 93', 'Ch. 95'], 5)).toBe('Ch. 93, Ch. 95 +3')
+  })
+})
+
+describe('series runs', () => {
+  it('names the run of an issue, whose numbers restart in each volume', () => {
+    expect(seriesPositionToken(t, '1', 'issue', '2')).toBe('v2 #1')
+    expect(seriesNameWithPosition(t, 'Doom Patrol', '1', 'issue', '3')).toBe('Doom Patrol v3 #1')
+  })
+
+  it('keeps a chapter as it reads, since chapter numbers run on across volumes', () => {
+    expect(seriesPositionToken(t, '12', 'chapter', '3')).toBe('Ch. 12')
+    expect(seriesPositionToken(t, '3', 'volume', '9')).toBe('Vol. 3')
+  })
+
+  it('names the run of a chapter where runs share numbers', () => {
+    expect(runPositionToken(t, '5', 'chapter', '2')).toBe('Vol. 2 Ch. 5')
+    expect(runPositionToken(t, '5', 'issue', '2')).toBe('v2 #5')
+    expect(runPositionToken(t, '5', 'chapter', null)).toBe('Ch. 5')
+  })
+
+  it('names gaps by their run when the server sends positions', () => {
+    const issues = counts({ issue: 6 })
+    expect(
+      chapterGapTokens(
+        t,
+        [],
+        [
+          { index: 3, volumeIndex: '2' },
+          { index: 3, volumeIndex: '3' },
+          { index: 7, volumeIndex: null },
+        ],
+        issues,
+      ),
+    ).toEqual(['v2 #3', 'v3 #3', '#7'])
+    expect(chapterGapTokens(t, [4], undefined, issues)).toEqual(['#4'])
+  })
+
+  it('numbers a ladder rung with its run', () => {
+    expect(ladderNumberToken(t, 2, counts({ issue: 6 }), '4')).toBe('v4 #2')
   })
 })

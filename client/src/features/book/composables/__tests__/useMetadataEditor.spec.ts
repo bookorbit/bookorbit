@@ -256,8 +256,8 @@ describe('useMetadataEditor', () => {
       })
 
       expect(sent).toEqual([
-        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: 'chapter' },
-        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: 'volume' },
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: 'chapter', volumeIndex: '9' },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: 'volume', volumeIndex: null },
       ])
     })
 
@@ -267,8 +267,8 @@ describe('useMetadataEditor', () => {
       })
 
       expect(sent).toEqual([
-        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: null },
-        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null },
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: null, volumeIndex: null },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null, volumeIndex: null },
       ])
     })
 
@@ -278,8 +278,19 @@ describe('useMetadataEditor', () => {
       })
 
       expect(sent).toEqual([
-        { seriesName: 'Harbor of Lanterns', seriesIndex: '88', expectedBookCount: null, unit: 'chapter' },
-        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null },
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '88', expectedBookCount: null, unit: 'chapter', volumeIndex: '9' },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null, volumeIndex: null },
+      ])
+    })
+
+    it('sends a changed volume number with the chapter it belongs to', async () => {
+      const sent = await savedMemberships((form) => {
+        form.seriesMemberships = form.seriesMemberships.map((membership, index) => (index === 0 ? { ...membership, volumeIndex: '10' } : membership))
+      })
+
+      expect(sent).toEqual([
+        { seriesName: 'Harbor of Lanterns', seriesIndex: '87', expectedBookCount: null, unit: 'chapter', volumeIndex: '10' },
+        { seriesName: 'Lantern Tales', seriesIndex: '2', expectedBookCount: 4, unit: null, volumeIndex: null },
       ])
     })
 

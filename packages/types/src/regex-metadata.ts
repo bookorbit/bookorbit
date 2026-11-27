@@ -119,7 +119,8 @@ const NUMBER = String.raw`0*(?<seriesIndex>\d+(?:[.,]\d+)?)(?![\p{L}\p{N}])`;
 // The marker before the number lands in `unit`; a volume number ahead of it ("v03 c012") in `volumeIndex`.
 const VOLUME_BEFORE_MARKER = String.raw`(?:${BEFORE_MARKER}(?:v|vol|volume|t|tome)\.?[\s_-]*0*(?<volumeIndex>\d+(?:\.\d+)?)[\s_-]+)?`;
 // "第3巻" is volume 3: that 第 is left to the CJK volume rule.
-const CHAPTER_OR_ISSUE = String.raw`[^/]*?${VOLUME_BEFORE_MARKER}(?<unit>${BEFORE_MARKER}(?:c|ch|chap|chapter|chapitre|cap|capitulo|issue|no|nr|n°)\.?[\s_-]*(?!(?:19|20)\d{2}(?!\d))|#\s*|第\s*(?!\d+(?:[.,]\d+)?\s*(?:巻|卷|권|冊|册)))${NUMBER}[^/]*$`;
+const MARKED_NUMBER = String.raw`(?<unit>${BEFORE_MARKER}(?:c|ch|chap|chapter|chapitre|cap|capitulo|issue|no|nr|n°)\.?[\s_-]*(?!(?:19|20)\d{2}(?!\d))|#\s*|第\s*(?!\d+(?:[.,]\d+)?\s*(?:巻|卷|권|冊|册)))${NUMBER}[^/]*$`;
+const CHAPTER_OR_ISSUE = String.raw`[^/]*?${VOLUME_BEFORE_MARKER}${MARKED_NUMBER}`;
 // No marker before the second number: a captured volume number makes it an issue.
 const VOLUME_THEN_ISSUE = String.raw`[^/]*?${BEFORE_MARKER}(?:v|vol|volume)\.?[\s_-]*0*(?<volumeIndex>\d+)[\s_]+(?<unit>#\s*)?${NUMBER}[^/]*$`;
 const VOLUME = String.raw`[^/]*?${BEFORE_MARKER}(?<unit>t|tome|tomo|v|vol|volume|band|book|livre|libro)\.?[\s_-]*${NUMBER}[^/]*$`;
@@ -131,6 +132,17 @@ const TRAILING_NUMBER = String.raw`[^/]*?[\s_]0*(?<seriesIndex>(?!(?:19|20)\d{2}
 const ANY_FILE = String.raw`[^/]+$`;
 
 /**
+ * A run folder inside the series folder, "Volume 2 (2011)" or "Doom Patrol v2 (1987)", names the
+ * volume its issues restart in. The file's own volume number wins, so these rules only take files
+ * that name none. A bare number needs the folder's run year as well: a manga "Vol. 01/Name 01"
+ * folder holds volume 1 itself, not its first issue.
+ */
+const RUN_FOLDER_NUMBER = String.raw`(?:\k<series>[\s._-]*)?(?:vol(?:ume)?|tome|tomo|band|v)\.?[\s_-]*0*(?<volumeIndex>\d+)(?![\p{L}\p{N}])`;
+const RUN_FOLDER = String.raw`${SERIES_FOLDER}${RUN_FOLDER_NUMBER}[^/]*/`;
+const RUN_YEAR_FOLDER = String.raw`${SERIES_FOLDER}${RUN_FOLDER_NUMBER}[^/]*?\((?:19|20)\d{2}\)[^/]*/`;
+const NAMES_NO_VOLUME = String.raw`(?![^/]*?${BEFORE_MARKER}(?:v|vol|volume|t|tome)\.?[\s_-]*\d)`;
+
+/**
  * Rules for the layout Komga and Kavita use, one folder per series and one file per volume,
  * chapter or issue. Files at the library root match none of them and keep their own metadata.
  */
@@ -140,6 +152,9 @@ export const FOLDER_SERIES_REGEX_METADATA: RegexMetadataConfig = {
     RUN_YEAR_FILE_SERIES + CHAPTER_OR_ISSUE,
     RUN_YEAR_FILE_SERIES + TRAILING_NUMBER,
     SPECIALS_IN_SERIES,
+    RUN_FOLDER + NAMES_NO_VOLUME + String.raw`[^/]*?` + MARKED_NUMBER,
+    RUN_YEAR_FOLDER + NAMES_NO_VOLUME + LEADING_NUMBER,
+    RUN_YEAR_FOLDER + NAMES_NO_VOLUME + TRAILING_NUMBER,
     FOLDER_SERIES + CHAPTER_OR_ISSUE,
     FOLDER_SERIES + VOLUME_THEN_ISSUE,
     FOLDER_SERIES + VOLUME,

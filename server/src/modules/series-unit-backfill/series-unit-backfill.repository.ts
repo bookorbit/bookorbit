@@ -14,6 +14,8 @@ export type SeriesUnitBackfillCandidate = {
   libraryId: number;
   relPath: string;
   seriesIndex: string;
+  /** Set when an earlier pass or a scan already classified the book but found no run. */
+  unit: SeriesUnit | null;
   lockedFields: string[];
   rules: RegexMetadataConfig;
 };
@@ -31,18 +33,22 @@ const COMIC_FORMATS = sql.raw(`('cbz', 'cbr', 'cb7', 'cbt')`);
 export class SeriesUnitBackfillRepository {
   constructor(@Inject(DB) private readonly db: Db) {}
 
-  /** Numbered comic books with no unit yet, in libraries with path rules, after `afterBookId`. */
+  /**
+   * Numbered comic books with no unit yet, or chapters and issues with no run, in libraries with
+   * path rules, after `afterBookId`.
+   */
   async findCandidates(afterBookId: number, limit: number): Promise<SeriesUnitBackfillCandidate[]> {
     const rows = await this.db.execute<{
       book_id: number;
       library_id: number;
       rel_path: string;
       series_index: string;
+      series_unit: SeriesUnit | null;
       locked_fields: string[];
       regex_metadata: RegexMetadataConfig;
     }>(sql`
       SELECT ${books.id} AS book_id, ${books.libraryId} AS library_id, ${bookFiles.relPath} AS rel_path, ${bookMetadata.seriesIndex} AS series_index,
-        ${bookMetadata.lockedFields} AS locked_fields, ${libraries.regexMetadata} AS regex_metadata
+        ${bookMetadata.seriesUnit} AS series_unit, ${bookMetadata.lockedFields} AS locked_fields, ${libraries.regexMetadata} AS regex_metadata
       FROM ${books}
       INNER JOIN ${libraries} ON ${libraries.id} = ${books.libraryId}
       INNER JOIN ${bookMetadata} ON ${bookMetadata.bookId} = ${books.id}
@@ -51,7 +57,7 @@ export class SeriesUnitBackfillRepository {
         AND ${libraries.regexMetadata} IS NOT NULL
         AND ${bookMetadata.seriesId} IS NOT NULL
         AND ${bookMetadata.seriesIndex} IS NOT NULL
-        AND ${bookMetadata.seriesUnit} IS NULL
+        AND (${bookMetadata.seriesUnit} IS NULL OR (${bookMetadata.seriesUnit} IN ('chapter', 'issue') AND ${bookMetadata.seriesVolumeIndex} IS NULL))
         AND ${bookFiles.relPath} IS NOT NULL
         AND lower(${bookFiles.format}) IN ${COMIC_FORMATS}
       ORDER BY ${books.id}
@@ -62,6 +68,7 @@ export class SeriesUnitBackfillRepository {
       libraryId: Number(row.library_id),
       relPath: row.rel_path,
       seriesIndex: row.series_index,
+      unit: row.series_unit ?? null,
       lockedFields: row.locked_fields ?? [],
       rules: row.regex_metadata,
     }));
@@ -69,8 +76,8 @@ export class SeriesUnitBackfillRepository {
 
   /**
    * Sets the unit on the book and on its primary series membership. Both are guarded by the number
-   * and an empty unit, so a book a scan or a person changed meanwhile is left alone. Returns the ids
-   * of the books written.
+   * and an empty unit, or the same unit with no run yet, so a book a scan or a person changed
+   * meanwhile is left alone. Returns the ids of the books written.
    */
   async writeUnits(writes: readonly SeriesUnitBackfillWrite[]): Promise<number[]> {
     if (writes.length === 0) return [];
@@ -83,7 +90,8 @@ export class SeriesUnitBackfillRepository {
         UPDATE ${bookMetadata} AS m
         SET series_unit = w.unit, series_volume_index = w.volume_index
         FROM (VALUES ${values}) AS w(book_id, series_index, unit, volume_index)
-        WHERE m.book_id = w.book_id AND m.series_index = w.series_index AND m.series_unit IS NULL
+        WHERE m.book_id = w.book_id AND m.series_index = w.series_index
+          AND (m.series_unit IS NULL OR (m.series_unit = w.unit AND m.series_volume_index IS NULL AND w.volume_index IS NOT NULL))
         RETURNING m.book_id
       `);
       const bookIds = updated.rows.map((row) => Number(row.book_id));
@@ -96,7 +104,7 @@ export class SeriesUnitBackfillRepository {
           AND bsm.series_id = m.series_id
           AND bsm.display_order = 0
           AND bsm.series_index = m.series_index
-          AND bsm.series_unit IS NULL
+          AND (bsm.series_unit IS NULL OR (bsm.series_unit = m.series_unit AND bsm.series_volume_index IS NULL))
           AND bsm.book_id = ANY(${sql.param(bookIds)}::int[])
       `);
       return bookIds;

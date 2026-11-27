@@ -737,7 +737,7 @@ describe('SeriesService', () => {
       seriesRepo.findNextReadableBook.mockResolvedValue(row);
 
       await expect(service.findNextBook(reqUser(), 42, 90, { formatGroup: 'cbx' })).resolves.toEqual({
-        next: { bookId: 91, fileId: 501, format: 'cbr', title: 'Issue 10', seriesIndex: '10', seriesUnit: null },
+        next: { bookId: 91, fileId: 501, format: 'cbr', title: 'Issue 10', seriesIndex: '10', seriesUnit: null, seriesVolumeIndex: null },
       });
     });
 

@@ -135,15 +135,17 @@ export const bookMetadata = pgTable(
     index('bm_chapters_updated_by_idx')
       .on(t.chaptersUpdatedBy)
       .where(sql`${t.chaptersUpdatedBy} is not null`),
-    index('bm_series_id_index_book_id_idx').on(
+    index('bm_series_id_order_book_id_idx').on(
       t.seriesId,
       sql`(CASE WHEN ${t.seriesUnit} IN ('chapter', 'issue') THEN 1 ELSE 0 END)`,
+      sql`(ARRAY[split_part(${t.seriesVolumeIndex}, '.', 1)::numeric, CASE WHEN ${t.seriesVolumeIndex} IS NULL THEN NULL WHEN strpos(${t.seriesVolumeIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesVolumeIndex}, '.', 2)::numeric END])`,
       sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
       sql`${t.seriesIndex} COLLATE "C"`,
       t.bookId,
     ),
-    index('bm_series_index_sort_idx').on(
+    index('bm_series_order_sort_idx').on(
       sql`(CASE WHEN ${t.seriesUnit} IN ('chapter', 'issue') THEN 1 ELSE 0 END)`,
+      sql`(ARRAY[split_part(${t.seriesVolumeIndex}, '.', 1)::numeric, CASE WHEN ${t.seriesVolumeIndex} IS NULL THEN NULL WHEN strpos(${t.seriesVolumeIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesVolumeIndex}, '.', 2)::numeric END])`,
       sql`(CASE WHEN ${t.seriesIndex} IS NULL THEN NULL ELSE ARRAY[split_part(${t.seriesIndex}, '.', 1)::numeric, CASE WHEN strpos(${t.seriesIndex}, '.') = 0 THEN -1::numeric ELSE split_part(${t.seriesIndex}, '.', 2)::numeric END] END)`,
       sql`${t.seriesIndex} COLLATE "C"`,
       t.bookId,

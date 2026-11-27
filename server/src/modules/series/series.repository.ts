@@ -2,10 +2,10 @@ import { Inject, Injectable } from '@nestjs/common';
 import { SQL, and, asc, count, desc, eq, gt, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
-import { type ContentFilterRules, type SeriesUnit, type SeriesUnitClass, seriesUnitClass } from '@bookorbit/types';
+import { type ContentFilterRules, type SeriesUnit, type SeriesUnitClass, seriesRunOf, seriesUnitClass } from '@bookorbit/types';
 import { buildContentFilterClauses } from '../../common/utils/content-filter-sql.utils';
 import { accentInsensitiveIlike, buildSearchPattern } from '../../common/utils/accent-insensitive-search.utils';
-import { compareSeriesIndexSql, seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
+import { compareSeriesIndexSql, compareSeriesVolumeSql, seriesIndexOrderBy } from '../../common/utils/series-index-sql.utils';
 import { seriesUnitClassFilter } from '../../common/utils/series-unit.utils';
 import { DB } from '../../db';
 import { workKeySql } from '../../db/book-work-key';
@@ -41,6 +41,8 @@ type SeriesSummaryRow = {
 export type SeriesVolumeMember = {
   seriesIndex: string | null;
   unit: SeriesUnit | null;
+  /** The run a chapter or issue belongs to. */
+  volumeIndex?: string | null;
   status: string | null;
 };
 
@@ -70,6 +72,7 @@ export type SeriesNextBookRow = {
   title: string | null;
   seriesIndex: string | null;
   seriesUnit: SeriesUnit | null;
+  seriesVolumeIndex: string | null;
   fileId: number;
   format: string | null;
 };
@@ -311,6 +314,7 @@ export class SeriesRepository {
         .select({
           seriesIndex: bookSeriesMemberships.seriesIndex,
           unit: bookSeriesMemberships.seriesUnit,
+          volumeIndex: bookSeriesMemberships.seriesVolumeIndex,
           status: userBookStatus.status,
         })
         .from(books)
@@ -465,7 +469,11 @@ export class SeriesRepository {
     const libraryFilter = this.buildLibraryFilter(params.libraryIds);
 
     const [current] = await this.db
-      .select({ seriesIndex: bookSeriesMemberships.seriesIndex, unit: bookSeriesMemberships.seriesUnit })
+      .select({
+        seriesIndex: bookSeriesMemberships.seriesIndex,
+        unit: bookSeriesMemberships.seriesUnit,
+        volumeIndex: bookSeriesMemberships.seriesVolumeIndex,
+      })
       .from(bookSeriesMemberships)
       .innerJoin(books, eq(books.id, bookSeriesMemberships.bookId))
       .where(and(eq(bookSeriesMemberships.seriesId, params.seriesId), eq(bookSeriesMemberships.bookId, params.bookId), libraryFilter))
@@ -475,7 +483,7 @@ export class SeriesRepository {
 
     // Mirrors the ascending series order, where unindexed books sort after every indexed one:
     // an indexed book can be followed by an unindexed one, an unindexed one only by another.
-    const afterCurrent =
+    const laterInRun =
       current.seriesIndex === null
         ? and(isNull(bookSeriesMemberships.seriesIndex), gt(books.id, params.bookId))!
         : or(
@@ -483,6 +491,12 @@ export class SeriesRepository {
             and(compareSeriesIndexSql(bookSeriesMemberships.seriesIndex, '>=', current.seriesIndex), gt(books.id, params.bookId)),
             isNull(bookSeriesMemberships.seriesIndex),
           )!;
+    // Runs read in order, so the last issue of v2 leads to the first of v3.
+    const currentRun = seriesRunOf(current.unit, current.volumeIndex);
+    const afterCurrent = or(
+      compareSeriesVolumeSql(bookSeriesMemberships.seriesVolumeIndex, '>', currentRun),
+      and(compareSeriesVolumeSql(bookSeriesMemberships.seriesVolumeIndex, '=', currentRun), laterInRun),
+    )!;
 
     // A volume leads to the next volume and a chapter to the next chapter, never across (v1 to c1).
     const sameClass = seriesUnitClassFilter(bookSeriesMemberships.seriesUnit, seriesUnitClass(current.unit));
@@ -494,6 +508,7 @@ export class SeriesRepository {
         title: bookMetadata.title,
         seriesIndex: bookSeriesMemberships.seriesIndex,
         seriesUnit: bookSeriesMemberships.seriesUnit,
+        seriesVolumeIndex: bookSeriesMemberships.seriesVolumeIndex,
         fileId: bookFiles.id,
         format: bookFiles.format,
       })
@@ -515,7 +530,7 @@ export class SeriesRepository {
         ),
       )
       .orderBy(
-        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, 'ASC'),
+        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, bookSeriesMemberships.seriesVolumeIndex, 'ASC'),
         asc(books.id),
         sql`(${bookFiles.id} = ${books.primaryFileId}) DESC`,
         sql`${bookFiles.sortOrder} ASC NULLS LAST`,
@@ -579,7 +594,7 @@ export class SeriesRepository {
       )
       .orderBy(
         bookSeriesMemberships.seriesId,
-        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, 'ASC'),
+        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, bookSeriesMemberships.seriesVolumeIndex, 'ASC'),
         asc(books.addedAt),
       );
 
@@ -633,7 +648,7 @@ export class SeriesRepository {
     const filterClauses = contentFilters ? buildContentFilterClauses(contentFilters, this.db) : [];
     const orderInWindow = sql.join(
       [
-        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, 'ASC'),
+        ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, bookSeriesMemberships.seriesVolumeIndex, 'ASC'),
         sql`${books.addedAt} ASC`,
         sql`${books.id} ASC`,
       ],
@@ -646,6 +661,7 @@ export class SeriesRepository {
         bookId: books.id,
         seriesIndex: bookSeriesMemberships.seriesIndex,
         unit: bookSeriesMemberships.seriesUnit,
+        volumeIndex: bookSeriesMemberships.seriesVolumeIndex,
         title: bookMetadata.title,
         status: userBookStatus.status,
         libraryName: libraries.name,
@@ -677,7 +693,14 @@ export class SeriesRepository {
         entry.truncated = true;
         continue;
       }
-      entry.rows.push({ bookId: row.bookId, seriesIndex: row.seriesIndex, unit: row.unit ?? null, title: row.title, status: row.status });
+      entry.rows.push({
+        bookId: row.bookId,
+        seriesIndex: row.seriesIndex,
+        unit: row.unit ?? null,
+        volumeIndex: row.volumeIndex ?? null,
+        title: row.title,
+        status: row.status,
+      });
       if (row.libraryName && !entry.libraryNames.includes(row.libraryName)) entry.libraryNames.push(row.libraryName);
     }
     for (const entry of result.values()) entry.libraryNames.sort((a, b) => a.localeCompare(b));
@@ -731,7 +754,12 @@ export class SeriesRepository {
       case 'seriesIndex':
       default:
         return [
-          ...seriesIndexOrderBy(bookSeriesMemberships.seriesIndex, bookSeriesMemberships.seriesUnit, order === 'asc' ? 'ASC' : 'DESC'),
+          ...seriesIndexOrderBy(
+            bookSeriesMemberships.seriesIndex,
+            bookSeriesMemberships.seriesUnit,
+            bookSeriesMemberships.seriesVolumeIndex,
+            order === 'asc' ? 'ASC' : 'DESC',
+          ),
           asc(books.id),
         ];
     }

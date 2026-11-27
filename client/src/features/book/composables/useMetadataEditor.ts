@@ -9,6 +9,7 @@ import {
   type BookMetadataSaveResult,
   type CustomMetadataBookValue,
   type CustomMetadataBookValueInput,
+  type SeriesIndex,
   type SeriesUnit,
 } from '@bookorbit/types'
 import { hasAudioFile, hasReadAlongFile } from '@/features/book/lib/file-capabilities'
@@ -23,6 +24,11 @@ export type EditableSeriesMembership = {
    * edit, so the payload omits it and the server keeps each book's saved unit.
    */
   unit?: SeriesUnit | null
+  /**
+   * The volume a chapter or issue belongs to, its run. Undefined wherever `unit` is, so the server
+   * keeps the saved one; a volume or a book with no unit never keeps one.
+   */
+  volumeIndex?: SeriesIndex | null
 }
 
 const ROOT_FIELDS = [
@@ -96,6 +102,7 @@ export function normalizeSeriesMemberships(values: readonly EditableSeriesMember
       seriesIndex: value.seriesIndex ?? null,
       expectedBookCount: value.expectedBookCount ?? null,
       ...(value.unit !== undefined ? { unit: value.unit } : {}),
+      ...(value.volumeIndex !== undefined ? { volumeIndex: value.unit === 'chapter' || value.unit === 'issue' ? value.volumeIndex : null } : {}),
     })
   }
   return out
@@ -110,10 +117,13 @@ function seriesMembershipsFromBook(book: BookDetail): EditableSeriesMembership[]
         seriesIndex: membership.seriesIndex,
         expectedBookCount: membership.expectedBookCount ?? null,
         unit: membership.unit ?? null,
+        volumeIndex: membership.volumeIndex ?? null,
       })),
     )
   }
-  return book.seriesName ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null, unit: null }] : []
+  return book.seriesName
+    ? [{ seriesName: book.seriesName, seriesIndex: book.seriesIndex, expectedBookCount: null, unit: null, volumeIndex: null }]
+    : []
 }
 
 function changedCustomMetadataPayload(

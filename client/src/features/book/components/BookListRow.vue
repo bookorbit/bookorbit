@@ -98,7 +98,7 @@ const authorLine = computed(() => props.book.authors.join(', ') || null)
 const authorQuery = computed(() => props.book.authors[0] ?? null)
 const seriesLine = computed(() => {
   if (!props.book.seriesName) return null
-  return seriesNameWithPosition(t, props.book.seriesName, props.book.seriesIndex, props.book.seriesUnit)
+  return seriesNameWithPosition(t, props.book.seriesName, props.book.seriesIndex, props.book.seriesUnit, props.book.seriesVolumeIndex)
 })
 
 const isMissing = computed(() => props.book.status === 'missing')

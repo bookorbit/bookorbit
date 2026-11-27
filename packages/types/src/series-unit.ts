@@ -1,3 +1,5 @@
+import { compareSeriesIndices, type SeriesIndex } from "./series-index";
+
 /**
  * What a book is within its series: a collected volume, a single chapter, or a single issue.
  * Null means unclassified, which sorts, counts and filters with volumes, so a series with nothing
@@ -54,4 +56,41 @@ export function seriesUnitMarkerKey(marker: string): string {
 export function classifySeriesUnitMarker(marker: string | null | undefined): SeriesUnit | null {
   if (!marker) return null;
   return SERIES_UNIT_MARKERS.get(seriesUnitMarkerKey(marker)) ?? null;
+}
+
+/**
+ * The volume a chapter or issue belongs to, which its numbers restart in: issue numbers begin again
+ * in each run of a comic. Volumes and unclassified books never sit in a run.
+ */
+export function seriesRunOf(unit: SeriesUnit | string | null | undefined, volumeIndex: SeriesIndex | null | undefined): SeriesIndex | null {
+  return seriesUnitClass(unit) === "chapter" ? (volumeIndex ?? null) : null;
+}
+
+export type SeriesPosition = {
+  seriesIndex: SeriesIndex | null;
+  unit?: SeriesUnit | string | null;
+  volumeIndex?: SeriesIndex | null;
+};
+
+/** Run order: by volume number, with chapters and issues that name no volume after every run. */
+export function compareSeriesRuns(a: SeriesIndex | null, b: SeriesIndex | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+  return compareSeriesIndices(a, b);
+}
+
+/**
+ * Series order, mirroring the server's: volumes and unclassified books, then chapters and issues run
+ * by run, each by number, with unnumbered books last. Returns 0 for the same position.
+ */
+export function compareSeriesPositions(a: SeriesPosition, b: SeriesPosition): number {
+  const byClass = (seriesUnitClass(a.unit) === "chapter" ? 1 : 0) - (seriesUnitClass(b.unit) === "chapter" ? 1 : 0);
+  if (byClass !== 0) return byClass;
+  const byRun = compareSeriesRuns(seriesRunOf(a.unit, a.volumeIndex), seriesRunOf(b.unit, b.volumeIndex));
+  if (byRun !== 0) return byRun;
+  if (a.seriesIndex === b.seriesIndex) return 0;
+  if (a.seriesIndex === null) return 1;
+  if (b.seriesIndex === null) return -1;
+  return compareSeriesIndices(a.seriesIndex, b.seriesIndex);
 }

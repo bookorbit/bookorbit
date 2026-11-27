@@ -207,6 +207,8 @@ export class SeriesUnitBackfillService implements OnApplicationBootstrap, OnModu
     if (!matched || !seriesUnit || seriesIndex === undefined || Number(seriesIndex) !== Number(candidate.seriesIndex)) return null;
     // A volume has no volume number of its own; only chapters and issues carry the one they sit in.
     const volumeIndex = seriesUnitClass(seriesUnit) === 'chapter' ? (seriesVolumeIndex ?? null) : null;
+    // A book already classified only gains the run its folder names; its unit stays as it is.
+    if (candidate.unit !== null && (candidate.unit !== seriesUnit || volumeIndex === null)) return null;
     return { bookId: candidate.bookId, seriesIndex: candidate.seriesIndex, unit: seriesUnit, volumeIndex };
   }
 
