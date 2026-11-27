@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search, TriangleAlert, UserPlus, X } from '@lucide/vue'
-import { Permission, type DefaultLibraryAccessConfig, type UserListSortField, type UserListState } from '@bookorbit/types'
+import { Permission, type DefaultLibraryAccessConfig, type PasswordResetLink, type UserListSortField, type UserListState } from '@bookorbit/types'
 
 import { Button } from '@/components/ui/button'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
@@ -15,6 +15,7 @@ import { useUsers, type UserRow } from './composables/useUsers'
 import { useSelfRegistration } from './composables/useSelfRegistration'
 import UserFormDrawer from './UserFormDrawer.vue'
 import ResetLinkModal from './ResetLinkModal.vue'
+import InvitationLifetimeCard from './components/InvitationLifetimeCard.vue'
 import StartingPermissionsCard from './components/StartingPermissionsCard.vue'
 import { useStartingPermissions } from './composables/useStartingPermissions'
 import NewAccountDefaults from './components/NewAccountDefaults.vue'
@@ -68,7 +69,7 @@ const {
 } = useStartingPermissions()
 const drawerOpen = ref(false)
 const editingUser = ref<UserRow | null>(null)
-const resetUrl = ref<string | null>(null)
+const resetLink = ref<PasswordResetLink | null>(null)
 const deleteConfirmUser = ref<UserRow | null>(null)
 const superuserConfirm = ref<{ user: UserRow; isSuperuser: boolean } | null>(null)
 const deleting = ref(false)
@@ -190,8 +191,8 @@ function closeDrawer() {
   drawerOpen.value = false
 }
 
-function clearResetUrl() {
-  resetUrl.value = null
+function clearResetLink() {
+  resetLink.value = null
 }
 
 function canManage(user: UserRow): boolean {
@@ -236,8 +237,7 @@ async function handleResetPassword(userId: number) {
       actionError.value = t('adminFeature.usersPage.errors.resetPassword')
       return
     }
-    const data = await res.json()
-    resetUrl.value = data.resetUrl
+    resetLink.value = await res.json()
     await reload()
   } finally {
     busyUserId.value = null
@@ -326,9 +326,9 @@ async function confirmDeleteUser() {
   }
 }
 
-async function onSaved(newResetUrl?: string) {
+async function onSaved(newResetLink?: PasswordResetLink) {
   drawerOpen.value = false
-  if (newResetUrl) resetUrl.value = newResetUrl
+  if (newResetLink) resetLink.value = newResetLink
   await reload()
 }
 
@@ -537,6 +537,7 @@ async function saveDefaultLibraryAccess() {
         :error="permissionsError"
         @retry="loadPermissions"
       />
+      <InvitationLifetimeCard v-if="canManageUserDefaults && passwordLoginEnabled" />
     </NewAccountDefaults>
 
     <UserFormDrawer
@@ -556,7 +557,7 @@ async function saveDefaultLibraryAccess() {
       @request-superuser-change="requestSuperuserChange"
       @delete="handleDrawerDelete"
     />
-    <ResetLinkModal v-if="resetUrl" :reset-url="resetUrl" @close="clearResetUrl" />
+    <ResetLinkModal v-if="resetLink" :reset-url="resetLink.resetUrl" :reset-link-expires-at="resetLink.resetLinkExpiresAt" @close="clearResetLink" />
 
     <ConfirmDialog
       :open="deleteConfirmUser !== null"

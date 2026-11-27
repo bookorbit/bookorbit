@@ -17,7 +17,7 @@ import { ConfigService } from '@nestjs/config';
 import { compare, hash } from 'bcryptjs';
 import { createHash, timingSafeEqual } from 'crypto';
 import '@fastify/cookie';
-import { and, count, eq, isNull, sql } from 'drizzle-orm';
+import { and, count, eq, gt, isNull, sql } from 'drizzle-orm';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 
@@ -555,7 +555,14 @@ export class AuthService {
         })
         .where(eq(schema.users.id, row.userId));
 
-      await tx.update(schema.passwordResetTokens).set({ usedAt: new Date() }).where(eq(schema.passwordResetTokens.id, row.id));
+      const now = new Date();
+      const claimed = await tx
+        .update(schema.passwordResetTokens)
+        .set({ usedAt: now })
+        .where(
+          and(eq(schema.passwordResetTokens.id, row.id), isNull(schema.passwordResetTokens.usedAt), gt(schema.passwordResetTokens.expiresAt, now)),
+        );
+      if (claimed.rowCount !== 1) throw new BadRequestException('Invalid or expired reset token');
 
       await tx
         .update(schema.refreshTokens)
@@ -604,6 +611,10 @@ export class AuthService {
         })
         .where(eq(schema.users.id, userId));
 
+      await tx
+        .update(schema.passwordResetTokens)
+        .set({ usedAt: new Date() })
+        .where(and(eq(schema.passwordResetTokens.userId, userId), isNull(schema.passwordResetTokens.usedAt)));
       await tx
         .update(schema.refreshTokens)
         .set({ revokedAt: new Date() })

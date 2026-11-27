@@ -437,7 +437,9 @@ describe('UserRepository', () => {
   });
 
   it('generateResetToken revokes previous active tokens and inserts a new hashed token in one transaction', async () => {
+    const lock = vi.fn().mockResolvedValue([{ isDefaultPassword: true }]);
     const tx = {
+      select: vi.fn(() => ({ from: () => ({ where: () => ({ for: lock }) }) })),
       update: vi.fn().mockReturnThis(),
       set: vi.fn().mockReturnThis(),
       where: vi.fn().mockResolvedValue(undefined),
@@ -450,7 +452,8 @@ describe('UserRepository', () => {
 
     const token = await repo.generateResetToken(22);
 
-    expect(token).toBe('abcd');
+    expect(lock).toHaveBeenCalledWith('update');
+    expect(token).toEqual({ rawToken: 'abcd', expiresAt: new Date('2026-01-01T00:15:00.000Z') });
     expect(tx.update).toHaveBeenCalledWith(schema.passwordResetTokens);
     expect(tx.insert).toHaveBeenCalledWith(schema.passwordResetTokens);
     expect(tx.values).toHaveBeenCalledWith(

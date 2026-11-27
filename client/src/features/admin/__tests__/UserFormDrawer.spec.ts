@@ -363,7 +363,7 @@ describe('UserFormDrawer saving', () => {
 
   it('creates a password account and hands back its reset link', async () => {
     apiMock.mockImplementation(async (input: string) => {
-      if (input === '/api/v1/users') return jsonResponse({ resetUrl: 'https://example.test/reset/abc' })
+      if (input === '/api/v1/users') return jsonResponse({ resetUrl: 'https://example.test/reset/abc', resetLinkExpiresAt: '2026-07-01T12:00:00Z' })
       return jsonResponse({})
     })
 
@@ -376,7 +376,7 @@ describe('UserFormDrawer saving', () => {
     await save?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.emitted('saved')?.[0]).toEqual(['https://example.test/reset/abc'])
+    expect(wrapper.emitted('saved')?.[0]).toEqual([{ resetUrl: 'https://example.test/reset/abc', resetLinkExpiresAt: '2026-07-01T12:00:00Z' }])
   })
 
   it('asks the page to delete rather than confirming inside the editor', async () => {

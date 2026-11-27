@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import type { PasswordResetLink } from '@bookorbit/types'
+import { formatDateTime } from '@/i18n/formatters'
 import { Button } from '@/components/ui/button'
 import { computed, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -8,9 +10,15 @@ import { resolveResetLinkUrl } from './lib/reset-link'
 
 const { t } = useI18n()
 
-const props = defineProps<{ resetUrl: string }>()
+const props = defineProps<PasswordResetLink>()
 const emit = defineEmits<{ close: [] }>()
 const displayedUrl = computed(() => resolveResetLinkUrl(props.resetUrl, window.location.origin))
+
+const description = computed(() =>
+  props.resetLinkExpiresAt
+    ? t('adminFeature.resetLink.descriptionWithExpiry', { expiry: formatDateTime(new Date(props.resetLinkExpiresAt)) })
+    : t('adminFeature.resetLink.description'),
+)
 
 const copied = ref(false)
 const copyFailed = ref(false)
@@ -62,7 +70,7 @@ function handleCopy() {
         </Button>
       </div>
 
-      <p class="text-sm text-muted-foreground mb-3">{{ t('adminFeature.resetLink.description') }}</p>
+      <p class="text-sm text-muted-foreground mb-3">{{ description }}</p>
 
       <div class="flex gap-2">
         <input

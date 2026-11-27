@@ -15,7 +15,7 @@ import {
   X,
   type LucideIcon,
 } from '@lucide/vue'
-import { Permission } from '@bookorbit/types'
+import { Permission, type PasswordResetLink } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/ui/sheet'
 import Badge from '@/components/ui/badge/Badge.vue'
@@ -50,7 +50,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   close: []
-  saved: [resetUrl?: string]
+  saved: [resetLink?: PasswordResetLink]
   requestSuperuserChange: [isSuperuser: boolean]
   delete: []
 }>()
@@ -300,7 +300,7 @@ async function handleSubmit() {
     if (result.section) activeSection.value = result.section
     return
   }
-  emit('saved', result.resetUrl)
+  emit('saved', result.resetLink)
 }
 </script>
 

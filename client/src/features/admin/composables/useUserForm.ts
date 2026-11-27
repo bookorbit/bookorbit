@@ -1,5 +1,5 @@
 import { computed, ref, watch, type Ref } from 'vue'
-import { type AccessLevel, type AuthUser, type Permission, type UserLibraryGrant } from '@bookorbit/types'
+import { type AccessLevel, type AuthUser, type PasswordResetLink, type Permission, type UserLibraryGrant } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { grantingPermissions, isRestrictionPermission, presetPermissions, toggledPermissions, type PermissionPreset } from '../lib/permission-presets'
 
@@ -22,7 +22,7 @@ export interface NamedItem {
 export interface UserFormSaveResult {
   ok: boolean
   /** Present when creating a password account, so the caller can offer the one-time link. */
-  resetUrl?: string
+  resetLink?: PasswordResetLink
   /** The section holding the field a failed save complained about. */
   section?: UserFormSection
 }
@@ -343,8 +343,8 @@ export function useUserForm(
       body: JSON.stringify({ ...payload, email: trimmedEmail }),
     })
     if (!res.ok) return profileFailure(res, 'createUser')
-    const data = await res.json()
-    return { ok: true, resetUrl: data.resetUrl }
+    const { resetUrl, resetLinkExpiresAt }: PasswordResetLink = await res.json()
+    return { ok: true, resetLink: { resetUrl, resetLinkExpiresAt } }
   }
 
   async function save(): Promise<UserFormSaveResult> {

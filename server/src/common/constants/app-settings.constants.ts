@@ -19,6 +19,7 @@ export const APP_SETTING_KEYS = {
   AUTHORS_ENRICHMENT_PAUSED: 'authors_enrichment_paused',
   AUTHORS_METADATA_PREFERENCES: 'authors_metadata_preferences',
   OIDC_CONFIG: 'oidc_config',
+  INVITATION_LIFETIME_MINUTES: 'invitation_lifetime_minutes',
   STARTING_PERMISSIONS: 'admin_starting_permissions',
   DEFAULT_LIBRARY_ACCESS: 'default_library_access',
   UPLOAD_FILE_PATTERN: 'upload_file_pattern',

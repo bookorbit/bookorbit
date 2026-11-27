@@ -1,4 +1,4 @@
-import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import { createHash, randomBytes, randomUUID } from 'crypto';
 import { and, asc, count, desc, eq, ilike, inArray, isNull, ne, notInArray, or, sql } from 'drizzle-orm';
 import type { SQL } from 'drizzle-orm';
@@ -7,6 +7,7 @@ import { hash } from 'bcryptjs';
 
 import { Permission, withRequiredPermissions } from '@bookorbit/types';
 import type {
+  InvitationLifetimeMinutes,
   UserAttentionReason,
   UserLibraryGrant,
   UserListSortDirection,
@@ -21,6 +22,10 @@ import { AuthenticationPolicyService } from '../../common/services/authenticatio
 
 type Db = NodePgDatabase<typeof schema>;
 type Tx = Parameters<Parameters<Db['transaction']>[0]>[0];
+
+export const PASSWORD_RESET_LIFETIME_MINUTES = 15;
+type ResetTokenTarget = Pick<typeof schema.users.$inferSelect, 'isDefaultPassword' | 'provisioningMethod' | 'isSuperuser'>;
+export type IssuedResetToken = { rawToken: string; expiresAt: Date };
 
 export type ManagedUserMutationStatus = 'updated' | 'target_not_found' | 'requester_not_superuser' | 'last_superuser';
 export type SuperuserTransitionStatus = ManagedUserMutationStatus | 'unchanged' | 'self_target' | 'shared_target' | 'target_no_oidc';
@@ -390,7 +395,13 @@ export class UserRepository {
     return user;
   }
 
-  async createManagedAccount(data: typeof schema.users.$inferInsert, permissionNames: Permission[], libraryIds: number[], kindleEmail?: string) {
+  async createManagedAccount(
+    data: typeof schema.users.$inferInsert,
+    permissionNames: Permission[],
+    libraryIds: number[],
+    kindleEmail: string | undefined,
+    invitationLifetimeMinutes: InvitationLifetimeMinutes | null,
+  ) {
     return this.db.transaction(async (tx) => {
       const [user] = await tx
         .insert(schema.users)
@@ -399,7 +410,7 @@ export class UserRepository {
       await this.insertPermissions(tx, user.id, permissionNames);
       await this.assignViewerLibraries(user.id, libraryIds, tx);
       if (kindleEmail) await this.addKindleRecipient(tx, user.id, kindleEmail);
-      const resetToken = data.isDefaultPassword ? await this.issueResetToken(tx, user.id) : null;
+      const resetToken = invitationLifetimeMinutes === null ? null : await this.issueResetToken(tx, user.id, invitationLifetimeMinutes);
       return { ...user, resetToken };
     });
   }
@@ -612,14 +623,27 @@ export class UserRepository {
     return this.db.query.users.findFirst({ where: eq(schema.users.email, email) });
   }
 
-  async generateResetToken(userId: number): Promise<string> {
-    return this.db.transaction((tx) => this.issueResetToken(tx, userId));
+  async generateResetToken(userId: number, lifetimeFor?: (target: ResetTokenTarget) => number) {
+    return this.db.transaction(async (tx) => {
+      // Serialize reissues with password setup and role changes before choosing the link lifetime.
+      const [target] = await tx
+        .select({
+          isDefaultPassword: schema.users.isDefaultPassword,
+          provisioningMethod: schema.users.provisioningMethod,
+          isSuperuser: schema.users.isSuperuser,
+        })
+        .from(schema.users)
+        .where(eq(schema.users.id, userId))
+        .for('update');
+      if (!target) throw new NotFoundException('User not found');
+      return this.issueResetToken(tx, userId, lifetimeFor?.(target) ?? PASSWORD_RESET_LIFETIME_MINUTES);
+    });
   }
 
-  private async issueResetToken(tx: Tx, userId: number) {
+  private async issueResetToken(tx: Tx, userId: number, lifetimeMinutes: number): Promise<IssuedResetToken> {
     const rawToken = randomBytes(32).toString('hex');
     const tokenHash = createHash('sha256').update(rawToken).digest('hex');
-    const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + lifetimeMinutes * 60_000);
 
     await tx
       .update(schema.passwordResetTokens)
@@ -627,7 +651,7 @@ export class UserRepository {
       .where(and(eq(schema.passwordResetTokens.userId, userId), isNull(schema.passwordResetTokens.usedAt)));
     await tx.insert(schema.passwordResetTokens).values({ userId, tokenHash, expiresAt });
 
-    return rawToken;
+    return { rawToken, expiresAt };
   }
 
   async clearLockout(userId: number): Promise<void> {

@@ -1,3 +1,16 @@
+export const INVITATION_LIFETIMES_MINUTES = [15, 1440, 10080] as const;
+export type InvitationLifetimeMinutes = (typeof INVITATION_LIFETIMES_MINUTES)[number];
+
+export interface InvitationLifetimeSetting {
+  minutes: InvitationLifetimeMinutes;
+}
+
+export interface PasswordResetLink {
+  resetUrl: string;
+  /** Older servers return only the URL. */
+  resetLinkExpiresAt?: string;
+}
+
 export enum LoginErrorCode {
   ACCOUNT_LOCKED = "account_locked",
   PASSWORD_AUTH_DISABLED = "password_auth_disabled",

@@ -15,6 +15,7 @@ import { DB } from '../src/db';
 import * as schema from '../src/db/schema';
 import { MetadataService } from '../src/modules/metadata/metadata.service';
 import { OidcDiscoveryService } from '../src/modules/auth/oidc/oidc-discovery.service';
+import { AppSettingsService } from '../src/modules/app-settings/app-settings.service';
 import { SystemMailService } from '../src/modules/email/system-mail.service';
 import { makeMetadataNoopMock, type Db } from './e2e/app-harness';
 
@@ -165,6 +166,7 @@ async function createUser(
     password?: string;
     provisioningMethod?: 'local' | 'oidc';
     active?: boolean;
+    isDefaultPassword?: boolean;
   },
 ): Promise<LocalUserCredentials> {
   const suffix = randomUUID().replace(/-/g, '');
@@ -182,7 +184,7 @@ async function createUser(
       passwordHash,
       active: options?.active ?? true,
       provisioningMethod: options?.provisioningMethod ?? 'local',
-      isDefaultPassword: false,
+      isDefaultPassword: options?.isDefaultPassword ?? false,
     })
     .returning({ id: schema.users.id });
 
@@ -405,6 +407,25 @@ describe('Auth recovery and OIDC logout hardening (e2e)', () => {
         where: eq(schema.passwordResetTokens.tokenHash, sha256(rawToken)),
       });
       expect(tokenRowAfterReset?.usedAt).not.toBeNull();
+    });
+
+    it('issues a 15-minute recovery email even for a pending account with a seven-day invitation lifetime', async () => {
+      const user = await createUser(context.db, { isDefaultPassword: true });
+      const settings = context.app.get(AppSettingsService);
+      const original = await settings.getInvitationLifetimeMinutes();
+      try {
+        await settings.setInvitationLifetimeMinutes(10080);
+        const response = await context.app.inject({ method: 'POST', url: '/api/v1/auth/forgot-password', payload: { email: user.email } });
+        expect(response.statusCode).toBe(200);
+        await waitForExpectation(() => expect(context.systemMailMock.sendPasswordReset).toHaveBeenCalledTimes(1));
+        const token = await context.db.query.passwordResetTokens.findFirst({
+          where: eq(schema.passwordResetTokens.tokenHash, sha256(latestResetTokenFromMail(context))),
+        });
+        expect(token?.userId).toBe(user.userId);
+        expect(Math.abs(token!.expiresAt.getTime() - Date.now() - 15 * 60_000)).toBeLessThan(10_000);
+      } finally {
+        await settings.setInvitationLifetimeMinutes(original);
+      }
     });
 
     it('rejects reset token reuse after successful password reset', async () => {

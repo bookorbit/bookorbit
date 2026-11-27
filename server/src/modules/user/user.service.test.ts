@@ -54,8 +54,10 @@ describe('UserService', () => {
     replaceFilters: vi.fn(),
   };
 
+  const issuedToken = { rawToken: 'reset-token', expiresAt: new Date('2026-07-01T12:00:00Z') };
   const appConfiguration = { appUrl: '' };
   const appSettingsService = {
+    getInvitationLifetimeMinutes: vi.fn(),
     getDefaultLibraryAccessLibraryIds: vi.fn(),
   };
   const userStatistics = {
@@ -85,13 +87,14 @@ describe('UserService', () => {
     mockHash.mockResolvedValue('hashed-secret');
     mockRandomBytes.mockReturnValue(Buffer.from('abcd', 'hex'));
     appConfiguration.appUrl = 'https://app.example.com';
+    appSettingsService.getInvitationLifetimeMinutes.mockResolvedValue(1440);
     appSettingsService.getDefaultLibraryAccessLibraryIds.mockResolvedValue([]);
 
-    userRepo.createManagedAccount.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User', resetToken: 'reset-token' });
+    userRepo.createManagedAccount.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User', resetToken: issuedToken });
     userRepo.create.mockResolvedValue({ id: 10, username: 'newuser', name: 'New User' });
     userRepo.createOidcUser.mockResolvedValue({ id: 11, username: 'oidcuser', name: 'OIDC User' });
     userRepo.findByEmail.mockResolvedValue(null);
-    userRepo.generateResetToken.mockResolvedValue('reset-token');
+    userRepo.generateResetToken.mockResolvedValue(issuedToken);
     userRepo.findExistingLibraryIds.mockImplementation((ids: number[]) => Promise.resolve(ids));
     userRepo.updateManagedUser.mockResolvedValue({ status: 'updated', user: { id: 2 } });
     userRepo.deleteManagedUser.mockResolvedValue('updated');
@@ -112,7 +115,7 @@ describe('UserService', () => {
     await service.findByOidcSubject('subject', 'issuer');
     await service.linkOidcIdentity(7, 'subject', 'issuer', 'https://img.example/a.jpg');
     await service.createOidcUser({ username: 'oidc', name: 'OIDC', email: 'oidc@example.com', oidcSubject: 'sub', oidcIssuer: 'iss' });
-    await service.generatePasswordResetToken(7);
+    await expect(service.generatePasswordResetToken(7)).resolves.toBe(issuedToken.rawToken);
     await service.incrementTokenVersion(7);
     await service.findByIdWithPermissions(7);
     await service.create({ username: 'new' } as any);
@@ -165,8 +168,15 @@ describe('UserService', () => {
       [Permission.LibraryDownload, Permission.KoboSync],
       [3, 5],
       undefined,
+      1440,
     );
-    expect(result).toEqual({ id: 10, username: 'newuser', name: 'New User', resetUrl: 'https://app.example.com/reset-password?token=reset-token' });
+    expect(result).toEqual({
+      id: 10,
+      username: 'newuser',
+      name: 'New User',
+      resetUrl: 'https://app.example.com/reset-password?token=reset-token',
+      resetLinkExpiresAt: issuedToken.expiresAt.toISOString(),
+    });
   });
 
   it('createUser applies default library access when libraries are omitted', async () => {
@@ -180,7 +190,7 @@ describe('UserService', () => {
       permissionNames: [],
     } as any);
 
-    expect(userRepo.createManagedAccount).toHaveBeenCalledWith(expect.anything(), [], [2, 4], undefined);
+    expect(userRepo.createManagedAccount).toHaveBeenCalledWith(expect.anything(), [], [2, 4], undefined, 1440);
   });
 
   it('createOidcUser applies default library access', async () => {
@@ -217,7 +227,7 @@ describe('UserService', () => {
       libraryIds: [],
     } as any);
 
-    expect(userRepo.createManagedAccount).toHaveBeenCalledWith(expect.anything(), [], [], undefined);
+    expect(userRepo.createManagedAccount).toHaveBeenCalledWith(expect.anything(), [], [], undefined, 1440);
     expect(result.resetUrl).toBe('https://app.example.com/reset-password?token=reset-token');
   });
 
@@ -804,30 +814,26 @@ describe('UserService', () => {
   });
 
   it('adminResetPassword forbids non-superuser reset of superuser account', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: true, provisioningMethod: 'local' });
-
+    userRepo.generateResetToken.mockImplementation((_id, lifetimeFor) => lifetimeFor({ isSuperuser: true, provisioningMethod: 'local' }));
     await expect(service.adminResetPassword(2, reqUser())).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('adminResetPassword throws when target user does not exist', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue(null);
-
-    await expect(service.adminResetPassword(9, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(NotFoundException);
+  it.each(['oidc', 'shared'])('adminResetPassword rejects %s users', async (provisioningMethod) => {
+    userRepo.generateResetToken.mockImplementation((_id, lifetimeFor) => lifetimeFor({ provisioningMethod }));
+    await expect(service.adminResetPassword(2, reqUser())).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('adminResetPassword rejects OIDC users', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false, provisioningMethod: 'oidc' });
-
-    await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).rejects.toBeInstanceOf(BadRequestException);
-  });
-
-  it('adminResetPassword builds the reset link from the configured app URL', async () => {
-    userRepo.findByIdWithPermissions.mockResolvedValue({ id: 2, isSuperuser: false, provisioningMethod: 'local' });
-    userRepo.generateResetToken.mockResolvedValue('token-2');
-    appConfiguration.appUrl = 'http://localhost:6263';
-
-    await expect(service.adminResetPassword(2, reqUser({ isSuperuser: true }))).resolves.toEqual({
-      resetUrl: 'http://localhost:6263/reset-password?token=token-2',
+  it.each([
+    [true, 1440],
+    [false, 15],
+  ] as const)('adminResetPassword chooses the lifetime for isDefaultPassword=%s', async (isDefaultPassword, expected) => {
+    userRepo.generateResetToken.mockImplementation((_id, lifetimeFor) => {
+      expect(lifetimeFor({ provisioningMethod: 'local', isDefaultPassword })).toBe(expected);
+      return issuedToken;
+    });
+    await expect(service.adminResetPassword(2, reqUser())).resolves.toEqual({
+      resetUrl: 'https://app.example.com/reset-password?token=reset-token',
+      resetLinkExpiresAt: issuedToken.expiresAt.toISOString(),
     });
   });
 });

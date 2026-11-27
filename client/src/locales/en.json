@@ -5533,6 +5533,7 @@
     "resetLink": {
       "title": "Password Reset Link",
       "description": "Share this link with the user. It expires in 15 minutes.",
+      "descriptionWithExpiry": "Share this link with the user. It expires on {expiry}.",
       "copy": "Copy",
       "copied": "Copied!",
       "copyFailed": "Copy failed",
@@ -5791,6 +5792,13 @@
         "enabledNotice": "New accounts start with the default library access below and no other permissions. Grant permissions before they can use protected features.",
         "loadError": "Failed to load the self-registration setting",
         "saveError": "Failed to update the self-registration setting"
+      },
+      "invitationLifetime": {
+        "label": "Invitation link lifetime",
+        "hint": "Applies when a new account receives its first password link or an administrator reissues the invitation.",
+        "loadError": "The invitation link lifetime could not be loaded.",
+        "saveError": "The invitation link lifetime could not be saved.",
+        "saved": "Invitation link lifetime saved."
       },
       "defaultLibraryAccess": {
         "title": "Default Library Access",

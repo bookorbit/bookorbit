@@ -3,7 +3,7 @@ import type { ConfigType } from '@nestjs/config';
 import { hash } from 'bcryptjs';
 import { randomBytes } from 'crypto';
 import { Permission } from '@bookorbit/types';
-import type { ProvisioningMethod, UserAttentionResponse, UserLibraryGrant, UserListSummary, UserSettings } from '@bookorbit/types';
+import type { PasswordResetLink, ProvisioningMethod, UserAttentionResponse, UserLibraryGrant, UserListSummary, UserSettings } from '@bookorbit/types';
 
 import type { RequestUser } from '../../common/types/request-user';
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
@@ -18,7 +18,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { UpdateMeSettingsDto } from './dto/update-me-settings.dto';
 import { UpdateSeriesCollapsePreferencesDto } from './dto/update-series-collapse-preferences.dto';
 import { USER_DELETING, UserEventsService, type UserDeletingEvent } from './user-events.service';
-import { UserRepository, type UserListQuery } from './user.repository';
+import { PASSWORD_RESET_LIFETIME_MINUTES, UserRepository, type IssuedResetToken, type UserListQuery } from './user.repository';
 import { AppSettingsService } from '../app-settings/app-settings.service';
 import { UserStatisticsService } from '../user-statistics/user-statistics.service';
 import { AuthenticationPolicyService } from '../../common/services/authentication-policy.service';
@@ -76,8 +76,9 @@ export class UserService {
     return user;
   }
 
-  generatePasswordResetToken(userId: number): Promise<string> {
-    return this.userRepo.generateResetToken(userId);
+  async generatePasswordResetToken(userId: number): Promise<string> {
+    const { rawToken } = await this.userRepo.generateResetToken(userId);
+    return rawToken;
   }
 
   incrementTokenVersion(userId: number) {
@@ -135,7 +136,7 @@ export class UserService {
   async createUser(dto: CreateUserDto) {
     this.authenticationPolicy.assertPasswordLoginEnabled();
     const { resetToken, ...user } = await this.createManagedAccount(dto, false);
-    return { ...user, resetUrl: `${this.appConfiguration.appUrl}/reset-password?token=${resetToken}` };
+    return { ...user, ...this.formatResetLink(resetToken!) };
   }
 
   async createSharedUser(dto: CreateSharedUserDto) {
@@ -161,6 +162,7 @@ export class UserService {
       this.uniquePermissions(dto.permissionNames ?? []),
       libraryIds,
       dto.kindleEmail,
+      shared ? null : await this.appSettingsService.getInvitationLifetimeMinutes(),
     );
   }
 
@@ -415,20 +417,20 @@ export class UserService {
 
   async adminResetPassword(targetUserId: number, requestingUser: RequestUser) {
     this.authenticationPolicy.assertPasswordLoginEnabled();
-    const target = await this.userRepo.findByIdWithPermissions(targetUserId);
-    if (!target) throw new NotFoundException('User not found');
-    if (target.isSuperuser && !requestingUser.isSuperuser) {
-      throw new ForbiddenException('Only administrators can reset administrator passwords');
-    }
-    if (target.provisioningMethod === 'oidc') {
-      throw new BadRequestException('OIDC accounts cannot reset their password here');
-    }
-    if (target.provisioningMethod === 'shared') {
-      throw new BadRequestException('Shared accounts do not have passwords');
-    }
-    const appUrl = this.appConfiguration.appUrl;
-    const rawToken = await this.userRepo.generateResetToken(targetUserId);
-    return { resetUrl: `${appUrl}/reset-password?token=${rawToken}` };
+    const invitationMinutes = await this.appSettingsService.getInvitationLifetimeMinutes();
+    const token = await this.userRepo.generateResetToken(targetUserId, (target) => {
+      if (target.isSuperuser && !requestingUser.isSuperuser) {
+        throw new ForbiddenException('Only administrators can reset administrator passwords');
+      }
+      if (target.provisioningMethod === 'oidc') throw new BadRequestException('OIDC accounts cannot reset their password here');
+      if (target.provisioningMethod === 'shared') throw new BadRequestException('Shared accounts do not have passwords');
+      return target.provisioningMethod === 'local' && target.isDefaultPassword ? invitationMinutes : PASSWORD_RESET_LIFETIME_MINUTES;
+    });
+    return this.formatResetLink(token);
+  }
+
+  private formatResetLink({ rawToken, expiresAt }: IssuedResetToken): PasswordResetLink {
+    return { resetUrl: `${this.appConfiguration.appUrl}/reset-password?token=${rawToken}`, resetLinkExpiresAt: expiresAt.toISOString() };
   }
 
   async unlockUser(targetUserId: number, requestingUser: RequestUser) {

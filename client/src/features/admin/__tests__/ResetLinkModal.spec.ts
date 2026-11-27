@@ -1,5 +1,6 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { formatDateTime } from '@/i18n/formatters'
 import ResetLinkModal from '../ResetLinkModal.vue'
 
 const copyToClipboardMock = vi.hoisted(() => vi.fn<(text: string) => Promise<boolean>>())
@@ -21,6 +22,12 @@ describe('ResetLinkModal', () => {
     vi.runOnlyPendingTimers()
     vi.useRealTimers()
     vi.clearAllMocks()
+  })
+
+  it('shows the deadline returned by the server', () => {
+    const resetLinkExpiresAt = '2026-07-01T12:00:00Z'
+    const wrapper = mount(ResetLinkModal, { props: { resetUrl: 'https://example.test/reset', resetLinkExpiresAt } })
+    expect(wrapper.text()).toContain(formatDateTime(new Date(resetLinkExpiresAt)))
   })
 
   it('shows copied feedback after a successful copy', async () => {

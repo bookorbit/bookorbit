@@ -2,6 +2,8 @@ import { BadRequestException, Inject, Injectable, Logger, NotFoundException } fr
 import { ConfigService, type ConfigType } from '@nestjs/config';
 
 import {
+  INVITATION_LIFETIMES_MINUTES,
+  type InvitationLifetimeMinutes,
   Permission,
   withRequiredPermissions,
   RESTRICTIVE_PERMISSIONS,
@@ -78,6 +80,15 @@ export class AppSettingsService {
     return this.repo.listPublic();
   }
 
+  async getInvitationLifetimeMinutes(): Promise<InvitationLifetimeMinutes> {
+    const value = await this.getValue(APP_SETTING_KEYS.INVITATION_LIFETIME_MINUTES);
+    return INVITATION_LIFETIMES_MINUTES.find((minutes) => String(minutes) === value) ?? 15;
+  }
+
+  async setInvitationLifetimeMinutes(minutes: InvitationLifetimeMinutes) {
+    await this.repo.upsert(APP_SETTING_KEYS.INVITATION_LIFETIME_MINUTES, String(minutes));
+  }
+
   async getValue(key: string): Promise<string | null> {
     const row = await this.repo.findByKey(key);
     return row?.value ?? null;
@@ -95,6 +106,9 @@ export class AppSettingsService {
   }
 
   async update(key: string, value: string) {
+    if (key === APP_SETTING_KEYS.INVITATION_LIFETIME_MINUTES) {
+      throw new BadRequestException('Use the invitation lifetime endpoint to update this setting');
+    }
     if (key === APP_SETTING_KEYS.STARTING_PERMISSIONS) {
       throw new BadRequestException('Use the starting permissions endpoint to update this setting');
     }

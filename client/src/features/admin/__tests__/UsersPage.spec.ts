@@ -86,7 +86,7 @@ interface StubOptions {
 }
 
 function stubApi(overrides: StubOptions = {}) {
-  apiMock.mockImplementation(async (input: string) => {
+  apiMock.mockImplementation(async (input: string, init?: RequestInit) => {
     if (input === '/api/v1/users/summary') return jsonResponse({ ...EMPTY_SUMMARY, ...overrides.summary })
     if (input === '/api/v1/users/attention') {
       const items = overrides.attention ?? []
@@ -95,6 +95,7 @@ function stubApi(overrides: StubOptions = {}) {
     if (input.startsWith('/api/v1/users?')) {
       return jsonResponse({ users: overrides.users ?? [USER], total: overrides.total ?? 1 })
     }
+    if (input === '/api/v1/app-settings/invitation-lifetime') return jsonResponse(init?.body ? JSON.parse(String(init.body)) : { minutes: 15 })
     if (input === '/api/v1/app-settings/starting-permissions') return jsonResponse([])
     if (input.endsWith('/kindle-recipients')) return jsonResponse([])
     if (input === '/api/v1/libraries') return jsonResponse({ libraries: [{ id: 1, name: 'Novels' }] })
@@ -143,6 +144,35 @@ beforeEach(() => {
   authState.userId = 1
   policyState.passwordLoginEnabled = true
   stubApi()
+})
+
+describe('UsersPage invitation lifetime', () => {
+  it('loads the saved lifetime and submits the selected number of minutes', async () => {
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+    const select = wrapper.get<HTMLSelectElement>('#invitation-lifetime')
+    expect(select.element.value).toBe('15')
+    await select.setValue('10080')
+    select.element.closest('section')!.querySelector('button')!.click()
+    await flushPromises()
+    expect(apiMock).toHaveBeenCalledWith(
+      '/api/v1/app-settings/invitation-lifetime',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ minutes: 10080 }),
+      }),
+    )
+    expect(select.element.value).toBe('10080')
+  })
+
+  it.each(['permission', 'password login'])('omits the control when %s is unavailable', async (reason) => {
+    if (reason === 'permission') permState.denied = ['manage_users']
+    else policyState.passwordLoginEnabled = false
+    const wrapper = mount(UsersPage)
+    await flushPromises()
+    expect(wrapper.find('#invitation-lifetime').exists()).toBe(false)
+    expect(apiMock.mock.calls.some(([url]) => url.endsWith('/invitation-lifetime'))).toBe(false)
+  })
 })
 
 describe('UsersPage self-registration toggle', () => {

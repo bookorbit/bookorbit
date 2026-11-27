@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, ParseIntPipe, Patch, Post, Put, Query } from '@nestjs/common';
 
-import { Permission, AuditAction, AuditResource } from '@bookorbit/types';
+import { Permission, AuditAction, AuditResource, type InvitationLifetimeSetting } from '@bookorbit/types';
 import { Public } from '../../common/decorators/public.decorator';
 import { RequirePermission } from '../../common/decorators/require-permission.decorator';
 import { Auditable } from '../../common/decorators/auditable.decorator';
@@ -17,6 +17,7 @@ import { CreateGroupMappingDto } from './dto/create-group-mapping.dto';
 import { UpdateGroupMappingDto } from './dto/update-group-mapping.dto';
 
 import { InteractiveOnly } from '../../common/decorators/api-key-policy.decorator';
+import { UpdateInvitationLifetimeDto } from './dto/update-invitation-lifetime.dto';
 import { UpdateStartingPermissionsDto } from './dto/update-starting-permissions.dto';
 
 @Controller('app-settings')
@@ -113,6 +114,21 @@ export class AppSettingsController {
   @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated API key settings' })
   updateApiKeySettings(@Body() dto: UpdateApiKeySettingsDto) {
     return this.appSettingsService.updateApiKeySettings({ enabled: dto.enabled, maxLifetimeDays: dto.maxLifetimeDays });
+  }
+
+  @Get('invitation-lifetime')
+  @RequirePermission(Permission.ManageUsers)
+  async getInvitationLifetime(): Promise<InvitationLifetimeSetting> {
+    return { minutes: await this.appSettingsService.getInvitationLifetimeMinutes() };
+  }
+
+  @Put('invitation-lifetime')
+  @InteractiveOnly()
+  @RequirePermission(Permission.ManageUsers)
+  @Auditable({ action: AuditAction.AppSettingsUpdate, resource: AuditResource.AppSettings, description: 'Updated invitation link lifetime' })
+  async setInvitationLifetime(@Body() dto: UpdateInvitationLifetimeDto): Promise<InvitationLifetimeSetting> {
+    await this.appSettingsService.setInvitationLifetimeMinutes(dto.minutes);
+    return { minutes: dto.minutes };
   }
 
   @Get('starting-permissions')
