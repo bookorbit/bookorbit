@@ -122,6 +122,40 @@ describe('parseXmp', () => {
     });
   });
 
+  describe('legacy Ghostscript XMP', () => {
+    it('decodes the escaped UTF-16 title and author from issue 2344', () => {
+      const result = parseXmp(
+        xmpDoc(String.raw`
+          <dc:title><rdf:Alt><rdf:li xml:lang="x-default">\376\377\000H\000u\000i\000d\000a\000 \000d\000e\000 \000I\000n\000n\000s\000m\000o\000u\000t\000h</rdf:li></rdf:Alt></dc:title>
+          <dc:creator><rdf:Seq><rdf:li>
+            \376\377\000U\000s\000u\000a\000r\000i\000o
+          </rdf:li><rdf:li>Second Author</rdf:li></rdf:Seq></dc:creator>
+        `),
+      );
+      expect(result?.title).toBe('Huida de Innsmouth');
+      expect(result?.authors.map(({ name }) => name)).toEqual(['Usuario', 'Second Author']);
+    });
+
+    it('decodes non-ASCII bytes, surrogate pairs, and literal bytes resolved from XML entities', () => {
+      const title = String.raw`\376\377\000\351\000&amp;\330=\336\000\000\\`;
+      expect(parseXmp(xmpDoc(`<dc:title>${title}</dc:title>`))?.title).toBe('é&😀\\');
+    });
+
+    it('preserves a final space byte that belongs to a non-space character', () => {
+      expect(parseXmp(xmpDoc(String.raw`<dc:title>\376\377\001 </dc:title>`))?.title).toBe('Ġ');
+    });
+
+    it.each([
+      String.raw`A literal \000 escape`,
+      String.raw`\376\377\000`,
+      String.raw`\376\377\330\000`,
+      String.raw`\376\377\000\000`,
+      String.raw`\376\377\000\999`,
+    ])('preserves literal text or malformed encoded data: %s', (title) => {
+      expect(parseXmp(xmpDoc(`<dc:title>${title}</dc:title>`))?.title).toBe(title);
+    });
+  });
+
   describe('bookorbit: namespace fields', () => {
     it('parses bookorbit:subtitle', () => {
       const r = parseXmp(xmpDoc('<bookorbit:subtitle>A Novel</bookorbit:subtitle>'));

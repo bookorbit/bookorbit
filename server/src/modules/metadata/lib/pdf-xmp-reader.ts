@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream, PDFRef } from 'pdf-lib';
+import { decodePDFRawStream, PDFDocument, PDFName, PDFRawStream, PDFRef, PDFString } from 'pdf-lib';
 import { parseSeriesIndex } from '@bookorbit/types';
 
 import { BOOKORBIT_NS_PREFIX } from '../../../common/bookorbit-ns';
@@ -35,8 +35,31 @@ export interface XmpParsed {
   itunesId: string | null;
 }
 
+const escapedUtf16Bom = String.raw`\376\377`;
+const pdfLiteralLine = /^((?:[\x20-\x5b\x5d-\x7e]|\\[0-3][0-7]{2}|\\[\\()nrtbf])+)(?:\r?\n\s*)?$/;
+const xmlText = /^[\t\n\r\u0020-\uD7FF\uE000-\uFFFD\u{10000}-\u{10FFFF}]+$/u;
+const utf16be = new TextDecoder('utf-16be', { fatal: true });
+
+function decodeXmpText(value: string): string {
+  // Older Ghostscript versions wrote PDF literal-string bytes directly into XMP text nodes.
+  const text = value.trimStart();
+  if (!text.startsWith(escapedUtf16Bom)) return text.trimEnd();
+
+  const payload = pdfLiteralLine.exec(text.slice(escapedUtf16Bom.length))?.[1];
+  if (!payload) return text.trimEnd();
+  try {
+    const decoded = utf16be.decode(PDFString.of(payload).asBytes());
+    return xmlText.test(decoded) ? decoded.trim() : text.trimEnd();
+  } catch {
+    return text.trimEnd();
+  }
+}
+
 const xmpParser = new XMLParser({
   ignoreAttributes: false,
+  trimValues: false, // A trailing space may be the low byte of a UTF-16 code unit.
+  tagValueProcessor: (_, value: string) => decodeXmpText(value),
+  attributeValueProcessor: (_, value: string) => value.trim(),
   attributeNamePrefix: '@_',
   isArray: (name) => name === 'rdf:li' || name === 'rdf:Description',
   textNodeName: '#text',
