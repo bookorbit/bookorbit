@@ -273,6 +273,7 @@ export class ReadingAttemptService {
     occurredOn: string;
     origin: Exclude<ReadingAttemptOrigin, 'manual' | 'hardcover' | 'migration'>;
     progress: number;
+    readingThreshold: number;
     finishThreshold: number;
     strongRereadEvidence: boolean;
     meaningfulActivity: boolean;
@@ -332,7 +333,8 @@ export class ReadingAttemptService {
         });
         changed = true;
       }
-      if (!active && !isFinished && (input.progress > 0 || input.strongRereadEvidence || input.meaningfulActivity)) {
+      if (!active && !isFinished) {
+        if (!hasCompleted && !hasReachedProgressThreshold(input.progress, input.readingThreshold)) return null;
         active = await this.repo.createActive(tx, {
           userId: input.userId,
           bookId: input.bookId,

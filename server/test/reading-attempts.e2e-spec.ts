@@ -350,6 +350,28 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
     expect((await listAttempts(book.bookId)).total).toBe(0);
   });
 
+  it('starts the first reading attempt at the configured threshold and keeps it if progress moves back', async () => {
+    const { bookId } = await createBook();
+    const statuses = ctx.app.get(UserBookStatusService);
+    const readingThreshold = 5;
+    const finishThreshold = 98;
+
+    await statuses.autoUpdate(adminUserId, bookId, 1, readingThreshold, finishThreshold, { origin: 'koreader' });
+    await statuses.autoUpdate(adminUserId, bookId, 0, readingThreshold, finishThreshold, { meaningfulActivity: true });
+    await statuses.autoUpdate(adminUserId, bookId, 1, readingThreshold, finishThreshold, { strongRereadEvidence: true });
+    expect(await statuses.findOne(adminUserId, bookId)).toBeNull();
+    expect((await listAttempts(bookId)).total).toBe(0);
+
+    await statuses.autoUpdate(adminUserId, bookId, 5, readingThreshold, finishThreshold, { origin: 'koreader' });
+    expect(await statuses.findOne(adminUserId, bookId)).toMatchObject({ status: 'reading', source: 'auto' });
+    const history = await listAttempts(bookId);
+    expect(history.items).toEqual([expect.objectContaining({ origin: 'koreader', outcome: null })]);
+
+    await statuses.autoUpdate(adminUserId, bookId, 1, readingThreshold, finishThreshold);
+    expect(await statuses.findOne(adminUserId, bookId)).toMatchObject({ status: 'reading' });
+    expect(await listAttempts(bookId)).toEqual(history);
+  });
+
   it('9. detects web rereads from a substantial progress rollback and completes the same attempt', async () => {
     const book = await createBook();
     await patchStatus(book.bookId, { status: 'read', startedAt: '2024-01-01', finishedAt: '2024-01-10' });
@@ -470,6 +492,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
         occurredOn: '2026-04-01',
         origin: 'kobo',
         progress: 10,
+        readingThreshold: 5,
         finishThreshold: 98,
         strongRereadEvidence: true,
         meaningfulActivity: false,
@@ -480,6 +503,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
         occurredOn: '2026-04-01',
         origin: 'kobo',
         progress: 12,
+        readingThreshold: 5,
         finishThreshold: 98,
         strongRereadEvidence: true,
         meaningfulActivity: false,
@@ -1387,6 +1411,7 @@ describe('Reading attempts main-flow simulation (docker e2e)', { timeout: TIMEOU
       occurredOn: '2026-01-02',
       origin: 'kobo',
       progress: 25,
+      readingThreshold: 5,
       finishThreshold: 98,
       strongRereadEvidence: false,
       meaningfulActivity: true,

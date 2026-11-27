@@ -272,12 +272,6 @@ export class UserBookStatusService {
 
     const normalizedPercentage = this.normalizePercentage(percentage);
     const { readThreshold, finishThreshold: normalizedFinishThreshold } = this.normalizeThresholds(readingThreshold, finishThreshold);
-    const derived: ReadStatus = hasReachedProgressThreshold(normalizedPercentage, normalizedFinishThreshold)
-      ? 'read'
-      : normalizedPercentage >= readThreshold
-        ? 'reading'
-        : 'unread';
-
     if (this.attempts) {
       const timeZone = activity.timeZone ?? (await this.repo.findUserTimeZone(userId));
       const updated = await this.attempts.recordActivity({
@@ -286,6 +280,7 @@ export class UserBookStatusService {
         occurredOn: this.dayKeyFor(activity.occurredAt, timeZone),
         origin: activity.origin ?? 'bookorbit',
         progress: normalizedPercentage,
+        readingThreshold: readThreshold,
         finishThreshold: normalizedFinishThreshold,
         strongRereadEvidence: activity.strongRereadEvidence === true,
         meaningfulActivity: activity.meaningfulActivity === true,
@@ -301,6 +296,12 @@ export class UserBookStatusService {
       }
       return;
     }
+
+    const derived: ReadStatus = hasReachedProgressThreshold(normalizedPercentage, normalizedFinishThreshold)
+      ? 'read'
+      : hasReachedProgressThreshold(normalizedPercentage, readThreshold)
+        ? 'reading'
+        : 'unread';
 
     if (existing?.source === 'manual' && (existing.status !== 'want_to_read' || derived === 'unread')) return;
 

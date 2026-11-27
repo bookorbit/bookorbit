@@ -42,6 +42,7 @@ describe('ReadingAttemptService', () => {
         occurredOn: '2026-07-12',
         origin: 'kobo',
         progress: 25,
+        readingThreshold: 5,
         finishThreshold: 98,
         strongRereadEvidence: false,
         meaningfulActivity: false,
@@ -58,6 +59,7 @@ describe('ReadingAttemptService', () => {
         occurredOn,
         origin: 'bookorbit',
         progress,
+        readingThreshold: 5,
         finishThreshold: 98,
         strongRereadEvidence,
         meaningfulActivity: true,
@@ -100,10 +102,10 @@ describe('ReadingAttemptService', () => {
       expect(fake.repo.attachBackfilledSessions).not.toHaveBeenCalled();
     });
 
-    it('still opens a reread from activity after the finish day', async () => {
+    it('still opens a reread below the start threshold from a meaningful session after the finish day', async () => {
       await finished('2026-10-11');
 
-      await expect(lateActivity('2026-10-18')).resolves.toMatchObject({ status: 'rereading' });
+      await expect(lateActivity('2026-10-18', 1)).resolves.toMatchObject({ status: 'rereading' });
       expect(fake.rows).toHaveLength(2);
     });
   });
@@ -126,7 +128,8 @@ describe('ReadingAttemptService', () => {
       bookId: 10,
       occurredOn: '2026-07-12',
       origin: 'kobo',
-      progress: 25,
+      progress: 1,
+      readingThreshold: 5,
       finishThreshold: 98,
       strongRereadEvidence: true,
       meaningfulActivity: false,
@@ -156,6 +159,7 @@ describe('ReadingAttemptService', () => {
       occurredOn: '2026-07-12',
       origin: 'kobo',
       progress: 99,
+      readingThreshold: 5,
       finishThreshold: 98,
       strongRereadEvidence: true,
       meaningfulActivity: false,
@@ -185,6 +189,7 @@ describe('ReadingAttemptService', () => {
       occurredOn: '2026-07-12',
       origin: 'bookorbit',
       progress: 99,
+      readingThreshold: 5,
       finishThreshold: 98,
       strongRereadEvidence: false,
       meaningfulActivity: true,
@@ -193,6 +198,28 @@ describe('ReadingAttemptService', () => {
     expect(result?.status).toBe('read');
     expect(fake.rows).toHaveLength(1);
     expect(fake.rows[0]).toMatchObject({ outcome: 'completed', endedOn: '2026-07-12' });
+  });
+
+  it.each([
+    { progress: 0.94, threshold: 0.95, starts: false },
+    { progress: Math.fround(0.95), threshold: 0.95, starts: true },
+    { progress: 4.999995, threshold: 5, starts: false },
+    { progress: 0, threshold: 0, starts: true },
+  ])('applies the first-read boundary at $progress% with a $threshold% threshold', async ({ progress, threshold, starts }) => {
+    const result = await service.recordActivity({
+      userId: 1,
+      bookId: 10,
+      occurredOn: '2026-07-12',
+      origin: 'bookorbit',
+      progress,
+      readingThreshold: threshold,
+      finishThreshold: 98,
+      strongRereadEvidence: false,
+      meaningfulActivity: false,
+    });
+
+    expect(result?.status ?? null).toBe(starts ? 'reading' : null);
+    expect(fake.rows).toHaveLength(starts ? 1 : 0);
   });
 
   it.each([
@@ -205,6 +232,7 @@ describe('ReadingAttemptService', () => {
       occurredOn: '2026-07-12',
       origin: 'bookorbit',
       progress,
+      readingThreshold: 5,
       finishThreshold: 99.95,
       strongRereadEvidence: false,
       meaningfulActivity: true,
@@ -502,6 +530,7 @@ describe('ReadingAttemptService', () => {
         occurredOn: '2026-07-12',
         origin: 'kobo',
         progress: 100,
+        readingThreshold: 5,
         finishThreshold: 98,
         strongRereadEvidence: false,
         meaningfulActivity: true,
