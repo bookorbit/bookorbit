@@ -388,7 +388,7 @@ const HEADER = 'px-3 py-2.5 text-start text-xs font-semibold tracking-wide text-
                   <component :is="requestMediaIcon(half.mediaKind)" :size="13" :class="requestMediaColor(half.mediaKind)" aria-hidden="true" />
                   <span class="sr-only">{{ mediaLabel(half) }}</span>
                 </template>
-                <RequestStatusBadge :status="statusFor(half)" />
+                <RequestStatusBadge :status="statusFor(half)" :uploading="half.download?.source === 'upload'" />
               </div>
             </div>
           </td>
@@ -404,7 +404,9 @@ const HEADER = 'px-3 py-2.5 text-start text-xs font-semibold tracking-wide text-
                     aria-valuemin="0"
                     aria-valuemax="100"
                     :aria-label="
-                      t('bookRequests.download.progressLabel', { title: isPair(row) ? `${half.title} (${mediaLabel(half)})` : half.title })
+                      t(half.download?.source === 'upload' ? 'bookRequests.upload.progressLabel' : 'bookRequests.download.progressLabel', {
+                        title: isPair(row) ? `${half.title} (${mediaLabel(half)})` : half.title,
+                      })
                     "
                   >
                     <div
@@ -571,7 +573,7 @@ const HEADER = 'px-3 py-2.5 text-start text-xs font-semibold tracking-wide text-
                   <component :is="requestMediaIcon(half.mediaKind)" :size="13" :class="requestMediaColor(half.mediaKind)" aria-hidden="true" />
                   <span class="sr-only">{{ mediaLabel(half) }}</span>
                 </template>
-                <RequestStatusBadge :status="statusFor(half)" />
+                <RequestStatusBadge :status="statusFor(half)" :uploading="half.download?.source === 'upload'" />
                 <template v-if="nextLine(half).kind === 'progress'">
                   <div
                     class="h-1.5 w-12 shrink-0 overflow-hidden rounded-full bg-muted"
@@ -580,7 +582,9 @@ const HEADER = 'px-3 py-2.5 text-start text-xs font-semibold tracking-wide text-
                     aria-valuemin="0"
                     aria-valuemax="100"
                     :aria-label="
-                      t('bookRequests.download.progressLabel', { title: isPair(row) ? `${half.title} (${mediaLabel(half)})` : half.title })
+                      t(half.download?.source === 'upload' ? 'bookRequests.upload.progressLabel' : 'bookRequests.download.progressLabel', {
+                        title: isPair(row) ? `${half.title} (${mediaLabel(half)})` : half.title,
+                      })
                     "
                   >
                     <div

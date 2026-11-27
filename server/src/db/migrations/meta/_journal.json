@@ -1177,6 +1177,13 @@
       "when": 1795756796290,
       "tag": "0167_add_series_run_order_indexes",
       "breakpoints": true
+    },
+    {
+      "idx": 168,
+      "version": "7",
+      "when": 1795806106340,
+      "tag": "0168_add_book_request_uploads",
+      "breakpoints": true
     }
   ]
 }

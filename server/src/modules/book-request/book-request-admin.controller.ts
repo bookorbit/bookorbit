@@ -29,6 +29,8 @@ import { RequestFulfillmentService } from './fulfillment/request-fulfillment.ser
 import { RequestImportService } from './fulfillment/request-import.service';
 import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestVerificationService } from './fulfillment/request-verification.service';
+import { RequestUploadService } from './fulfillment/request-upload.service';
+import { PlanBookRequestUploadDto, StartBookRequestUploadDto, UPLOAD_PLAN_BODY_LIMIT_BYTES } from './dto/book-request-upload.dto';
 import { BulkBookRequestsDto, BulkRejectBookRequestsDto } from './dto/bulk-book-requests.dto';
 import { DecideBookRequestDto } from './dto/decide-book-request.dto';
 import { GRAB_BODY_LIMIT_BYTES, GrabBookRequestDto } from './dto/grab-book-request.dto';
@@ -54,6 +56,7 @@ export class BookRequestAdminController {
     private readonly seed: RequestSeedService,
     private readonly imports: RequestImportService,
     private readonly verification: RequestVerificationService,
+    private readonly uploads: RequestUploadService,
   ) {}
 
   @Get()
@@ -290,6 +293,38 @@ export class BookRequestAdminController {
   })
   grab(@Param('id', ParseIntPipe) id: number, @Body() dto: GrabBookRequestDto, @CurrentUser() user: RequestUser) {
     return this.fulfillment.grab(id, dto, user);
+  }
+
+  /**
+   * What picked files become, read from their names and sizes before any of them is sent, so the
+   * drawer can say so and refuse a set that could never close this request.
+   */
+  @Post(':id/upload/plan')
+  @RouteConfig({ bodyLimit: UPLOAD_PLAN_BODY_LIMIT_BYTES })
+  @HttpCode(HttpStatus.OK)
+  planUpload(@Param('id', ParseIntPipe) id: number, @Body() dto: PlanBookRequestUploadDto) {
+    return this.uploads.plan(id, dto.files);
+  }
+
+  /** Starts an `upload` attempt. The files then arrive as upload sessions, one per manifest entry. */
+  @Post(':id/upload')
+  @RouteConfig({ bodyLimit: UPLOAD_PLAN_BODY_LIMIT_BYTES })
+  @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.BookRequestGrab,
+    resource: AuditResource.BookRequest,
+    getResourceId: (req) => Number(req.params.id),
+    description: 'Started uploading the files of a book request',
+  })
+  async startUpload(@Param('id', ParseIntPipe) id: number, @Body() dto: StartBookRequestUploadDto, @CurrentUser() user: RequestUser) {
+    const upload = await this.uploads.start(id, dto.files, dto.holdForReview === true, user);
+    return { request: await this.service.getOne(id, user), upload };
+  }
+
+  /** The files a running upload still waits for, so a reloaded page or another device can finish it. */
+  @Get(':id/upload')
+  async uploadManifest(@Param('id', ParseIntPipe) id: number) {
+    return { upload: await this.uploads.manifest(id) };
   }
 
   /**

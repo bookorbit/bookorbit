@@ -39,6 +39,7 @@ describe('UploadModule', () => {
       UploadStorageService,
       UploadProcessorService,
       UploadService,
+      UploadSessionService,
       GeneratedBookFileService,
     ]);
     expect(Reflect.getMetadata('imports', UploadModule)).toContain(FileWriteModule);

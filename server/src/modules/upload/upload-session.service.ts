@@ -29,6 +29,7 @@ import { LibraryDockService } from '../book-dock/library-dock.service';
 import type { CreateUploadSessionDto } from './dto/create-upload-session.dto';
 import { UploadProcessorService } from './upload-processor.service';
 import { UploadService } from './upload.service';
+import { RequestUploadReceiver } from './request-upload-receiver';
 import { UploadSessionRepository } from './upload-session.repository';
 import { UploadStorageService } from './upload-storage.service';
 import { CONTENT_SIGNATURE_BYTES, UploadValidatorService } from './upload-validator.service';
@@ -112,7 +113,8 @@ export class UploadSessionService implements OnApplicationBootstrap {
 
     const filename = this.validator.sanitizeFilename(dto.filename);
     const target = this.parseTarget(dto);
-    await this.validateTarget(target, filename, user);
+    if (target.kind === 'book_request') await this.requestReceiver().admit(target.requestFileId, filename, dto.sizeBytes, user);
+    else await this.validateTarget(target, filename, user);
 
     const id = randomUUID();
     const stagingPath = join(this.stagingDirectory, `${id}.upload`);
@@ -127,6 +129,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
         targetLibraryId: targetLibraryId(target),
         targetFolderId: target.kind === 'library' ? (target.folderId ?? null) : null,
         targetBookId: target.kind === 'existing_book' ? target.bookId : null,
+        targetRequestFileId: target.kind === 'book_request' ? target.requestFileId : null,
         filename,
         contentType: dto.contentType ?? null,
         sizeBytes: dto.sizeBytes,
@@ -189,6 +192,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
 
         const receivedBytes = row.receivedBytes + stagedChunk.sizeBytes;
         row = (await this.repo.update(row.id, { receivedBytes, expiresAt: new Date(Date.now() + UPLOAD_SESSION_TTL_MS) }))!;
+        if (row.targetKind === 'book_request' && row.targetRequestFileId !== null) await this.reportRequestProgress(row);
         return this.toResponse(row);
       });
     } finally {
@@ -208,6 +212,8 @@ export class UploadSessionService implements OnApplicationBootstrap {
         const actual = await sha256File(row.stagingPath);
         if (actual !== row.expectedSha256) throw uploadError.checksumMismatch('File checksum does not match');
       }
+
+      if (row.targetKind === 'book_request') return this.completeRequestFile(row, user);
 
       const format = this.validator.validateFormat(row.filename, await this.allowedFormats(row));
       await this.refuseUnreadable(row, () => this.validator.validateContent(row.stagingPath, format));
@@ -267,6 +273,22 @@ export class UploadSessionService implements OnApplicationBootstrap {
     });
   }
 
+  /**
+   * Ends the sessions still delivering these request files, because the attempt they belong to is
+   * over. Each waits for its own lock, so a chunk in flight lands or fails before its file goes.
+   */
+  async cancelForRequestFiles(requestFileIds: number[]): Promise<void> {
+    if (requestFileIds.length === 0) return;
+    for (const row of await this.repo.findReceivingForRequestFiles(requestFileIds)) {
+      await this.withLock(row.id, async () => {
+        const current = await this.repo.findById(row.id);
+        if (!current || current.status !== 'receiving') return;
+        await this.repo.update(current.id, { status: 'cancelled', completedAt: new Date() });
+        await this.storageService.cleanup(current.stagingPath);
+      });
+    }
+  }
+
   @Interval(60 * 60 * 1_000)
   async cleanupExpired(): Promise<void> {
     const rows = await this.repo.findExpiredReceiving(new Date());
@@ -302,7 +324,41 @@ export class UploadSessionService implements OnApplicationBootstrap {
     }
   }
 
+  /**
+   * A request file is checked against what the attempt declared rather than against a library's
+   * formats: the import decides what the files become, and artwork and archives travel with them.
+   * The contents are still checked wherever the extension names a format with a signature.
+   */
+  private async completeRequestFile(row: UploadSessionRow, user: RequestUser): Promise<UploadSessionResponse> {
+    const format = this.validator.signatureFormatOf(row.filename);
+    if (format) await this.refuseUnreadable(row, () => this.validator.validateContent(row.stagingPath, format));
+    row = (await this.repo.update(row.id, { status: 'processing', errorCode: null, errorMessage: null }))!;
+    try {
+      if (row.targetRequestFileId === null) throw uploadError.invalidTarget('This upload is no longer expected');
+      await this.requestReceiver().receive(row.targetRequestFileId, row.stagingPath, user);
+      row = (await this.repo.update(row.id, { status: 'completed', completedAt: new Date() }))!;
+      await this.storageService.cleanup(row.stagingPath);
+      return this.toResponse(row);
+    } catch (error) {
+      await this.failImport(row.id, error);
+      await this.storageService.cleanup(row.stagingPath);
+      throw error;
+    }
+  }
+
+  private async reportRequestProgress(row: UploadSessionRow): Promise<void> {
+    try {
+      await this.requestReceiver().progress(row.targetRequestFileId!, row.receivedBytes);
+    } catch (error) {
+      const message = sanitizeLogValue(error instanceof Error ? error.message : String(error));
+      this.logger.warn(
+        `[upload_session.request_progress] [fail] sessionId=${row.id} requestFileId=${row.targetRequestFileId} errorClass=${error instanceof Error ? error.name : typeof error} error="${message}" - request upload progress was not recorded`,
+      );
+    }
+  }
+
   private async validateTarget(target: UploadTarget, filename: string, user: RequestUser): Promise<void> {
+    if (target.kind === 'book_request') return;
     if (target.kind === 'book_dock') {
       if (!this.hasPermission(user, Permission.BookDockAccess)) throw new ForbiddenException('Library Dock access is required');
       if (target.libraryId) await this.libraryDocks().resolveUploadDock(user, target.libraryId, filename);
@@ -362,6 +418,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
     }
     if (dto.target.kind === 'existing_book' && dto.target.bookId) return { kind: 'existing_book', bookId: dto.target.bookId };
     if (dto.target.kind === 'book_dock') return dto.target.libraryId ? { kind: 'book_dock', libraryId: dto.target.libraryId } : { kind: 'book_dock' };
+    if (dto.target.kind === 'book_request' && dto.target.requestFileId) return { kind: 'book_request', requestFileId: dto.target.requestFileId };
     throw uploadError.invalidTarget('Upload target fields are invalid');
   }
 
@@ -382,7 +439,8 @@ export class UploadSessionService implements OnApplicationBootstrap {
       row.targetKind === target.kind &&
       row.targetLibraryId === targetLibraryId(target) &&
       row.targetFolderId === (target.kind === 'library' ? (target.folderId ?? null) : null) &&
-      row.targetBookId === (target.kind === 'existing_book' ? target.bookId : null);
+      row.targetBookId === (target.kind === 'existing_book' ? target.bookId : null) &&
+      row.targetRequestFileId === (target.kind === 'book_request' ? target.requestFileId : null);
     if (!matches) throw uploadError.invalidSessionState('Idempotency key is already used by a different upload');
   }
 
@@ -415,6 +473,11 @@ export class UploadSessionService implements OnApplicationBootstrap {
     return this.moduleRef.get(LibraryDockService, { strict: false });
   }
 
+  /** Provided by the book request module, which imports this one. */
+  private requestReceiver(): RequestUploadReceiver {
+    return this.moduleRef.get(RequestUploadReceiver, { strict: false });
+  }
+
   private hasPermission(user: RequestUser, permission: Permission): boolean {
     return user.isSuperuser || user.permissions.includes(permission);
   }
@@ -425,7 +488,9 @@ export class UploadSessionService implements OnApplicationBootstrap {
    */
   private async refuseUnreadableStart(row: UploadSessionRow, chunk: { tempPath: string; sizeBytes: number }): Promise<void> {
     if (chunk.sizeBytes < CONTENT_SIGNATURE_BYTES && chunk.sizeBytes < row.sizeBytes) return;
-    const format = this.validator.validateFormat(row.filename, []);
+    const format =
+      row.targetKind === 'book_request' ? this.validator.signatureFormatOf(row.filename) : this.validator.validateFormat(row.filename, []);
+    if (!format) return;
     await this.refuseUnreadable(row, () => this.validator.validateContent(chunk.tempPath, format));
   }
 
@@ -471,12 +536,7 @@ export class UploadSessionService implements OnApplicationBootstrap {
       receivedBytes: row.receivedBytes,
       chunkSizeBytes: UPLOAD_CHUNK_SIZE_BYTES,
       status: row.status as UploadSessionResponse['status'],
-      target:
-        row.targetKind === 'library'
-          ? { kind: 'library', libraryId: row.targetLibraryId!, ...(row.targetFolderId ? { folderId: row.targetFolderId } : {}) }
-          : row.targetKind === 'existing_book'
-            ? { kind: 'existing_book', bookId: row.targetBookId! }
-            : { kind: 'book_dock', ...(row.targetLibraryId ? { libraryId: row.targetLibraryId } : {}) },
+      target: responseTarget(row),
       errorCode: (row.errorCode as UploadSessionResponse['errorCode']) ?? null,
       errorMessage: row.errorMessage,
       bookId: row.resultBookId,
@@ -506,7 +566,20 @@ export class UploadSessionService implements OnApplicationBootstrap {
   }
 }
 
-/** A session a repeated create may hand back: still able to take bytes, importing, or added. */
+function responseTarget(row: UploadSessionRow): UploadTarget {
+  switch (row.targetKind) {
+    case 'library':
+      return { kind: 'library', libraryId: row.targetLibraryId!, ...(row.targetFolderId ? { folderId: row.targetFolderId } : {}) };
+    case 'existing_book':
+      return { kind: 'existing_book', bookId: row.targetBookId! };
+    case 'book_request':
+      // The manifest entry outlives nothing it belongs to, so a session can outlive the entry.
+      return { kind: 'book_request', requestFileId: row.targetRequestFileId ?? 0 };
+    default:
+      return { kind: 'book_dock', ...(row.targetLibraryId ? { libraryId: row.targetLibraryId } : {}) };
+  }
+}
+
 /** The library a session is for: a library upload's, or a library dock's. */
 function targetLibraryId(target: UploadTarget): number | null {
   if (target.kind === 'library') return target.libraryId;
@@ -514,6 +587,7 @@ function targetLibraryId(target: UploadTarget): number | null {
   return null;
 }
 
+/** A session a repeated create may hand back: still able to take bytes, importing, or added. */
 function isResumable(row: UploadSessionRow): boolean {
   if (row.status === 'processing' || row.status === 'completed') return true;
   return row.status === 'receiving' && row.expiresAt.getTime() > Date.now();

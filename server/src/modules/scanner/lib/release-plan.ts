@@ -104,6 +104,14 @@ function containerKind(format: string | null, role: FileRole): ReleaseContainerK
   return null;
 }
 
+/**
+ * `.r00`, `.r01` and `.002` are parts of the archive their first volume opens, not archives in
+ * their own right. Feeding them in separately would extract the same release several times over.
+ */
+export function isContinuationVolume(path: string): boolean {
+  return /\.(?:r\d{2,3}|\d{3})$/i.test(path) && !/\.(?:rar|7z|zip)$/i.test(path);
+}
+
 /** Strips the noise release groups add to a stem so `Book (retail)` and `Book [v2]` are one book. */
 export function normalizeReleaseStem(stem: string): string {
   return stem
@@ -355,11 +363,12 @@ export function unitRelativePath(unit: ReleaseUnit, path: string): string {
 
 function formatRank(format: string | null): number {
   if (!format) return Number.MAX_SAFE_INTEGER;
-  const index = FORMAT_RANK.indexOf(format.toLowerCase());
+  const index = RELEASE_FORMAT_RANK.indexOf(format.toLowerCase());
   return index === -1 ? Number.MAX_SAFE_INTEGER : index;
 }
 
-const FORMAT_RANK: string[] = [
+/** Best format first, which is also the order a release's formats are named in. */
+export const RELEASE_FORMAT_RANK: readonly string[] = [
   'epub',
   'kepub',
   'azw3',

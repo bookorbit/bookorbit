@@ -83,6 +83,18 @@ describe('RequestWatchdogService.sweep', () => {
     expect(fulfillment.failDownload).toHaveBeenCalledWith({ id: 13 }, 'The import did not finish within an hour');
   });
 
+  it('gives an upload a day before failing it, since it waits on a person rather than a swarm', async () => {
+    const hours = (count: number) => new Date(Date.now() - count * 60 * 60 * 1000);
+    const halfDay = { id: 21, source: 'upload', lastProgressAt: hours(13), updatedAt: hours(13) } as BookRequestDownloadRow;
+    const wholeDay = { id: 22, source: 'upload', lastProgressAt: hours(25), updatedAt: hours(25) } as BookRequestDownloadRow;
+    const { service, fulfillment } = makeService({ 'queued,downloading': [halfDay, wholeDay] });
+
+    await service.sweep();
+
+    expect(fulfillment.failDownload).toHaveBeenCalledTimes(1);
+    expect(fulfillment.failDownload).toHaveBeenCalledWith(wholeDay, 'The upload made no progress for 24 hours');
+  });
+
   it('swallows a sweep failure rather than crashing the scheduler', async () => {
     const { service } = makeService();
     const downloads = { findByStatusOlderThan: vi.fn().mockRejectedValue(new Error('db down')) };

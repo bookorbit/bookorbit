@@ -43,6 +43,7 @@ watch(
  * "download failed" would say something that did not happen: nothing was ever downloaded.
  */
 function outcomeText(attempt: BookRequestDownloadItem): string {
+  if (attempt.source === 'upload' && attempt.status === 'failed') return t('bookRequests.upload.attemptStopped')
   if (attempt.status === 'failed' && attempt.clientKey === null) return t('bookRequests.attempts.refused')
   return t(`bookRequests.download.status.${attempt.status}`)
 }
@@ -51,8 +52,15 @@ function isRefusal(attempt: BookRequestDownloadItem): boolean {
   return attempt.status === 'failed'
 }
 
+function sourceText(attempt: BookRequestDownloadItem): string {
+  if (attempt.source === 'upload') {
+    return attempt.uploadedByName ? t('bookRequests.upload.uploadedBy', { name: attempt.uploadedByName }) : t('bookRequests.upload.uploaded')
+  }
+  return attempt.indexerName ?? t('bookRequests.attempts.handPicked')
+}
+
 function facts(attempt: BookRequestDownloadItem): string[] {
-  const parts = [outcomeText(attempt), attempt.indexerName ?? t('bookRequests.attempts.handPicked')]
+  const parts = [outcomeText(attempt), sourceText(attempt)]
   if (attempt.releaseSizeBytes !== null) parts.push(formatBytes(attempt.releaseSizeBytes))
   parts.push(formatDate(new Date(attempt.createdAt), { dateStyle: 'medium', timeStyle: 'short' }))
   return parts

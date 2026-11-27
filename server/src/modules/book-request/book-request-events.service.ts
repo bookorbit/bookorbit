@@ -11,6 +11,8 @@ import { EventEmitter } from 'events';
  */
 export const BOOK_REQUEST_DOWNLOAD_FAILED = 'book-request.download.failed';
 export const BOOK_REQUEST_DOWNLOAD_QUEUED = 'book-request.download.queued';
+/** Emitted with a `book_request_downloads.id` once every file of an `upload` attempt has arrived. */
+export const BOOK_REQUEST_UPLOAD_ARRIVED = 'book-request.upload.arrived';
 
 @Injectable()
 export class BookRequestEventsService extends EventEmitter {}

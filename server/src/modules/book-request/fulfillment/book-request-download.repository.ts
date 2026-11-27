@@ -15,8 +15,10 @@ import * as schema from '../../../db/schema';
 import {
   bookRequestDownloads,
   bookRequests,
+  bookRequestUploadFiles,
   downloadClients,
   requestIndexers,
+  users,
   type BookRequestDownloadRow,
   type BookRequestRow,
   type NewBookRequestDownloadRow,
@@ -47,6 +49,10 @@ export interface BookRequestDownloadJoinedRow {
   /** Null once the indexer row is gone, or for a magnet somebody pasted by hand. */
   indexerName: string | null;
   indexerColor: IndexerColor | null;
+  /** An `upload` attempt's sender and file counts; null on every other source. */
+  uploadedByName?: string | null;
+  uploadFileCount?: number | null;
+  uploadFilesReceived?: number | null;
 }
 
 /** A request held for review and the attempt it waits on, keyed by the Book Dock file they point at. */
@@ -57,6 +63,15 @@ export interface HeldDockFileRow {
 }
 
 const laterAttempt = aliasedTable(bookRequestDownloads, 'later_attempt');
+const uploader = aliasedTable(users, 'uploader');
+
+/** Counted only for an upload, which is bounded by the plan's file limit. */
+const uploadFileCount = sql<
+  number | null
+>`case when ${bookRequestDownloads.source} = 'upload' then (select count(*)::int from ${bookRequestUploadFiles} where ${bookRequestUploadFiles.downloadId} = ${bookRequestDownloads.id}) end`;
+const uploadFilesReceived = sql<
+  number | null
+>`case when ${bookRequestDownloads.source} = 'upload' then (select count(*)::int from ${bookRequestUploadFiles} where ${bookRequestUploadFiles.downloadId} = ${bookRequestDownloads.id} and ${bookRequestUploadFiles.status} = 'received') end`;
 
 export interface ReconciliationAttemptRow {
   download: BookRequestDownloadRow;
@@ -417,11 +432,15 @@ export class BookRequestDownloadRepository {
         downloadClientAdapterType: downloadClients.adapterType,
         indexerName: sql<string | null>`coalesce(${requestIndexers.managerMetadata}->>'displayName', ${requestIndexers.name})`,
         indexerColor: requestIndexers.color,
+        uploadedByName: uploader.name,
+        uploadFileCount,
+        uploadFilesReceived,
       })
       .from(bookRequestDownloads)
       .innerJoin(newest, eq(newest.id, bookRequestDownloads.id))
       .leftJoin(downloadClients, eq(downloadClients.id, bookRequestDownloads.downloadClientId))
-      .leftJoin(requestIndexers, eq(requestIndexers.id, bookRequestDownloads.indexerId));
+      .leftJoin(requestIndexers, eq(requestIndexers.id, bookRequestDownloads.indexerId))
+      .leftJoin(uploader, eq(uploader.id, bookRequestDownloads.uploadedByUserId));
 
     return new Map(rows.map((row) => [row.download.requestId, row]));
   }
@@ -441,10 +460,14 @@ export class BookRequestDownloadRepository {
         downloadClientAdapterType: downloadClients.adapterType,
         indexerName: sql<string | null>`coalesce(${requestIndexers.managerMetadata}->>'displayName', ${requestIndexers.name})`,
         indexerColor: requestIndexers.color,
+        uploadedByName: uploader.name,
+        uploadFileCount,
+        uploadFilesReceived,
       })
       .from(bookRequestDownloads)
       .leftJoin(downloadClients, eq(downloadClients.id, bookRequestDownloads.downloadClientId))
       .leftJoin(requestIndexers, eq(requestIndexers.id, bookRequestDownloads.indexerId))
+      .leftJoin(uploader, eq(uploader.id, bookRequestDownloads.uploadedByUserId))
       .where(eq(bookRequestDownloads.requestId, requestId))
       .orderBy(desc(bookRequestDownloads.id))
       .limit(MAX_ATTEMPTS_PER_REQUEST);

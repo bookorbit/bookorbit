@@ -149,4 +149,67 @@ describe('requestCardModel', () => {
     expect(card.tone).toBe('done')
     expect(card.sentence).toBe('bookRequests.outcome.filedIn {"library":"Fiction","time":"14 minutes ago"}')
   })
+
+  describe('an upload', () => {
+    const UPLOAD = {
+      ...DOWNLOAD,
+      source: 'upload',
+      downloadClientName: null,
+      uploadedByName: 'Neon',
+      uploadFileCount: 39,
+      uploadFilesReceived: 16,
+    } as BookRequestDownloadItem
+    const sending = { here: true, fileCount: 39, doneCount: 16, stalledCount: 0, sentBytes: 251, totalBytes: 612 }
+
+    it('counts files and bytes from the page sending them, and asks it to stay open', () => {
+      const card = model({ request: request({ status: 'downloading', download: UPLOAD }), upload: sending })
+
+      expect(card.icon).toBe('upload')
+      expect(card.tone).toBe('progress')
+      expect(card.headline).toBe('bookRequests.upload.card.uploading {"done":16,"total":39}')
+      expect(card.sentence).toBe('bookRequests.upload.card.uploadingHere {"sent":"251 B","size":"612 B","name":"Neon"}')
+      expect(card.percent).toBe(41)
+    })
+
+    it('names the sender to anyone else watching it arrive', () => {
+      const card = model({ request: request({ status: 'downloading', download: UPLOAD }) })
+
+      expect(card.sentence).toBe('bookRequests.upload.card.uploadingElsewhere {"sent":"400 B","size":"1000 B","name":"Neon"}')
+      expect(card.percent).toBe(40)
+    })
+
+    it('pauses once nothing is moving and a file is still missing', () => {
+      const card = model({
+        request: request({ status: 'downloading', download: UPLOAD }),
+        upload: { ...sending, here: false, doneCount: 38, stalledCount: 1 },
+      })
+
+      expect(card.icon).toBe('paused')
+      expect(card.tone).toBe('waiting')
+      expect(card.headline).toBe('bookRequests.upload.card.paused {"count":1}')
+      expect(card.sentence).toBe('bookRequests.upload.card.pausedSentence {"arrived":38,"total":39}')
+      expect(card.percent).toBeNull()
+    })
+
+    it('says the arrived files are being checked rather than filed', () => {
+      const card = model({ request: request({ status: 'importing', download: { ...UPLOAD, status: 'completed' } }) })
+
+      expect(card.icon).toBe('checking')
+      expect(card.headline).toBe('bookRequests.upload.card.checking')
+      expect(card.sentence).toBe('bookRequests.upload.card.checkingSentence {"total":39}')
+    })
+
+    it('says which book it joined, and that the requester was told only to someone else', () => {
+      const filed = request({ status: 'available', mediaKind: 'audiobook', targetBookId: 12, download: { ...UPLOAD, status: 'imported' } })
+
+      expect(model({ request: filed }).headline).toBe('bookRequests.upload.card.filedIn {"library":"Fiction"}')
+      expect(model({ request: filed }).sentence).toBe(
+        'bookRequests.upload.card.joinedTold.audiobook {"title":"The Left Hand of Darkness","requester":"Maya Ortiz"}',
+      )
+      expect(model({ request: filed, viewerIsRequester: true }).sentence).toBe(
+        'bookRequests.upload.card.joined.audiobook {"title":"The Left Hand of Darkness","requester":"Maya Ortiz"}',
+      )
+      expect(model({ request: { ...filed, targetBookId: null }, viewerIsRequester: true }).sentence).toBeNull()
+    })
+  })
 })

@@ -36,6 +36,10 @@ export interface SessionUploadOptions {
   /** Kept across retries of one file, so a retry carries on from the bytes the server already holds. */
   resumeKey: string
   onProgress: (fraction: number) => void
+  /** The name the server should know the file by, when it is not the picked file's own. */
+  filename?: string
+  /** Stops the transfer between requests and aborts the chunk in flight. */
+  signal?: AbortSignal
 }
 
 class UploadStepError extends Error {
@@ -79,6 +83,7 @@ export function parseUploadFailure(status: number, responseText: string): Upload
 export async function uploadWithSession(options: SessionUploadOptions): Promise<SessionUploadOutcome> {
   let sessionId: string | null = null
   try {
+    if (options.signal?.aborted) throw new UploadStepError({ kind: 'network' })
     let session = await retrying(() => createSession(options))
     sessionId = session.id
     session = await sendChunks(session, options)
@@ -94,9 +99,9 @@ export function cancelUploadSession(sessionId: string): void {
   void api(`${SESSIONS_URL}/${sessionId}`, { method: 'DELETE' }).catch(() => undefined)
 }
 
-function createSession({ file, target, resumeKey }: SessionUploadOptions): Promise<UploadSessionResponse> {
+function createSession({ file, target, resumeKey, filename }: SessionUploadOptions): Promise<UploadSessionResponse> {
   const body: CreateUploadSessionRequest = {
-    filename: file.name,
+    filename: filename ?? file.name,
     sizeBytes: file.size,
     // A different target is a different upload: the server refuses a key it already holds for another.
     idempotencyKey: `${resumeKey}.${targetKey(target)}`,
@@ -114,6 +119,8 @@ function targetKey(target: UploadTarget): string {
       return `b${target.bookId}`
     case 'book_dock':
       return target.libraryId === undefined ? 'd' : `d${target.libraryId}`
+    case 'book_request':
+      return `r${target.requestFileId}`
   }
 }
 
@@ -121,6 +128,7 @@ async function sendChunks(session: UploadSessionResponse, options: SessionUpload
   let current = session
   let setbacks = 0
   while (current.status === 'receiving' && current.receivedBytes < current.sizeBytes) {
+    if (options.signal?.aborted) throw new UploadStepError({ kind: 'network' })
     try {
       current = await sendChunk(current, options)
       setbacks = 0
@@ -141,7 +149,7 @@ async function sendChunks(session: UploadSessionResponse, options: SessionUpload
   return current
 }
 
-async function sendChunk(session: UploadSessionResponse, { file, onProgress }: SessionUploadOptions): Promise<UploadSessionResponse> {
+async function sendChunk(session: UploadSessionResponse, { file, onProgress, signal }: SessionUploadOptions): Promise<UploadSessionResponse> {
   const start = session.receivedBytes
   const end = Math.min(start + session.chunkSizeBytes, session.sizeBytes)
   let token: string | null
@@ -174,6 +182,7 @@ async function sendChunk(session: UploadSessionResponse, { file, onProgress }: S
       reject(new UploadStepError(parseUploadFailure(xhr.status, xhr.responseText)))
     }
 
+    signal?.addEventListener('abort', () => xhr.abort(), { once: true })
     const form = new FormData()
     form.append('chunk', file.slice(start, end), file.name)
     xhr.send(form)

@@ -11350,7 +11350,8 @@
       "bulkUnhidden": "{count, plural, one {# request back on your list} other {# requests back on your list}}",
       "bulkLeft": "{count, plural, one {Left # request} other {Left # requests}}",
       "bulkCancelled": "{count, plural, one {# request cancelled} other {# requests cancelled}}",
-      "bulkDeleted": "{count, plural, one {# request deleted} other {# requests deleted}}"
+      "bulkDeleted": "{count, plural, one {# request deleted} other {# requests deleted}}",
+      "uploadCancelled": "Upload cancelled"
     },
     "errors": {
       "loadFailed": "Could not load requests",
@@ -11377,7 +11378,8 @@
       "bulkLeaveFailed": "Could not leave the selected requests",
       "bulkCancelFailed": "Could not cancel the selected requests",
       "bulkDeleteFailed": "Could not delete the selected requests",
-      "selectAllFailed": "Could not select every matching request"
+      "selectAllFailed": "Could not select every matching request",
+      "cancelUploadFailed": "Could not cancel that upload"
     },
     "grab": {
       "title": "Send to a download client",
@@ -11828,7 +11830,10 @@
       "leaveManyDescription": "You stop following them and stop being notified about them. Whoever asked for them keeps their request.",
       "leaveConfirm": "{count, plural, one {Leave request} other {Leave # requests}}",
       "stay": "{count, plural, one {Stay on it} other {Stay on them}}",
-      "goBack": "Go back"
+      "goBack": "Go back",
+      "cancelUploadTitle": "Cancel this upload?",
+      "cancelUploadDescription": "The files sent so far are deleted, and the request stays open for another release or another upload.",
+      "discardUploadDescription": "The uploaded files are removed from the Library Dock and the request is marked failed."
     },
     "outcome": {
       "filedIn": "Filed in {library} {time}",
@@ -12207,6 +12212,132 @@
         "failed": "{step}: failed here",
         "upcoming": "{step}: not yet"
       }
+    },
+    "upload": {
+      "action": "Upload files",
+      "send": "{count, plural, one {Upload # file} other {Upload # files}}",
+      "clear": "Clear",
+      "cancel": "Cancel upload",
+      "retry": "{count, plural, one {Retry # file} other {Retry # files}}",
+      "addMissing": "Add missing files",
+      "section": "Your files",
+      "fileCount": "{count, plural, one {# file} other {# files}}",
+      "addMore": "Add more",
+      "planning": "Reading the files...",
+      "doneCount": "{done} of {total} done",
+      "arrivedCount": "{arrived} of {total} arrived",
+      "drop": {
+        "title": "Drop to upload to this request",
+        "body": "Book files, a whole audiobook folder, or an archive. Checked against the request before it is filed."
+      },
+      "plan": {
+        "ebook": "One e-book",
+        "ebookFormats": "One e-book in {count} formats",
+        "audiobook": "{count, plural, one {One audiobook · # track} other {One audiobook · # tracks}}",
+        "comic": "One comic",
+        "archive": "An archive",
+        "choose": "{count} different books",
+        "severalArchives": "{count} separate archives",
+        "noBook": "No book files",
+        "sub": "{formats} · {size}",
+        "subWithArt": "{formats} with cover art · {size}",
+        "subChoose": "Pick the one this request is for",
+        "subNoBook": "Nothing picked can become a book",
+        "subArchives": "One archive at a time",
+        "unitsLabel": "Which book this request is for",
+        "filesLabel": "Picked files",
+        "chip": {
+          "matches": "Matches the request",
+          "later": "Checked after upload",
+          "pickOne": "Pick one",
+          "notEbook": "Not an e-book",
+          "notAudiobook": "Not an audiobook",
+          "noBook": "No book",
+          "oneArchive": "One archive",
+          "tooLarge": "Too large",
+          "matchesTitle": "Matches the title",
+          "notComic": "Not a comic"
+        },
+        "destination": "Files into {library}",
+        "joins": {
+          "audiobook": "Joins {title} as its audiobook",
+          "ebook": "Joins {title} as its e-book"
+        },
+        "blocked": {
+          "wrongEbook": "This request is for the e-book. Audiobook files can close an audiobook request.",
+          "wrongAudiobook": "This request is for the audiobook. E-book files can close an e-book request.",
+          "noBook": "Pick the book's own files, such as an EPUB, a PDF or an audiobook's tracks.",
+          "severalArchives": "Upload one archive, or the files inside it.",
+          "tooLarge": "{name} is {size}, over this server's {limit} upload limit.",
+          "tooMany": "That is more than {max} files. Pick the book's own folder instead.",
+          "refused": "The server would not read these files.",
+          "network": "Could not reach the server to read these files.",
+          "wrongComic": "This request is for the comic. Comic files, such as a CBZ or CBR, can close it."
+        }
+      },
+      "moreTracks": "{count, plural, one {# more track} other {# more tracks}}",
+      "moreFiles": "{count, plural, one {# more file} other {# more files}}",
+      "moreWaiting": "{count, plural, one {# more waiting} other {# more waiting}}",
+      "othersArrived": "{count, plural, one {# other file arrived} other {# other files arrived}}",
+      "skipped": "Skipped: {reason}",
+      "skip": {
+        "hidden": "Hidden file",
+        "sample": "Sample",
+        "padding": "Padding",
+        "unsupported": "Not a book file",
+        "junk_folder": "Extra folder",
+        "other_book": "Another book",
+        "empty": "Empty file"
+      },
+      "fileDone": "Done",
+      "notSent": "Not sent yet",
+      "retryFile": "Retry {name}",
+      "hold": {
+        "title": "Let me check the match before it is filed",
+        "hint": "Without this, a good match is filed straight away. A poor one waits for a check either way."
+      },
+      "fileErrors": {
+        "connection": "Connection lost at {sent} of {total}",
+        "notABook": "The file is not what its name says",
+        "tooLarge": "Larger than this server accepts",
+        "storageFull": "The server is out of space",
+        "notExpected": "The request no longer expects this file",
+        "expired": "The upload took too long and expired",
+        "other": "Could not send this file"
+      },
+      "startFailed": "Could not start the upload",
+      "noneMatched": "None of those files are ones this upload is waiting for",
+      "progressLabel": "Upload progress for {title}",
+      "card": {
+        "uploading": "{total, plural, one {Uploading the file} other {Uploading {done} of # files}}",
+        "uploadingHere": "{sent} of {size}. Keep this tab open until the upload finishes.",
+        "uploadingElsewhere": "{sent} of {size}, sent by {name}.",
+        "uploadingSoFar": "{sent} of {size} so far.",
+        "paused": "{count, plural, one {Upload paused: # file did not arrive} other {Upload paused: # files did not arrive}}",
+        "pausedSentence": "{total, plural, one {The file is not on the server yet. Nothing is filed until it arrives.} other {{arrived} of # files are on the server. Nothing is filed until all of them arrive.}}",
+        "checking": "Checking the match",
+        "checkingSentence": "{total, plural, one {The file arrived. It is compared with the request before it is filed.} other {All # files arrived. They are compared with the request before they are filed.}}",
+        "filedIn": "Filed in {library}",
+        "joinedTold": {
+          "audiobook": "Joined {title} as its audiobook. {requester} was told it is ready.",
+          "ebook": "Joined {title} as its e-book. {requester} was told it is ready."
+        },
+        "joined": {
+          "audiobook": "Joined {title} as its audiobook.",
+          "ebook": "Joined {title} as its e-book."
+        },
+        "told": "{requester} was told it is ready.",
+        "cancelled": "Upload cancelled",
+        "cancelledSentence": "The files sent were deleted. Upload them again, or pick a release."
+      },
+      "steps": {
+        "filesChosen": "Files chosen",
+        "uploading": "Uploading",
+        "uploaded": "Uploaded"
+      },
+      "uploadedBy": "Uploaded by {name}",
+      "uploaded": "Uploaded",
+      "attemptStopped": "Upload stopped"
     }
   },
   "collection": {

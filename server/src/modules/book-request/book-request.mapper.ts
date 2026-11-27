@@ -91,6 +91,9 @@ export function mapBookRequestDownload({
   downloadClientAdapterType,
   indexerName,
   indexerColor,
+  uploadedByName,
+  uploadFileCount,
+  uploadFilesReceived,
 }: BookRequestDownloadJoinedRow): BookRequestDownloadItem {
   return {
     id: download.id,
@@ -117,5 +120,13 @@ export function mapBookRequestDownload({
     importedAt: download.importedAt?.toISOString() ?? null,
     releaseUnits: download.releaseUnits ?? null,
     createdAt: download.createdAt.toISOString(),
+    ...(download.source === 'upload'
+      ? {
+          uploadedByUserId: download.uploadedByUserId,
+          uploadedByName: uploadedByName ?? null,
+          uploadFileCount: uploadFileCount ?? null,
+          uploadFilesReceived: uploadFilesReceived ?? null,
+        }
+      : {}),
   };
 }

@@ -42,6 +42,6 @@ import { UploadSessionService } from './upload-session.service';
     UploadSessionRepository,
     UploadSessionService,
   ],
-  exports: [UploadValidatorService, UploadStorageService, UploadProcessorService, UploadService, GeneratedBookFileService],
+  exports: [UploadValidatorService, UploadStorageService, UploadProcessorService, UploadService, UploadSessionService, GeneratedBookFileService],
 })
 export class UploadModule {}

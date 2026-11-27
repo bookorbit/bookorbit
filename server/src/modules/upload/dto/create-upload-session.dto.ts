@@ -2,8 +2,8 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, MaxLength, Min, ValidateNested } from 'class-validator';
 
 export class UploadTargetDto {
-  @IsIn(['library', 'existing_book', 'book_dock'])
-  kind!: 'library' | 'existing_book' | 'book_dock';
+  @IsIn(['library', 'existing_book', 'book_dock', 'book_request'])
+  kind!: 'library' | 'existing_book' | 'book_dock' | 'book_request';
 
   @IsOptional()
   @Type(() => Number)
@@ -22,6 +22,13 @@ export class UploadTargetDto {
   @IsInt()
   @Min(1)
   bookId?: number;
+
+  /** A `book_request` target's manifest entry. */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  requestFileId?: number;
 }
 
 export class CreateUploadSessionDto {

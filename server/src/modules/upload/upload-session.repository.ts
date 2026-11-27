@@ -18,6 +18,20 @@ export class UploadSessionRepository {
     return row!;
   }
 
+  async findReceivingForRequestFiles(requestFileIds: number[]) {
+    if (requestFileIds.length === 0) return [];
+    return this.db
+      .select()
+      .from(uploadSessions)
+      .where(
+        and(
+          eq(uploadSessions.targetKind, 'book_request'),
+          inArray(uploadSessions.targetRequestFileId, requestFileIds),
+          eq(uploadSessions.status, 'receiving'),
+        ),
+      );
+  }
+
   async findById(id: string) {
     const [row] = await this.db.select().from(uploadSessions).where(eq(uploadSessions.id, id)).limit(1);
     return row ?? null;

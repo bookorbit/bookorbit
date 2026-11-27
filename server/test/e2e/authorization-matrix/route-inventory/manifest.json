@@ -1,5 +1,5 @@
 {
-  "totalRoutes": 767,
+  "totalRoutes": 773,
   "byPermission": {
     "(none)": 286,
     "Permission.ManageMetadataConfig": 50,
@@ -25,9 +25,9 @@
     "Permission.HardcoverSync": 1,
     "Permission.ReadwiseSync": 1,
     "Permission.StorygraphSync": 1,
-    "Permission.BookRequestAccess": 32,
-    "Permission.ManageBookRequests": 27,
-    "Permission.BookRequestSelfFulfill": 15,
+    "Permission.BookRequestAccess": 35,
+    "Permission.ManageBookRequests": 30,
+    "Permission.BookRequestSelfFulfill": 18,
     "Permission.LibraryGenerateReadAloud": 15,
     "Permission.LibraryMergeBooks": 15,
     "Permission.ApiKeys": 2,

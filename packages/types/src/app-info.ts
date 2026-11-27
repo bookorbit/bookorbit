@@ -158,6 +158,12 @@ export const SERVER_FEATURES = [
    * `volumeIndex` on each series membership; leaving it out keeps the stored one.
    */
   "series-runs",
+  /**
+   * `POST .../book-requests/:id/upload/plan` describes picked files, `POST .../:id/upload` starts an
+   * `upload` attempt, `GET .../:id/upload` reads its manifest, and upload sessions accept a
+   * `book_request` target. Download items carry `uploadedByName` and the upload's file counts.
+   */
+  "book-request-upload",
 ] as const;
 
 export type ServerFeature = (typeof SERVER_FEATURES)[number];

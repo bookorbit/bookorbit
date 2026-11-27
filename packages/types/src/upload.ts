@@ -51,7 +51,12 @@ export type UploadErrorCode = (typeof UploadErrorCode)[keyof typeof UploadErrorC
 export type UploadTarget =
   | { kind: "library"; libraryId: number; folderId?: number }
   | { kind: "existing_book"; bookId: number }
-  | { kind: "book_dock"; libraryId?: number };
+  | { kind: "book_dock"; libraryId?: number }
+  /**
+   * One file of an upload to a book request, named by its entry in the attempt's manifest. Send it
+   * only to a server advertising `book-request-upload`.
+   */
+  | { kind: "book_request"; requestFileId: number };
 
 export type UploadSessionStatus = "receiving" | "processing" | "completed" | "failed" | "cancelled" | "expired";
 

@@ -298,7 +298,11 @@ export const UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES: readonly BookRequestDownl
   "needs_review",
 ];
 
-export const BOOK_REQUEST_DOWNLOAD_SOURCES = ["magnet", "torrent_file", "direct_url", "nzb_file"] as const;
+/**
+ * `upload` is a person sending the book's files from their own device. It is an attempt with no
+ * client and nothing to poll; released clients read a source they do not know as "other".
+ */
+export const BOOK_REQUEST_DOWNLOAD_SOURCES = ["magnet", "torrent_file", "direct_url", "nzb_file", "upload"] as const;
 export type BookRequestDownloadSource = (typeof BOOK_REQUEST_DOWNLOAD_SOURCES)[number];
 
 /** Which kind of client can carry out a grab of each source. */
@@ -307,6 +311,7 @@ export const DELIVERY_BY_DOWNLOAD_SOURCE: Record<BookRequestDownloadSource, Down
   torrent_file: "torrent",
   direct_url: "file",
   nzb_file: "usenet",
+  upload: "file",
 };
 
 export interface BookRequestDownloadItem {
@@ -345,6 +350,14 @@ export interface BookRequestDownloadItem {
    * Null everywhere else, including once one of them has been chosen.
    */
   releaseUnits: ReleaseUnitChoice[] | null;
+  /**
+   * Set only on an `upload` attempt: who sent the files, and how many of them the attempt expects
+   * and already holds. Absent on servers older than `book-request-upload`.
+   */
+  uploadedByUserId?: number | null;
+  uploadedByName?: string | null;
+  uploadFileCount?: number | null;
+  uploadFilesReceived?: number | null;
 }
 
 export interface SelectReleaseUnitPayload {

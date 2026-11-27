@@ -9,7 +9,20 @@ import {
 } from './requestPipeline'
 
 /** Which picture leads the card; the component maps these to icons. */
-export type RequestCardIcon = 'waiting' | 'search' | 'download' | 'filing' | 'review' | 'failed' | 'done' | 'stopped'
+export type RequestCardIcon =
+  'waiting' | 'search' | 'download' | 'filing' | 'review' | 'failed' | 'done' | 'stopped' | 'upload' | 'paused' | 'checking'
+
+/** What this page knows about an upload it is sending, or one its sender came back to. */
+export interface RequestCardUpload {
+  /** This page holds the files and is sending them. */
+  here: boolean
+  fileCount: number
+  doneCount: number
+  /** Files that are not moving: refused, cut off, or never picked again after a reload. */
+  stalledCount: number
+  sentBytes: number
+  totalBytes: number
+}
 
 export interface RequestCardModel {
   tone: RequestPipelineTone
@@ -32,6 +45,10 @@ export interface RequestCardInput {
   canDecide: boolean
   /** The client still holds the finished download as a seed, where that has been read. */
   seeding: boolean | null
+  /** The upload this page is sending for the request, when it is one. */
+  upload?: RequestCardUpload | null
+  /** Who is looking, so a filed upload only says the requester was told when that is someone else. */
+  viewerIsRequester?: boolean
   t: (key: string, named?: Record<string, unknown>) => string
   formatBytes: (bytes: number) => string
   relativeTime: (iso: string) => string
@@ -68,6 +85,64 @@ function reviewSentence(review: BookRequestReview, t: RequestCardInput['t']): st
   if (detail.reason === 'edition_mismatch') return t('bookRequests.review.editionHeld')
   const named = { score: detail.score, threshold: detail.threshold }
   return detail.passed ? t('bookRequests.review.scoreClears', named) : t('bookRequests.review.scoreShort', named)
+}
+
+function isUpload(request: BookRequestItem): boolean {
+  return request.download?.source === 'upload'
+}
+
+/** The files arriving, said the way a download's bytes are, for an attempt that is an upload. */
+function uploadCard(input: RequestCardInput, base: Pick<RequestCardModel, 'score' | 'path'>): RequestCardModel {
+  const { request, live, upload, t, formatBytes } = input
+  const download = request.download!
+  const fileCount = upload?.fileCount ?? download.uploadFileCount ?? 0
+  const doneCount = upload?.doneCount ?? download.uploadFilesReceived ?? 0
+  if (upload && upload.stalledCount > 0 && !upload.here) {
+    return {
+      ...base,
+      tone: 'waiting',
+      icon: 'paused',
+      headline: t('bookRequests.upload.card.paused', { count: upload.stalledCount }),
+      sentence: t('bookRequests.upload.card.pausedSentence', { arrived: doneCount, total: fileCount }),
+      percent: null,
+    }
+  }
+
+  const current = currentRequestProgress(request, live)
+  const sent = upload?.here ? upload.sentBytes : (current?.downloadedBytes ?? download.downloadedBytes)
+  const total = upload?.here ? upload.totalBytes : (current?.totalBytes ?? download.totalBytes ?? 0)
+  const named = { sent: formatBytes(sent), size: formatBytes(total), name: download.uploadedByName }
+  const sentence = upload?.here
+    ? t('bookRequests.upload.card.uploadingHere', named)
+    : download.uploadedByName
+      ? t('bookRequests.upload.card.uploadingElsewhere', named)
+      : t('bookRequests.upload.card.uploadingSoFar', named)
+  return {
+    ...base,
+    tone: 'progress',
+    icon: 'upload',
+    headline: t('bookRequests.upload.card.uploading', { done: doneCount, total: fileCount }),
+    sentence,
+    percent: clampPercent(total > 0 ? (sent / total) * 100 : 0),
+  }
+}
+
+/** An upload's transfer step is named for what it did, as the steps under the card name it. */
+function failedStepKey(request: BookRequestItem, index: number): string {
+  const step = REQUEST_PIPELINE_STEPS[index]
+  if (isUpload(request) && step === 'downloading') return 'bookRequests.upload.steps.uploading'
+  return `bookRequests.pipeline.steps.${step}`
+}
+
+function filedUploadSentence(input: RequestCardInput): string | null {
+  const { request, t } = input
+  const medium = request.mediaKind === 'audiobook' ? 'audiobook' : 'ebook'
+  const told = !input.viewerIsRequester
+  if (request.targetBookId !== null) {
+    const named = { title: request.title, requester: request.requesterName }
+    return t(told ? `bookRequests.upload.card.joinedTold.${medium}` : `bookRequests.upload.card.joined.${medium}`, named)
+  }
+  return told ? t('bookRequests.upload.card.told', { requester: request.requesterName }) : null
 }
 
 /**
@@ -107,6 +182,7 @@ export function requestCardModel(input: RequestCardInput): RequestCardModel {
       }
     case 'grabbed':
     case 'downloading': {
+      if (isUpload(request)) return uploadCard(input, base)
       const current = currentRequestProgress(request, live)
       const downloadStatus = current?.status ?? request.download?.status ?? 'queued'
       const percent = current?.progressPercent ?? request.download?.progressPercent ?? 0
@@ -119,6 +195,14 @@ export function requestCardModel(input: RequestCardInput): RequestCardModel {
       }
     }
     case 'importing':
+      if (isUpload(request)) {
+        return {
+          ...base,
+          icon: 'checking',
+          headline: t('bookRequests.upload.card.checking'),
+          sentence: t('bookRequests.upload.card.checkingSentence', { total: request.download?.uploadFileCount ?? 1 }),
+        }
+      }
       return { ...base, icon: 'filing', headline: t('bookRequests.download.status.importing'), sentence: null }
     case 'needs_review': {
       const verification = review?.bookDockFileId !== null ? (review?.verification ?? null) : null
@@ -131,6 +215,16 @@ export function requestCardModel(input: RequestCardInput): RequestCardModel {
       }
     }
     case 'failed': {
+      // Cancelling hands the request back rather than failing it, so only the attempt failed.
+      if (isUpload(request) && request.status !== 'failed') {
+        return {
+          ...base,
+          tone: 'stopped',
+          icon: 'stopped',
+          headline: t('bookRequests.upload.card.cancelled'),
+          sentence: t('bookRequests.upload.card.cancelledSentence'),
+        }
+      }
       const path = request.failureCode === UNREADABLE_FILES_CODE ? readPath(request) : null
       if (path) {
         const client = request.download?.downloadClientName ?? null
@@ -146,11 +240,19 @@ export function requestCardModel(input: RequestCardInput): RequestCardModel {
       return {
         ...base,
         icon: 'failed',
-        headline: t('bookRequests.pipeline.summary.failed', { step: t(`bookRequests.pipeline.steps.${REQUEST_PIPELINE_STEPS[state.currentIndex]}`) }),
-        sentence: failure ?? t('bookRequests.outcome.failedUnknown'),
+        headline: t('bookRequests.pipeline.summary.failed', { step: t(failedStepKey(request, state.currentIndex)) }),
+        sentence: failure ?? (isUpload(request) ? request.download?.errorMessage : null) ?? t('bookRequests.outcome.failedUnknown'),
       }
     }
     case 'available':
+      if (isUpload(request) && request.targetLibraryName) {
+        return {
+          ...base,
+          icon: 'done',
+          headline: t('bookRequests.upload.card.filedIn', { library: request.targetLibraryName }),
+          sentence: filedUploadSentence(input),
+        }
+      }
       return {
         ...base,
         icon: 'done',

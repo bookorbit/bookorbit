@@ -51,14 +51,17 @@ async function makeService(
     remove: options.removeError ? vi.fn().mockRejectedValue(options.removeError) : vi.fn().mockResolvedValue(undefined),
   };
 
+  const uploads = { discard: vi.fn().mockResolvedValue(undefined) };
+
   const service = new DownloadRemovalService(
     downloads as never,
     clients as never,
     registry as never,
     direct as never,
     { getOrThrow: vi.fn(() => appDataPath) } as never,
+    uploads as never,
   );
-  return { service, downloads, clients, adapter, registry, direct, appDataPath };
+  return { service, downloads, clients, adapter, registry, direct, uploads, appDataPath };
 }
 
 describe('DownloadRemovalService.removeAttempt', () => {
@@ -73,6 +76,42 @@ describe('DownloadRemovalService.removeAttempt', () => {
       errorMessage: 'Removed from the download client by ann',
       failureCode: 'removed',
     });
+  });
+});
+
+describe('DownloadRemovalService with an upload attempt', () => {
+  const upload = () => download({ source: 'upload', downloadClientId: null, clientKey: 'upload-1' });
+
+  it('stops the upload and drops its files, naming who cancelled it', async () => {
+    const row = upload();
+    const { service, downloads, uploads, registry, direct } = await makeService({ latest: row });
+
+    await expect(service.removeAttempt(7, 11, false, 'ann')).resolves.toBe(true);
+
+    expect(uploads.discard).toHaveBeenCalledWith(row);
+    expect(registry.require).not.toHaveBeenCalled();
+    expect(direct.remove).not.toHaveBeenCalled();
+    expect(downloads.updateIf).toHaveBeenCalledWith(11, expect.arrayContaining(['downloading']), {
+      status: 'failed',
+      errorMessage: 'Upload cancelled by ann',
+      failureCode: 'removed',
+    });
+  });
+
+  it('stops it when the request itself is settled', async () => {
+    const row = upload();
+    const { service, uploads } = await makeService({ latest: row });
+
+    await expect(service.removeLatestForRequest(7, false, 'ann')).resolves.toEqual({ removed: true, error: null });
+    expect(uploads.discard).toHaveBeenCalledWith(row);
+  });
+
+  it('drops the uploaded copy once the Book Dock holds the import', async () => {
+    const row = upload();
+    const { service, uploads } = await makeService({ latest: row });
+
+    await service.cleanupStagedUpload(row);
+    expect(uploads.discard).toHaveBeenCalledWith(row);
   });
 });
 

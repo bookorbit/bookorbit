@@ -3,8 +3,9 @@ import { computed, inject, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { toast } from 'vue-sonner'
-import { ArrowRight, BookHeadphones, Ellipsis, EyeOff, Library, Loader2, RefreshCw, Search, Trash2, Users } from '@lucide/vue'
+import { ArrowRight, BookHeadphones, Ellipsis, EyeOff, Library, Loader2, RefreshCw, RotateCcw, Search, Trash2, Upload, Users, X } from '@lucide/vue'
 import {
+  bookRequestUploadPlanIsSendable,
   DELIVERY_BY_DOWNLOAD_SOURCE,
   isBookRequestFulfiller,
   isBookRequestMediaKind,
@@ -33,6 +34,7 @@ import RequestAttemptsPanel from './RequestAttemptsPanel.vue'
 import RequestFulfilDialog from './RequestFulfilDialog.vue'
 import RequestSeedPanel from './RequestSeedPanel.vue'
 import RequestStatusCard from './RequestStatusCard.vue'
+import RequestUploadSection from './RequestUploadSection.vue'
 import { useBookRequestActions, type ActionOutcome } from '../composables/useBookRequests'
 import { useBookRequestDetail } from '../composables/useBookRequestDetail'
 import { useBookRequestProgress } from '../composables/useBookRequestProgress'
@@ -40,6 +42,7 @@ import { useCoalescedRefresh } from '../composables/useCoalescedRefresh'
 import { formatLanguageName } from '@/i18n/formatters'
 import { requestLanguageOptions, useRequestDestinationDefault } from '../composables/useRequestDestinationDefault'
 import { useRequestReview } from '../composables/useRequestReview'
+import { plannedUploadFiles, requestUploadSummary, useRequestUpload } from '../composables/useRequestUpload'
 import { prefetchRequestAttempts } from '../composables/useRequestAttempts'
 import { prefetchSeedStatus } from '../composables/useRequestSeedStatus'
 import { REQUEST_DRAWER } from '../requestDrawerContext'
@@ -49,6 +52,7 @@ import { requestMediaIcon } from '../requestMedia'
 import { localizedRequestActionFailure } from '../requestActionFailure'
 import { currentRequestProgress } from '../requestPipeline'
 import { sourceDotClass } from '../sourceColors'
+import { dragCarriesFiles, pickedFromDrop, pickedFromInput, type PickedUploadFile } from '../requestUploadFiles'
 
 const { t, locale } = useI18n()
 const route = useRoute()
@@ -82,6 +86,7 @@ const { load: loadDefaultDestination, defaultFor: instanceDefaultFor, resolveDes
 const { progressByRequest, onRequestsChanged, pruneSettledProgress } = useBookRequestProgress()
 const actions = useBookRequestActions(canManageFn)
 const { review, coverUrl: reviewCoverUrl, fetchReview, reset: resetReview } = useRequestReview(canManageFn)
+const uploads = useRequestUpload(canManageFn)
 
 const decisionNote = ref('')
 /**
@@ -132,6 +137,43 @@ const transferActive = computed(() => {
 const isPending = computed(() => request.value?.status === 'pending')
 const canDecide = computed(() => canManage.value && isPending.value)
 const canGrab = computed(() => canFulfilThis.value && request.value != null && isGrabbableBookRequestStatus(request.value.status))
+/** Files can close the request wherever a release could, once it knows which library they go to. */
+const canUpload = computed(() => canGrab.value && request.value?.targetLibraryId != null)
+const uploadState = computed(() => (request.value ? uploads.stateFor(request.value.id) : null))
+/** The request's running upload, whoever started it. */
+const activeUpload = computed(() => {
+  const download = request.value?.download
+  return download?.source === 'upload' && (download.status === 'queued' || download.status === 'downloading') ? download : null
+})
+/** This page's own record of that upload: the files it is sending, or the ones it came back for. */
+const sentHere = computed(() => {
+  const state = uploadState.value
+  return state && activeUpload.value && state.downloadId === activeUpload.value.id ? state : null
+})
+/** Files picked here that have not been sent yet. */
+const stagedUpload = computed(() => {
+  const state = uploadState.value
+  return canUpload.value && state && state.downloadId === null && state.picked.length > 0 ? state : null
+})
+const uploadSectionState = computed(() => sentHere.value ?? stagedUpload.value)
+const uploadSummary = computed(() => requestUploadSummary(sentHere.value))
+const uploadPaused = computed(() => uploadSummary.value !== null && !uploadSummary.value.here && uploadSummary.value.stalledCount > 0)
+const uploadSendCount = computed(() => (stagedUpload.value ? plannedUploadFiles(stagedUpload.value).length : 0))
+const canSendUpload = computed(() => {
+  const state = stagedUpload.value
+  return (
+    state !== null &&
+    !busy.value &&
+    !state.planning &&
+    !state.starting &&
+    state.plan !== null &&
+    bookRequestUploadPlanIsSendable(state.plan.status) &&
+    uploadSendCount.value > 0
+  )
+})
+const retryableUploadCount = computed(() => sentHere.value?.files.filter((file) => file.state === 'failed' && file.file !== null).length ?? 0)
+const viewerIsRequester = computed(() => request.value?.userId === user.value?.id)
+
 /** Grabbing again after a failure is a retry, and is named as one. */
 const isRetry = computed(() => request.value?.status === 'failed' || request.value?.download?.status === 'failed')
 const canFulfill = computed(() => canManage.value && request.value != null && isFulfillableBookRequestStatus(request.value.status))
@@ -162,13 +204,15 @@ const joinsBookId = computed(() => (request.value && request.value.status !== 'a
 const fileIsOverride = computed(() => !review.value?.heldOnRequest || review.value?.verification?.passed === false)
 const goToBookId = computed(() => (request.value?.status === 'available' ? request.value.matchedBookId : null))
 
-type FooterStage = 'decide' | 'transfer' | 'grab' | 'review' | 'reviewGone' | 'done'
+type FooterStage = 'decide' | 'transfer' | 'uploading' | 'uploadPaused' | 'uploadReady' | 'grab' | 'review' | 'reviewGone' | 'done'
 
 /** The one action the stage this request is at asks for, which always lives in the footer. */
 const footerStage = computed<FooterStage | null>(() => {
   if (!request.value) return null
   if (canDecide.value) return 'decide'
+  if (activeUpload.value && (canCancel.value || sentHere.value)) return uploadPaused.value ? 'uploadPaused' : 'uploading'
   if (canCancelDownload.value) return 'transfer'
+  if (stagedUpload.value) return 'uploadReady'
   if (canGrab.value) return 'grab'
   if (isHeld.value && canFulfilThis.value && review.value) {
     if (review.value.bookDockFileId !== null) return 'review'
@@ -250,6 +294,15 @@ const quotes = computed(() => {
 const releaseMeta = computed(() => {
   const download = request.value?.download
   if (!download) return []
+  // A score is only kept for an import that was held, so an upload's line has none to show.
+  if (download.source === 'upload') {
+    const parts: { text: string; numeric?: boolean }[] = [
+      { text: download.uploadedByName ? t('bookRequests.upload.uploadedBy', { name: download.uploadedByName }) : t('bookRequests.upload.uploaded') },
+    ]
+    if (download.releaseSizeBytes !== null) parts.push({ text: formatBytes(download.releaseSizeBytes), numeric: true })
+    parts.push({ text: formatDate(new Date(download.grabbedAt ?? download.createdAt), { month: 'short', day: 'numeric' }), numeric: true })
+    return parts
+  }
   const delivery = DELIVERY_BY_DOWNLOAD_SOURCE[download.source]
   const parts: { text: string; numeric?: boolean }[] = [
     { text: download.indexerName ?? t('bookRequests.download.source.pasted') },
@@ -261,7 +314,7 @@ const releaseMeta = computed(() => {
   return parts
 })
 
-const confirming = ref<'cancel' | 'cancelDownload' | 'delete' | 'leave' | 'discardImport' | null>(null)
+const confirming = ref<'cancel' | 'cancelDownload' | 'cancelUpload' | 'delete' | 'leave' | 'discardImport' | null>(null)
 
 /**
  * Each dialog names both of its answers, so "Cancel" never stands beside "Cancel request" meaning
@@ -276,6 +329,7 @@ const CONFIRM_COPY = {
     label: 'bookRequests.actions.cancelDownload',
     keep: 'bookRequests.confirm.goBack',
   },
+  cancelUpload: { title: 'bookRequests.confirm.cancelUploadTitle', label: 'bookRequests.upload.cancel', keep: 'bookRequests.confirm.goBack' },
   cancel: { title: 'bookRequests.confirm.cancelTitle', label: 'bookRequests.confirm.stopConfirm', keep: 'bookRequests.confirm.keep' },
 } as const
 
@@ -288,7 +342,14 @@ const confirmDescription = computed(() => {
     return t(alwaysDeletesRemote ? 'bookRequests.confirm.deleteHideDescriptionRemoteDelete' : 'bookRequests.confirm.deleteHideDescription')
   }
   if (confirming.value === 'leave') return t('bookRequests.confirm.leaveDescription')
-  if (confirming.value === 'discardImport') return t('bookRequests.confirm.discardImportDescription')
+  if (confirming.value === 'discardImport') {
+    return t(
+      request.value?.download?.source === 'upload'
+        ? 'bookRequests.confirm.discardUploadDescription'
+        : 'bookRequests.confirm.discardImportDescription',
+    )
+  }
+  if (confirming.value === 'cancelUpload') return t('bookRequests.confirm.cancelUploadDescription')
   if (confirming.value === 'cancelDownload') {
     return t(alwaysDeletesRemote ? 'bookRequests.confirm.cancelDownloadDescriptionRemoteDelete' : 'bookRequests.confirm.cancelDownloadDescription')
   }
@@ -408,6 +469,31 @@ watch(requestId, async (id) => {
   resetDestination()
   void syncReview()
 })
+
+/**
+ * An upload outlives the page that started it. Its sender, back on the request, reads which files
+ * it still waits for, so the missing ones can be picked again rather than the upload abandoned.
+ */
+watch(
+  () => [activeUpload.value?.id ?? null, activeUpload.value?.uploadedByUserId ?? null, user.value?.id ?? null] as const,
+  ([downloadId, uploaderId, viewerId]) => {
+    if (downloadId === null || uploaderId === null || uploaderId !== viewerId || sentHere.value || !request.value) return
+    void uploads.load(request.value.id)
+  },
+  { immediate: true },
+)
+
+/** Once the attempt has ended, filed, failed or cancelled, the request's own row says the rest. */
+watch(
+  () => [request.value?.id ?? null, request.value?.download?.id ?? null, request.value?.download?.status ?? null] as const,
+  ([id, downloadId, status]) => {
+    if (id === null) return
+    const state = uploads.stateFor(id)
+    if (!state || state.downloadId === null || downloadId === null) return
+    const ended = downloadId === state.downloadId ? status !== 'queued' && status !== 'downloading' : downloadId > state.downloadId
+    if (ended) uploads.clear(id)
+  },
+)
 
 // Libraries can land after the panel has rendered, and an untouched picker still needs them.
 watch(libraries, () => {
@@ -616,6 +702,126 @@ function handleCancelDownload() {
   confirming.value = 'cancelDownload'
 }
 
+function handleCancelUpload() {
+  confirming.value = 'cancelUpload'
+}
+
+/** Ended on the server first, which closes its sessions; only then does this page stop sending. */
+async function cancelUpload() {
+  const current = request.value
+  const download = activeUpload.value
+  if (!current || !download) return
+  const outcome = await actions.cancelDownload(current.id, download.id)
+  if (!applyUpdate(outcome, 'bookRequests.errors.cancelUploadFailed')) return
+  uploads.clear(current.id)
+  toast.success(t('bookRequests.toasts.uploadCancelled'))
+}
+
+/* ------------------------------------------------------------------ uploading files to the request */
+
+const fileInput = ref<HTMLInputElement | null>(null)
+type PickPurpose = 'new' | 'append' | 'resume'
+/** What the open file picker is for: files to replace, files to add, or the ones an upload lacks. */
+const pickPurpose = ref<PickPurpose>('new')
+/** Nested elements each fire their own enter and leave, so the overlay counts rather than toggles. */
+const dragDepth = ref(0)
+
+const dropPurpose = computed<PickPurpose | null>(() => {
+  if (uploadPaused.value && sentHere.value) return 'resume'
+  if (!canUpload.value || activeUpload.value) return null
+  return stagedUpload.value ? 'append' : 'new'
+})
+
+function openPicker(purpose: PickPurpose) {
+  pickPurpose.value = purpose
+  fileInput.value?.click()
+}
+
+function handleUploadFiles() {
+  openPicker('new')
+}
+
+function handleAddMore() {
+  openPicker('append')
+}
+
+function handleAddMissing() {
+  openPicker('resume')
+}
+
+async function takeFiles(picked: PickedUploadFile[], purpose: PickPurpose) {
+  const current = request.value
+  if (!current || picked.length === 0) return
+  if (purpose === 'resume') {
+    if (uploads.resume(current.id, picked) === 0) toast.error(t('bookRequests.upload.noneMatched'))
+    return
+  }
+  await uploads.pick(current.id, picked, { append: purpose === 'append' })
+}
+
+async function handleFilesPicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const picked = input.files ? pickedFromInput(input.files) : []
+  // Cleared, so picking the same file again after clearing it still fires a change.
+  input.value = ''
+  await takeFiles(picked, pickPurpose.value)
+}
+
+function handleDragEnter(event: DragEvent) {
+  if (!dropPurpose.value || !dragCarriesFiles(event)) return
+  event.preventDefault()
+  dragDepth.value++
+}
+
+function handleDragOver(event: DragEvent) {
+  if (!dropPurpose.value || !dragCarriesFiles(event)) return
+  event.preventDefault()
+  if (event.dataTransfer) event.dataTransfer.dropEffect = 'copy'
+}
+
+function handleDragLeave() {
+  if (dragDepth.value > 0) dragDepth.value--
+}
+
+async function handleDrop(event: DragEvent) {
+  dragDepth.value = 0
+  const purpose = dropPurpose.value
+  if (!purpose || !event.dataTransfer || !dragCarriesFiles(event)) return
+  event.preventDefault()
+  await takeFiles(await pickedFromDrop(event.dataTransfer), purpose)
+}
+
+async function handleStartUpload() {
+  const current = request.value
+  if (!current || !canSendUpload.value) return
+  const outcome = await uploads.start(current.id)
+  if (!outcome.ok) {
+    toast.error(t('bookRequests.upload.startFailed'), outcome.reason ? { description: outcome.reason } : undefined)
+    return
+  }
+  setRequest(outcome.request)
+}
+
+function handleClearUpload() {
+  if (request.value) uploads.clear(request.value.id)
+}
+
+function handleRetryUpload() {
+  if (request.value) uploads.retry(request.value.id)
+}
+
+function handleRetryUploadFile(fileId: number) {
+  if (request.value) uploads.retry(request.value.id, fileId)
+}
+
+function handleChooseUploadUnit(unitIndex: number) {
+  if (request.value) uploads.chooseUnit(request.value.id, unitIndex)
+}
+
+function handleUploadHold(hold: boolean) {
+  if (request.value) uploads.setHold(request.value.id, hold)
+}
+
 function handleRemove() {
   confirming.value = 'delete'
 }
@@ -638,6 +844,7 @@ async function handleConfirm() {
   if (pending === 'delete') await deleteRequest()
   else if (pending === 'cancel') await cancelRequest()
   else if (pending === 'cancelDownload') await cancelDownload()
+  else if (pending === 'cancelUpload') await cancelUpload()
   else if (pending === 'leave') await leaveRequest()
   else if (pending === 'discardImport') await discardImport()
   confirming.value = null
@@ -770,178 +977,225 @@ async function handleFileAnyway() {
       </template>
     </RequestDrawerToolbar>
 
-    <div class="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6 @min-[30rem]:px-5 @min-[30rem]:pt-5 @min-[30rem]:pb-7">
-      <div v-if="loading" role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
-        <Loader2 class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-        {{ t('bookRequests.detail.loading') }}
-      </div>
+    <!-- The whole body takes dropped files, wherever the request can take an upload. -->
+    <div
+      class="relative flex min-h-0 flex-1 flex-col"
+      @dragenter="handleDragEnter"
+      @dragover="handleDragOver"
+      @dragleave="handleDragLeave"
+      @drop="handleDrop"
+    >
+      <div class="min-h-0 flex-1 overflow-y-auto px-4 pt-4 pb-6 @min-[30rem]:px-5 @min-[30rem]:pt-5 @min-[30rem]:pb-7">
+        <div v-if="loading" role="status" class="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          {{ t('bookRequests.detail.loading') }}
+        </div>
 
-      <EntityNotFound v-else-if="error === 'notFound' || error === 'forbidden'" :entity="t('bookRequests.detail.entityName')" />
+        <EntityNotFound v-else-if="error === 'notFound' || error === 'forbidden'" :entity="t('bookRequests.detail.entityName')" />
 
-      <div v-else-if="error" role="alert" class="flex flex-wrap items-center gap-3">
-        <p class="text-sm text-destructive">{{ t(`bookRequests.detail.errors.${error}`) }}</p>
-        <Button variant="outline" size="sm" :disabled="loading" @click="handleRetryLoad">{{ t('common.retry') }}</Button>
-      </div>
+        <div v-else-if="error" role="alert" class="flex flex-wrap items-center gap-3">
+          <p class="text-sm text-destructive">{{ t(`bookRequests.detail.errors.${error}`) }}</p>
+          <Button variant="outline" size="sm" :disabled="loading" @click="handleRetryLoad">{{ t('common.retry') }}</Button>
+        </div>
 
-      <template v-else-if="request">
-        <RequestPairSwitch v-if="companion" :request="request" :companion="companion" :progress-by-request="progressByRequest" />
+        <template v-else-if="request">
+          <RequestPairSwitch v-if="companion" :request="request" :companion="companion" :progress-by-request="progressByRequest" />
 
-        <header class="flex items-start gap-4">
-          <RequestCover
-            :src="request.coverUrl"
-            :fallback-sources="bookCoverSources"
-            :media-kind="request.mediaKind"
-            class="h-24 w-16 rounded-sm! shadow-[0_6px_16px_oklch(0_0_0/0.22)]"
-            :icon-size="22"
-          />
+          <header class="flex items-start gap-4">
+            <RequestCover
+              :src="request.coverUrl"
+              :fallback-sources="bookCoverSources"
+              :media-kind="request.mediaKind"
+              class="h-24 w-16 rounded-sm! shadow-[0_6px_16px_oklch(0_0_0/0.22)]"
+              :icon-size="22"
+            />
 
-          <div class="min-w-0 flex-1 pt-0.5">
-            <h2 class="text-[19px] leading-[1.25] font-[650] tracking-[-0.01em] text-balance text-foreground">{{ request.title }}</h2>
-            <p class="mt-1 text-sm text-muted-foreground">{{ authorLine || t('bookRequests.detail.unknownAuthor') }}</p>
+            <div class="min-w-0 flex-1 pt-0.5">
+              <h2 class="text-[19px] leading-[1.25] font-[650] tracking-[-0.01em] text-balance text-foreground">{{ request.title }}</h2>
+              <p class="mt-1 text-sm text-muted-foreground">{{ authorLine || t('bookRequests.detail.unknownAuthor') }}</p>
 
-            <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <component :is="mediaIcon" :size="13" class="flex-none" aria-hidden="true" />
-                {{ t(`bookRequests.mediaKind.${request.mediaKind}`) }}
-              </span>
-              <span v-if="request.targetLibraryName" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Library :size="13" class="flex-none" aria-hidden="true" />
-                {{ request.targetLibraryName }}
-              </span>
-              <!-- Where the files go matters more than which library, once there is a book to join. -->
-              <RouterLink
-                v-if="joinsBookId !== null"
-                :to="{ name: 'book-detail', params: { bookId: joinsBookId } }"
-                class="inline-flex items-center gap-1.5 rounded-sm text-xs text-foreground hover:underline hover:underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                :title="t('bookRequests.detail.joinsBookHint')"
-              >
-                <BookHeadphones :size="13" class="flex-none" aria-hidden="true" />
-                {{ t('bookRequests.detail.joinsBook') }}
-              </RouterLink>
-              <span v-if="request.subscribers.length" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Users :size="13" class="flex-none" aria-hidden="true" />
-                {{ t('bookRequests.card.alsoWantedCount', { count: request.subscribers.length }) }}
-              </span>
-              <span v-if="request.dismissed" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-                <EyeOff :size="13" class="flex-none" aria-hidden="true" />
-                {{ t('bookRequests.card.dismissedBadge') }}
-              </span>
+              <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                <span class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <component :is="mediaIcon" :size="13" class="flex-none" aria-hidden="true" />
+                  {{ t(`bookRequests.mediaKind.${request.mediaKind}`) }}
+                </span>
+                <span v-if="request.targetLibraryName" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Library :size="13" class="flex-none" aria-hidden="true" />
+                  {{ request.targetLibraryName }}
+                </span>
+                <!-- Where the files go matters more than which library, once there is a book to join. -->
+                <RouterLink
+                  v-if="joinsBookId !== null"
+                  :to="{ name: 'book-detail', params: { bookId: joinsBookId } }"
+                  class="inline-flex items-center gap-1.5 rounded-sm text-xs text-foreground hover:underline hover:underline-offset-2 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  :title="t('bookRequests.detail.joinsBookHint')"
+                >
+                  <BookHeadphones :size="13" class="flex-none" aria-hidden="true" />
+                  {{ t('bookRequests.detail.joinsBook') }}
+                </RouterLink>
+                <span v-if="request.subscribers.length" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Users :size="13" class="flex-none" aria-hidden="true" />
+                  {{ t('bookRequests.card.alsoWantedCount', { count: request.subscribers.length }) }}
+                </span>
+                <span v-if="request.dismissed" class="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <EyeOff :size="13" class="flex-none" aria-hidden="true" />
+                  {{ t('bookRequests.card.dismissedBadge') }}
+                </span>
+              </div>
             </div>
-          </div>
-        </header>
+          </header>
 
-        <RequestStatusCard :request="request" :live="liveProgress" :review="review" :can-decide="canDecide" :seeding="seeding" />
-
-        <!-- First, because it is the decision the hold is waiting on. -->
-        <ReleaseUnitChooser v-if="canFulfilThis && releaseUnits.length" :units="releaseUnits" :busy="busy" @choose="handleChooseReleaseUnit" />
-
-        <!-- The decision inputs live here; the buttons that consume them sit in the footer. -->
-        <RequestDrawerSection v-if="canDecide" :title="t('bookRequests.detail.decideTitle')">
-          <div class="grid grid-cols-1 gap-3 @min-[30rem]:grid-cols-2">
-            <div class="grid min-w-0 gap-1.5">
-              <label for="request-target-library" class="text-xs font-medium text-foreground">
-                {{ t('bookRequests.detail.destinationLibraryLabel') }}
-              </label>
-              <select
-                id="request-target-library"
-                :value="targetLibraryId ?? ''"
-                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                @change="handleLibraryChange"
-              >
-                <!-- Names the instance default, so an approver can see where a request that
-                     chose nowhere would land rather than guessing from an empty select. -->
-                <option value="">{{ unpickedDestinationLabel }}</option>
-                <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
-              </select>
-            </div>
-
-            <div class="grid min-w-0 gap-1.5">
-              <label for="request-language" class="text-xs font-medium text-foreground">{{ t('bookRequests.detail.languageLabel') }}</label>
-              <select
-                id="request-language"
-                :value="request?.language ?? ''"
-                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                @change="handleLanguageChange"
-              >
-                <option value="">{{ t('bookRequests.detail.languageAny') }}</option>
-                <option v-for="option in languageOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
-              </select>
-            </div>
-
-            <div v-if="folders.length > 1" class="grid min-w-0 gap-1.5 @min-[30rem]:col-span-2">
-              <label for="request-target-folder" class="text-xs font-medium text-foreground">
-                {{ t('bookRequests.detail.destinationFolderLabel') }}
-              </label>
-              <select
-                id="request-target-folder"
-                :value="targetFolderId ?? ''"
-                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                @change="handleFolderChange"
-              >
-                <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
-              </select>
-            </div>
-
-            <div class="grid min-w-0 gap-1.5 @min-[30rem]:col-span-2">
-              <label for="request-decision-note" class="text-xs font-medium text-foreground">{{ t('bookRequests.detail.decisionNoteLabel') }}</label>
-              <input
-                id="request-decision-note"
-                v-model="decisionNote"
-                type="text"
-                class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
-                :placeholder="t('bookRequests.detail.decisionNotePlaceholder')"
-              />
-            </div>
-          </div>
-
-          <p v-if="targetLibraryId === null" class="mt-2.5 text-[13px] text-muted-foreground">{{ t('bookRequests.detail.destinationRequired') }}</p>
-        </RequestDrawerSection>
-
-        <RequestReviewPanel v-if="isHeld && review" :review="review" :cover-url="reviewCoverUrl" :can-manage="canFulfilThis" />
-
-        <RequestDrawerSection v-if="request.download" :title="t('bookRequests.detail.releaseSection')">
-          <p class="text-sm font-medium [overflow-wrap:anywhere] text-foreground">{{ request.download.releaseTitle }}</p>
-          <p class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
-            <span class="size-2 flex-none rounded-full" :class="sourceDotClass(request.download.indexerColor)" aria-hidden="true" />
-            <template v-for="(part, index) in releaseMeta" :key="index">
-              <span v-if="index > 0" aria-hidden="true">·</span>
-              <span :class="part.numeric ? 'tabular-nums' : undefined">{{ part.text }}</span>
-            </template>
-          </p>
-
-          <RequestSeedPanel
-            v-if="canFulfilThis"
+          <RequestStatusCard
             :request="request"
-            :busy="busy"
-            :can-manage="canManage"
-            @remove="handleRemoveDownload"
-            @seeding="handleSeeding"
+            :live="liveProgress"
+            :review="review"
+            :can-decide="canDecide"
+            :seeding="seeding"
+            :upload="uploadSummary"
+            :viewer-is-requester="viewerIsRequester"
           />
 
-          <!-- What was tried before this, and what those sources said. Approvers only: it names indexers. -->
-          <RequestAttemptsPanel v-if="canFulfilThis" :request="request" :can-manage="canManage" />
-        </RequestDrawerSection>
+          <RequestUploadSection
+            v-if="uploadSectionState"
+            :request="request"
+            :state="uploadSectionState"
+            :busy="busy"
+            @choose-unit="handleChooseUploadUnit"
+            @hold="handleUploadHold"
+            @add-more="handleAddMore"
+            @retry-file="handleRetryUploadFile"
+          />
 
-        <RequestDrawerSection :title="t('bookRequests.detail.requestSection')">
-          <dl class="grid grid-cols-2 gap-x-6 gap-y-3.5 @min-[35rem]:grid-cols-3">
-            <div v-for="fact in facts" :key="fact.key" class="min-w-0">
-              <dt class="text-xs text-muted-foreground">{{ fact.label }}</dt>
-              <dd class="mt-0.5 text-sm [overflow-wrap:anywhere] text-foreground" :class="fact.numeric ? 'tabular-nums' : undefined">
-                {{ fact.value }}
-                <time v-if="fact.when" class="mt-px block text-xs text-muted-foreground tabular-nums" :datetime="fact.when.iso">{{
-                  fact.when.text
-                }}</time>
-              </dd>
+          <!-- First, because it is the decision the hold is waiting on. -->
+          <ReleaseUnitChooser v-if="canFulfilThis && releaseUnits.length" :units="releaseUnits" :busy="busy" @choose="handleChooseReleaseUnit" />
+
+          <!-- The decision inputs live here; the buttons that consume them sit in the footer. -->
+          <RequestDrawerSection v-if="canDecide" :title="t('bookRequests.detail.decideTitle')">
+            <div class="grid grid-cols-1 gap-3 @min-[30rem]:grid-cols-2">
+              <div class="grid min-w-0 gap-1.5">
+                <label for="request-target-library" class="text-xs font-medium text-foreground">
+                  {{ t('bookRequests.detail.destinationLibraryLabel') }}
+                </label>
+                <select
+                  id="request-target-library"
+                  :value="targetLibraryId ?? ''"
+                  class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                  @change="handleLibraryChange"
+                >
+                  <!-- Names the instance default, so an approver can see where a request that
+                     chose nowhere would land rather than guessing from an empty select. -->
+                  <option value="">{{ unpickedDestinationLabel }}</option>
+                  <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+                </select>
+              </div>
+
+              <div class="grid min-w-0 gap-1.5">
+                <label for="request-language" class="text-xs font-medium text-foreground">{{ t('bookRequests.detail.languageLabel') }}</label>
+                <select
+                  id="request-language"
+                  :value="request?.language ?? ''"
+                  class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                  @change="handleLanguageChange"
+                >
+                  <option value="">{{ t('bookRequests.detail.languageAny') }}</option>
+                  <option v-for="option in languageOptions" :key="option.code" :value="option.code">{{ option.name }}</option>
+                </select>
+              </div>
+
+              <div v-if="folders.length > 1" class="grid min-w-0 gap-1.5 @min-[30rem]:col-span-2">
+                <label for="request-target-folder" class="text-xs font-medium text-foreground">
+                  {{ t('bookRequests.detail.destinationFolderLabel') }}
+                </label>
+                <select
+                  id="request-target-folder"
+                  :value="targetFolderId ?? ''"
+                  class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                  @change="handleFolderChange"
+                >
+                  <option v-for="folder in folders" :key="folder.id" :value="folder.id">{{ folder.path }}</option>
+                </select>
+              </div>
+
+              <div class="grid min-w-0 gap-1.5 @min-[30rem]:col-span-2">
+                <label for="request-decision-note" class="text-xs font-medium text-foreground">{{
+                  t('bookRequests.detail.decisionNoteLabel')
+                }}</label>
+                <input
+                  id="request-decision-note"
+                  v-model="decisionNote"
+                  type="text"
+                  class="h-9 w-full rounded-sm border border-input bg-background px-2.5 text-sm text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+                  :placeholder="t('bookRequests.detail.decisionNotePlaceholder')"
+                />
+              </div>
             </div>
-          </dl>
 
-          <figure v-for="quote in quotes" :key="quote.key" class="mt-4 border-s-2 border-border py-px ps-3">
-            <blockquote class="text-sm [overflow-wrap:anywhere] text-foreground">{{ quote.text }}</blockquote>
-            <figcaption class="mt-[3px] text-xs text-muted-foreground">{{ quote.caption }}</figcaption>
-          </figure>
-        </RequestDrawerSection>
-      </template>
+            <p v-if="targetLibraryId === null" class="mt-2.5 text-[13px] text-muted-foreground">{{ t('bookRequests.detail.destinationRequired') }}</p>
+          </RequestDrawerSection>
+
+          <RequestReviewPanel v-if="isHeld && review" :review="review" :cover-url="reviewCoverUrl" :can-manage="canFulfilThis" />
+
+          <RequestDrawerSection v-if="request.download" :title="t('bookRequests.detail.releaseSection')">
+            <p class="text-sm font-medium [overflow-wrap:anywhere] text-foreground">{{ request.download.releaseTitle }}</p>
+            <p class="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground">
+              <Upload v-if="request.download.source === 'upload'" :size="13" class="flex-none" aria-hidden="true" />
+              <span v-else class="size-2 flex-none rounded-full" :class="sourceDotClass(request.download.indexerColor)" aria-hidden="true" />
+              <template v-for="(part, index) in releaseMeta" :key="index">
+                <span v-if="index > 0" aria-hidden="true">·</span>
+                <span :class="part.numeric ? 'tabular-nums' : undefined">{{ part.text }}</span>
+              </template>
+            </p>
+
+            <RequestSeedPanel
+              v-if="canFulfilThis"
+              :request="request"
+              :busy="busy"
+              :can-manage="canManage"
+              @remove="handleRemoveDownload"
+              @seeding="handleSeeding"
+            />
+
+            <!-- What was tried before this, and what those sources said. Approvers only: it names indexers. -->
+            <RequestAttemptsPanel v-if="canFulfilThis" :request="request" :can-manage="canManage" />
+          </RequestDrawerSection>
+
+          <RequestDrawerSection :title="t('bookRequests.detail.requestSection')">
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-3.5 @min-[35rem]:grid-cols-3">
+              <div v-for="fact in facts" :key="fact.key" class="min-w-0">
+                <dt class="text-xs text-muted-foreground">{{ fact.label }}</dt>
+                <dd class="mt-0.5 text-sm [overflow-wrap:anywhere] text-foreground" :class="fact.numeric ? 'tabular-nums' : undefined">
+                  {{ fact.value }}
+                  <time v-if="fact.when" class="mt-px block text-xs text-muted-foreground tabular-nums" :datetime="fact.when.iso">{{
+                    fact.when.text
+                  }}</time>
+                </dd>
+              </div>
+            </dl>
+
+            <figure v-for="quote in quotes" :key="quote.key" class="mt-4 border-s-2 border-border py-px ps-3">
+              <blockquote class="text-sm [overflow-wrap:anywhere] text-foreground">{{ quote.text }}</blockquote>
+              <figcaption class="mt-[3px] text-xs text-muted-foreground">{{ quote.caption }}</figcaption>
+            </figure>
+          </RequestDrawerSection>
+        </template>
+      </div>
+
+      <div
+        v-if="dragDepth > 0"
+        class="pointer-events-none absolute inset-2.5 z-[5] grid place-items-center rounded-[calc(var(--radius)+4px)] border-2 border-dashed border-[color-mix(in_oklab,var(--primary)_65%,transparent)] bg-[color-mix(in_oklab,var(--primary)_9%,color-mix(in_oklab,var(--background)_82%,transparent))] backdrop-blur-[2px]"
+        aria-hidden="true"
+      >
+        <div class="grid max-w-[340px] justify-items-center gap-1.5 p-6 text-center">
+          <span class="mb-1 grid size-11 place-items-center rounded-lg bg-[color-mix(in_oklab,var(--primary)_14%,transparent)] text-primary">
+            <Upload :size="22" />
+          </span>
+          <p class="text-[15px] font-semibold text-foreground">{{ t('bookRequests.upload.drop.title') }}</p>
+          <p class="text-[13px] leading-[1.45] text-muted-foreground">{{ t('bookRequests.upload.drop.body') }}</p>
+        </div>
+      </div>
     </div>
+
+    <input ref="fileInput" type="file" multiple class="hidden" tabindex="-1" aria-hidden="true" @change="handleFilesPicked" />
 
     <!--
       The action the stage this request is at asks for, always here and never in the body. On a
@@ -980,13 +1234,44 @@ async function handleFileAnyway() {
         {{ t('bookRequests.actions.cancelDownload') }}
       </Button>
 
+      <template v-else-if="footerStage === 'uploading' || footerStage === 'uploadPaused'">
+        <template v-if="footerStage === 'uploadPaused'">
+          <Button v-if="retryableUploadCount > 0" :disabled="busy" @click="handleRetryUpload">
+            <RotateCcw :size="15" aria-hidden="true" />
+            {{ t('bookRequests.upload.retry', { count: retryableUploadCount }) }}
+          </Button>
+          <Button v-else :disabled="busy" @click="handleAddMissing">
+            <Upload :size="15" aria-hidden="true" />
+            {{ t('bookRequests.upload.addMissing') }}
+          </Button>
+        </template>
+        <Button v-if="canCancel" variant="destructive-outline" :disabled="busy" @click="handleCancelUpload">
+          <X :size="15" aria-hidden="true" />
+          {{ t('bookRequests.upload.cancel') }}
+        </Button>
+      </template>
+
+      <template v-else-if="footerStage === 'uploadReady' && stagedUpload">
+        <Button :disabled="!canSendUpload" @click="handleStartUpload">
+          <Loader2 v-if="stagedUpload.starting" class="size-4 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <Upload v-else :size="15" aria-hidden="true" />
+          {{ uploadSendCount > 0 ? t('bookRequests.upload.send', { count: uploadSendCount }) : t('bookRequests.upload.action') }}
+        </Button>
+        <Button variant="ghost" :disabled="stagedUpload.starting" @click="handleClearUpload">{{ t('bookRequests.upload.clear') }}</Button>
+      </template>
+
       <template v-else-if="footerStage === 'grab'">
         <Button :disabled="busy" @click="goToReleases">
           <RefreshCw v-if="isRetry" :size="15" aria-hidden="true" />
           <Search v-else :size="15" aria-hidden="true" />
           {{ isRetry ? t('bookRequests.actions.retryRelease') : t('bookRequests.actions.pickRelease') }}
         </Button>
-        <Button v-if="canFulfill" variant="ghost" class="hidden @min-[30rem]:inline-flex" :disabled="busy" @click="openFulfil">
+        <!-- Closing it by hand stays in the menu; the footer offers the files instead. -->
+        <Button v-if="canUpload" variant="outline" :disabled="busy" @click="handleUploadFiles">
+          <Upload :size="15" aria-hidden="true" />
+          {{ t('bookRequests.upload.action') }}
+        </Button>
+        <Button v-else-if="canFulfill" variant="ghost" class="hidden @min-[30rem]:inline-flex" :disabled="busy" @click="openFulfil">
           {{ t('bookRequests.actions.closeRequest') }}
         </Button>
       </template>

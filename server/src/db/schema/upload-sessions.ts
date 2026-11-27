@@ -3,6 +3,7 @@ import { bigint, check, index, integer, pgTable, text, timestamp, uniqueIndex, u
 
 import { users } from './auth';
 import { books } from './books';
+import { bookRequestUploadFiles } from './download-clients';
 import { libraries, libraryFolders } from './libraries';
 
 export const uploadSessions = pgTable(
@@ -17,6 +18,8 @@ export const uploadSessions = pgTable(
     targetLibraryId: integer('target_library_id').references(() => libraries.id, { onDelete: 'set null' }),
     targetFolderId: integer('target_folder_id').references(() => libraryFolders.id, { onDelete: 'set null' }),
     targetBookId: integer('target_book_id').references(() => books.id, { onDelete: 'set null' }),
+    /** The manifest entry a `book_request` session delivers. */
+    targetRequestFileId: integer('target_request_file_id').references(() => bookRequestUploadFiles.id, { onDelete: 'set null' }),
     filename: varchar('filename', { length: 500 }).notNull(),
     contentType: varchar('content_type', { length: 200 }),
     sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
@@ -40,7 +43,8 @@ export const uploadSessions = pgTable(
     uniqueIndex('upload_sessions_user_idempotency_uidx').on(t.userId, t.idempotencyKey),
     index('upload_sessions_user_created_idx').on(t.userId, sql`${t.createdAt} desc`),
     index('upload_sessions_status_expires_idx').on(t.status, t.expiresAt),
-    check('upload_sessions_target_kind_chk', sql`${t.targetKind} in ('library', 'existing_book', 'book_dock')`),
+    index('upload_sessions_target_request_file_idx').on(t.targetRequestFileId),
+    check('upload_sessions_target_kind_chk', sql`${t.targetKind} in ('library', 'existing_book', 'book_dock', 'book_request')`),
     check('upload_sessions_status_chk', sql`${t.status} in ('receiving', 'processing', 'completed', 'failed', 'cancelled', 'expired')`),
     check('upload_sessions_size_positive_chk', sql`${t.sizeBytes} > 0`),
     check('upload_sessions_received_range_chk', sql`${t.receivedBytes} >= 0 and ${t.receivedBytes} <= ${t.sizeBytes}`),

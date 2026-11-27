@@ -7,6 +7,9 @@ import { uploadError } from './upload-errors';
 
 export const SUPPORTED_BOOK_FORMATS = new Set<string>(UPLOAD_SUPPORTED_FORMATS);
 
+/** Archives a release may arrive in. Only request uploads accept them; the import opens them. */
+const ARCHIVE_FORMATS = new Set(['zip', 'rar', '7z']);
+
 /** How much of a file's start `validateContent` reads to recognise its format. */
 export const CONTENT_SIGNATURE_BYTES = 512;
 
@@ -28,6 +31,16 @@ export class UploadValidatorService {
     }
 
     return ext;
+  }
+
+  /**
+   * The format a request file's contents are checked against: a book or archive extension, which
+   * both carry a signature. Artwork and sidecars return null and travel unchecked; the plan only
+   * ever declares them beside a book.
+   */
+  signatureFormatOf(filename: string): string | null {
+    const ext = extname(filename).toLowerCase().slice(1);
+    return SUPPORTED_BOOK_FORMATS.has(ext) || ARCHIVE_FORMATS.has(ext) ? ext : null;
   }
 
   /** Whether a library's own format list lets this file in. An empty list allows every supported format. */
@@ -91,14 +104,17 @@ function matchesFormatSignature(bytes: Buffer, format: string): boolean {
     case 'epub':
     case 'kepub':
     case 'cbz':
+    case 'zip':
       return bytes[0] === 0x50 && bytes[1] === 0x4b;
     case 'pdf':
       return ascii.startsWith('%PDF-');
     case 'djvu':
       return bytes.length >= 16 && ascii.startsWith('AT&TFORM') && ['DJVU', 'DJVM'].includes(ascii.slice(12, 16));
     case 'cbr':
+    case 'rar':
       return ascii.startsWith('Rar!\x1a\x07');
     case 'cb7':
+    case '7z':
       return bytes.subarray(0, 6).equals(Buffer.from([0x37, 0x7a, 0xbc, 0xaf, 0x27, 0x1c]));
     case 'mobi':
     case 'azw':

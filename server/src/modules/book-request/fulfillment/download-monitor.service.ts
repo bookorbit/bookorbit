@@ -6,7 +6,7 @@ import { SystemCron } from '../../../common/decorators/system-cron.decorator';
 import { IdlePoll } from '../../../common/utils/idle-poll';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
 import type { BookRequestDownloadRow } from '../../../db/schema';
-import { BOOK_REQUEST_DOWNLOAD_QUEUED, BookRequestEventsService } from '../book-request-events.service';
+import { BOOK_REQUEST_DOWNLOAD_QUEUED, BOOK_REQUEST_UPLOAD_ARRIVED, BookRequestEventsService } from '../book-request-events.service';
 import { BookRequestGateway } from '../book-request.gateway';
 import { BookRequestRepository } from '../book-request.repository';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
@@ -79,6 +79,11 @@ export class DownloadMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(DownloadMonitorService.name);
   private readonly activePoll = new IdlePoll();
   private readonly onDownloadQueued = () => this.activePoll.wake();
+  /** An upload has no client to report that it finished, so its last file says so instead. */
+  private readonly onUploadArrived = (downloadId: number) => {
+    this.importQueue.enqueue(downloadId);
+    this.activePoll.wake();
+  };
   private running = false;
   private lastResumeAt = 0;
   private lastHeartbeatAt = 0;
@@ -114,10 +119,12 @@ export class DownloadMonitorService implements OnModuleInit, OnModuleDestroy {
 
   onModuleInit(): void {
     this.events.on(BOOK_REQUEST_DOWNLOAD_QUEUED, this.onDownloadQueued);
+    this.events.on(BOOK_REQUEST_UPLOAD_ARRIVED, this.onUploadArrived);
   }
 
   onModuleDestroy(): void {
     this.events.off(BOOK_REQUEST_DOWNLOAD_QUEUED, this.onDownloadQueued);
+    this.events.off(BOOK_REQUEST_UPLOAD_ARRIVED, this.onUploadArrived);
     this.importQueue.stop();
     this.stageQueue.stop();
   }

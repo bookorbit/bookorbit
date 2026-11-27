@@ -15,6 +15,8 @@ import { RequestFulfillmentService } from './fulfillment/request-fulfillment.ser
 import { RequestImportService } from './fulfillment/request-import.service';
 import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestVerificationService } from './fulfillment/request-verification.service';
+import { RequestUploadService } from './fulfillment/request-upload.service';
+import { PlanBookRequestUploadDto, StartBookRequestUploadDto, UPLOAD_PLAN_BODY_LIMIT_BYTES } from './dto/book-request-upload.dto';
 import { GRAB_BODY_LIMIT_BYTES, GrabBookRequestDto } from './dto/grab-book-request.dto';
 import { InspectBookRequestReleaseDto } from './dto/inspect-book-request-release.dto';
 import { SelectReleaseUnitDto } from './dto/select-release-unit.dto';
@@ -47,6 +49,7 @@ export class BookRequestSelfFulfilController {
     private readonly seed: RequestSeedService,
     private readonly imports: RequestImportService,
     private readonly verification: RequestVerificationService,
+    private readonly uploads: RequestUploadService,
   ) {}
 
   /** Names and ids only, so the grab dialog can offer a choice it is allowed to act on. */
@@ -91,6 +94,35 @@ export class BookRequestSelfFulfilController {
   async grab(@Param('id', ParseIntPipe) id: number, @Body() dto: GrabBookRequestDto, @CurrentUser() user: RequestUser) {
     await this.service.assertCanFulfil(id, user);
     return this.fulfillment.grab(id, dto, user);
+  }
+
+  @Post(':id/upload/plan')
+  @RouteConfig({ bodyLimit: UPLOAD_PLAN_BODY_LIMIT_BYTES })
+  @HttpCode(HttpStatus.OK)
+  async planUpload(@Param('id', ParseIntPipe) id: number, @Body() dto: PlanBookRequestUploadDto, @CurrentUser() user: RequestUser) {
+    await this.service.assertCanFulfil(id, user);
+    return this.uploads.plan(id, dto.files);
+  }
+
+  @Post(':id/upload')
+  @RouteConfig({ bodyLimit: UPLOAD_PLAN_BODY_LIMIT_BYTES })
+  @HttpCode(HttpStatus.OK)
+  @Auditable({
+    action: AuditAction.BookRequestGrab,
+    resource: AuditResource.BookRequest,
+    getResourceId: (req) => Number(req.params.id),
+    description: 'Started uploading the files of their own book request',
+  })
+  async startUpload(@Param('id', ParseIntPipe) id: number, @Body() dto: StartBookRequestUploadDto, @CurrentUser() user: RequestUser) {
+    await this.service.assertCanFulfil(id, user);
+    const upload = await this.uploads.start(id, dto.files, dto.holdForReview === true, user);
+    return { request: await this.service.getOne(id, user), upload };
+  }
+
+  @Get(':id/upload')
+  async uploadManifest(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: RequestUser) {
+    await this.service.assertCanFulfil(id, user);
+    return { upload: await this.uploads.manifest(id) };
   }
 
   @Get(':id/attempts')

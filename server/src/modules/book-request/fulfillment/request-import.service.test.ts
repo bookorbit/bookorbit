@@ -65,6 +65,7 @@ async function makeHarness(options: { useHardlinks?: boolean; stagesLocally?: bo
   const audit = { record: vi.fn().mockResolvedValue(undefined) };
   const removal = {
     cleanupStagedDirectDownload: vi.fn().mockResolvedValue(undefined),
+    cleanupStagedUpload: vi.fn().mockResolvedValue(undefined),
     cleanupStagedClientDownload: vi.fn().mockResolvedValue(undefined),
     removeCompletedDownload: vi.fn().mockResolvedValue(undefined),
   };

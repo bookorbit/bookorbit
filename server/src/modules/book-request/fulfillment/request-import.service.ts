@@ -24,6 +24,7 @@ import {
 } from '../../../common/archive/release-archive';
 import {
   interpretRelease,
+  isContinuationVolume,
   selectReleaseUnit,
   unitRelativePath,
   type ReleaseFileInput,
@@ -37,6 +38,7 @@ import { DownloadClientConfigService } from '../download-clients/download-client
 import { PathMappingService, type ResolvedDownloadPath } from '../download-clients/path-mapping.service';
 import { stagedDownloadRoot } from '../download-clients/download-client-adapter';
 import { directDownloadRoot } from './direct-download.service';
+import { requestUploadRoot } from './request-upload-storage.service';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DownloadRemovalService } from './download-removal.service';
 import { RequestFulfillmentService, type ClassifiedRequestFailure } from './request-fulfillment.service';
@@ -196,6 +198,11 @@ export class RequestImportService implements OnApplicationBootstrap {
    * configured for it, which is also what declares the directory the import may read out of.
    */
   private async resolveLocalPath(download: BookRequestDownloadRow, contentPath: string): Promise<ResolvedDownloadPath> {
+    if (download.source === 'upload') {
+      const containmentRoot = requestUploadRoot(this.config.getOrThrow<string>('storage.appDataPath'));
+      await this.pathMappings.assertWithinRoot(containmentRoot, contentPath);
+      return { localPath: contentPath, containmentRoot };
+    }
     if (download.source === 'direct_url') {
       const containmentRoot = directDownloadRoot(this.config.getOrThrow<string>('storage.appDataPath'));
       await this.pathMappings.assertWithinRoot(containmentRoot, contentPath);
@@ -352,6 +359,7 @@ export class RequestImportService implements OnApplicationBootstrap {
       });
 
     await this.removal.cleanupStagedDirectDownload(download);
+    await this.removal.cleanupStagedUpload(download);
     await this.removal.cleanupStagedClientDownload(download);
     await this.removal.removeCompletedDownload(download);
   }
@@ -676,7 +684,9 @@ export class RequestImportService implements OnApplicationBootstrap {
    */
   private async placeFile(sourceFile: string, destPath: string, download: BookRequestDownloadRow): Promise<void> {
     const wantsHardlink =
-      download.source === 'direct_url' || (download.downloadClientId !== null && (await this.clients.useHardlinks(download.downloadClientId)));
+      download.source === 'direct_url' ||
+      download.source === 'upload' ||
+      (download.downloadClientId !== null && (await this.clients.useHardlinks(download.downloadClientId)));
 
     if (wantsHardlink) {
       try {
@@ -695,14 +705,6 @@ export class RequestImportService implements OnApplicationBootstrap {
     // free when it was named and taken by the time it is written would be silently clobbered.
     await copyFile(sourceFile, destPath, constants.COPYFILE_EXCL);
   }
-}
-
-/**
- * `.r00`, `.r01` and `.002` are parts of the archive their first volume opens, not archives in
- * their own right. Feeding them in separately would extract the same release several times over.
- */
-function isContinuationVolume(path: string): boolean {
-  return /\.(?:r\d{2,3}|\d{3})$/i.test(path) && !/\.(?:rar|7z|zip)$/i.test(path);
 }
 
 /**

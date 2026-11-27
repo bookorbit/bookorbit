@@ -21,6 +21,7 @@ describe('UploadSessionService', () => {
   let library: Record<string, any>;
   let bookDockIngest: Record<string, any>;
   let libraryDocks: Record<string, any>;
+  let receiver: Record<string, any>;
   const validator = new UploadValidatorService();
   const user = { id: 7, isSuperuser: false, permissions: [Permission.LibraryUpload, Permission.BookDockAccess] } as any;
 
@@ -104,6 +105,11 @@ describe('UploadSessionService', () => {
       verifyAccess: vi.fn(() => undefined),
     };
     bookDockIngest = { ingestUpload: vi.fn(() => 31) };
+    receiver = {
+      admit: vi.fn(() => undefined),
+      progress: vi.fn(() => undefined),
+      receive: vi.fn(() => undefined),
+    };
     libraryDocks = {
       resolveUploadDock: vi.fn((_user: unknown, libraryId: number) => ({ dockId: 5, libraryId, folderId: 2, folderName: 'Main' })),
     };
@@ -116,7 +122,11 @@ describe('UploadSessionService', () => {
       storage as any,
       upload as any,
       { processNewBookImport: vi.fn(() => undefined) } as any,
-      { get: vi.fn((token: { name: string }) => (token.name === 'LibraryDockService' ? libraryDocks : bookDockIngest)) } as any,
+      {
+        get: vi.fn((token: { name: string }) =>
+          token.name === 'LibraryDockService' ? libraryDocks : token.name === 'RequestUploadReceiver' ? receiver : bookDockIngest,
+        ),
+      } as any,
     );
   });
 
@@ -334,6 +344,84 @@ describe('UploadSessionService', () => {
     expect(upload.addFileToBook).toHaveBeenCalledWith(9, 'book.pdf', expect.anything(), user);
     expect(result.status).toBe('completed');
     expect(result.bookId).toBe(9);
+  });
+
+  describe('book request targets', () => {
+    const requestDto = (filename: string, sizeBytes: number, idempotencyKey = 'request-file-41') =>
+      ({ filename, sizeBytes, idempotencyKey, target: { kind: 'book_request', requestFileId: 41 } }) as any;
+    // No library or dock permission: sending a request's files is the request's question.
+    const fulfiller = { id: 7, isSuperuser: false, permissions: [] } as any;
+
+    async function received(filename: string, contents: string | Buffer) {
+      const size = Buffer.byteLength(contents);
+      const response = await service.create(requestDto(filename, size), fulfiller);
+      const row = rows.get(response.id);
+      await writeFile(row.stagingPath, contents);
+      rows.set(response.id, { ...row, receivedBytes: size });
+      return response;
+    }
+
+    it('asks the request whether it expects this file before taking a byte', async () => {
+      const response = await service.create(requestDto('Track 01.mp3', 9), fulfiller);
+
+      expect(receiver.admit).toHaveBeenCalledWith(41, 'Track 01.mp3', 9, fulfiller);
+      expect(response.target).toEqual({ kind: 'book_request', requestFileId: 41 });
+      expect(rows.get(response.id)).toMatchObject({ targetKind: 'book_request', targetRequestFileId: 41 });
+    });
+
+    it('refuses the session when the request does not expect the file', async () => {
+      receiver.admit.mockRejectedValueOnce(uploadError.invalidTarget('This upload has ended'));
+
+      await expect(service.create(requestDto('Track 01.mp3', 9), fulfiller)).rejects.toMatchObject({
+        response: { errorCode: UploadErrorCode.InvalidTarget },
+      });
+      expect(repo.create).not.toHaveBeenCalled();
+    });
+
+    it('hands a finished book file to the request and completes the session', async () => {
+      const response = await received('Track 01.mp3', 'ID3AAAAAA');
+
+      const result = await service.complete(response.id, fulfiller);
+
+      expect(receiver.receive).toHaveBeenCalledWith(41, rows.get(response.id).stagingPath, fulfiller);
+      expect(result.status).toBe('completed');
+    });
+
+    it('takes artwork and archives, which a library upload refuses', async () => {
+      const cover = await received('cover.jpg', 'not checked');
+      await expect(service.complete(cover.id, fulfiller)).resolves.toMatchObject({ status: 'completed' });
+
+      const archive = await service.create(requestDto('book.zip', 4, 'request-file-42'), fulfiller);
+      await writeFile(rows.get(archive.id).stagingPath, 'PK\x03\x04');
+      rows.set(archive.id, { ...rows.get(archive.id), receivedBytes: 4 });
+      await expect(service.complete(archive.id, fulfiller)).resolves.toMatchObject({ status: 'completed' });
+    });
+
+    it('still refuses a book file whose contents are not what its name says', async () => {
+      const response = await received('Book.epub', 'not a zip');
+
+      await expect(service.complete(response.id, fulfiller)).rejects.toMatchObject({ response: { errorCode: UploadErrorCode.InvalidContent } });
+      expect(receiver.receive).not.toHaveBeenCalled();
+    });
+
+    it('fails the session when the request turns the file away at the end', async () => {
+      receiver.receive.mockRejectedValueOnce(uploadError.invalidTarget('This upload has ended'));
+      const response = await received('Track 01.mp3', 'ID3AAAAAA');
+
+      await expect(service.complete(response.id, fulfiller)).rejects.toMatchObject({ response: { errorCode: UploadErrorCode.InvalidTarget } });
+      expect(rows.get(response.id)).toMatchObject({ status: 'failed', errorCode: UploadErrorCode.InvalidTarget });
+    });
+
+    it('cancels the sessions still sending an ended upload', async () => {
+      const response = await service.create(requestDto('Track 01.mp3', 9), fulfiller);
+      repo.findReceivingForRequestFiles = vi.fn(() => [rows.get(response.id)]);
+
+      await service.cancelForRequestFiles([41]);
+
+      expect(repo.findReceivingForRequestFiles).toHaveBeenCalledWith([41]);
+      expect(rows.get(response.id).status).toBe('cancelled');
+      expect(storage.cleanup).toHaveBeenCalledWith(rows.get(response.id).stagingPath);
+    });
   });
 
   describe('Book Dock targets', () => {

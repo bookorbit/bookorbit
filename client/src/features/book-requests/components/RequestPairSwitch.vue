@@ -53,7 +53,7 @@ function isCurrent(half: BookRequestItem): boolean {
     >
       <component :is="iconFor(half)" :size="14" class="shrink-0" aria-hidden="true" />
       <span class="truncate">{{ t(`bookRequests.mediaKind.${half.mediaKind}`) }}</span>
-      <RequestStatusBadge :status="statusFor(half)" class="ms-auto" />
+      <RequestStatusBadge :status="statusFor(half)" :uploading="half.download?.source === 'upload'" class="ms-auto" />
     </RouterLink>
   </nav>
 </template>

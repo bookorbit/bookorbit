@@ -4,7 +4,11 @@ import { useI18n } from 'vue-i18n'
 import { Check, TriangleAlert } from '@lucide/vue'
 import type { BookRequestStatus } from '@bookorbit/types'
 
-const props = defineProps<{ status: BookRequestStatus }>()
+const props = defineProps<{
+  status: BookRequestStatus
+  /** The transfer is an upload, which has nothing to download. */
+  uploading?: boolean
+}>()
 
 const { t } = useI18n()
 
@@ -37,7 +41,11 @@ const STATUS_TONES: Record<BookRequestStatus, Tone> = {
 }
 
 const tone = computed(() => STATUS_TONES[props.status] ?? 'stopped')
-const label = computed(() => t(`bookRequests.status.${props.status}`))
+const label = computed(() =>
+  props.uploading && (props.status === 'grabbed' || props.status === 'downloading')
+    ? t('bookRequests.upload.steps.uploading')
+    : t(`bookRequests.status.${props.status}`),
+)
 </script>
 
 <template>

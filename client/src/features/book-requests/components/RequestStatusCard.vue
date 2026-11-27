@@ -2,14 +2,14 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
-import { Ban, Check, CircleCheck, CircleX, Copy, Download, FolderInput, Hourglass, ScanSearch, Search, X } from '@lucide/vue'
+import { Ban, Check, CircleCheck, CircleX, CloudAlert, Copy, Download, FolderInput, Hourglass, ScanSearch, Search, Upload, X } from '@lucide/vue'
 import type { BookRequestItem, BookRequestProgressEvent, BookRequestReview } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import { formatDate, formatDateTime, formatPercent, formatRelativeTimeFromNow } from '@/i18n/formatters'
 import { copyToClipboard } from '@/lib/clipboard'
 import { formatBytes } from '@/lib/formatting'
 import { REQUEST_PIPELINE_STEPS, requestPipelineState, requestStepState, requestStepTime, type RequestPipelineTone } from '../requestPipeline'
-import { requestCardModel, type RequestCardIcon } from '../requestStatusCard'
+import { requestCardModel, type RequestCardIcon, type RequestCardUpload } from '../requestStatusCard'
 
 const props = defineProps<{
   request: BookRequestItem
@@ -19,6 +19,9 @@ const props = defineProps<{
   canDecide: boolean
   /** Whether the client still seeds the finished download, where the drawer has read it. */
   seeding: boolean | null
+  /** What this page is sending, when the attempt is an upload it started or came back to. */
+  upload?: RequestCardUpload | null
+  viewerIsRequester?: boolean
 }>()
 
 const { t } = useI18n()
@@ -41,6 +44,9 @@ const ICONS: Record<RequestCardIcon, typeof Hourglass> = {
   failed: CircleX,
   done: CircleCheck,
   stopped: Ban,
+  upload: Upload,
+  paused: CloudAlert,
+  checking: ScanSearch,
 }
 
 const model = computed(() =>
@@ -50,6 +56,8 @@ const model = computed(() =>
     review: props.review,
     canDecide: props.canDecide,
     seeding: props.seeding,
+    upload: props.upload ?? null,
+    viewerIsRequester: props.viewerIsRequester ?? false,
     t: (key, named) => (named ? t(key, named) : t(key)),
     formatBytes,
     relativeTime: (iso) => formatRelativeTimeFromNow(iso, { smallestUnit: 'minute' }),
@@ -57,6 +65,7 @@ const model = computed(() =>
 )
 
 const state = computed(() => requestPipelineState(props.request, props.live))
+const isUpload = computed(() => props.request.download?.source === 'upload')
 const percentLabel = computed(() => (model.value.percent === null ? null : formatPercent(model.value.percent / 100)))
 
 type StepLook = 'done' | 'current' | 'failed' | 'upcoming'
@@ -74,9 +83,9 @@ function shortTime(iso: string): string {
 const steps = computed(() =>
   REQUEST_PIPELINE_STEPS.map((step, index) => {
     const raw = requestStepState(state.value, index)
-    const look: StepLook = raw === 'current' && state.value.tone === 'failed' ? 'failed' : raw
+    const look: StepLook = raw === 'current' && model.value.tone === 'failed' ? 'failed' : raw
     const time = requestStepTime(props.request, state.value, index)
-    const label = t(`bookRequests.pipeline.steps.${step}`)
+    const label = stepLabel(step, look)
     return {
       step,
       look,
@@ -88,6 +97,14 @@ const steps = computed(() =>
     }
   }),
 )
+
+/** An upload has no release to pick and nothing to download: its files are chosen, then sent. */
+function stepLabel(step: (typeof REQUEST_PIPELINE_STEPS)[number], look: StepLook): string {
+  if (isUpload.value && step === 'release') return t('bookRequests.upload.steps.filesChosen')
+  if (isUpload.value && step === 'downloading')
+    return t(look === 'done' ? 'bookRequests.upload.steps.uploaded' : 'bookRequests.upload.steps.uploading')
+  return t(`bookRequests.pipeline.steps.${step}`)
+}
 
 const STEP_BAR: Record<StepLook, string> = {
   done: 'bg-success',
@@ -155,7 +172,7 @@ async function handleCopyPath() {
       v-if="model.percent !== null"
       class="mt-3 h-1.5 overflow-hidden rounded-full bg-[color-mix(in_oklab,var(--tone)_18%,var(--border))] @min-[30rem]:ms-11"
       role="progressbar"
-      :aria-label="t('bookRequests.download.progressLabel', { title: request.title })"
+      :aria-label="t(isUpload ? 'bookRequests.upload.progressLabel' : 'bookRequests.download.progressLabel', { title: request.title })"
       :aria-valuenow="model.percent"
       aria-valuemin="0"
       aria-valuemax="100"

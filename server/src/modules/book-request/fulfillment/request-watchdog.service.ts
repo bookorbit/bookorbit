@@ -18,6 +18,7 @@ import { RequestFulfillmentService } from './request-fulfillment.service';
  * told, not to enforce a service level.
  */
 const STALL_TIMEOUT_MS = 12 * 60 * 60 * 1000;
+const UPLOAD_STALL_TIMEOUT_MS = 24 * 60 * 60 * 1000;
 /** Import is local filesystem work plus a metadata fetch. An hour is already pathological. */
 const IMPORT_TIMEOUT_MS = 60 * 60 * 1000;
 
@@ -181,8 +182,16 @@ export class RequestWatchdogService implements OnApplicationBootstrap {
 
   private async failStalled(): Promise<void> {
     const rows = await this.downloads.findByStatusOlderThan(STALLABLE, new Date(Date.now() - STALL_TIMEOUT_MS), 'progress');
+    const uploadCutoff = Date.now() - UPLOAD_STALL_TIMEOUT_MS;
     for (const row of rows) {
-      await this.fulfillment.failDownload(row, 'The download made no progress for 12 hours');
+      if (row.source !== 'upload') {
+        await this.fulfillment.failDownload(row, 'The download made no progress for 12 hours');
+        continue;
+      }
+      // An upload waits on a person coming back to a closed tab or a phone out of signal, which a
+      // torrent client never does, so it is given a day rather than half of one.
+      if ((row.lastProgressAt ?? row.updatedAt).getTime() > uploadCutoff) continue;
+      await this.fulfillment.failDownload(row, 'The upload made no progress for 24 hours');
     }
   }
 

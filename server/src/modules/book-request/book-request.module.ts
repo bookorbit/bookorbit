@@ -68,6 +68,10 @@ import { RequestAutomationSearchDelay } from './fulfillment/request-automation-s
 import { RequestAutomationSettingsService } from './fulfillment/request-automation-settings.service';
 import { RequestFulfillmentService } from './fulfillment/request-fulfillment.service';
 import { RequestImportService } from './fulfillment/request-import.service';
+import { RequestUploadFileRepository } from './fulfillment/request-upload-file.repository';
+import { RequestUploadService } from './fulfillment/request-upload.service';
+import { RequestUploadStorageService } from './fulfillment/request-upload-storage.service';
+import { RequestUploadReceiver } from '../upload/request-upload-receiver';
 import { RequestSeedService } from './fulfillment/request-seed.service';
 import { RequestUserCleanupService } from './fulfillment/request-user-cleanup.service';
 import { RequestCompanionService } from './fulfillment/request-companion.service';
@@ -167,6 +171,11 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
     DownloadRemovalService,
     RequestFulfillmentService,
     RequestImportService,
+    RequestUploadFileRepository,
+    RequestUploadStorageService,
+    RequestUploadService,
+    // How a `book_request` upload session reaches this module without the upload module importing it.
+    { provide: RequestUploadReceiver, useExisting: RequestUploadService },
     RequestCompanionService,
     RequestVerificationService,
     RequestSeedService,

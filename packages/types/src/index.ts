@@ -50,6 +50,7 @@ export * from "./book-request-destination";
 export * from "./book-request-preferences";
 export * from "./book-request-profile";
 export * from "./book-request-review";
+export * from "./book-request-upload";
 export * from "./download-client";
 export * from "./indexer";
 export * from "./indexer-manager";
