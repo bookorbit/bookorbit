@@ -1,7 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { COVER_MEDIA } from '@bookorbit/types';
 import { ConfigService } from '@nestjs/config';
-import { rm } from 'fs/promises';
+import { rm, stat } from 'fs/promises';
 import { join } from 'path';
 import type {
   BrokenCoverEntry,
@@ -27,6 +27,7 @@ import {
   COVER_DISK_CONCURRENCY,
   findBrokenCoverSlots,
   hasServableCover,
+  isMissingEntry,
   mapWithConcurrency,
   measureCoverDir,
   readCoverDirBookIds,
@@ -142,18 +143,29 @@ export class MissingResourcesService {
     this.logger.log(`[${event}] [start] userId=${user.id} requested=${requestedIds.length} targets=${targets.length} - missing book cleanup started`);
     try {
       let cleaned = 0;
+      let stillOnDisk = 0;
       await this.readingAttemptEvents.coalesceChanges(async () => {
         for (let index = 0; index < targets.length; index += DELETE_BATCH_SIZE) {
           const batch = targets.slice(index, index + DELETE_BATCH_SIZE);
-          const result = await this.bookService.deleteBooks(batch, user);
+          const gone = await this.filterContentGoneFromDisk(batch);
+          stillOnDisk += batch.length - gone.length;
+          if (gone.length === 0) continue;
+          const result = await this.bookService.deleteMissingBookRecords(gone, user);
           cleaned += result.total;
         }
       });
       const remaining = await this.repo.countMissingBooks(libraryIds);
       this.logger.log(
-        `[${event}] [end] userId=${user.id} requested=${requestedIds.length} cleaned=${cleaned} remaining=${remaining} durationMs=${Date.now() - startedAt} - missing book cleanup completed`,
+        `[${event}] [end] userId=${user.id} requested=${requestedIds.length} cleaned=${cleaned} stillOnDisk=${stillOnDisk} remaining=${remaining} durationMs=${Date.now() - startedAt} - missing book cleanup completed`,
       );
-      return { category: 'missing_books', requested: requestedIds.length, cleaned, skipped: requestedIds.length - cleaned, remaining };
+      return {
+        category: 'missing_books',
+        requested: requestedIds.length,
+        cleaned,
+        skipped: requestedIds.length - cleaned,
+        remaining,
+        stillOnDisk,
+      };
     } catch (err) {
       this.logFailure(event, user, startedAt, err);
       throw err;
@@ -259,6 +271,35 @@ export class MissingResourcesService {
     } catch (err) {
       this.logFailure(event, user, startedAt, err);
       throw err;
+    }
+  }
+
+  /**
+   * The missing flag is only as fresh as the last scan. A share that reconnected or a drive that was
+   * remounted brings content back, and the next scan restores the book with its reading history, so
+   * a book with any content file on disk is left alone. A file that cannot be checked counts as present.
+   */
+  private async filterContentGoneFromDisk(bookIds: number[]): Promise<number[]> {
+    const pathsByBook = new Map<number, string[]>();
+    for (const file of await this.repo.findContentFilePaths(bookIds)) {
+      const paths = pathsByBook.get(file.bookId);
+      if (paths) paths.push(file.absolutePath);
+      else pathsByBook.set(file.bookId, [file.absolutePath]);
+    }
+    const gone = await mapWithConcurrency(bookIds, COVER_DISK_CONCURRENCY, async (bookId) => {
+      for (const path of pathsByBook.get(bookId) ?? []) {
+        if (!(await this.isGoneFromDisk(path))) return false;
+      }
+      return true;
+    });
+    return bookIds.filter((_, index) => gone[index]);
+  }
+
+  private async isGoneFromDisk(path: string): Promise<boolean> {
+    try {
+      return !(await stat(path)).isFile();
+    } catch (err) {
+      return isMissingEntry(err);
     }
   }
 

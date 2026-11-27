@@ -16870,6 +16870,7 @@
         "broken_covers": "{count, plural, =0 {Nothing to clean} one {Cleared one broken cover reference} other {Cleared # broken cover references}}",
         "orphaned_cover_dirs": "{count, plural, =0 {Nothing to clean} one {Removed one orphaned cover folder} other {Removed # orphaned cover folders}}"
       },
+      "stillOnDisk": "{count, plural, one {Kept one book because its file is still on disk. Rescan its library to bring it back.} other {Kept # books because their files are still on disk. Rescan their libraries to bring them back.}}",
       "pagination": {
         "label": "Missing resource pages",
         "page": "Page {page} of {total}"

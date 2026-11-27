@@ -6,7 +6,7 @@ import { findPreferredBookCoverFileName } from '../../../common/book-cover-stora
 
 export const COVER_DISK_CONCURRENCY = 16;
 
-function isMissingEntry(err: unknown): boolean {
+export function isMissingEntry(err: unknown): boolean {
   const code = (err as NodeJS.ErrnoException | undefined)?.code;
   return code === 'ENOENT' || code === 'ENOTDIR';
 }

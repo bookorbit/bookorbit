@@ -1,5 +1,5 @@
 import { and, eq, inArray } from 'drizzle-orm';
-import { rm } from 'fs/promises';
+import { readFile, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 
 import * as schema from '../src/db/schema';
@@ -201,5 +201,57 @@ describe('Missing Resources slot covers (e2e)', { timeout: SCENARIO_TIMEOUT_MS }
       .where(eq(schema.bookMetadata.bookId, half.bookId));
     expect(halfSlots).toEqual([{ medium: 'ebook' }]);
     expect(halfMetadata).toEqual({ coverSource: 'extracted' });
+  });
+
+  it('removes missing book records without deleting library files, and keeps books whose content came back', async () => {
+    const library = await createLibraryWithFolder(ctx, { name: 'Missing Resources records', mode: 'book_per_folder' });
+    await createEpubFixture(library.folderPath, 'Salt Road/book.epub', { title: 'The Salt Road' });
+    await writeFixtureFile(library.folderPath, 'Salt Road/cover.jpg', Buffer.from('salt-road-cover'));
+    await writeFixtureFile(library.folderPath, 'Salt Road/metadata.opf', '<package/>');
+    await createEpubFixture(library.folderPath, 'Glass Harbor/book.epub', { title: 'The Glass Harbor' });
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const salt = await locateBookFileByRelPath(ctx, library.libraryId, 'Salt Road/book.epub');
+    const glass = await locateBookFileByRelPath(ctx, library.libraryId, 'Glass Harbor/book.epub');
+    const saltRoles = await ctx.db.select({ role: schema.bookFiles.role }).from(schema.bookFiles).where(eq(schema.bookFiles.bookId, salt.bookId));
+    expect(saltRoles.map((row) => row.role).sort()).toEqual(['content', 'cover', 'metadata']);
+
+    const glassContent = await readFile(glass.absolutePath);
+    await rm(salt.absolutePath);
+    await rm(glass.absolutePath);
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const missing = await ctx.db
+      .select({ id: schema.books.id, status: schema.books.status })
+      .from(schema.books)
+      .where(eq(schema.books.libraryId, library.libraryId));
+    expect(missing).toEqual(
+      expect.arrayContaining([
+        { id: salt.bookId, status: 'missing' },
+        { id: glass.bookId, status: 'missing' },
+      ]),
+    );
+    // The share came back before anyone rescanned it.
+    await writeFile(glass.absolutePath, glassContent);
+
+    const cleanup = await ctx.app.inject({
+      method: 'POST',
+      url: '/api/v1/maintenance/missing-resources/books/clean',
+      headers: authHeader(ctx.adminToken),
+      payload: { bookIds: [salt.bookId, glass.bookId] },
+    });
+    expect(cleanup.statusCode).toBe(201);
+    expect(cleanup.json()).toMatchObject({ category: 'missing_books', requested: 2, cleaned: 1, skipped: 1, stillOnDisk: 1 });
+
+    const saltRows = await ctx.db.select({ id: schema.books.id }).from(schema.books).where(eq(schema.books.id, salt.bookId));
+    expect(saltRows).toEqual([]);
+    await expect(readFile(join(library.folderPath, 'Salt Road/cover.jpg'), 'utf8')).resolves.toBe('salt-road-cover');
+    await expect(readFile(join(library.folderPath, 'Salt Road/metadata.opf'), 'utf8')).resolves.toBe('<package/>');
+    await expect(readFile(glass.absolutePath)).resolves.toEqual(glassContent);
+
+    await triggerAndWaitForLibraryScan(ctx, library.libraryId);
+    const afterRescan = await ctx.db
+      .select({ id: schema.books.id, status: schema.books.status })
+      .from(schema.books)
+      .where(eq(schema.books.libraryId, library.libraryId));
+    expect(afterRescan).toEqual([{ id: glass.bookId, status: 'present' }]);
   });
 });

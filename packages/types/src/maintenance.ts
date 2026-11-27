@@ -81,4 +81,9 @@ export type MissingResourceCleanupResult = {
   skipped: number;
   /** Entries still matching after this pass. Cleaning "all" works in bounded passes; repeat until zero. */
   remaining: number;
+  /**
+   * Missing books kept because a content file is on disk again; a rescan of their library restores
+   * them. Counted within `skipped`. Missing-book cleanup only; older servers omit it.
+   */
+  stillOnDisk?: number;
 };

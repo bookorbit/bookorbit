@@ -1984,26 +1984,14 @@ export class BookService {
         return row ? [row] : [];
       });
       const files = await this.bookRepo.findAllFilesByBookIds(deletedBookIds);
-      const removeTarget = async (path: string, kind: 'bookFile' | 'coverDir'): Promise<boolean> => {
-        try {
-          await rm(path, kind === 'coverDir' ? { recursive: true, force: true } : { force: true });
-          return true;
-        } catch (err) {
-          const errorClass = err instanceof Error ? err.name : 'Error';
-          const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
-          this.logger.warn(
-            `[${event}] [fail] userId=${user.id} path="${sanitizeLogValue(path)}" kind=${kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
-          );
-          return false;
-        }
-      };
+      const removeTarget = (path: string) => this.removeDeletionTarget(path, 'bookFile', event, user, startedAt);
 
       // A surviving content file would be imported again by the scanner. Keep all records and
       // user state on failure; force:true lets a retry finish after a partially removed batch.
       const paths = [...new Set(files.map((file) => file.absolutePath))];
       // Defer watcher reconciliation until the records reflect the intentional removal.
       await this.selfWriteRegistry.track(paths, async () => {
-        const fileResults = await mapWithConcurrency(paths, BOOK_DELETION_CONCURRENCY, (path) => removeTarget(path, 'bookFile'));
+        const fileResults = await mapWithConcurrency(paths, BOOK_DELETION_CONCURRENCY, removeTarget);
         if (fileResults.some((removed) => !removed)) {
           throw new InternalServerErrorException(
             "Could not delete all book files. Book records were kept, but some files may already be removed. Check the server's library permissions or read-only mounts, then retry.",
@@ -2015,10 +2003,7 @@ export class BookService {
       });
       // Cover cleanup cannot resurrect a book and must not turn a committed deletion into a
       // failure. Leave covers alone until the database transaction has succeeded.
-      const coverResults = await mapWithConcurrency(deletedBookIds, BOOK_DELETION_CONCURRENCY, (bookId) =>
-        removeTarget(join(this.appDataPath, 'covers', String(bookId)), 'coverDir'),
-      );
-      const failedDeletes = coverResults.filter((removed) => !removed).length;
+      const failedDeletes = await this.removeCoverCacheDirs(deletedBookIds, event, user, startedAt);
       this.logger.log(
         `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${files.length} failedDeletes=${failedDeletes} - delete books completed`,
       );
@@ -2034,6 +2019,81 @@ export class BookService {
         `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books failed`,
       );
       throw err;
+    }
+  }
+
+  /**
+   * Removes the records of books a scan marked missing and leaves the library alone. A missing book
+   * can still own files that exist, such as a cover or OPF beside the vanished content, or content a
+   * remounted share brought back, so nothing on disk is deleted except BookOrbit's own cover cache.
+   * A book that is no longer missing by the time the delete runs is kept.
+   */
+  async deleteMissingBookRecords(bookIds: number[], user: RequestUser): Promise<BookDeletionAuditMeta> {
+    const event = 'book.delete_missing_records';
+    const startedAt = Date.now();
+    this.logger.log(`[${event}] [start] count=${bookIds.length} userId=${user.id} - missing book record deletion started`);
+    try {
+      if (bookIds.length === 0) {
+        this.logger.log(`[${event}] [end] count=0 durationMs=${Date.now() - startedAt} deletedBooks=0 - missing book record deletion completed`);
+        return { total: 0, books: [], omitted: 0 };
+      }
+      const rows = await this.verifyLibraryAccessForBookIds(bookIds, user);
+      const rowIds = new Set(rows.map((row) => row.id));
+      const candidateIds = [...new Set(bookIds)].filter((bookId) => rowIds.has(bookId));
+      // Audit titles are read first: the rows are gone once the delete commits.
+      const auditRows = await this.bookRepo.findDeletionAuditBooksByIds(candidateIds.slice(0, MAX_DELETION_AUDIT_BOOKS));
+      const deletedBookIds = await this.bookRepo.deleteByIdsAndInvalidateScanState(candidateIds, { onlyMissing: true });
+      if (deletedBookIds.length > 0) this.readingAttemptEvents?.notifyChanged(null);
+      const failedDeletes = await this.removeCoverCacheDirs(deletedBookIds, event, user, startedAt);
+
+      const auditRowsById = new Map(auditRows.map((row) => [row.id, row]));
+      const auditBooks = deletedBookIds.flatMap((bookId) => {
+        const row = auditRowsById.get(bookId);
+        return row ? [row] : [];
+      });
+      this.logger.log(
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${deletedBookIds.length} keptBooks=${candidateIds.length - deletedBookIds.length} failedDeletes=${failedDeletes} - missing book record deletion completed`,
+      );
+      return {
+        total: deletedBookIds.length,
+        books: auditBooks,
+        omitted: Math.max(0, deletedBookIds.length - auditBooks.length),
+      };
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] count=${bookIds.length} userId=${user.id} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - missing book record deletion failed`,
+      );
+      throw err;
+    }
+  }
+
+  /** Returns how many cover cache folders could not be removed; a leftover folder never fails the deletion. */
+  private async removeCoverCacheDirs(bookIds: number[], event: string, user: RequestUser, startedAt: number): Promise<number> {
+    const results = await mapWithConcurrency(bookIds, BOOK_DELETION_CONCURRENCY, (bookId) =>
+      this.removeDeletionTarget(join(this.appDataPath, 'covers', String(bookId)), 'coverDir', event, user, startedAt),
+    );
+    return results.filter((removed) => !removed).length;
+  }
+
+  private async removeDeletionTarget(
+    path: string,
+    kind: 'bookFile' | 'coverDir',
+    event: string,
+    user: RequestUser,
+    startedAt: number,
+  ): Promise<boolean> {
+    try {
+      await rm(path, kind === 'coverDir' ? { recursive: true, force: true } : { force: true });
+      return true;
+    } catch (err) {
+      const errorClass = err instanceof Error ? err.name : 'Error';
+      const errorMessage = sanitizeLogValue(err instanceof Error ? err.message : String(err));
+      this.logger.warn(
+        `[${event}] [fail] userId=${user.id} path="${sanitizeLogValue(path)}" kind=${kind} durationMs=${Date.now() - startedAt} errorClass=${errorClass} error="${errorMessage}" - delete books cleanup target failed`,
+      );
+      return false;
     }
   }
 

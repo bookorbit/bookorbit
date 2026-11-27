@@ -1,5 +1,5 @@
 import { ConflictException } from '@nestjs/common';
-import { mkdir, mkdtemp, rm, writeFile } from 'fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -67,10 +67,14 @@ describe('MissingResourcesService', () => {
       filterBookIdsWithCoverSource: vi.fn().mockImplementation((ids: number[]) => Promise.resolve(ids)),
       clearCoverSource: vi.fn().mockImplementation((ids: number[]) => Promise.resolve(ids.length)),
       findExistingBookIds: vi.fn().mockResolvedValue([]),
+      findContentFilePaths: vi.fn().mockResolvedValue([]),
       ...overrides,
     };
     const libraryService = { findAccessibleLibraryIds: vi.fn().mockResolvedValue([1, 2]) };
-    const bookService = { deleteBooks: vi.fn().mockImplementation((ids: number[]) => Promise.resolve({ total: ids.length, books: [], omitted: 0 })) };
+    const bookService = {
+      deleteBooks: vi.fn(),
+      deleteMissingBookRecords: vi.fn().mockImplementation((ids: number[]) => Promise.resolve({ total: ids.length, books: [], omitted: 0 })),
+    };
     const config = { get: vi.fn().mockReturnValue(appDataPath) };
     const events = new ReadingAttemptEventsService();
     const service = new MissingResourcesService(
@@ -237,8 +241,75 @@ describe('MissingResourcesService', () => {
       const result = await service.cleanMissingBooks(user, { bookIds: [1, 2, 3] });
 
       expect(repo.filterStillMissingBookIds).toHaveBeenCalledWith([1, 2, 3], [1, 2]);
-      expect(bookService.deleteBooks).toHaveBeenCalledWith([1, 3], user);
-      expect(result).toEqual({ category: 'missing_books', requested: 3, cleaned: 2, skipped: 1, remaining: 4 });
+      expect(bookService.deleteMissingBookRecords).toHaveBeenCalledWith([1, 3], user);
+      expect(result).toEqual({ category: 'missing_books', requested: 3, cleaned: 2, skipped: 1, remaining: 4, stillOnDisk: 0 });
+    });
+
+    it('removes records only and never deletes library files', async () => {
+      const libraryDir = join(appDataPath, 'library', 'Salt Road');
+      await mkdir(libraryDir, { recursive: true });
+      await writeFile(join(libraryDir, 'cover.jpg'), 'sidecar cover');
+      await writeFile(join(libraryDir, 'metadata.opf'), 'sidecar opf');
+      const { service, bookService } = setup({
+        filterStillMissingBookIds: vi.fn().mockResolvedValue([4]),
+        findContentFilePaths: vi.fn().mockResolvedValue([{ bookId: 4, absolutePath: join(libraryDir, 'audio.mp3') }]),
+      });
+
+      const result = await service.cleanMissingBooks(user, { bookIds: [4] });
+
+      expect(bookService.deleteMissingBookRecords).toHaveBeenCalledWith([4], user);
+      expect(bookService.deleteBooks).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ cleaned: 1, skipped: 0, stillOnDisk: 0 });
+      await expect(readFile(join(libraryDir, 'cover.jpg'), 'utf8')).resolves.toBe('sidecar cover');
+      await expect(readFile(join(libraryDir, 'metadata.opf'), 'utf8')).resolves.toBe('sidecar opf');
+    });
+
+    it('keeps a missing book whose content file is back on disk', async () => {
+      const libraryDir = join(appDataPath, 'library');
+      await mkdir(libraryDir, { recursive: true });
+      const returned = join(libraryDir, 'returned.mp3');
+      await writeFile(returned, 'audio');
+      const { service, bookService } = setup({
+        filterStillMissingBookIds: vi.fn().mockResolvedValue([5, 6, 7]),
+        findContentFilePaths: vi.fn().mockResolvedValue([
+          { bookId: 5, absolutePath: join(libraryDir, 'gone-part1.mp3') },
+          { bookId: 5, absolutePath: returned },
+          { bookId: 6, absolutePath: join(libraryDir, 'gone.epub') },
+        ]),
+        countMissingBooks: vi.fn().mockResolvedValue(1),
+      });
+
+      const result = await service.cleanMissingBooks(user, { bookIds: [5, 6, 7] });
+
+      expect(bookService.deleteMissingBookRecords).toHaveBeenCalledExactlyOnceWith([6, 7], user);
+      expect(result).toEqual({ category: 'missing_books', requested: 3, cleaned: 2, skipped: 1, remaining: 1, stillOnDisk: 1 });
+      await expect(readFile(returned, 'utf8')).resolves.toBe('audio');
+    });
+
+    it('treats a path blocked by a file as gone and a directory in place of the content as gone', async () => {
+      const libraryDir = join(appDataPath, 'library');
+      await mkdir(join(libraryDir, 'now-a-folder.epub'), { recursive: true });
+      await writeFile(join(libraryDir, 'plain-file'), 'x');
+      const { service, bookService } = setup({
+        filterStillMissingBookIds: vi.fn().mockResolvedValue([8, 9]),
+        findContentFilePaths: vi.fn().mockResolvedValue([
+          { bookId: 8, absolutePath: join(libraryDir, 'plain-file', 'book.epub') },
+          { bookId: 9, absolutePath: join(libraryDir, 'now-a-folder.epub') },
+        ]),
+      });
+
+      expect(await service.cleanMissingBooks(user, { bookIds: [8, 9] })).toMatchObject({ cleaned: 2, stillOnDisk: 0 });
+      expect(bookService.deleteMissingBookRecords).toHaveBeenCalledWith([8, 9], user);
+    });
+
+    it('keeps a book whose content cannot be checked', async () => {
+      const { service, bookService } = setup({
+        filterStillMissingBookIds: vi.fn().mockResolvedValue([10]),
+        findContentFilePaths: vi.fn().mockResolvedValue([{ bookId: 10, absolutePath: `${'x'.repeat(5000)}.epub` }]),
+      });
+
+      expect(await service.cleanMissingBooks(user, { bookIds: [10] })).toMatchObject({ cleaned: 0, skipped: 1, stillOnDisk: 1 });
+      expect(bookService.deleteMissingBookRecords).not.toHaveBeenCalled();
     });
 
     it('cleans a bounded pass when all is requested', async () => {
@@ -250,7 +321,7 @@ describe('MissingResourcesService', () => {
       const result = await service.cleanMissingBooks(user, { all: true });
 
       expect(repo.findMissingBookIds).toHaveBeenCalledWith([1, 2], 0, 5000);
-      expect(bookService.deleteBooks).toHaveBeenCalledWith([8, 9], user);
+      expect(bookService.deleteMissingBookRecords).toHaveBeenCalledWith([8, 9], user);
       expect(result).toMatchObject({ cleaned: 2, remaining: 0 });
     });
 
@@ -259,13 +330,13 @@ describe('MissingResourcesService', () => {
       const { service, events, bookService } = setup({ findMissingBookIds: vi.fn().mockResolvedValue(ids) });
       const listener = vi.fn();
       events.on(READING_ATTEMPT_CHANGED, listener);
-      bookService.deleteBooks.mockImplementation((batch: number[]) => {
+      bookService.deleteMissingBookRecords.mockImplementation((batch: number[]) => {
         events.notifyChanged(null);
         expect(listener).not.toHaveBeenCalled();
         return Promise.resolve({ total: batch.length, books: [], omitted: 0 });
       });
       expect(await service.cleanMissingBooks(user, { all: true })).toMatchObject({ cleaned: 1043 });
-      expect(bookService.deleteBooks.mock.calls.map(([batch]) => batch.length)).toEqual([500, 500, 43]);
+      expect(bookService.deleteMissingBookRecords.mock.calls.map(([batch]) => batch.length)).toEqual([500, 500, 43]);
       expect(listener).toHaveBeenCalledExactlyOnceWith({ userId: null });
     });
 
@@ -274,7 +345,7 @@ describe('MissingResourcesService', () => {
       const { service, events, bookService } = setup({ findMissingBookIds: vi.fn().mockResolvedValue(ids) });
       const listener = vi.fn();
       events.on(READING_ATTEMPT_CHANGED, listener);
-      bookService.deleteBooks.mockImplementation((batch: number[]) => {
+      bookService.deleteMissingBookRecords.mockImplementation((batch: number[]) => {
         if (batch[0] === 501) return Promise.reject(new Error('Deletion failed'));
         events.notifyChanged(null);
         expect(listener).not.toHaveBeenCalled();

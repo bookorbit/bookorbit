@@ -4,7 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres';
 
 import { DB } from '../../db';
 import * as schema from '../../db/schema';
-import { bookMetadata, books, libraries } from '../../db/schema';
+import { bookFiles, bookMetadata, books, libraries } from '../../db/schema';
 import { formatKeyRank, normalizeFormatPriority } from '@bookorbit/types';
 
 type Db = NodePgDatabase<typeof schema>;
@@ -85,6 +85,14 @@ export class MissingResourcesRepository {
       .from(books)
       .where(and(eq(books.status, 'missing'), inArray(books.libraryId, libraryIds), inArray(books.id, bookIds)));
     return rows.map((row) => row.id);
+  }
+
+  async findContentFilePaths(bookIds: number[]): Promise<Array<{ bookId: number; absolutePath: string }>> {
+    if (bookIds.length === 0) return [];
+    return this.db
+      .select({ bookId: bookFiles.bookId, absolutePath: bookFiles.absolutePath })
+      .from(bookFiles)
+      .where(and(inArray(bookFiles.bookId, bookIds), eq(bookFiles.role, 'content')));
   }
 
   async countBooksWithCoverSource(libraryIds: number[]): Promise<number> {

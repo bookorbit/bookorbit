@@ -2502,18 +2502,22 @@ export class BookRepository {
     await deleteBooksWithHashInvalidation(this.db, inArray(books.id, bookIds), { keepFinishedReads: true });
   }
 
-  async deleteByIdsAndInvalidateScanState(bookIds: number[]): Promise<void> {
+  /**
+   * Returns the ids it deleted. With `onlyMissing`, a book a scan restored after the caller checked it
+   * is kept: the status is read under the same row lock as the delete.
+   */
+  async deleteByIdsAndInvalidateScanState(bookIds: number[], options: { onlyMissing?: boolean } = {}): Promise<number[]> {
     const uniqueBookIds = [...new Set(bookIds)].sort((a, b) => a - b);
-    if (uniqueBookIds.length === 0) return;
+    if (uniqueBookIds.length === 0) return [];
 
-    await this.db.transaction(async (tx) => {
+    return this.db.transaction(async (tx) => {
       const rows = await tx
         .select({ id: books.id, libraryFolderId: books.libraryFolderId, folderPath: books.folderPath })
         .from(books)
-        .where(inArray(books.id, uniqueBookIds))
+        .where(options.onlyMissing ? and(inArray(books.id, uniqueBookIds), eq(books.status, 'missing')) : inArray(books.id, uniqueBookIds))
         .orderBy(asc(books.id))
         .for('update');
-      if (rows.length === 0) return;
+      if (rows.length === 0) return [];
 
       const libraryFolderIds = [...new Set(rows.map((row) => row.libraryFolderId))].sort((a, b) => a - b);
       await tx
@@ -2553,14 +2557,9 @@ export class BookRepository {
         }
       }
 
-      await deleteBooksWithHashInvalidation(
-        tx,
-        inArray(
-          books.id,
-          rows.map((row) => row.id),
-        ),
-        { keepFinishedReads: true },
-      );
+      const deletedIds = rows.map((row) => row.id);
+      await deleteBooksWithHashInvalidation(tx, inArray(books.id, deletedIds), { keepFinishedReads: true });
+      return deletedIds;
     });
   }
 

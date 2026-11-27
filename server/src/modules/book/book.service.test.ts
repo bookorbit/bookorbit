@@ -3311,6 +3311,93 @@ describe('BookService', () => {
       expect(mockRm).not.toHaveBeenCalled();
     });
 
+    describe('deleteMissingBookRecords', () => {
+      it('deletes only records and the cover cache, never library files', async () => {
+        const { service, bookRepo, readingEvents } = makeService({ appDataPath: '/path/to/data' });
+        bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
+          { id: 3, libraryId: 7 },
+          { id: 4, libraryId: 7 },
+        ]);
+        bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([
+          { id: 4, title: 'The Salt Road' },
+          { id: 3, title: 'Dune' },
+        ]);
+        bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue([3, 4]);
+        mockRm.mockResolvedValue(undefined);
+        const notify = vi.spyOn(readingEvents, 'notifyChanged');
+
+        const result = await service.deleteMissingBookRecords([4, 3, 4], makeUser());
+
+        expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([4, 3], { onlyMissing: true });
+        expect(bookRepo.findAllFilesByBookIds).not.toHaveBeenCalled();
+        expect(mockRm).toHaveBeenCalledTimes(2);
+        expect(mockRm).toHaveBeenCalledWith('/path/to/data/covers/3', { recursive: true, force: true });
+        expect(mockRm).toHaveBeenCalledWith('/path/to/data/covers/4', { recursive: true, force: true });
+        expect(notify).toHaveBeenCalledExactlyOnceWith(null);
+        expect(result).toEqual({
+          total: 2,
+          books: [
+            { id: 3, title: 'Dune' },
+            { id: 4, title: 'The Salt Road' },
+          ],
+          omitted: 0,
+        });
+      });
+
+      it('keeps a book a scan restored before the delete ran', async () => {
+        const { service, bookRepo, readingEvents } = makeService({ appDataPath: '/path/to/data' });
+        bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
+          { id: 3, libraryId: 7 },
+          { id: 4, libraryId: 7 },
+        ]);
+        bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([
+          { id: 3, title: 'Dune' },
+          { id: 4, title: 'The Glass Harbor' },
+        ]);
+        bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue([3]);
+        mockRm.mockResolvedValue(undefined);
+        const notify = vi.spyOn(readingEvents, 'notifyChanged');
+
+        const result = await service.deleteMissingBookRecords([3, 4], makeUser());
+
+        expect(result).toEqual({ total: 1, books: [{ id: 3, title: 'Dune' }], omitted: 0 });
+        expect(mockRm).toHaveBeenCalledExactlyOnceWith('/path/to/data/covers/3', { recursive: true, force: true });
+        expect(notify).toHaveBeenCalledTimes(1);
+      });
+
+      it('changes nothing when every book was restored', async () => {
+        const { service, bookRepo, readingEvents } = makeService();
+        bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+        bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
+        bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue([]);
+        const notify = vi.spyOn(readingEvents, 'notifyChanged');
+
+        await expect(service.deleteMissingBookRecords([3], makeUser())).resolves.toEqual({ total: 0, books: [], omitted: 0 });
+        expect(notify).not.toHaveBeenCalled();
+        expect(mockRm).not.toHaveBeenCalled();
+      });
+
+      it('keeps the deletion when cover cache cleanup fails', async () => {
+        const { service, bookRepo } = makeService({ appDataPath: '/path/to/data' });
+        bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+        bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
+        bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue([3]);
+        mockRm.mockRejectedValue(Object.assign(new Error('denied'), { code: 'EACCES' }));
+
+        await expect(service.deleteMissingBookRecords([3], makeUser())).resolves.toMatchObject({ total: 1 });
+      });
+
+      it('does not delete anything when library access is denied', async () => {
+        const { service, bookRepo, libraryService } = makeService();
+        bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
+        libraryService.verifyAccess.mockRejectedValue(new ForbiddenException());
+
+        await expect(service.deleteMissingBookRecords([3], makeUser())).rejects.toBeInstanceOf(ForbiddenException);
+        expect(bookRepo.deleteByIdsAndInvalidateScanState).not.toHaveBeenCalled();
+        expect(mockRm).not.toHaveBeenCalled();
+      });
+    });
+
     it('returns queued=0 when embed-all is already running', async () => {
       const { service, bookRepo, embedder } = makeService();
       let resolveEmbed: (() => void) | null = null;

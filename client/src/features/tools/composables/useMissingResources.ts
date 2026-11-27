@@ -237,22 +237,27 @@ export function useMissingResources() {
     error.value = null
     try {
       let cleaned = 0
+      // Every "all" pass re-reads the missing books from the start, so the last pass counts every kept book once.
+      let stillOnDisk = 0
       if (selectAllMatching.value) {
         let passes = 0
         for (;;) {
           const result: MissingResourceCleanupResult = await cleaner({ all: true })
           cleaned += result.cleaned
+          stillOnDisk = result.stillOnDisk ?? 0
           passes += 1
           if (result.remaining === 0 || result.cleaned === 0 || passes >= MAX_CLEAN_PASSES) break
         }
       } else {
         const result = await cleaner({ bookIds: [...selectedIds.value] })
         cleaned = result.cleaned
+        stillOnDisk = result.stillOnDisk ?? 0
       }
       clearSelection()
       await refreshSummary()
       await loadPage(1)
       toast.success(t(`tools.missingResources.cleaned.${target}`, { count: cleaned }))
+      if (stillOnDisk > 0) toast.info(t('tools.missingResources.stillOnDisk', { count: stillOnDisk }))
       return true
     } catch {
       error.value = t('tools.missingResources.errors.clean')

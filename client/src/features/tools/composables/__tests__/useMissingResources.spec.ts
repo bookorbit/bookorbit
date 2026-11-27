@@ -15,8 +15,15 @@ vi.mock('../../api/missing-resources', () => ({
   startCoverSweep: vi.fn<(...args: unknown[]) => unknown>(),
 }))
 
-vi.mock('vue-sonner', () => ({ toast: { success: vi.fn<(...args: unknown[]) => void>(), error: vi.fn<(...args: unknown[]) => void>() } }))
+vi.mock('vue-sonner', () => ({
+  toast: {
+    success: vi.fn<(...args: unknown[]) => void>(),
+    error: vi.fn<(...args: unknown[]) => void>(),
+    info: vi.fn<(...args: unknown[]) => void>(),
+  },
+}))
 
+import { toast } from 'vue-sonner'
 import * as api from '../../api/missing-resources'
 import { useMissingResources } from '../useMissingResources'
 
@@ -213,6 +220,44 @@ describe('useMissingResources', () => {
     expect(api.cleanMissingBooks).toHaveBeenCalledWith({ bookIds: [2] })
     expect(api.cleanMissingBooks).toHaveBeenCalledTimes(1)
     expect(resources.selectionCount.value).toBe(0)
+    expect(toast.info).not.toHaveBeenCalled()
+  })
+
+  it('says which selected books were kept because their files are still on disk', async () => {
+    vi.mocked(api.cleanMissingBooks).mockResolvedValue({
+      category: 'missing_books',
+      requested: 2,
+      cleaned: 1,
+      skipped: 1,
+      remaining: 1,
+      stillOnDisk: 1,
+    })
+    const { resources } = mountComposable()
+    await resources.initialize()
+    resources.toggleSelection(1)
+    resources.toggleSelection(2)
+
+    await resources.cleanSelected()
+
+    expect(toast.success).toHaveBeenCalledWith('Removed one missing book')
+    expect(toast.info).toHaveBeenCalledExactlyOnceWith('Kept one book because its file is still on disk. Rescan its library to bring it back.')
+  })
+
+  it('counts books kept on disk once across chained passes', async () => {
+    vi.mocked(api.cleanMissingBooks)
+      .mockResolvedValueOnce({ category: 'missing_books', requested: 5000, cleaned: 4998, skipped: 2, remaining: 14, stillOnDisk: 2 })
+      .mockResolvedValueOnce({ category: 'missing_books', requested: 14, cleaned: 12, skipped: 2, remaining: 2, stillOnDisk: 2 })
+      .mockResolvedValueOnce({ category: 'missing_books', requested: 2, cleaned: 0, skipped: 2, remaining: 2, stillOnDisk: 2 })
+    const { resources } = mountComposable()
+    await resources.initialize()
+    resources.selectAll()
+
+    await resources.cleanSelected()
+
+    expect(api.cleanMissingBooks).toHaveBeenCalledTimes(3)
+    expect(toast.info).toHaveBeenCalledExactlyOnceWith(
+      'Kept 2 books because their files are still on disk. Rescan their libraries to bring them back.',
+    )
   })
 
   it('repeats bounded passes until nothing matches when all is selected', async () => {

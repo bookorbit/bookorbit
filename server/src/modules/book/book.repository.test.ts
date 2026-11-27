@@ -187,6 +187,37 @@ describe('BookRepository', () => {
     expect(invalidationQuery.params).not.toContain('/books/Sibling');
   });
 
+  it('deletes only books still missing under the row lock and returns their ids', async () => {
+    const bookSelect = makeSelectChain('for', [{ id: 11, libraryFolderId: 7, folderPath: '/books/Salt Road' }]);
+    const folderSelect = makeSelectChain('for', [{ id: 7 }]);
+    const tx = {
+      execute: vi.fn().mockResolvedValue(undefined),
+      select: vi.fn().mockReturnValueOnce(bookSelect).mockReturnValueOnce(folderSelect),
+      update: vi.fn().mockReturnValue({ set: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }) }),
+      delete: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) }),
+    };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<number[]>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.deleteByIdsAndInvalidateScanState([12, 11], { onlyMissing: true })).resolves.toEqual([11]);
+
+    const lockQuery = new PgDialect().sqlToQuery(bookSelect.where.mock.calls[0]![0]);
+    expect(lockQuery.sql).toContain('"books"."status" = $');
+    expect(lockQuery.params).toEqual([11, 12, 'missing']);
+    expect(new PgDialect().sqlToQuery(tx.execute.mock.calls[2]![0]).params).toContain(11);
+  });
+
+  it('returns no ids and writes nothing when no book is still missing', async () => {
+    const bookSelect = makeSelectChain('for', []);
+    const tx = { execute: vi.fn(), select: vi.fn().mockReturnValueOnce(bookSelect), update: vi.fn(), delete: vi.fn() };
+    const db = { transaction: vi.fn((callback: (executor: typeof tx) => Promise<number[]>) => callback(tx)) };
+    const repo = new BookRepository(db as never);
+
+    await expect(repo.deleteByIdsAndInvalidateScanState([11], { onlyMissing: true })).resolves.toEqual([]);
+    expect(tx.update).not.toHaveBeenCalled();
+    expect(tx.execute).not.toHaveBeenCalled();
+  });
+
   it('does not reach the book delete when scan-state invalidation fails', async () => {
     const bookSelect = makeSelectChain('for', [{ id: 10, libraryFolderId: 7, folderPath: '/books/Book' }]);
     const folderSelect = makeSelectChain('for', [{ id: 7 }]);
