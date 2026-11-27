@@ -1,9 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { ref } from 'vue'
 import { getReaderSidebarPinStorageKey, useReaderSidebarPin } from '../useReaderSidebarPin'
+
+const isDesktop = ref(true)
+vi.mock('@vueuse/core', () => ({
+  breakpointsTailwind: {},
+  useBreakpoints: () => ({ greaterOrEqual: () => isDesktop }),
+}))
 
 describe('useReaderSidebarPin', () => {
   beforeEach(() => {
     sessionStorage.clear()
+    isDesktop.value = true
   })
 
   afterEach(() => {
@@ -40,6 +48,25 @@ describe('useReaderSidebarPin', () => {
 
     expect(sidebarPin.isSidebarPinned.value).toBe(false)
     expect(sessionStorage.getItem(key)).toBeNull()
+  })
+
+  it('restores the saved pin when the viewport is wide enough again', () => {
+    const key = getReaderSidebarPinStorageKey(42)
+    sessionStorage.setItem(key, 'true')
+    const sidebarPin = useReaderSidebarPin(42)
+
+    isDesktop.value = false
+
+    expect(sidebarPin.isSidebarPinned.value).toBe(false)
+    expect(sidebarPin.shouldCloseAfterNavigation()).toBe(true)
+
+    sidebarPin.toggleSidebarPinned()
+    expect(sessionStorage.getItem(key)).toBe('true')
+
+    isDesktop.value = true
+
+    expect(sidebarPin.isSidebarPinned.value).toBe(true)
+    expect(sidebarPin.shouldCloseAfterNavigation()).toBe(false)
   })
 
   it('keeps working when session storage is unavailable', () => {

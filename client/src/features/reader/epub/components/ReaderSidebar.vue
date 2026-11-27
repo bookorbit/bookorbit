@@ -21,6 +21,7 @@ const props = withDefaults(
     locationMetaByCfi: Record<string, { chapterTitle: string | null; percentage: number | null }>
     activeHref: string
     expandedHrefs: Set<string>
+    canPin: boolean
     pinned: boolean
     navigationLocked?: boolean
   }>(),
@@ -250,9 +251,12 @@ function togglePinned() {
 </script>
 
 <template>
-  <div class="fixed inset-0 z-50 flex" :class="pinned ? 'pointer-events-none' : ''">
+  <div class="flex" :class="pinned ? 'order-first shrink-0' : 'fixed inset-0 z-50'">
     <div
-      class="sidebar-panel pointer-events-auto w-[17.1rem] sm:w-[18rem] md:w-[19.35rem] lg:w-[20.25rem] h-full bg-card text-card-foreground flex flex-col shadow-2xl border-r border-border"
+      class="sidebar-panel flex h-full w-[17.1rem] max-w-full flex-col border-e border-border bg-card text-card-foreground sm:w-[18rem] md:w-[19.35rem] lg:w-[20.25rem]"
+      :class="{
+        'shadow-2xl motion-safe:animate-in motion-safe:duration-250 ltr:motion-safe:slide-in-from-left rtl:motion-safe:slide-in-from-right': !pinned,
+      }"
       @click.stop
     >
       <div class="flex items-stretch border-b border-border shrink-0">
@@ -275,12 +279,12 @@ function togglePinned() {
           </Tooltip>
         </div>
         <div class="flex items-center gap-1 border-l border-border px-1.5">
-          <Tooltip>
+          <Tooltip v-if="canPin">
             <TooltipTrigger as-child>
               <button
                 type="button"
-                class="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                :class="pinned ? 'bg-primary/10 text-primary hover:bg-primary/15 hover:text-primary' : ''"
+                class="flex h-8 w-8 items-center justify-center rounded-md transition-colors focus-visible:ring-2 focus-visible:ring-ring"
+                :class="pinned ? 'bg-primary/10 text-primary hover:bg-primary/15' : 'text-foreground hover:bg-muted'"
                 :aria-label="pinLabel"
                 :aria-pressed="pinned"
                 @click="togglePinned"
@@ -577,18 +581,3 @@ const TocList = defineComponent({
   },
 })
 </script>
-
-<style scoped>
-.sidebar-panel {
-  animation: slideInFromLeft 0.25s ease;
-}
-
-@keyframes slideInFromLeft {
-  from {
-    transform: translateX(-100%);
-  }
-  to {
-    transform: translateX(0);
-  }
-}
-</style>

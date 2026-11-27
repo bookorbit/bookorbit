@@ -87,7 +87,7 @@ watch(
 
 <template>
   <footer
-    class="fixed bottom-0 left-0 right-0 h-10 sm:h-11 z-50 flex items-center gap-2 px-2 sm:gap-3 sm:px-4 bg-background/90 backdrop-blur-md border-t border-border"
+    class="absolute inset-x-0 bottom-0 h-10 sm:h-11 z-50 flex items-center gap-2 px-2 sm:gap-3 sm:px-4 bg-background/90 backdrop-blur-md border-t border-border"
   >
     <Tooltip>
       <TooltipTrigger as-child>

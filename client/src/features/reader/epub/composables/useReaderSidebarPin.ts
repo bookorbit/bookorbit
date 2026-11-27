@@ -1,4 +1,5 @@
-import { ref } from 'vue'
+import { breakpointsTailwind, useBreakpoints } from '@vueuse/core'
+import { computed, ref } from 'vue'
 
 const SIDEBAR_PIN_KEY_PREFIX = 'reader:sidebar:pinned'
 
@@ -38,15 +39,17 @@ function writeStoredSidebarPinned(key: string, pinned: boolean): void {
 
 export function useReaderSidebarPin(bookFileId: number) {
   const storageKey = getReaderSidebarPinStorageKey(bookFileId)
-  const isSidebarPinned = ref(readStoredSidebarPinned(storageKey))
+  const canPinSidebar = useBreakpoints(breakpointsTailwind).greaterOrEqual('lg')
+  const storedPinned = ref(readStoredSidebarPinned(storageKey))
+  const isSidebarPinned = computed(() => canPinSidebar.value && storedPinned.value)
 
   function setSidebarPinned(pinned: boolean): void {
-    isSidebarPinned.value = pinned
+    storedPinned.value = pinned
     writeStoredSidebarPinned(storageKey, pinned)
   }
 
   function toggleSidebarPinned(): void {
-    setSidebarPinned(!isSidebarPinned.value)
+    if (canPinSidebar.value) setSidebarPinned(!isSidebarPinned.value)
   }
 
   function shouldCloseAfterNavigation(): boolean {
@@ -54,6 +57,7 @@ export function useReaderSidebarPin(bookFileId: number) {
   }
 
   return {
+    canPinSidebar,
     isSidebarPinned,
     setSidebarPinned,
     toggleSidebarPinned,

@@ -90,7 +90,7 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
 
 <template>
   <header
-    class="fixed top-0 left-0 right-0 h-10 sm:h-11 z-50 flex items-center px-2 sm:px-3 gap-1 bg-background/90 backdrop-blur-md border-b border-border"
+    class="absolute inset-x-0 top-0 h-10 sm:h-11 z-50 flex items-center px-2 sm:px-3 gap-1 bg-background/90 backdrop-blur-md border-b border-border"
   >
     <!-- Left button group -->
     <div class="flex items-center gap-1 shrink-0">
@@ -131,13 +131,10 @@ function getFooterModeTooltip(mode: 0 | 1 | 2): string {
       </Tooltip>
     </div>
 
-    <!-- Title: desktop/tablet only to avoid overlap on narrow mobile headers -->
-    <div class="hidden sm:absolute sm:inset-x-0 sm:top-0 sm:h-12 sm:flex sm:items-center sm:justify-center sm:pointer-events-none">
-      <p class="text-sm font-serif font-medium truncate text-center text-muted-foreground max-w-[40vw]">{{ chapterTitle }}</p>
-    </div>
+    <p class="hidden min-w-0 flex-1 truncate text-center font-serif text-sm font-medium text-muted-foreground sm:block">{{ chapterTitle }}</p>
 
     <!-- Right button group -->
-    <div class="flex items-center gap-1 shrink-0 ml-auto">
+    <div class="ms-auto flex shrink-0 items-center gap-1">
       <div v-if="props.peekMode" class="flex h-7 items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-1.5 text-primary">
         <span class="hidden text-[11px] font-medium sm:inline">{{ t('reader.peek.badge') }}</span>
         <button

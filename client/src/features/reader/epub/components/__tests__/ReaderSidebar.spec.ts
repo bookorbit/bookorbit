@@ -36,6 +36,7 @@ describe('ReaderSidebar', () => {
       locationMetaByCfi: {},
       activeHref: '',
       expandedHrefs: new Set<string>(),
+      canPin: true,
       pinned: false,
     }
   }
@@ -123,6 +124,17 @@ describe('ReaderSidebar', () => {
 
     await wrapper.get('button[aria-label="Close sidebar"]').trigger('click')
     expect(wrapper.emitted('close')).toHaveLength(2)
+  })
+
+  it('keeps the sidebar dismissible when pinning is unavailable', () => {
+    const wrapper = mount(ReaderSidebar, {
+      props: { ...makeBaseProps(), canPin: false },
+      global,
+    })
+
+    expect(wrapper.find('button[aria-label="Pin sidebar"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="Close sidebar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-reader-sidebar-backdrop]').exists()).toBe(true)
   })
 
   it('navigates and deletes bookmark/annotation entries from sidebar tabs', async () => {
