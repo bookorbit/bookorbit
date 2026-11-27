@@ -116,6 +116,7 @@ export function parseGoodreadsAuthorPage(html: string): ParsedGoodreadsAuthor | 
 function dataItemAbout($: CheerioAPI): string {
   const container = $('.aboutAuthorInfo').first();
   if (container.length === 0) return '';
+  container.find('a[href^="/author/edit/"]').remove();
   return spanText($, container);
 }
 

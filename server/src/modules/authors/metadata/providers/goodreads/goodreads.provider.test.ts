@@ -208,8 +208,8 @@ describe('GoodreadsAuthorMetadataProvider', () => {
   });
 
   describe('cache declaration', () => {
-    it('never keeps empty answers', () => {
-      expect(provider.cache.version).toBe(1);
+    it('uses the current parser cache version and never keeps empty answers', () => {
+      expect(provider.cache.version).toBe(2);
       expect(provider.cache.trustEmpty).toBe(false);
     });
 

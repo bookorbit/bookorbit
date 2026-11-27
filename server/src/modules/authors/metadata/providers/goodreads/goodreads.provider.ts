@@ -43,7 +43,7 @@ export class GoodreadsAuthorMetadataProvider implements IdentifiableAuthorMetada
 
   // A scraper cannot prove an empty page is a genuine "no results", so empty answers are never kept.
   readonly cache: ProviderCacheSpec<AuthorMetadataSearchParams> = {
-    version: 1,
+    version: 2,
     trustEmpty: false,
     context: async () => authorProviderCacheContext(await this.isEnabled()),
     describeSearch: (params) => {

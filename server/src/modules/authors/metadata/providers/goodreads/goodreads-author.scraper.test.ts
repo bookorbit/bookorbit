@@ -88,6 +88,28 @@ describe('parseGoodreadsAuthorPage', () => {
     expect(parsed?.description).toBeUndefined();
   });
 
+  it.each([
+    { scenario: 'there is no biography', bio: '', description: undefined },
+    {
+      scenario: 'the biography contains a regular link',
+      bio: 'Co-author of <a href="/book/show/41678">Computer Networking</a>.',
+      description: 'Co-author of Computer Networking.',
+    },
+  ])('ignores the edit link when $scenario', ({ bio, description }) => {
+    const parsed = parseGoodreadsAuthorPage(`
+      <h1 class="authorName"><span itemprop="name">James F. Kurose</span></h1>
+      <div class="aboutAuthorInfo">
+        <div style="float: right;">
+          <a class="smallText greyText" rel="nofollow" href="/author/edit/38971109.James_F_Kurose">edit data</a>
+        </div>
+        ${bio}
+      </div>
+    `);
+
+    expect(parsed).toMatchObject({ name: 'James F. Kurose' });
+    expect(parsed?.description).toBe(description);
+  });
+
   it('returns null when the page carries no author name', () => {
     expect(parseGoodreadsAuthorPage('<html><body>blocked</body></html>')).toBeNull();
     expect(parseGoodreadsAuthorPage('')).toBeNull();
