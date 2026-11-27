@@ -68,7 +68,7 @@ describe('ProwlarrClient', () => {
         priority: 20,
         seedRatioGoal: null,
         seedTimeMinutes: null,
-        categories: { ebook: [7020], audiobook: [3030] },
+        categories: { ebook: [7020, 7030], audiobook: [3030] },
       },
     ]);
     expect(fetchMock.mock.calls[0]?.[1]?.headers).toEqual(expect.objectContaining({ 'X-Api-Key': 'secret-key' }));
@@ -115,6 +115,56 @@ describe('ProwlarrClient', () => {
     await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([
       expect.objectContaining({ categories: { ebook: [7020], audiobook: [3030] } }),
     ]);
+  });
+
+  it('searches comics beside ebooks when the source files them under 7030', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 4,
+            name: 'Manga source',
+            protocol: 'torrent',
+            enable: true,
+            capabilities: { categories: [{ id: 7000, subCategories: [{ id: 7020 }, { id: 7030 }] }, { id: 3030 }] },
+          },
+        ]),
+      ),
+    );
+
+    await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([
+      expect.objectContaining({ categories: { ebook: [7020, 7030], audiobook: [3030] } }),
+    ]);
+  });
+
+  it('leaves the parent book category alone because it already reaches comics', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([
+          {
+            id: 4,
+            name: 'Parent-only source',
+            protocol: 'torrent',
+            enable: true,
+            capabilities: { categories: [{ id: 7000, subCategories: [{ id: 7030 }] }] },
+          },
+        ]),
+      ),
+    );
+
+    await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([
+      expect.objectContaining({ categories: { ebook: [7000], audiobook: [] } }),
+    ]);
+  });
+
+  it('keeps an uncategorised ebook search rather than narrowing it to comics', async () => {
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify([{ id: 4, name: 'Comics-only source', protocol: 'torrent', enable: true, capabilities: { categories: [{ id: 7030 }] } }]),
+      ),
+    );
+
+    await expect(new ProwlarrClient().indexers(connection)).resolves.toEqual([expect.objectContaining({ categories: { ebook: [], audiobook: [] } })]);
   });
 
   it('searches without a category when Prowlarr advertises no compatible book category', async () => {

@@ -127,9 +127,19 @@ function categoryMap(value: unknown, fallback: IndexerCategoryMap): IndexerCateg
   const ids = new Set<number>();
   collectCategoryIds(value.categories, ids);
   return {
-    ebook: preferredCategory(ids, 7020, 7000),
+    ebook: ebookCategories(ids),
     audiobook: preferredCategory(ids, 3030, 3000),
   };
+}
+
+/**
+ * Comics are requested as ebooks, so a source that files them under 7030 has to be searched there
+ * too. A 7000 search already reaches every book subcategory, and a source with neither 7020 nor 7000
+ * is searched without a category at all, so 7030 is added only beside 7020.
+ */
+function ebookCategories(ids: ReadonlySet<number>): number[] {
+  const books = preferredCategory(ids, 7020, 7000);
+  return books[0] === 7020 && ids.has(7030) ? [7020, 7030] : books;
 }
 
 function collectCategoryIds(values: unknown[], ids: Set<number>): void {

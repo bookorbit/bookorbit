@@ -133,7 +133,7 @@ describe('TorznabAdapter', () => {
     expect(url.pathname).toBe('/api/v2.0/indexers/all/results/torznab/api');
     expect(url.searchParams.get('t')).toBe('search');
     expect(url.searchParams.get('apikey')).toBe('secret-key');
-    expect(url.searchParams.get('cat')).toBe('7020');
+    expect(url.searchParams.get('cat')).toBe('7020,7030');
     // The ISBN is not in the query text: trackers do not index it, and it is a scoring signal.
     expect(url.searchParams.get('q')).toBe('Dune Frank Herbert');
   });

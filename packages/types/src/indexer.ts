@@ -49,12 +49,13 @@ export type IndexerCategoryMap = Record<BookRequestMediaKind, number[]>;
 
 /**
  * Starting points, not constraints. Torznab follows the Newznab category numbering (7020 ebooks,
- * 3030 audiobooks). A source with no categories at all declares an empty map, and
- * `INDEXER_USES_CATEGORIES` hides the editor rather than showing boxes that do nothing.
+ * 7030 comics, 3030 audiobooks). Comics are requested as ebooks, so the ebook search covers both.
+ * A source with no categories at all declares an empty map, and `INDEXER_USES_CATEGORIES` hides
+ * the editor rather than showing boxes that do nothing.
  */
 export const DEFAULT_INDEXER_CATEGORIES: Record<IndexerAdapterType, IndexerCategoryMap> = {
-  torznab: { ebook: [7020], audiobook: [3030] },
-  newznab: { ebook: [7020], audiobook: [3030] },
+  torznab: { ebook: [7020, 7030], audiobook: [3030] },
+  newznab: { ebook: [7020, 7030], audiobook: [3030] },
 };
 
 /** What the credential field holds. Null where the source needs none, as an open library does. */

@@ -89,7 +89,7 @@ describe('NewznabAdapter', () => {
     expect(url.pathname).toBe('/api');
     expect(url.searchParams.get('t')).toBe('search');
     expect(url.searchParams.get('q')).toBe('9780441013593');
-    expect(url.searchParams.get('cat')).toBe('7020');
+    expect(url.searchParams.get('cat')).toBe('7020,7030');
     expect(url.searchParams.get('apikey')).toBe('secret-key');
     expect(releases[0]).toMatchObject({
       guid: 'release-guid',
