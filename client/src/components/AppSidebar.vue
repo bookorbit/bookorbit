@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onScopeDispose, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, onScopeDispose, ref, shallowRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Orbit } from '@lucide/vue'
 import type { Library } from '@bookorbit/types'
 import { formatCompactNumber } from '@/i18n/formatters'
@@ -32,9 +32,11 @@ import SettingsSidebar from '@/features/settings/components/SettingsSidebar.vue'
 
 // Only opened to create a library, so it stays out of every page's first load.
 const LibraryCreatorModal = defineAsyncComponent(() => import('@/features/library/components/LibraryCreatorModal.vue'))
+const ImportSmartScopeDialog = defineAsyncComponent(() => import('@/features/smart-scope/components/ImportSmartScopeDialog.vue'))
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const { state, isMobile, openMobile, setOpen, setOpenMobile } = useSidebar()
 const { outstandingRequestTotal } = useSidebarDataSync()
 const { zones, jobsAllowed } = useSidebarNav(() => outstandingRequestTotal.value)
@@ -138,6 +140,7 @@ function handleNavigate() {
 }
 
 const openCreateDialog = ref<SidebarListKind | null>(null)
+const importSmartScopeTrigger = shallowRef<HTMLButtonElement | null>(null)
 
 function handleAdd(section: SidebarSection) {
   openCreateDialog.value = section.kind
@@ -145,6 +148,20 @@ function handleAdd(section: SidebarSection) {
 
 function closeCreateDialog() {
   openCreateDialog.value = null
+}
+
+function openSmartScopeImport(trigger: HTMLButtonElement) {
+  importSmartScopeTrigger.value = trigger
+}
+
+function closeSmartScopeImport() {
+  importSmartScopeTrigger.value = null
+}
+
+function openImportedSmartScope(id: number) {
+  closeSmartScopeImport()
+  handleNavigate()
+  void router.push({ name: 'smartScope', params: { id } })
 }
 
 async function onLibrarySaved(library: Library) {
@@ -156,6 +173,12 @@ async function onLibrarySaved(library: Library) {
 
 <template>
   <CreateSmartScopeDialog :open="openCreateDialog === 'smartScope'" @close="closeCreateDialog" />
+  <ImportSmartScopeDialog
+    v-if="importSmartScopeTrigger"
+    :return-focus-to="importSmartScopeTrigger"
+    @close="closeSmartScopeImport"
+    @imported="openImportedSmartScope"
+  />
   <CreateCollectionDialog :open="openCreateDialog === 'collection'" @close="closeCreateDialog" />
   <LibraryCreatorModal v-if="openCreateDialog === 'library'" @close="closeCreateDialog" @saved="onLibrarySaved" />
 
@@ -264,7 +287,13 @@ async function onLibrarySaved(library: Library) {
                 :icon="block.section.icon"
                 :count="block.section.props.items.length"
               >
-                <SidebarEntitySection v-bind="block.section.props" always-open @add="handleAdd(block.section)" @navigate="handleNavigate" />
+                <SidebarEntitySection
+                  v-bind="block.section.props"
+                  always-open
+                  @add="handleAdd(block.section)"
+                  @import="openSmartScopeImport"
+                  @navigate="handleNavigate"
+                />
               </SidebarSectionPopover>
             </template>
           </div>
@@ -279,6 +308,7 @@ async function onLibrarySaved(library: Library) {
                 :persist-order="block.section.persistOrder"
                 :activity="block.section.activity"
                 @add="handleAdd(block.section)"
+                @import="openSmartScopeImport"
                 @navigate="handleNavigate"
               />
             </template>

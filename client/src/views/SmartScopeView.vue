@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { formatNumber } from '@/i18n/formatters'
-import { AlertTriangle, Aperture, FileSpreadsheet, Settings2, Tablet, Trash2 } from '@lucide/vue'
+import { AlertTriangle, Aperture, FileSpreadsheet, Settings2, Share2, Tablet, Trash2 } from '@lucide/vue'
 import { DropdownMenuCheckboxItem, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import ConfirmDialog from '@/components/ui/ConfirmDialog.vue'
 import EntityNotFound from '@/components/EntityNotFound.vue'
@@ -19,6 +19,7 @@ import BookListToolbar from '@/features/book/components/list-page/BookListToolba
 import { useBookListPage } from '@/features/book/composables/useBookListPage'
 import { DEFAULT_SORT } from '@/features/book/lib/sort-defaults'
 import SmartScopeEditorPanel from '@/features/smart-scope/components/SmartScopeEditorPanel.vue'
+import ShareSmartScopeDialog from '@/features/smart-scope/components/ShareSmartScopeDialog.vue'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useSmartScopeKoboSync } from '@/features/smart-scope/composables/useSmartScopeKoboSync'
 import { usePageTitle } from '@/composables/usePageTitle'
@@ -73,6 +74,7 @@ watch(
 )
 
 const editorOpen = ref(false)
+const shareOpen = ref(false)
 const confirmDeleteOpen = ref(false)
 const deleting = ref(false)
 
@@ -147,6 +149,14 @@ function closeEditor() {
   editorOpen.value = false
 }
 
+function openShare() {
+  if (isSmartScopeOwner.value) shareOpen.value = true
+}
+
+function closeShare() {
+  shareOpen.value = false
+}
+
 onMounted(async () => {
   await retrySmartScopeLoad()
 })
@@ -165,6 +175,7 @@ async function retrySmartScopeLoad() {
 }
 
 watch(smartScopeId, async () => {
+  closeShare()
   page.resetNarrowing()
   await retrySmartScopeLoad()
 })
@@ -175,6 +186,7 @@ defineOptions({ name: 'SmartScopeView' })
 <template>
   <div class="flex h-full flex-col">
     <SmartScopeEditorPanel :open="editorOpen" :smartScope="smartScope" @close="closeEditor" @saved="page.reload" />
+    <ShareSmartScopeDialog v-if="shareOpen && smartScope && isSmartScopeOwner" :scope="smartScope" @close="closeShare" />
 
     <BookListDialogs :page="page" />
 
@@ -217,6 +229,10 @@ defineOptions({ name: 'SmartScopeView' })
             <DropdownMenuItem v-if="isSmartScopeOwner" class="md:hidden" @click="openEditor">
               <Settings2 :size="14" class="mr-2" />
               {{ t('components.browseHeader.menu.editRules') }}
+            </DropdownMenuItem>
+            <DropdownMenuItem v-if="isSmartScopeOwner" @select="openShare">
+              <Share2 :size="14" class="me-2" aria-hidden="true" />
+              {{ t('smartScope.transfer.shareAction') }}
             </DropdownMenuItem>
             <DropdownMenuItem v-if="page.canExport" @click="page.openMetadataExport">
               <FileSpreadsheet :size="14" class="mr-2" />

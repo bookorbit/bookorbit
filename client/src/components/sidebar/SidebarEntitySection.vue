@@ -39,6 +39,7 @@ const props = withDefaults(
     seeAllLabel: string
     canAdd?: boolean
     addLabel?: string
+    importLabel?: string
     canReorder?: boolean
     persistOrder?: (order: { id: number; displayOrder: number }[]) => Promise<void>
     tourId?: string
@@ -52,6 +53,7 @@ const props = withDefaults(
     canAdd: false,
     canReorder: false,
     addLabel: undefined,
+    importLabel: undefined,
     persistOrder: undefined,
     tourId: undefined,
     alwaysOpen: false,
@@ -59,7 +61,7 @@ const props = withDefaults(
   },
 )
 
-const emit = defineEmits<{ add: []; navigate: [] }>()
+const emit = defineEmits<{ add: []; import: [trigger: HTMLButtonElement]; navigate: [] }>()
 
 const { t } = useI18n()
 const { sections, toggleSection, setSectionCap } = useSidebarPrefs()
@@ -144,6 +146,10 @@ function handleAdd() {
   emit('add')
 }
 
+function handleImport(trigger: HTMLButtonElement) {
+  emit('import', trigger)
+}
+
 function handleNavigate() {
   emit('navigate')
 }
@@ -189,6 +195,7 @@ function onGripBlur(id: number) {
       :count="total"
       :can-add="canAdd"
       :add-label="addLabel"
+      :import-label="importLabel"
       :cap="cap"
       :can-change-cap="total > 0"
       :can-reorder="canEnterReorder && !isFiltering"
@@ -196,6 +203,7 @@ function onGripBlur(id: number) {
       :collapsible="!alwaysOpen"
       @toggle="handleToggle"
       @add="handleAdd"
+      @import="handleImport"
       @update:cap="handleCapChange"
       @toggle-reorder="toggleReorder"
     />

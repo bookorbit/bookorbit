@@ -122,6 +122,12 @@ describe('useSidebarSections', () => {
     expect(sections.value.map(({ kind }) => kind)).toEqual(['library', 'smartScope', 'collection'])
   })
 
+  it('offers import in the Smart Scopes add menu only', () => {
+    const { sections } = useSidebarSections()
+
+    expect(sections.value.map(({ props }) => props.importLabel)).toEqual([undefined, 'smartScope.transfer.importTitle', undefined])
+  })
+
   it('persists only the scopes the user owns', async () => {
     scopes.value = [row(1, { isOwner: true }), row(2, { isOwner: false }), row(3, { isOwner: true })]
 

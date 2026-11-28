@@ -99,6 +99,7 @@ export interface SidebarSectionProps {
   seeAllLabel: string
   canAdd: boolean
   addLabel: string
+  importLabel?: string
 }
 
 export interface SidebarSection {
@@ -163,6 +164,7 @@ export function useSidebarSections() {
         seeAllLabel: t(definition.copy.seeAll, { count: formatNumber(items.length) }),
         canAdd: isLibrary ? canManageLibraries.value : true,
         addLabel: t(definition.copy.add),
+        importLabel: definition.kind === 'smartScope' ? t('smartScope.transfer.importTitle') : undefined,
       },
       tourId: definition.tourId,
       canReorder: isLibrary ? canManageLibraries.value : true,

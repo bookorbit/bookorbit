@@ -183,6 +183,8 @@ function itemCountText(item: EntityIndexItem): string {
           <X :size="13" aria-hidden="true" />
         </button>
 
+        <slot name="secondary-actions" />
+
         <button
           v-if="canAdd"
           class="flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90"

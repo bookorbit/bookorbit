@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, useTemplateRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { ChevronDown, Check, GripVertical, MoreVertical, Plus, SlidersHorizontal } from '@lucide/vue'
+import { ChevronDown, Check, FileUp, GripVertical, MoreVertical, Plus, SlidersHorizontal } from '@lucide/vue'
 import { SIDEBAR_CAP_OPTIONS, type SidebarCap } from '@bookorbit/types'
 import {
   DropdownMenu,
@@ -23,6 +23,7 @@ const props = withDefaults(
     count?: number
     canAdd?: boolean
     addLabel?: string
+    importLabel?: string
     cap?: SidebarCap
     canChangeCap?: boolean
     canReorder?: boolean
@@ -35,12 +36,16 @@ const props = withDefaults(
   { collapsible: true, canCustomize: true },
 )
 
-const emit = defineEmits<{ toggle: []; add: []; 'update:cap': [SidebarCap]; 'toggle-reorder': [] }>()
+const emit = defineEmits<{ toggle: []; add: []; import: [trigger: HTMLButtonElement]; 'update:cap': [SidebarCap]; 'toggle-reorder': [] }>()
 
 const { t } = useI18n()
 const themeStore = useThemeStore()
 const { startCustomizing } = useSidebarCustomizeMode()
 const iconRadiusClass = computed(() => (themeStore.radius === 'sharp' ? 'rounded-none' : 'rounded-full'))
+const addMenuLabel = computed(() => t('components.sidebar.sectionHeader.addToSection', { section: props.label }))
+const addMenuButton = useTemplateRef<HTMLButtonElement>('addMenuButton')
+const addButtonClass =
+  'flex h-6 w-6 shrink-0 items-center justify-center text-primary outline-hidden transition-colors duration-150 hover:bg-(--shell-accent-wash) focus-visible:ring-2 focus-visible:ring-sidebar-ring'
 
 function handleToggle() {
   emit('toggle')
@@ -48,6 +53,10 @@ function handleToggle() {
 
 function handleAdd() {
   emit('add')
+}
+
+function handleImport() {
+  if (addMenuButton.value) emit('import', addMenuButton.value)
 }
 
 function selectCap(cap: SidebarCap) {
@@ -96,11 +105,27 @@ const showCount = computed(() => !props.isOpen && typeof props.count === 'number
     </button>
     <p v-else class="sidebar-section-label min-w-0 flex-1 truncate px-2">{{ label }}</p>
 
+    <DropdownMenu v-if="canAdd && importLabel" :modal="false">
+      <DropdownMenuTrigger as-child>
+        <button ref="addMenuButton" type="button" :class="[addButtonClass, iconRadiusClass]" :aria-label="addMenuLabel" :title="addMenuLabel">
+          <Plus :size="13" :stroke-width="2.5" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" :side-offset="4">
+        <DropdownMenuItem @select="handleAdd">
+          <Plus :size="13" aria-hidden="true" />
+          {{ addLabel ?? t('components.sidebar.sectionHeader.add') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem @select="handleImport">
+          <FileUp :size="13" aria-hidden="true" />
+          {{ importLabel }}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
     <button
-      v-if="canAdd"
+      v-else-if="canAdd"
       type="button"
-      class="flex h-6 w-6 shrink-0 items-center justify-center text-primary outline-hidden transition-colors duration-150 hover:bg-(--shell-accent-wash) focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-      :class="iconRadiusClass"
+      :class="[addButtonClass, iconRadiusClass]"
       :aria-label="addLabel ?? t('components.sidebar.sectionHeader.add')"
       :title="addLabel ?? t('components.sidebar.sectionHeader.add')"
       @click="handleAdd"

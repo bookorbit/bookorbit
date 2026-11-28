@@ -92,7 +92,7 @@ function handleSearch() {
     >
       <Search :size="17" aria-hidden="true" />
     </button>
-    <div v-if="slots.actions" class="flex shrink-0 items-center gap-2">
+    <div v-if="slots.actions" class="flex max-w-full shrink-0 flex-wrap items-center gap-2">
       <slot name="actions" />
     </div>
   </div>

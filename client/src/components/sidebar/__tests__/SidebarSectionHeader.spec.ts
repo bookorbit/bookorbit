@@ -10,10 +10,18 @@ vi.mock('vue-i18n', () => ({
 vi.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenu: { name: 'DropdownMenu', template: '<div><slot /></div>' },
   DropdownMenuContent: { name: 'DropdownMenuContent', template: '<div><slot /></div>' },
-  DropdownMenuItem: { name: 'DropdownMenuItem', emits: ['click'], template: '<button type="button" @click="$emit(\'click\')"><slot /></button>' },
+  DropdownMenuItem: {
+    name: 'DropdownMenuItem',
+    emits: ['click', 'select'],
+    template: '<button type="button" @click="$emit(\'click\'); $emit(\'select\')"><slot /></button>',
+  },
   DropdownMenuLabel: { name: 'DropdownMenuLabel', template: '<div><slot /></div>' },
   DropdownMenuSeparator: { name: 'DropdownMenuSeparator', template: '<hr />' },
-  DropdownMenuTrigger: { name: 'DropdownMenuTrigger', template: '<button type="button"><slot /></button>' },
+  DropdownMenuTrigger: {
+    name: 'DropdownMenuTrigger',
+    props: { asChild: Boolean },
+    template: '<slot v-if="asChild" /><button v-else type="button"><slot /></button>',
+  },
 }))
 
 vi.mock('@/stores/theme', () => ({ useThemeStore: () => ({ radius: 'rounded' }) }))
@@ -59,5 +67,39 @@ describe('SidebarSectionHeader', () => {
     const wrapper = mount(SidebarSectionHeader, { props: { label: 'Browse', isOpen: true, contentId: 'browse', canCustomize: false } })
 
     expect(wrapper.findComponent({ name: 'DropdownMenu' }).exists()).toBe(false)
+  })
+
+  it('offers New and Import from the add menu even when Smart Scopes is collapsed and empty', async () => {
+    const wrapper = mount(SidebarSectionHeader, {
+      props: {
+        label: 'Smart Scopes',
+        isOpen: false,
+        contentId: 'scopes',
+        count: 0,
+        canAdd: true,
+        addLabel: 'New smart scope',
+        importLabel: 'Import smart scope',
+        canCustomize: false,
+      },
+    })
+
+    const trigger = wrapper.get('button[aria-label="components.sidebar.sectionHeader.addToSection"]')
+    const [create, importScope] = items(wrapper)
+    expect([create?.text(), importScope?.text()]).toEqual(['New smart scope', 'Import smart scope'])
+    await importScope!.trigger('click')
+    expect(wrapper.emitted('import')).toEqual([[trigger.element]])
+    expect(wrapper.emitted('add')).toBeUndefined()
+    await create!.trigger('click')
+    expect(wrapper.emitted('add')).toHaveLength(1)
+  })
+
+  it('opens creation directly when a section has no import action', async () => {
+    const wrapper = mount(SidebarSectionHeader, {
+      props: { label: 'Collections', isOpen: true, contentId: 'collections', canAdd: true, addLabel: 'New collection', canCustomize: false },
+    })
+
+    await wrapper.get('button[aria-label="New collection"]').trigger('click')
+    expect(wrapper.emitted('add')).toHaveLength(1)
+    expect(items(wrapper)).toHaveLength(0)
   })
 })
