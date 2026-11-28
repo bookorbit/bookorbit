@@ -75,14 +75,13 @@ describe('useDisplaySettingsSync', () => {
     const { apiMock, displaySettings, sync } = await loadModules()
     apiMock.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ settings: validDisplayPreferences({ bookCoverDisplayMode: 'natural-bottom', thumbnailClickAction: 'details' }) }),
+      json: async () => ({ settings: validDisplayPreferences({ bookCoverDisplayMode: 'natural-bottom' }) }),
     })
 
     await sync.loadDisplaySettingsFromServer()
 
     expect(apiMock).toHaveBeenCalledWith('/api/v1/user-preferences/display')
     expect(displaySettings.useDisplaySettings().bookCoverDisplayMode.value).toBe('natural-bottom')
-    expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('details')
   })
 
   it('ignores missing or non-ok server display settings responses', async () => {
@@ -381,34 +380,18 @@ describe('useDisplaySettingsSync', () => {
     expect(s.gridCardSecondaryLabel.value).toBe('author')
   })
 
-  it('syncs thumbnailClickAction changes to the server', async () => {
+  it('no longer sends the retired thumbnail click setting to the server', async () => {
     vi.useFakeTimers()
     const { apiMock, displaySettings, sync } = await loadModules()
     apiMock.mockResolvedValue({ ok: true })
 
     sync.initDisplaySettingsSync()
-    displaySettings.useDisplaySettings().thumbnailClickAction.value = 'reader'
+    displaySettings.useDisplaySettings().cardInfoMode.value = 'below-cover'
     await vi.advanceTimersByTimeAsync(1500)
 
-    expect(apiMock).toHaveBeenCalledWith(
-      '/api/v1/user-preferences/display',
-      expect.objectContaining({
-        method: 'PUT',
-        body: expect.stringContaining('"thumbnailClickAction":"reader"'),
-      }),
-    )
-  })
-
-  it('loads thumbnailClickAction from the server', async () => {
-    const { apiMock, displaySettings, sync } = await loadModules()
-    apiMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ settings: validDisplayPreferences({ thumbnailClickAction: 'reader' }) }),
-    })
-
-    await sync.loadDisplaySettingsFromServer()
-
-    expect(displaySettings.useDisplaySettings().thumbnailClickAction.value).toBe('reader')
+    const body = String((apiMock.mock.calls.at(-1)?.[1] as { body?: string } | undefined)?.body)
+    expect(body).toContain('"cardInfoMode":"below-cover"')
+    expect(body).not.toContain('thumbnailClickAction')
   })
 
   it('syncs openHighlightsInPeek changes to the server', async () => {

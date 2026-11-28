@@ -477,14 +477,6 @@
       },
       "behavior": {
         "title": "書庫行為",
-        "thumbnailClicks": {
-          "label": "縮圖點選",
-          "hint": "選擇從網格和清單檢視開啟一本書時發生的行為",
-          "readFirst": "首先閱讀",
-          "readFirstHint": "存在可讀檔案時直接開啟閱讀器",
-          "openDetails": "開啟詳情",
-          "openDetailsHint": "從網格和清單的縮圖進入書籍詳情頁"
-        },
         "filterPreview": {
           "label": "預設顯示過濾器預覽",
           "hint": "開啟智慧書架時展開當前的篩選與排序摘要"

@@ -511,14 +511,6 @@
       },
       "behavior": {
         "title": "Könyvtár viselkedése",
-        "thumbnailClicks": {
-          "label": "Kattintás az indexképekre",
-          "hint": "Kiválaszthatod, hogy mi történjen, amikor megnyitsz egy könyvet a rács- és listanézetekben",
-          "readFirst": "Azonnali olvasás",
-          "readFirstHint": "Nyissa meg az olvasót, ha létezik olvasható fájl",
-          "openDetails": "Részletek megnyitása",
-          "openDetailsHint": "A könyvadatlap megnyitása a rács- és listaindexképekről"
-        },
         "highlightPeek": {
           "label": "Kiemelések megnyitása Betekintés módban",
           "hint": "Egy kiemelésre ugráskor az olvasási haladás és az olvasottsági állapot változatlan marad"

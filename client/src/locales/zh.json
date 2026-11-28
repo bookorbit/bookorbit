@@ -512,14 +512,6 @@
       },
       "behavior": {
         "title": "书库行为",
-        "thumbnailClicks": {
-          "label": "缩略图点击",
-          "hint": "选择从网格和列表视图打开一本书时发生的行为",
-          "readFirst": "首先阅读",
-          "readFirstHint": "存在可读文件时直接打开阅读器",
-          "openDetails": "打开详情",
-          "openDetailsHint": "从网格和列表的缩略图进入书籍详情页"
-        },
         "highlightPeek": {
           "label": "使用一瞥模式打开高亮",
           "hint": "跳转到高亮，不改变阅读进度及状态"

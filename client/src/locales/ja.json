@@ -477,14 +477,6 @@
       },
       "behavior": {
         "title": "ライブラリの動作",
-        "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "グリッドビューとリストビューからブックを開くときの動作を選択します",
-          "readFirst": "最初に読む",
-          "readFirstHint": "読み取り可能なファイルが存在するときにリーダーを開く",
-          "openDetails": "詳細を開く",
-          "openDetailsHint": "グリッドからブックの詳細ページに移動し、サムネイルを一覧表示します"
-        },
         "filterPreview": {
           "label": "デフォルトでフィルタープレビューを表示する",
           "hint": "smartScopeを開くときにアクティブなフィルタと並べ替えの概要を展開します"

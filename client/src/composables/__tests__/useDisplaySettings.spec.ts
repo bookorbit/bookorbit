@@ -29,7 +29,6 @@ function resetDisplaySettings() {
   settings.gridCardPrimaryLabel.value = 'hidden'
   settings.gridCardSecondaryLabel.value = 'hidden'
   settings.cardInfoMode.value = 'hover-overlay'
-  settings.thumbnailClickAction.value = 'details'
   settings.openHighlightsInPeek.value = false
   settings.formatBadgeStyle.value = 'underline'
 }
@@ -53,8 +52,8 @@ describe('useDisplaySettings preferences helpers', () => {
       showJumpRails: true,
       bookSpineOverlay: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
-      thumbnailClickAction: 'details',
     })
+    expect(getDisplayPreferencesSnapshot()).not.toHaveProperty('thumbnailClickAction')
   })
 
   it('sanitizes valid incoming preferences and drops invalid fields', () => {
@@ -65,7 +64,7 @@ describe('useDisplaySettings preferences helpers', () => {
       cardOverlays: ['format', 'unknown', 'format', 'lock-status'],
       showJumpRails: false,
       bookCoverDisplayMode: 'fill-crop',
-      thumbnailClickAction: 'details',
+      thumbnailClickAction: 'reader',
       tableDensity: 'huge',
       extra: true,
     })
@@ -76,7 +75,6 @@ describe('useDisplaySettings preferences helpers', () => {
       cardOverlays: ['format', 'lock-status'],
       showJumpRails: false,
       bookCoverDisplayMode: 'fill-crop',
-      thumbnailClickAction: 'details',
     })
   })
 
@@ -90,7 +88,6 @@ describe('useDisplaySettings preferences helpers', () => {
       tableZebraStriping: true,
       bookShadowStrength: 'strong',
       bookCoverDisplayMode: 'natural-bottom',
-      thumbnailClickAction: 'details',
       tableDensity: 'invalid',
     })
 
@@ -103,7 +100,6 @@ describe('useDisplaySettings preferences helpers', () => {
     expect(settings.tableDensity.value).toBe('comfortable')
     expect(settings.bookShadowStrength.value).toBe('strong')
     expect(settings.bookCoverDisplayMode.value).toBe('natural-bottom')
-    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 
   it('ignores non-object payloads', () => {
@@ -224,32 +220,6 @@ describe('useDisplaySettings preferences helpers', () => {
   it('applies bookDetailCoverTint from preferences', () => {
     applyDisplayPreferences({ bookDetailCoverTint: 'off' })
     expect(settings.bookDetailCoverTint.value).toBe('off')
-  })
-
-  it('includes thumbnailClickAction in snapshot', () => {
-    settings.thumbnailClickAction.value = 'details'
-    const snap = getDisplayPreferencesSnapshot()
-    expect(snap.thumbnailClickAction).toBe('details')
-  })
-
-  it('defaults thumbnailClickAction to details', () => {
-    resetDisplaySettings()
-    expect(settings.thumbnailClickAction.value).toBe('details')
-  })
-
-  it('sanitizes valid thumbnailClickAction values', () => {
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'reader' })).toEqual({ thumbnailClickAction: 'reader' })
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'details' })).toEqual({ thumbnailClickAction: 'details' })
-  })
-
-  it('drops invalid thumbnailClickAction values', () => {
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 'preview' })).toEqual({})
-    expect(sanitizeDisplayPreferences({ thumbnailClickAction: 1 })).toEqual({})
-  })
-
-  it('applies thumbnailClickAction from preferences', () => {
-    applyDisplayPreferences({ thumbnailClickAction: 'details' })
-    expect(settings.thumbnailClickAction.value).toBe('details')
   })
 
   it('defaults openHighlightsInPeek to off and includes it in the snapshot', () => {

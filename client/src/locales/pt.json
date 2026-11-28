@@ -511,14 +511,6 @@
       },
       "behavior": {
         "title": "Comportamento da Biblioteca",
-        "thumbnailClicks": {
-          "label": "Cliques na miniatura",
-          "hint": "Escolha o que acontece ao abrir um livro a partir das visualizações em grade e lista",
-          "readFirst": "Ler primeiro",
-          "readFirstHint": "Abrir o leitor quando existir um arquivo legível",
-          "openDetails": "Abrir detalhes",
-          "openDetailsHint": "Ir para a página de detalhes do livro a partir das miniaturas de grade e lista"
-        },
         "filterPreview": {
           "label": "Exibir pré-visualização do filtro por padrão",
           "hint": "Expandir o resumo do filtro e ordenação ativos ao abrir um escopo inteligente (smartScope)"

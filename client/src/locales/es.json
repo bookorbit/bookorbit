@@ -512,14 +512,6 @@
       },
       "behavior": {
         "title": "Comportamiento de la biblioteca",
-        "thumbnailClicks": {
-          "label": "Clics en miniatura",
-          "hint": "Elige qué sucede al abrir un libro desde las vistas de cuadrícula y lista",
-          "readFirst": "Leer primero",
-          "readFirstHint": "Abrir el lector cuando exista un archivo legible",
-          "openDetails": "Abrir detalles",
-          "openDetailsHint": "Ir a la página de detalles del libro desde la cuadrícula y lista de miniaturas"
-        },
         "filterPreview": {
           "label": "Mostrar vista previa de filtro predeterminado",
           "hint": "Expandir el filtro activo y ordenar el resumen al abrir un SmartScope"

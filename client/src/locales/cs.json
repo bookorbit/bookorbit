@@ -476,14 +476,6 @@
       },
       "behavior": {
         "title": "Chování knihovny",
-        "thumbnailClicks": {
-          "label": "Kliknutí na náhled",
-          "hint": "Zvolte, co se stane při otevření knihy ze zobrazení mřížky a seznamu",
-          "readFirst": "Nejprve číst",
-          "readFirstHint": "Otevřít čtečku, když existuje čitelný soubor",
-          "openDetails": "Otevřít podrobnosti",
-          "openDetailsHint": "Přejít na stránku s podrobnostmi z náhledů v mřížce a seznamu"
-        },
         "filterPreview": {
           "label": "Zobrazit filtrovaný náhled ve výchozím nastavení",
           "hint": "Rozbalit aktivní filtr a seřadit shrnutí při otevření smartScope"

@@ -526,14 +526,6 @@
       },
       "behavior": {
         "title": "Library Behavior",
-        "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "Choose what happens when opening a book from grid and list views",
-          "readFirst": "Read first",
-          "readFirstHint": "Open the reader when a readable file exists",
-          "openDetails": "Open details",
-          "openDetailsHint": "Go to the book details page from grid and list thumbnails"
-        },
         "highlightPeek": {
           "label": "Open highlights in Peek mode",
           "hint": "Jumping to a highlight leaves your reading progress and read status unchanged"
@@ -7161,7 +7153,13 @@
     },
     "card": {
       "missing": "Missing",
-      "moreActions": "More actions for {title}"
+      "moreActions": "More actions for {title}",
+      "dock": {
+        "continue": "Continue",
+        "resume": "Resume",
+        "readAgain": "Read again",
+        "listenAgain": "Listen again"
+      }
     },
     "file": {
       "primary": "Primary",

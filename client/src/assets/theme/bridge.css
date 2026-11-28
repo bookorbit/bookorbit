@@ -72,6 +72,7 @@
   --color-scrim-media: var(--scrim-media);
   --color-cover-chip: var(--cover-chip);
   --color-cover-chip-foreground: var(--cover-chip-foreground);
+  --color-cover-chip-muted-foreground: var(--cover-chip-muted-foreground);
   --color-path-dim: var(--path-dim);
   --color-path-fold: var(--path-fold);
 

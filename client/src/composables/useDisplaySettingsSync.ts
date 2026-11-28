@@ -127,7 +127,6 @@ export function initDisplaySettingsSync(): void {
         settings.gridCardPrimaryLabel.value,
         settings.gridCardSecondaryLabel.value,
         settings.cardInfoMode.value,
-        settings.thumbnailClickAction.value,
         settings.openHighlightsInPeek.value,
         settings.placeholderCoverStyle.value,
       ] as const,

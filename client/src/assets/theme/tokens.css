@@ -115,6 +115,9 @@
      is dark and mostly opaque in both themes and the ink near-white: above 7:1 even over a white cover. */
   --cover-chip: oklch(0.16 0.01 var(--tint-h) / 0.72);
   --cover-chip-foreground: oklch(0.985 0.002 var(--tint-h));
+  /* Secondary text over cover art (author, counts), always on the dark card scrim, so one step down
+     from the chip ink rather than faded with alpha. */
+  --cover-chip-muted-foreground: oklch(0.86 0.003 var(--tint-h));
 
   /* Shadows */
   --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.05);
@@ -447,6 +450,7 @@
   /* Deeper on a dark page so the chip does not glow against the darkened card around the cover. */
   --cover-chip: oklch(0.12 0.01 var(--tint-h) / 0.78);
   --cover-chip-foreground: oklch(0.97 0.002 var(--tint-h));
+  --cover-chip-muted-foreground: oklch(0.85 0.003 var(--tint-h));
 
   /* Shadows */
   --elevation-xs: 0 1px 2px oklch(0 0 0 / 0.4);

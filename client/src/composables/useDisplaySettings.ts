@@ -5,7 +5,6 @@ import {
   BOOK_DETAIL_COVER_TINTS,
   BOOK_SHADOW_STRENGTHS,
   BOOK_SPINE_OVERLAYS,
-  BOOK_THUMBNAIL_CLICK_ACTION,
   BOOK_VIEW_MODES,
   CARD_INFO_MODES,
   CARD_OVERLAY_KEYS,
@@ -20,7 +19,6 @@ import {
   type BookDetailCoverTint,
   type BookShadowStrength,
   type BookSpineOverlay,
-  type BookThumbnailClickAction,
   type BookViewMode,
   type CardInfoMode,
   type CardOverlayKey,
@@ -40,7 +38,6 @@ export type {
   BookDetailCoverTint,
   BookShadowStrength,
   BookSpineOverlay,
-  BookThumbnailClickAction,
   BookViewMode,
   CardInfoMode,
   CardOverlayKey,
@@ -61,7 +58,6 @@ const DEFAULT_BOOK_SHADOW_STRENGTH: BookShadowStrength = 'default'
 const DEFAULT_BOOK_COVER_DISPLAY_MODE: BookCoverDisplayMode = 'blurred-fit'
 const DEFAULT_BOOK_DETAIL_COVER_TINT: BookDetailCoverTint = 'off'
 const DEFAULT_SERIES_CARD_COVER_MODE: SeriesCardCoverMode = 'stack'
-const DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION: BookThumbnailClickAction = 'details'
 const DEFAULT_PLACEHOLDER_COVER_STYLE: PlaceholderCoverStyle = 'bauhaus'
 const DEFAULT_CARD_OVERLAYS: CardOverlayKey[] = ['progress-bar', 'format', 'rating', 'read-status', 'series-position']
 const DEFAULT_FORMAT_BADGE_STYLE: FormatBadgeStyle = 'underline'
@@ -110,12 +106,6 @@ function normalizePlaceholderCoverStyle(value: unknown): PlaceholderCoverStyle {
   return typeof value === 'string' && PLACEHOLDER_COVER_STYLES.includes(value as PlaceholderCoverStyle)
     ? (value as PlaceholderCoverStyle)
     : DEFAULT_PLACEHOLDER_COVER_STYLE
-}
-
-function normalizeThumbnailClickAction(value: unknown): BookThumbnailClickAction {
-  return typeof value === 'string' && BOOK_THUMBNAIL_CLICK_ACTION.includes(value as BookThumbnailClickAction)
-    ? (value as BookThumbnailClickAction)
-    : DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION
 }
 
 function normalizeGridCardLabelField(value: unknown): GridCardLabelField {
@@ -191,9 +181,6 @@ const seriesCardCoverMode = ref<SeriesCardCoverMode>(normalizeSeriesCardCoverMod
 const gridCardPrimaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardPrimaryLabel', 'hidden')))
 const gridCardSecondaryLabel = ref<GridCardLabelField>(normalizeGridCardLabelField(storage.get('gridCardSecondaryLabel', 'hidden')))
 const cardInfoMode = ref<CardInfoMode>(normalizeCardInfoMode(storage.get('cardInfoMode', 'hover-overlay')))
-const thumbnailClickAction = ref<BookThumbnailClickAction>(
-  normalizeThumbnailClickAction(storage.get('thumbnailClickAction', DEFAULT_BOOK_THUMBNAIL_CLICK_ACTION)),
-)
 const openHighlightsInPeek = ref(storage.get<boolean>('openHighlightsInPeek', false) === true)
 const placeholderCoverStyle = ref<PlaceholderCoverStyle>(
   normalizePlaceholderCoverStyle(storage.get('placeholderCoverStyle', DEFAULT_PLACEHOLDER_COVER_STYLE)),
@@ -225,7 +212,6 @@ watch(seriesCardCoverMode, (value) => storage.set('seriesCardCoverMode', normali
 watch(gridCardPrimaryLabel, (value) => storage.set('gridCardPrimaryLabel', normalizeGridCardLabelField(value)))
 watch(gridCardSecondaryLabel, (value) => storage.set('gridCardSecondaryLabel', normalizeGridCardLabelField(value)))
 watch(cardInfoMode, (value) => storage.set('cardInfoMode', normalizeCardInfoMode(value)))
-watch(thumbnailClickAction, (value) => storage.set('thumbnailClickAction', normalizeThumbnailClickAction(value)))
 watch(openHighlightsInPeek, (v) => storage.set('openHighlightsInPeek', v))
 watch(placeholderCoverStyle, (value) => storage.set('placeholderCoverStyle', normalizePlaceholderCoverStyle(value)))
 
@@ -257,7 +243,6 @@ export function getDisplayPreferencesSnapshot(): DisplayPreferences {
     gridCardPrimaryLabel: normalizeGridCardLabelField(gridCardPrimaryLabel.value),
     gridCardSecondaryLabel: normalizeGridCardLabelField(gridCardSecondaryLabel.value),
     cardInfoMode: normalizeCardInfoMode(cardInfoMode.value),
-    thumbnailClickAction: normalizeThumbnailClickAction(thumbnailClickAction.value),
     openHighlightsInPeek: openHighlightsInPeek.value === true,
     placeholderCoverStyle: normalizePlaceholderCoverStyle(placeholderCoverStyle.value),
   }
@@ -309,9 +294,6 @@ export function sanitizeDisplayPreferences(raw: unknown): Partial<DisplayPrefere
   if (CARD_INFO_MODES.includes(obj.cardInfoMode as CardInfoMode)) {
     out.cardInfoMode = obj.cardInfoMode as CardInfoMode
   }
-  if (BOOK_THUMBNAIL_CLICK_ACTION.includes(obj.thumbnailClickAction as BookThumbnailClickAction)) {
-    out.thumbnailClickAction = obj.thumbnailClickAction as BookThumbnailClickAction
-  }
   if (typeof obj.openHighlightsInPeek === 'boolean') out.openHighlightsInPeek = obj.openHighlightsInPeek
   if (PLACEHOLDER_COVER_STYLES.includes(obj.placeholderCoverStyle as PlaceholderCoverStyle)) {
     out.placeholderCoverStyle = obj.placeholderCoverStyle as PlaceholderCoverStyle
@@ -348,7 +330,6 @@ export function applyDisplayPreferences(raw: unknown): void {
   if (prefs.gridCardPrimaryLabel !== undefined) gridCardPrimaryLabel.value = prefs.gridCardPrimaryLabel
   if (prefs.gridCardSecondaryLabel !== undefined) gridCardSecondaryLabel.value = prefs.gridCardSecondaryLabel
   if (prefs.cardInfoMode !== undefined) cardInfoMode.value = prefs.cardInfoMode
-  if (prefs.thumbnailClickAction !== undefined) thumbnailClickAction.value = prefs.thumbnailClickAction
   if (prefs.openHighlightsInPeek !== undefined) openHighlightsInPeek.value = prefs.openHighlightsInPeek
   if (prefs.placeholderCoverStyle !== undefined) placeholderCoverStyle.value = prefs.placeholderCoverStyle
 }
@@ -381,7 +362,6 @@ export function useDisplaySettings() {
     gridCardPrimaryLabel,
     gridCardSecondaryLabel,
     cardInfoMode,
-    thumbnailClickAction,
     openHighlightsInPeek,
     placeholderCoverStyle,
   }

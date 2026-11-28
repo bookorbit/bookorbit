@@ -412,14 +412,6 @@
       },
       "behavior": {
         "title": "Biblioteksadfærd",
-        "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "Vælg hvad der sker, når du åbner en bog fra gitter og listevisninger",
-          "readFirst": "Læs først",
-          "readFirstHint": "Åbn læseren, når en læsbar fil findes",
-          "openDetails": "Åbn detaljer",
-          "openDetailsHint": "Gå til bogdetaljesiden fra gitter og liste miniaturer"
-        },
         "filterPreview": {
           "label": "Vis forhåndsvisning af filter som standard",
           "hint": "Udvid det aktive filter og sortere resumé, når du åbner en smartScope"

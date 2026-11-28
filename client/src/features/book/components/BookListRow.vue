@@ -37,7 +37,6 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraryPermissions } from '@/features/library/composables/useLibraryPermissions'
 import SendBookDialog from '@/features/email/components/SendBookDialog.vue'
 import { RATING_STARS, getRatingStarClass } from '@/features/book/lib/rating-stars'
-import { useDisplaySettings } from '@/composables/useDisplaySettings'
 import { displayPublishedDate } from '../lib/published-date'
 import { bookFormatEntries, formatKeyCode, type BookFormatEntry } from '@/features/book/lib/book-formats'
 import { formatChipStyle } from '@/features/book/lib/format-colors'
@@ -69,7 +68,6 @@ const emit = defineEmits<{
 const { hasPermission } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
-const { thumbnailClickAction } = useDisplaySettings()
 const showSendDialog = ref(false)
 
 const collapsedSeries = computed(() => props.book.collapsedSeries ?? null)
@@ -224,12 +222,7 @@ function handleRowClick(event: MouseEvent) {
     return
   }
 
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  emit('action', 'quick-view')
+  openBookDetails()
 }
 
 function handleRowAuxClick(event: MouseEvent) {

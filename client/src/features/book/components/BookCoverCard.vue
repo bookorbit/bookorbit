@@ -2,12 +2,12 @@
 import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
 import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
 import BookCardFormatBadges from './BookCardFormatBadges.vue'
-import BookCardFormatList from './BookCardFormatList.vue'
+import BookCardHoverPanel, { type CardDockAction } from './BookCardHoverPanel.vue'
 import BookCardLabel from './BookCardLabel.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
 import { cardEditionCount } from '../lib/book-editions'
-import { formatNumber } from '@/i18n/formatters'
+import { formatNumber, formatPercent } from '@/i18n/formatters'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
 import {
@@ -25,7 +25,6 @@ import {
   LockOpen,
   Loader2,
   MoreVertical,
-  PanelRight,
   Pencil,
   Play,
   RefreshCw,
@@ -64,6 +63,7 @@ import { useI18n } from 'vue-i18n'
 import { toast } from 'vue-sonner'
 import { seriesNameWithPosition, seriesPositionToken } from '@/features/series/lib/series-unit-label'
 import { useOpenInNewTab } from '@/composables/useOpenInNewTab'
+import { useLongPress } from '../composables/useLongPress'
 
 const { t } = useI18n()
 
@@ -156,8 +156,7 @@ async function handleRefreshMetadata() {
 const { hasPermission } = usePermissions()
 const { hasLibraryPermission } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
-const { cardOverlays, formatBadgeStyle, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode, thumbnailClickAction } =
-  useDisplaySettings()
+const { cardOverlays, formatBadgeStyle, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
 const effectiveCoverAspectRatio = computed<CoverAspectRatio>(
   () => props.coverAspectRatio ?? mediaView.value?.coverAspectRatio ?? props.book.coverAspectRatio ?? injectedCoverAspectRatio.value,
@@ -167,8 +166,6 @@ const showSendDialog = ref(false)
 const hasProgress = computed(() => props.book.readingProgress != null && props.book.readingProgress > 0)
 const showProgressBar = computed(() => cardOverlays.value.includes('progress-bar') && hasProgress.value)
 const showFormatOverlay = computed(() => cardOverlays.value.includes('format') && hasFormatBadges.value)
-/** Every badge style but the plain pill hides which formats a book has, so the hover overlay lists them. */
-const showFormatList = computed(() => showFormatOverlay.value && formatBadgeStyle.value !== 'primary')
 const showRatingOverlay = computed(() => cardOverlays.value.includes('rating') && props.book.rating != null)
 const showLockStatusPill = computed(() => cardOverlays.value.includes('lock-status') && !props.selectionMode && !isMissing.value)
 const metadataLocked = computed(() => props.book.hasMetadataLocks)
@@ -211,10 +208,6 @@ const coverOverlayFrameStyle = computed(() => {
   if (bookCoverDisplayMode.value !== 'natural-bottom' || !props.book.hasCover || !coverLoaded.value || coverFailed.value) return { inset: '0' }
   return fittedCoverFrameStyle(coverImageRatio.value, coverSlotRatio.value, 'bottom')
 })
-
-const isTouch = computed(
-  () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches,
-)
 
 watch(coverSrc, () => {
   coverLoaded.value = false
@@ -317,50 +310,21 @@ function handleSecondaryLabelClick(event: MouseEvent) {
   handleLabelClick(gridCardSecondaryLabel.value, event)
 }
 
-const isPrimaryClickAvailable = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-const showPrimaryOverlayAction = computed(() => thumbnailClickAction.value === 'details' || (primaryFile.value != null && !isMissing.value))
-const primaryOverlayActionIcon = computed(() => {
-  if (thumbnailClickAction.value === 'details') return BookText
-  return isAudiobook.value ? Play : BookOpen
-})
-const primaryOverlayActionIconClass = computed(() => (thumbnailClickAction.value !== 'details' && isAudiobook.value ? 'ml-[2cqi]' : ''))
-const showExplicitReadButton = computed(() => thumbnailClickAction.value === 'details' && primaryFile.value != null && !isMissing.value)
-const readActionLabel = computed(() => {
-  if (isAudiobook.value) {
-    return hasProgress.value ? t('book.actions.continueListening') : t('book.actions.startListening')
-  }
-  return hasProgress.value ? t('book.actions.continueReading') : t('book.actions.startReading')
-})
-const primaryOverlayActionLabel = computed(() => (thumbnailClickAction.value === 'details' ? t('book.actions.bookDetails') : readActionLabel.value))
-
-const primaryOverlayLocation = computed<RouteLocationRaw | null>(() => {
-  if (thumbnailClickAction.value === 'details') return detailsLocation.value
-  return primaryFile.value && !isMissing.value ? readerLocation(primaryFile.value) : null
-})
-/** Where a plain click on the card goes; touch screens use the first tap to reveal the overlay instead. */
-const cardLocation = computed<RouteLocationRaw | null>(() =>
-  isTouch.value && thumbnailClickAction.value !== 'details' ? null : primaryOverlayLocation.value,
-)
-const explicitReadLocation = computed<RouteLocationRaw | null>(() =>
-  primaryFile.value && !isMissing.value ? readerLocation(primaryFile.value) : null,
-)
-
-function handlePrimaryOverlayAction(event: MouseEvent) {
-  if (openInNewTabIfRequested(event, primaryOverlayLocation.value)) return
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
-    return
-  }
-
-  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+function revealTouchOverlay() {
+  if (props.selectionMode) return
+  showMobileOverlay.value = true
 }
 
-function openPrimaryFileExplicit(event: MouseEvent) {
-  if (openInNewTabIfRequested(event, explicitReadLocation.value)) return
-  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
-}
+/** Touch has no hover, so holding a card reveals the panel that hovering shows. */
+const {
+  onPointerDown: handleCoverPointerDown,
+  onPointerMove: handleCoverPointerMove,
+  onPointerUp: handleCoverPointerUp,
+  onPointerCancel: handleCoverPointerCancel,
+  consumeClick: consumeLongPressClick,
+} = useLongPress(revealTouchOverlay)
 
+/** A click on the card opens the book's details; reading has its own button in the hover dock. */
 function handleCardClick(event: MouseEvent) {
   const target = event.target
   if (target instanceof Element && target.closest('button, [data-card-click-blocker]')) return
@@ -368,26 +332,20 @@ function handleCardClick(event: MouseEvent) {
     emit('select', event)
     return
   }
-  if (openInNewTabIfRequested(event, cardLocation.value)) return
-
-  if (thumbnailClickAction.value === 'details') {
-    openBookDetails()
+  if (consumeLongPressClick()) return
+  if (showMobileOverlay.value) {
+    showMobileOverlay.value = false
     return
   }
-
-  if (isTouch.value) {
-    showMobileOverlay.value = !showMobileOverlay.value
-    return
-  }
-
-  if (primaryFile.value && !isMissing.value) openFile(primaryFile.value)
+  if (openInNewTabIfRequested(event, detailsLocation.value)) return
+  openBookDetails()
 }
 
 function handleCardAuxClick(event: MouseEvent) {
   const target = event.target
   if (target instanceof Element && target.closest('button, [data-card-click-blocker]')) return
   if (props.selectionMode) return
-  openInNewTabIfRequested(event, cardLocation.value)
+  openInNewTabIfRequested(event, detailsLocation.value)
 }
 
 /** The browser's own menu is what offers "Open link in new tab", so it stays on links and is suppressed elsewhere on the card. */
@@ -424,10 +382,22 @@ function openAuthorBrowse() {
 const showHoverTitle = computed(
   () => (cardInfoMode.value === 'hover-overlay' || !props.showLabel) && (coverLoaded.value || !props.book.hasCover || coverFailed.value),
 )
-const hoverTitleLines = computed(() => (effectiveCoverAspectRatio.value === '1/1' ? 1 : 2))
-
-const overlayBackground = computed(() => (cardInfoMode.value === 'hover-overlay' || !props.showLabel ? 'bg-black/70' : 'bg-black/20'))
-const overlayFadeClass = computed(() => (cardInfoMode.value === 'hover-overlay' || !props.showLabel ? 'group-hover:opacity-0' : ''))
+/** The hover panel restates what the badges say, so every badge gives way to it. */
+const restFadeClass = computed(() => (showMobileOverlay.value ? 'opacity-0' : 'group-hover:opacity-0 group-focus-within:opacity-0'))
+/** Badges that take the pointer (for their tooltips) must also stop taking it once they fade. */
+const interactiveRestFadeClass = computed(() =>
+  showMobileOverlay.value
+    ? 'opacity-0 pointer-events-none'
+    : 'group-hover:opacity-0 group-hover:pointer-events-none group-focus-within:opacity-0 group-focus-within:pointer-events-none',
+)
+const overlayVisibilityClass = computed(() =>
+  showMobileOverlay.value
+    ? 'opacity-100'
+    : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100',
+)
+const panelRevealClass = computed(() =>
+  showMobileOverlay.value ? '' : 'translate-y-1.5 group-hover:translate-y-0 group-focus-within:translate-y-0 motion-reduce:translate-y-0',
+)
 const showBelowCoverLabelArea = computed(() => props.showLabel && cardInfoMode.value === 'below-cover')
 
 const { downloadFile, exportBooks } = useBookDownload()
@@ -476,6 +446,41 @@ async function handleSetStatus(status: ReadStatus) {
   }
 }
 
+const canOpenPrimaryFile = computed(() => primaryFile.value != null && !isMissing.value)
+const isUnderway = computed(() => {
+  const progress = props.book.readingProgress
+  return progress != null && progress > 0 && progress < 100 && localReadStatus.value !== 'read'
+})
+
+const dockAction = computed<CardDockAction>(() => {
+  if (!canOpenPrimaryFile.value) {
+    return { icon: BookText, label: t('book.actions.details'), ariaLabel: t('book.actions.bookDetails'), progress: null, progressLabel: null }
+  }
+  const icon = isAudiobook.value ? Play : BookOpen
+  if (localReadStatus.value === 'read') {
+    return isAudiobook.value
+      ? { icon, label: t('book.actions.listen'), ariaLabel: t('book.card.dock.listenAgain'), progress: null, progressLabel: null }
+      : { icon, label: t('book.actions.read'), ariaLabel: t('book.card.dock.readAgain'), progress: null, progressLabel: null }
+  }
+  const progress = isUnderway.value ? props.book.readingProgress! : null
+  const progressLabel = progress === null ? null : formatPercent(progress / 100)
+  if (isAudiobook.value) {
+    return progress === null
+      ? { icon, label: t('book.actions.listen'), ariaLabel: t('book.actions.startListening'), progress, progressLabel }
+      : { icon, label: t('book.card.dock.resume'), ariaLabel: t('book.actions.continueListening'), progress, progressLabel }
+  }
+  return progress === null
+    ? { icon, label: t('book.actions.read'), ariaLabel: t('book.actions.startReading'), progress, progressLabel }
+    : { icon, label: t('book.card.dock.continue'), ariaLabel: t('book.actions.continueReading'), progress, progressLabel }
+})
+
+function handleDockPrimary(event: MouseEvent) {
+  const file = canOpenPrimaryFile.value ? primaryFile.value : null
+  if (openInNewTabIfRequested(event, file ? readerLocation(file) : detailsLocation.value)) return
+  if (file) openFile(file)
+  else openBookDetails()
+}
+
 function resolveBookLabel(field: GridCardLabelField): string | null {
   if (field === 'hidden') return null
   if (field === 'book-title') return props.book.title?.trim() || null
@@ -505,14 +510,20 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
 <template>
   <div
     ref="root"
-    class="flex flex-col @container touch-manipulation"
-    :class="[selectionMode || isPrimaryClickAvailable ? 'cursor-pointer' : 'cursor-default', selectionMode ? 'select-none' : '']"
+    class="flex flex-col @container touch-manipulation cursor-pointer"
+    :class="selectionMode ? 'select-none' : ''"
     @click="handleCardClick"
     @auxclick="handleCardAuxClick"
     @contextmenu="handleContextMenu"
   >
     <!-- Cover -->
-    <div class="group">
+    <div
+      class="group [-webkit-touch-callout:none]"
+      @pointerdown="handleCoverPointerDown"
+      @pointermove="handleCoverPointerMove"
+      @pointerup="handleCoverPointerUp"
+      @pointercancel="handleCoverPointerCancel"
+    >
       <BookCoverSurface
         class="book-cover-surface--spine-fitted relative w-full rounded-sm overflow-hidden transition-[box-shadow,transform,ring] duration-150 will-change-transform"
         :class="isMissing || selectionMode ? '' : 'group-hover:[transform:var(--cover-hover-transform)] motion-reduce:group-hover:[transform:none]'"
@@ -545,12 +556,16 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
           @error="handleArtworkError"
         />
 
-        <div data-testid="cover-overlay-frame" class="absolute z-10 overflow-hidden rounded-[inherit]" :style="coverOverlayFrameStyle">
+        <div
+          data-testid="cover-overlay-frame"
+          class="absolute z-10 overflow-hidden rounded-[inherit] [container-type:size]"
+          :style="coverOverlayFrameStyle"
+        >
           <!-- Top-left overlay: read status -->
           <div
             v-if="showReadBadge && !isMissing"
             class="absolute top-1.5 left-1.5 z-10 flex items-center justify-center rounded-full bg-black/60 p-1 pointer-events-none transition-opacity duration-150"
-            :class="[overlayFadeClass, overlayFadeClass ? '' : showMobileOverlay ? 'opacity-0 pointer-events-none' : '']"
+            :class="restFadeClass"
           >
             <component :is="STATUS_ICONS[localReadStatus!]" :size="12" :class="STATUS_COLORS[localReadStatus!]" />
           </div>
@@ -560,7 +575,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
             <div
               v-if="showLockStatusPill"
               class="flex items-center justify-center rounded-full bg-black/60 p-1 transition-opacity duration-150"
-              :class="showMobileOverlay ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0'"
+              :class="restFadeClass"
             >
               <component :is="metadataLocked ? Lock : LockOpen" :size="12" :class="metadataLocked ? 'text-amber-400' : 'text-emerald-400'" />
             </div>
@@ -570,7 +585,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                 <div
                   data-card-click-blocker
                   class="pointer-events-auto flex items-center bg-black/60 rounded-full px-1.5 py-0.5 transition-opacity duration-150 cursor-default"
-                  :class="showMobileOverlay ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0 group-hover:pointer-events-none'"
+                  :class="interactiveRestFadeClass"
                 >
                   <span class="text-[9px] font-bold text-white leading-none">{{ seriesPositionLabel }}</span>
                 </div>
@@ -586,7 +601,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                   data-card-click-blocker
                   data-testid="card-editions-pill"
                   class="pointer-events-auto flex items-center gap-[3px] bg-black/60 rounded-full px-1.5 py-0.5 transition-opacity duration-150 cursor-default"
-                  :class="showMobileOverlay ? 'opacity-0 pointer-events-none' : 'group-hover:opacity-0 group-hover:pointer-events-none'"
+                  :class="interactiveRestFadeClass"
                   role="img"
                   :aria-label="t('book.editions.card.count', { count: editionCount })"
                 >
@@ -604,7 +619,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
           <div
             v-if="showRatingOverlay && !selectionMode"
             class="absolute bottom-1.5 left-1.5 z-10 flex items-center gap-0.5 bg-black/60 rounded-full px-1.5 py-0.5 pointer-events-none transition-opacity duration-150"
-            :class="overlayFadeClass"
+            :class="restFadeClass"
           >
             <Star class="size-3" :style="{ fill: ratingColor, color: ratingColor }" />
             <span class="text-[9px] font-bold text-white leading-none">{{ Math.round(book.rating!) }}</span>
@@ -614,7 +629,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
           <div
             v-if="showFormatOverlay && !selectionMode"
             class="absolute inset-0 z-10 pointer-events-none transition-opacity duration-150"
-            :class="overlayFadeClass"
+            :class="restFadeClass"
           >
             <BookCardFormatBadges :own-keys="ownFormatKeys" :linked="book.linked" :badge-style="formatBadgeStyle" />
           </div>
@@ -625,7 +640,7 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
             data-testid="reading-progress-bar"
             class="absolute bottom-0 left-0 z-10 h-0.75 transition-[width,opacity] duration-500 [box-shadow:0_-1px_0_rgba(255,255,255,0.25)]"
             style="transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1)"
-            :class="[localReadStatus === 'read' ? 'bg-green-500/80' : 'bg-primary/70', overlayFadeClass]"
+            :class="[localReadStatus === 'read' ? 'bg-green-500/80' : 'bg-primary/70', restFadeClass]"
             :style="{ width: `${book.readingProgress}%` }"
           />
 
@@ -659,94 +674,29 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
             </div>
           </Transition>
 
-          <!-- Hover overlay -->
+          <!-- Hover overlay: one panel at the foot of the cover -->
           <div
             v-if="!selectionMode"
-            class="absolute inset-0 flex flex-col p-2 transition-opacity duration-150"
-            :class="[
-              overlayBackground,
-              showMobileOverlay
-                ? 'opacity-100'
-                : 'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100',
-            ]"
+            data-testid="grid-card-hover-overlay"
+            class="absolute inset-0 z-20 flex flex-col justify-end p-[clamp(6px,5cqi,12px)] transition-opacity duration-150"
+            :class="overlayVisibilityClass"
           >
-            <!-- Top row: Quick View + explicit Read (when thumbnail click prefers details) -->
-            <div class="shrink-0 flex items-center justify-end gap-1">
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <button
-                    class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
-                    :aria-label="t('book.actions.quickView')"
-                    @click.stop="openQuickView"
-                  >
-                    <PanelRight class="size-[12cqi]" aria-hidden="true" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ t('book.actions.quickView') }}</TooltipContent>
-              </Tooltip>
-              <Tooltip v-if="showExplicitReadButton">
-                <TooltipTrigger as-child>
-                  <button
-                    class="p-[3cqi] rounded-[2.5cqi] bg-black/50 hover:bg-black/30 transition-colors text-white"
-                    :aria-label="readActionLabel"
-                    @click.stop="openPrimaryFileExplicit"
-                  >
-                    <BookOpen class="size-[12cqi]" aria-hidden="true" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ readActionLabel }}</TooltipContent>
-              </Tooltip>
-            </div>
-
-            <!-- Center: primary thumbnail action -->
-            <div class="flex-1 flex items-center justify-center">
-              <Tooltip v-if="showPrimaryOverlayAction" :disabled="thumbnailClickAction === 'details'">
-                <TooltipTrigger as-child>
-                  <button
-                    data-testid="grid-card-primary-action"
-                    class="size-[30cqi] flex items-center justify-center rounded-full bg-primary text-white shadow-2xl transition-all duration-300 scale-75 hover:scale-110 active:scale-90"
-                    :class="[showMobileOverlay || 'group-hover:scale-100', showMobileOverlay ? 'scale-100' : '']"
-                    :aria-label="primaryOverlayActionLabel"
-                    @click.stop="handlePrimaryOverlayAction"
-                  >
-                    <component :is="primaryOverlayActionIcon" class="size-[16cqi]" :class="primaryOverlayActionIconClass" aria-hidden="true" />
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>{{ primaryOverlayActionLabel }}</TooltipContent>
-              </Tooltip>
-            </div>
-
-            <!-- Bottom: title/author (hover-overlay mode only) + kebab (when not in below-cover label row) -->
-            <div class="shrink-0 flex flex-col pr-10">
-              <BookCardFormatList v-if="showFormatList" class="mb-1" :own-keys="ownFormatKeys" :linked="book.linked" />
-              <div class="flex items-start justify-between gap-2">
-                <BookCardLabel
-                  v-if="showHoverTitle"
-                  as="p"
-                  :text="book.title ?? '-'"
-                  :lines="hoverTitleLines"
-                  class="min-w-0 flex-1 text-xs leading-tight font-semibold text-cover-chip-foreground"
-                  data-testid="grid-card-hover-title"
-                />
-                <div v-else class="flex-1" />
-              </div>
-
-              <div v-if="showHoverTitle && authorLine" class="min-w-0">
-                <BookCardLabel :text="authorLine" class="w-full text-[10px] text-cover-chip-foreground" @activate="openAuthorBrowse" />
-              </div>
-            </div>
-
-            <!-- Kebab menu anchored to lower-right (not in below-cover mode, where it lives in the label row) -->
-            <div v-if="!showBelowCoverLabelArea" class="absolute bottom-2 right-2 z-20">
-              <DropdownMenu>
-                <DropdownMenuTrigger as-child>
-                  <button
-                    class="px-0.75 py-1.5 rounded-md bg-black/40 hover:bg-white/30 transition-colors text-white shrink-0"
-                    :aria-label="menuLabel"
-                  >
-                    <MoreVertical class="size-3.5" />
-                  </button>
-                </DropdownMenuTrigger>
+            <BookCardHoverPanel
+              class="transition-transform duration-240 ease-[cubic-bezier(0.2,0.8,0.2,1)] motion-reduce:transition-none"
+              :class="panelRevealClass"
+              :action="dockAction"
+              :own-keys="ownFormatKeys"
+              :linked="book.linked"
+              :show-formats="showFormatOverlay"
+              :title="showHoverTitle ? (book.title ?? '-') : null"
+              :author="authorLine"
+              :show-menu="!showBelowCoverLabelArea"
+              :menu-label="menuLabel"
+              @primary="handleDockPrimary"
+              @quick-view="openQuickView"
+              @author="openAuthorBrowse"
+            >
+              <template #menu>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem v-if="openableFiles.length <= 1 && primaryFile && !isMissing" @click="openFile(primaryFile)">
                     <BookOpen class="size-4 mr-2" />
@@ -868,8 +818,8 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                     {{ t('common.delete') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
+              </template>
+            </BookCardHoverPanel>
           </div>
         </div>
       </BookCoverSurface>

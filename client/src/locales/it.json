@@ -512,14 +512,6 @@
       },
       "behavior": {
         "title": "Comportamento della biblioteca",
-        "thumbnailClicks": {
-          "label": "Clic sulle miniature",
-          "hint": "Scegli cosa succede quando si apre un libro dalle visualizzazioni griglia ed elenco",
-          "readFirst": "Leggi",
-          "readFirstHint": "Aprire il lettore se il file è leggibile",
-          "openDetails": "Apri i dettagli",
-          "openDetailsHint": "Apre la pagina dei dettagli del libro dalle miniature della griglia e dell'elenco"
-        },
         "highlightPeek": {
           "label": "Apri gli evidenziazioni in modalità Anteprima",
           "hint": "Passare a un elemento evidenziato non modifica i tuoi progressi di lettura né lo stato di lettura"

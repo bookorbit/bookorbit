@@ -444,14 +444,6 @@
       },
       "behavior": {
         "title": "Bibliotek Beteende",
-        "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "Välj vad som händer när du öppnar en bok från rutnät och listvyer",
-          "readFirst": "Läs först",
-          "readFirstHint": "Öppna läsaren när en läsbar fil finns",
-          "openDetails": "Öppna detaljer",
-          "openDetailsHint": "Gå till sidan bokdetaljer från rutnät och lista miniatyrer"
-        },
         "filterPreview": {
           "label": "Visa förhandsgranskning av filter som standard",
           "hint": "Utöka det aktiva filtret och sortera sammanfattningen när du öppnar en smartScope"

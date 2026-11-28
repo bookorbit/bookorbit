@@ -477,14 +477,6 @@
       },
       "behavior": {
         "title": "Kirjaston Käyttäytyminen",
-        "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "Valitse mitä tapahtuu, kun avaat kirjan ruudukosta ja listaa näkymiä",
-          "readFirst": "Lue ensin",
-          "readFirstHint": "Avaa lukija, kun luettavissa oleva tiedosto on olemassa",
-          "openDetails": "Avaa tiedot",
-          "openDetailsHint": "Siirry kirjan yksityiskohdat sivulle ruudukosta ja listaa pikkukuvat"
-        },
         "filterPreview": {
           "label": "Näytä suodattimen esikatselu oletuksena",
           "hint": "Laajenna aktiivinen suodatin- ja lajittelutiivistelmä, kun avaat smartScope"

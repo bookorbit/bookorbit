@@ -512,14 +512,6 @@
       },
       "behavior": {
         "title": "Bibliotheksverhalten",
-        "thumbnailClicks": {
-          "label": "Klicks auf Miniaturansichten",
-          "hint": "Wählen Sie, was beim Öffnen eines Buchs aus Raster- und Listenansichten passiert",
-          "readFirst": "Zuerst lesen",
-          "readFirstHint": "Den Reader öffnen, wenn eine lesbare Datei vorhanden ist",
-          "openDetails": "Details öffnen",
-          "openDetailsHint": "Zur Buchdetailseite von Raster- und Listenminiaturansichten wechseln"
-        },
         "highlightPeek": {
           "label": "Markierungen im Vorschau-Modus öffnen",
           "hint": "Beim Springen zu einer Markierung bleiben Ihr Lesefortschritt und Lesestatus unverändert"

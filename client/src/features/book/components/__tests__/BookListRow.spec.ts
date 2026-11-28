@@ -42,7 +42,7 @@ const globalStubs = {
   },
 }
 
-const { bookSpineOverlay, thumbnailClickAction } = useDisplaySettings()
+const { bookSpineOverlay } = useDisplaySettings()
 
 beforeEach(() => {
   routerPushMock.mockClear()
@@ -50,7 +50,6 @@ beforeEach(() => {
 
 afterEach(() => {
   bookSpineOverlay.value = 'off'
-  thumbnailClickAction.value = 'reader'
 })
 
 const missingBook: BookCard = {
@@ -164,8 +163,7 @@ describe('BookListRow - missing state', () => {
     expect(root.classes().join(' ')).not.toContain('hover:bg-muted')
   })
 
-  it('opens book details for missing books when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
+  it('opens book details on row click for missing books', async () => {
     const wrapper = mount(BookListRow, { props: { book: missingBook }, global: globalStubs })
 
     await wrapper.find('.flex.items-center').trigger('click')
@@ -175,17 +173,7 @@ describe('BookListRow - missing state', () => {
 })
 
 describe('BookListRow - present state', () => {
-  it('emits quick-view on row click by default', async () => {
-    const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
-
-    await wrapper.find('.flex.items-center').trigger('click')
-
-    expect(wrapper.emitted('action')?.[0]).toEqual(['quick-view'])
-    expect(routerPushMock).not.toHaveBeenCalled()
-  })
-
-  it('opens book details on row click when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
+  it('opens book details on row click', async () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
 
     await wrapper.find('.flex.items-center').trigger('click')
@@ -195,7 +183,6 @@ describe('BookListRow - present state', () => {
   })
 
   it('selects instead of navigating in selection mode', async () => {
-    thumbnailClickAction.value = 'details'
     const wrapper = mount(BookListRow, { props: { book: presentBook, selectionMode: true }, global: globalStubs })
 
     await wrapper.find('.flex.items-center').trigger('click')
@@ -204,8 +191,7 @@ describe('BookListRow - present state', () => {
     expect(routerPushMock).not.toHaveBeenCalled()
   })
 
-  it('keeps the explicit format button opening the reader when thumbnail clicks prefer details', async () => {
-    thumbnailClickAction.value = 'details'
+  it('opens the reader from the format button', async () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
 
     const formatButton = wrapper.findAll('button').find((button) => button.text() === 'EPUB')
@@ -303,7 +289,6 @@ describe('BookListRow collapsed series', () => {
   })
 
   it('opens the series detail route on row click', async () => {
-    thumbnailClickAction.value = 'details'
     const wrapper = mount(BookListRow, { props: { book: collapsedSeriesBook }, global: globalStubs })
 
     await wrapper.get('[data-testid="collapsed-series-list-row"]').trigger('click')
@@ -380,8 +365,7 @@ describe('BookListRow - opening in a new tab', () => {
     openSpy.mockRestore()
   })
 
-  it('opens the book details in a new tab on Ctrl+click, whatever a plain click does', async () => {
-    thumbnailClickAction.value = 'reader'
+  it('opens the book details in a new tab on Ctrl+click', async () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
 
     await wrapper.find('.flex.items-center').trigger('click', { ctrlKey: true })
@@ -426,13 +410,14 @@ describe('BookListRow - opening in a new tab', () => {
     expect(openSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('renders the title as a link to the book page that still runs the row action on a plain click', async () => {
+  it('renders the title as a link to the book page that opens the details on a plain click', async () => {
     const wrapper = mount(BookListRow, { props: { book: presentBook }, global: globalStubs })
     const title = wrapper.findAll('a').find((link) => link.text() === 'Available Book')
 
     expect(wrapper.findComponent(RouterLinkStub).props('to')).toEqual({ name: 'book-detail', params: { bookId: 2 } })
     await title!.trigger('click')
-    expect(wrapper.emitted('action')?.[0]).toEqual(['quick-view'])
+    expect(routerPushMock).toHaveBeenCalledWith({ name: 'book-detail', params: { bookId: 2 } })
+    expect(wrapper.emitted('action')).toBeUndefined()
   })
 
   it('renders the title as plain text while selecting', () => {

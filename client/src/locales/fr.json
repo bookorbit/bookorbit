@@ -491,14 +491,6 @@
       },
       "behavior": {
         "title": "Comportement de la bibliothèque",
-        "thumbnailClicks": {
-          "label": "Clics sur les vignettes",
-          "hint": "Choisissez ce qui se passe lors de l'ouverture d'un livre à partir des vues grille et liste",
-          "readFirst": "Lire d'abord",
-          "readFirstHint": "Ouvrir le lecteur lorsqu'un fichier lisible existe",
-          "openDetails": "Ouvrir les détails",
-          "openDetailsHint": "Accédez à la page de détails du livre à partir des vignettes de la grille et de la liste."
-        },
         "filterPreview": {
           "label": "Afficher l'aperçu du filtre par défaut",
           "hint": "Développez le résumé du filtre et du tri actifs à l'ouverture d'une liste intelligente"

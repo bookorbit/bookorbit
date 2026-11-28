@@ -413,14 +413,6 @@
       },
       "behavior": {
         "title": "라이브러리 동작",
-        "thumbnailClicks": {
-          "label": "썸네일 클릭",
-          "hint": "그리드 보기와 목록 보기에서 책을 열 때 수행할 동작",
-          "readFirst": "읽기 우선",
-          "readFirstHint": "읽을 수 있는 파일이 존재할 경우 리더를 엽니다.",
-          "openDetails": "상세 정보 열기",
-          "openDetailsHint": "그리드 및 목록 썸네일 클릭 시 책 상세 정보 페이지로 이동합니다."
-        },
         "filterPreview": {
           "label": "필터 표시를 기본값으로",
           "hint": "스마트 스코프를 열 때 활성활된 필터와 정렬 기준을 표시"

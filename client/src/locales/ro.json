@@ -477,14 +477,6 @@
       },
       "behavior": {
         "title": "Comportament bibliotecă",
-        "thumbnailClicks": {
-          "label": "Thumbnail clicks",
-          "hint": "Alege ce se întâmplă când deschizi o carte din grilă și vizualizări listă",
-          "readFirst": "Citește mai întâi",
-          "readFirstHint": "Deschide cititorul atunci când există un fișier lizibil",
-          "openDetails": "Deschideți detaliile",
-          "openDetailsHint": "Mergeți la pagina de detalii a cărții din grilă și miniaturi de listă"
-        },
         "filterPreview": {
           "label": "Arată previzualizarea filtrului în mod implicit",
           "hint": "Extindeți filtrul activ și sortați rezumatul atunci când deschideți un smartScope"

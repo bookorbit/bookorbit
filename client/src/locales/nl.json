@@ -497,14 +497,6 @@
       },
       "behavior": {
         "title": "Bibliotheekgedrag",
-        "thumbnailClicks": {
-          "label": "Klikken op miniaturen",
-          "hint": "Kies wat er gebeurt bij het openen van een boek vanuit raster- en lijstweergaven",
-          "readFirst": "Eerst lezen",
-          "readFirstHint": "Open de lezer wanneer er een leesbaar bestand bestaat",
-          "openDetails": "Details openen",
-          "openDetailsHint": "Ga naar de boekdetailpagina vanuit raster- en lijstminiaturen"
-        },
         "filterPreview": {
           "label": "Filtervoorbeeld standaard tonen",
           "hint": "Vouw de samenvatting van het actieve filter en de sortering uit bij het openen van een smartScope"

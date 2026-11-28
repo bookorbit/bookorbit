@@ -477,14 +477,6 @@
       },
       "behavior": {
         "title": "Obnašanje knjižnice",
-        "thumbnailClicks": {
-          "label": "Kliki na sličice",
-          "hint": "Izberite, kaj se zgodi ob odpiranju knjige iz pogledov mreže in seznama",
-          "readFirst": "Najprej beri",
-          "readFirstHint": "Odpri bralnik, kadar obstaja berljiva datoteka",
-          "openDetails": "Odpri podrobnosti",
-          "openDetailsHint": "Pojdi na stran s podrobnostmi knjige iz sličic v mreži in seznamu"
-        },
         "filterPreview": {
           "label": "Privzeto prikaži predogled filtra",
           "hint": "Razširi povzetek aktivnega filtra in razvrščanja ob odpiranju pametnih obsegov"

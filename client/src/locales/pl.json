@@ -512,14 +512,6 @@
       },
       "behavior": {
         "title": "Zachowanie biblioteki",
-        "thumbnailClicks": {
-          "label": "Kliknięcia miniatur",
-          "hint": "Wybierz, co się stanie podczas otwierania książki w widokach siatki i listy",
-          "readFirst": "Otwórz czytnik",
-          "readFirstHint": "Otwórz czytnik, gdy istnieje czytelny plik",
-          "openDetails": "Otwórz szczegóły",
-          "openDetailsHint": "Przejdź do strony szczegółów książki z siatki i listy miniatur"
-        },
         "highlightPeek": {
           "label": "Otwieraj wyróżnione fragmenty w trybie podglądu",
           "hint": "Przejście do wyróżnionego fragmentu nie zmienia postępu czytania ani statusu lektury"

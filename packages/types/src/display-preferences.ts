@@ -86,7 +86,11 @@ export interface DisplayPreferences {
   gridCardPrimaryLabel: GridCardLabelField;
   gridCardSecondaryLabel: GridCardLabelField;
   cardInfoMode: CardInfoMode;
-  thumbnailClickAction: BookThumbnailClickAction;
+  /**
+   * @deprecated A card click always opens the book's details; reading has its own button on the card.
+   * Still accepted so preferences saved by older clients validate. Clients no longer send or read it.
+   */
+  thumbnailClickAction?: BookThumbnailClickAction;
   /** Jumping to a highlight opens the book in Peek mode, leaving progress and read status untouched. */
   openHighlightsInPeek: boolean;
   placeholderCoverStyle: PlaceholderCoverStyle;
