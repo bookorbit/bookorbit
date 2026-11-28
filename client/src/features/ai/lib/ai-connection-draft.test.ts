@@ -49,6 +49,14 @@ describe('connection drafts', () => {
     expect(draftFromPreset('other').name).toBe('')
   })
 
+  it('gives every OpenCode Go connection its own session ID', () => {
+    const first = draftFromPreset('opencodego')
+    const second = draftFromUrl('https://opencode.ai/inference/go/openai/v1')
+    expect(first.headers).toEqual([{ name: 'x-opencode-session', value: expect.stringMatching(/^[0-9a-f-]{36}$/), storedHint: null }])
+    expect(second?.headers[0]?.value).not.toBe(first.headers[0]?.value)
+    expect(draftFromPreset('opencodezen').headers).toEqual([])
+  })
+
   it('picks the preset and API type from a pasted URL', () => {
     expect(draftFromUrl('https://api.anthropic.com/v1/messages')).toMatchObject({
       presetId: 'anthropic',

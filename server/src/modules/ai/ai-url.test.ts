@@ -90,6 +90,11 @@ describe('detectAiConnection', () => {
     ['https://contoso.openai.azure.com/', 'azure', 'openai-chat', 'https://contoso.openai.azure.com/openai/v1'],
     ['https://contoso.services.ai.azure.com/models', 'azure', 'openai-chat', 'https://contoso.services.ai.azure.com/openai/v1'],
     ['https://openrouter.ai/api/v1', 'openrouter', 'openai-chat', 'https://openrouter.ai/api/v1'],
+    ['https://opencode.ai/inference/openai/v1', 'opencodezen', 'openai-chat', 'https://opencode.ai/inference/openai/v1'],
+    ['https://opencode.ai/inference/go/openai/v1', 'opencodego', 'openai-chat', 'https://opencode.ai/inference/go/openai/v1'],
+    ['https://opencode.ai/inference/go/openai/v1/chat/completions', 'opencodego', 'openai-chat', 'https://opencode.ai/inference/go/openai/v1'],
+    ['https://opencode.ai/zen/v1', 'opencodezen', 'openai-chat', 'https://opencode.ai/zen/v1'],
+    ['https://opencode.ai/zen/go/v1', 'opencodego', 'openai-chat', 'https://opencode.ai/zen/go/v1'],
     ['http://localhost:11434', 'ollama', 'openai-chat', 'http://localhost:11434/v1'],
     ['http://192.168.1.5:1234/v1', 'lmstudio', 'openai-chat', 'http://192.168.1.5:1234/v1'],
     ['http://gpu-box:8000/v1/chat/completions', 'vllm', 'openai-chat', 'http://gpu-box:8000/v1'],
@@ -114,6 +119,12 @@ describe('detectAiConnection', () => {
   it('never decides from anything but the URL', () => {
     expect(detectAiConnection('http://localhost:8317/v1')?.preset).toBe('cliproxyapi');
     expect(detectAiConnection('not a url at all')).toBeNull();
+  });
+
+  it('prefills a fresh session header for OpenCode Go', () => {
+    expect(AI_PRESETS.opencodego.headers).toEqual([{ name: 'x-opencode-session', value: '', fresh: true }]);
+    expect(AI_PRESETS.opencodezen.headers).toEqual([]);
+    expect(detectAiConnection('https://opencode.ai/inference/go/openai/v1')?.keyOptional).toBe(false);
   });
 
   it('normalises every preset URL to itself', () => {

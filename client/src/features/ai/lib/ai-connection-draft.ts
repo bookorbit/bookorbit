@@ -1,3 +1,5 @@
+import { createUuid } from '@/lib/uuid'
+
 import {
   AI_CONNECTION_LIMITS,
   AI_PRESETS,
@@ -72,7 +74,11 @@ export function draftFromPreset(presetId: AiPresetId): AiConnectionDraft {
     name: presetId === 'other' ? '' : preset.name,
     apiType: preset.apiType,
     baseUrl: preset.baseUrl,
-    headers: preset.headers.map((header) => ({ name: header.name, value: header.value, storedHint: null })),
+    headers: preset.headers.map((header) => ({
+      name: header.name,
+      value: header.fresh ? createUuid() : header.value,
+      storedHint: null,
+    })),
   }
 }
 
