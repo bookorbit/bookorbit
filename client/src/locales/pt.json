@@ -10,6 +10,7 @@
     "loading": "Carregando...",
     "search": "Buscar",
     "back": "Voltar",
+    "openInNewTab": "Abrir em nova aba",
     "next": "Próximo",
     "previous": "Anterior",
     "retry": "Tentar novamente",
@@ -511,6 +512,10 @@
       },
       "behavior": {
         "title": "Comportamento da Biblioteca",
+        "highlightPeek": {
+          "label": "Abrir destaques no modo Peek",
+          "hint": "Ir para um destaque deixa seu progresso de leitura e estado de leitura inalterado"
+        },
         "filterPreview": {
           "label": "Exibir pré-visualização do filtro por padrão",
           "hint": "Expandir o resumo do filtro e ordenação ativos ao abrir um escopo inteligente (smartScope)"
@@ -570,12 +575,56 @@
           "bulkDelete": "Falha ao excluir ícones"
         }
       },
+      "libraryVisibility": {
+        "intro": "Ocultar uma biblioteca de qualquer um destes lugares. Ela permanece na barra lateral, busca e sua própria página, e ainda mostra ela em uma biblioteca de séries ou estatísticas.",
+        "librariesLabel": "Bibliotecas",
+        "showEverywhere": "Mostrar em todos os lugares",
+        "shownAgain": "Toda biblioteca exibida novamente",
+        "saveFailed": "Não foi possível salvar a visibilidade da biblioteca",
+        "tableLabel": "Visibilidade da biblioteca",
+        "libraryColumn": "Biblioteca",
+        "noLibraries": "Não há bibliotecas para serem exibidas ainda.",
+        "shown": "Mostrando",
+        "hidden": "Oculto",
+        "toggleLabel": "Ocultar {library} de {place}",
+        "books": "{count, plural, one {# livro} other {# livros}}",
+        "hiddenFrom": "oculta do {places}",
+        "hiddenInOne": "Oculto em {place}",
+        "hiddenInMany": "Oculto em {count} lugares",
+        "hiddenEverywhere": "Oculto em todos os lugares",
+        "legendLabel": "{place}:",
+        "newLibraries": "Bibliotecas adicionadas posteriormente serão exibidas em todos os lugares até ocultas aqui.",
+        "syncLabel": "Sincronizar",
+        "syncHint": "Cada página do serviço tem sua própria lista de bibliotecas que nunca sincronizam.",
+        "syncHintOne": "Sua página de configurações tem sua própria lista de bibliotecas que nunca sincronizam.",
+        "places": {
+          "shelves": {
+            "label": "Lendo as prateleiras",
+            "short": "Prateleiras",
+            "inSentence": "lendo as prateleiras",
+            "covers": "Continuar lendo, Continuar ouvindo, Próximo na série, Descubra algo novo e o widget Lendo atualmente, no painel, no iOS e no catálogo do KOReader."
+          },
+          "series": {
+            "label": "Séries",
+            "short": "Séries",
+            "inSentence": "Séries",
+            "covers": "A página Séries e sua contagem na barra lateral. Uma série dividida entre bibliotecas mantém os livros das bibliotecas ainda exibidas."
+          },
+          "stats": {
+            "label": "Estatísticas",
+            "short": "Estatísticas",
+            "inSentence": "Estatísticas",
+            "covers": "Estatísticas, histórico de leitura, Retrospectiva do ano e os widgets de leitura do painel, como sua meta e sequência. A leitura continua sendo registrada, então exibir a biblioteca novamente traz seus números de volta."
+          }
+        }
+      },
       "tabs": {
         "theme": "Tema",
         "book-covers": "Capas dos Livros",
         "icons": "Ícones",
         "layout": "Layout",
         "behavior": "Comportamento",
+        "library-visibility": "Visibilidade da biblioteca",
         "language": "Idioma"
       }
     },
@@ -1514,6 +1563,7 @@
         "magic-links": "Links Mágicos",
         "oidc": "OIDC / SSO",
         "tts": "Texto-para-voz",
+        "ai": "IA",
         "server-fonts": "Fontes do Servidor",
         "api-keys": "Chave API"
       },
@@ -1587,6 +1637,9 @@
           "summaryUnsaved": "{count, plural, one {# voz configurada} other {# vozes configuradas}} - Alterações não salvas",
           "importFromProvider": "Importar do provedor",
           "loadPreset": "Carregado {preset} presente",
+          "addVoice": "Adicione voz",
+          "duplicateVoiceId": "Uma voz com este ID já existe.",
+          "discardChanges": "Descartar alterações de voz não salvas?",
           "importUnsupported": "Este provedor não suporta descoberta de voz.",
           "importUnsupportedWithPreset": "Este provedor não suporta a descoberta de voz. Use o botão \"Carregar {preset} predefinição\".",
           "discoveryUnsupported": "Este provedor não expõe uma extremidade da lista de voz.",
@@ -1608,6 +1661,410 @@
           "previewVoice": "Pré-visualizar {name}",
           "stopPreview": "Parar pré-visualização para {name}",
           "saveVoices": "{count, plural, one {Save # voz} other {Save # vozes}}"
+        }
+      },
+      "ai": {
+        "mobileAppsSubtitle": "Conecte um provedor de IA para ativar o Constellations e outros recursos de IA nos aplicativos oficiais do BookOrbit para iOS e Android. A configuração só é necessária se você usar esses aplicativos. O texto do livro é enviado ao provedor escolhido; informações sobre seus leitores não são enviadas.",
+        "loading": "Carregando",
+        "costBelow": "< {cost}",
+        "apiTypes": {
+          "openai-chat": "Compatível com OpenAI",
+          "anthropic-messages": "Mensagens Antrópicas",
+          "openai-responses": "Respostas OpenAI",
+          "unknown": "Não suportado por esta versão do servidor"
+        },
+        "slots": {
+          "fast": "Rápido",
+          "careful": "Cuidadoso",
+          "vision": "Visão"
+        },
+        "featureNames": {
+          "story-guides": "Guias da história para as constelações",
+          "connection-test": "Testes de provedor",
+          "try-it": "Tente isso",
+          "vision-scan": "Análises de fotos",
+          "reading-help": "Ajuda para leitura"
+        },
+        "status": {
+          "label": "Status da IA",
+          "requests": "Solicitações este mês",
+          "spentOf": "Gasto de {budget} limite",
+          "spent": "Gastos este mês",
+          "built": "Guias da história construídos",
+          "failed": "Solicitações com falha",
+          "review": "Revisão",
+          "budgetUsed": "Compartilhamento do limite mensal usado",
+          "connectionFailing": "{name} começou a falhar {time}.",
+          "connectionFailingFeatures": "{name} começou a falhar em {time}, então {features} não pode correr.",
+          "testAgain": "Testar novamente",
+          "slotFailing": "O modelo {slot}, {model}, começou a falhar {time}.",
+          "show": "Mostrar",
+          "budgetWarning": "{percent} do limite de {budget} deste mês fo usado. Em 100%, novas requisições param e constroem pausas.",
+          "budgetExhausted": "O limite {budget} deste mês foi usado. Novas solicitações são interrompidas e compilações esperam até que o limite seja aumentado ou o mês seja virado.",
+          "raiseLimit": "Aumentar o limite",
+          "addPrices": "Adicionar preços",
+          "setup": {
+            "title": "Configurar a IA em três passos",
+            "brief": "Cada passo desbloqueia o próximo. Nada é enviado para um provedor até que um recurso seja ativado.",
+            "provider": "Adicionar provedor",
+            "providerBrief": "Anthropic, OpenAI, um servidor local e muito mais",
+            "models": "Escolher modelo",
+            "features": "Ativar recurso",
+            "done": "Concluído"
+          }
+        },
+        "providers": {
+          "title": "Provedores",
+          "presetsLabel": "Predefinições do provedor",
+          "columns": {
+            "provider": "Provedor",
+            "address": "Endereço e chave",
+            "status": "Status",
+            "month": "Este mês"
+          },
+          "testNamed": "Testar {name}",
+          "editNamed": "Editar {name}"
+        },
+        "overview": {
+          "loadFailed": "Não foi possível carregar o uso da IA deste mês.",
+          "viewUsage": "Ver uso",
+          "encryptionMissing": "Defina AI_ENCRYPTION_KEY no servidor antes de salvar uma chave de provedor ou um valor de cabeçalho. Gere um rand openssl -hex 32"
+        },
+        "connections": {
+          "add": "Adicionar provedor",
+          "emptyTitle": "Nenhum provedor de IA ainda",
+          "loadFailed": "Não foi possível carregar os provedores de IA.",
+          "noKey": "Sem chave",
+          "keySaved": "Chave salva",
+          "statusWorking": "Trabalhando, testado {time}",
+          "statusFailing": "Falhando desde {time}",
+          "statusUntested": "Não testado",
+          "unusable": "Esta versão de servidor não suporta o tipo de API deste provedor.",
+          "providerSaid": "O provedor respondeu: {message}",
+          "test": "Testar",
+          "delete": "Apagar",
+          "deleteNamed": "Apagar {name}",
+          "testPassed": "{name} passou no teste",
+          "testFailed": "{name} falhou no teste",
+          "deleteTitle": "Apagar {name}?",
+          "deleted": "{name} excluído",
+          "deleteFailed": "Não foi possível excluir o provedor.",
+          "inUseTitle": "{name} está em uso",
+          "goToModels": "Ir para modelos"
+        },
+        "models": {
+          "title": "Modelos",
+          "loadFailed": "Não foi possível carregar as configurações de IA.",
+          "listFailed": "Não foi possível carregar a lista do modelo.",
+          "none": "Nenhum",
+          "model": "Modelo",
+          "deployment": "Nome de implantação",
+          "modelPlaceholder": "Pesquise ou digite um ID de modelo",
+          "listLoading": "Carregando a lista do modelo",
+          "listFailedHint": "Não foi possível carregar a lista de modelos. Digite o ID do modelo, ou tente novamente.",
+          "bothRequired": "Escolha um provedor e um modelo, ou nenhuma das opções.",
+          "priceShort": "{input} entrada, {output} por milhão de tokens",
+          "contextShort": "Contexto {tokens}",
+          "anthropicAdd": "Adicionar provedor de mensagens",
+          "anthropicName": "{name} (Mensagens)",
+          "priceInput": "Preço de entrada",
+          "priceOutput": "Preço de saída",
+          "priceInvalid": "Digite ambos os preços como números, ou deixe ambos vazios.",
+          "advanced": "Avançado",
+          "jsonMode": "Modo JSON",
+          "jsonModes": {
+            "auto": "Automático",
+            "schema": "Esquema JSON",
+            "json": "Modo JSON",
+            "instructions": "Somente instruções"
+          },
+          "effort": "Esforço de raciocínio",
+          "effortListed": "Os níveis deste modelo de lista. Permitem que cada recurso escolha automaticamente.",
+          "effortListedDefault": "Os níveis que este modelo lista. Ele usa {level} quando nenhum é enviado. Permite automaticamente cada recurso escolher.",
+          "effortNone": "Esse modelo não assume nível de esforço.",
+          "effortUnknown": "Este provedor não informa quais níveis seus modelos aceitam, e alguns usam silenciosamente um nível diferente. Automático permite que cada recurso escolha. Salve e depois use Testar para verificar um nível.",
+          "efforts": {
+            "auto": "Automático",
+            "none": "Nenhum",
+            "minimal": "Mínimo",
+            "low": "Baixo",
+            "medium": "Médio",
+            "high": "Alto",
+            "xhigh": "Muito alto",
+            "max": "Máximo"
+          },
+          "save": "Salvar",
+          "saved": "Espaço {slot} salvo",
+          "saveFailed": "Não foi possível salvar o log.",
+          "try": "Tente isso",
+          "trying": "Tentando",
+          "tryFailed": "Não foi possível executá-lo.",
+          "durationMs": "{ms} ms",
+          "durationSeconds": "{seconds} s",
+          "tryJson": "Formato da resposta: {how}",
+          "costUnknown": "custo desconhecido",
+          "kinds": {
+            "person": "Pessoa",
+            "place": "Local",
+            "group": "Grupo",
+            "thing": "Objeto"
+          },
+          "tryErrors": {
+            "off": "Os pedidos de IA estão desativados neste servidor.",
+            "slot-empty": "Escolha um provedor e um modelo para este slot primeiro.",
+            "budget": "O limite de despesas deste mês foi usado.",
+            "provider-auth": "O provedor rejeitou a chave. Verifique a chave do provedor.",
+            "model-missing": "O provedor não tem esse modelo.",
+            "provider-down": "O provedor não pôde ser alcançado ou respondeu com um erro. Tente novamente daqui a pouco.",
+            "bad-request": "O provedor recusou os parâmetros da solicitação.",
+            "refused": "O modelo recusou ler a passagem da amostra."
+          },
+          "columns": {
+            "model": "Modelo",
+            "price": "Preço por 1M tokens",
+            "status": "Status"
+          },
+          "usedBy": "Utilizado por",
+          "optionalUse": "{name}, opcional",
+          "notSet": "Não definido",
+          "chooseModel": "Selecione um modelo",
+          "addProviderFirst": "Adicione um provedor primeiro",
+          "priceCell": "{input} / {output}",
+          "inOut": "dentro / fora",
+          "noPrice": "Sem preço",
+          "statusFailing": "Falhando desde {time}",
+          "statusNotSet": "Não definido",
+          "statusProviderFailing": "Provedor falhado",
+          "statusUntested": "Provedor não testado",
+          "statusWorking": "Trabalhando",
+          "providerFailing": "{name} está falhando, então a solicitação deste slot falhou.",
+          "useAnother": "Usar outro provedor",
+          "tryNamed": "Experimente o modelo {slot}",
+          "editNamed": "Edite o espaço {slot}",
+          "provider": "Provedor",
+          "jsonOutput": "Saída JSON",
+          "saveAndTry": "Salvar e tentar"
+        },
+        "features": {
+          "title": "Recursos",
+          "loadFailed": "Não foi possível carregar os recursos AI.",
+          "empty": "Este servidor ainda não possui AI.",
+          "goToModels": "Ir para modelos",
+          "privacyConfirmed": "Enviando texto do livro confirmado por {name}, {time}",
+          "maxWords": "Livro mais longo (palavras)",
+          "maxWordsBrief": "Livros mais longos não foram construídos.",
+          "concurrentBuilds": "Construi ao mesmo tempo",
+          "concurrentBuildsBrief": "Mais construções esperam a sua vez.",
+          "readerMonthlyBudget": "Cada leitor, por mês (dólares)",
+          "save": "Salvar",
+          "saved": "{name} salvo",
+          "saveFailed": "Não foi possível salvar o recurso.",
+          "turnedOn": "{name} foi ligado",
+          "turnedOff": "{name} foi ligado",
+          "privacyTitle": "Ativar {name}?",
+          "turnOn": "Ligar",
+          "storyGuides": {
+            "deleteFixes": "Apagar também",
+            "continue": "Avançar",
+            "typeTitle": "Isso não pode ser desfeito",
+            "delete": "Apagar tudo",
+            "speeds": {
+              "title": "Velocidade do modelo",
+              "loading": "Lendo velocidades do modelo",
+              "loadFailed": "Falha ao ler as velocidades do modelo.",
+              "onConnection": "em {connection}",
+              "modelAtEffort": "{model} a {level} esforço",
+              "perCall": "{time} por chamada",
+              "steps": {
+                "names": "Encontrando nomes",
+                "review": "Verificando quem é quem",
+                "ties": "Encontrar laços",
+                "lines": "Escrevendo descrições",
+                "profiles": "Perfis de escrita",
+                "summaries": "Escrevendo resumos"
+              },
+              "reset": "Redefinir",
+              "resetLabel": "Redefinir a velocidade do {model}",
+              "resetTitle": "Redefinir a velocidade deste modelo?",
+              "resetDone": "Redefinir velocidade para {model}",
+              "resetFailed": "Não foi possível redefinir a velocidade."
+            }
+          },
+          "columns": {
+            "feature": "Recurso",
+            "runsOn": "Executa em",
+            "limits": "Limites",
+            "month": "Este mês",
+            "on": "Ligado"
+          },
+          "shortNames": {
+            "story-guides": "Guias da história",
+            "vision-scan": "Análises de fotos",
+            "reading-help": "Ajuda para leitura"
+          },
+          "sends": {
+            "story-guides": "envia texto do livro inteiro",
+            "vision-scan": "enviar fotos",
+            "reading-help": "envia trechos"
+          },
+          "stateOn": "Ligado",
+          "stateOff": "Desligado",
+          "stateFailing": "Falhando",
+          "optionalSlot": "{slot}, opcional",
+          "editNamed": "Editar {name}",
+          "goToSlot": "Ir para {slot}"
+        },
+        "spending": {
+          "title": "Despesas",
+          "columns": {
+            "appliesTo": "Aplica-se a",
+            "limit": "Limite mensal",
+            "spent": "Gasto",
+            "used": "Usado"
+          },
+          "server": "Todo o servidor",
+          "builds": "Construções sem preços",
+          "noLimit": "Sem limite",
+          "sharesServer": "Compartilha os servidores",
+          "sharesPlaceholder": "Compartilha o {amount} do servidor",
+          "monthlyLimit": "Limite mensal ($)",
+          "serverLimitBrief": "Sem limite disponível.",
+          "save": "Salvar",
+          "saved": "Limite {name} salvo",
+          "saveFailed": "Impossível salvar o limite."
+        },
+        "usage": {
+          "title": "Utilização",
+          "brief": "Este mês e os onze anteriores.",
+          "range": "{from} até {to}",
+          "back": "Voltar às configurações de IA",
+          "export": "Exportar CSV",
+          "exportFailed": "Falha ao exportar o uso.",
+          "months": "Por mês",
+          "byFeature": "Por recurso",
+          "byModel": "Por modelo",
+          "recentErrors": "Erros recentes",
+          "empty": "Nenhum pedido neste período.",
+          "noJobs": "Nenhuma construção neste período.",
+          "noErrors": "Nenhum erro neste período.",
+          "unnamedJob": "Construção sem nome",
+          "modelOn": "{model} em {connection}",
+          "costPartial": "{cost} + desconhecido",
+          "costUnknown": "Desconhecido",
+          "columns": {
+            "month": "Mês",
+            "feature": "Recurso",
+            "model": "Modelo",
+            "requests": "Solicitações",
+            "input": "Entrada",
+            "output": "Saída",
+            "reasoning": "Justificativa",
+            "cost": "Preço",
+            "errors": "Erros",
+            "job": "Construções",
+            "at": "Quando",
+            "slot": "Espaço",
+            "outcome": "Resultado"
+          },
+          "outcomes": {
+            "ok": "OK",
+            "refused": "Recusado pelo modelo",
+            "filtered": "Bloqueado pelo filtro do provedor",
+            "length": "Recortar curto no limite de saída",
+            "rate-limited": "Limite de taxa",
+            "timeout": "Tempo esgotado",
+            "invalid-json": "Resposta não era um JSON válido"
+          },
+          "errorCodes": {
+            "off": "IA desligada",
+            "slot-empty": "Espaço vazio",
+            "budget": "Excede o orçamento",
+            "provider-auth": "Chave rejeitada",
+            "model-missing": "Modelo não encontrado",
+            "provider-down": "Provedor desligado",
+            "invalid-json": "JSON inválido",
+            "too-long": "Muito longo para o modelo",
+            "bad-request": "Pedido recusado",
+            "cancelled": "Cancelado"
+          }
+        },
+        "presets": {
+          "other": "Outro",
+          "otherBrief": "Qualquer servidor que fale a API OpenAI",
+          "warnings": {
+            "gemini": "O Google chama esse beta de extremidade, e rejeita chaves de API que não têm restrições.",
+            "ollama": "Pequenos modelos locais são pouco confiáveis em JSON.",
+            "lmstudio": "O LM Studio avisa que modelos sob 7B muitas vezes não podem seguir um esquema JSON."
+          }
+        },
+        "sheet": {
+          "addTitle": "Adicionar provedor de IA",
+          "editTitle": "Editar {name}",
+          "stepOf": "Passo {step} de 3",
+          "steps": {
+            "provider": "Provedor",
+            "details": "Detalhes",
+            "test": "Testar"
+          },
+          "next": "Seguinte",
+          "back": "Voltar",
+          "runTest": "Testar",
+          "save": "Salvar",
+          "saving": "Salvando",
+          "pasteLabel": "Ou cole uma URL",
+          "pastePlaceholder": "https://api.example.com/v1",
+          "pasteUse": "Usar URL",
+          "name": "Nome",
+          "baseUrl": "URL base",
+          "calls": "Chamadas {url}",
+          "apiType": "Tipo da API",
+          "key": "Chave API",
+          "keyOptional": "Chave da API (opcional)",
+          "addHeader": "Adicionar cabeçalho",
+          "removeHeader": "Remover {name}",
+          "proxyUrl": "URL do proxy",
+          "proxyBrief": "Alcance o provedor através de um proxy HTTP.",
+          "resolvers": "Servidores DNS",
+          "resolversBrief": "Procure o provedor com esses servidores em vez do sistema.",
+          "timeout": "Tempo limite esgotado (segundos)",
+          "secondsRange": "Por pedido, {min} para {max} segundos.",
+          "parallel": "Solicitações paralelas",
+          "range": "{min} até {max}.",
+          "perMinute": "Requisições por Minuto",
+          "perMinuteBrief": "Sem limite disponível.",
+          "testModel": "Modelo de teste",
+          "testDeployment": "Teste de implantação",
+          "testAgain": "Testar novamente",
+          "saveWithFailureTitle": "Salvar sem teste de passagem?",
+          "saveAnyway": "Salvar mesmo assim",
+          "saved": "{name} salvo",
+          "saveFailed": "Não foi possível salvar a conexão.",
+          "errors": {
+            "nameRequired": "Insira um nome.",
+            "urlRequired": "Insira a URL do provedor.",
+            "urlInvalid": "Insira uma URL que começa com http:// ou https://.",
+            "keyRequired": "Digite a chave de API.",
+            "headerNameRequired": "Digite um nome para cada cabeçalho.",
+            "headerValueRequired": "Digite um valor para {name}."
+          }
+        },
+        "test": {
+          "failed": "Não foi possível executar o teste.",
+          "steps": {
+            "models": "Modelos encontrados",
+            "image": "Ler uma imagem"
+          },
+          "jsonSupport": {
+            "schema": "Esquema JSON aplicado",
+            "json": "Modo JSON",
+            "instructions": "Somente instruções"
+          }
+        },
+        "failures": {
+          "unreachable": "Não foi possível acessar o servidor. Verifique a URL e se o servidor está rodando.",
+          "timeout": "O servidor levou muito tempo para responder.",
+          "tls": "O certificado do servidor não foi aceito.",
+          "blocked-address": "Este endereço não é permitido."
         }
       },
       "serverFonts": {
@@ -2978,7 +3435,46 @@
         "destinationLibraryUpdated": "Biblioteca de destino atualizada",
         "destinationFolderUpdated": "Pasta de destino atualizada",
         "confidenceThresholdUpdated": "Limite de confiança atualizado",
-        "metadataModeUpdated": "Modo de metadados atualizado"
+        "metadataModeUpdated": "Modo de metadados atualizado",
+        "docks": {
+          "autoFile": "Arquivo automático",
+          "title": "Abas",
+          "defaultExplained": "\"Padrão\" segue as configurações acima.",
+          "columnLibrary": "Biblioteca",
+          "columnFiling": "Arquivando",
+          "columnExtras": "Extras",
+          "columnOn": "Ligado",
+          "unsortedHint": "A raiz do dock. Sempre ligado.",
+          "unsortedAlwaysOn": "Não ordenado está sempre ligado",
+          "unsortedOnly": "Somente não ordenado",
+          "unsortedSaved": "Configurações não ordenadas salvas",
+          "noDock": "Sem doca",
+          "oldName": "Nome antigo",
+          "oldNameHint": "A biblioteca foi renomeada; a pasta manteve seu nome",
+          "noFolder": "Nenhuma pasta",
+          "default": "Padrão",
+          "defaultValue": "Padrão ({value})",
+          "on": "Ligado",
+          "off": "Desligado",
+          "none": "Nenhum",
+          "filingMove": "Mover",
+          "filingCopy": "Copiar",
+          "filingHardlink": "Hardlink",
+          "folder": "Pasta",
+          "filesInto": "Arquivado em",
+          "thisDockOnly": "Apenas esta doca",
+          "autoJoin": "Juntar livros correspondentes",
+          "keepOriginal": "Manter originais",
+          "turnOnTitle": "Ativar a doca {library}",
+          "error": {
+            "LIBRARY_DOCK_NOT_ENABLED": "Esta doca está desativada.",
+            "LIBRARY_DOCK_EXISTS": "Esta biblioteca já tem uma doca.",
+            "LIBRARY_DOCK_FOLDER_OWNED": "Uma doca já possui essa pasta.",
+            "LIBRARY_DOCK_FOLDER_NOT_EMPTY": "A pasta ainda tem arquivos.",
+            "LIBRARY_DOCK_FOLDER_UNWRITABLE": "O BookOrbit não consegue gravar na pasta doca.",
+            "LIBRARY_DOCK_OTHER_FILESYSTEM": "A pasta está em um disco diferente da doca."
+          }
+        }
       },
       "fileNaming": {
         "title": "Nomeação de Arquivos",
@@ -3067,6 +3563,7 @@
         "tokenSubtitle": "Subtítulo do livro",
         "tokenAuthors": "Autor(es), separado por vírgulas",
         "tokenNarrators": "Narrador(es) separados por vírgulas",
+        "tokenFirstPublishedYear": "Ano de publicação do trabalho pela primeira vez",
         "tokenYear": "Ano de publicação",
         "tokenSeries": "Nome da série",
         "tokenSeriesIndex": "Índice da série (zero-padded)",
@@ -3845,6 +4342,8 @@
           "apiKeyWillClear": "A chave API armazenada é removida quando você salvar",
           "category": "Categoria",
           "categoryHint": "Tags nos torrents o BookOrbit adiciona, então só age por conta própria.",
+          "audiobookCategory": "Categoria de Audiobook",
+          "comicCategory": "Categoria de quadrinhos",
           "priority": "Prioridade",
           "enabled": "Ativado",
           "useHardlinks": "Usar hardlinks",
@@ -4321,6 +4820,7 @@
           "failedAt": "falhou: {time}"
         },
         "categoryLabel": "categoria {category}",
+        "audiobookCategoryLabel": "audiolivros em {category}",
         "priorityLabel": "prioridade {priority}",
         "editClientName": "Editar {name}",
         "sections": {
@@ -4377,6 +4877,7 @@
         "appearanceIcons": "Escolha o estilo do ícone usado pelo aplicativo.",
         "appearanceLayout": "Visualização padrão da biblioteca, densidade e espaçamento.",
         "appearanceBehavior": "Como a biblioteca reage conforme você navega e ordena.",
+        "appearanceLibraryVisibility": "Ocultar bibliotecas da leitura de prateleiras, séries e estatísticas.",
         "appearanceLanguage": "Idioma da interface e formatos regionais.",
         "readerEbook": "Fontes, espaçamento e comportamento da página para eBooks.",
         "readerPdf": "Renderização, zoom, e página cabem em PDFs.",
@@ -4825,6 +5326,43 @@
       "notShownAgain": "Este link não será exibido novamente."
     },
     "userForm": {
+      "permissionLabels": {
+        "library_download": "Baixar livros",
+        "library_upload": "Upload de livros",
+        "library_edit_metadata": "Editar metadados",
+        "library_delete_books": "Apagar livro",
+        "library_merge_books": "Mesclar livros",
+        "library_generate_read_aloud": "Gerar livros lidos em voz alta",
+        "library_generate_story_guide": "Crie guias de histórias",
+        "book_dock_access": "Doca da biblioteca",
+        "book_request_access": "Solicitar livros",
+        "demo_restricted": "Demo restrito",
+        "kobo_sync": "Sincronização Kobo",
+        "koreader_sync": "Sincronização KOReader",
+        "hardcover_sync": "Sincronização Hardcover",
+        "readwise_sync": "Sincronização Readwise",
+        "storygraph_sync": "Sincronização StoryGraph",
+        "opds_access": "Acesso OPDS",
+        "api_keys": "Criar chaves de API",
+        "email_send": "Enviar por e-mail",
+        "manage_email": "Gerenciar e-mails",
+        "manage_libraries": "Gerenciar bibliotecas",
+        "manage_metadata_config": "Configuração de metadados",
+        "manage_icons": "Gerenciar ícones",
+        "manage_app_settings": "Configurações do aplicativo",
+        "manage_book_dock": "Gerenciar Doca da Biblioteca",
+        "manage_book_requests": "Gerenciar solicitações de livros",
+        "book_request_auto_approve": "Auto-aprovar solicitações",
+        "book_request_self_fulfill": "Download de livros diretamente",
+        "manage_users": "Gestão de usuários",
+        "view_audit_log": "Ver o registro de auditoria",
+        "notification_access": "Notificações"
+      },
+      "kindle": {
+        "title": "Enviar ao Kindle",
+        "hint": "Adicionar um endereço de entrega para este leitor de Kindle.",
+        "address": "Endereço de e-mail Kindle"
+      },
       "editUser": "Editar Usuário",
       "createUser": "Criar Usuário",
       "createSharedAccount": "Criar Conta Compartilhada",
@@ -5116,6 +5654,10 @@
       "defaults": {
         "title": "Padrões para novas contas",
         "appliesTo": "Aplica-se ao auto-registro e ao OIDC",
+        "savePermissions": "Salvar padrões",
+        "permissionsLoadError": "Permissões iniciais não puderam ser carregadas.",
+        "permissionsSaveError": "Permissões iniciais não puderam ser salvas.",
+        "more": "+{count} a mais",
         "startingLibraries": "Carregando bibliotecas",
         "startingLibrariesHint": "Acesso ao visualizador concedido automaticamente a cada nova conta."
       }
@@ -5182,7 +5724,8 @@
         "webReader": "Leitor web",
         "koreader": "KOReader",
         "pdf": "PDF",
-        "kobo": "Kobo"
+        "kobo": "Kobo",
+        "page": "Página"
       },
       "status": {
         "exact": "Exato",
@@ -5335,7 +5878,8 @@
       "cyan": "Ciano",
       "purple": "Roxo",
       "gray": "Cinza"
-    }
+    },
+    "pageNote": "Nota na página {page}"
   },
   "apiKeys": {
     "errors": {
@@ -5599,10 +6143,13 @@
       "Collection": "Coleção",
       "SmartScope": "Escopo inteligente",
       "BookDockFile": "Arquivo de dock",
+      "LibraryDock": "Doca da biblioteca",
       "BookRequest": "Pedido de livro",
       "DownloadClient": "Cliente de download",
       "RequestIndexer": "Indexador",
       "MetadataHttpProvider": "Provedor de metadados",
+      "AiConnection": "Conexão IA",
+      "AiSettings": "Configurações de IA",
       "Author": "Autor",
       "AppSettings": "Configurações da aplicação",
       "Genre": "Gênero",
@@ -5692,6 +6239,13 @@
       "SmartScopeUpdate": "Atualizar escopo inteligente",
       "SmartScopeDelete": "Excluir escopo inteligente",
       "BookDockFinalize": "Finalizar arquivo Doca de Livro",
+      "AiJobBuild": "Iniciar construção IA",
+      "AiJobUpdate": "Atualizar compilação IA",
+      "AiJobRetry": "Tente construir IA novamente",
+      "AiJobCancel": "Cancelar construção IA",
+      "AiJobPause": "Pausar compilação IA",
+      "AiJobPrioritize": "Mover a IA para a frente da fila",
+      "AiJobOutputDelete": "Excluir saída IA",
       "BookRequestCreate": "Criar pedido de livro",
       "BookRequestApprove": "Aprovar pedido de livro",
       "BookRequestReject": "Rejeitar pedido do livro",
@@ -5713,6 +6267,16 @@
       "MetadataHttpProviderCreate": "Provedor de metadados adicionado",
       "MetadataHttpProviderUpdate": "Provedor de metadados atualizado",
       "MetadataHttpProviderDelete": "Provedor de metadados removido",
+      "AiConnectionCreate": "Conexão IA adicionada",
+      "AiConnectionUpdate": "Conexão IA editada",
+      "AiConnectionDelete": "Conexão de IA excluída",
+      "AiConnectionKeyReplace": "Tecla de conexão IA substituída",
+      "AiConnectionKeyRemove": "Tecla de conexão IA removida",
+      "AiSlotsUpdate": "Modelos IA alterados",
+      "AiFeatureUpdate": "Recurso IA alterado",
+      "AiBudgetUpdate": "Orçamento IA alterado",
+      "AiSpeedsReset": "Redefinição de velocidade do modelo IA",
+      "AiPrivacyConfirm": "Aviso de privacidade IA confirmado",
       "AuthorUpdate": "Atualizar autor",
       "AuthorDelete": "Excluir autor",
       "AuthorMerge": "Mesclar Autores",
@@ -5755,7 +6319,9 @@
       "ApiKeyRename": "Chave API renomeada",
       "ApiKeyRegenerate": "Chave de API regerada",
       "ApiKeyRevoke": "Chave da API revogada",
-      "ApiKeyRevokeAll": "Revogou todas as chaves de API"
+      "ApiKeyRevokeAll": "Revogou todas as chaves de API",
+      "AuthorBulkMetadataRefresh": "Atualizar metadados do autor",
+      "BulkRunCancel": "Cancelar ação em massa"
     },
     "views": {
       "label": "Apresentar",
@@ -6070,6 +6636,12 @@
     }
   },
   "author": {
+    "gender": {
+      "female": "Feminino",
+      "male": "Masculino",
+      "non_binary": "Não-binário",
+      "unknown": "Desconhecido"
+    },
     "card": {
       "portraitAlt": "Retrato de {name}",
       "viewDetails": "Ver Detalhes do Autor",
@@ -6104,6 +6676,7 @@
       "booksLabel": "Livros",
       "lastAdded": "Adicionado por Último",
       "born": "Nascido em",
+      "gender": "Gênero",
       "died": "Falecido em",
       "website": "Site",
       "genres": "Gênero",
@@ -6175,6 +6748,7 @@
         "name": "Nome",
         "sortName": "Nome de Ordenação",
         "description": "Descrição",
+        "gender": "Gênero",
         "image": "Imagem",
         "uploading": "Enviando...",
         "replaceImage": "Substituir imagem",
@@ -6331,7 +6905,8 @@
       "readCount": "{count} lido(s)"
     },
     "card": {
-      "missing": "Ausente"
+      "missing": "Ausente",
+      "moreActions": "Mais ações para {title}"
     },
     "file": {
       "primary": "Primário",
@@ -6356,6 +6931,7 @@
       "ogg": "Áudio OGG",
       "flac": "Áudio FLAC",
       "readAlong": "Leitura de EPUB",
+      "plainEpub": "EPUB sem leitura em voz alta",
       "primary": "Formato principal"
     },
     "actions": {
@@ -6390,6 +6966,16 @@
       "bulkInProgress": "Reextração de capas",
       "bulkFailed": "Não foi possível re-extrair as capas",
       "bulkCompleted": "Reextraído {updated} de {processed, plural, one {# capa} other {# capas}}"
+    },
+    "audioCoverEmbed": {
+      "action": "Incorporar em EPUB ao longo da leitura",
+      "inProgress": "Incorporando...",
+      "bulkInProgress": "Incorporando capas de audiolivro",
+      "requestFailed": "Não foi possível incorporar a capa do audiolivro",
+      "bulkFailed": "Não foi possível incorporar capas do audiolivro",
+      "results": {
+        "no_audio_cover": "Este livro não tem uma capa de audiolivro para incorporar"
+      }
     },
     "readStatus": {
       "unread": "Não Lido",
@@ -6435,6 +7021,7 @@
         "updatedAt": "Data de atualização",
         "publishedDate": "Data de Publicação",
         "publishedYear": "Ano de Publicação",
+        "originalPublishedYear": "Primeira publicação",
         "pageCount": "Número de páginas",
         "rating": "Avaliação",
         "publisher": "Editora",
@@ -6454,7 +7041,32 @@
       "customFieldFallback": "Campo personalizado",
       "remove": "Remover",
       "emptyState": "Nenhuma ordenação configurada. Ordem alfabética por título (crescente) será utilizada.",
-      "addLevel": "Adicionar nível de ordenação"
+      "addLevel": "Adicionar nível de ordenação",
+      "panelTitle": "Ordenar",
+      "findField": "Localizar um campo",
+      "findFieldAria": "Localizar campo de ordenação",
+      "findThenByAria": "Localizar um campo para ordenar pelo próximo",
+      "sortByList": "Ordenar por",
+      "thenBy": "Depois de",
+      "thenByEllipsis": "Depois por…",
+      "then": "depois",
+      "backToSort": "Voltar a ordenar",
+      "removeLevel": "Remover {field}",
+      "switchLevelOrder": "{field}: {order}. Interruptor",
+      "dragToReorder": "Arraste para reordenar",
+      "resetTo": "Redefinir para {field}, {order}",
+      "resetToField": "Redefinir para {field}",
+      "shuffleAgain": "Embaralhar novamente",
+      "noFieldMatch": "Nenhum campo corresponde \"{query}\".",
+      "sentenceSortBy": "Ordenar por",
+      "sentenceThenBy": "depois por",
+      "changeField": "Alterar campo de ordenação",
+      "groups": {
+        "common": "Comum",
+        "reading": "Lendo",
+        "details": "Detalhes do livro",
+        "files": "Arquivos"
+      }
     },
     "filter": {
       "match": "Corresponder",
@@ -6558,7 +7170,64 @@
       "group": "Grupo",
       "addRule": "Adicionar regra",
       "addGroup": "Adicionar grupo",
-      "typeToSearch": "Digite para buscar..."
+      "typeToSearch": "Digite para buscar...",
+      "editNamed": "Editar {label}",
+      "done": "Concluído",
+      "notAppliedYet": "Não aplicado até que tenha um valor",
+      "operator": "Operador",
+      "valuesOf": "Valores {field}",
+      "nothingMatches": "Nada corresponde a \"{query}\".",
+      "typeToFind": "Digite para encontrar mais",
+      "custom": "Personalizada…",
+      "dateValue": "Data",
+      "dateFrom": "De",
+      "dateTo": "Para",
+      "quickPicks": "Seleção rápida",
+      "provider": "Provedor",
+      "min": "Mínimo",
+      "max": "Máximo",
+      "typeValue": "Digite um valor",
+      "valueLabel": "Valores {field}",
+      "minimumLabel": "Mínimo de {field}",
+      "maximumLabel": "Mínimo de {field}",
+      "ratingEq": "Exatamente {count}",
+      "ratingGte": "{count} e acima",
+      "ratingLte": "{count} e abaixo",
+      "ratingGt": "Mais de {count}",
+      "ratingLt": "Menos de {count}",
+      "valueSearch": {
+        "author": "Buscar autores",
+        "series": "Buscar séries",
+        "storyArc": "Procurar arcos da história",
+        "genre": "Buscar gêneros",
+        "tag": "Pesquisar etiquetas",
+        "publisher": "Pesquisar editores",
+        "language": "Procurar Idiomas",
+        "collection": "Buscar coleções",
+        "library": "Buscar bibliotecas",
+        "readStatus": "Procurar status",
+        "format": "Formatos de pesquisa"
+      },
+      "emptyNote": {
+        "isEmpty": "Livros onde {field} está vazio.",
+        "isNotEmpty": "Livros onde {field} tem um valor."
+      },
+      "datePresets": {
+        "last7": "Últimos 7 Dias",
+        "last30": "Últimos 30 dias",
+        "last90": "Últimos 3 meses",
+        "last365": "Últimos 12 meses",
+        "olderThanYear": "Há mais de um ano"
+      },
+      "pagePreset": {
+        "under200": "Menos de 200",
+        "from200to400": "200 a 400",
+        "over400": "Mais de 400"
+      },
+      "groups": {
+        "book": "Livro",
+        "reading": "Lendo"
+      }
     },
     "deleteDialog": {
       "title": "Excluir livro?",
@@ -6583,6 +7252,10 @@
         "replace": "Substituir",
         "clear": "Limpar"
       }
+    },
+    "bulkActions": {
+      "lockFailed": "Não foi possível bloquear os metadados",
+      "unlockFailed": "Não foi possível desbloquear os metadados"
     },
     "bulkReadingState": {
       "title": "{count, plural, =0 {Atualize o estado de leitura} one {Atualize o estado de leitura para # livros} other {Atualize o estado de leitura para # livros}}",
@@ -6756,6 +7429,7 @@
         "highlights": "Destaques"
       },
       "discover": {
+        "editions": "Edições",
         "moreInSeries": "Mais na Série",
         "byAuthor": "Pelo Autor",
         "similarBooks": "Livros Semelhantes"
@@ -6883,6 +7557,7 @@
         "primary": "Primário",
         "peek": "Espiar",
         "sendViaEmail": "Enviar por E-mail",
+        "moreActions": "Mais ações",
         "personalReview": {
           "title": "Revisão Pessoal",
           "toggleAria": "Alternar revisão pessoal",
@@ -6994,6 +7669,8 @@
         "resetHoldReleasing": "Liberando...",
         "resetHoldReleaseFailed": "Não foi possível usar esta posição. Tente novamente.",
         "editions": "Edições",
+        "formatsCard": "Formatos",
+        "firstPublished": "Primeira publicação",
         "editionsSummary": "{count} · {size}",
         "moreFormats": "+{count} a mais",
         "filesOnDisk": "Arquivos no disco",

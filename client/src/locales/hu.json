@@ -154,6 +154,20 @@
           "value": "{value}%",
           "off": "Ki"
         },
+        "glowTexture": {
+          "label": "Ragyogás textúrája",
+          "hint": "A felső ragyogás alatti rajzolat. A ragyogással együtt halványul el, így nagyobb kiterjedésnél több látszik belőle.",
+          "options": {
+            "warp": "Görbület",
+            "starfield": "Csillagmező",
+            "constellations": "Csillagképek",
+            "star-trails": "Csillagcsíkok",
+            "milky-way": "Tejút",
+            "galaxy": "Galaxis",
+            "squares": "Négyzetek",
+            "none": "Nincs"
+          }
+        },
         "accents": {
           "grey": "Szürke",
           "scarlet": "Skarlátvörös",
@@ -1910,7 +1924,7 @@
             "keepFixes": "A mindenki számára készült javítások megőrzése",
             "keepFixesBrief": "A történetkalauz újbóli elkészítésekor a rendszer alkalmazza őket.",
             "deleteFixes": "Ezeket is törölje",
-            "continue": "Folytatás",
+            "continue": "Tovább",
             "typeTitle": "Ez a művelet nem vonható vissza",
             "typeBody": "Újbóli elkészítésükkor a rendszer ismét elküldi az egyes könyvek szövegét a szolgáltatónak.",
             "delete": "Összes törlése",
@@ -5030,7 +5044,7 @@
           "availability": "Elérhetőség",
           "behaviour": "Működés"
         },
-        "continueWithType": "Folytatás",
+        "continueWithType": "Tovább",
         "external": "Külső",
         "editorDescription": "A letöltőkliens beállításai.",
         "chooseClientType": "Válassz klienstípust",
@@ -5522,6 +5536,7 @@
     "resetLink": {
       "title": "Jelszó-visszaállítási hivatkozás",
       "description": "Oszd meg ezt a hivatkozást a felhasználóval. 15 perc múlva lejár.",
+      "descriptionWithExpiry": "Oszd meg ezt a hivatkozást a felhasználóval. Lejárat ideje: {expiry}.",
       "copy": "Másolás",
       "copied": "Másolva!",
       "copyFailed": "Másolás sikertelen",
@@ -5781,6 +5796,13 @@
         "loadError": "Nem sikerült betölteni a nyílt regisztrációs beállítást",
         "saveError": "Nem sikerült frissíteni a nyílt regisztrációs beállítást"
       },
+      "invitationLifetime": {
+        "label": "Meghívóhivatkozás élettartama",
+        "hint": "Akkor érvényes, amikor egy új fiók megkapja az első jelszóbeállító hivatkozását, vagy egy adminisztrátor újra kiállítja a meghívót.",
+        "loadError": "A meghívóhivatkozás élettartama nem tölthető be.",
+        "saveError": "A meghívóhivatkozás élettartamának mentése sikertelen volt.",
+        "saved": "A meghívóhivatkozás élettartama elmentve."
+      },
       "defaultLibraryAccess": {
         "title": "Alapértelmezett könyvtár-hozzáférés",
         "subtitle": "A nyílt regisztrációval és az OIDC-szolgáltatón keresztül létrehozott felhasználók Megtekintő hozzáférést kapnak.",
@@ -5938,7 +5960,8 @@
         "webReader": "Webes olvasó",
         "koreader": "KOReader",
         "pdf": "PDF",
-        "kobo": "Kobo"
+        "kobo": "Kobo",
+        "page": "Oldal"
       },
       "status": {
         "exact": "Pontos",
@@ -6091,7 +6114,8 @@
       "cyan": "Cián",
       "purple": "Lila",
       "gray": "Szürke"
-    }
+    },
+    "pageNote": "Jegyzet ezen az oldalon: {page}"
   },
   "apiKeys": {
     "errors": {
@@ -7126,7 +7150,13 @@
     },
     "card": {
       "missing": "Hiányzó",
-      "moreActions": "További műveletek ehhez: {title}"
+      "moreActions": "További műveletek ehhez: {title}",
+      "dock": {
+        "continue": "Tovább",
+        "resume": "Folytatás",
+        "readAgain": "Újraolvasás",
+        "listenAgain": "Újrahallgatás"
+      }
     },
     "file": {
       "primary": "Elsődleges",
@@ -7344,6 +7374,7 @@
         "pageCount": "Oldalszám",
         "author": "Szerző",
         "authorGender": "Szerző neme",
+        "storyArc": "Történetszál",
         "genre": "Zsáner",
         "tag": "Címke",
         "collection": "Gyűjtemény",
@@ -7397,6 +7428,7 @@
         "isLocked": "zárolva",
         "isUnlocked": "feloldva",
         "isUpNext": "a soron következő",
+        "hasGaps": "hiányos",
         "isTrue": "igen",
         "isFalse": "nem"
       },
@@ -7475,6 +7507,7 @@
       "valueSearch": {
         "author": "Szerzők keresése",
         "series": "Sorozatok keresése",
+        "storyArc": "Történetszálak keresése",
         "genre": "Zsánerek keresése",
         "tag": "Címkék keresése",
         "publisher": "Kiadók keresése",
@@ -9753,7 +9786,18 @@
         "invalidSeriesIndex": "Adj meg számjegyeket legfeljebb egy tizedesponttal, például: 5.10.",
         "totalLabel": "Könyvek a sorozatban",
         "totalPlaceholder": "/",
-        "totalHint": "A sorozatban található könyvek teljes száma. Mindenkivel megosztva, akinél szerepel ez a sorozat."
+        "totalHint": "A sorozatban található könyvek teljes száma. Mindenkivel megosztva, akinél szerepel ez a sorozat.",
+        "kindLabel": "Típus",
+        "kindButtonLabel": "Típus: {kind}",
+        "kindNone": "Nincs",
+        "kindVolume": "Kötet",
+        "kindChapter": "Fejezet",
+        "kindIssue": "Lapszám",
+        "kindNoneHint": "A „Nincs” a kötetekkel együtt rendeződik.",
+        "volumeIndexLabel": "Kötet, amelyhez tartozik",
+        "volumeIndexPlaceholder": "Köt.",
+        "volumeIndexHint": "A kötet, amelyhez ez a fejezet vagy szám tartozik. Azok a lapszámok, amelyek minden kötetben újraindulnak, kötetenként rendeződnek.",
+        "invalidVolumeIndex": "Add meg a kötet sorszámát számjegyekkel, például: 2."
       },
       "storyGuide": {
         "title": "Történetkalauz",
@@ -9820,7 +9864,7 @@
           "update": "Történetkalauz frissítése",
           "rebuild": "Újrakészítés elölről",
           "retry": "Újrapróbálás",
-          "keepBuilding": "Folytatás",
+          "keepBuilding": "Tovább",
           "resume": "Folytatás",
           "cancelBuild": "Készítés megszakítása",
           "dismiss": "Elvetés",
@@ -9959,7 +10003,7 @@
       "searchPlaceholder": "Keresés a könyvtárakban",
       "currentLibrary": "Jelenlegi",
       "folderCount": "{count, plural,one {# mappa} other {# mappa}}",
-      "continue": "Folytatás",
+      "continue": "Tovább",
       "back": "Vissza",
       "confirm": "{count, plural, one {# könyv áthelyezése} other {# könyv áthelyezése}}",
       "action": "Áthelyezés könyvtárba",
@@ -11315,7 +11359,8 @@
       "bulkUnhidden": "{count, plural, one {# kérés visszakerült a listádra} other {# kérés visszakerült a listádra}}",
       "bulkLeft": "{count, plural, one {Kiléptél # kérésből} other {Kiléptél # kérésből}}",
       "bulkCancelled": "{count, plural, one {# kérés megszakítva} other {# kérés megszakítva}}",
-      "bulkDeleted": "{count, plural, one {# kérés törölve} other {# kérés törölve}}"
+      "bulkDeleted": "{count, plural, one {# kérés törölve} other {# kérés törölve}}",
+      "uploadCancelled": "Feltöltés megszakítva"
     },
     "errors": {
       "loadFailed": "A kérések betöltése sikertelen volt",
@@ -11342,7 +11387,8 @@
       "bulkLeaveFailed": "A kijelölt kérésekből való kilépés sikertelen volt",
       "bulkCancelFailed": "A kijelölt kérések megszakítása sikertelen volt",
       "bulkDeleteFailed": "A kijelölt kérések törlése sikertelen volt",
-      "selectAllFailed": "Az összes egyező kérés kijelölése sikertelen volt"
+      "selectAllFailed": "Az összes egyező kérés kijelölése sikertelen volt",
+      "cancelUploadFailed": "A feltöltés megszakítása sikertelen volt"
     },
     "grab": {
       "title": "Küldés egy letöltőkliensbe",
@@ -11793,7 +11839,10 @@
       "leaveManyDescription": "Többé nem követed őket, és nem kapsz róluk értesítéseket. Aki eredetileg kérte őket, annál megmarad a kérés.",
       "leaveConfirm": "{count, plural, one {Kilépés a kérésből} other {Kilépés # kérésből}}",
       "stay": "{count, plural, one {Maradok benne} other {Maradok bennük}}",
-      "goBack": "Vissza"
+      "goBack": "Vissza",
+      "cancelUploadTitle": "Megszakítod ezt a feltöltést?",
+      "cancelUploadDescription": "Az eddig elküldött fájlok törlődnek, a kérés pedig nyitva marad egy másik kiadáshoz vagy egy újabb feltöltéshez.",
+      "discardUploadDescription": "A feltöltött fájlok eltávolításra kerülnek a Könyvtárdokkból, és a kérés sikertelennek lesz jelölve."
     },
     "outcome": {
       "filedIn": "Tárolva itt: {library} {time}",
@@ -12172,6 +12221,132 @@
         "failed": "{step}: itt sikertelen",
         "upcoming": "{step}: még nincs kész"
       }
+    },
+    "upload": {
+      "action": "Fájlok feltöltése",
+      "send": "{count, plural, one {# fájl feltöltése} other {# fájl feltöltése}}",
+      "clear": "Törlés",
+      "cancel": "Feltöltés megszakítása",
+      "retry": "{count, plural, one {# fájl újrapróbálása} other {# fájl újrapróbálása}}",
+      "addMissing": "Hiányzó fájlok hozzáadása",
+      "section": "Saját fájlok",
+      "fileCount": "{count, plural, one {# fájl} other {# fájl}}",
+      "addMore": "Továbbiak hozzáadása",
+      "planning": "Fájlok beolvasása...",
+      "doneCount": "{done} / {total} kész",
+      "arrivedCount": "{arrived} / {total} megérkezett",
+      "drop": {
+        "title": "Húzd ide a fájlokat az ehhez a kérelemhez való feltöltéshez",
+        "body": "Könyvfájlok, egy teljes hangoskönyvmappa vagy egy archívum. Besorolás előtt a rendszer ellenőrzi a kérelem alapján."
+      },
+      "plan": {
+        "ebook": "Egy e-könyv",
+        "ebookFormats": "Egy e-könyv {count} formátumban",
+        "audiobook": "{count, plural, one {Egy hangoskönyv · # sáv} other {Egy hangoskönyv · # sáv}}",
+        "comic": "Egy képregény",
+        "archive": "Egy archívum",
+        "choose": "{count} különböző könyv",
+        "severalArchives": "{count} különböző archívum",
+        "noBook": "Nincsenek könyvfájlok",
+        "sub": "{formats} · {size}",
+        "subWithArt": "{formats} borítóképpel · {size}",
+        "subChoose": "Válaszd ki azt, amelyikre ez a kérés vonatkozik",
+        "subNoBook": "A kiválasztottakból egyik sem alakítható könyvvé",
+        "subArchives": "Egyszerre csak egy archívum",
+        "unitsLabel": "Melyik könyvre vonatkozik ez a kérés",
+        "filesLabel": "Kiválasztott fájlok",
+        "chip": {
+          "matches": "Megfelel a kérésnek",
+          "later": "Feltöltés után ellenőrizve",
+          "pickOne": "Válassz egyet",
+          "notEbook": "Nem e-könyv",
+          "notAudiobook": "Nem hangoskönyv",
+          "noBook": "Nincs könyv",
+          "oneArchive": "Egy archívum",
+          "tooLarge": "Túl nagy",
+          "matchesTitle": "Egyezik a címmel",
+          "notComic": "Nem képregény"
+        },
+        "destination": "Besorolás ide: {library}",
+        "joins": {
+          "audiobook": "Csatlakozik a következőhöz hangoskönyvként: {title}",
+          "ebook": "Csatlakozik a következőhöz e-könyvként: {title}"
+        },
+        "blocked": {
+          "wrongEbook": "Ez a kérés e-könyvre vonatkozik. Hangoskönyvfájlokkal csak hangoskönyvre vonatkozó kérés teljesíthető.",
+          "wrongAudiobook": "Ez a kérés hangoskönyvre vonatkozik. E-könyvfájlokkal csak e-könyvre vonatkozó kérés teljesíthető.",
+          "noBook": "Válaszd ki a könyv fájljait, például egy EPUB- vagy PDF-fájlt, esetleg egy hangoskönyv sávjait.",
+          "severalArchives": "Tölts fel egyetlen archívumot, vagy a benne lévő fájlokat.",
+          "tooLarge": "{name} mérete {size}, ami meghaladja a szerver {limit} feltöltési korlátját.",
+          "tooMany": "Ez több mint {max} fájl. Válaszd ki inkább a könyv saját mappáját.",
+          "refused": "A szerver nem tudta beolvasni ezeket a fájlokat.",
+          "network": "Nem sikerült elérni a szervert ezeknek a fájloknak a beolvasásához.",
+          "wrongComic": "Ez a kérés képregényre vonatkozik. Képregényfájlokkal, például egy CBZ- vagy CBR-fájllal teljesíthető."
+        }
+      },
+      "moreTracks": "{count, plural, one {# további sáv} other {# további sáv}}",
+      "moreFiles": "{count, plural, one {# további fájl} other {# további fájl}}",
+      "moreWaiting": "{count, plural, one {# további váraozik} other {# további váraozik}}",
+      "othersArrived": "{count, plural, one {# további fájl megérkezett} other {# további fájl megérkezett}}",
+      "skipped": "Kihagyva: {reason}",
+      "skip": {
+        "hidden": "Rejtett fájl",
+        "sample": "Minta",
+        "padding": "Kiegészítő",
+        "unsupported": "Nem könyvfájl",
+        "junk_folder": "Többletmappa",
+        "other_book": "Másik könyv",
+        "empty": "Üres fájl"
+      },
+      "fileDone": "Kész",
+      "notSent": "Még nincs elküldve",
+      "retryFile": "{name} újra",
+      "hold": {
+        "title": "Hadd ellenőrizzem az egyezést besorolás előtt",
+        "hint": "Enélkül a jó egyezés azonnal besorolásra kerül. A gyenge egyezés mindenképp ellenőrzésre vár."
+      },
+      "fileErrors": {
+        "connection": "A kapcsolat megszakadt: {sent} / {total}",
+        "notABook": "A fájl tartalma nem egyezik a nevével",
+        "tooLarge": "Nagyobb, mint amennyit a szerver elfogad",
+        "storageFull": "Elfogyott a tárhely a szerveren",
+        "notExpected": "A kérés már nem várja ezt a fájlt",
+        "expired": "A feltöltés túl sokáig tartott, ezért lejárt",
+        "other": "A fájl elküldése sikertelen volt"
+      },
+      "startFailed": "A feltöltés elindítása sikertelen volt",
+      "noneMatched": "Ezek közül egyik sem olyan fájl, amelyre ez a feltöltés vár",
+      "progressLabel": "Feltöltés állapota: {title}",
+      "card": {
+        "uploading": "{total, plural, one {Fájl feltöltése} other {Fájlok feltöltése {done} / #}}",
+        "uploadingHere": "{sent} / {size}. Hagyd nyitva ezt a lapot, amíg a feltöltés be nem fejeződik.",
+        "uploadingElsewhere": "{sent} / {size}, küldte: {name}.",
+        "uploadingSoFar": "{sent} / {size} eddig.",
+        "paused": "{count, plural, one {Feltöltés szüneteltetve: # fájl nem érkezett meg} other {Feltöltés szüneteltetve: # fájl nem érkezett meg}}",
+        "pausedSentence": "{total, plural, one {A fájl még nincs a szerveren. Semmi sem kerül besorolásra, amíg meg nem érkezik.} other {{arrived} / # fájl van a szerveren. Semmi sem kerül besorolásra, amíg mind meg nem érkezik.}}",
+        "checking": "Egyezés ellenőrzése",
+        "checkingSentence": "{total, plural, one {A fájl megérkezett. Besorolás előtt a rendszer összeveti a kéréssel.} other {# fájl megérkezett. Besorolás előtt a rendszer összeveti őket a kéréssel.}}",
+        "filedIn": "Besorolva ide: {library}",
+        "joinedTold": {
+          "audiobook": "Csatlakozott a következőhöz hangoskönyvként: {title}. {requester} értesítést kapott, hogy elkészült.",
+          "ebook": "Csatlakozott a következőhöz e-könyvként: {title}. {requester} értesítést kapott, hogy elkészült."
+        },
+        "joined": {
+          "audiobook": "Csatlakozott a következőhöz hangoskönyvként: {title}.",
+          "ebook": "Csatlakozott a következőhöz e-könyvként: {title}."
+        },
+        "told": "{requester} értesítést kapott, hogy elkészült.",
+        "cancelled": "Feltöltés megszakítva",
+        "cancelledSentence": "Az elküldött fájlok törlődtek. Töltsd fel őket újra, vagy válassz egy kiadást."
+      },
+      "steps": {
+        "filesChosen": "Kiválasztott fájlok",
+        "uploading": "Feltöltés",
+        "uploaded": "Feltöltve"
+      },
+      "uploadedBy": "Feltöltötte: {name}",
+      "uploaded": "Feltöltve",
+      "attemptStopped": "Feltöltés leállítva"
     }
   },
   "collection": {
@@ -12251,6 +12426,7 @@
       "style": "Stílus",
       "surfacePalette": "Felület",
       "topGlow": "Felső derengés",
+      "glowTexture": "Ragyogás textúrája",
       "theme": "Téma",
       "accent": "Kiemelőszín",
       "radius": "Lekerekítettség",
@@ -13930,6 +14106,8 @@
             "authors": "Szerzők",
             "series": "Sorozatok",
             "seriesIndex": "Sorozat száma",
+            "seriesUnit": "Sorozat típusa",
+            "seriesVolumeIndex": "Kötet száma",
             "publishedYear": "Kiadás éve",
             "publishedDate": "Kiadás dátuma"
           },
@@ -15125,7 +15303,8 @@
       "bookmarkSaveFailed": "A könyvjelző hozzáadása sikertelen volt",
       "bookmarkDeleteFailed": "A könyvjelző eltávolítása sikertelen volt",
       "bookmarkUpdateFailed": "A könyvjelző mentése sikertelen volt",
-      "marksLoadFailed": "A kiemelések és könyvjelzők betöltése sikertelen volt"
+      "marksLoadFailed": "A kiemelések és könyvjelzők betöltése sikertelen volt",
+      "noteDeleteFailed": "Nem sikerült törölni a jegyzetet"
     },
     "newerPositionDialog": {
       "title": "Folytatod egy másik eszközről?",
@@ -15394,8 +15573,34 @@
         "action": "Következő olvasása",
         "open": "Következő olvasása: {title}",
         "numbered": "#{index} {title}",
+        "positioned": "{position} {title}",
         "untitled": "Névtelen",
         "autoAdvanceHint": "Lapozz még egyszer a folytatáshoz"
+      },
+      "notes": {
+        "title": "Jegyzetek",
+        "button": "Jegyzetek",
+        "buttonOnPage": "{count, plural, one {Jegyzetek, # ezen az oldalon} other {Jegyzetek, # ezen az oldalon}}",
+        "buttonOnPages": "{count, plural, one {Jegyzetek, # ezeken az oldalakon} other {Jegyzetek, # ezeken az oldalakon}}",
+        "close": "Jegyzetek bezárása",
+        "addToPage": "Jegyzet hozzáadása ehhez az oldalhoz: {page}",
+        "addToPages": "Jegyzet hozzáadása ezekhez az oldalakhoz: {start}–{end}",
+        "empty": "Még nincsenek jegyzetek ebben a könyvben",
+        "emptyHint": "A jegyzetek ahhoz az oldalhoz kapcsolódnak, amelyikhez hozzáadtad őket.",
+        "loading": "Jegyzetek betöltése",
+        "loadError": "A jegyzetek betöltése sikertelen volt",
+        "loadMore": "További jegyzetek betöltése",
+        "loadingMore": "További jegyzetek betöltése…",
+        "page": "{page}. oldal",
+        "more": "További műveletek az ezen az oldalon lévő jegyzethez: {page}",
+        "edit": "Szerkesztés",
+        "delete": "Törlés",
+        "addTitle": "Jegyzet hozzáadása",
+        "editTitle": "Jegyzet szerkesztése",
+        "whichPage": "Melyik oldal",
+        "color": "Szín",
+        "note": "Jegyzet",
+        "saveShortcut": "Nyomd meg a Ctrl+Enter vagy a ⌘+Enter billentyűkombinációt a mentéshez"
       }
     },
     "audiobook": {
@@ -15841,6 +16046,29 @@
       "complete": "Kész",
       "moreVolumes": "{count, plural, one {# további kötet} other {# további kötet}}",
       "label": "{name}, {read} / {total} kötet elolvasva"
+    },
+    "units": {
+      "volumeToken": "{index}. köt",
+      "chapterToken": "{index} fej",
+      "issueToken": "#{index}",
+      "issueInVolumeToken": "{volume}. k. #{index}",
+      "chapterInVolumeToken": "{volume}. köt. {index}. fej",
+      "chapterCount": "{count, plural, one {# fejezet} other {# fejezet}}",
+      "issueCount": "{count, plural, one {# szám} other {# szám}}",
+      "volumesAndChapters": "{volumes, plural, one {# kötet} other {# kötet}} · {chapters, plural, one {# fejezet} other {# fejezet}}",
+      "volumesAndIssues": "{volumes, plural, one {# kötet} other {# kötet}} · {issues, plural, one {# szám} other {# szám}}",
+      "chaptersRead": "{count, plural, one {# fejezet} other {# fejezet}} · {read} elolvasva",
+      "issuesRead": "{count, plural, one {# szám} other {# szám}} · {read} elolvasva",
+      "missingList": "hiányzó: {list}",
+      "countChip": "{volumes} + {chapters}",
+      "cardLabel": "{name}, {read} / {total} elolvasva",
+      "tabs": {
+        "label": "Könyvek szűrése típus szerint",
+        "all": "Összes",
+        "volumes": "Kötetek",
+        "chapters": "Fejezetek",
+        "issues": "Számok"
+      }
     }
   },
   "smartScope": {
@@ -16797,6 +17025,7 @@
         "broken_covers": "{count, plural, =0 {Nincs mit tisztítani} one {Egy sérült borítóhivatkozás tisztítva} other {# sérült borítóhivatkozás tisztítva}}",
         "orphaned_cover_dirs": "{count, plural, =0 {Nincs mit tisztítani} one {Egy árva borítómappa törölve} other {# árva borítómappa törölve}}"
       },
+      "stillOnDisk": "{count, plural, one {Egy könyvet megtartottunk, mert a fájlja még megvan a lemezen. Olvasd be újra a könyvtárát a visszaállításhoz.} other {# könyvet megtartottunk, mert a fájljaik még megvannak a lemezen. Olvasd be újra a könyvtáraikat a visszaállításhoz.}}",
       "pagination": {
         "label": "Hiányzó erőforrások oldala",
         "page": "{page} / {total} oldal"
@@ -17296,7 +17525,7 @@
       "requester": "Kérte"
     },
     "actions": {
-      "continue": "Folytatás",
+      "continue": "Tovább",
       "move-to-top": "Előre mozgatás a saját feladataim között",
       "prioritize": "Előre mozgatás mindenki elé"
     },
