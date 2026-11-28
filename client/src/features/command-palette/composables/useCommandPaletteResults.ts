@@ -2,7 +2,7 @@ import { computed, ref, watch, type Component, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { RouteLocationRaw } from 'vue-router'
 import { Moon, Settings, SlidersHorizontal, Sparkles, Sun, Upload } from '@lucide/vue'
-import type { AuthorSummary, BookCard, DashboardScrollerBatchResponse, SeriesSummary } from '@bookorbit/types'
+import type { AuthorSummary, BookCard, BookDockFile, DashboardScrollerBatchResponse, SeriesSummary } from '@bookorbit/types'
 import { api } from '@/lib/api'
 import { formatNumber } from '@/i18n/formatters'
 import { useSidebarCustomizeMode } from '@/composables/useSidebarCustomizeMode'
@@ -18,14 +18,16 @@ import { fetchSeries } from '@/features/series/api/series'
 import { searchSettingsNav, visibleSettingsNav } from '@/features/settings/lib/settings-nav'
 import { useSmartScopes } from '@/features/smart-scope/composables/useSmartScopes'
 import { useThemeStore } from '@/stores/theme'
+import { usePaletteDockSearch } from './usePaletteDockSearch'
 import { rankBooks } from '../lib/rank'
 
 export const PALETTE_MIN_QUERY = 2
 
-export type PaletteTab = 'all' | 'books' | 'authors' | 'series' | 'settings'
+export type PaletteTab = 'all' | 'dock' | 'books' | 'authors' | 'series' | 'settings'
 
 export type PaletteItem =
   | { kind: 'book'; key: string; book: BookCard }
+  | { kind: 'dockFile'; key: string; file: BookDockFile }
   | { kind: 'reading'; key: string; book: BookCard }
   | { kind: 'author'; key: string; author: AuthorSummary }
   | { kind: 'series'; key: string; series: SeriesSummary }
@@ -44,7 +46,7 @@ export interface PaletteSection {
 export interface PaletteTabOption {
   id: PaletteTab
   label: string
-  count: number
+  count?: number
 }
 
 const ALL_TAB_LIMITS = { books: 5, authors: 3, series: 3, places: 5, settings: 4, actions: 3 } as const
@@ -88,8 +90,13 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
   const needle = computed(() => trimmed.value.toLocaleLowerCase())
   const isSearching = computed(() => trimmed.value.length >= PALETTE_MIN_QUERY)
 
+  const canSearchDock = computed(() => hasPermission('book_dock_access'))
+  const searchingDock = computed(() => canSearchDock.value && tab.value === 'dock')
+  const libraryQuery = computed(() => (searchingDock.value ? '' : trimmed.value))
+  const dock = usePaletteDockSearch(computed(() => (isOpen.value && searchingDock.value && isSearching.value ? trimmed.value : '')))
+
   // One result per title: linked books (an ebook and its audiobook) share a row.
-  const books = useGlobalSearch(query, { collapseLinked: true })
+  const books = useGlobalSearch(libraryQuery, { collapseLinked: true })
 
   const authors = ref<AuthorSummary[]>([])
   const authorTotal = ref(0)
@@ -112,7 +119,7 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
     entitiesLoading.value = false
   }
 
-  watch(trimmed, (q) => {
+  watch(libraryQuery, (q) => {
     if (entityTimer) clearTimeout(entityTimer)
     entityGeneration += 1
     authors.value = []
@@ -246,15 +253,18 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
   const actionHits = computed(() => (isSearching.value ? actions.value.filter((action) => matches(action.label, needle.value)) : []))
 
   const tabs = computed<PaletteTabOption[]>(() => {
-    if (!isSearching.value) return []
-    const options: PaletteTabOption[] = [
+    const library: PaletteTabOption = { id: 'all', label: t(canSearchDock.value ? 'commandPalette.kinds.library' : 'commandPalette.tabs.all') }
+    const dockTabs: PaletteTabOption[] = canSearchDock.value ? [{ id: 'dock', label: t('components.appHeader.bookDock') }] : []
+    if (!isSearching.value) return canSearchDock.value ? [library, ...dockTabs] : []
+    if (searchingDock.value) return [library, ...dockTabs]
+    const options = [
       { id: 'books', label: t('commandPalette.tabs.books'), count: books.bookTotal.value },
       { id: 'authors', label: t('commandPalette.tabs.authors'), count: authorTotal.value },
       { id: 'series', label: t('commandPalette.tabs.series'), count: seriesTotal.value },
       { id: 'settings', label: t('commandPalette.tabs.settings'), count: settingsHits.value.length },
-    ]
-    const all = options.reduce((sum, option) => sum + option.count, 0) + placeHits.value.length
-    return [{ id: 'all', label: t('commandPalette.tabs.all'), count: all }, ...options.filter((option) => option.count > 0)]
+    ] satisfies PaletteTabOption[]
+    library.count = options.reduce((sum, option) => sum + option.count, 0) + placeHits.value.length
+    return [library, ...options.filter((option) => option.count > 0), ...dockTabs]
   })
 
   function moreRow(label: string, target: PaletteTab): PaletteItem {
@@ -262,6 +272,18 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
   }
 
   const sections = computed<PaletteSection[]>(() => {
+    if (searchingDock.value) {
+      const data = dock.results.value
+      if (!data?.items.length) return []
+      return [
+        {
+          id: 'dock',
+          label: t('commandPalette.dockFiles'),
+          count: data.total,
+          items: data.items.map((file) => ({ kind: 'dockFile', key: `dock:${file.id}`, file })),
+        },
+      ]
+    }
     if (!isSearching.value) {
       const result: PaletteSection[] = []
       if (continueReading.value.length) {
@@ -319,8 +341,10 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
     return result
   })
 
-  const loading = computed(() => isSearching.value && (books.loading.value || entitiesLoading.value))
-  const settled = computed(() => isSearching.value && books.settled.value && !entitiesLoading.value)
+  const loading = computed(() => isSearching.value && (searchingDock.value ? dock.loading.value : books.loading.value || entitiesLoading.value))
+  const settled = computed(
+    () => isSearching.value && (searchingDock.value ? dock.results.value !== null : books.settled.value && !entitiesLoading.value),
+  )
 
   function clear() {
     books.clear()
@@ -332,6 +356,11 @@ export function useCommandPaletteResults(query: Ref<string>, tab: Ref<PaletteTab
     isSearching,
     loading,
     settled,
+    canSearchDock,
+    searchingDock,
+    dockPage: dock.page,
+    dockPageCount: dock.pageCount,
+    dockFailed: dock.failed,
     hasMoreBooks: books.hasMore,
     loadingMoreBooks: books.loadingMore,
     loadMoreBooks: books.loadMore,

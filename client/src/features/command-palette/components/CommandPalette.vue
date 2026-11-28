@@ -3,7 +3,10 @@ import { computed, nextTick, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter, type RouteLocationRaw } from 'vue-router'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
-import { ArrowLeft, ArrowRight, Loader2, Search, X } from '@lucide/vue'
+import { ArrowLeft, ArrowRight, FileText, LibraryBig, PackageOpen, Loader2, Search, X } from '@lucide/vue'
+import PaginationNav from '@/components/PaginationNav.vue'
+import BookDockStatusBadge from '@/features/book-dock/components/BookDockStatusBadge.vue'
+import { displayTitle } from '@/features/book-dock/lib/file-display'
 import AppIcon from '@/components/AppIcon.vue'
 import AuthorPortrait from '@/features/author/components/AuthorPortrait.vue'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
@@ -40,12 +43,22 @@ function openUpload() {
   uploadOpen.value = true
 }
 
-const { sections, tabs, isSearching, loading, settled, hasMoreBooks, loadingMoreBooks, loadMoreBooks, clear } = useCommandPaletteResults(
-  query,
-  tab,
-  isOpen,
-  { openUpload, navigate },
-)
+const {
+  sections,
+  tabs,
+  isSearching,
+  loading,
+  settled,
+  canSearchDock,
+  searchingDock,
+  dockFailed,
+  dockPage,
+  dockPageCount,
+  hasMoreBooks,
+  loadingMoreBooks,
+  loadMoreBooks,
+  clear,
+} = useCommandPaletteResults(query, tab, isOpen, { openUpload, navigate })
 
 const flatItems = computed(() => sections.value.flatMap((section) => section.items))
 const resultCount = computed(() => flatItems.value.filter((item) => item.kind !== 'more').length)
@@ -68,7 +81,7 @@ watch(flatItems, () => {
 })
 
 watch(query, () => {
-  tab.value = 'all'
+  if (!searchingDock.value) tab.value = 'all'
 })
 
 watch(isOpen, (open) => {
@@ -97,6 +110,8 @@ function itemLocation(item: PaletteItem): RouteLocationRaw | null {
     case 'book':
     case 'reading':
       return { name: 'book-detail', params: { bookId: item.book.id } }
+    case 'dockFile':
+      return { name: 'book-dock', query: { file: String(item.file.id) } }
     case 'author':
       return { name: 'author-detail', params: { id: item.author.id } }
     case 'series':
@@ -132,6 +147,12 @@ function selectTab(next: PaletteTab) {
   inputRef.value?.focus()
 }
 
+function selectDockPage(page: number) {
+  dockPage.value = page
+  listRef.value?.scrollTo({ top: 0 })
+  inputRef.value?.focus()
+}
+
 function cycleTab(step: number) {
   const ids = tabs.value.map((option) => option.id)
   if (ids.length < 2) return
@@ -157,7 +178,7 @@ function handleKeydown(event: KeyboardEvent) {
       return
     }
     select(item)
-  } else if (event.key === 'Tab' && tabs.value.length > 1) {
+  } else if (event.key === 'Tab' && tabs.value.length > 1 && dockPageCount.value <= 1) {
     event.preventDefault()
     cycleTab(event.shiftKey ? -1 : 1)
   }
@@ -260,7 +281,8 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
             aria-controls="command-palette-list"
             :aria-activedescendant="activeOptionId"
             :aria-label="t('commandPalette.title')"
-            :placeholder="t('commandPalette.placeholder')"
+            :placeholder="t(searchingDock ? 'commandPalette.dockPlaceholder' : 'commandPalette.placeholder')"
+            :maxlength="searchingDock ? 500 : undefined"
             spellcheck="false"
             autocomplete="off"
             class="h-full min-w-0 flex-1 bg-transparent text-base text-foreground caret-primary outline-none placeholder:text-muted-foreground"
@@ -288,7 +310,7 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
             v-for="option in tabs"
             :key="option.id"
             type="button"
-            class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors"
+            class="inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[13px] font-medium whitespace-nowrap transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
             :class="
               tab === option.id
                 ? 'border-(--shell-accent-line) bg-(--shell-accent-tint) text-primary'
@@ -297,8 +319,10 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
             :aria-pressed="tab === option.id"
             @click="selectTab(option.id)"
           >
+            <PackageOpen v-if="option.id === 'dock'" :size="14" aria-hidden="true" />
+            <LibraryBig v-else-if="option.id === 'all' && canSearchDock" :size="14" aria-hidden="true" />
             {{ option.label }}
-            <span class="text-xs tabular-nums" :class="tab === option.id ? 'text-primary' : 'text-muted-foreground'">{{
+            <span v-if="option.count != null" class="text-xs tabular-nums" :class="tab === option.id ? 'text-primary' : 'text-muted-foreground'">{{
               formatNumber(option.count)
             }}</span>
           </button>
@@ -312,7 +336,13 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
           class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 pt-1 pb-1.5"
           @scroll.passive="handleListScroll"
         >
-          <p v-if="isSearching && loading && resultCount === 0" class="px-3 py-8 text-center text-[13px] text-muted-foreground">
+          <p v-if="searchingDock && !isSearching" class="px-3 py-8 text-center text-[13px] text-muted-foreground">
+            {{ t('commandPalette.dockPrompt') }}
+          </p>
+          <p v-else-if="dockFailed" role="alert" class="px-3 py-8 text-center text-[13px] text-muted-foreground">
+            {{ t('commandPalette.dockSearchFailed') }}
+          </p>
+          <p v-else-if="isSearching && loading && resultCount === 0" class="px-3 py-8 text-center text-[13px] text-muted-foreground">
             {{ t('components.appHeader.searching') }}
           </p>
           <p v-else-if="showEmpty" class="px-3 py-8 text-center text-[13px] text-muted-foreground">{{ t('components.appHeader.noResults') }}</p>
@@ -376,6 +406,27 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
                     class="gap-0.5 rounded-xs px-1 py-0.5 text-[11px]"
                   />
                 </span>
+              </template>
+
+              <template v-else-if="item.kind === 'dockFile'">
+                <span class="grid size-8 shrink-0 place-items-center rounded-md bg-muted text-muted-foreground">
+                  <FileText :size="17" aria-hidden="true" />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span v-if="displayTitle(item.file) !== item.file.fileName" class="block truncate text-[14px] font-medium">{{
+                    displayTitle(item.file)
+                  }}</span>
+                  <span
+                    class="block truncate"
+                    :class="displayTitle(item.file) === item.file.fileName ? 'text-[14px] font-medium' : 'text-[13px] text-muted-foreground'"
+                  >
+                    <template v-for="(seg, i) in segments(item.file.fileName)" :key="i">
+                      <span v-if="seg.match" :class="highlightClass">{{ seg.text }}</span>
+                      <template v-else>{{ seg.text }}</template>
+                    </template>
+                  </span>
+                </span>
+                <BookDockStatusBadge :status="item.file.status" class="shrink-0" />
               </template>
 
               <template v-else-if="item.kind === 'author'">
@@ -479,6 +530,14 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
           </p>
         </div>
 
+        <PaginationNav
+          v-if="searchingDock && dockPageCount > 1"
+          class="shrink-0 border-t border-border py-1"
+          :page="dockPage"
+          :total-pages="dockPageCount"
+          @update:page="selectDockPage"
+        />
+
         <div
           class="flex h-10 shrink-0 items-center gap-4 border-t border-border px-3.5 text-xs text-muted-foreground max-sm:hidden"
           aria-hidden="true"
@@ -487,7 +546,7 @@ const highlightClass = 'rounded-[2px] bg-(--shell-accent-tint) font-semibold tex
             <kbd class="cp-kbd">↑</kbd><kbd class="cp-kbd">↓</kbd>{{ t('commandPalette.hints.navigate') }}
           </span>
           <span class="inline-flex items-center gap-1.5"><kbd class="cp-kbd">↵</kbd>{{ t('commandPalette.hints.open') }}</span>
-          <span v-if="tabs.length > 1" class="inline-flex items-center gap-1.5"
+          <span v-if="tabs.length > 1 && dockPageCount <= 1" class="inline-flex items-center gap-1.5"
             ><kbd class="cp-kbd">{{ t('commandPalette.keys.tab') }}</kbd
             >{{ t('commandPalette.hints.filter') }}</span
           >

@@ -18042,6 +18042,11 @@
     "title": "Search",
     "description": "Search books, authors, series and settings, jump to a place, or run an action.",
     "placeholder": "Search books, authors, series, or go to…",
+    "dockPlaceholder": "Search Library Dock filenames…",
+    "dockPrompt": "Enter at least two characters to find a file.",
+    "dockFiles": "Matching files",
+    "dockSearchFailed": "Library Dock search failed. Try again.",
+    "dockFileUnavailable": "This Library Dock file could not be opened.",
     "close": "Close search",
     "clear": "Clear search",
     "tabs": {

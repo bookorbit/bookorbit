@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { toast } from 'vue-sonner'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { PackageOpen, CheckCircle2, AlertCircle } from '@lucide/vue'
@@ -256,6 +257,31 @@ function openSheet(file: BookDockFile) {
   selectedFile.value = file
   void refreshSelectedFile()
 }
+
+watch(
+  () => route.query.file,
+  async (file, _, onCleanup) => {
+    if (typeof file !== 'string' || !/^[1-9]\d*$/.test(file)) return
+    selectedFile.value = null
+    const controller = new AbortController()
+    onCleanup(() => controller.abort())
+    try {
+      const response = await api(`/api/v1/book-dock/files/${file}`, { signal: controller.signal })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const match: BookDockFile = await response.json()
+      if (!controller.signal.aborted && !selectedFile.value) selectedFile.value = match
+    } catch {
+      if (!controller.signal.aborted) toast.error(t('commandPalette.dockFileUnavailable'))
+    } finally {
+      if (!controller.signal.aborted) {
+        const query = { ...route.query }
+        delete query.file
+        void router.replace({ query })
+      }
+    }
+  },
+  { immediate: true },
+)
 
 async function refreshSelectedFile() {
   const selected = selectedFile.value

@@ -1,5 +1,6 @@
 import type {
   BookDockFile,
+  BookDockFilesPage,
   BookDockUploadTarget,
   BookDockUploadTargets,
   LibraryDockAdminEntry,
@@ -10,6 +11,12 @@ import type {
   UpdateLibraryDockRequest,
 } from '@bookorbit/types'
 import { api } from '@/lib/api'
+
+export async function fetchBookDockFiles(params: URLSearchParams, signal?: AbortSignal): Promise<BookDockFilesPage> {
+  const res = await api(`/api/v1/book-dock/files?${params}`, { signal })
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  return res.json()
+}
 
 export async function refetchBookDockMetadata(fileId: number): Promise<boolean> {
   const response = await api(`/api/v1/book-dock/files/${fileId}/refetch-metadata`, {

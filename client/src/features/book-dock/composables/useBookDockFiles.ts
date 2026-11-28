@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
-import { api } from '@/lib/api'
-import type { BookDockFile, BookDockFilesPage, BookDockHoldFilter, BookDockHoldReason } from '@bookorbit/types'
+import { fetchBookDockFiles } from '../api/book-dock.api'
+import type { BookDockFile, BookDockHoldFilter, BookDockHoldReason } from '@bookorbit/types'
 
 export type SortField = 'createdAt' | 'fileName' | 'format' | 'status' | 'fileSize' | 'attention'
 export type SortOrder = 'asc' | 'desc'
@@ -75,10 +75,7 @@ export function useBookDockFiles() {
       params.set('sort', filters.sort)
       params.set('order', filters.order)
 
-      const res = await api(`/api/v1/book-dock/files?${params}`)
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
-
-      const data: BookDockFilesPage = await res.json()
+      const data = await fetchBookDockFiles(params)
       if (reqId !== fetchReqSeq) return
       items.value = data.items
       total.value = data.total

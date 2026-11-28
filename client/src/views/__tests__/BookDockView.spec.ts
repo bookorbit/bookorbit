@@ -125,6 +125,28 @@ describe('BookDockView uploads', () => {
 })
 
 describe('BookDockView editor', () => {
+  it('opens a linked file outside the visible page and preserves the dock filter', async () => {
+    route.query = { dock: '7', file: '41' }
+    const file = { id: 41, fileName: 'Austen.epub', status: 'ready' }
+    try {
+      await apiMock.withImplementation(
+        async (url) => {
+          const data = url === '/api/v1/book-dock/files/41' ? file : { items: [], total: 0 }
+          return { ok: true, json: async () => data } as Response
+        },
+        async () => {
+          const wrapper = shallowMount(BookDockView, { global: { stubs: { Teleport: true } } })
+          await flushPromises()
+          expect(wrapper.getComponent({ name: 'BookDockFileSheet' }).props('file')).toEqual(file)
+          expect(replaceMock).toHaveBeenCalledWith({ query: { dock: '7' } })
+          wrapper.unmount()
+        },
+      )
+    } finally {
+      route.query = {}
+    }
+  })
+
   it('refreshes an open editor when extraction moves the file off the current list', async () => {
     const pending: BookDockFile = {
       id: 1,

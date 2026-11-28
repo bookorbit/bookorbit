@@ -118,6 +118,7 @@ function setup() {
 describe('useCommandPaletteResults', () => {
   beforeEach(() => {
     vi.useFakeTimers()
+    vi.clearAllMocks()
     mocks.permissions.clear()
     mocks.books = ref([])
     mocks.bookTotal = ref(0)
@@ -231,6 +232,53 @@ describe('useCommandPaletteResults', () => {
 
     expect(sections.value.find((section) => section.id === 'goto')?.items.map((item) => item.key)).toEqual(['smartScope:2'])
     expect(sections.value.find((section) => section.id === 'settings')?.items.map((item) => item.key)).toContain('setting:kobo')
+  })
+
+  it('searches dock filenames only after opting in, pages through matches and cancels on exit', async () => {
+    mocks.permissions.add('book_dock_access')
+    const { query, tab, isOpen, tabs, sections, dockPage, dockPageCount } = setup()
+    isOpen.value = true
+    query.value = 'Austen'
+    await nextTick()
+    await vi.runAllTimersAsync()
+    expect(tabs.value.map((option) => option.id)).toContain('dock')
+    expect(mocks.api.mock.calls.some(([url]) => url.includes('/book-dock/files'))).toBe(false)
+
+    mocks.api.mockResolvedValue({ ok: true, json: async () => ({ items: [{ id: 7, fileName: 'Austen.epub' }], total: 45 }) })
+    tab.value = 'dock'
+    await nextTick()
+    await vi.runAllTimersAsync()
+    expect(sections.value.map((section) => section.items.map((item) => item.key))).toEqual([['dock:7']])
+    expect(dockPageCount.value).toBe(3)
+
+    dockPage.value = 2
+    await nextTick()
+    await vi.runAllTimersAsync()
+    const [url, init] = mocks.api.mock.lastCall!
+    expect(new URLSearchParams(url.split('?')[1]).get('page')).toBe('2')
+    query.value = 'Austen & Co'
+    await nextTick()
+    expect(init?.signal?.aborted).toBe(true)
+    expect(dockPage.value).toBe(1)
+    expect(sections.value).toEqual([])
+    await vi.runAllTimersAsync()
+    expect(new URLSearchParams(mocks.api.mock.lastCall![0].split('?')[1]).get('search')).toBe('Austen & Co')
+
+    isOpen.value = false
+    await nextTick()
+    expect(mocks.api.mock.lastCall![1]?.signal?.aborted).toBe(true)
+    expect(sections.value).toEqual([])
+  })
+
+  it('keeps dock results and requests unavailable without dock access', async () => {
+    const { tab, tabs, query, isOpen } = setup()
+    tab.value = 'dock'
+    query.value = 'Austen'
+    isOpen.value = true
+    await nextTick()
+    await vi.runAllTimersAsync()
+    expect(tabs.value.map((option) => option.id)).not.toContain('dock')
+    expect(mocks.api.mock.calls.some(([url]) => url.includes('/book-dock/files'))).toBe(false)
   })
 
   it('switches the theme through the action', () => {
