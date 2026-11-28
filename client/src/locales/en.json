@@ -7246,7 +7246,7 @@
       "reading": "Reading",
       "onHold": "On Hold",
       "rereading": "Rereading",
-      "read": "Read",
+      "read": "Finished",
       "skimmed": "Skimmed",
       "abandoned": "Abandoned"
     },
@@ -14223,14 +14223,14 @@
         },
         "markAsFinished": {
           "title": "Mark as finished",
-          "hint": "A book is automatically marked as \"read\" when this percentage of progress is reached.",
+          "hint": "A book is automatically marked as finished when this percentage of progress is reached.",
           "invalidThreshold": "Finished progress must be between 90% and 100%."
         },
         "statusTitle": "Reading status",
         "zones": {
           "notStarted": "Not started",
           "reading": "Reading",
-          "read": "Read"
+          "read": "Finished"
         },
         "range": "Between {min} and {max}.",
         "startSlider": "Drag to set when a book counts as started",

@@ -3,15 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, ChevronDown, Clock, Minus, Plus, TrendingDown, TrendingUp } from '@lucide/vue'
 import type { BookDetail, BookReadingSessionStats, ReadStatus, UserBookStatus } from '@bookorbit/types'
-import { isAudioFormat } from '@bookorbit/types'
+import { isAudioFormat, READ_STATUSES } from '@bookorbit/types'
 import { bookFormatEntries, formatKeyName } from '@/features/book/lib/book-formats'
 import { api } from '@/lib/api'
 import { fetchBookProgress } from '@/lib/reading-progress'
 import { formatDate, formatNumber, formatRelativeFromNow } from '@/i18n/formatters'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { STATUS_COLORS, STATUS_ICONS, STATUS_OPTIONS, useBookStatus } from '@/features/book/composables/useBookStatus'
+import { STATUS_COLORS, STATUS_ICONS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import { useReadingLogInsights } from '@/features/book/composables/useReadingLogInsights'
 import { readingDateToDateKey } from '@/features/book/lib/reading-date'
+import { readStatusLabel } from '@/features/book/lib/read-status-label'
 import AchievementProgressRing from '@/features/achievements/components/AchievementProgressRing.vue'
 import ReadingLogSourceSplit from './ReadingLogSourceSplit.vue'
 
@@ -270,8 +271,6 @@ const formatLine = computed(() =>
     .join(' · '),
 )
 
-const currentStatusOption = computed(() => STATUS_OPTIONS.find((option) => option.value === (localReadStatus.value ?? 'unread')))
-
 // A book with no sessions still answers with a stats object of zeros, so a null one means the
 // first load has not landed. Printing its zeros claims the book is unread until the real count
 // arrives; the dash the pace and last-read rows already use says "not known yet" instead.
@@ -348,15 +347,15 @@ function handleAddSession() {
                 class="size-4 shrink-0"
                 :class="STATUS_COLORS[localReadStatus ?? 'unread']"
               />
-              <span class="truncate">{{ currentStatusOption?.label }}</span>
+              <span class="truncate">{{ readStatusLabel(localReadStatus ?? 'unread') }}</span>
               <ChevronDown class="size-3.5 shrink-0 text-muted-foreground" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start">
-            <DropdownMenuItem v-for="option in STATUS_OPTIONS" :key="option.value" @click="handleSetReadStatus(option.value)">
-              <component :is="STATUS_ICONS[option.value]" class="mr-2 size-4" :class="STATUS_COLORS[option.value]" />
-              {{ option.label }}
-              <Check v-if="localReadStatus === option.value" class="ml-auto size-3 text-primary" />
+            <DropdownMenuItem v-for="status in READ_STATUSES" :key="status" @click="handleSetReadStatus(status)">
+              <component :is="STATUS_ICONS[status]" class="mr-2 size-4" :class="STATUS_COLORS[status]" />
+              {{ readStatusLabel(status) }}
+              <Check v-if="localReadStatus === status" class="ml-auto size-3 text-primary" />
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

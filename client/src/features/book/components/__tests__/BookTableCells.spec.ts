@@ -10,6 +10,7 @@ import BookTableFormatCell from '../table/BookTableFormatCell.vue'
 import BookTableProgressCell from '../table/BookTableProgressCell.vue'
 import BookTableReadButtonCell from '../table/BookTableReadButtonCell.vue'
 import type { BookCard, BookFileRef, UserBookStatus } from '@bookorbit/types'
+import { activateI18nLocale } from '@/i18n'
 
 const routerPush = vi.fn<() => void>()
 
@@ -17,24 +18,6 @@ vi.mock('vue-router', () => ({
   useRouter: () => ({
     push: routerPush,
   }),
-}))
-
-vi.mock('@/features/book/composables/useBookStatus', () => ({
-  STATUS_OPTIONS: [
-    { value: 'unread', label: 'Unread' },
-    { value: 'reading', label: 'Reading' },
-    { value: 'read', label: 'Read' },
-  ],
-  STATUS_ICONS: {
-    unread: { template: '<span />' },
-    reading: { template: '<span />' },
-    read: { template: '<span />' },
-  },
-  STATUS_COLORS: {
-    unread: 'text-muted-foreground',
-    reading: 'text-blue-500',
-    read: 'text-green-500',
-  },
 }))
 
 const tooltipStubs = {
@@ -845,14 +828,14 @@ describe('BookTableReadStatusCell', () => {
     expect(wrapper.emitted('cancel')).toBeTruthy()
   })
 
-  it('does not emit cancel after a status is selected', async () => {
+  it('saves the Finished status as read without emitting cancel', async () => {
+    activateI18nLocale('en')
     const wrapper = mountStatus({ value: baseStatus, isActive: true })
-    const items = wrapper.findAll('button')
-    const readBtn = items.find((b) => b.text().includes('Read'))
-    await readBtn!.trigger('click')
+    const finished = wrapper.findAll('button').find((button) => button.text() === 'Finished')
+    await finished!.trigger('click')
     await wrapper.findComponent({ name: 'DropdownMenu' }).vm.$emit('update:open', false)
-    const cancelCount = wrapper.emitted('cancel')?.length ?? 0
-    expect(cancelCount).toBe(0)
+    expect(wrapper.emitted('save')).toEqual([['read']])
+    expect(wrapper.emitted('cancel')).toBeUndefined()
   })
 
   it('emits navigate next on Tab in dropdown content', async () => {

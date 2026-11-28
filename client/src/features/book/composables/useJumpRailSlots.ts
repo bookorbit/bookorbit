@@ -2,6 +2,7 @@ import { computed, type ComputedRef } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { JumpBucket, JumpBucketKind, SortField, TemporalJumpBucketGranularity } from '@bookorbit/types'
 import { formatDate, formatLanguageName, formatNumber } from '@/i18n/formatters'
+import { readStatusLabel } from '../lib/read-status-label'
 
 const MAX_TEMPORAL_SLOTS = 64
 
@@ -20,17 +21,6 @@ type JumpRailSlotOptions = {
   granularity: () => TemporalJumpBucketGranularity | null | undefined
   template: () => string[] | undefined
   maxSlots: () => number | undefined
-}
-
-const READ_STATUS_MESSAGE_KEYS: Record<string, string> = {
-  unread: 'book.readStatus.unread',
-  want_to_read: 'book.readStatus.wantToRead',
-  reading: 'book.readStatus.reading',
-  on_hold: 'book.readStatus.onHold',
-  rereading: 'book.readStatus.rereading',
-  read: 'book.readStatus.read',
-  skimmed: 'book.readStatus.skimmed',
-  abandoned: 'book.readStatus.abandoned',
 }
 
 function mergeLetterTemplate(template: string[], buckets: JumpBucket[]): string[] {
@@ -186,11 +176,9 @@ export function useJumpRailSlots(options: JumpRailSlotOptions): ComputedRef<Jump
       case 'language':
         label = formatLanguageName(bucket.key)
         break
-      case 'readStatus': {
-        const messageKey = READ_STATUS_MESSAGE_KEYS[bucket.key]
-        label = messageKey ? t(messageKey) : bucket.label
+      case 'readStatus':
+        label = readStatusLabel(bucket.key) ?? bucket.label
         break
-      }
     }
     return { label, displayLabel: label, accessibleLabel: label }
   }

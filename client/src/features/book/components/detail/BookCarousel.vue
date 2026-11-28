@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
 import { RouterLink, type RouteLocationRaw } from 'vue-router'
-import { useI18n } from 'vue-i18n'
 import { ChevronLeft, ChevronRight } from '@lucide/vue'
 
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { STATUS_COLORS, STATUS_ICONS } from '@/features/book/composables/useBookStatus'
+import { readStatusLabel } from '@/features/book/lib/read-status-label'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
 import BookCoverSurface from '@/features/book/components/BookCoverSurface.vue'
 import type { CoverAspectRatio, ReadStatus, UserBookStatus } from '@bookorbit/types'
@@ -49,7 +49,6 @@ const cardWidthClass = computed(() => {
   return { square, portrait }
 })
 
-const { t } = useI18n()
 const { coverUrl } = useCoverVersions()
 const scrollEl = ref<HTMLElement | null>(null)
 const coverResetVersion = ref(0)
@@ -79,11 +78,6 @@ function isComic(book: CarouselBook): boolean {
 function readStatus(book: CarouselBook): ReadStatus | null {
   const status = book.readStatus?.status
   return status != null && status !== 'unread' ? status : null
-}
-
-function readStatusLabel(status: ReadStatus): string {
-  const key = status.replace(/_([a-z])/g, (_, letter: string) => letter.toUpperCase())
-  return t(`book.readStatus.${key}`)
 }
 
 function cardAspectRatio(book: CarouselBook): string {

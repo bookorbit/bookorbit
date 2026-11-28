@@ -511,6 +511,7 @@ jobs:
           if [[ "$PACKAGE" == "server" ]]; then
             pnpm --filter server exec vitest --run --coverage --reporter=default --reporter=github-actions --reporter=junit --outputFile.junit="$JUNIT_OUTPUT"
           else
+            pnpm --filter @bookorbit/types build
             pnpm --filter client exec vitest --run --coverage --reporter=default --reporter=junit --outputFile="$JUNIT_OUTPUT"
           fi
 

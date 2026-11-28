@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useI18n } from 'vue-i18n'
 import { ChevronDown } from '@lucide/vue'
-import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS } from '@/features/book/composables/useBookStatus'
+import { STATUS_ICONS, STATUS_COLORS } from '@/features/book/composables/useBookStatus'
+import { readStatusLabel } from '@/features/book/lib/read-status-label'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import type { ReadStatus, UserBookStatus } from '@bookorbit/types'
+import { READ_STATUSES, type ReadStatus, type UserBookStatus } from '@bookorbit/types'
 
 const props = defineProps<{
   value: UserBookStatus | null
@@ -19,15 +19,13 @@ const emit = defineEmits<{
   navigate: [direction: 'next' | 'prev']
 }>()
 
-const { t } = useI18n()
-
 const isOpen = ref(false)
 const saving = ref(false)
 
 const currentStatus = computed<ReadStatus>(() => props.value?.status ?? 'unread')
 const CurrentIcon = computed(() => STATUS_ICONS[currentStatus.value] as unknown)
 const currentColor = computed(() => STATUS_COLORS[currentStatus.value])
-const currentLabel = computed(() => STATUS_OPTIONS.find((o) => o.value === currentStatus.value)?.label ?? t('book.table.readStatus.unread'))
+const currentLabel = computed(() => readStatusLabel(currentStatus.value) ?? readStatusLabel('unread'))
 
 watch(
   () => props.isActive,
@@ -76,14 +74,14 @@ function handleTab(e: KeyboardEvent) {
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" class="min-w-[140px]" :trap-focus="false" @keydown.tab.prevent="handleTab">
         <DropdownMenuItem
-          v-for="opt in STATUS_OPTIONS"
-          :key="opt.value"
+          v-for="status in READ_STATUSES"
+          :key="status"
           class="gap-2 text-xs"
-          :class="opt.value === currentStatus ? 'text-primary font-medium' : ''"
-          @select="selectOption(opt.value)"
+          :class="status === currentStatus ? 'text-primary font-medium' : ''"
+          @select="selectOption(status)"
         >
-          <component :is="STATUS_ICONS[opt.value]" :size="12" :class="STATUS_COLORS[opt.value]" />
-          {{ opt.label }}
+          <component :is="STATUS_ICONS[status]" :size="12" :class="STATUS_COLORS[status]" />
+          {{ readStatusLabel(status) }}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -2,9 +2,10 @@
 import { computed, ref, watch } from 'vue'
 import { X } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
-import type { ReadStatus } from '@bookorbit/types'
+import { READ_STATUSES, type ReadStatus } from '@bookorbit/types'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
-import { STATUS_OPTIONS, type BulkReadingStatePatch } from '@/features/book/composables/useBookStatus'
+import type { BulkReadingStatePatch } from '@/features/book/composables/useBookStatus'
+import { readStatusLabel } from '@/features/book/lib/read-status-label'
 
 type DateMode = 'set' | 'clear'
 
@@ -26,19 +27,6 @@ const startedAt = ref('')
 const finishedAtEnabled = ref(true)
 const finishedAtMode = ref<DateMode>('clear')
 const finishedAt = ref('')
-
-const STATUS_LABEL_KEYS: Record<ReadStatus, string> = {
-  unread: 'book.readStatus.unread',
-  want_to_read: 'book.readStatus.wantToRead',
-  reading: 'book.readStatus.reading',
-  on_hold: 'book.readStatus.onHold',
-  rereading: 'book.readStatus.rereading',
-  read: 'book.readStatus.read',
-  skimmed: 'book.readStatus.skimmed',
-  abandoned: 'book.readStatus.abandoned',
-}
-
-const localizedStatusOptions = computed(() => STATUS_OPTIONS.map((option) => ({ ...option, label: t(STATUS_LABEL_KEYS[option.value]) })))
 
 const today = computed(() => {
   const value = new Date()
@@ -132,7 +120,7 @@ watch(
               v-model="status"
               class="h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option v-for="option in localizedStatusOptions" :key="option.value" :value="option.value">{{ option.label }}</option>
+              <option v-for="option in READ_STATUSES" :key="option" :value="option">{{ readStatusLabel(option) }}</option>
             </select>
           </div>
 

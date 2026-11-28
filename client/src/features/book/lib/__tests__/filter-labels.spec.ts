@@ -103,12 +103,16 @@ describe('active locale', () => {
     catalog.book.filter.fields.title = 'Titel'
     catalog.book.filter.operators.contains = 'enthält'
     catalog.book.sort.fields.title = 'Titel'
+    catalog.book.readStatus.read = 'Abgeschlossen'
     i18n.global.setLocaleMessage('de', compileIcuCatalog(catalog, 'de'))
     activateI18nLocale('de')
 
     expect(fieldLabel('title')).toBe('Titel')
     expect(operatorLabel('contains')).toBe('enthält')
     expect(sortFieldLabel('title')).toBe('Titel')
+    const finished: Rule = { type: 'rule', field: 'readStatus', operator: 'includesAny', value: ['read'] }
+    expect(ruleToParts(finished).value).toBe('Abgeschlossen')
+    expect(ruleToTokenParts(finished).value).toBe('Abgeschlossen')
   })
 })
 

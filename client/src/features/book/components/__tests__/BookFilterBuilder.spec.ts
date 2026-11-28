@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { CUSTOM_FIELD_TYPE_OPERATORS, type CustomMetadataFieldSummary, type GroupRule, type Rule } from '@bookorbit/types'
 import { providerShortLabel } from '@/lib/provider-colors'
+import { activateI18nLocale } from '@/i18n'
 import BookFilterBuilder from '../BookFilterBuilder.vue'
 
 vi.mock('@/features/library/composables/useLibraries', () => ({
@@ -185,6 +186,7 @@ describe('BookFilterBuilder', () => {
   })
 
   it('shows list values as chips and a scalar value as one chip', () => {
+    activateI18nLocale('en')
     const wrapper = mountBuilder({
       modelValue: group(
         { ...unread, value: ['unread', 'reading', 'read', 'abandoned', 'skimmed'] },
@@ -196,7 +198,7 @@ describe('BookFilterBuilder', () => {
     expect(list!.findAll('[data-testid="filter-builder-value"] > span').map((chip) => chip.text())).toEqual([
       'Unread',
       'Reading',
-      'Read',
+      'Finished',
       'Abandoned',
       '+1',
     ])

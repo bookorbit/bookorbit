@@ -90,15 +90,9 @@ vi.mock('@/features/book/composables/useBookDownload', () => ({
 }))
 
 const mockSetStatus = vi.fn<() => void>()
-vi.mock('@/features/book/composables/useBookStatus', () => ({
+vi.mock('@/features/book/composables/useBookStatus', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/features/book/composables/useBookStatus')>()),
   useBookStatus: () => ({ setStatus: mockSetStatus }),
-  STATUS_OPTIONS: [
-    { value: 'unread', label: 'Unread' },
-    { value: 'reading', label: 'Reading' },
-    { value: 'read', label: 'Read' },
-  ],
-  STATUS_ICONS: { unread: 'span', reading: 'span', read: 'span' },
-  STATUS_COLORS: { unread: 'text-muted', reading: 'text-blue-500', read: 'text-emerald-500' },
 }))
 
 vi.mock('@/features/book/lib/book-cover', () => ({

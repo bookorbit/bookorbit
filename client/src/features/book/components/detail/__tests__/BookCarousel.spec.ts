@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import BookCarousel, { type CarouselBook } from '../BookCarousel.vue'
 import type { ReadStatus } from '@bookorbit/types'
+import { activateI18nLocale } from '@/i18n'
 
 vi.mock('vue-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('vue-router')>()
@@ -43,9 +44,10 @@ describe('BookCarousel read status badge', () => {
   })
 
   it('badges only the books that carry a status', () => {
+    activateI18nLocale('en')
     const wrapper = mountCarousel([makeBook(1, 'read'), makeBook(2, null), makeBook(3, 'abandoned')])
 
-    expect(wrapper.get('[data-book-id="1"]').text()).toContain('Read')
+    expect(wrapper.get('[data-book-id="1"]').get('.sr-only').text()).toBe('Finished')
     expect(wrapper.get('[data-book-id="2"]').find('.sr-only').exists()).toBe(false)
     expect(wrapper.get('[data-book-id="3"]').text()).toContain('Abandoned')
   })

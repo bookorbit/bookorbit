@@ -6,6 +6,7 @@ import type { BookCard } from '@bookorbit/types'
 import { nextTick, ref } from 'vue'
 import { COVER_ASPECT_RATIO_KEY } from '@/features/book/lib/cover-aspect-ratio'
 import { useDisplaySettings } from '@/composables/useDisplaySettings'
+import { activateI18nLocale } from '@/i18n'
 
 config.global.stubs = { ...config.global.stubs, RouterLink: RouterLinkStub }
 
@@ -43,12 +44,12 @@ const globalStubs = {
   stubs: {
     DropdownMenu: { template: '<div><slot /></div>' },
     DropdownMenuContent: { template: '<div><slot /></div>' },
-    DropdownMenuItem: { template: '<div><slot /></div>' },
+    DropdownMenuItem: { template: '<div data-test="dropdown-item"><slot /></div>' },
     DropdownMenuTrigger: { template: '<div><slot /></div>' },
     DropdownMenuSeparator: { template: '<div data-test="dropdown-separator" />' },
     DropdownMenuSub: { template: '<div><slot /></div>' },
     DropdownMenuSubTrigger: { template: '<div><slot /></div>' },
-    DropdownMenuSubContent: { template: '<div><slot /></div>' },
+    DropdownMenuSubContent: { template: '<div data-test="dropdown-sub-content"><slot /></div>' },
     Tooltip: { template: '<div><slot /></div>' },
     TooltipTrigger: { template: '<div><slot /></div>' },
     TooltipContent: { template: '<div data-testid="tooltip-content"><slot /></div>' },
@@ -362,17 +363,24 @@ describe('BookCoverCard - present state', () => {
     expect(wrapper.get('[data-testid="grid-card-primary-action"]').attributes('aria-label')).toBe('Continue reading')
   })
 
-  it('names a finished book Read on the button and Read again for assistive technology', () => {
+  it.each(['hover-overlay', 'below-cover'] as const)('distinguishes the Finished status from the Read action in %s mode', async (mode) => {
+    activateI18nLocale('en')
+    cardInfoMode.value = mode
     const wrapper = mountCard({
       ...presentBook,
       readingProgress: 100,
       readStatus: { status: 'read', source: 'manual', startedAt: null, finishedAt: null, updatedAt: '2026-01-01T00:00:00.000Z' },
     })
+    await wrapper.setProps({ showLabel: true })
     const action = wrapper.get('[data-testid="grid-card-primary-action"]')
 
     expect(action.attributes('aria-label')).toBe('Read again')
     expect(action.get('[data-testid="grid-card-primary-label"]').text()).toBe('Read')
     expect(action.find('[data-testid="grid-card-primary-progress-label"]').exists()).toBe(false)
+    const statusMenu = wrapper.findAll('[data-test="dropdown-sub-content"]').find((menu) => menu.text().includes('Unread'))
+    const labels = statusMenu?.findAll('[data-test="dropdown-item"]').map((item) => item.text())
+    expect(labels).toContain('Finished')
+    expect(labels).not.toContain('Read')
   })
 
   it('shows reading progress on the main action of a book under way', () => {

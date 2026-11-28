@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import type { BookCard, BookFileRef, ConcreteBookMediaKind, CoverAspectRatio } from '@bookorbit/types'
-import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS } from '@bookorbit/types'
+import { getBookMediaKind, getBookMediaProfile, isAudioFormat, READER_OPENABLE_FORMATS, READ_STATUSES } from '@bookorbit/types'
 import BookCardFormatBadges from './BookCardFormatBadges.vue'
 import BookCardHoverPanel, { type CardDockAction } from './BookCardHoverPanel.vue'
 import BookCardLabel from './BookCardLabel.vue'
 import { bookFormatEntries, fileFormatKey, formatKeyName } from '../lib/book-formats'
 import { cardMediaView } from '../lib/card-media'
 import { cardEditionCount } from '../lib/book-editions'
+import { readStatusLabel } from '../lib/read-status-label'
 import { formatNumber, formatPercent } from '@/i18n/formatters'
 import { computed, inject, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter, type RouteLocationRaw } from 'vue-router'
@@ -33,7 +34,7 @@ import {
   Trash2,
   TriangleAlert,
 } from '@lucide/vue'
-import { useBookStatus, STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS } from '../composables/useBookStatus'
+import { useBookStatus, STATUS_ICONS, STATUS_COLORS } from '../composables/useBookStatus'
 import type { ReadStatus } from '@bookorbit/types'
 import {
   DropdownMenu,
@@ -797,10 +798,10 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                       {{ t('book.actions.setStatus') }}
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent>
-                      <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
-                        <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                        {{ opt.label }}
-                        <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+                      <DropdownMenuItem v-for="status in READ_STATUSES" :key="status" @click="handleSetStatus(status)">
+                        <component :is="STATUS_ICONS[status]" class="size-4 mr-2" :class="STATUS_COLORS[status]" />
+                        {{ readStatusLabel(status) }}
+                        <Check v-if="localReadStatus === status" class="size-3 ml-auto text-primary" />
                       </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuSub>
@@ -938,10 +939,10 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                 {{ t('book.actions.setStatus') }}
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent>
-                <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetStatus(opt.value)">
-                  <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                  {{ opt.label }}
-                  <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+                <DropdownMenuItem v-for="status in READ_STATUSES" :key="status" @click="handleSetStatus(status)">
+                  <component :is="STATUS_ICONS[status]" class="size-4 mr-2" :class="STATUS_COLORS[status]" />
+                  {{ readStatusLabel(status) }}
+                  <Check v-if="localReadStatus === status" class="size-3 ml-auto text-primary" />
                 </DropdownMenuItem>
               </DropdownMenuSubContent>
             </DropdownMenuSub>

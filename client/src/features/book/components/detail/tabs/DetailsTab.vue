@@ -35,10 +35,19 @@ import { createBookProviderLinks, createExternalProviderLinks } from '@/features
 import { useMetadataProviderLabels } from '@/features/book/composables/useMetadataProviderLabels'
 import { faceMedium } from '@/features/book/lib/cover-slots'
 import { readingDateToDateKey } from '@/features/book/lib/reading-date'
+import { readStatusLabel } from '@/features/book/lib/read-status-label'
 import { getProviderColor, providerShortLabel } from '@/lib/provider-colors'
 import { useCoverVersions } from '@/features/book/composables/useCoverVersions'
 import { useBookCoverAspectRatio } from '@/features/book/composables/useBookCoverAspectRatio'
-import { FORMAT_TO_GROUP, getPrimaryBookFile, Permission, READER_OPENABLE_FORMATS, isComicFormat, showsFirstPublished } from '@bookorbit/types'
+import {
+  FORMAT_TO_GROUP,
+  getPrimaryBookFile,
+  Permission,
+  READER_OPENABLE_FORMATS,
+  READ_STATUSES,
+  isComicFormat,
+  showsFirstPublished,
+} from '@bookorbit/types'
 import type {
   BookDetail,
   BookKoboState,
@@ -49,7 +58,7 @@ import type {
   ReadStatus,
   UserBookStatus,
 } from '@bookorbit/types'
-import { STATUS_OPTIONS, STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
+import { STATUS_ICONS, STATUS_COLORS, useBookStatus } from '@/features/book/composables/useBookStatus'
 import BookDownloadButton from '@/features/book/components/BookDownloadButton.vue'
 import DiscoverRow from '@/features/book/components/detail/DiscoverRow.vue'
 import BookCoverArtwork from '@/features/book/components/BookCoverArtwork.vue'
@@ -1589,15 +1598,15 @@ watch(
               <DropdownMenuTrigger as-child>
                 <button class="flex items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
                   <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-3.5" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
-                  {{ STATUS_OPTIONS.find((o) => o.value === (localReadStatus ?? 'unread'))?.label }}
+                  {{ readStatusLabel(localReadStatus ?? 'unread') }}
                   <ChevronDown class="size-3 opacity-60" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start">
-                <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
-                  <component :is="STATUS_ICONS[opt.value]" class="mr-2 size-4" :class="STATUS_COLORS[opt.value]" />
-                  {{ opt.label }}
-                  <Check v-if="localReadStatus === opt.value" class="ml-auto size-3 text-primary" />
+                <DropdownMenuItem v-for="status in READ_STATUSES" :key="status" @click="handleSetReadStatus(status)">
+                  <component :is="STATUS_ICONS[status]" class="mr-2 size-4" :class="STATUS_COLORS[status]" />
+                  {{ readStatusLabel(status) }}
+                  <Check v-if="localReadStatus === status" class="ml-auto size-3 text-primary" />
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1883,15 +1892,15 @@ watch(
             <DropdownMenuTrigger as-child>
               <button class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors">
                 <component :is="STATUS_ICONS[localReadStatus ?? 'unread']" class="size-3.5" :class="STATUS_COLORS[localReadStatus ?? 'unread']" />
-                {{ STATUS_OPTIONS.find((o) => o.value === (localReadStatus ?? 'unread'))?.label }}
+                {{ readStatusLabel(localReadStatus ?? 'unread') }}
                 <ChevronDown class="size-3 opacity-60" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-              <DropdownMenuItem v-for="opt in STATUS_OPTIONS" :key="opt.value" @click="handleSetReadStatus(opt.value)">
-                <component :is="STATUS_ICONS[opt.value]" class="size-4 mr-2" :class="STATUS_COLORS[opt.value]" />
-                {{ opt.label }}
-                <Check v-if="localReadStatus === opt.value" class="size-3 ml-auto text-primary" />
+              <DropdownMenuItem v-for="status in READ_STATUSES" :key="status" @click="handleSetReadStatus(status)">
+                <component :is="STATUS_ICONS[status]" class="size-4 mr-2" :class="STATUS_COLORS[status]" />
+                {{ readStatusLabel(status) }}
+                <Check v-if="localReadStatus === status" class="size-3 ml-auto text-primary" />
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

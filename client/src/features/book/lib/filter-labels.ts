@@ -5,6 +5,7 @@ import { activeCustomFieldLabel } from '@/features/book/composables/useActiveCus
 import { providerShortLabel } from '@/lib/provider-colors'
 import { formatBytes } from '@/lib/formatting'
 import { formatKeyName } from './book-formats'
+import { readStatusLabel } from './read-status-label'
 
 // Resolved through the global composer rather than useI18n() because these helpers also run
 // outside a component setup (useViewSort, plain computeds). Composer.t tracks the active locale,
@@ -71,7 +72,7 @@ export function ruleToParts(rule: Rule): { field: string; operator: string; valu
   }
   const values = Array.isArray(rule.value) ? (rule.value as string[]) : null
   const val = values
-    ? values.map((value) => (rule.field === 'authorGender' ? filterValueLabel(rule.field, value) : value)).join(', ')
+    ? values.map((value) => (rule.field === 'authorGender' || rule.field === 'readStatus' ? filterValueLabel(rule.field, value) : value)).join(', ')
     : String(rule.value ?? '')
   return { field, operator, value: rule.valueTo !== undefined ? `${val} - ${rule.valueTo}` : val }
 }
@@ -79,11 +80,7 @@ export function ruleToParts(rule: Rule): { field: string; operator: string; valu
 /** A list value as people read it: read statuses by their translated names, formats by their codes. */
 export function filterValueLabel(field: Rule['field'], value: string): string {
   if (field === 'authorGender') return t(`author.gender.${value}`)
-  if (field === 'readStatus') {
-    const key = `book.readStatus.${value.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())}`
-    const label = t(key)
-    return label === key ? value : label
-  }
+  if (field === 'readStatus') return readStatusLabel(value) ?? value
   if (field === 'format') return formatFilterValueLabel(value)
   return value
 }
@@ -99,12 +96,10 @@ export function formatFilterValueLabel(value: string): string {
  */
 export function ruleToTokenParts(rule: Rule): { field: string; operator: string; value: string | null } {
   const parts = ruleToParts(rule)
-  if (!Array.isArray(rule.value) || (rule.field !== 'readStatus' && rule.field !== 'format')) {
-    const operator = Array.isArray(rule.value) ? singleValueOperator(rule, rule.value.length) : null
-    return operator ? { ...parts, operator } : parts
-  }
-  const values = (rule.value as string[]).map((value) => filterValueLabel(rule.field, value))
-  return { field: parts.field, operator: singleValueOperator(rule, values.length) ?? parts.operator, value: values.join(', ') }
+  if (!Array.isArray(rule.value)) return parts
+  const operator = singleValueOperator(rule, rule.value.length) ?? parts.operator
+  const value = rule.field === 'format' ? (rule.value as string[]).map(formatFilterValueLabel).join(', ') : parts.value
+  return { ...parts, operator, value }
 }
 
 /** "includes any of" one value reads as "is", and "excludes all of" one value as "is not". */
