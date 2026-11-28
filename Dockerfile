@@ -15,13 +15,16 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
     pnpm install --filter client... --frozen-lockfile
 
 COPY packages/ ./packages/
-COPY client/ ./client/
 # pnpm defaults verifyDepsBeforeRun to "install", so running a script
-# re-installs first. Each stage installed its own filtered subset with a frozen
-# lockfile two steps up, and no stage carries the whole workspace, so that
+# re-installs first. Each stage installs its own filtered subset with a frozen
+# lockfile, and no stage carries the whole workspace, so that
 # re-install is both redundant and wrong: it resolves against a partial
 # workspace. In the server stage it is fatal, because only server/ is present and
 # the patches for packages it does not install then look unused.
+# Vue's SFC compiler needs these declarations to resolve imported prop types.
+RUN pnpm --config.verify-deps-before-run=false --filter @bookorbit/types run build
+
+COPY client/ ./client/
 RUN pnpm --config.verify-deps-before-run=false --filter client run build-only
 
 # Stage 2: Build server + create deploy bundle
