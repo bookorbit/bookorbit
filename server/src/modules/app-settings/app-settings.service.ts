@@ -373,7 +373,7 @@ export class AppSettingsService {
 
     const start = Date.now();
     try {
-      const res = await fetch(discoveryUrl, { signal: controller.signal, redirect: 'manual' });
+      const res = await fetch(discoveryUrl, { signal: controller.signal, redirect: 'follow' });
       if (!res.ok) {
         throw new BadRequestException(`Provider returned HTTP ${res.status}`);
       }

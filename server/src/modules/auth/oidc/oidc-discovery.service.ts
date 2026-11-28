@@ -52,7 +52,7 @@ export class OidcDiscoveryService {
     const url = `${normalized}/.well-known/openid-configuration`;
 
     try {
-      const res = await fetch(url, { signal: AbortSignal.timeout(10_000), redirect: 'error' });
+      const res = await fetch(url, { signal: AbortSignal.timeout(10_000), redirect: 'follow' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const raw = (await res.json()) as RawDiscoveryDoc;
 
