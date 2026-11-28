@@ -2,12 +2,18 @@
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DialogContent, DialogDescription, DialogOverlay, DialogPortal, DialogRoot, DialogTitle } from 'reka-ui'
-import { FileText, Loader2, Search } from '@lucide/vue'
-import type { BookCard, BookDockFile } from '@bookorbit/types'
+import { BookOpen, FileText, Headphones, Images, Loader2, Search } from '@lucide/vue'
+import { getBookMediaProfile, type BookCard, type BookDockFile } from '@bookorbit/types'
 import { Button } from '@/components/ui/button'
 import BookCoverImage from '@/features/book/components/BookCoverImage.vue'
 import { formatBytes } from '@/lib/formatting'
 import { useFulfilmentPicker, type FulfilmentSource } from '../composables/useFulfilmentPicker'
+
+const MEDIA_BADGES = [
+  { kind: 'ebook', field: 'hasEbook', icon: BookOpen },
+  { kind: 'audiobook', field: 'hasAudio', icon: Headphones },
+  { kind: 'comic', field: 'hasComic', icon: Images },
+] as const
 
 const props = defineProps<{
   open: boolean
@@ -22,7 +28,13 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const picker = useFulfilmentPicker()
 
-const results = computed(() => (picker.source.value === 'book' ? picker.books.value : picker.dockFiles.value))
+const libraryResults = computed(() =>
+  picker.books.value.map((book) => {
+    const profile = getBookMediaProfile(book.files)
+    return { book, badges: MEDIA_BADGES.filter(({ field }) => profile[field]) }
+  }),
+)
+const hasResults = computed(() => (picker.source.value === 'book' ? libraryResults.value.length > 0 : picker.dockFiles.value.length > 0))
 const hasSearched = computed(() => picker.query.value.trim() !== '')
 
 /** Every opening starts from nothing: a choice made for one request must not close another. */
@@ -123,12 +135,12 @@ function dockFileMeta(file: BookDockFile): string {
         <div class="mt-3 min-h-0 flex-1 overflow-y-auto">
           <p v-if="picker.searching.value" role="status" class="text-sm text-muted-foreground">{{ t('bookRequests.detail.fulfilSearching') }}</p>
 
-          <p v-else-if="hasSearched && results.length === 0" role="status" class="text-sm text-muted-foreground">
+          <p v-else-if="hasSearched && !hasResults" role="status" class="text-sm text-muted-foreground">
             {{ t('bookRequests.detail.fulfilNoResults') }}
           </p>
 
-          <ul v-else-if="picker.source.value === 'book' && picker.books.value.length" class="grid gap-1.5">
-            <li v-for="book in picker.books.value" :key="book.id">
+          <ul v-else-if="picker.source.value === 'book' && libraryResults.length" class="grid gap-1.5">
+            <li v-for="{ book, badges } in libraryResults" :key="book.id">
               <button
                 type="button"
                 class="flex w-full items-center gap-2.5 rounded-md border p-2 text-start transition-colors focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-reduce:transition-none"
@@ -148,6 +160,16 @@ function dockFileMeta(file: BookDockFile): string {
                 <span class="min-w-0 flex-1">
                   <span class="block text-sm font-medium [overflow-wrap:anywhere] text-foreground">{{ book.title }}</span>
                   <span class="block text-xs text-muted-foreground">{{ book.authors.join(', ') }}</span>
+                  <span v-if="badges.length" class="mt-1.5 flex flex-wrap gap-1">
+                    <span
+                      v-for="badge in badges"
+                      :key="badge.kind"
+                      class="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-muted px-1.5 py-0.5 text-xs font-medium [overflow-wrap:anywhere] text-foreground"
+                    >
+                      <component :is="badge.icon" class="size-3 shrink-0" aria-hidden="true" />
+                      <span>{{ t(`bookRequests.mediaKind.${badge.kind}`) }}</span>
+                    </span>
+                  </span>
                 </span>
               </button>
             </li>
