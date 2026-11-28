@@ -170,6 +170,36 @@ describe('IndexerConfigService', () => {
     expect(managers.findById).not.toHaveBeenCalled();
   });
 
+  describe('resolveNetworkProfile', () => {
+    const proxied = { proxyUrl: 'http://gluetun:8888' };
+
+    it("returns the source's own profile without decrypting its credential", async () => {
+      const { service, credentials } = makeService({
+        repo: { findById: vi.fn().mockResolvedValue(indexerRow({ networkProfile: proxied, credentialsEnc: 'cipher' })) },
+      });
+
+      await expect(service.resolveNetworkProfile(9)).resolves.toEqual(proxied);
+      expect(credentials.decrypt).not.toHaveBeenCalled();
+    });
+
+    /** A managed source is reached the way its manager is, the same rule `resolveConfig` applies. */
+    it("prefers the manager's profile for a managed source", async () => {
+      const managed = indexerRow({ managerId: 3, managerExternalId: '7', networkProfile: { proxyUrl: 'http://stale:1' } });
+      const { service } = makeService({
+        repo: { findById: vi.fn().mockResolvedValue(managed) },
+        managers: { findRowById: vi.fn().mockResolvedValue({ id: 3, networkProfile: proxied } as RequestIndexerManagerRow) },
+      });
+
+      await expect(service.resolveNetworkProfile(9)).resolves.toEqual(proxied);
+    });
+
+    it('answers null for a source that no longer exists', async () => {
+      const { service } = makeService({ repo: { findById: vi.fn().mockResolvedValue(undefined) } });
+
+      await expect(service.resolveNetworkProfile(9)).resolves.toBeNull();
+    });
+  });
+
   it('refuses direct edits and deletion of a managed child', async () => {
     const managed = indexerRow({
       managerId: 3,

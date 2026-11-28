@@ -1,5 +1,5 @@
 import { BadGatewayException, BadRequestException, ConflictException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_ADAPTER_TYPES, pickUnusedIndexerColor } from '@bookorbit/types';
+import { BOOK_REQUEST_MEDIA_KINDS, INDEXER_ADAPTER_TYPES, pickUnusedIndexerColor, type NetworkProfile } from '@bookorbit/types';
 import type {
   BookRequestMediaKind,
   BookRequestSourceStatus,
@@ -246,6 +246,18 @@ export class IndexerConfigService {
     const row = await this.requireIndexer(id);
     const manager = row.managerId === null ? null : ((await this.managers.findRowById(row.managerId)) ?? null);
     return this.toConfig(row, manager);
+  }
+
+  /**
+   * How a source is reached, without the rest of its config: what a direct download needs to go
+   * out the way the source's own requests do. Reads no credential, so a source whose secret cannot
+   * be decrypted still says how it is reached. `null` when it has no profile or no longer exists.
+   */
+  async resolveNetworkProfile(id: number): Promise<NetworkProfile | null> {
+    const row = await this.repo.findById(id);
+    if (!row) return null;
+    const manager = row.managerId === null ? null : ((await this.managers.findRowById(row.managerId)) ?? null);
+    return manager?.networkProfile ?? row.networkProfile ?? null;
   }
 
   async resolveSeedPolicy(id: number): Promise<ResolvedIndexerSeedPolicy> {
