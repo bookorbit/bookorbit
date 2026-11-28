@@ -10,8 +10,7 @@ import { BOOK_FORMATS, hasNetworkProfile, type NetworkProfile } from '@bookorbit
 
 import { storageConfig } from '../../../config/config';
 import { sanitizeLogValue } from '../../../common/utils/log-sanitize.utils';
-import { safeFetch } from '../../../common/utils/safe-fetch';
-import { ensureSafeUrl } from '../../../common/utils/ssrf.utils';
+import { ensureSafeUrlFor, safeFetch } from '../../../common/utils/safe-fetch';
 import type { BookRequestDownloadRow } from '../../../db/schema';
 import type { DownloadStatus } from '../download-clients/download-client-adapter';
 import { IndexerConfigService } from '../indexers/indexer-config.service';
@@ -165,8 +164,9 @@ export class DirectDownloadService {
   }
 
   async add(release: DirectDownloadRequest): Promise<{ clientKey: string }> {
-    const url = await ensureSafeUrl(release.fileUrl, { allowPrivate: ALLOW_PRIVATE });
+    // The source's profile first, so the URL is checked through the resolvers it will be fetched with.
     const profile = await this.profileFor(release.indexerId);
+    const url = await ensureSafeUrlFor(release.fileUrl, { allowPrivate: ALLOW_PRIVATE, profile });
 
     const directory = join(this.root, release.clientKey);
     const target = safeJoin(directory, stagedDirectFileName(release.fileName, release.format));
@@ -189,7 +189,8 @@ export class DirectDownloadService {
       return false;
     }
 
-    const url = await ensureSafeUrl(download.directUrl, { allowPrivate: ALLOW_PRIVATE });
+    const profile = await this.profileFor(download.indexerId);
+    const url = await ensureSafeUrlFor(download.directUrl, { allowPrivate: ALLOW_PRIVATE, profile });
     const directory = join(this.root, download.clientKey);
     const target = safeJoin(directory, download.directFileName);
     const existingBytes = await stat(target)
@@ -198,8 +199,6 @@ export class DirectDownloadService {
     const validator = resumeValidator(download.directEtag, download.directLastModified);
     if (existingBytes > 0 && validator === null) return false;
     if (existingBytes > MAX_FILE_BYTES) return false;
-
-    const profile = await this.profileFor(download.indexerId);
 
     await mkdir(directory, { recursive: true });
     this.start(download.id, download.clientKey, url, target, directory, existingBytes, validator, download.totalBytes, profile);
@@ -510,7 +509,7 @@ export class DirectDownloadService {
         const location = response.headers.get('location');
         await response.body?.cancel().catch(() => {});
         if (!location) throw new Error(`That URL answered ${response.status} without saying where to go`);
-        current = await ensureSafeUrl(new URL(location, current).href, { allowPrivate: ALLOW_PRIVATE });
+        current = await ensureSafeUrlFor(new URL(location, current).href, { allowPrivate: ALLOW_PRIVATE, profile });
 
         continue;
       }

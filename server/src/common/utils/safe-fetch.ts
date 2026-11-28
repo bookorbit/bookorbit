@@ -55,7 +55,7 @@ const dispatchers = new Map<string, Dispatcher>();
 export async function safeFetch(rawUrl: string, init: RequestInit = {}, options: SafeFetchOptions = {}): Promise<Response> {
   // A pre-flight so a bad host fails with a clear message rather than as a socket error, and so
   // a caller with no profile behaves exactly as it did before this existed.
-  const url = await ensureSafeUrl(rawUrl, options);
+  const url = await ensureSafeUrlFor(rawUrl, options);
 
   if (!hasNetworkProfile(options.profile) && !options.pinResolvedAddress) {
     return fetch(url, init);
@@ -65,6 +65,18 @@ export async function safeFetch(rawUrl: string, init: RequestInit = {}, options:
   // undici's own fetch, not the global one: the global fetch rejects a dispatcher built from this
   // package, because Node bundles a separate copy of undici and type-checks against its own.
   return undiciFetch(url.href, { ...(init as Record<string, unknown>), dispatcher } as never) as unknown as Promise<Response>;
+}
+
+/**
+ * The pre-flight URL check, resolving the host the way the request will: through the profile's
+ * resolvers when it names any, since a host may resolve only there, and through the system resolver
+ * otherwise. A proxy resolves the destination itself, so a proxy alone leaves the system check in
+ * place, as before.
+ */
+export function ensureSafeUrlFor(rawUrl: string, options: SafeFetchOptions = {}): Promise<URL> {
+  const profile = options.profile;
+  if (!profile?.resolvers || profile.resolvers.length === 0) return ensureSafeUrl(rawUrl, options);
+  return ensureSafeUrl(rawUrl, { ...options, resolveHost: (hostname) => resolveWith(profile, hostname) });
 }
 
 /** Drop pooled agents, so a settings change is not served by a connection opened under the old one. */

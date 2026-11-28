@@ -11,8 +11,20 @@ import { join } from 'node:path';
  */
 vi.mock('dns/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('dns/promises')>();
+  /** A source's own resolver, which alone knows `files.resolver-only.test`. */
+  class Resolver {
+    setServers(): void {}
+    resolve4(hostname: string): Promise<string[]> {
+      if (hostname === 'files.resolver-only.test') return Promise.resolve(['203.0.113.11']);
+      return Promise.reject(Object.assign(new Error(`queryA ENOTFOUND ${hostname}`), { code: 'ENOTFOUND' }));
+    }
+    resolve6(hostname: string): Promise<string[]> {
+      return Promise.reject(Object.assign(new Error(`queryAaaa ENODATA ${hostname}`), { code: 'ENODATA' }));
+    }
+  }
   return {
     ...actual,
+    Resolver,
     lookup: vi.fn(async (hostname: string, options: unknown) =>
       hostname === 'files.example.com' ? [{ address: '203.0.113.10', family: 4 }] : actual.lookup(hostname, options as never),
     ),
@@ -84,6 +96,21 @@ describe('DirectDownloadService with a source network profile', () => {
     await expect(readFile(status.contentPath!, 'utf8')).resolves.toBe('through the proxy');
     expect(seenByProxy.map((request) => request.url)).toEqual([FILE_URL]);
     expect(indexers.resolveNetworkProfile).toHaveBeenCalledWith(4);
+  });
+
+  /**
+   * A host only the source's own resolvers know: the system resolver cannot find it, so the URL
+   * check has to resolve it the way the request will, or the download never starts.
+   */
+  it('checks the URL through the resolvers of the source it came from', async () => {
+    indexers.resolveNetworkProfile.mockResolvedValue({ resolvers: ['192.0.2.53'], proxyUrl });
+    const fileUrl = 'http://files.resolver-only.test/book.epub';
+
+    await service.add({ downloadId: 1, fileUrl, fileName: 'book.epub', clientKey: HASH, indexerId: 4 });
+    const status = await settle();
+
+    expect(status.state).toBe('completed');
+    expect(seenByProxy.map((request) => request.url)).toEqual([fileUrl]);
   });
 
   /** The point of sending a source through a proxy: with the proxy gone, nothing leaves another way. */
