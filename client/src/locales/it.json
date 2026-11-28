@@ -154,6 +154,20 @@
           "value": "{value}%",
           "off": "Disattivo"
         },
+        "glowTexture": {
+          "label": "Bagliore trama",
+          "hint": "Il disegno sotto il bagliore sovrastante. Sfuma con il bagliore, quindi un valore maggiore, ne mostra di più'.",
+          "options": {
+            "warp": "Distorsione",
+            "starfield": "Campo Stellato",
+            "constellations": "Costellazioni",
+            "star-trails": "Scie stellari",
+            "milky-way": "Via Lattea",
+            "galaxy": "Galassia",
+            "squares": "Quadrati",
+            "none": "Nessuno"
+          }
+        },
         "accents": {
           "grey": "Grigio",
           "scarlet": "Scarlatto",
@@ -1637,6 +1651,8 @@
           "summaryUnsaved": "{count, plural, one {# voce configurata} other {# voci configurate}} - Modifiche non salvate",
           "importFromProvider": "Importa dal provider",
           "loadPreset": "Carica la preimpostazione {preset}",
+          "addVoice": "Aggiungi voce",
+          "discardChanges": "Scarta i cambiamenti non salvati alla voce?",
           "importUnsupported": "Questo provider non supporta il rilevamento delle voci.",
           "importUnsupportedWithPreset": "Questo fornitore non supporta il rilevamento delle voci. Usa invece il pulsante «Carica la preimpostazione {preset}».",
           "discoveryUnsupported": "Questo provider non espone un endpoint della lista vocale.",
@@ -2049,6 +2065,7 @@
             "reasoning": "Ragionamento",
             "cost": "Costo",
             "errors": "Errori",
+            "job": "Crea",
             "at": "Quando",
             "slot": "Slot",
             "outcome": "Esito"
@@ -2155,8 +2172,49 @@
             "urlRequired": "Inserisci l'URL del provider.",
             "urlInvalid": "Inserisci un URL che inizi con http:// o https://.",
             "keyRequired": "Inserisci la chiave API.",
-            "headerNameRequired": "Inserisci un nome per ciascuna intestazione."
+            "headerNameRequired": "Inserisci un nome per ciascuna intestazione.",
+            "headerValueRequired": "Inserisci un valore per {name}.",
+            "range": "Inserire un numero intero fra {min} e {max}."
           }
+        },
+        "test": {
+          "failed": "Non è stato possibile eseguire il test.",
+          "notRun": "Non verificato, a causa di una verifica precente fallita.",
+          "steps": {
+            "reach": "Contattato il server",
+            "reachDone": "Contattato {host} in {ms} ms",
+            "key": "Tasto accettato",
+            "models": "Modello trovato",
+            "json": "Risposta in JSON",
+            "jsonDone": "Risposta in JSON: {how}",
+            "usage": "Utilizzo token riportato",
+            "image": "Leggi un'immagine"
+          },
+          "jsonSupport": {
+            "schema": "Schema JSON forzato",
+            "json": "Modalità JSON",
+            "instructions": "Solo istruzioni"
+          }
+        },
+        "failures": {
+          "unreachable": "Impossibile raggiungere il server. Controlla l' URL e che il server sia in esecuzione.",
+          "timeout": "Il server ha impiegato troppo tempo per rispondere.",
+          "tls": "Il certificato del server non è stato accettato.",
+          "redirect": "Questo URL reindirizza da qualche altra parte. Inserisci l'indirizzo a cui punta.",
+          "web-page": "Questo URL ha risposto con una pagina web, non un'API.",
+          "blocked-address": "Questo indirizzo non è consentito.",
+          "invalid-url": "Questo non è un URL del provider che il server può usare.",
+          "key-rejected": "Il provider ha rifiutato la chiave. Controllare la chiave.",
+          "key-unreadable": "La chiave salvata non può essere letta. Inseriscila nuovamente.",
+          "out-of-credit": "L'account provider ha esurito il credito.",
+          "spend-limit": "L'account provider ha raggiunto il limite di spesa.",
+          "rate-limited": "Il provider ha limitato le richieste. Riprova tra un momento.",
+          "model-missing": "Modello non trovato.",
+          "no-model": "Nessun modello con cui provare. Digita il nome del modello.",
+          "no-model-list": "Questo provider non ha un elenco di modelli; digita il nome del modello.",
+          "no-json": "Il modello non ha risposto in JSON.",
+          "no-usage": "Il provider non ha segnalato l'utilizzo del token, quindi i costi non possono essere conteggiati.",
+          "unsupported-api-type": "Questa versione del server non supporta questo tipo di API."
         }
       },
       "serverFonts": {
@@ -5457,6 +5515,9 @@
       "notShownAgain": "Questo collegamento non verrà più mostrato."
     },
     "userForm": {
+      "kindle": {
+        "permissionHint": "Abilita Invia via email in Autorizzazioni in modo che questo lettore possa inviare libri."
+      },
       "editUser": "Modifica utente",
       "createUser": "Crea utente",
       "createSharedAccount": "Crea un account condiviso",

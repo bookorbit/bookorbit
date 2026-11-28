@@ -144,8 +144,8 @@
             "olive": "Olivenöl",
             "stone": "Stein",
             "sepia": "Sepia",
-            "crimson": "Crimson",
-            "plum": "Pflaum"
+            "crimson": "Scharlachrot",
+            "plum": "Pflaume"
           }
         },
         "topGlow": {
@@ -174,7 +174,7 @@
           "acid-green": "Säuregrün",
           "emerald": "Smaragd",
           "teal": "Aquamarin",
-          "electric-blue": "Elektrisch Blau",
+          "electric-blue": "Elektrisches Blau",
           "cyan": "Cyan",
           "jade": "Jade",
           "ultramarine": "Ultramarin",
@@ -231,7 +231,7 @@
             "sharp": "Scharf",
             "default": "Standard",
             "rounded": "Abgerundet",
-            "pill": "Pill"
+            "pill": "Pillenform"
           }
         },
         "surfaceBrightness": {
@@ -393,23 +393,23 @@
         },
         "formatBadgeStyle": {
           "title": "Formatierung des Abzeichens anpassen",
-          "hint": "Wie das Abzeichen ein Buch mit mehreren Formaten darstellt. Ein Buch mit einem Format wird immer als einfache Pille dargestellt.",
+          "hint": "Wie das Abzeichen ein Buch mit mehreren Formaten darstellt. Ein Buch mit einem Format wird immer als einfache Tablette dargestellt.",
           "options": {
             "primary": {
               "label": "Primäre Formatierung",
-              "hint": "Eine Pille mit der Formatierung wie sich die Karte öffnet."
+              "hint": "Eine Tablette mit der Formatierung wie sich die Karte öffnet."
             },
             "bubble": {
               "label": "Zählblase",
-              "hint": "Das primäre Etikett mit einer kleinen Zahl der weiteren Formate an seiner Ecke."
+              "hint": "Die primäre Tablette mit einer kleinen Zahl der weiteren Formate an seiner Ecke."
             },
             "underline": {
               "label": "Hervorheben",
-              "hint": "Das primäre Etikett mit einem Balken darunter, ein farbiges Segment pro weiterem Format."
+              "hint": "Die primäre Tablette mit einem Balken darunter, ein farbiges Segment pro weiterem Format."
             },
             "pips": {
               "label": "Punkte",
-              "hint": "Das primäre Etikett mit einem farbigen Punkt darüber für jedes weitere Format."
+              "hint": "Die primäre Tablette mit einem farbigen Punkt darüber für jedes weitere Format."
             },
             "seal": {
               "label": "Siegel",
@@ -514,7 +514,7 @@
         "title": "Bibliotheksverhalten",
         "highlightPeek": {
           "label": "Markierungen im Vorschau-Modus öffnen",
-          "hint": "Beim Springen zu einer Markierung bleiben Ihr Lesefortschritt und Lesestatus unverändert"
+          "hint": "Beim Springen zu einer Markierung bleibt Ihr Lesefortschritt und Lesestatus unverändert"
         },
         "filterPreview": {
           "label": "Filtervorschau standardmäßig anzeigen",
@@ -587,6 +587,7 @@
         "shown": "Sichtbar",
         "hidden": "Ausgeblendet",
         "toggleLabel": "{library} in {place} ausblenden",
+        "books": "{count, plural, one {# Buch} other {# Bücher}}",
         "hiddenFrom": "ausgeblendet in {places}",
         "hiddenInOne": "Ausgeblendet in {place}",
         "hiddenInMany": "An {count} Stellen ausgeblendet",
@@ -594,7 +595,15 @@
         "legendLabel": "{place}:",
         "newLibraries": "Später hinzugefügte Bibliotheken werden überall angezeigt, bis sie hier ausgeblendet werden.",
         "syncLabel": "Synchronisierung",
+        "syncHint": "Die Seite jedes Dienstes hat eine eigene Liste von Bibliotheken, die nie synchronisiert werden.",
+        "syncHintOne": "Seine Einstellungsseite hat eine eigene Liste von Bibliotheken, die nie synchronisiert werden.",
         "places": {
+          "shelves": {
+            "label": "Leseregale",
+            "short": "Regale",
+            "inSentence": "Leseregale",
+            "covers": "„Weiterlesen“, „Weiterhören“, „Als Nächstes in der Reihe“, „Etwas Neues entdecken“ und das Widget „Aktuell gelesen“, im Dashboard, in der iOS-App und im KOReader-Katalog."
+          },
           "series": {
             "label": "Reihen",
             "short": "Reihen",
@@ -1628,6 +1637,9 @@
           "summaryUnsaved": "{count, plural, one {# Stimme konfiguriert} other {# Stimmen konfiguriert}} – Nicht gespeicherte Änderungen",
           "importFromProvider": "Import vom Anbieter",
           "loadPreset": "Voreinstellung {preset} laden",
+          "addVoice": "Stimme hinzufügen",
+          "duplicateVoiceId": "Eine Stimme mit dieser ID ist bereits vorhanden.",
+          "discardChanges": "Ungespeicherte Sprachänderungen verwerfen?",
           "importUnsupported": "Dieser Anbieter unterstützt keine Spracherkennung.",
           "importUnsupportedWithPreset": "Dieser Anbieter unterstützt keine Spracherkennung. Verwenden Sie stattdessen die Schaltfläche „{preset}-Voreinstellung laden“.",
           "discoveryUnsupported": "Dieser Anbieter stellt keinen Sprachlisten-Endpunkt bereit.",
@@ -1658,16 +1670,90 @@
         "apiTypes": {
           "openai-chat": "OpenAI-kompatibel",
           "anthropic-messages": "Anthropic Messages",
-          "openai-responses": "OpenAI Responses"
+          "openai-responses": "OpenAI Responses",
+          "unknown": "Von dieser Serverversion nicht unterstützt"
         },
-        "providers": {
-          "columns": {
-            "status": "Status"
+        "slots": {
+          "fast": "Schnell",
+          "careful": "Sorgfältig",
+          "vision": "Bilderkennung"
+        },
+        "featureNames": {
+          "story-guides": "Story-Guides für Constellations",
+          "connection-test": "Anbietertests",
+          "try-it": "Ausprobieren",
+          "vision-scan": "Foto-Scans",
+          "reading-help": "Lesehilfe"
+        },
+        "status": {
+          "label": "KI-Status",
+          "requests": "Anfragen in diesem Monat",
+          "spentOf": "Verbraucht von {budget} Limit",
+          "spent": "Verbraucht in diesem Monat",
+          "built": "Erstellte Story-Guides",
+          "failed": "Fehlgeschlagene Anfragen",
+          "review": "Prüfen",
+          "budgetUsed": "Genutzter Anteil des Monatslimits",
+          "connectionFailing": "{name} schlägt seit {time} fehl.",
+          "connectionFailingFeatures": "{name} schlägt seit {time} fehl, daher können {features} nicht ausgeführt werden.",
+          "testAgain": "Erneut testen",
+          "slotFailing": "Das {slot}-Modell, {model}, schlägt seit {time} fehl.",
+          "show": "Anzeigen",
+          "budgetWarning": "{percent} des Monatslimits von {budget} sind verbraucht. Bei 100 % werden neue Anfragen gestoppt und Erstellungen pausiert.",
+          "budgetExhausted": "Das Monatslimit von {budget} ist aufgebraucht. Neue Anfragen sind gestoppt, und Erstellungen warten, bis das Limit erhöht wird oder der Monat wechselt.",
+          "raiseLimit": "Limit erhöhen",
+          "unknownCost": "{count, plural, one {# Anfrage in diesem Monat hatte keinen Preis, daher sind ihre Kosten nicht in der Summe enthalten.} other {# Anfragen in diesem Monat hatten keinen Preis, daher sind ihre Kosten nicht in der Summe enthalten.}}",
+          "addPrices": "Preise hinzufügen",
+          "setup": {
+            "title": "KI in drei Schritten einrichten",
+            "brief": "Jeder Schritt schaltet den nächsten frei. Es wird nichts an einen Anbieter gesendet, bevor eine Funktion aktiviert ist.",
+            "provider": "Anbieter hinzufügen",
+            "providerBrief": "Anthropic, OpenAI, ein lokaler Server und mehr",
+            "models": "Modelle auswählen",
+            "features": "Funktionen aktivieren",
+            "done": "Fertig"
           }
         },
+        "providers": {
+          "title": "Anbieter",
+          "emptyBrief": "Beginnen Sie mit einer Vorlage oder wählen Sie „Andere“ für jeden Server, der die OpenAI-API unterstützt, etwa CLIProxyAPI, vLLM oder Azure OpenAI.",
+          "presetsLabel": "Anbieter-Voreinstellungen",
+          "columns": {
+            "provider": "Anbieter",
+            "address": "Adresse und Schlüssel",
+            "status": "Status",
+            "month": "Dieser Monat"
+          },
+          "requests": "{count, plural, one {# Anfrage} other {# Anfragen}}",
+          "testNamed": "{name} testen",
+          "editNamed": "{name} bearbeiten"
+        },
+        "overview": {
+          "loadFailed": "Die KI-Nutzung dieses Monats konnte nicht geladen werden.",
+          "viewUsage": "Verbrauch anzeigen",
+          "encryptionMissing": "Setzen Sie AI_ENCRYPTION_KEY auf dem Server, bevor Sie einen Anbieterschlüssel oder Header-Wert speichern. Einen Schlüssel erzeugen Sie mit: openssl rand -hex 32"
+        },
         "connections": {
+          "add": "Anbieter hinzufügen",
+          "emptyTitle": "Noch keine KI-Anbieter vorhanden",
+          "loadFailed": "Die KI-Anbieter konnten nicht geladen werden.",
+          "noKey": "Kein Schlüssel",
+          "keySaved": "Schlüssel gespeichert",
+          "statusWorking": "Funktioniert, getestet {time}",
+          "statusFailing": "Fehlerhaft seit {time}",
           "statusUntested": "Nicht getestet",
-          "test": "Test"
+          "unusable": "Diese Serverversion unterstützt den API-Typ dieses Anbieters nicht.",
+          "providerSaid": "Meldung des Anbieters: {message}",
+          "test": "Test",
+          "delete": "Löschen",
+          "deleteNamed": "{name} löschen",
+          "testPassed": "{name} hat den Test bestanden",
+          "testFailed": "{name} hat den Test nicht bestanden",
+          "deleteTitle": "{name} löschen?",
+          "deleteConfirm": "Bereits über diesen Anbieter erfasste Nutzung bleibt in der Nutzungsansicht erhalten. Dies kann nicht rückgängig gemacht werden.",
+          "deleted": "{name} gelöscht",
+          "deleteFailed": "Der Anbieter konnte nicht gelöscht werden.",
+          "inUseTitle": "{name} wird verwendet"
         }
       },
       "serverFonts": {
@@ -1825,6 +1911,9 @@
     "integrations": {
       "title": "Integrationen",
       "subtitle": "Verbinden Sie externe Dienste, um Ihre Lesedaten und Hervorhebungen zu synchronisieren.",
+      "excludedLibraries": {
+        "appliesOnSave": "Wird beim Klick auf „Speichern“ übernommen."
+      },
       "noPermission": "Sie haben keine Berechtigung um Integrationen zu verwenden.",
       "tabs": {
         "hardcover": "Hardcover",
@@ -1849,6 +1938,7 @@
         "authors": "Autoren",
         "publisher": "Verlag",
         "publishedYear": "Erscheinungsjahr",
+        "originalPublishedYear": "Erstveröffentlichung",
         "language": "Sprache",
         "pageCount": "Seitenzahl",
         "isbn": "ISBNs",
@@ -3032,6 +3122,9 @@
         "tokenSubtitle": "Buchuntertitel",
         "tokenAuthors": "Autore(n), durch Komma getrennt",
         "tokenNarrators": "Erzähler, durch Kommas getrennt",
+        "tokenFirstPublishedYear": "Jahr der Erstveröffentlichung des Werks",
+        "tokenIndexedSeries": "Reihenname nach Position. Verwenden Sie [0] für die primäre, [1] für die zweite.",
+        "tokenIndexedSeriesIndex": "Buchnummer in der ausgewählten Reihe, mit führenden Nullen",
         "tokenYear": "Jahr der Veröffentlichung",
         "tokenSeries": "Reihenname",
         "tokenSeriesIndex": "Reihe-Index (Führende Null)",
@@ -3176,6 +3269,7 @@
         "previewWithAria": "Vorschau von {title}",
         "previewBook": {
           "sample": "Beispielbuch",
+          "multipleSeries": "Zwei Reihen mit unterschiedlichen Buchnummern",
           "longTitle": "Langer Titel und Reihe",
           "longSubtitle": "Langer Untertitel",
           "manyAuthors": "Fünf Autoren",
@@ -3237,6 +3331,8 @@
         "syncHighlightsHint": "Sendet Markierungen, die in BookOrbit oder KOReader erstellt wurden, an Ihr Kobo. Kobo-Markierungen werden auch dann in BookOrbit importiert, wenn diese Option deaktiviert ist. Verknüpfte Anmerkungen synchronisieren Bearbeitungen und Löschungen in beide Richtungen. Erfordert KEPUB-Zustellung; das Buch auf dem Kobo muss das von BookOrbit heruntergeladene KEPUB sein.",
         "storeSync": "Kobo Store-Titel einbeziehen",
         "storeSyncHint": "Übermitteln Sie auch Bücher von Ihrem Kobo Account, einschließlich Kobo Plus käufe, neben Ihrer BookOrbit Bibliothek. Ohne dies erreichen nur Bücher von BookOrbit das Gerät. Store-Titel werden direkt von Kobo heruntergeladen und werden nicht zu Ihrer BookOrbit Bibliothek hinzugefügt.",
+        "fullSizeCovers": "Cover in voller Größe",
+        "fullSizeCoversHint": "Sendet jedes Cover in der Bildschirmauflösung Ihres Kobo, damit Ruhebildschirme und Vollbild-Cover scharf bleiben. Deaktivieren Sie dies, um kleinere Cover zu senden, die schneller synchronisieren. Ein bereits auf einem Kobo vorhandenes Cover ändert sich nur, wenn sich das Cover des Buchs ändert.",
         "convertKepub": "In KEPUB konvertieren",
         "convertKepubHint": "Sendet geeignete EPUBs als KEPUB. Dies bleibt aktiviert, solange Fortschrittssynchronisierung oder Markierungen von BookOrbit zu Kobo aktiviert sind. Bei der nächsten Kobo-Synchronisierung werden betroffene Bücher erneut als KEPUB-Downloads angeboten; entfernen Sie eine alte EPUB-Kopie, falls Kobo diese weiterhin öffnet.",
         "forceHyphenation": "Silbentrennung erzwingen",
@@ -3511,6 +3607,12 @@
         "syncEnabled": "KOReader-Synchronisierung aktiviert",
         "syncDisabled": "KOReader-Synchronisierung deaktiviert",
         "toggleSyncFailed": "Umschalten der Synchronisierung fehlgeschlagen",
+        "pluginLibrary": "Plugin-Bibliothek",
+        "hideAudioOnlyBooks": "Reine Hörbücher ausblenden",
+        "hideAudioOnlyBooksHint": "KOReader kann kein Audio abspielen, daher erscheinen Bücher mit ausschließlich Audiodateien nicht in den Listen, der Suche und den Downloads des Plugins, ebenso wenig eine Bibliothek, die nichts anderes enthält. Bücher, die zusätzlich ein E-Book haben, werden weiterhin angezeigt.",
+        "audioOnlyBooksHidden": "Reine Hörbücher im Plugin ausgeblendet",
+        "audioOnlyBooksShown": "Reine Hörbücher im Plugin werden angezeigt",
+        "toggleAudioOnlyBooksFailed": "Die Einstellung für die Plugin-Bibliothek konnte nicht aktualisiert werden",
         "syncUrlCopied": "Synchronisierungs-URL in die Zwischenablage kopiert",
         "syncUrlCopyFailed": "Kopieren der Synchronisierungs-URL fehlgeschlagen",
         "statusRefreshed": "Synchronisierungsstatus aktualisiert",
@@ -3561,7 +3663,10 @@
             "reviewDismissed": "Buch wurde von der Überprüfung abgewiesen",
             "reviewDismissFailed": "Fehler beim Verwerfen des Buches",
             "reviewAllDismissed": "{count, plural, =0 {Keine Bücher aus der Rezension abgewiesen} one {# Buch aus der Rezension} other {Verworfen # Bücher aus der Rezension}}",
-            "reviewDismissAllFailed": "Fehler beim Verwerfen aller Bücher aus der Überprüfung"
+            "reviewDismissAllFailed": "Fehler beim Verwerfen aller Bücher aus der Überprüfung",
+            "suggestedLinked": "{count, plural, one {# vorgeschlagenes Buch verknüpft} other {# vorgeschlagene Bücher verknüpft}}",
+            "suggestedPartlyLinked": "{linked, plural, one {# vorgeschlagenes Buch verknüpft.} other {# vorgeschlagene Bücher verknüpft.}} {failed, plural, one {# konnte nicht verknüpft werden und bleibt in der Liste.} other {# konnten nicht verknüpft werden und bleiben in der Liste.}}",
+            "suggestedLinkFailed": "Die vorgeschlagenen Bücher konnten nicht verknüpft werden"
           },
           "modal": {
             "linkTitle": "KOReader-Buch verknüpfen",
@@ -3622,7 +3727,21 @@
           "manualUnlinkConfirmBody": "Entferne den manuellen Link zu {title} und bringe dieses Buch an die Überprüfungsliste zurück. Künftige Synchronisationen verwenden ein automatisches Spiel, falls eine existiert. Bereits synchronisierte Statistiken bleiben in ihrem aktuellen BookOrbit-Buch.",
           "reviewDismissConfirmBody": "Dies entfernt es aus Ihren Büchern, um es zu überprüfen. Automatische Übereinstimmung und bestehende Synchronisationsdaten werden beibehalten. Wenn ein Gerät den Hash ohne Übereinstimmung erneut meldet, kann er wieder erscheinen.",
           "reviewDismissAllConfirmTitle": "{count, plural, =0 {Keine Bücher zum Überprüfen} one {Verwerfen Sie alle # Buch?} other {Verwerfen Sie alle # Bücher zum Überprüfen?}}",
-          "reviewDismissAllConfirmBody": "Dies löscht Ihre gesamten Bücher zur Überprüfungsliste, einschließlich der Einträge auf anderen Seiten. Automatische übereinstimmende und existierende Sync-Daten werden beibehalten. Wenn ein Gerät einen Hash ohne Übereinstimmung meldet, kann er wieder erscheinen."
+          "reviewDismissAllConfirmBody": "Dies löscht Ihre gesamten Bücher zur Überprüfungsliste, einschließlich der Einträge auf anderen Seiten. Automatische übereinstimmende und existierende Sync-Daten werden beibehalten. Wenn ein Gerät einen Hash ohne Übereinstimmung meldet, kann er wieder erscheinen.",
+          "copyNote": "Diese KOReader-Kopie ist eine andere Datei als die in BookOrbit. Lesestatus, Bewertung, Lesezeit und Fortschritt (als Prozentwert) werden synchronisiert, Markierungen und Lesezeichen nicht. Um alles zu synchronisieren, laden Sie das Buch aus BookOrbit in KOReader herunter.",
+          "differentCopyHint": "Andere Datei als die in BookOrbit: Der Fortschritt wird als Prozentwert synchronisiert, Markierungen und Lesezeichen werden nicht synchronisiert.",
+          "suggestedMatch": "Vorgeschlagene Übereinstimmung",
+          "possibleMatches": "{count, plural, one {# mögliche Übereinstimmung} other {# mögliche Übereinstimmungen}}",
+          "morePossibleMatches": "{count, plural, one {Mehr als # mögliche Übereinstimmung} other {Mehr als # mögliche Übereinstimmungen}}",
+          "possibleMatchesHint": "Bücher in Ihrer Bibliothek mit demselben Titel und denselben Autoren. Prüfen Sie die Ausgabe, bevor Sie verknüpfen.",
+          "reviewMatch": "Übereinstimmung prüfen",
+          "chooseMatch": "Übereinstimmung wählen",
+          "linkSuggested": "Vorgeschlagene verknüpfen ({count})",
+          "bulkLinkTitle": "{count, plural, one {# vorgeschlagenes Buch verknüpfen?} other {# vorgeschlagene Bücher verknüpfen?}}",
+          "bulkLinkDescription": "Jedes KOReader-Buch unten hat denselben Titel und dieselben Autoren wie genau ein Buch in Ihrer Bibliothek. Prüfen Sie die Liste vor dem Verknüpfen.",
+          "bulkLinkConfirm": "{count, plural, one {# Buch verknüpfen} other {# Bücher verknüpfen}}",
+          "bulkLinkListLabel": "Vorgeschlagene Verknüpfungen",
+          "openCandidate": "{title} in neuem Tab öffnen"
         },
         "remove": "Entfernen",
         "removing": "Wird entfernt ...",
@@ -3645,7 +3764,18 @@
         "retireDeviceFailed": "Gerät kann nicht archiviert werden",
         "restoreDeviceFailed": "Gerät konnte nicht wiederhergestellt werden",
         "retiredDevices": "{count, plural, one {# Gerät Archiviert} other {# Geräte Archiviert}}",
-        "retiredOnLabel": "Archiviert"
+        "retiredOnLabel": "Archiviert",
+        "renameDevice": {
+          "action": "Umbenennen",
+          "actionLabel": "{device} umbenennen",
+          "title": "Gerät umbenennen",
+          "description": "BookOrbit zeigt diesen Namen anstelle des vom Gerät gemeldeten Modells an, hier und im BookOrbit-Plugin auf Ihren anderen Geräten. Lassen Sie das Feld leer, um wieder das Modell anzuzeigen.",
+          "nameLabel": "Name",
+          "modelHint": "Gemeldetes Modell: {model}",
+          "saved": "Gerät umbenannt",
+          "cleared": "Gerätename entfernt",
+          "failed": "Gerät konnte nicht umbenannt werden"
+        }
       },
       "opds": {
         "title": "OPDS",
@@ -3758,6 +3888,7 @@
           "name": "Name",
           "type": "Programm-Typ",
           "baseUrl": "Basis URL",
+          "baseUrlRtorrentBrief": "Der XML-RPC-Endpunkt selbst: meist /RPC2 oder plugins/httprpc/action.php, wenn ruTorrent vorgeschaltet ist. Benutzername und Passwort sind die des Webservers, falls er danach fragt.",
           "username": "Benutzername",
           "password": "Passwort",
           "apiKey": "API-Schlüssel",
@@ -3776,7 +3907,8 @@
           "allowPrivateAddressHint": "Benötigt, wenn das Programm in Ihrem lokalen Netzwerk oder auf dem gleichen Rechner läuft.",
           "passwordBrief": "Verschlüsselt gespeichert.",
           "apiKeyBrief": "Gefunden in SABnzbd unter Config > General. Verschlüsselt gespeichert.",
-          "useHardlinksBrief": "Seeded ohne den Speicherplatz zweimal zu verwenden. Verwendet nur eine Kopie über Dateisysteme."
+          "torboxApiKeyBrief": "Zu finden unter https://torbox.app/settings?section=account. Wird verschlüsselt gespeichert.",
+          "useHardlinksBrief": "Importiert, ohne den Speicherplatz doppelt zu belegen. Über Dateisystemgrenzen hinweg wird stattdessen kopiert."
         },
         "mappings": {
           "title": "Pfadzuordnungen",
@@ -4294,6 +4426,7 @@
         "appearanceIcons": "Wählen Sie den Symbol-Stil, der in der gesamten App verwendet wird.",
         "appearanceLayout": "Standard Bibliotheksansicht, Dichte und Abstand.",
         "appearanceBehavior": "Wie die Bibliothek reagiert, wie Sie suchen und sortieren.",
+        "appearanceLibraryVisibility": "Bibliotheken in Leseregalen, Reihen und Statistiken ausblenden.",
         "appearanceLanguage": "Interface-Sprache und regionale Formate.",
         "readerEbook": "Schriftarten, Abstände und Seitenverhalten für eBooks.",
         "readerPdf": "Rendering, Zoom, und Seite passend für PDFs.",
@@ -4318,10 +4451,14 @@
         "oidc": "Single-Sign-On-Anbieter, Ansprüche und Bereitstellung.",
         "serverFonts": "Für jeden Leser auf diesem Server installierte Schriftarten.",
         "bookDock": "Auf Buchseiten angezeigte Schnellaktionen.",
+        "bookDockIntake": "Ablageordner, Metadatenabruf und automatisches Einsortieren für eingehende Bücher.",
         "auditLog": "Wer was wann geändert hat.",
         "requests": "Quellen, Download-Clients und was mit einem Buch passiert, wenn es heruntergeladen wird.",
         "readerTts": "Voreingestellte Sprach-, Geschwindigkeits- und Narrationsvorgaben.",
-        "adminTts": "Text-zu-Sprache-Engines stehen jedem Leser auf diesem Server zur Verfügung."
+        "adminTts": "Text-zu-Sprache-Engines stehen jedem Leser auf diesem Server zur Verfügung.",
+        "adminAi": "KI-Anbieter, Modelle und Ausgabenlimits für KI-Funktionen.",
+        "apiKeys": "Schlüssel, mit denen Skripte und andere Apps BookOrbit in Ihrem Namen nutzen können.",
+        "adminApiKeys": "API-Schlüssel auf diesem Server erlauben und ihre Gültigkeitsdauer begrenzen."
       },
       "backToApp": "Zurück zur Bibliothek",
       "pageDescriptions": {
@@ -5034,6 +5171,7 @@
   },
   "annotations": {
     "unknownBook": "Unbekanntes Buch",
+    "textUnavailable": "Text für diese Markierung nicht verfügbar",
     "styles": {
       "highlight": "Markierung",
       "underline": "Unterstreichen",
@@ -5092,7 +5230,8 @@
         "webReader": "Web-Reader",
         "koreader": "KOReader",
         "pdf": "PDF",
-        "kobo": "Kobo"
+        "kobo": "Kobo",
+        "page": "Seite"
       },
       "status": {
         "exact": "Exakt",
@@ -5174,7 +5313,8 @@
         "bulkRestored": "{count, plural, =0 {Keine Markierungen wiederhergestellt} one {# Markierung wiederhergestellt} other {# Markierungen wiederhergestellt}}",
         "bulkRecolored": "{count, plural, =0 {Farbe für keine Markierung geändert} one {Farbe für # Markierung geändert} other {Farbe für # Markierungen geändert}}",
         "bulkRestyled": "{count, plural, =0 {Stil für keine Markierung geändert} one {Stil für # Markierung geändert} other {Stil für # Markierungen geändert}}",
-        "noteSaved": "Notiz gespeichert"
+        "noteSaved": "Notiz gespeichert",
+        "purgePendingDeviceSync": "Ein synchronisiertes Gerät muss diese Anmerkung noch entfernen. Synchronisieren Sie dieses Gerät und löschen Sie sie dann endgültig."
       },
       "railTitle": "{marks} Markierungen · {books} Bücher",
       "lastTwelveMonths": "Letzte 12 Monate",
@@ -5182,6 +5322,7 @@
       "whereFrom": "Woher sie kommen",
       "theShelf": "Das Regal",
       "devices": "Geräte",
+      "deviceWithSource": "{source} · {device}",
       "allBooks": "Alle {count} Bücher",
       "behindCount": "{count, plural, one {# dahinter} other {# dahinter}}",
       "busiestWeek": "Fleißigste Woche",
@@ -5219,10 +5360,16 @@
       },
       "activitySummary": "{count, plural, one {# Hervorhebung zwischen {from} und {to}} other {# Hervorhebung zwischen {from} und {to}}}",
       "book": "Buch",
-      "needsReview": "Benötigt Überprüfung"
+      "needsReview": "Benötigt Überprüfung",
+      "trashToggle": "{count, plural, one {Papierkorb, # Anmerkung} other {Papierkorb, # Anmerkungen}}",
+      "purgeDialog": {
+        "title": "Endgültig löschen?",
+        "description": "Diese Anmerkung und ihre Notiz werden dauerhaft entfernt. Sie kann nicht aus dem Papierkorb wiederhergestellt werden."
+      }
     },
     "sources": {
       "web": "Web",
+      "bookorbit": "BookOrbit",
       "koreader": "KOReader",
       "kobo": "Kobo"
     },
@@ -5237,6 +5384,150 @@
       "cyan": "Cyan",
       "purple": "Lila",
       "gray": "Grau"
+    },
+    "pageNote": "Anmerkung auf Seite {page}"
+  },
+  "apiKeys": {
+    "errors": {
+      "load": "API-Schlüssel konnten nicht geladen werden.",
+      "create": "Der API-Schlüssel konnte nicht erstellt werden.",
+      "rename": "Der API-Schlüssel konnte nicht umbenannt werden.",
+      "regenerate": "Der API-Schlüssel konnte nicht neu generiert werden.",
+      "revoke": "Der API-Schlüssel konnte nicht widerrufen werden.",
+      "revokeAll": "Die API-Schlüssel konnten nicht widerrufen werden.",
+      "nameRequired": "Geben Sie einen Namen für den Schlüssel ein.",
+      "saveSettings": "Die Einstellungen für API-Schlüssel konnten nicht gespeichert werden."
+    },
+    "expiry": {
+      "never": "Nie",
+      "days": "{count, plural, one {# Tag} other {# Tage}}"
+    },
+    "access": {
+      "read": "Nur lesen",
+      "readHint": "Kann ansehen, aber nichts ändern.",
+      "write": "Lesen und schreiben",
+      "writeHint": "Kann im Rahmen der unten stehenden Berechtigungen auch Änderungen vornehmen."
+    },
+    "state": {
+      "active": "Aktiv",
+      "expiring": "Läuft bald ab",
+      "expired": "Abgelaufen",
+      "revoked": "Widerrufen"
+    },
+    "create": {
+      "title": "API-Schlüssel erstellen",
+      "description": "Mit einem Schlüssel kann ein Skript oder eine andere App BookOrbit in Ihrem Namen nutzen, mit nicht mehr Zugriff, als Sie hier festlegen.",
+      "issueTitle": "API-Schlüssel ausstellen",
+      "issueDescription": "Der Schlüssel gehört dieser Person und handelt in ihrem Namen, mit nicht mehr Zugriff, als hier festgelegt.",
+      "name": "Name",
+      "namePlaceholder": "Backup-Skript",
+      "nameHint": "Etwas, das angibt, wo der Schlüssel verwendet wird.",
+      "expiry": "Läuft ab nach",
+      "expiryCapped": "Dieser Server erlaubt eine Gültigkeit von höchstens {count, plural, one {# Tag} other {# Tagen}}.",
+      "access": "Zugriff",
+      "libraries": "Bibliotheken",
+      "librariesAll": "Alle meine Bibliotheken, einschließlich später hinzugefügter",
+      "librariesAllTheirs": "Alle ihre Bibliotheken, einschließlich später hinzugefügter",
+      "librariesSome": "Nur bestimmte Bibliotheken",
+      "librariesSelected": "{count, plural, =0 {Keine ausgewählt} one {# von {total} ausgewählt} other {# von {total} ausgewählt}}",
+      "librariesRequired": "Wählen Sie mindestens eine Bibliothek.",
+      "admin": "Administratorzugriff",
+      "adminHint": "Der Schlüssel kann alles, was ein Administrator kann.",
+      "adminWithLibraries": "Nicht verfügbar, solange der Schlüssel auf bestimmte Bibliotheken beschränkt ist.",
+      "adminWarning": "Wer diesen Schlüssel besitzt, kontrolliert den gesamten Server. Bewahren Sie ihn sicher auf und geben Sie ihm eine kurze Gültigkeit.",
+      "permissions": "Zusätzliche Berechtigungen",
+      "permissionsHint": "Zum Lesen der oben genannten Bibliotheken ist keine Berechtigung nötig. Gewähren Sie nur, was das Skript braucht; der Schlüssel erhält nie mehr als sein Eigentümer hat.",
+      "noPermissions": "Es gibt keine Berechtigungen, die gewährt werden können.",
+      "creating": "Wird erstellt...",
+      "submit": "Schlüssel erstellen",
+      "issueSubmit": "Schlüssel ausstellen"
+    },
+    "reveal": {
+      "title": "Schlüssel für {name} kopieren",
+      "description": "Speichern Sie ihn wie ein Passwort in der App oder dem Skript, das ihn verwenden wird.",
+      "onceOnly": "Der Schlüssel wird nur dieses eine Mal angezeigt. Wenn er verloren geht, generieren Sie ihn neu.",
+      "tokenLabel": "API-Schlüssel",
+      "copy": "Kopieren",
+      "copied": "Kopiert",
+      "copyFailed": "Der Schlüssel konnte nicht kopiert werden. Markieren Sie ihn und kopieren Sie ihn manuell.",
+      "copiedAnnouncement": "Schlüssel in die Zwischenablage kopiert.",
+      "examplesTitle": "Den Schlüssel verwenden",
+      "examplesHint": "Senden Sie ihn in einem der beiden Header. Fügen Sie ihn nie in einen Link ein.",
+      "done": "Fertig"
+    },
+    "list": {
+      "label": "API-Schlüssel",
+      "activeCount": "{count, plural, one {# aktiver Schlüssel} other {# aktive Schlüssel}}, bis zu {max}",
+      "limitReached": "Das Limit von {max} aktiven Schlüsseln ist erreicht. Widerrufen Sie einen Schlüssel, um einen neuen zu erstellen.",
+      "adminBadge": "Administrator",
+      "permissions": "Berechtigungen",
+      "permissionsAdmin": "Alle Berechtigungen",
+      "permissionsNone": "Nichts außer Lesen",
+      "permissionsCount": "{count, plural, one {# Berechtigung} other {# Berechtigungen}}",
+      "libraries": "Bibliotheken",
+      "librariesAll": "Alle",
+      "librariesNone": "Keine mehr",
+      "libraryUnknown": "Bibliothek {id}",
+      "librariesCount": "{count, plural, one {# Bibliothek} other {# Bibliotheken}}",
+      "created": "Erstellt",
+      "createdBy": "{date}, ausgestellt von {username}",
+      "lastUsed": "Zuletzt verwendet",
+      "neverUsed": "Nie",
+      "lastUsedFrom": "{time} von {ip}",
+      "expires": "Läuft ab",
+      "noExpiry": "Nie",
+      "revokedOn": "Widerrufen am {date}",
+      "renameLabel": "Schlüsselname",
+      "revokedHeading": "Widerrufen",
+      "revokedHint": "Widerrufene Schlüssel bleiben 90 Tage lang aufgelistet und werden dann gelöscht."
+    },
+    "actions": {
+      "create": "Schlüssel erstellen",
+      "issue": "Schlüssel ausstellen",
+      "rename": "Umbenennen",
+      "renameAria": "{name} umbenennen",
+      "regenerate": "Neu generieren",
+      "regenerateAria": "{name} neu generieren",
+      "revoke": "Widerrufen",
+      "revokeAria": "{name} widerrufen",
+      "revokeAll": "Alle widerrufen"
+    },
+    "confirm": {
+      "regenerateTitle": "{name} neu generieren?",
+      "regenerateDescription": "Ein neuer Schlüssel mit demselben Zugriff ersetzt diesen. Alles, was noch den alten Schlüssel verwendet, funktioniert sofort nicht mehr.",
+      "revokeTitle": "{name} widerrufen?",
+      "revokeDescription": "Alles, was diesen Schlüssel verwendet, funktioniert sofort nicht mehr. Dies kann nicht rückgängig gemacht werden.",
+      "revokeAllTitle": "Alle API-Schlüssel widerrufen?",
+      "revokeAllDescription": "Jedes Skript und jede App, die einen dieser Schlüssel verwendet, funktioniert sofort nicht mehr. Dies kann nicht rückgängig gemacht werden.",
+      "revokeAllIssuedDescription": "Alle Schlüssel dieser Person funktionieren sofort nicht mehr, auch die selbst erstellten. Dies kann nicht rückgängig gemacht werden."
+    },
+    "announce": {
+      "renamed": "Schlüssel in {name} umbenannt.",
+      "revoked": "{name} widerrufen.",
+      "revokedAll": "{count, plural, =0 {Keine Schlüssel zum Widerrufen.} one {# Schlüssel widerrufen.} other {# Schlüssel widerrufen.}}"
+    },
+    "disabledNotice": "API-Schlüssel sind auf diesem Server deaktiviert. Vorhandene Schlüssel funktionieren erst wieder, wenn ein Administrator sie aktiviert.",
+    "ownerNotPermitted": "Diese Person benötigt die Berechtigung „API-Schlüssel erstellen“, bevor ein Schlüssel für sie ausgestellt werden kann. Ihre vorhandenen Schlüssel funktionieren ohne diese Berechtigung nicht mehr.",
+    "empty": {
+      "title": "Noch keine API-Schlüssel",
+      "hint": "Erstellen Sie einen Schlüssel, damit ein Backup-Skript, eine Hausautomation oder eine andere App ohne Ihr Passwort auf Ihre Bibliothek zugreifen kann.",
+      "issuedTitle": "Keine API-Schlüssel",
+      "issuedHint": "Schlüssel, die diese Person erstellt oder die für sie ausgestellt werden, erscheinen hier."
+    },
+    "admin": {
+      "section": "API-Schlüssel",
+      "sectionSummary": "Schlüssel für Skripte und Apps",
+      "title": "API-Schlüssel",
+      "hint": "Änderungen hier werden sofort wirksam und müssen nicht gespeichert werden."
+    },
+    "server": {
+      "enabled": "API-Schlüssel erlauben",
+      "enabledHint": "Wenn deaktiviert, funktioniert kein Schlüssel und es kann keiner erstellt werden. Schlüssel bleiben erhalten und funktionieren wieder, sobald dies aktiviert wird.",
+      "maxLifetime": "Maximale Gültigkeitsdauer",
+      "maxLifetimeHint": "Neue Schlüssel können nicht länger gültig sein, und unbegrenzt gültige Schlüssel werden nicht angeboten. Vorhandene Schlüssel behalten ihr Ablaufdatum.",
+      "noLimit": "Kein Limit",
+      "saved": "Einstellungen für API-Schlüssel gespeichert.",
+      "perUserHint": "Wer Schlüssel erstellen darf, wird pro Person über die Berechtigung „API-Schlüssel erstellen“ unter „Benutzer“ festgelegt."
     }
   },
   "audit": {
@@ -5358,9 +5649,13 @@
       "Collection": "Sammlung",
       "SmartScope": "Intelligenter Bereich",
       "BookDockFile": "Bücherablage-Datei",
+      "LibraryDock": "Bibliotheksablage",
       "BookRequest": "Buchanfrage",
       "DownloadClient": "Download Programm",
       "RequestIndexer": "Indexer",
+      "MetadataHttpProvider": "Metadatenanbieter",
+      "AiConnection": "KI-Verbindung",
+      "AiSettings": "KI-Einstellungen",
       "Author": "Autor",
       "AppSettings": "App-Einstellungen",
       "Genre": "Genre",
@@ -5376,7 +5671,8 @@
       "Series": "Reihe",
       "OidcIdentity": "OIDC-Identität",
       "MagicLinkToken": "Magischer Link",
-      "ReadingInsightsProfile": "Leseprofil"
+      "ReadingInsightsProfile": "Leseprofil",
+      "ApiKey": "API-Schlüssel"
     },
     "actionLabels": {
       "AuthRegister": "Benutzerkonto erstellen",
@@ -5419,6 +5715,7 @@
       "LibraryWriteMetadataToFiles": "Metadaten in Dateien schreiben",
       "LibraryBulkRename": "Bibliotheksdateien umbenennen",
       "LibraryRecomputeAddedAt": "Neuberechnungsdatum hinzugefügt",
+      "LibraryReapplyRegexMetadata": "Pfadregeln auf vorhandene Bücher anwenden",
       "BookUpload": "Buch hochladen",
       "BookMetadataUpdate": "Buchmetadaten aktualisieren",
       "BookMetadataLocksUpdate": "Metadatensperren aktualisieren",
@@ -5426,6 +5723,7 @@
       "BookBulkMetadataRefresh": "Buchmetadaten aktualisieren",
       "BookBulkDelete": "Bücher löschen",
       "BookBulkCoverReextract": "Buchumschläge erneut extrahieren",
+      "BookBulkEmbedAudioCover": "Hörbuch-Cover in Vorlese-EPUBs einbetten",
       "BookBulkSetStatus": "Buchstatus festlegen",
       "BookBulkSetRating": "Buchbewertung festlegen",
       "BookBulkSetMetadata": "Metadaten festlegen",
@@ -5433,8 +5731,13 @@
       "BookBulkSetMetadataLock": "Metadaten-Sperren setzen",
       "BookBulkEditMetadata": "Metadaten bearbeiten",
       "BookBulkMoveLibrary": "Bücher in eine andere Bibliothek verschieben",
+      "BookMerge": "Bücher zusammenführen",
+      "BookLink": "Bücher verknüpfen",
+      "BookUnlink": "Buchverknüpfung aufheben",
+      "BookDuplicatesResolve": "Doppelte Bücher auflösen",
       "BookReadingStateReset": "Lesestatus zurücksetzen",
       "BookWriteAndRename": "Metadaten schreiben und Datei umbenennen",
+      "BookEmbedAudioCover": "Hörbuch-Cover in Vorlese-EPUB einbetten",
       "CollectionCreate": "Sammlung erstellen",
       "CollectionUpdate": "Sammlung aktualisieren",
       "CollectionDelete": "Sammlung löschen",
@@ -5444,6 +5747,19 @@
       "SmartScopeUpdate": "Smart Scope aktualisieren",
       "SmartScopeDelete": "Smart Scope löschen",
       "BookDockFinalize": "Bücherablage-Datei finalisieren",
+      "LibraryDockUpdate": "Bibliotheksablage aktualisieren",
+      "LibraryDockFolderRename": "Ordner der Bibliotheksablage umbenennen",
+      "LibraryDockFolderAdopt": "Ordner als Bibliotheksablage übernehmen",
+      "LibraryDockFolderMove": "Ordner der Bibliotheksablagen nach „Unsortiert“ verschieben",
+      "LibraryDockFolderRemove": "Ordner der Bibliotheksablagen entfernen",
+      "AiJobBuild": "KI-Erstellung starten",
+      "AiJobUpdate": "KI-Erstellung aktualisieren",
+      "AiJobRebuild": "KI-Ergebnis neu erstellen",
+      "AiJobRetry": "KI-Erstellung erneut versuchen",
+      "AiJobCancel": "KI-Erstellung abbrechen",
+      "AiJobPause": "KI-Erstellung pausieren",
+      "AiJobPrioritize": "KI-Erstellung an den Anfang der Warteschlange verschieben",
+      "AiJobOutputDelete": "KI-Ergebnis löschen",
       "BookRequestCreate": "Anfrage erstellen",
       "BookRequestApprove": "Anfrage genehmigen",
       "BookRequestReject": "Anfrage ablehnen",
@@ -5462,6 +5778,19 @@
       "RequestIndexerPluginInspect": "Indexer Plugin überprüft",
       "RequestIndexerPluginInstall": "Indexer-Plugin installiert",
       "RequestIndexerPluginRemove": "Indexer-Plugin gelöscht",
+      "MetadataHttpProviderCreate": "Metadatenanbieter hinzugefügt",
+      "MetadataHttpProviderUpdate": "Metadatenanbieter aktualisiert",
+      "MetadataHttpProviderDelete": "Metadatenanbieter entfernt",
+      "AiConnectionCreate": "KI-Verbindung hinzugefügt",
+      "AiConnectionUpdate": "KI-Verbindung bearbeitet",
+      "AiConnectionDelete": "KI-Verbindung gelöscht",
+      "AiConnectionKeyReplace": "Schlüssel der KI-Verbindung ersetzt",
+      "AiConnectionKeyRemove": "Schlüssel der KI-Verbindung entfernt",
+      "AiSlotsUpdate": "KI-Modelle geändert",
+      "AiFeatureUpdate": "KI-Funktion geändert",
+      "AiBudgetUpdate": "KI-Budget geändert",
+      "AiSpeedsReset": "KI-Modellgeschwindigkeit zurückgesetzt",
+      "AiPrivacyConfirm": "KI-Datenschutzhinweis bestätigt",
       "AuthorUpdate": "Autor aktualisieren",
       "AuthorDelete": "Autor löschen",
       "AuthorMerge": "Autoren zusammenführen",
@@ -5499,7 +5828,14 @@
       "EmailRecipientGroupMemberRemove": "Empfänger aus Gruppe entfernen",
       "MaintenanceMissingBooksClean": "Fehlende Bücher gelöscht",
       "MaintenanceBrokenCoversClean": "Defekte Cover bereinigt",
-      "MaintenanceOrphanedCoversClean": "Bereinigte verwaiste Cover-Ordner"
+      "MaintenanceOrphanedCoversClean": "Bereinigte verwaiste Cover-Ordner",
+      "ApiKeyCreate": "API-Schlüssel erstellt",
+      "ApiKeyRename": "API-Schlüssel umbenannt",
+      "ApiKeyRegenerate": "API-Schlüssel neu generiert",
+      "ApiKeyRevoke": "API-Schlüssel widerrufen",
+      "ApiKeyRevokeAll": "Alle API-Schlüssel widerrufen",
+      "AuthorBulkMetadataRefresh": "Autoren-Metadaten aktualisieren",
+      "BulkRunCancel": "Massenaktion abbrechen"
     },
     "views": {
       "label": "Zeigen",
@@ -5628,6 +5964,7 @@
       "skipped": "Übersprungen",
       "remaining": "Verbleibend",
       "sharingLevel": "Freigabelevel",
+      "viaApiKey": "Über API-Schlüssel",
       "sharing": {
         "private": "Nicht geteilt",
         "summary": "Summary",
@@ -6107,6 +6444,7 @@
       "ogg": "OGG Audio",
       "flac": "FLAC Audio",
       "readAlong": "Mitlesen EPUB",
+      "plainEpub": "EPUB ohne Vorlesefunktion",
       "primary": "Primärformat"
     },
     "actions": {
@@ -6328,7 +6666,56 @@
       "addRule": "Regel hinzufügen",
       "addGroup": "Gruppe hinzufügen",
       "typeToSearch": "Zum Suchen eingeben ...",
+      "filterBy": "Filtern nach…",
+      "findFieldAria": "Feld zum Filtern suchen",
+      "fieldList": "Filterfelder",
+      "active": "Aktiv",
+      "clearAll": "Alle entfernen",
       "addAFilter": "Filter hinzufügen",
+      "advancedBuilder": "Erweiterter Editor",
+      "advancedBuilderHint": "Gruppen, beliebige von",
+      "backToFields": "Zurück zu den Feldern",
+      "removeThisFilter": "Diesen Filter entfernen",
+      "removeNamed": "{label} entfernen",
+      "editNamed": "{label} bearbeiten",
+      "done": "Fertig",
+      "matchCount": "{count, plural, one {# Buch passt} other {# Bücher passen}}",
+      "notAppliedYet": "Wird erst angewendet, wenn ein Wert vorhanden ist",
+      "operator": "Operator",
+      "valuesOf": "{field} Werte",
+      "nothingMatches": "Keine Treffer für \"{query}\".",
+      "moreValues": "{count} weitere. Tippen Sie, um einzugrenzen.",
+      "typeToFind": "Tippen, um weitere zu finden",
+      "custom": "Benutzerdefiniert…",
+      "dateValue": "Datum",
+      "dateFrom": "Von",
+      "dateTo": "Bis",
+      "quickPicks": "Schnellauswahl",
+      "provider": "Anbieter",
+      "min": "Min",
+      "max": "Max",
+      "typeValue": "Wert eingeben",
+      "valueLabel": "{field} Wert",
+      "minimumLabel": "Minimum für {field}",
+      "maximumLabel": "Maximum für {field}",
+      "stars": "{count, plural, one {# Stern} other {# Sterne}}",
+      "ratingEq": "Genau {count}",
+      "ratingGte": "{count} und mehr",
+      "ratingLte": "{count} und weniger",
+      "ratingGt": "Mehr als {count}",
+      "ratingLt": "Weniger als {count}",
+      "valueSearch": {
+        "author": "Autoren suchen",
+        "series": "Reihen suchen",
+        "genre": "Genres suchen",
+        "tag": "Tags suchen",
+        "publisher": "Verlage suchen",
+        "language": "Sprachen suchen",
+        "collection": "Sammlungen suchen",
+        "library": "Bibliotheken suchen",
+        "readStatus": "Status suchen",
+        "format": "Formate suchen"
+      },
       "builder": {
         "matchPrefix": "Erfülle",
         "ofTheseFilters": "dieser Filter",
@@ -7513,6 +7900,75 @@
           "titlesHint": "Ihre Startzeiten behalten und die Titel passender Zeilen übernehmen.",
           "times": "Nur Startzeiten",
           "timesHint": "Ihre Titel behalten und die Startzeiten passender Zeilen übernehmen."
+        },
+        "sources": {
+          "description": "Vergleichen Sie sie mit der Liste, die Sie bearbeiten, und wählen Sie dann, was übernommen werden soll.",
+          "loading": "Kapitel werden gelesen...",
+          "counts": "{incoming, plural, one {# eingehendes Kapitel} other {# eingehende Kapitel}}, {current, plural, one {# im Editor} other {# im Editor}}",
+          "pastEnd": "{count, plural, one {# Kapitel beginnt nach dem Ende Ihres Hörbuchs.} other {# Kapitel beginnen nach dem Ende Ihres Hörbuchs.}}",
+          "currentColumn": "Im Editor",
+          "incomingColumn": "Eingehend",
+          "deltaColumn": "Verschiebung (s)",
+          "applied": "Im Editor übernommen. Speichern Sie, um es zu behalten.",
+          "empty": "Hier wurden keine Kapitel gefunden.",
+          "files": {
+            "menu": "Aus den Audiodateien",
+            "title": "Kapitel in den Audiodateien"
+          },
+          "tracks": {
+            "menu": "Eines pro Audiodatei",
+            "title": "Ein Kapitel pro Audiodatei"
+          },
+          "lookup": {
+            "menu": "Von Audible...",
+            "title": "Kapitel von Audible",
+            "asin": "ASIN",
+            "region": "Shop",
+            "action": "Nachschlagen",
+            "hint": "Die Kapitel von Audible für diese Ausgabe. Die Zeitangaben stammen aus Audibles eigener Aufnahme und brauchen daher eventuell einen Versatz oder eine Streckung, um zu Ihren Dateien zu passen."
+          },
+          "toc": {
+            "menu": "Aus dem Inhaltsverzeichnis des E-Books",
+            "title": "Titel aus dem E-Book"
+          },
+          "readAlong": {
+            "menu": "Aus dem Vorlese-EPUB",
+            "title": "Kapitel aus der Vorlesefassung"
+          },
+          "import": {
+            "menu": "Importieren...",
+            "title": "Kapitel importieren",
+            "pasteLabel": "Kapitel einfügen",
+            "placeholder": "00:00:00 Vorspann\n00:00:14 Widmung\n00:00:23 Kapitel 1",
+            "formats": "Liest CUE-Sheets, FFmpeg-Metadaten, Audacity-Marken, Audiobookshelf-JSON, Zeilen mit Zeitstempeln oder eine einfache Titelliste.",
+            "read": "Kapitel einlesen",
+            "chooseFile": "Datei auswählen",
+            "unreadable": "Davon konnten keine Kapitel gelesen werden.",
+            "tooLarge": "Diese Datei ist zu groß für eine Kapitelliste.",
+            "skipped": "{count, plural, one {# Zeile übersprungen} other {# Zeilen übersprungen}}",
+            "truncated": "Nur die ersten {count} Kapitel wurden gelesen."
+          },
+          "version": {
+            "title": "Gespeicherte Version",
+            "detail": "Gespeichert {when}",
+            "detailBy": "Gespeichert {when} von {name}"
+          }
+        },
+        "review": {
+          "adjust": "Zeiten ausrichten",
+          "runtimes": "Laufzeit der Quelle {theirs}, dieses Hörbuch {ours} ({difference} s)",
+          "accurate": "Audible kennzeichnet diese Zeiten als exakt",
+          "offset": "Versatz (s)",
+          "suggestIntro": "Audible-Intro überspringen ({seconds} s)",
+          "suggestMatch": "Ans erste Kapitel anpassen ({seconds} s)",
+          "fitPauses": "An Pausen anpassen",
+          "fitPausesResult": "An Pausen anpassen ({seconds} s, {hits} von {total})",
+          "fitPausesNone": "Kein einzelner Versatz richtet diese Kapitel an Pausen in Ihrem Audio aus.",
+          "resetOffset": "Zurücksetzen",
+          "stretch": "Auf dieses Hörbuch strecken",
+          "stretchHint": "Skaliert jede Startzeit um {factor}, wodurch sich das letzte Kapitel um {seconds} s verschiebt.",
+          "parts": "Teilüberschriften",
+          "partsOwn": "Als Kapitel behalten"
         }
       },
       "highlights": {
@@ -9652,7 +10108,7 @@
       "sharp": "Scharfe Ecken",
       "default": "Standardecken",
       "rounded": "Abgerundete Ecken",
-      "pill": "Pillenförmige Ecken"
+      "pill": "Tabletteförmige Ecken"
     },
     "languagePicker": {
       "searchPlaceholder": "Sprachen suchen",
@@ -11767,6 +12223,10 @@
           "label": "Autorenanreicherung",
           "description": "Wenn der Abruf von Autorenbiografien und Fotos abgeschlossen ist."
         },
+        "bulkActions": {
+          "label": "Massenaktionen",
+          "description": "Wenn eine von Ihnen gestartete Massenaktion abgeschlossen wird, nachdem Sie sie verlassen haben, stoppt oder durch einen Neustart abgebrochen wird."
+        },
         "fileWriteBack": {
           "label": "Zurückschreiben der Datei",
           "description": "Wenn bearbeitete Metadaten zurück in Buchdateien auf der Festplatte geschrieben werden."
@@ -11778,6 +12238,14 @@
         "bulkRename": {
           "label": "Massenumbenennung",
           "description": "Wenn eine Massenumbenennung oder eine Verschiebung von Büchern zwischen Bibliotheken abgeschlossen wird oder fehlschlägt."
+        },
+        "readAloud": {
+          "label": "Erstellung von Vorlesefassungen",
+          "description": "Wenn eine von Ihnen gestartete Erstellung einer Vorlesefassung bereit ist, Ihre Prüfung benötigt oder fehlschlägt."
+        },
+        "storyGuides": {
+          "label": "Story guides",
+          "description": "Wenn eine von Ihnen gestartete Erstellung einer Story guide bereit ist, Ihre Prüfung benötigt oder fehlschlägt."
         },
         "migration": {
           "label": "Datenmigration",
@@ -13131,6 +13599,68 @@
         "list": "Diese Einträge konnten nicht geladen werden.",
         "clean": "Bereinigung fehlgeschlagen."
       }
+    },
+    "chapterHealth": {
+      "accessDenied": "Sie benötigen die Berechtigung zum Bearbeiten von Metadaten, um dieses Werkzeug zu verwenden.",
+      "untitled": "Unbenanntes Buch",
+      "categoriesLabel": "Kapitelprobleme",
+      "categories": {
+        "no_chapters": "Keine Kapitel",
+        "one_per_file": "Eines pro Datei",
+        "numbered_tracks": "Nummerierte Tracks",
+        "needs_review": "Prüfung erforderlich",
+        "edited": "Bearbeitet"
+      },
+      "hints": {
+        "no_chapters": "Hörbücher in einer einzigen Datei mit einem oder keinem Kapitel.",
+        "one_per_file": "Hörbücher in mehreren Dateien ohne eigene Kapitel, sodass jede Datei als Kapitel abgespielt wird.",
+        "numbered_tracks": "Kapitel, die wie Dateien oder Tracks benannt sind, etwa \"001\" oder \"Track 03\", statt wie Kapitel.",
+        "needs_review": "Audible-Abfragen, die nicht gut genug zu Ihren Dateien passten, um automatisch angewendet zu werden. „Prüfen“ öffnet die Kapitel des Buchs mit der vorbereiteten Abfrage.",
+        "edited": "Kapitellisten, die eine Person bearbeitet hat, zur Information angezeigt."
+      },
+      "library": "Bibliothek",
+      "allLibraries": "Alle Bibliotheken",
+      "found": "{count, plural, =0 {Hier keine Bücher} one {# Buch} other {# Bücher}}",
+      "emptyTitle": "Hier ist nichts",
+      "clearSelection": "Auswahl aufheben",
+      "row": {
+        "select": "{title} auswählen",
+        "facts": "{files, plural, one {# Datei} other {# Dateien}}; {chapters, plural, =0 {keine Kapitel} one {# Kapitel} other {# Kapitel}}; {library}",
+        "files": "{count, plural, one {# Datei} other {# Dateien}}",
+        "chapters": "{count, plural, =0 {keine Kapitel} one {# Kapitel} other {# Kapitel}}",
+        "noAsin": "Keine ASIN",
+        "review": "Prüfen",
+        "dismiss": "Verwerfen"
+      },
+      "reasons": {
+        "runtime_mismatch": "Die Laufzeit bei Audible weicht um {seconds} s von Ihren Dateien ab.",
+        "runtime_mismatch_long": "Die Laufzeit bei Audible weicht um {duration} von Ihren Dateien ab, daher handelt es sich wahrscheinlich um eine andere Ausgabe.",
+        "runtime_unknown": "Audible gibt für dieses Buch keine Laufzeit an, daher konnten die Zeiten nicht mit Ihren Dateien abgeglichen werden.",
+        "not_exact": "Audible kennzeichnet diese Zeiten nicht als exakt.",
+        "implausible": "Die Liste von Audible sieht nicht nach Kapiteln für dieses Buch aus.",
+        "unknown_length": "Die Länge dieses Buchs ist unbekannt.",
+        "locked": "Die Kapitel dieses Buches sind geschützt, daher wurde nichts ersetzt."
+      },
+      "lookup": {
+        "title": "Kapitel auf Audible suchen",
+        "description": "Fragt jedes Buch mit einer Audible-ASIN ab. Wenn Audible die Zeiten als exakt kennzeichnet und die Laufzeit zu Ihren Dateien passt, werden die Kapitel angewendet und geschützt, und die alte Liste bleibt im Verlauf des Buchs. Alles andere wartet unter „Prüfung erforderlich“.",
+        "lookUpCategory": "{count, plural, =0 {Kein Buch hier hat eine ASIN} one {Das # Buch mit ASIN abfragen} other {Die # Bücher mit ASIN abfragen}}",
+        "lookUpSelected": "{count, plural, one {# ausgewähltes Buch abfragen} other {# ausgewählte Bücher abfragen}}",
+        "waiting": "{count, plural, =0 {Wird abgeschlossen} one {# Buch wartet} other {# Bücher warten}}",
+        "current": "{title} wird abgefragt",
+        "idle": "Keine Abfragen in Warteschlange.",
+        "finished": "Abgeschlossen: {applied} angewendet, {review} zu prüfen, {notFound} nicht gefunden, {failed} fehlgeschlagen",
+        "stop": "Stoppen",
+        "clear": "Leeren",
+        "queued": "{count, plural, =0 {Kein Buch wurde eingereiht} one {# Buch eingereiht} other {# Bücher eingereiht}}",
+        "queuedWithSkipped": "{count, plural, =0 {Kein Buch wurde eingereiht} one {# Buch eingereiht} other {# Bücher eingereiht}}; {skipped, plural, one {# hatte keine ASIN} other {# hatten keine ASIN}}"
+      },
+      "errors": {
+        "load": "Der Kapitelzustand konnte nicht geladen werden.",
+        "enqueue": "Die Abfragen konnten nicht eingereiht werden.",
+        "cancel": "Die Abfragen konnten nicht geändert werden.",
+        "dismiss": "Die Prüfung konnte nicht ausgeblendet werden."
+      }
     }
   },
   "views": {
@@ -13186,6 +13716,7 @@
         "editMetadata": "Metadaten bearbeiten · {base}",
         "edit": "Bearbeiten · {base}",
         "files": "Dateien · {base}",
+        "chapters": "Kapitel · {base}",
         "readingLog": "Lesetagebuch · {base}",
         "highlights": "Markierungen · {base}"
       }
@@ -13980,6 +14511,17 @@
         "title": "Pageturner",
         "description": "Lies diesen Monat 500 Seiten"
       }
+    }
+  },
+  "setupOverview": {
+    "title": "Wie dies eingerichtet ist",
+    "navDescription": "Alle Abläufe, die BookOrbit für Sie ausführt, mit Ihren eigenen Einstellungen. Hier wird nichts geändert.",
+    "loading": "Die Einrichtung dieser Installation wird gelesen",
+    "empty": "Noch nichts eingerichtet. Fügen Sie eine Bibliothek und eine Ablage hinzu, damit sich dies füllt.",
+    "needYou": "{count, plural, one {# braucht Sie} other {# brauchen Sie}}",
+    "allClear": "Nichts braucht Sie",
+    "error": {
+      "title": "Dies konnte nicht gelesen werden"
     }
   }
 }
