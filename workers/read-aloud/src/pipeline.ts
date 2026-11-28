@@ -7,7 +7,6 @@ import { getModelDir, loadCtcModel, resolveCtcRun, type CtcRun } from "@storytel
 import type { ReadAloudStageDetail, ReadAloudStageUnit } from "@bookorbit/types";
 import { StageError, type Pipeline, type StageContext } from "./pipeline-contract.js";
 
-const ENGINE = "ctc-local";
 const MAX_SPLIT_HOURS = 2;
 /** Written only after every package file matched the registry and the model loaded. */
 const INSTALL_MARKER = ".bookorbit-installed";
@@ -20,6 +19,8 @@ type InstallModelPackage = (
 /** STAlign's own `pipeline --ctc` stages, called with the options Storyteller's server uses. */
 export const pipeline: Pipeline = {
   async modelInstalled(context) {
+    // A remote emission server installs and runs its own model.
+    if (context.job.ctcServer) return true;
     const run = ctcRun(context);
     return isInstalled(run) && existsSync(join(packageDir(run), INSTALL_MARKER));
   },
@@ -96,7 +97,9 @@ export const pipeline: Pipeline = {
     });
     const job = context.job;
     await emit(context.paths.processedAudioDir, context.paths.emissionsDir, {
-      engine: ENGINE,
+      engine: job.ctcServer ? "ctc-server" : "ctc-local",
+      serverUrl: job.ctcServer?.url,
+      serverApiKey: job.ctcServer?.apiKey ?? undefined,
       device: job.device,
       model: job.model,
       dtype: job.dtype,
@@ -110,7 +113,7 @@ export const pipeline: Pipeline = {
     if (cached > 0) {
       context.event("info", "emissions_cached", `Reused emissions for ${cached} of ${total} tracks`, { cached, tracks: total });
     }
-    return { data: { tracks: total, cached, device: job.device } };
+    return { data: { tracks: total, cached, device: job.ctcServer ? "server" : job.device } };
   },
 
   async markupEbook(context) {

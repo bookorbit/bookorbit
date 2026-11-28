@@ -87,6 +87,7 @@ test("config: binds to loopback and keeps temp files beside the job folder by de
   assert.equal(config.configuredDevice, "auto");
   assert.equal(config.dtype, null);
   assert.equal(config.batchSize, null);
+  assert.equal(config.ctcServer, null);
   assert.equal(loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_WORKER_HOST: "0.0.0.0" }).host, "0.0.0.0");
 });
 
@@ -95,6 +96,23 @@ test("config: rejects a short token and bad tuning values", () => {
   assert.throws(() => loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_DEVICE: "tpu" }), /READ_ALOUD_CTC_DEVICE/);
   assert.throws(() => loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_BATCH_SIZE: "100" }), /BATCH_SIZE/);
   assert.throws(() => loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_TMP_DIR: "tmp" }), /absolute/);
+});
+
+test("config: a remote emission server URL with an optional API key", () => {
+  const remote = loadConfig({
+    READ_ALOUD_WORKER_TOKEN: TOKEN,
+    READ_ALOUD_CTC_SERVER_URL: " http://gpu-box:8765/ ",
+    READ_ALOUD_CTC_SERVER_API_KEY: " secret ",
+  });
+  assert.deepEqual(remote.ctcServer, { url: "http://gpu-box:8765", apiKey: "secret" });
+  assert.deepEqual(loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_SERVER_URL: "https://gpu-box" }).ctcServer, {
+    url: "https://gpu-box",
+    apiKey: null,
+  });
+  assert.equal(loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_SERVER_URL: " " }).ctcServer, null);
+  assert.throws(() => loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_SERVER_URL: "gpu-box:8765" }), /http or https/);
+  assert.throws(() => loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_SERVER_URL: "ftp://gpu-box" }), /http or https/);
+  assert.throws(() => loadConfig({ READ_ALOUD_WORKER_TOKEN: TOKEN, READ_ALOUD_CTC_SERVER_API_KEY: "secret" }), /READ_ALOUD_CTC_SERVER_URL is not/);
 });
 
 test("data folders: only the worker's own temp subfolder is emptied, and a temp folder holding the jobs is refused", async () => {

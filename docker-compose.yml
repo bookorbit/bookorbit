@@ -99,6 +99,8 @@ services:
       READ_ALOUD_CTC_DEVICE: ${READ_ALOUD_CTC_DEVICE:-auto}
       READ_ALOUD_CTC_DTYPE: ${READ_ALOUD_CTC_DTYPE:-auto}
       READ_ALOUD_CTC_BATCH_SIZE: ${READ_ALOUD_CTC_BATCH_SIZE:-}
+      READ_ALOUD_CTC_SERVER_URL: ${READ_ALOUD_CTC_SERVER_URL:-}
+      READ_ALOUD_CTC_SERVER_API_KEY: ${READ_ALOUD_CTC_SERVER_API_KEY:-}
     depends_on:
       app:
         condition: service_healthy
