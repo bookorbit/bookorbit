@@ -32,6 +32,11 @@ export interface SafeRemoteHostOptions {
    * metadata service.
    */
   blockLinkLocal?: boolean;
+  /**
+   * How to find the host's addresses, for a source whose network profile names its own resolvers.
+   * Without it, the system resolver. Whatever it returns still has to pass the same policy.
+   */
+  resolveHost?: (hostname: string) => Promise<Array<{ address: string }>>;
 }
 
 export async function ensureSafeUrl(rawUrl: string, options?: SafeRemoteHostOptions): Promise<URL> {
@@ -78,9 +83,9 @@ export async function ensureSafeRemoteHost(hostname: string, options?: SafeRemot
     return;
   }
 
-  let resolved: any[];
+  let resolved: Array<{ address: string }>;
   try {
-    resolved = await lookup(normalizedHost, { all: true, verbatim: true });
+    resolved = options?.resolveHost ? await options.resolveHost(normalizedHost) : await lookup(normalizedHost, { all: true, verbatim: true });
   } catch {
     throw new RemoteHostResolutionException();
   }
