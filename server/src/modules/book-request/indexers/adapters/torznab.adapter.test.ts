@@ -202,6 +202,21 @@ describe('TorznabAdapter', () => {
     expect(release.leechers).toBe(8);
   });
 
+  it.each([
+    ['MyAnonamouse', 'Dune by Frank Herbert [EN / EPUB] [VIP]', true],
+    ['MyAnonamouse', 'Dune [VIP] by Frank Herbert [EN / EPUB]', undefined],
+    ['Cardigann', 'Dune by Frank Herbert [EN / EPUB] [VIP]', undefined],
+    [undefined, 'Dune by Frank Herbert [EN / EPUB] [VIP]', undefined],
+  ] as const)('reads the trailing VIP flag only on managed MAM feeds (%s, %s)', async (managerImplementation, title, vipOnly) => {
+    fetchMock.mockResolvedValue(new Response(feed(ITEM.replace('Dune - Frank Herbert (retail) [EPUB]', title))));
+
+    const [release] = await new TorznabAdapter().search(query(), config({ managerImplementation }), AbortSignal.timeout(1000));
+
+    expect(release.title).toBe(title);
+    expect(release.vipOnly).toBe(vipOnly);
+    expect(release.freeleech).toBe(true);
+  });
+
   /**
    * Jackett reuses the tracker's download link as the guid for some trackers, and a private
    * tracker's download link carries the passkey. The guid is what the picker holds on to, so it

@@ -16,6 +16,7 @@ export interface ResolvedIndexerConfig {
   id: number;
   managerId: number | null;
   managerPriority: number | null;
+  managerImplementation?: string;
   name: string;
   /** The operator's colour for this source, carried so a search status can report it unlooked-up. */
   color: IndexerColor | null;

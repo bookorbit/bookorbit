@@ -82,7 +82,7 @@ export class TorznabAdapter implements IndexerAdapter {
     if (categories.length > 0) params.set('cat', categories.join(','));
 
     const xml = await this.callXml(config, params, signal);
-    return parseItems(xml, config.id);
+    return parseItems(xml, config.id, config.managerImplementation === 'MyAnonamouse');
   }
 
   async test(config: ResolvedIndexerConfig): Promise<IndexerTestResult> {
@@ -257,7 +257,7 @@ function readErrorElement(body: string): { failure: 'unauthorized' | 'error'; de
   return { failure: Number.isFinite(code) && code >= 100 && code < 200 ? 'unauthorized' : 'error', description };
 }
 
-function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
+function parseItems(xml: string, indexerId: number, isProwlarrMam: boolean): ReleaseCandidate[] {
   const parsed = parser.parse(xml) as { rss?: { channel?: { item?: TorznabItem | TorznabItem[] } } };
   // Bounded before the loop, so an item count nobody asked for costs one slice rather than a pass.
   const items = toArray(parsed.rss?.channel?.item).slice(0, MAX_FEED_ITEMS);
@@ -309,6 +309,8 @@ function parseItems(xml: string, indexerId: number): ReleaseCandidate[] {
       ...(attrs.get('language') ? { language: attrs.get('language') } : {}),
       // Torznab reports freeleech as a downloadvolumefactor of 0: the release costs no download.
       freeleech: toNumber(attrs.get('downloadvolumefactor')) === 0,
+      // Prowlarr appends the MAM VIP flag to the title because its feed has no dedicated field.
+      ...(isProwlarrMam && title.endsWith(' [VIP]') ? { vipOnly: true } : {}),
       ...(publishedAt ? { publishedAt } : {}),
       ...(fileCount !== null ? { fileCount } : {}),
       ...(seedRatioGoal !== undefined ? { seedRatioGoal } : {}),

@@ -271,6 +271,7 @@ export class IndexerConfigService {
       id: row.id,
       managerId: row.managerId,
       managerPriority: row.managerMetadata?.priority ?? null,
+      managerImplementation: managed ? (row.managerMetadata?.implementation ?? undefined) : undefined,
       name: managed ? (row.managerMetadata?.displayName ?? row.name) : row.name,
       color: row.color ?? null,
       adapterType: row.adapterType as IndexerAdapterType,
