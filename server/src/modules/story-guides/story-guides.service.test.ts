@@ -256,16 +256,18 @@ describe('StoryGuidesService.status', () => {
       allowed: false,
       reason: 'language',
       language: 'pt',
-      languages: ['en', 'es'],
+      languages: ['en', 'es', 'hu'],
     });
     const undetermined = setup({ text: textRow({ language: 'und' }) });
     expect((await undetermined.service.status(3, undefined, admin)).status.build).toEqual({
       allowed: false,
       reason: 'language',
-      languages: ['en', 'es'],
+      languages: ['en', 'es', 'hu'],
     });
     const spanish = setup({ text: textRow({ language: 'es' }) });
     expect((await spanish.service.status(3, undefined, admin)).status.build).toEqual({ allowed: true });
+    const hungarian = setup({ text: textRow({ language: 'hu' }) });
+    expect((await hungarian.service.status(3, undefined, admin)).status.build).toEqual({ allowed: true });
   });
 
   it('answers 404 for a file of another book', async () => {

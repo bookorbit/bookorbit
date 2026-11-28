@@ -2,7 +2,7 @@ import type { AiStep, AiStepRequest } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson } from './json-reply';
 import { entityKind } from './merge-step';
-import { WORD_CHAR, escapeRegExp, isNumberOnly, mostCommon, nameKey, namesConflict, ownWords, splitWords } from './name-text';
+import { callingWords, isNumberOnly, mostCommon, nameKey, namePattern, namesConflict, ownWords, splitWords } from './name-text';
 import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import { mergeResult, passageOrder, textResult } from './step-context';
 import type { StoryGuideSubject } from './story-guide-subject';
@@ -194,7 +194,7 @@ export function applyReview(
   text: TextStepResult,
   lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
 ): StoryReviewResult {
-  const { titles, namePrefixWords, honorificOnly, nameFold } = lexicon;
+  const { titles, namePrefixWords, honorificOnly, nameFold, eitherNameOrder: either } = lexicon;
   const entities = merge.entities;
   const order = passageOrder(text);
   const chapterOf = new Map(text.passages.map((passage) => [passage.id, passage.chapter]));
@@ -211,20 +211,29 @@ export function applyReview(
       .map(nameFold);
 
   // A one-word name that is the surname of two or more people ("Drebber") never joins anyone. People
-  // are counted by review group, and only names with a personal name before the surname count.
-  const personal = (entity: StoryMergedEntity) =>
+  // are counted by review group, and only names with a personal name before the surname count. Where
+  // names come in either order, either end of a name may be its surname.
+  const untitled = (entity: StoryMergedEntity) =>
     splitWords(entity.name)
-      .slice(0, -1)
-      .some((word) => !titles.has(word.replace(/^\.+|\.+$/g, '').toLowerCase()));
+      .map((word) => word.toLowerCase())
+      .filter((word) => !titles.has(word.replace(/^\.+|\.+$/g, '')));
+  const personal = (entity: StoryMergedEntity) =>
+    either
+      ? untitled(entity).length >= 2
+      : splitWords(entity.name)
+          .slice(0, -1)
+          .some((word) => !titles.has(word.replace(/^\.+|\.+$/g, '').toLowerCase()));
   const groupOf = new Map<number, number>();
   groups.forEach((group, index) => group.ids.forEach((id) => groupOf.has(id) || groupOf.set(id, index)));
   const surnamePeople = new Map<string, Set<string>>();
   for (const entity of entities) {
     if (kind(entity.id) !== 'character' || splitWords(entity.name).length <= 1 || !personal(entity)) continue;
-    const surname = splitWords(entity.name).at(-1)!.toLowerCase();
-    const people = surnamePeople.get(surname) ?? new Set<string>();
-    people.add(groupOf.has(entity.id) ? `group ${groupOf.get(entity.id)}` : `alone ${entity.id}`);
-    surnamePeople.set(surname, people);
+    const surnames = either ? callingWords(untitled(entity), true) : [splitWords(entity.name).at(-1)!.toLowerCase()];
+    for (const surname of surnames) {
+      const people = surnamePeople.get(surname) ?? new Set<string>();
+      people.add(groupOf.has(entity.id) ? `group ${groupOf.get(entity.id)}` : `alone ${entity.id}`);
+      surnamePeople.set(surname, people);
+    }
   }
   const shared = (id: number) => {
     const entity = entities[id];
@@ -232,6 +241,7 @@ export function applyReview(
     if (splitWords(entity.name).length !== 1 || (surnamePeople.get(surname)?.size ?? 0) < 2) return false;
     return entity.names.every((name) => {
       const words = nameKey(name.key).split(' ');
+      if (either) return words.includes(surname) && words.every((word) => word === surname || titles.has(word));
       return words.at(-1) === surname && words.slice(0, -1).every((word) => titles.has(word));
     });
   };
@@ -243,6 +253,27 @@ export function applyReview(
 
   const blocked = new Map<string, { id: number; reason: StoryReviewBlockReason }>();
   const block = (id: number, reason: StoryReviewBlockReason) => blocked.set(`${id} ${reason}`, { id, reason });
+  // The names of people split off a group, which a one-word member then no longer stands for: their
+  // first names, and surnames no kept member has. Where names come in either order, every word of theirs
+  // no kept member has.
+  const leftNames = (left: readonly number[], kept: readonly number[]) => {
+    const staySurnames = new Set(kept.flatMap((id) => fullName(id)?.slice(-1) ?? []));
+    return new Set([
+      ...left.map((id) => fullName(id)![0]),
+      ...left.map((id) => fullName(id)!.at(-1)!).filter((surname) => !staySurnames.has(surname)),
+    ]);
+  };
+  const leftWords = (left: readonly number[], kept: readonly number[]) => {
+    const stay = new Set(kept.flatMap((id) => fullName(id) ?? []));
+    return new Set(left.flatMap((id) => fullName(id)!).filter((word) => !stay.has(word)));
+  };
+
+  // Where names come in either order, no word is known to be the first name, so two names that share a
+  // word are left to the review: a nickname ("Kőrössy Tyutyu") or a married surname ("Erőss Márta" for
+  // "Harmat Márta") differs from the full name in its other word just as a relative does.
+  const anotherPerson = (mine: readonly string[], theirs: readonly string[]) =>
+    either ? !mine.some((word) => theirs.includes(word)) && namesConflict(mine, theirs, true) : namesConflict(mine, theirs);
+
   const links: Link[] = [];
 
   for (const group of groups) {
@@ -258,14 +289,10 @@ export function applyReview(
     for (const id of [...candidates].sort((a, b) => entities[b].passages.length - entities[a].passages.length)) {
       const mine = fullName(id);
       const theirs = kept.map(fullName).filter((name): name is string[] => name !== null);
-      if (mine && theirs.length > 0 && theirs.every((name) => namesConflict(mine, name))) left.push(id);
+      if (mine && theirs.length > 0 && theirs.every((name) => anotherPerson(mine, name))) left.push(id);
       else kept.push(id);
     }
-    const staySurnames = new Set(kept.flatMap((id) => fullName(id)?.slice(-1) ?? []));
-    const gone = new Set([
-      ...left.map((id) => fullName(id)![0]),
-      ...left.map((id) => fullName(id)!.at(-1)!).filter((surname) => !staySurnames.has(surname)),
-    ]);
+    const gone = either ? leftWords(left, kept) : leftNames(left, kept);
     left.push(...kept.filter((id) => bareWords(id).length === 1 && gone.has(bareWords(id)[0])));
     kept = kept.filter((id) => !left.includes(id));
     left.forEach((id) => block(id, 'another-person'));
@@ -282,6 +309,7 @@ export function applyReview(
           members.filter((other) => other !== id),
           text,
           group.modelFrom,
+          lexicon.nameInflection,
         );
         if (quote) links.push({ members: [id, quote.partner], at: quote.at, chapter: chapterOf.get(quote.at.passage)!, reveal: true });
         else block(id, 'reveal-without-quote');
@@ -311,6 +339,7 @@ function revealQuote(
   partners: readonly number[],
   text: TextStepResult,
   fromChapter: number,
+  inflection: StoryLexicon['nameInflection'],
 ): { at: PassageSpan; partner: number } | null {
   const mine = entities[id].names.map((name) => name.text);
   const theirs = partners.flatMap((partner) => entities[partner].names.map((name) => ({ text: name.text, partner })));
@@ -319,8 +348,8 @@ function revealQuote(
     let best: { start: number; end: number; partner: number } | null = null;
     let lineStart = 0;
     for (const line of passage.text.split('\n')) {
-      const own = occurrences(line, mine);
-      const other = theirs.flatMap(({ text: name, partner }) => occurrences(line, [name]).map((found) => ({ ...found, partner })));
+      const own = occurrences(line, mine, inflection);
+      const other = theirs.flatMap(({ text: name, partner }) => occurrences(line, [name], inflection).map((found) => ({ ...found, partner })));
       for (const a of own) {
         for (const b of other) {
           if (a.start < b.end && b.start < a.end) continue;
@@ -341,14 +370,12 @@ function revealQuote(
   return null;
 }
 
-/** Whole-word occurrences of any of the names, comparing apostrophes as one. */
-function occurrences(line: string, names: readonly string[]): { start: number; end: number }[] {
+/** Whole-word occurrences of any of the names, comparing apostrophes as one, with their case endings where names inflect. */
+function occurrences(line: string, names: readonly string[], inflection: StoryLexicon['nameInflection']): { start: number; end: number }[] {
   const folded = line.replace(/’/g, "'");
   return names.flatMap((name) => {
-    const target = name.replace(/’/g, "'");
-    if (!target) return [];
-    const pattern = new RegExp(`(?<!${WORD_CHAR})${escapeRegExp(target)}(?!${WORD_CHAR})`, 'gu');
-    return [...folded.matchAll(pattern)].map((match) => ({ start: match.index, end: match.index + target.length }));
+    if (!name) return [];
+    return [...folded.matchAll(namePattern(name, inflection))].map((match) => ({ start: match.index, end: match.index + match[0].length }));
   });
 }
 

@@ -19,6 +19,11 @@ const spanish = [
     'Él tenía miedo de lo que diría su padre, pero ella sabía que la carta había llegado por una razón. ' +
     'En la casa, las ventanas estaban abiertas y el viento pasaba sobre la mesa donde habíamos dejado los libros. ',
 ].map((text) => text.repeat(30));
+const hungarian = [
+  'A reggel tiszta volt, és a város még aludt. Ő az utcán sétált a bátyjával, és nem beszéltek. ' +
+    'Félt attól, hogy mit mond majd az apjuk, de tudta, hogy a levél nem véletlenül érkezett meg. ' +
+    'A házban az ablakok nyitva voltak, és a szél végigsöpört az asztalon, ahol a könyveket hagytuk. ',
+].map((text) => text.repeat(30));
 const russian = ['Утро было ясным, и город ещё спал. Она шла по улице со своим братом, и они молчали. '.repeat(60)];
 
 describe('story language', () => {
@@ -35,6 +40,9 @@ describe('story language', () => {
     ['Français', 'fr'],
     ['francais', 'fr'],
     ['Deutsch', 'de'],
+    ['hun', 'hu'],
+    ['Magyar', 'hu'],
+    ['Hungarian', 'hu'],
     ['und', null],
     ['mul', null],
     ['', null],
@@ -45,10 +53,11 @@ describe('story language', () => {
     expect(normaliseLanguage(value)).toBe(code);
   });
 
-  it('tells English, French and Spanish text apart by common words', () => {
+  it('tells English, French, Spanish and Hungarian text apart by common words', () => {
     expect(detectLanguage(english)).toBe('en');
     expect(detectLanguage(french)).toBe('fr');
     expect(detectLanguage(spanish)).toBe('es');
+    expect(detectLanguage(hungarian)).toBe('hu');
     expect(detectLanguage(russian)).toBeNull();
     expect(detectLanguage(['too short'])).toBeNull();
   });
@@ -65,6 +74,7 @@ describe('story language', () => {
     expect(storyLanguage([], english)).toBe('en');
     expect(storyLanguage(['und'], english)).toBe('en');
     expect(storyLanguage([], spanish)).toBe('es');
+    expect(storyLanguage([], hungarian)).toBe('hu');
     expect(storyLanguage([], ['short'])).toBe('und');
   });
 
@@ -75,9 +85,10 @@ describe('story language', () => {
     expect(storyLanguage(['en'], russian)).toBe('und');
   });
 
-  it('builds guides in English and Spanish only', () => {
+  it('builds guides in English, Spanish and Hungarian only', () => {
     expect(isStoryGuideLanguage('en')).toBe(true);
     expect(isStoryGuideLanguage('es')).toBe(true);
+    expect(isStoryGuideLanguage('hu')).toBe(true);
     expect(isStoryGuideLanguage('fr')).toBe(false);
     expect(isStoryGuideLanguage('pt')).toBe(false);
     expect(isStoryGuideLanguage('und')).toBe(false);

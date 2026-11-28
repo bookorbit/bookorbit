@@ -4,7 +4,7 @@ import { askForJson, parseJsonReply } from './json-reply';
 import { isPlaceholder, laterNames, linesRows, linesUnits, namedLater, type LineNames, type LinesUnit } from './lines-step';
 import { nameKey, splitWords } from './name-text';
 import { mergeResult, reviewResult, textResult } from './step-context';
-import { ENGLISH_STORY_LEXICON, storyLexicon } from './story-lexicon';
+import { ENGLISH_STORY_LEXICON, storyLexicon, writingIn, type StoryLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
 import type {
   StoryDroppedProfile,
@@ -136,9 +136,9 @@ export function profilesUser(chapter: string, rows: readonly ProfilesRow[]): str
   return `<chapter>\n${chapter}\n</chapter>\n\nCharacters:\n${rows.map(rowLine).join('\n')}`;
 }
 
-export function profilesRequest(chapter: string, rows: readonly ProfilesRow[]): AiStepRequest {
+export function profilesRequest(chapter: string, rows: readonly ProfilesRow[], lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): AiStepRequest {
   return {
-    system: PROFILES_SYSTEM,
+    system: writingIn(PROFILES_SYSTEM, lexicon, 'every profile'),
     user: profilesUser(chapter, rows),
     schema: PROFILES_SCHEMA,
     maxOutputTokens: PROFILES_MAX_OUTPUT_TOKENS,
@@ -172,9 +172,16 @@ export function profileProblem(profile: string, names: LineNames): { reason: Sto
 }
 
 /** The one rewrite of the profiles that failed a check. It needs no chapter: it only cuts or renames. */
-export function profilesRewriteRequest(failed: readonly { row: ProfilesRow; profile: string; detail: string }[]): AiStepRequest {
+export function profilesRewriteSystem(lexicon: StoryLexicon = ENGLISH_STORY_LEXICON): string {
+  return writingIn(PROFILES_REWRITE_SYSTEM, lexicon, 'every profile');
+}
+
+export function profilesRewriteRequest(
+  failed: readonly { row: ProfilesRow; profile: string; detail: string }[],
+  lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
+): AiStepRequest {
   const user = failed.map((item) => `- ${item.row.name}: "${item.profile}" (${item.detail})`).join('\n');
-  return { system: PROFILES_REWRITE_SYSTEM, user, schema: PROFILES_SCHEMA, maxOutputTokens: PROFILES_MAX_OUTPUT_TOKENS, effort: 'medium' };
+  return { system: profilesRewriteSystem(lexicon), user, schema: PROFILES_SCHEMA, maxOutputTokens: PROFILES_MAX_OUTPUT_TOKENS, effort: 'medium' };
 }
 
 /** Every profile after the units so far, by entity: each unit's changes applied in order. */
@@ -199,7 +206,8 @@ export async function writeProfiles(
 ): Promise<StoryProfilesResult> {
   const result: StoryProfilesResult = { through, profiles: [], dropped: [], rewritten: 0 };
   if (rows.length === 0) return result;
-  const answer = await askForJson(ctx, profilesRequest(chapter, rows), readProfilesAnswer);
+  const lexicon = later.lexicon ?? ENGLISH_STORY_LEXICON;
+  const answer = await askForJson(ctx, profilesRequest(chapter, rows, lexicon), readProfilesAnswer);
   const failed: { row: ProfilesRow; profile: string; detail: string; reason: StoryProfileDropReason }[] = [];
   const written = new Set<number>();
   const accept = (row: ProfilesRow, profile: string) => {
@@ -216,7 +224,7 @@ export async function writeProfiles(
 
   if (failed.length > 0) {
     result.rewritten = failed.length;
-    const reply = await ctx.complete(profilesRewriteRequest(failed));
+    const reply = await ctx.complete(profilesRewriteRequest(failed, lexicon));
     const parsed = parseJsonReply(reply.text);
     const rewritten = (parsed && readProfilesAnswer(parsed)) ?? new Map<string, string>();
     for (const item of failed) {
@@ -267,8 +275,9 @@ export function profilesAiStep(): AiStep<StoryGuideSubject> {
     units: (ctx) => linesUnits(textResult(ctx)).units.map((unit) => ({ id: unit.id })),
     fingerprint: (ctx, unit) => {
       const { rows, chapter } = prepare(ctx, unit.id);
-      const request = profilesRequest(chapter, rows);
-      return hashOf('profiles', unit.id, request.system, request.user, PROFILES_REWRITE_SYSTEM, PROFILES_SCHEMA);
+      const lexicon = storyLexicon(ctx.subject.text.language);
+      const request = profilesRequest(chapter, rows, lexicon);
+      return hashOf('profiles', unit.id, request.system, request.user, profilesRewriteSystem(lexicon), PROFILES_SCHEMA);
     },
     async run(ctx, unit) {
       const { unit: profilesUnit, text, merge, rows, chapter } = prepare(ctx, unit.id);

@@ -47,8 +47,28 @@ export interface StoryLexicon {
   firstPersonWords: readonly string[];
   nameToken: RegExp;
   quoteEdgeChars: string;
-  /** A name word as names are compared: Spanish spells one name with and without its accents ("Cárlos", "Carlos"). */
+  /**
+   * A name word as names are compared: Spanish spells one name with and without its accents ("Cárlos", "Carlos"),
+   * older Hungarian typesetting prints "Ernő" as "Ernö".
+   */
   nameFold: (word: string) => string;
+  /**
+   * For a language whose names take case endings in the text: a regex source for an already escaped
+   * name with the endings it can carry ("Boka", "Bokát"). Null where names stand as they are.
+   */
+  nameInflection: ((escapedName: string) => string) | null;
+  /**
+   * The bare forms an inflected name could stand for, for a language whose names take case endings
+   * ("Bokát" could be "Boka", "Kunt" could be "Kun"). Empty where names stand as they are.
+   */
+  caseStems: (name: string) => string[];
+  /** A rule the names prompt adds for the language; null for none. */
+  namesRule: string | null;
+  /**
+   * Whether a book's names come in either order: Hungarian writes its own family name first ("Boka
+   * János") and keeps the original order for translated ones ("Sherlock Holmes").
+   */
+  eitherNameOrder: boolean;
 }
 
 function anyCase(word: string): string {
@@ -127,6 +147,10 @@ export const ENGLISH_STORY_LEXICON: StoryLexicon = {
   nameToken: /[A-Za-z][\p{L}\p{N}_']*/gu,
   quoteEdgeChars: EN_QUOTE_EDGE_CHARS,
   nameFold: (word) => word,
+  nameInflection: null,
+  caseStems: () => [],
+  namesRule: null,
+  eitherNameOrder: false,
 };
 
 // Spanish. Words are given with and without accents, since older texts and OCR drop them.
@@ -243,9 +267,141 @@ export const SPANISH_STORY_LEXICON: StoryLexicon = {
       .normalize('NFD')
       .replace(/[\u0300-\u0302\u0308]/gu, '')
       .normalize('NFC'),
+  nameInflection: null,
+  caseStems: () => [],
+  namesRule: null,
+  eitherNameOrder: false,
 };
 
-const LEXICONS: Readonly<Record<string, StoryLexicon>> = { en: ENGLISH_STORY_LEXICON, es: SPANISH_STORY_LEXICON };
+// Hungarian. Titles and kin words follow the name ("Kovács úr", "Mari néni"), names take case
+// endings ("Nemecseknek", "Bokát"), and pronouns do not tell he from she.
+const HU_TITLES = words(
+  'úr ur asszony kisasszony néni bácsi özvegy özv dr id ifj idősebb ifjabb gróf grófnő báró bárónő herceg hercegnő ' +
+    'király királyné királynő királyfi királylány kapitány tábornok ezredes őrnagy hadnagy főhadnagy százados ' +
+    'nagynéni nagybácsi nagyapa nagyanya nagymama nagypapa tanár tanító doktor mester a az',
+);
+const HU_NAME_PREFIX_WORDS = words(
+  'felügyelő főfelügyelő nyomozó rendőr főkapitány őrmester törzsőrmester főtörzsőrmester tizedes alezredes vezérőrnagy bíró polgármester elnök miniszter szenátor professzor tanárnő tanítónő ' +
+    'orvos ápoló ápolónő tiszteletes plébános pap atya páter püspök érsek bíboros szent szt császár császárné főnök ' +
+    'ügyvéd jegyző',
+);
+const HU_HONORIFIC_ONLY = words(
+  'felség felséges őfelsége fenség fenséges őfensége méltóság méltóságos kegyelmes nagyságos tekintetes excellenciás ' +
+    'eminenciás uram asszonyom ön önök maga őrség őr őrök',
+);
+const HU_HONORIFICS = words('dr özv id ifj úr asszony kisasszony néni bácsi doktor tanár');
+const HU_FAMILY_AND_ROLE_WORDS = words(
+  'apa anya apu anyu apuka anyuka papa mama édesapa édesanya nagyapa nagyanya nagymama nagypapa nagyi nagynéni nagybácsi ' +
+    'néni bácsi úr asszony kisasszony király királyné királynő herceg hercegnő tábornok ezredes doktor kapitány tanár mester',
+);
+const HU_ROLE_ONLY = words('apám anyám apukám anyukám édesapám édesanyám uram asszonyom fiam lányom öreg öregem a az');
+const HU_CALENDAR = words(
+  'hétfő kedd szerda csütörtök péntek szombat vasárnap január február március április május június július augusztus ' +
+    'szeptember október november december',
+);
+// Written as one word: "huszonhárom", "kétszáz".
+const HU_NUMBER_PARTS =
+  'nulla|egy|kettő|két|három|négy|öt|hat|hét|nyolc|kilenc|tíz|tizen|húsz|huszon|harminc|negyven|ötven|hatvan|hetven|' +
+  'nyolcvan|kilencven|száz|ezer';
+const HU_KIN_TITLES = '(?:néni|bácsi|nagynéni|nagybácsi)';
+const HU_FAMILY =
+  `ap(?:a|ja|ám|ád|juk|ának|át|ával|u|uka|uká${WORD_CHAR}*)|any(?:a|ja|ám|ád|juk|ának|át|ával|u|uka|uká${WORD_CHAR}*)|` +
+  `édesap${WORD_CHAR}*|édesany${WORD_CHAR}*|szül(?:ő|ei|eim|eid|einek|eit|ők|őket|őknek)${WORD_CHAR}*|` +
+  `fi(?:a|am|ad|ai|aim|ait|át|ának|ával|uk|unk)|lány(?:a|om|od|ai|aim|át|ának|ával|uk|unk)|gyerek${WORD_CHAR}*|gyermek${WORD_CHAR}*|` +
+  `testvér${WORD_CHAR}*|báty${WORD_CHAR}*|öcs${WORD_CHAR}*|öccs${WORD_CHAR}*|húg${WORD_CHAR}*|nővér${WORD_CHAR}*|iker|ikr${WORD_CHAR}*|` +
+  `férj${WORD_CHAR}*|feleség${WORD_CHAR}*|házas${WORD_CHAR}*|esküv${WORD_CHAR}*|özvegy${WORD_CHAR}*|jegyes${WORD_CHAR}*|` +
+  `menyasszony${WORD_CHAR}*|vőlegény${WORD_CHAR}*|eljegyz${WORD_CHAR}*|nagyap${WORD_CHAR}*|nagyany${WORD_CHAR}*|nagymam${WORD_CHAR}*|` +
+  `nagypap${WORD_CHAR}*|nagynén${WORD_CHAR}*|nagybác${WORD_CHAR}*|nagybáty${WORD_CHAR}*|unok${WORD_CHAR}*|déd${WORD_CHAR}*|` +
+  `mostoh${WORD_CHAR}*|após${WORD_CHAR}*|anyós${WORD_CHAR}*|sógor${WORD_CHAR}*|sógornő${WORD_CHAR}*|menye|vej${WORD_CHAR}*|` +
+  `család${WORD_CHAR}*|rokon${WORD_CHAR}*|örökös${WORD_CHAR}*|elsőszülött${WORD_CHAR}*|árva${WORD_CHAR}*`;
+// The kin words with a possessive ending: "nagynénje" (her aunt), "nagyapám" (my grandfather).
+const HU_POSSESSIVE_KIN = `${WORD_EDGE}(?:nagyné(?:né|nj)|nagybáty[jáo]|nagyany[jáo]|nagyap[jáo]|nagymamá|nagypapá|unokatestvér[eéü]|nénj|bátyj)${WORD_CHAR}*`;
+const HU_FIRST_PERSON =
+  'én|engem|nekem|velem|tőlem|rólam|rám|hozzám|nálam|bennem|belém|belőlem|rajtam|mellettem|előttem|mögöttem|' +
+  'utánam|körülöttem|enyém|magam|magamat|magamnak|magamban|magammal';
+const HU_THIRD_PERSON =
+  'ő|őt|ők|őket|neki|nekik|vele|velük|tőle|tőlük|róla|róluk|rá|rájuk|hozzá|hozzájuk|nála|náluk|benne|bennük|' +
+  'belőle|rajta|rajtuk|mellette|előtte|mögötte|övé|övék';
+const HU_CASE_ENDING = '-?\\p{Ll}{1,8}';
+// Case endings only, not plurals ("Radomirék" is the family) or derived words ("Keleti"), and not a
+// bare "-n", which surnames end with ("Moldován" is not "Moldova").
+const HU_CASE_SUFFIXES =
+  'nak nek ban ben ba be ból ből ra re ról ről on en ön hoz hez höz tól től nál nél val vel ig ért ként vá vé at et ot öt t'.split(' ');
+
+function hungarianCaseStems(name: string): string[] {
+  const stems = new Set<string>();
+  for (const suffix of HU_CASE_SUFFIXES) {
+    if (!name.endsWith(suffix)) continue;
+    const stem = name.slice(0, -suffix.length).replace(/-$/u, '');
+    if (stem.length < 3) continue;
+    stems.add(stem);
+    // A final a or e lengthens before an ending: "Bokát" is "Boka".
+    if (/[áé]$/u.test(stem)) stems.add(`${stem.slice(0, -1)}${stem.endsWith('á') ? 'a' : 'e'}`);
+  }
+  // "-val" and "-vel" take the sound of a final consonant: "Kunnal" is "Kun".
+  if (/(\p{L})\1[ae]l$/u.test(name)) stems.add(name.slice(0, -3));
+  return [...stems];
+}
+
+const HU_TITLE_SET = union(TITLES, HU_TITLES);
+const HU_HONORIFIC_SET = union(HONORIFICS, HU_HONORIFICS);
+const HU_FAMILY_SET = union(FAMILY_AND_ROLE_WORDS, HU_FAMILY_AND_ROLE_WORDS);
+
+export const HUNGARIAN_STORY_LEXICON: StoryLexicon = {
+  language: 'hu',
+  writeIn: 'Hungarian',
+  titles: HU_TITLE_SET,
+  namePrefixWords: union(NAME_PREFIX_WORDS, HU_NAME_PREFIX_WORDS),
+  honorificOnly: union(HONORIFIC_ONLY, HU_HONORIFIC_ONLY),
+  honorifics: HU_HONORIFIC_SET,
+  familyAndRoleWords: HU_FAMILY_SET,
+  roleOnly: union(EN_ROLE_ONLY, [...HU_FAMILY_AND_ROLE_WORDS, ...HU_ROLE_ONLY]),
+  calendar: union(EN_CALENDAR, HU_CALENDAR),
+  connectives: new Set(['the', 'and', 'a', 'az', 'egy', 'és', 's']),
+  numberOnly: new RegExp(`^(?:\\d+|(?:${HU_NUMBER_PARTS})+(?:[- ](?:${HU_NUMBER_PARTS})+)*)$`, 'iu'),
+  houseWords: ['house'],
+  run: capitalRun(`${EN_HONORIFIC_PREFIX}|Id|Ifj|Özv|Szt`, '\\p{Lu}'),
+  // Hungarian quotes open low („) and set inner quotes in guillemets either way round; dialogue opens with a dash.
+  sentenceStart: /(?:^|[.!?…]["”’»«]?\s+|["“„«»—–―]\s*)\n?$/u,
+  lowerWord: new RegExp(`(?<!${WORD_CHAR})\\p{Ll}[\\p{L}\\p{N}_’'-]*`, 'gu'),
+  // The polite "Ön" is capitalised mid-sentence without naming anyone.
+  pronounRuns: new Set(['Ön', 'Önök', 'Önt', 'Önnek', 'Önnel', 'Öntől', 'Önről', 'Dr', 'Id', 'Ifj', 'Özv']),
+  // A line that opens with a dash is dialogue, the speaker's tag included.
+  dialogue: /„[^”"\n]*[”"]|“[^”]*”|"[^"\n]*"|»[^«]*«|«[^»]*»|^[ \t]*[—–―].*$/gmu,
+  firstPerson: new RegExp(`${WORD_EDGE}(?:${HU_FIRST_PERSON})${WORD_EDGE}`, 'giu'),
+  thirdPerson: new RegExp(`${WORD_EDGE}(?:${HU_THIRD_PERSON})${WORD_EDGE}`, 'giu'),
+  narrator: new RegExp(`${WORD_EDGE}(?:the narrator|narrátor${WORD_CHAR}*|elbeszélő${WORD_CHAR}*)${WORD_EDGE}`, 'iu'),
+  hedge: new RegExp(`${WORD_EDGE}(?:or|vagy|avagy)${WORD_EDGE}`, 'iu'),
+  placeholder:
+    /^(?:none|unknown|n\/?a|no (?:identity )?line|not (?:stated|known)|nincs(?: adat| információ| sor)?|ismeretlen|nem ismert|nem tudni|semmi)$/iu,
+  kinTitle: new RegExp(`${WORD_EDGE}(?:${EN_KIN_WORDS.map(anyCase).join('|')})\\s+\\p{Lu}|\\p{Lu}${WORD_CHAR}*\\s+${HU_KIN_TITLES}${WORD_EDGE}`, 'u'),
+  familyWords: new RegExp(`${WORD_EDGE}(?:${EN_FAMILY}|${HU_FAMILY})${WORD_EDGE}`, 'iu'),
+  possessiveKin: new RegExp(`${EN_POSSESSIVE_KIN}|${HU_POSSESSIVE_KIN}`, 'iu'),
+  // The kin word may stand alone or after the name: "Nagyapa", "Mari néni".
+  elderTitle: {
+    aunt_or_uncle_of: new RegExp(`^${EN_AUNT_OR_UNCLE}${WORD_EDGE}|(?:^|\\s)${HU_KIN_TITLES}$`, 'iu'),
+    grandparent_of: new RegExp(`^${EN_GRANDPARENT}${WORD_EDGE}|(?:^|\\s)(?:nagyapa|nagyanya|nagymama|nagypapa|nagyi|öregapó|öreganyó)$`, 'iu'),
+  },
+  tieStop: new Set([...HU_HONORIFIC_SET, ...HU_FAMILY_SET, 'the', 'of', 'and', 'mr', 'mrs', 'ms', 'miss', 'a', 'az', 'egy', 'és']),
+  firstPersonWords: words(HU_FIRST_PERSON.replace(/\|/g, ' ')),
+  nameToken: /\p{L}[\p{L}\p{N}_']*/gu,
+  quoteEdgeChars: `${EN_QUOTE_EDGE_CHARS}„”»«`,
+  // Older typesetting and Latin-1 text print "ő" and "ű" as "ö", "õ" or "ô" and "ü", "û" or "ũ": "Ernő" is "Ernö".
+  nameFold: (word) => word.normalize('NFC').replace(/[őõô]/gu, 'ö').replace(/[űûũ]/gu, 'ü'),
+  // A final a or e lengthens before an ending: "Boka", "Bokát", "Bokának".
+  nameInflection: (escaped) => {
+    const lengthened = /[ae]$/u.test(escaped) ? `|${escaped.slice(0, -1)}${escaped.endsWith('a') ? 'á' : 'é'}(?:${HU_CASE_ENDING})` : '';
+    return `(?:${escaped}(?:${HU_CASE_ENDING})?${lengthened})`;
+  },
+  caseStems: hungarianCaseStems,
+  namesRule:
+    'Names in Hungarian take case endings ("Nemecseknek", "Bokát", "Pestre"). Write every name without its case ending, as it stands ' +
+    'as the subject of a sentence ("Nemecsek", "Boka", "Pest"), and give each name once, never once per ending. Keep a title that ' +
+    'follows the name with it ("Rácz tanár úr", "Mari néni").',
+  eitherNameOrder: true,
+};
+
+const LEXICONS: Readonly<Record<string, StoryLexicon>> = { en: ENGLISH_STORY_LEXICON, es: SPANISH_STORY_LEXICON, hu: HUNGARIAN_STORY_LEXICON };
 
 /** The lexicon for a book's language; English for one without its own. */
 export function storyLexicon(language: string | null | undefined): StoryLexicon {

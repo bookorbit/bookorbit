@@ -2,7 +2,7 @@ import type { AiStep, AiStepContext, AiStepRequest } from '../../ai-jobs/ai-feat
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
 import { askForJson, parseJsonReply } from './json-reply';
 import { entityKind } from './merge-step';
-import { WORD_CHAR, escapeRegExp, isNumberOnly, nameKey, splitWords, stripChars } from './name-text';
+import { isNumberOnly, nameKey, namePattern, splitWords, stripChars } from './name-text';
 import { mergeResult, passageOrder, reviewResult, textResult } from './step-context';
 import { ENGLISH_STORY_LEXICON, storyLexicon, writingIn, type StoryLexicon } from './story-lexicon';
 import type { StoryGuideSubject } from './story-guide-subject';
@@ -163,8 +163,8 @@ export interface LineNames {
   lexicon?: StoryLexicon;
 }
 
-function lineName(name: string): LineName {
-  return { text: name, pattern: new RegExp(`(?<!${WORD_CHAR})${escapeRegExp(name.replace(/’/g, "'"))}(?!${WORD_CHAR})`, 'gu') };
+function lineName(name: string, lexicon: StoryLexicon): LineName {
+  return { text: name, pattern: namePattern(name, lexicon.nameInflection) };
 }
 
 /**
@@ -198,8 +198,8 @@ export function laterNames(
     }
   }
   return {
-    later: [...later.values()].map(lineName),
-    visible: [...firstUnit.values()].filter((name) => name.unit <= index).map((name) => lineName(name.text)),
+    later: [...later.values()].map((name) => lineName(name, lexicon)),
+    visible: [...firstUnit.values()].filter((name) => name.unit <= index).map((name) => lineName(name.text, lexicon)),
     lexicon,
   };
 }

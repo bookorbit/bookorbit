@@ -14,10 +14,13 @@ interface ProseShape {
 /**
  * English measured on the golden books. Spanish on Marianela and El sombrero de tres picos, whose
  * passage calls read about 1.46 times the tokens per word of English books on the same model.
+ * Hungarian is not measured yet: its words carry their endings, so they run longer and split into
+ * more tokens than Spanish ones.
  */
 const PROSE: Readonly<Record<string, ProseShape>> = {
   en: { charsPerWord: 5.4, tokensPerWord: 1.33 },
   es: { charsPerWord: 5.9, tokensPerWord: 1.9 },
+  hu: { charsPerWord: 6.8, tokensPerWord: 2.5 },
 };
 
 function proseOf(language: string | null | undefined): ProseShape {

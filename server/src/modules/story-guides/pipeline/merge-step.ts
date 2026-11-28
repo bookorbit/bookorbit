@@ -2,11 +2,11 @@ import type { StoryGuideEntityKind } from '@bookorbit/types';
 
 import type { AiStep } from '../../ai-jobs/ai-feature';
 import { hashOf } from '../../ai-jobs/ai-fingerprint';
-import { mostCommon, nameKey, namesConflict, ownWords as ownWordsIn } from './name-text';
+import { callingWords, familyPart, mostCommon, nameKey, namesConflict as namesConflictIn, ownWords as ownWordsIn } from './name-text';
 import { ENGLISH_STORY_LEXICON, storyLexicon, type StoryLexicon } from './story-lexicon';
 import { namesResults, textResult } from './step-context';
 import type { StoryGuideSubject } from './story-guide-subject';
-import type { PassageSpan, StoryMergedEntity, StoryMergeResult, StoryNamesResult } from './story-guide.types';
+import type { PassageSpan, StoryMergedEntity, StoryMergeResult, StoryNameEntry, StoryNamesResult } from './story-guide.types';
 import type { StoryPassage } from './text-step';
 
 interface Building extends Omit<StoryMergedEntity, 'names'> {
@@ -32,6 +32,9 @@ export function mergeNames(
   lexicon: StoryLexicon = ENGLISH_STORY_LEXICON,
 ): StoryMergeResult {
   const ownWords = (name: string) => ownWordsIn(name, lexicon);
+  const bare = withBareNames(names, lexicon);
+  const either = lexicon.eitherNameOrder;
+  const namesConflict = (a: readonly string[], b: readonly string[]) => namesConflictIn(a, b, either);
   const entities: Building[] = [];
   const byName = new Map<string, number>();
   const byAlias = new Map<string, Set<number>>();
@@ -42,7 +45,7 @@ export function mergeNames(
   const groupOnly = (id: number) => entityKind(entities[id]) === 'group';
 
   passages.forEach((passage, index) => {
-    const result = names.get(passage.id);
+    const result = bare.get(passage.id);
     if (!result) return;
     const placed: Record<string, number> = (placement[passage.id] = {});
     for (const entry of result.entries) {
@@ -59,7 +62,7 @@ export function mergeNames(
         const people = [...(firstNames.get(own[0]) ?? [])].sort((a, b) => a - b);
         const recent = people.filter((id) => lastSeen.get(id)?.chapter === passage.chapter);
         if (specific.size === 1) target = [...specific][0];
-        else if (new Set(people.map((id) => ownWords(entities[id].name).at(-1))).size >= 2 && recent.length > 0) {
+        else if (new Set(people.map((id) => familyPart(ownWords(entities[id].name), own[0], either))).size >= 2 && recent.length > 0) {
           target = recent.reduce((best, id) => (lastSeen.get(id)!.index > lastSeen.get(best)!.index ? id : best));
         }
       }
@@ -80,7 +83,7 @@ export function mergeNames(
       }
       const entity = entities[target];
       const entityWords = ownWords(entity.name);
-      if (entry.kind === 'character' && entityWords.length >= 2) add(firstNames, entityWords[0], target);
+      if (entry.kind === 'character' && entityWords.length >= 2) for (const word of callingWords(entityWords, either)) add(firstNames, word, target);
       const mine = entry.kind === 'character' ? entityWords : [];
       for (const name of all) {
         const key = nameKey(name);
@@ -98,7 +101,10 @@ export function mergeNames(
           if (anotherPerson || anotherFirstName) continue;
         }
         if (!entity.names.has(key)) {
-          entity.names.set(key, { text: entry.at[name].text, at: entry.at[name] });
+          const at = entry.at[name];
+          // Found only with an ending that changes the name ("Boká" in "Bokát"): show the name, not the printed stem.
+          const shown = at.text.replace(/’/g, "'") === name.replace(/’/g, "'") ? at.text : name;
+          entity.names.set(key, { text: shown, at });
           add(byAlias, key, target);
         }
       }
@@ -115,6 +121,39 @@ export function mergeNames(
     entities: entities.map((entity) => ({ ...entity, names: [...entity.names].map(([key, name]) => ({ key, ...name })) })),
     placement,
   };
+}
+
+/**
+ * Gives an entry the model named with a case ending ("Kunt", "Keletről") the bare name the book uses
+ * elsewhere ("Kun", "Kelet"). People only fold into people, and other kinds into other kinds.
+ */
+function withBareNames(names: ReadonlyMap<string, StoryNamesResult>, lexicon: StoryLexicon): ReadonlyMap<string, StoryNamesResult> {
+  const people = new Set<string>();
+  const things = new Set<string>();
+  for (const result of names.values()) for (const entry of result.entries) (entry.kind === 'character' ? people : things).add(nameKey(entry.name));
+  const bareName = (entry: StoryNameEntry) => {
+    const known = entry.kind === 'character' ? people : things;
+    const stems = lexicon.caseStems(entry.name).filter((stem) => known.has(nameKey(stem)));
+    return stems.length === 1 ? stems[0] : null;
+  };
+  return new Map(
+    [...names].map(([passage, result]) => [
+      passage,
+      {
+        ...result,
+        entries: result.entries.map((entry) => {
+          const stem = bareName(entry);
+          if (stem === null) return entry;
+          return {
+            ...entry,
+            name: stem,
+            aliases: entry.aliases.filter((alias) => nameKey(alias) !== nameKey(stem)),
+            at: { ...entry.at, [stem]: entry.at[stem] ?? entry.at[entry.name] },
+          };
+        }),
+      },
+    ]),
+  );
 }
 
 /**
@@ -153,7 +192,7 @@ function add<K, V>(map: Map<K, Set<V>>, key: K, value: V): void {
 export function mergeAiStep(): AiStep<StoryGuideSubject> {
   return {
     id: 'merge',
-    version: 2,
+    version: 3,
     slot: null,
     dependsOn: ['text', 'names'],
     units: () => [{ id: 'book' }],
