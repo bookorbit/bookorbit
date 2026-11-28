@@ -110,37 +110,43 @@ export function useBookChapters(bookId: Ref<number>) {
   }
 
   /** `silent` revalidates behind rows already on screen without raising `loading`. */
-  async function load(options: { silent?: boolean; operations?: boolean } = {}): Promise<void> {
+  async function load(options: { silent?: boolean; operations?: boolean } = {}): Promise<BookChaptersState | null> {
     const id = bookId.value
     const token = ++loadToken
     if (!options.silent) loading.value = true
     loadError.value = null
     try {
-      const next = await apiJson<BookChaptersState>(base(), { signal: lifetime.signal }, 'book.detail.chapters.errors.load')
-      if (id === bookId.value && token === loadToken) {
+      const next = await apiJson<BookChaptersState>(base(), { cache: 'no-store', signal: lifetime.signal }, 'book.detail.chapters.errors.load')
+      if (!lifetime.signal.aborted && id === bookId.value && token === loadToken) {
         state.value = next
         if (options.operations && !busy.value) void recoverOperation(id, jobToken)
+        return next
       }
     } catch (reason) {
       if (id === bookId.value && token === loadToken && !options.silent) loadError.value = errorMessage(reason, 'book.detail.chapters.errors.load')
     } finally {
       if (id === bookId.value && token === loadToken) loading.value = false
     }
+    return null
   }
 
   /** Throws a localized error for the caller to show; the state only changes once the save lands. */
-  async function save(chapters: AudiobookChapter[], lock: boolean): Promise<BookChaptersState> {
+  async function save(payload: SaveBookChaptersRequest): Promise<BookChaptersState> {
     if (!state.value) throw new Error('Chapters are not loaded')
     const id = bookId.value
     busy.value = 'saving'
     try {
-      const payload: SaveBookChaptersRequest = { chapters, baseRevision: state.value.revision, lock }
-      const next = await apiJson<BookChaptersState>(base(), jsonBody('PUT', payload), 'book.detail.chapters.errors.save')
+      const next = await apiJson<BookChaptersState>(
+        base(),
+        { ...jsonBody('PUT', payload), signal: lifetime.signal },
+        'book.detail.chapters.errors.save',
+      )
+      lifetime.signal.throwIfAborted()
       if (id !== bookId.value) throw new DOMException('Book changed', 'AbortError')
       state.value = next
       return state.value
     } finally {
-      busy.value = null
+      if (id === bookId.value) busy.value = null
     }
   }
 

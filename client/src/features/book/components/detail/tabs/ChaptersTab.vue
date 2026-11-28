@@ -9,6 +9,7 @@ import {
   BOOK_CHAPTERS_ERROR_CODES,
   Permission,
   type AudibleRegion,
+  type BookChaptersState,
   type BookChapterVersionSummary,
   type BookDetail,
   type EbookChapterSource,
@@ -87,6 +88,9 @@ const totalDurationMs = computed(() => state.value?.totalDurationMs ?? null)
 const draft = useChapterDraft(totalDurationMs)
 const { rows, activeKey, activeIndex, activeRow, selected, issuesByKey } = draft
 const preview = useChapterPreview(bookId)
+const draftRevision = ref<string | null>(null)
+const saveConflict = shallowRef<{ status: 'loading' | 'failed' } | { status: 'ready'; revision: string } | null>(null)
+const hasUnsavedDraft = computed(() => draft.isDirty.value || saveConflict.value !== null)
 
 const editing = ref(false)
 const showRail = computed(() => editing.value && Boolean(totalDurationMs.value))
@@ -103,13 +107,14 @@ const readAlong = computed(() => state.value?.readAlong === true)
 watch(
   state,
   (next) => {
-    if (next && busy.value !== 'saving' && !draft.isDirty.value) draft.reset(next.chapters)
+    if (next && busy.value !== 'saving' && !hasUnsavedDraft.value) resetDraft(next)
   },
   { flush: 'sync' },
 )
 
 watch(bookId, () => {
   editing.value = false
+  resetDraft(null)
   preview.teardown()
   void refresh()
 })
@@ -159,6 +164,7 @@ watch(
 )
 
 async function handleRetryOperation() {
+  if (saveConflict.value || busy.value) return
   try {
     const result = await store.retryOperation()
     if (result && 'chapters' in result && !('revision' in result)) openSource({ kind: 'files' }, { kind: 'files', chapters: result.chapters })
@@ -177,7 +183,7 @@ onActivated(() => {
     activatedBefore = true
     return
   }
-  if (!draft.isDirty.value) void refresh({ silent: true }).then(openRequestedSource)
+  if (!hasUnsavedDraft.value) void refresh({ silent: true }).then(openRequestedSource)
 })
 
 // ── Editing lifecycle ────────────────────────────────────────────────────────
@@ -199,15 +205,15 @@ async function loadVersions() {
 
 function startEditing() {
   if (!state.value) return
-  draft.reset(state.value.chapters)
+  resetDraft(state.value)
   lockOnSave.value = true
   editing.value = true
   void loadVersions()
 }
 
 async function finishEditing() {
-  if (draft.isDirty.value && !(await confirmDiscard())) return
-  if (state.value) draft.reset(state.value.chapters)
+  if (hasUnsavedDraft.value && !(await confirmDiscard())) return
+  resetDraft(state.value)
   editing.value = false
   preview.pause()
 }
@@ -233,19 +239,19 @@ function handleDiscardCancel() {
 // The tab change is a route update, so unsaved edits are guarded there and on leaving the book.
 onBeforeRouteUpdate(async (to, from) => {
   const leaving = from.query.tab === 'chapters' && (to.query.tab !== 'chapters' || to.params.bookId !== from.params.bookId)
-  if (!leaving || !draft.isDirty.value) return true
+  if (!leaving || !hasUnsavedDraft.value) return true
   const discard = await confirmDiscard()
-  if (discard && state.value) {
-    draft.reset(state.value.chapters)
+  if (discard) {
+    resetDraft(state.value)
     editing.value = false
   }
   return discard
 })
 
-onBeforeRouteLeave(async () => (draft.isDirty.value ? confirmDiscard() : true))
+onBeforeRouteLeave(async () => (hasUnsavedDraft.value ? confirmDiscard() : true))
 
 function handleBeforeUnload(event: BeforeUnloadEvent) {
-  if (!draft.isDirty.value) return
+  if (!hasUnsavedDraft.value) return
   event.preventDefault()
   event.returnValue = ''
 }
@@ -255,21 +261,33 @@ onBeforeUnmount(() => window.removeEventListener('beforeunload', handleBeforeUnl
 
 // ── Save, discard, revert ────────────────────────────────────────────────────
 
+function resetDraft(next: BookChaptersState | null) {
+  draft.reset(next?.chapters ?? [])
+  draftRevision.value = next?.revision ?? null
+  saveConflict.value = null
+}
+
 /** Saves the draft and says how it went; true once the saved list is what the editor shows. */
-async function saveDraft(options: { quiet?: boolean } = {}): Promise<boolean> {
+async function saveDraft(options: { quiet?: boolean; baseRevision?: string } = {}): Promise<boolean> {
+  const baseRevision = options.baseRevision ?? draftRevision.value
+  if (!baseRevision || busy.value || (!options.baseRevision && saveConflict.value)) return false
   if (listCard.value?.commitPendingStarts() === false) return false
-  if (!draft.isDirty.value || draft.errorCount.value > 0 || busy.value) return false
+  if (rows.value.length === 0 || draft.errorCount.value > 0 || (!options.baseRevision && !draft.isDirty.value)) return false
+  const id = bookId.value
   const generation = draft.generation.value
   try {
-    const next = await store.save(draft.chapters(), lockOnSave.value)
+    const next = await store.save({ chapters: draft.chapters(), lock: lockOnSave.value, baseRevision })
+    draftRevision.value = next.revision
     draft.acknowledge(next.chapters, generation)
+    saveConflict.value = null
     if (!options.quiet) toast.success(t('book.detail.chapters.saved'))
     emit('changed')
     void loadVersions()
     return true
   } catch (reason) {
+    if (id !== bookId.value || !editing.value || (reason instanceof DOMException && reason.name === 'AbortError')) return false
     if (reason instanceof ApiError && reason.errorCode === BOOK_CHAPTERS_ERROR_CODES.stale) {
-      toast.error(t('book.detail.chapters.errors.stale'), { action: { label: t('book.detail.chapters.reload'), onClick: handleReloadAfterConflict } })
+      await refreshSaveConflict()
       return false
     }
     toast.error(errorMessage(reason, 'book.detail.chapters.errors.save'))
@@ -279,6 +297,46 @@ async function saveDraft(options: { quiet?: boolean } = {}): Promise<boolean> {
 
 async function handleSave() {
   await saveDraft()
+}
+
+async function refreshSaveConflict(discard = false) {
+  const id = bookId.value
+  const generation = draft.generation.value
+  const pending = { status: 'loading' } as const
+  saveConflict.value = pending
+  const latest = await store.load({ silent: true })
+  if (id !== bookId.value || saveConflict.value !== pending) return
+  if (!latest) {
+    saveConflict.value = { status: 'failed' }
+    return
+  }
+
+  preview.teardown()
+  waveform.clear()
+  if (discard && draft.generation.value === generation) {
+    resetDraft(latest)
+    return
+  }
+  saveConflict.value = { status: 'ready', revision: latest.revision }
+  if (showRail.value && activeRow.value) void waveform.show(activeRow.value.startMs, { force: true })
+}
+
+async function handleApplyDraft() {
+  const conflict = saveConflict.value
+  if (conflict?.status !== 'ready' || busy.value || !canEdit.value || !state.value?.revision) return
+  if (state.value?.revision !== conflict.revision) {
+    await refreshSaveConflict()
+    return
+  }
+  await saveDraft({ baseRevision: conflict.revision })
+}
+
+async function handleDiscardConflict() {
+  if (saveConflict.value?.status === 'ready' && !busy.value) await refreshSaveConflict(true)
+}
+
+async function handleRetryConflict() {
+  if (saveConflict.value?.status === 'failed' && !busy.value) await refreshSaveConflict()
 }
 
 // ── Write into the audio files ───────────────────────────────────────────────
@@ -302,6 +360,7 @@ function handleWriteCancel() {
 async function handleWriteConfirm() {
   const mode = writeConfirm.value
   writeConfirm.value = null
+  if (!mode || saveConflict.value || busy.value) return
   if (mode === 'saveAndWrite' && !(await saveDraft({ quiet: true }))) return
   try {
     const result = await store.writeToFiles()
@@ -316,11 +375,6 @@ async function handleWriteConfirm() {
   }
 }
 
-async function handleReloadAfterConflict() {
-  await store.load({ silent: true })
-  if (state.value) draft.reset(state.value.chapters)
-}
-
 function handleUndo() {
   draft.undo()
 }
@@ -330,10 +384,10 @@ function handleRedo() {
 }
 
 function handleDiscard() {
-  if (!state.value) return
+  if (!state.value || saveConflict.value || busy.value) return
   // A reset gives every row a new key, so the watcher that keeps a parked playhead on its cut cannot follow.
   const parkedOnCut = !preview.isPlaying.value && Math.round(preview.positionMs.value) === activeRow.value?.startMs
-  draft.reset(state.value.chapters)
+  resetDraft(state.value)
   if (parkedOnCut && activeRow.value) preview.park(activeRow.value.startMs)
 }
 
@@ -346,6 +400,7 @@ onDeactivated(() => {
 const revertOpen = ref(false)
 
 function handleRevertRequest() {
+  if (saveConflict.value || busy.value) return
   revertOpen.value = true
 }
 
@@ -354,9 +409,10 @@ function handleRevertCancel() {
 }
 
 async function handleRevertConfirm() {
+  if (saveConflict.value || busy.value) return
   try {
     const next = await store.revert()
-    draft.reset(next.chapters)
+    resetDraft(next)
     revertOpen.value = false
     toast.success(t('book.detail.chapters.revert.done'))
     emit('changed')
@@ -877,7 +933,7 @@ function handleKeydown(event: KeyboardEvent) {
 <template>
   <div class="chapters-tab flex flex-col gap-3.5 lg:h-full lg:min-h-0" @keydown="handleKeydown">
     <button
-      v-if="store.operation.value?.status === 'failed'"
+      v-if="store.operation.value?.status === 'failed' && !saveConflict"
       class="self-start rounded-md px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       @click="handleRetryOperation"
     >
@@ -1022,6 +1078,7 @@ function handleKeydown(event: KeyboardEvent) {
                 :versions="versions"
                 :loading="versionsLoading"
                 :reverting="busy === 'reverting'"
+                :revert-disabled="saveConflict !== null || busy !== null"
                 @open="handleOpenVersion"
                 @revert="handleRevertRequest"
               >
@@ -1098,15 +1155,20 @@ function handleKeydown(event: KeyboardEvent) {
       <ChapterSaveBar
         v-if="editing"
         v-model:lock="lockOnSave"
-        :dirty="draft.isDirty.value"
+        :dirty="hasUnsavedDraft"
         :error-count="draft.errorCount.value"
         :warning-count="draft.warningCount.value"
         :saving="busy === 'saving'"
+        :conflict="saveConflict?.status"
+        :can-apply-draft="canEdit && Boolean(state.revision) && rows.length > 0"
         :can-undo="draft.canUndo.value"
         :can-redo="draft.canRedo.value"
         :write-back="state.writeBack"
         :writing="busy === 'writing'"
         @save="handleSave"
+        @apply-draft="handleApplyDraft"
+        @discard-conflict="handleDiscardConflict"
+        @retry-conflict="handleRetryConflict"
         @save-and-write="handleSaveAndWrite"
         @write-files="handleWriteSaved"
         @discard="handleDiscard"

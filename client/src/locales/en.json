@@ -9081,6 +9081,14 @@
           "description": "Your changes to the chapters have not been saved.",
           "confirm": "Discard"
         },
+        "saveConflict": {
+          "message": "The chapters or audio tracks changed while you were editing. Your draft is still here.",
+          "loading": "Loading the latest chapters and audio tracks...",
+          "loadFailed": "The latest chapters and audio tracks could not be loaded.",
+          "applyHint": "Check your chapter starts against the current audio. Applying your draft replaces the current chapter list.",
+          "apply": "Apply my draft",
+          "discard": "Discard draft and reload"
+        },
         "save": {
           "action": "Save chapters",
           "discard": "Discard",

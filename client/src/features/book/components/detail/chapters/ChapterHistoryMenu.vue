@@ -9,6 +9,7 @@ defineProps<{
   versions: BookChapterVersionSummary[] | null
   loading: boolean
   reverting: boolean
+  revertDisabled?: boolean
 }>()
 
 const emit = defineEmits<{ open: [versionId: number]; revert: [] }>()
@@ -67,7 +68,7 @@ function handleRevert() {
         </span>
       </DropdownMenuItem>
       <DropdownMenuSeparator />
-      <DropdownMenuItem :disabled="reverting" @click="handleRevert">
+      <DropdownMenuItem :disabled="reverting || revertDisabled" @click="handleRevert">
         <Loader2 v-if="reverting" class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
         <RotateCcw v-else class="size-3.5" aria-hidden="true" />
         {{ t('book.detail.chapters.revert.action') }}
