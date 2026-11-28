@@ -68,6 +68,7 @@ const REASON_KEYS: Record<Exclude<ReadAloudEligibilityReason, 'worker_not_config
   no_epub: 'book.detail.files.readAloud.reasons.no_epub',
   too_many_audio_files: 'book.detail.files.readAloud.reasons.too_many_audio_files',
   epub_not_allowed: 'book.detail.files.readAloud.reasons.epub_not_allowed',
+  library_read_only: 'library.readOnly.reason',
   library_not_mounted: 'book.detail.files.readAloud.reasons.library_not_mounted',
   job_active: 'book.detail.files.readAloud.reasons.job_active',
 }

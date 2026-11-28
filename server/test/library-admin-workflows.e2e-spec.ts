@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { access, mkdir, readFile, stat, utimes, writeFile } from 'fs/promises';
+import { access, mkdir, readdir, readFile, rename, stat, symlink, utimes, writeFile } from 'fs/promises';
 import { basename, dirname, join } from 'path';
 
 import { and, eq, sql } from 'drizzle-orm';
@@ -893,6 +893,87 @@ describe('Library admin workflows (e2e)', { timeout: SCENARIO_TIMEOUT_MS }, () =
       });
       expectError(revokedLibraryResponse, 403, 'No library access');
     });
+  });
+
+  it('protects a writable source directory when its library becomes read-only', async () => {
+    const folderPath = join(ctx.fixture.rootPath, 'network-library');
+    const { body: library } = await createLibraryViaApi(ctx, ctx.adminToken, { folders: [folderPath] });
+    await waitForNoRunningScans(ctx, library.id);
+    const headers = authHeader(ctx.adminToken);
+    const path = await createEpubFixture(folderPath, 'original.epub', { title: 'Read Only' });
+    const bytes = await readFile(path);
+    const libraryUrl = `/api/v1/libraries/${library.id}`;
+    await waitForCondition(async () => {
+      const changed = await ctx.app.inject({
+        method: 'PATCH',
+        url: libraryUrl,
+        headers,
+        payload: {
+          readOnly: true,
+          fileWriteEnabled: true,
+          fileRenameEnabled: true,
+        },
+      });
+      expect(changed.statusCode, changed.body).toBe(200);
+      expect(changed.json()).toMatchObject({ readOnly: true });
+    }, 15_000);
+    await startLibraryScanAs(ctx, ctx.adminToken, library.id);
+    const { bookId, bookFileId } = await locateBookByAbsolutePath(ctx, path);
+
+    const editedTitle = 'Database-only edit';
+    const edited = await ctx.app.inject({ method: 'PATCH', url: `/api/v1/books/${bookId}/metadata`, headers, payload: { title: editedTitle } });
+    expect(edited.statusCode, edited.body).toBe(200);
+    const metadata = await ctx.db.query.bookMetadata.findFirst({ where: eq(schema.bookMetadata.bookId, bookId) });
+    expect(metadata?.title).toBe(editedTitle);
+
+    const fileUrl = `/api/v1/books/files/${bookFileId}`;
+    for (const response of [
+      await ctx.app.inject({ method: 'POST', url: `/api/v1/books/${bookId}/write-and-rename`, headers }),
+      await ctx.app.inject({ method: 'PATCH', url: fileUrl, headers, payload: { filename: 'renamed.epub' } }),
+      await ctx.app.inject({ method: 'DELETE', url: fileUrl, headers }),
+      await ctx.app.inject({ method: 'POST', url: '/api/v1/path', headers, payload: { parentPath: folderPath, name: 'new-folder' } }),
+      await uploadLibraryFileWithRawQuery(ctx, {
+        token: ctx.adminToken,
+        libraryId: library.id,
+        file: { fileName: 'new.epub', content: bytes },
+      }),
+    ]) {
+      expect(response.statusCode, response.body).toBe(403);
+      expect(response.json()).toMatchObject({ errorCode: 'LIBRARY_READ_ONLY' });
+    }
+    const deleted = await ctx.app.inject({ method: 'DELETE', url: '/api/v1/books', headers, payload: { bookIds: [bookId] } });
+    expect(deleted.statusCode, deleted.body).toBe(204);
+    expect(await ctx.db.select({ id: schema.books.id }).from(schema.books).where(eq(schema.books.id, bookId))).toEqual([]);
+    expect(await readFile(path)).toEqual(bytes);
+    expect(await readdir(folderPath)).toEqual(['original.epub']);
+    await startLibraryScanAs(ctx, ctx.adminToken, library.id);
+    expect((await locateBookByAbsolutePath(ctx, path)).bookId).not.toBe(bookId);
+  });
+
+  it('refuses writes through an indexed writable book whose parent now points into a protected library', async () => {
+    const writable = await createLibraryWithFolder(ctx);
+    const archive = await createLibraryWithFolder(ctx);
+    await ctx.db.update(schema.libraries).set({ readOnly: true }).where(eq(schema.libraries.id, archive.libraryId));
+    const indexed = await createEpubFixture(writable.folderPath, 'nested/book.epub', { title: 'Writable' });
+    const protectedFile = await createEpubFixture(archive.folderPath, 'book.epub', { title: 'Archive' });
+    const bytes = await readFile(protectedFile);
+    await startLibraryScanAs(ctx, ctx.adminToken, writable.libraryId);
+    const { bookId, bookFileId } = await locateBookByAbsolutePath(ctx, indexed);
+    await rename(dirname(indexed), join(writable.folderPath, 'original'));
+    await symlink(archive.folderPath, dirname(indexed), 'dir');
+    const headers = authHeader(ctx.adminToken);
+    const fileUrl = `/api/v1/books/files/${bookFileId}`;
+    const sync = await ctx.app.inject({ method: 'POST', url: `/api/v1/books/${bookId}/write-and-rename`, headers });
+    expect(sync.json()).toMatchObject({ write: { status: 'failed' } });
+    for (const response of [
+      await ctx.app.inject({ method: 'PATCH', url: fileUrl, headers, payload: { filename: 'renamed.epub' } }),
+      await ctx.app.inject({ method: 'DELETE', url: fileUrl, headers }),
+      await ctx.app.inject({ method: 'DELETE', url: '/api/v1/books', headers, payload: { bookIds: [bookId] } }),
+    ])
+      expect(response.statusCode, response.body).toBe(403);
+    expect(await readFile(protectedFile)).toEqual(bytes);
+    expect(await readdir(archive.folderPath)).toEqual(['book.epub']);
+    expect((await locateBookByAbsolutePath(ctx, indexed)).bookId).toBe(bookId);
   });
 
   describe('upload, scan, and stats', () => {

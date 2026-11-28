@@ -131,6 +131,10 @@ export class UpdateLibraryDto {
 
   @IsOptionalNotNull()
   @IsBoolean()
+  readOnly?: boolean;
+
+  @IsOptionalNotNull()
+  @IsBoolean()
   fileWriteEnabled?: boolean;
 
   @IsOptionalNotNull()

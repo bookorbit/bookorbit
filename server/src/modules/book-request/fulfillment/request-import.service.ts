@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import { PathService } from '../../path/path.service';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuditAction, AuditResource, UNSETTLED_BOOK_REQUEST_DOWNLOAD_STATUSES, WORKER_WRITABLE_BOOK_REQUEST_STATUSES } from '@bookorbit/types';
 import type { ReleaseUnitChoice } from '@bookorbit/types';
@@ -32,12 +33,13 @@ import {
   type ReleaseUnit,
 } from '../../scanner/lib/release-plan';
 import { UploadValidatorService } from '../../upload/upload-validator.service';
-import { BookRequestRepository } from '../book-request.repository';
+import { BookRequestRepository, type BookRequestJoinedRow } from '../book-request.repository';
 import { BookRequestGateway } from '../book-request.gateway';
 import { DownloadClientConfigService } from '../download-clients/download-client-config.service';
 import { PathMappingService, type ResolvedDownloadPath } from '../download-clients/path-mapping.service';
 import { stagedDownloadRoot } from '../download-clients/download-client-adapter';
 import { directDownloadRoot } from './direct-download.service';
+import { libraryFilePolicy } from '../../../common/services/library-file-policy';
 import { requestUploadRoot } from './request-upload-storage.service';
 import { BookRequestDownloadRepository } from './book-request-download.repository';
 import { DownloadRemovalService } from './download-removal.service';
@@ -94,6 +96,7 @@ export class RequestImportService implements OnApplicationBootstrap {
   private readonly stagingPath: string;
 
   constructor(
+    private readonly paths: PathService,
     private readonly config: ConfigService,
     private readonly downloads: BookRequestDownloadRepository,
     private readonly requests: BookRequestRepository,
@@ -132,7 +135,7 @@ export class RequestImportService implements OnApplicationBootstrap {
     }
 
     try {
-      await this.runImport(download, joined.request);
+      await this.runImport(download, joined);
       return true;
     } catch (error) {
       await this.failImport(download, error);
@@ -165,7 +168,7 @@ export class RequestImportService implements OnApplicationBootstrap {
     if (!download) throw new BadRequestException('This download is not waiting for a book to be chosen');
 
     try {
-      await this.runImport(download, joined.request, choice.primaryPath);
+      await this.runImport(download, joined, choice.primaryPath);
     } catch (error) {
       throw new BadRequestException(await this.failImport(download, error));
     }
@@ -179,7 +182,9 @@ export class RequestImportService implements OnApplicationBootstrap {
     return message;
   }
 
-  private async runImport(download: BookRequestDownloadRow, request: BookRequestRow, chosenPrimaryPath?: string): Promise<void> {
+  private async runImport(download: BookRequestDownloadRow, joined: BookRequestJoinedRow, chosenPrimaryPath?: string): Promise<void> {
+    const request = joined.request;
+    if (request.targetLibraryId != null) libraryFilePolicy.assertWritable(request.targetLibraryId, joined.targetLibraryReadOnly ?? false);
     const extractionDirectory = extractionDirectoryFor(this.stagingPath, download.id, randomUUID().slice(0, 8));
     try {
       await this.runImportFromDisk(download, request, extractionDirectory, chosenPrimaryPath);
@@ -607,6 +612,21 @@ export class RequestImportService implements OnApplicationBootstrap {
    * turning a harmless name collision into data loss.
    */
   private async placeUnit(placement: UnitPlacement, containmentRoot: string, download: BookRequestDownloadRow): Promise<void> {
+    using _destinations = await this.paths.beginFileWrites(placement.files.map((file) => file.destPath));
+    const wantsHardlink =
+      download.source === 'direct_url' ||
+      download.source === 'upload' ||
+      (download.downloadClientId !== null && (await this.clients.useHardlinks(download.downloadClientId)));
+    using sourceWrites = new DisposableStack();
+    let linkSources = wantsHardlink;
+    if (wantsHardlink) {
+      try {
+        sourceWrites.use(await this.paths.beginFileWrites(placement.files.map((file) => file.sourcePath)));
+      } catch (error) {
+        if (!(error instanceof ForbiddenException)) throw error;
+        linkSources = false;
+      }
+    }
     const placed: string[] = [];
     const createdDirectories: string[] = [];
 
@@ -623,7 +643,7 @@ export class RequestImportService implements OnApplicationBootstrap {
         if (placement.unitDirectory !== null) {
           await this.createDestinationDirectories(placement.unitDirectory, dirname(file.destPath), createdDirectories);
         }
-        await this.placeFile(file.sourcePath, file.destPath, download);
+        await this.placeFile(file.sourcePath, file.destPath, download, linkSources);
         placed.push(file.destPath);
       }
     } catch (error) {
@@ -682,19 +702,14 @@ export class RequestImportService implements OnApplicationBootstrap {
    * Radarr and Sonarr fall back to a copy silently; for book-sized files a copy is a perfectly
    * workable steady state, so this says so rather than raising an alarm.
    */
-  private async placeFile(sourceFile: string, destPath: string, download: BookRequestDownloadRow): Promise<void> {
-    const wantsHardlink =
-      download.source === 'direct_url' ||
-      download.source === 'upload' ||
-      (download.downloadClientId !== null && (await this.clients.useHardlinks(download.downloadClientId)));
-
+  private async placeFile(sourceFile: string, destPath: string, download: BookRequestDownloadRow, wantsHardlink: boolean): Promise<void> {
     if (wantsHardlink) {
       try {
         await link(sourceFile, destPath);
         return;
       } catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
-        if (code !== 'EXDEV' && code !== 'EPERM' && code !== 'ENOSYS') throw error;
+        if (code !== 'EXDEV' && code !== 'EPERM' && code !== 'ENOSYS' && code !== 'EROFS') throw error;
         this.logger.warn(
           `[book_request.hardlink] [fail] requestId=${download.requestId} downloadId=${download.id} errorClass=${(error as Error)?.constructor?.name ?? 'Error'} error="${sanitizeLogValue(code ?? '')}" - hardlink unavailable, copying instead; the file now uses disk space twice`,
         );

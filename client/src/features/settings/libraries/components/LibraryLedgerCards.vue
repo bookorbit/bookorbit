@@ -49,6 +49,7 @@ function automationSummary(library: Library): string {
 
 function fileSummary(library: Library): string | null {
   const count = writtenKindCount(library)
+  if (library.readOnly) return t('library.readOnly.title')
   if (library.fileWriteEnabled && library.fileRenameEnabled) return t('library.creator.summary.writesAndRenames', { count })
   if (library.fileWriteEnabled) return t('library.creator.summary.writes', { count })
   if (library.fileRenameEnabled) return t('library.creator.summary.renames')

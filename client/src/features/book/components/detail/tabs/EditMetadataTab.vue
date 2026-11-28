@@ -142,6 +142,7 @@ const fileWriteTargetSummary = computed(() => {
   return t('book.detail.editMetadata.formatFilesTarget', { formats: formatWritableFormatList(formats) })
 })
 const fileWriteManualDisabledReasonLabel = computed(() => {
+  if (props.book.libraryReadOnly) return t('library.readOnly.reason')
   if (!primaryFile.value) return t('book.detail.editMetadata.noPrimaryFile')
   switch (fileWriteStatus.value?.reason) {
     case 'no_primary_file':

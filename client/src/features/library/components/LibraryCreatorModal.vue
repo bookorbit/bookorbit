@@ -193,6 +193,7 @@ function summaryFor(id: LibraryCreatorSectionId): string {
       return t('library.creator.summary.manualOnly')
     }
     case 'fileWrite':
+      if (form.readOnly) return t('library.readOnly.title')
       if (form.fileWriteEnabled && form.fileRenameEnabled) return t('library.creator.summary.writesAndRenames', { count: writtenKinds.value })
       if (form.fileWriteEnabled) return t('library.creator.summary.writes', { count: writtenKinds.value })
       if (form.fileRenameEnabled) return t('library.creator.summary.renames')
@@ -306,6 +307,7 @@ const sectionProps = computed(() => ({
   },
   fileWrite: {
     fileRenameEnabled: form.fileRenameEnabled,
+    readOnly: form.readOnly,
     fileWriteEnabled: form.fileWriteEnabled,
     fileWriteWriteCover: form.fileWriteWriteCover,
     fileWriteEpubEnabled: form.fileWriteEpubEnabled,
@@ -503,6 +505,7 @@ const sectionListeners = {
   'update:watch': handleWatchUpdate,
   'update:autoScanCronExpression': (value: string | null) => (form.autoScanCronExpression = value),
   'update:fileRenameEnabled': (value: boolean) => (form.fileRenameEnabled = value),
+  'update:readOnly': (value: boolean) => (form.readOnly = value),
   'update:fileWriteEnabled': (value: boolean) => (form.fileWriteEnabled = value),
   'update:fileWriteWriteCover': handleWriteCoverUpdate,
   'update:fileWriteEpubEnabled': (value: boolean) => (form.fileWriteEpubEnabled = value),
@@ -805,7 +808,11 @@ onMounted(async () => {
                   <Images :size="14" aria-hidden="true" />
                   {{ t('settings.admin.libraries.refreshCovers') }}
                 </DropdownMenuItem>
-                <DropdownMenuItem :disabled="!library.fileWriteEnabled" @click="runSyncFiles">
+                <DropdownMenuItem
+                  :title="library.readOnly ? t('library.readOnly.reason') : undefined"
+                  :disabled="library.readOnly || !library.fileWriteEnabled"
+                  @click="runSyncFiles"
+                >
                   <FileCode :size="14" aria-hidden="true" />
                   {{ t('settings.admin.libraries.syncMetadataToFiles') }}
                 </DropdownMenuItem>

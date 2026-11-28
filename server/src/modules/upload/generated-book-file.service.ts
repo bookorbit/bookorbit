@@ -1,3 +1,5 @@
+import { PathService } from '../path/path.service';
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { constants, createWriteStream } from 'node:fs';
 import { link, lstat, open, readdir, rename, rm, stat, statfs, unlink } from 'node:fs/promises';
@@ -82,6 +84,7 @@ export class GeneratedBookFileService {
   private readonly logger = new Logger(GeneratedBookFileService.name);
 
   constructor(
+    private readonly paths: PathService,
     private readonly repository: GeneratedBookFileRepository,
     private readonly libraryService: LibraryService,
     private readonly validator: UploadValidatorService,
@@ -114,9 +117,11 @@ export class GeneratedBookFileService {
     startedAt: number,
   ): Promise<{ fileId: number; reused: boolean }> {
     const book = await this.loadBook(source.bookId, source.user);
+    using _write = libraryFilePolicy.beginWrite(book.libraryId, book.readOnly);
     const filename = fitGeneratedFilename(this.validator.sanitizeFilename(source.filename));
     const format = this.assertAllowed(book, filename);
     const sizeBytes = await this.assertSourceSize(source);
+    using _paths = await this.paths.beginFileWrites([book.folderPath], [book.libraryId]);
     await this.clearPartials(book.folderPath, source.bookId);
     await this.assertFreeSpace(book.folderPath, sizeBytes);
 
@@ -200,10 +205,12 @@ export class GeneratedBookFileService {
 
   private async replaceFileLocked(source: GeneratedFileSource & { fileId: number }, event: string, startedAt: number): Promise<{ fileId: number }> {
     const book = await this.loadBook(source.bookId, source.user);
+    using _write = libraryFilePolicy.beginWrite(book.libraryId, book.readOnly);
     const target = await this.loadTarget(source.bookId, source.fileId);
     const folder = dirname(target.absolutePath);
     const format = this.assertAllowed(book, basename(target.absolutePath));
     const sizeBytes = await this.assertSourceSize(source);
+    using _paths = await this.paths.beginFileWrites([target.absolutePath, book.folderPath], [book.libraryId]);
     await this.pathPolicy.assertWithinRoot(target.absolutePath, book.folderPath);
     await this.clearPartials(folder, source.bookId);
     await this.assertFreeSpace(folder, sizeBytes);

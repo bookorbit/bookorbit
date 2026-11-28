@@ -1,3 +1,4 @@
+import { PathService } from '../path/path.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { dirname, relative } from 'path';
 
@@ -53,6 +54,7 @@ export class BookMoveExecutorService {
   private readonly logger = new Logger(BookMoveExecutorService.name);
 
   constructor(
+    private readonly paths: PathService,
     private readonly moveRepo: BookMoveRepository,
     private readonly lockService: FileLockService,
     private readonly selfWriteRegistry: SelfWriteRegistry,
@@ -79,9 +81,17 @@ export class BookMoveExecutorService {
     this.selfWriteRegistry.begin(suppressionPaths);
 
     const completed: CompletedMove[] = [];
+    using activePaths = new DisposableStack();
     let crossDevice = false;
 
     try {
+      activePaths.use(await this.paths.beginFileWrites([plan.sourceFolderPath, ...plan.files.map((file) => file.from)], [plan.sourceLibraryId]));
+      activePaths.use(
+        await this.paths.beginFileWrites(
+          plan.files.map((file) => file.to),
+          [target.libraryId],
+        ),
+      );
       for (const file of plan.files) {
         if (!(await pathExists(file.from))) {
           await this.rollback(completed, plan.bookId);

@@ -144,6 +144,7 @@ describe('Library DTO validation', () => {
       'excludePatterns',
       'readingThreshold',
       'markAsFinishedPercentComplete',
+      'readOnly',
       'fileWriteEnabled',
       'fileWriteWriteCover',
       'fileWriteEpubEnabled',

@@ -101,6 +101,7 @@ function makeService() {
     beforeOwnedFilesExit: vi.fn().mockResolvedValue(reportExit),
   };
   const service = new BookDockService(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     db as never,
     repo as never,
     ingestService as never,

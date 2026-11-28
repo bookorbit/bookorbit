@@ -52,7 +52,7 @@ describe('onApplicationBootstrap()', () => {
     const db = {
       select: vi
         .fn()
-        .mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 42 }]) }) })
+        .mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ id: 42, readOnly: true }]) }) })
         .mockReturnValueOnce({ from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ path: '/books' }]) }) }),
     };
     const { service } = makeService(db);
@@ -60,7 +60,7 @@ describe('onApplicationBootstrap()', () => {
 
     await expect(service.onApplicationBootstrap()).resolves.toBeUndefined();
 
-    expect(startWatcher).toHaveBeenCalledWith(42, ['/books']);
+    expect(startWatcher).toHaveBeenCalledWith(42, ['/books'], true);
     await service.onModuleDestroy();
   });
 });
@@ -639,6 +639,26 @@ describe('pauseWatcher() / resumeWatcher()', () => {
 
 // A real chokidar watcher over a real directory, because the whole fix rests on the claim that a
 // paused watcher delivers nothing and a resumed one delivers again.
+describe('read-only library polling', () => {
+  it('discovers an externally created file', async () => {
+    vi.useRealTimers();
+    const dir = await mkdtemp(join(tmpdir(), 'bookorbit-polling-'));
+    const { service } = makeService();
+    const { writeFile } = await import('fs/promises');
+    const process = vi.spyOn(service as any, 'process').mockResolvedValue(undefined);
+    try {
+      await service.startWatcher(1, [dir], true);
+      const added = join(dir, 'external.epub');
+      await writeFile(added, 'book');
+      await vi.waitFor(() => expect(process.mock.calls.some((call) => call[1] === added)).toBe(true), { timeout: 15000, interval: 200 });
+    } finally {
+      await service.onModuleDestroy();
+      await rm(dir, { recursive: true, force: true });
+      vi.useFakeTimers();
+    }
+  }, 20000);
+});
+
 describe('pauseWatcher() against a real filesystem', () => {
   it('ignores a file created while paused and sees one created after resuming', async () => {
     vi.useRealTimers();

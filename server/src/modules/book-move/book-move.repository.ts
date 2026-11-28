@@ -44,6 +44,7 @@ export interface MoveBookFile {
 export interface MoveBookData {
   bookId: number;
   status: string;
+  readOnly?: boolean;
   libraryId: number;
   libraryFolderId: number;
   libraryFolderPath: string;
@@ -58,6 +59,7 @@ export interface MoveBookData {
 }
 
 export interface MoveTargetLibrary {
+  readOnly?: boolean;
   libraryId: number;
   libraryName: string;
   organizationMode: string;
@@ -98,6 +100,7 @@ export class BookMoveRepository {
   async findTargetLibrary(targetLibraryId: number, targetFolderId: number): Promise<MoveTargetLibrary | null> {
     const [row] = await this.db
       .select({
+        readOnly: libraries.readOnly,
         libraryId: libraries.id,
         libraryName: libraries.name,
         organizationMode: libraries.organizationMode,
@@ -128,6 +131,7 @@ export class BookMoveRepository {
         .select({
           bookId: books.id,
           status: books.status,
+          readOnly: libraries.readOnly,
           libraryId: books.libraryId,
           libraryFolderId: books.libraryFolderId,
           libraryFolderPath: libraryFolders.path,
@@ -224,6 +228,7 @@ export class BookMoveRepository {
         rows.push({
           bookId: row.bookId,
           status: row.status,
+          readOnly: row.readOnly,
           libraryId: row.libraryId,
           libraryFolderId: row.libraryFolderId,
           libraryFolderPath: row.libraryFolderPath,
@@ -490,12 +495,13 @@ export class BookMoveRepository {
     }));
   }
 
-  async findLibraryFolders(libraryIds: number[]): Promise<{ libraryId: number; path: string }[]> {
+  async findLibraryFolders(libraryIds: number[]) {
     if (libraryIds.length === 0) return [];
     return this.db
-      .select({ libraryId: libraryFolders.libraryId, path: libraryFolders.path })
+      .select({ libraryId: libraryFolders.libraryId, path: libraryFolders.path, readOnly: libraries.readOnly })
       .from(libraryFolders)
-      .where(inArray(libraryFolders.libraryId, libraryIds));
+      .innerJoin(libraries, eq(libraries.id, libraryFolders.libraryId))
+      .where(and(inArray(libraryFolders.libraryId, libraryIds), eq(libraries.watch, true)));
   }
 
   async findWatchedLibraryIds(libraryIds: number[]): Promise<number[]> {

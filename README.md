@@ -258,14 +258,13 @@ Financial support is entirely optional. Using BookOrbit, recommending it to othe
 
 <a id="unsupported-storage-configurations"></a>
 
-## ⚠️ Unsupported Storage Configurations
+## Storage requirements
 
-> [!WARNING]
-> **NAS and network storage configurations are not supported.** BookOrbit requires a local filesystem with dependable semantics for every writable path, including book libraries, import folders, application data, and PostgreSQL data. Do not place these paths on SMB/CIFS, NFS, FUSE or cloud mounts, distributed filesystems, or similar storage, even when the storage is mounted as an ordinary directory.
->
-> BookOrbit scans, moves, renames, and writes files while coordinating with its database and background jobs. Network and nonstandard filesystems can behave differently around atomic renames, locking, file notifications, permissions, caching, consistency, and durability. A configuration may appear to work and later cause intermittent failures, incomplete moves, stale library state, data loss, or corruption.
->
-> Such configurations may work in a particular environment, but using them is entirely at your own risk. No support is provided for them. Please do not open GitHub issues for problems encountered with these configurations unless the problem can be reproduced using supported local storage.
+Book libraries on SMB/CIFS or NFS are supported when the share is mounted read-only and **Read-only library** is enabled under the library's **File updates** settings. Keep application data, PostgreSQL, Book Dock, download and import folders, and writable libraries on local storage. For Docker, pass the book mount to the container as read-only as well. Use a read-only mount wherever BookOrbit or its download clients can reach the same collection.
+
+Use a scheduled scan to discover new or changed files. Enabling **Watch folders** on a read-only library uses polling. For large shares, scheduled scans avoid the ongoing cost of polling. On a writable library, disabling automatic file updates still allows a manual **Write & Rename**. A read-only library blocks that action too. Metadata and cover edits stay in BookOrbit. Deleting a book removes its records and cached covers. A later scan can rediscover the source files.
+
+Writable network storage, FUSE, cloud mounts and distributed filesystems remain unsupported. Writable paths require dependable atomic renames, locking and filesystem consistency.
 
 <a id="repository-activity"></a>
 

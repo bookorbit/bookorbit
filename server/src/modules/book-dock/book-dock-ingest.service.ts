@@ -1,3 +1,4 @@
+import { PathService } from '../path/path.service';
 import { BadRequestException, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { basename, dirname, extname, join, relative, sep } from 'path';
@@ -64,6 +65,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   private readonly forcedAutoFetchFileIds = new Set<number>();
 
   constructor(
+    private readonly paths: PathService,
     private readonly config: ConfigService,
     private readonly repo: BookDockRepository,
     private readonly validator: UploadValidatorService,
@@ -114,11 +116,14 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
     }
 
     const { tempPath, sizeBytes } = await this.storage.streamToTemp(fileStream);
+    using writes = new DisposableStack();
     let destPath: string | null = null;
 
     try {
       const directory = dock ? await this.uploadDockDirectory(dock.folderName) : this.bookDockPath;
-      destPath = await this.resolveUniquePath(join(directory, filename));
+      const target = await this.resolveUniquePath(join(directory, filename));
+      writes.use(await this.paths.beginFileWrites([target]));
+      destPath = target;
 
       await this.storage.moveToPath(tempPath, destPath);
 
@@ -516,6 +521,7 @@ export class BookDockIngestService implements OnApplicationBootstrap, OnModuleDe
   private async uploadDockDirectory(folderName: string): Promise<string> {
     const librariesPath = (await findLibrariesDir(this.bookDockPath)) ?? join(this.bookDockPath, LIBRARIES_DIR);
     const directory = join(librariesPath, folderName);
+    using _paths = await this.paths.beginFileWrites([directory]);
     await mkdir(directory, { recursive: true });
     return directory;
   }

@@ -69,7 +69,7 @@ function handleConfirm() {
           <div class="min-w-0">
             <h2 class="text-base font-semibold text-foreground">{{ t('book.deleteDialog.title') }}</h2>
             <p class="text-sm text-muted-foreground mt-1">
-              {{ t('book.deleteDialog.description') }}
+              {{ t('book.deleteDialog.descriptionWithReadOnly') }}
             </p>
             <div
               v-if="choice"

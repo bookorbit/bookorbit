@@ -270,9 +270,9 @@ export class BookDockRepository {
     }
   }
 
-  async findLibraryFormats(libraryId: number): Promise<{ name: string; allowedFormats: string[] } | undefined> {
+  async findLibraryFormats(libraryId: number) {
     const [row] = await this.db
-      .select({ name: libraries.name, allowedFormats: libraries.allowedFormats })
+      .select({ name: libraries.name, allowedFormats: libraries.allowedFormats, readOnly: libraries.readOnly })
       .from(libraries)
       .where(eq(libraries.id, libraryId))
       .limit(1);

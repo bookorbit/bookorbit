@@ -1,3 +1,5 @@
+import { PathService } from '../path/path.service';
+import { libraryFilePolicy, readOnlyLibraryError } from '../../common/services/library-file-policy';
 import { ReadingAttemptEventsService } from '../user-book-status/reading-attempt-events.service';
 import {
   BadRequestException,
@@ -306,6 +308,7 @@ type MetadataSaveResult = {
 };
 
 type LibraryWriteSettings = {
+  readOnly?: boolean;
   fileWriteEnabled: boolean;
   fileRenameEnabled: boolean;
 };
@@ -345,6 +348,7 @@ export class BookService {
   private readonly activeExportCounts = new Map<number, number>();
 
   constructor(
+    private readonly paths: PathService,
     private readonly bookRepo: BookRepository,
     private readonly libraryService: LibraryService,
     private readonly queryBuilder: BookQueryBuilder,
@@ -1857,9 +1861,11 @@ export class BookService {
     if (file.bookId !== checked.bookId || file.libraryId !== checked.libraryId) {
       throw new ConflictException('The file changed while it was being renamed. Try again.');
     }
+    using _write = libraryFilePolicy.beginWrite(file.libraryId, file.readOnly);
     const newAbsolutePath = join(dirname(file.absolutePath), filename);
     if (newAbsolutePath === file.absolutePath) return false;
 
+    using _paths = await this.paths.beginFileWrites([file.absolutePath, newAbsolutePath], [file.libraryId]);
     const book = await this.bookRepo.findBookBase(file.bookId);
     if (!book) throw new NotFoundException(`No file with id ${file.id}`);
     const oldBookKey = book.folderPath === file.absolutePath ? { bookId: book.id, folderPath: book.folderPath } : null;
@@ -1921,6 +1927,8 @@ export class BookService {
     try {
       const file = await this.verifyFileAccess(fileId, user);
 
+      using _write = libraryFilePolicy.beginWrite(file.libraryId, file.readOnly);
+      using _paths = await this.paths.beginFileWrites([file.absolutePath], [file.libraryId]);
       try {
         await rm(file.absolutePath, { force: true });
       } catch {
@@ -1983,12 +1991,21 @@ export class BookService {
         const row = auditRowsById.get(bookId);
         return row ? [row] : [];
       });
-      const files = await this.bookRepo.findAllFilesByBookIds(deletedBookIds);
+      const files = await this.bookRepo.findDeletionFiles(deletedBookIds);
+      using writes = new DisposableStack();
+      const writableFiles = new Map<number, string[]>();
+      for (const file of files) {
+        if (libraryFilePolicy.keepFilesOnDelete(file.libraryId, file.readOnly)) continue;
+        const paths = writableFiles.get(file.libraryId);
+        if (paths) paths.push(file.absolutePath);
+        else {
+          writes.use(libraryFilePolicy.beginWrite(file.libraryId, file.readOnly));
+          writableFiles.set(file.libraryId, [file.absolutePath]);
+        }
+      }
+      for (const [id, paths] of writableFiles) writes.use(await this.paths.beginFileWrites(paths, [id]));
       const removeTarget = (path: string) => this.removeDeletionTarget(path, 'bookFile', event, user, startedAt);
-
-      // A surviving content file would be imported again by the scanner. Keep all records and
-      // user state on failure; force:true lets a retry finish after a partially removed batch.
-      const paths = [...new Set(files.map((file) => file.absolutePath))];
+      const paths = [...new Set([...writableFiles.values()].flat())];
       // Defer watcher reconciliation until the records reflect the intentional removal.
       await this.selfWriteRegistry.track(paths, async () => {
         const fileResults = await mapWithConcurrency(paths, BOOK_DELETION_CONCURRENCY, removeTarget);
@@ -2005,7 +2022,7 @@ export class BookService {
       // failure. Leave covers alone until the database transaction has succeeded.
       const failedDeletes = await this.removeCoverCacheDirs(deletedBookIds, event, user, startedAt);
       this.logger.log(
-        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${files.length} failedDeletes=${failedDeletes} - delete books completed`,
+        `[${event}] [end] count=${bookIds.length} durationMs=${Date.now() - startedAt} deletedBooks=${rows.length} deletedFiles=${paths.length} failedDeletes=${failedDeletes} - delete books completed`,
       );
       return {
         total: rows.length,
@@ -2353,7 +2370,7 @@ export class BookService {
         const settingsResult = await this.findLibraryWriteSettingsAfterSave(id);
         const settings = settingsResult.settings;
         write = settingsResult.writeFailure;
-        libraryAutoWriteEnabled = settings?.fileWriteEnabled ?? false;
+        libraryAutoWriteEnabled = !settings?.readOnly && (settings?.fileWriteEnabled ?? false);
         this.fileWriteService?.cancelPendingWrite(id);
         this.fileRenameService?.cancelPendingRename(id);
 
@@ -2362,7 +2379,7 @@ export class BookService {
         }
 
         const syncWriteFailed = write?.status === 'failed';
-        if (hasRenameRelevantField && settings?.fileRenameEnabled && !syncWriteFailed) {
+        if (hasRenameRelevantField && !settings?.readOnly && settings?.fileRenameEnabled && !syncWriteFailed) {
           await this.renameFileAfterSave(id, user);
         }
       } else {
@@ -3859,6 +3876,7 @@ export class BookService {
     return {
       id: book.books.id,
       libraryId: book.books.libraryId,
+      libraryReadOnly: book.libraries?.readOnly ?? false,
       libraryName: book.libraries?.name ?? '',
       status: book.books.status,
       folderPath: book.books.folderPath,
@@ -4107,6 +4125,7 @@ export class BookService {
 
     const settings = (await this.fileWriteService?.findLibraryWriteSettingsForBook(bookId)) ?? null;
 
+    if (settings?.readOnly) throw readOnlyLibraryError();
     let write: WriteResult;
     try {
       write = (await this.fileWriteService?.writeToFile(bookId, 'sync', user.id, false, true, true)) ?? {

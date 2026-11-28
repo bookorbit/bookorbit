@@ -150,6 +150,7 @@ function makeService() {
   const digest = { recordFiled: vi.fn(), recordHeld: vi.fn() };
 
   const service = new BookDockFinalizeService(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     db as never,
     repo as never,
     libraryService as never,

@@ -1,3 +1,5 @@
+import { PathService } from '../path/path.service';
+import { libraryFilePolicy, READ_ONLY_LIBRARY_MESSAGE } from '../../common/services/library-file-policy';
 import { ConflictException, Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { readFile, stat } from 'fs/promises';
@@ -108,6 +110,7 @@ export class FileWriteService implements OnModuleDestroy {
   private readonly supports: WriterSupport = (format) => this.registry.supports(format);
 
   constructor(
+    private readonly paths: PathService,
     private readonly fileWriteRepo: FileWriteRepository,
     private readonly registry: FormatWriterRegistry,
     private readonly lockService: FileLockService,
@@ -239,6 +242,8 @@ export class FileWriteService implements OnModuleDestroy {
         return result;
       }
 
+      if (libraryFilePolicy.isReadOnly(scope.libraryId, libConfig.readOnly)) return skipResult(READ_ONLY_LIBRARY_MESSAGE);
+      using _write = dryRun ? null : libraryFilePolicy.beginWrite(scope.libraryId, libConfig.readOnly);
       if (!libConfig.fileWriteEnabled && !dryRun && !force) {
         const result: WriteResult = { status: 'skipped', fieldsWritten: [], durationMs: 0, reason: 'disabled' };
         this.logWriteEnd(bookId, primaryFormat, triggeredBy, userId, dryRun, startedAt, result);
@@ -252,6 +257,13 @@ export class FileWriteService implements OnModuleDestroy {
       ];
       const skipped = plan.filter((entry) => entry.skip !== null);
       const writable = plan.filter((entry) => entry.skip === null).map((entry) => entry.file);
+      using _paths =
+        !dryRun && writable.length
+          ? await this.paths.beginFileWrites(
+              writable.map((file) => file.absolutePath),
+              [scope.libraryId],
+            )
+          : null;
 
       if (writable.length === 0) {
         await this.insertSkipLogsIfSync(bookId, skipped, triggeredBy, userId);
@@ -407,6 +419,9 @@ export class FileWriteService implements OnModuleDestroy {
     const libConfig = await this.fileWriteRepo.findLibraryFileWriteConfig(readAlong[0]!.libraryId);
     if (!libConfig) return skipResult(AUDIO_COVER_SKIP_REASON.libraryNotFound);
 
+    const libraryId = readAlong[0]!.libraryId;
+    if (libraryFilePolicy.isReadOnly(libraryId, libConfig.readOnly)) return skipResult(READ_ONLY_LIBRARY_MESSAGE);
+    using _write = dryRun ? null : libraryFilePolicy.beginWrite(libraryId, libConfig.readOnly);
     const plan: PlannedTarget[] = (await this.withSizesOnDisk(readAlong)).map((file) => ({
       file,
       skip:
@@ -415,6 +430,13 @@ export class FileWriteService implements OnModuleDestroy {
     }));
     const skipped = plan.filter((entry) => entry.skip !== null);
     const writable = plan.filter((entry) => entry.skip === null).map((entry) => entry.file);
+    using _paths =
+      !dryRun && writable.length
+        ? await this.paths.beginFileWrites(
+            writable.map((file) => file.absolutePath),
+            [libraryId],
+          )
+        : null;
     await this.insertSkipLogsIfSync(bookId, skipped, 'sync', userId);
     if (writable.length === 0) {
       return aggregateWriteResults(
@@ -530,6 +552,11 @@ export class FileWriteService implements OnModuleDestroy {
             throw new ConflictException({ message: 'Audio files changed', errorCode: BOOK_CHAPTERS_ERROR_CODES.stale });
           if (!status.available) throw new ChapterWriteUnavailableError(status.reason ?? 'format_not_supported');
 
+          using _write = libraryFilePolicy.beginWrite(targets[0]!.libraryId, libConfig?.readOnly);
+          using _paths = await this.paths.beginFileWrites(
+            targets.map((file) => file.absolutePath),
+            [targets[0]!.libraryId],
+          );
           await onProgress?.(0, targets.length);
           const durations: (number | null)[] = [];
           for (const target of targets)
@@ -967,6 +994,7 @@ export const AUDIO_COVER_SKIP_REASON = {
 
 const AUDIO_COVER_CODE_BY_SKIP_REASON: Record<string, AudioCoverEmbedCode> = {
   [AUDIO_COVER_UNCHANGED_REASON]: 'unchanged',
+  [READ_ONLY_LIBRARY_MESSAGE]: 'write_disabled',
   [AUDIO_COVER_SKIP_REASON.noReadAlongFile]: 'no_read_along_file',
   [AUDIO_COVER_SKIP_REASON.noAudioCover]: 'no_audio_cover',
   [AUDIO_COVER_SKIP_REASON.libraryNotFound]: 'unsupported',
@@ -986,7 +1014,9 @@ function audioCoverEmbedCode(result: WriteResult): AudioCoverEmbedCode {
   return 'unsupported';
 }
 
-function skipResult(reason: WriteTargetSkipReason | (typeof AUDIO_COVER_SKIP_REASON)[keyof typeof AUDIO_COVER_SKIP_REASON]): WriteResult {
+function skipResult(
+  reason: typeof READ_ONLY_LIBRARY_MESSAGE | WriteTargetSkipReason | (typeof AUDIO_COVER_SKIP_REASON)[keyof typeof AUDIO_COVER_SKIP_REASON],
+): WriteResult {
   return { status: 'skipped', fieldsWritten: [], durationMs: 0, reason };
 }
 

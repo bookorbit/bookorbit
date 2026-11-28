@@ -27,6 +27,12 @@ export function useBookSelectionPermissions(books: Ref<BookCard[]>, selectedIds:
     },
     { immediate: true, flush: 'sync' },
   )
+  const readOnlySelection = computed(() => {
+    const query = querySelection?.value
+    const ids = new Set(libraries.value.filter((library) => library.readOnly).map((library) => library.id))
+    if (query) return query.libraryId != null ? ids.has(query.libraryId) : libraries.value.length > 0 && ids.size === libraries.value.length
+    return [...selectedLibraries.value.values()].some((id) => id !== undefined && ids.has(id))
+  })
   const canEditSelectionMetadata = computed(() => {
     const query = querySelection?.value
     if (query) {
@@ -94,5 +100,5 @@ export function useBookSelectionPermissions(books: Ref<BookCard[]>, selectedIds:
     return { disabledReason: linkDisabledReason({ queryScoped: false, count: selectedIds.value.size, allEditable }) }
   })
 
-  return { canEditSelectionMetadata, mergeSelection, linkSelection }
+  return { readOnlySelection, canEditSelectionMetadata, mergeSelection, linkSelection }
 }

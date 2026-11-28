@@ -1,0 +1,1 @@
+ALTER TABLE "libraries" ADD COLUMN "read_only" boolean DEFAULT false NOT NULL;

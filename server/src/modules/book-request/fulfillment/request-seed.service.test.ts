@@ -67,6 +67,7 @@ function makeService(
   // The real removal service, not a double: these tests are about what reaches the download
   // client, and a stubbed remover would assert only that the seed service called a mock.
   const removal = new DownloadRemovalService(
+    { beginClientRemoval: vi.fn().mockResolvedValue(null) } as never,
     downloads as never,
     clients as never,
     registry as never,

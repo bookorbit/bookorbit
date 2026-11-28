@@ -96,6 +96,7 @@ function makeService(bookDockPath = '/books/book-dock') {
   };
 
   const service = new BookDockIngestService(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     config as never,
     repo as never,
     validator as never,

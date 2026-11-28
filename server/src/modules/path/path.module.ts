@@ -9,6 +9,6 @@ import { PathService } from './path.service';
 @Module({
   controllers: [PathController],
   providers: [PathPolicyService, PathService, PathRepository, FolderInsightService],
-  exports: [PathPolicyService],
+  exports: [PathPolicyService, PathService],
 })
 export class PathModule {}

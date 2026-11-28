@@ -62,6 +62,7 @@ export interface MergeLibraryRow {
   formatPriority: string[] | null;
   allowedFormats: string[];
   excludePatterns: string[];
+  readOnly?: boolean;
   fileWriteEnabled: boolean;
   fileNamingPattern: string | null;
   watch: boolean;
@@ -212,6 +213,7 @@ export class BookMergeRepository {
         formatPriority: schema.libraries.formatPriority,
         allowedFormats: schema.libraries.allowedFormats,
         excludePatterns: schema.libraries.excludePatterns,
+        readOnly: schema.libraries.readOnly,
         fileWriteEnabled: schema.libraries.fileWriteEnabled,
         fileNamingPattern: schema.libraries.fileNamingPattern,
         watch: schema.libraries.watch,

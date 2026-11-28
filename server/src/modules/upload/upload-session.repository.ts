@@ -89,7 +89,7 @@ export class UploadSessionRepository {
     return this.db
       .select({ id: libraries.id, name: libraries.name, allowedFormats: libraries.allowedFormats, organizationMode: libraries.organizationMode })
       .from(libraries)
-      .where(inArray(libraries.id, libraryIds));
+      .where(and(inArray(libraries.id, libraryIds), eq(libraries.readOnly, false)));
   }
 
   findCapabilityFolders(libraryIds: number[]) {
@@ -119,6 +119,7 @@ export class UploadSessionRepository {
       .select({
         libraryId: books.libraryId,
         allowedFormats: libraries.allowedFormats,
+        readOnly: libraries.readOnly,
         organizationMode: libraries.organizationMode,
         // Needed by validateTarget: a book whose folder path is a file cannot receive another file,
         // and without checking it the upload is accepted, transferred, and only fails at import.

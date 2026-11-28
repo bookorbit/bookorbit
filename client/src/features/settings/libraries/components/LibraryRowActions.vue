@@ -75,7 +75,11 @@ function requestHistory() {
           <Images :class="refreshingCovers ? 'animate-pulse motion-reduce:animate-none' : ''" />
           {{ t('settings.admin.libraries.refreshCovers') }}
         </DropdownMenuItem>
-        <DropdownMenuItem :disabled="syncingFiles || !library.fileWriteEnabled" @click="requestSyncFiles">
+        <DropdownMenuItem
+          :title="library.readOnly ? t('library.readOnly.reason') : undefined"
+          :disabled="syncingFiles || library.readOnly || !library.fileWriteEnabled"
+          @click="requestSyncFiles"
+        >
           <FileEdit :class="syncingFiles ? 'animate-pulse motion-reduce:animate-none' : ''" />
           <span class="flex-1">{{ t('settings.admin.libraries.syncMetadataToFiles') }}</span>
         </DropdownMenuItem>

@@ -44,6 +44,7 @@ export class LibraryRepository {
         icon: libraries.icon,
         displayOrder: libraries.displayOrder,
         coverAspectRatio: libraries.coverAspectRatio,
+        readOnly: libraries.readOnly,
         watch: libraries.watch,
         autoScanCronExpression: libraries.autoScanCronExpression,
         organizationMode: libraries.organizationMode,
@@ -109,7 +110,7 @@ export class LibraryRepository {
 
   findAllFolderPaths() {
     return this.db
-      .select({ libraryId: libraryFolders.libraryId, path: libraryFolders.path, libraryName: libraries.name })
+      .select({ libraryId: libraryFolders.libraryId, path: libraryFolders.path, libraryName: libraries.name, readOnly: libraries.readOnly })
       .from(libraryFolders)
       .innerJoin(libraries, eq(libraries.id, libraryFolders.libraryId))
       .orderBy(libraries.displayOrder, libraries.name, libraryFolders.createdAt, libraryFolders.id);

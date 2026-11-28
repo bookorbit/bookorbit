@@ -1,3 +1,5 @@
+import { PathService } from '../path/path.service';
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import {
   BadRequestException,
   ForbiddenException,
@@ -306,6 +308,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
   private readonly holdReviewQueue: BookDockWorkQueue;
 
   constructor(
+    private readonly paths: PathService,
     @Inject(DB) private readonly db: Db,
     private readonly repo: BookDockRepository,
     private readonly libraryService: LibraryService,
@@ -502,10 +505,19 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
         return { fileId: row.id, fileName: row.fileName, success: false, message: 'Finalization target could not be resolved' };
       }
 
+      using _write = libraryFilePolicy.beginWrite(library.id, library.readOnly);
       // Every file of the unit, or the single file that is the whole unit. Placed one at a time and
       // remembered as they land, so a failure part-way can undo exactly what was placed. A
       // keep-original dock links or copies instead of moving, and undoing that only ever removes
       // the library's copy: the original is never touched (D34).
+      using _sources = await this.paths.beginFileWrites([
+        ...placement.map((file) => file.sourcePath),
+        ...(row.unitDirectory ? [row.unitDirectory] : []),
+      ]);
+      using _destinations = await this.paths.beginFileWrites(
+        placement.map((file) => file.destPath),
+        [library.id],
+      );
       const keepOriginal = await this.keptFiles.keepsOriginals(row);
       const undo: Array<() => Promise<unknown>> = [];
       let copied = 0;
@@ -760,6 +772,7 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
 
       const library = await this.findLibraryOrFail(libraryId);
       await this.libraryService.verifyAccess(requester ?? { id: userId, isSuperuser }, libraryId);
+      libraryFilePolicy.assertWritable(library.id, library.readOnly);
       if (requestedJoin && requestedJoin.libraryId !== libraryId) {
         throw joinError('BOOK_DOCK_JOIN_OTHER_LIBRARY', 'The book this file was meant to join is in a different library');
       }
@@ -1876,7 +1889,13 @@ export class BookDockFinalizeService implements OnModuleInit, OnApplicationBoots
     if (keepOriginal) {
       await this.keptFiles.remember(row, { discarded: true });
     } else {
-      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
+      const unitFiles = await this.repo.findUnitFiles(row.id);
+      using _paths = await this.paths.beginFileWrites([
+        row.absolutePath,
+        ...unitFiles.map((file) => file.absolutePath),
+        ...(row.unitDirectory ? [row.unitDirectory] : []),
+      ]);
+      for (const file of unitFiles) await safeUnlink(file.absolutePath);
       if (row.unitDirectory) {
         await removeEmptyDirectory(row.unitDirectory);
       }

@@ -1736,6 +1736,8 @@ watch(
                 <button
                   v-if="canEditMetadata"
                   class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm hover:bg-muted transition-colors"
+                  :disabled="book?.libraryReadOnly"
+                  :title="book?.libraryReadOnly ? t('library.readOnly.reason') : undefined"
                   @click="handleMoveFromMenu"
                 >
                   <FolderInput class="size-3.5 shrink-0" />
@@ -1745,6 +1747,8 @@ watch(
                   v-if="canMergeBook"
                   class="flex w-full items-center gap-2 px-2 py-1.5 text-start rounded-xs text-sm text-foreground hover:bg-muted transition-colors"
                   data-testid="detail-merge-book"
+                  :disabled="book?.libraryReadOnly"
+                  :title="book?.libraryReadOnly ? t('library.readOnly.reason') : undefined"
                   @click="handleMergeFromMenu"
                 >
                   <Combine class="size-3.5 shrink-0" aria-hidden="true" />

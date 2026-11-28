@@ -81,7 +81,8 @@ const companion = computed(() => {
   const other = companionDetail.request.value
   return other && request.value && other.id === request.value.companionRequestId && other.companionRequestId === request.value.id ? other : null
 })
-const { libraries, fetchLibraries } = useLibraries()
+const { libraries: allLibraries, fetchLibraries } = useLibraries()
+const libraries = computed(() => allLibraries.value.filter((library) => !library.readOnly))
 const { load: loadDefaultDestination, defaultFor: instanceDefaultFor, resolveDestination } = useRequestDestinationDefault()
 const { progressByRequest, onRequestsChanged, pruneSettledProgress } = useBookRequestProgress()
 const actions = useBookRequestActions(canManageFn)
@@ -138,7 +139,8 @@ const isPending = computed(() => request.value?.status === 'pending')
 const canDecide = computed(() => canManage.value && isPending.value)
 const canGrab = computed(() => canFulfilThis.value && request.value != null && isGrabbableBookRequestStatus(request.value.status))
 /** Files can close the request wherever a release could, once it knows which library they go to. */
-const canUpload = computed(() => canGrab.value && request.value?.targetLibraryId != null)
+const targetReadOnly = computed(() => allLibraries.value.some((library) => library.id === request.value?.targetLibraryId && library.readOnly))
+const canUpload = computed(() => canGrab.value && request.value?.targetLibraryId != null && !targetReadOnly.value)
 const uploadState = computed(() => (request.value ? uploads.stateFor(request.value.id) : null))
 /** The request's running upload, whoever started it. */
 const activeUpload = computed(() => {
@@ -416,11 +418,11 @@ async function syncReview(): Promise<void> {
  * select on exactly the load that went straight to a request.
  */
 watch(
-  canManage,
+  () => canManage.value || canFulfilThis.value,
   (allowed) => {
     if (!allowed) return
     void fetchLibraries()
-    void loadDefaultDestination()
+    if (canManage.value) void loadDefaultDestination()
     void syncReview()
   },
   { immediate: true },
@@ -1267,7 +1269,13 @@ async function handleFileAnyway() {
           {{ isRetry ? t('bookRequests.actions.retryRelease') : t('bookRequests.actions.pickRelease') }}
         </Button>
         <!-- Closing it by hand stays in the menu; the footer offers the files instead. -->
-        <Button v-if="canUpload" variant="outline" :disabled="busy" @click="handleUploadFiles">
+        <Button
+          v-if="canUpload || targetReadOnly"
+          variant="outline"
+          :disabled="busy || targetReadOnly"
+          :title="targetReadOnly ? t('library.readOnly.reason') : undefined"
+          @click="handleUploadFiles"
+        >
           <Upload :size="15" aria-hidden="true" />
           {{ t('bookRequests.upload.action') }}
         </Button>

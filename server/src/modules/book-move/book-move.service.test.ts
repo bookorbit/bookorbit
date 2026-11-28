@@ -226,8 +226,8 @@ beforeEach(() => {
     finishJob: vi.fn().mockResolvedValue(undefined),
     markInterruptedJobs: vi.fn().mockResolvedValue([]),
     findLibraryFolders: vi.fn().mockResolvedValue([
-      { libraryId: 1, path: '/libA' },
-      { libraryId: 2, path: '/libB' },
+      { libraryId: 1, path: '/libA', readOnly: false },
+      { libraryId: 2, path: '/libB', readOnly: false },
     ]),
     findWatchedLibraryIds: vi.fn().mockResolvedValue([1, 2]),
     applyBookMove: vi.fn(),
@@ -289,6 +289,14 @@ describe('access control', () => {
 });
 
 describe('preview', () => {
+  it.each(['source', 'target'])('refuses a move involving a read-only %s library before starting a job', async (side) => {
+    if (side === 'source') moveRepo.findMoveBookData.mockResolvedValue([makeBook({ readOnly: true })]);
+    else moveRepo.findTargetLibrary.mockResolvedValue(makeTarget({ readOnly: true }));
+    await expect(service.preview(makeDto(), USER)).rejects.toBeInstanceOf(ForbiddenException);
+    await expect(service.planRun(makeDto(), USER)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(moveRepo.createJob).not.toHaveBeenCalled();
+  });
+
   it('summarises a clean move without demanding review', async () => {
     const result = await service.preview(makeDto(), USER);
 
@@ -528,8 +536,8 @@ describe('starting a run', () => {
     await expect(service.prepareRun(makeRun(plan), USER)).rejects.toThrow('close failed');
     expect(libraryGate.current(1)).toBeNull();
     expect(libraryGate.current(2)).toBeNull();
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA']);
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB']);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA'], false);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB'], false);
   });
 
   it('fails the run when the account lost editor access to the target', async () => {
@@ -555,8 +563,8 @@ describe('a run', () => {
     await runMove();
 
     expect(fileWatcherService.stopWatcher.mock.calls.map((call) => call[0]).sort()).toEqual([1, 2]);
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA']);
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB']);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA'], false);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB'], false);
   });
 
   it('restarts watchers and frees the libraries even when closing the job throws', async () => {
@@ -564,8 +572,8 @@ describe('a run', () => {
 
     await expect(runMove()).rejects.toThrow('db gone');
 
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA']);
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB']);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(1, ['/libA'], false);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(2, ['/libB'], false);
     expect(service.isBusy(1)).toBe(false);
   });
 

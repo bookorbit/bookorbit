@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { createHash } from 'crypto';
 import { constants as fsConstants } from 'fs';
@@ -234,6 +235,7 @@ export class BookMergePlanner {
     const bookById = (id: number) => books.find((book) => book.id === id)!;
     const involvedLibraryIds = [...new Set(books.map((book) => book.libraryId))].sort((a, b) => a - b);
     const libraries = await this.repository.loadLibraries(involvedLibraryIds);
+    for (const lib of libraries.values()) libraryFilePolicy.assertWritable(lib.id, lib.readOnly);
     const seeOthers = canSeeOthers(user);
 
     // Eligibility. Books may sit in different libraries; each library's own rules are checked below.

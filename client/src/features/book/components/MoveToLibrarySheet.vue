@@ -82,7 +82,7 @@ function folderCount(library: Library): number {
 }
 
 function selectLibrary(library: Library): void {
-  if (isCurrentLibrary(library)) return
+  if (library.readOnly || isCurrentLibrary(library)) return
   selectedLibraryId.value = library.id
   selectedFolderId.value = library.folders?.[0]?.id ?? null
   move.preview.value = null
@@ -222,7 +222,7 @@ function collisionLabel(kind: string): string {
                   selectedLibraryId === library.id ? 'border-primary ring-1 ring-primary' : 'border-border',
                   isCurrentLibrary(library) ? 'opacity-55 cursor-not-allowed' : 'hover:bg-muted cursor-pointer',
                 ]"
-                :disabled="isCurrentLibrary(library)"
+                :disabled="library.readOnly || isCurrentLibrary(library)"
                 :aria-pressed="selectedLibraryId === library.id"
                 @click="selectLibrary(library)"
               >
@@ -236,7 +236,7 @@ function collisionLabel(kind: string): string {
                 </span>
                 <span class="min-w-0 flex-1">
                   <span class="flex flex-wrap items-center gap-2 text-sm font-semibold text-foreground">
-                    {{ library.name }}
+                    {{ library.readOnly ? t('library.readOnly.option', { name: library.name }) : library.name }}
                     <span v-if="isCurrentLibrary(library)" class="rounded-full bg-muted px-2 py-0.5 text-[0.68rem] font-medium text-muted-foreground">
                       {{ t('book.move.currentLibrary') }}
                     </span>

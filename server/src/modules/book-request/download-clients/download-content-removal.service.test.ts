@@ -17,7 +17,9 @@ async function setup() {
   await mkdir(downloads);
   await mkdir(outside);
   const repo = { findPathMappings: vi.fn().mockResolvedValue([{ remotePath: '/downloads', localPath: downloads }]) };
-  const service = new DownloadContentRemovalService(new PathMappingService(repo as never));
+  const service = new DownloadContentRemovalService(
+    new PathMappingService(repo as never, { beginPathWrite: () => Promise.resolve(new DisposableStack()) } as never),
+  );
   return { root, downloads, outside, service };
 }
 
@@ -209,7 +211,9 @@ describe('DownloadContentRemovalService', () => {
 
     it('accepts a Windows-style folder through a matching mapping', async () => {
       const repo = { findPathMappings: vi.fn().mockResolvedValue([{ remotePath: 'D:\\usenet', localPath: env.downloads }]) };
-      const service = new DownloadContentRemovalService(new PathMappingService(repo as never));
+      const service = new DownloadContentRemovalService(
+        new PathMappingService(repo as never, { beginPathWrite: () => Promise.resolve(new DisposableStack()) } as never),
+      );
       await put(join(env.downloads, 'Dune', 'Dune.epub'));
 
       await service.execute(await service.planFolder(CLIENT_ID, 'D:\\usenet\\Dune'));

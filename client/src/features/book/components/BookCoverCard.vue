@@ -155,7 +155,7 @@ async function handleRefreshMetadata() {
   if (updated) emit('update:book', mergeBookCardWithDetail(props.book, updated))
 }
 const { hasPermission } = usePermissions()
-const { hasLibraryPermission } = useLibraryPermissions()
+const { hasLibraryPermission, isReadOnlyLibrary } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { cardOverlays, formatBadgeStyle, bookCoverDisplayMode, gridCardPrimaryLabel, gridCardSecondaryLabel, cardInfoMode } = useDisplaySettings()
 const injectedCoverAspectRatio = inject(COVER_ASPECT_RATIO_KEY, ref(DEFAULT_COVER_ASPECT_RATIO))
@@ -784,7 +784,12 @@ const secondaryLabelLocation = computed(() => (props.selectionMode ? null : reso
                     <FolderPlus class="size-4 mr-2" />
                     {{ t('book.actions.addToCollection') }}
                   </DropdownMenuItem>
-                  <DropdownMenuItem v-if="allowMoveToLibrary && canEditMetadata" @click="emit('action', 'move-to-library')">
+                  <DropdownMenuItem
+                    v-if="allowMoveToLibrary && canEditMetadata"
+                    :disabled="isReadOnlyLibrary(book?.libraryId)"
+                    :title="isReadOnlyLibrary(book?.libraryId) ? t('library.readOnly.reason') : undefined"
+                    @click="emit('action', 'move-to-library')"
+                  >
                     <FolderInput class="size-4 mr-2" />
                     {{ t('book.move.action') }}
                   </DropdownMenuItem>

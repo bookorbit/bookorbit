@@ -44,6 +44,14 @@ beforeEach(() => {
 afterEach(() => wrapper?.unmount())
 
 describe('BookDestinationFields', () => {
+  it('explains a read-only scoped destination and prevents submission', () => {
+    const library = makeLibrary({ readOnly: true })
+    libraries.value = [library]
+    const fields = mountFields({ libraryId: library.id }, true)
+    expect(fields.props('destination').hasDestination.value).toBe(false)
+    expect(wrapper.get('[role="status"]').text()).toBe('Files in this library are read-only.')
+  })
+
   it('renders the sole library and folder as readable text without selects', () => {
     mountFields()
     expect(wrapper.findAll('select')).toHaveLength(0)

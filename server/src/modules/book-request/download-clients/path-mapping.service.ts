@@ -1,10 +1,12 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomBytes } from 'crypto';
+import { PathService } from '../../path/path.service';
 import { link, realpath, stat, unlink, writeFile } from 'fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 
 import type { PathMappingHardlinkTestResult } from '@bookorbit/types';
 
+import type { DownloadClientAdapter, ResolvedClientConfig } from './download-client-adapter';
 import { DownloadClientRepository } from './download-client.repository';
 
 const MAX_PATH_LENGTH = 4096;
@@ -32,7 +34,32 @@ export interface ResolvedDownloadPath {
  */
 @Injectable()
 export class PathMappingService {
-  constructor(private readonly repo: DownloadClientRepository) {}
+  constructor(
+    private readonly repo: DownloadClientRepository,
+    private readonly paths: PathService,
+  ) {}
+
+  beginDownloadRemoval(path: string) {
+    return this.paths.beginPathWrite(path, true);
+  }
+
+  /** A client can delete data in a different filesystem namespace. Resolve its live location
+   * through its configured mapping before sending a destructive command when a library is protected. */
+  async beginClientRemoval(adapter: DownloadClientAdapter, config: ResolvedClientConfig, key: string, deleteFiles: boolean) {
+    if (!deleteFiles || adapter.stage) return null;
+    return this.paths.beginFileWrites(
+      async () => {
+        const statuses = await adapter.status([key], config);
+        const entry = statuses.find((item) => item.clientKey.toLowerCase() === key.toLowerCase());
+        if (!entry?.contentPath)
+          throw new BadRequestException('Cannot verify the download location. Remove the download without deleting its files.');
+        const { localPath } = await this.toLocalPath(config.id, entry.contentPath);
+        return [localPath];
+      },
+      undefined,
+      true,
+    );
+  }
 
   /**
    * Every client must declare at least one mapping, the single-host case included: qBittorrent and
@@ -97,6 +124,8 @@ export class PathMappingService {
       return { localPathExists, bookDockPathExists, hardlinkWorks: false };
     }
 
+    using _source = await this.paths.beginPathWrite(localPath);
+    using _target = await this.paths.beginPathWrite(bookDockPath);
     const probeName = `.bookorbit-hardlink-probe-${randomBytes(8).toString('hex')}`;
     const source = join(localPath, probeName);
     const target = join(bookDockPath, probeName);

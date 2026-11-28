@@ -54,6 +54,7 @@ async function makeService(
   const uploads = { discard: vi.fn().mockResolvedValue(undefined) };
 
   const service = new DownloadRemovalService(
+    { beginClientRemoval: vi.fn().mockResolvedValue(null) } as never,
     downloads as never,
     clients as never,
     registry as never,

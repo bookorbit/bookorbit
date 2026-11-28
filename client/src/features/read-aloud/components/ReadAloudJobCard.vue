@@ -46,6 +46,7 @@ const props = defineProps<{
   errorKey: string | null
   /** Whether a new job could start now, which "Start over" needs. */
   canStartOver: boolean
+  libraryReadOnly?: boolean
   viewerId: number | null
 }>()
 
@@ -432,7 +433,15 @@ function handleReloadEvents(): void {
         </ol>
       </template>
 
-      <ReadAloudReview v-if="review" :job="job" :action="action" @resync="handleResync" @publish="handlePublish" @discard="handleDiscard" />
+      <ReadAloudReview
+        v-if="review"
+        :job="job"
+        :action="action"
+        :library-read-only="libraryReadOnly"
+        @resync="handleResync"
+        @publish="handlePublish"
+        @discard="handleDiscard"
+      />
 
       <ul v-if="complete && warnings.length > 0" class="flex flex-col gap-1.5" :aria-label="t('book.detail.files.readAloud.job.warnings')">
         <li v-for="warning in warnings" :key="warning" class="flex items-start gap-2 text-[12.5px] text-foreground">
@@ -448,7 +457,8 @@ function handleReloadEvents(): void {
           v-if="paused && job.canManage && !stopping"
           type="button"
           class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          :disabled="busy"
+          :disabled="busy || libraryReadOnly"
+          :title="libraryReadOnly ? t('library.readOnly.reason') : undefined"
           data-test="read-aloud-resume"
           @click="handleResume"
         >
@@ -490,7 +500,8 @@ function handleReloadEvents(): void {
           v-if="retryable && job.canManage"
           type="button"
           class="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-2.5 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-          :disabled="busy"
+          :disabled="busy || libraryReadOnly"
+          :title="libraryReadOnly ? t('library.readOnly.reason') : undefined"
           @click="handleRetry"
         >
           <Loader2 v-if="action === 'retry'" class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />

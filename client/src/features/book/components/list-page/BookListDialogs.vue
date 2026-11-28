@@ -36,6 +36,7 @@ function handleRemoveFromCollection() {
   />
 
   <SelectionActionBar
+    :read-only-selection="page.readOnlySelection"
     :metadata-editable="page.canEditSelectionMetadata"
     :visible="page.selectionMode"
     :count="page.selectedCount"

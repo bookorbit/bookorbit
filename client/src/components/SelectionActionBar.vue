@@ -83,6 +83,7 @@ const props = withDefaults(
     // Selection is query-scoped (all matching across pages), so individual ids aren't enumerable.
     queryScoped?: boolean
     metadataEditable?: boolean
+    readOnlySelection?: boolean
     /** Present when the user may merge books here; its reason says why this selection cannot be merged. */
     merge?: MergeSelectionState | null
     /** Present when the user may link books here; its reason says why this selection cannot be linked. */
@@ -150,6 +151,7 @@ const canMoveToLibrary = computed(() => hasPermission('library_edit_metadata') &
 const canMerge = computed(() => props.merge !== null && canBulkActions.value)
 const canLink = computed(() => props.link !== null && canBulkActions.value)
 const mergeDisabledText = computed(() => {
+  if (props.readOnlySelection) return t('library.readOnly.reason')
   switch (props.merge?.disabledReason) {
     case 'queryScoped':
       return t('book.merge.disabled.queryScoped')
@@ -608,7 +610,12 @@ watch(
                           <ImageDown :size="14" />
                           <span>{{ t('components.selectionActionBar.reExtractCover') }}</span>
                         </DropdownMenuItem>
-                        <DropdownMenuItem data-testid="action-bulk-embed-audio-cover" @click="onEmbedAudioCover">
+                        <DropdownMenuItem
+                          data-testid="action-bulk-embed-audio-cover"
+                          :disabled="readOnlySelection"
+                          :title="readOnlySelection ? t('library.readOnly.reason') : undefined"
+                          @click="onEmbedAudioCover"
+                        >
                           <ImageUp :size="14" />
                           <span>{{ t('components.selectionActionBar.embedAudioCover') }}</span>
                         </DropdownMenuItem>
@@ -639,7 +646,12 @@ watch(
                       </template>
                       <template v-if="canMoveToLibrary">
                         <DropdownMenuSeparator />
-                        <DropdownMenuItem data-testid="action-move-to-library" @click="onMoveToLibrary">
+                        <DropdownMenuItem
+                          data-testid="action-move-to-library"
+                          :disabled="readOnlySelection"
+                          :title="readOnlySelection ? t('library.readOnly.reason') : undefined"
+                          @click="onMoveToLibrary"
+                        >
                           <FolderInput :size="14" />
                           <span>{{ t('book.move.action') }}</span>
                         </DropdownMenuItem>

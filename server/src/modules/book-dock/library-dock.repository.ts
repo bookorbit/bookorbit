@@ -50,7 +50,7 @@ export class LibraryDockRepository {
       })
       .from(libraryDocks)
       .innerJoin(libraries, eq(libraries.id, libraryDocks.libraryId))
-      .where(and(eq(libraryDocks.enabled, true), inArray(libraryDocks.libraryId, libraryIds)))
+      .where(and(eq(libraryDocks.enabled, true), eq(libraries.readOnly, false), inArray(libraryDocks.libraryId, libraryIds)))
       .orderBy(asc(libraries.name), asc(libraries.id));
   }
 

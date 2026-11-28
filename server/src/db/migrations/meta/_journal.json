@@ -1184,6 +1184,13 @@
       "when": 1795806106340,
       "tag": "0168_add_book_request_uploads",
       "breakpoints": true
+    },
+    {
+      "idx": 169,
+      "version": "7",
+      "when": 1795840969524,
+      "tag": "0169_add_library_read_only",
+      "breakpoints": true
     }
   ]
 }

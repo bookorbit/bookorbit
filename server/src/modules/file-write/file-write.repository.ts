@@ -76,9 +76,12 @@ export class FileWriteRepository {
     return row ?? null;
   }
 
-  async findLibraryWriteSettingsForBook(bookId: number): Promise<{ fileWriteEnabled: boolean; fileRenameEnabled: boolean } | null> {
+  async findLibraryWriteSettingsForBook(
+    bookId: number,
+  ): Promise<{ readOnly: boolean; fileWriteEnabled: boolean; fileRenameEnabled: boolean } | null> {
     const [row] = await this.db
       .select({
+        readOnly: libraries.readOnly,
         fileWriteEnabled: libraries.fileWriteEnabled,
         fileRenameEnabled: libraries.fileRenameEnabled,
       })
@@ -92,6 +95,7 @@ export class FileWriteRepository {
   async findLibraryFileWriteConfig(libraryId: number) {
     const [row] = await this.db
       .select({
+        readOnly: libraries.readOnly,
         fileWriteEnabled: libraries.fileWriteEnabled,
         fileWriteWriteCover: libraries.fileWriteWriteCover,
         fileWriteEpubEnabled: libraries.fileWriteEpubEnabled,

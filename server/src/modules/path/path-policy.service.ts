@@ -1,6 +1,6 @@
 import type { ConfigType } from '@nestjs/config';
 import { BadRequestException, ForbiddenException, Inject, Injectable } from '@nestjs/common';
-import { realpath } from 'fs/promises';
+import { lstat, realpath } from 'fs/promises';
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 
 import { storageConfig } from '../../config/config';
@@ -73,25 +73,11 @@ export class PathPolicyService {
     const lexicalRelativePath = relative(rootPath, resolvedPath);
     if (lexicalRelativePath === '..' || lexicalRelativePath.startsWith(`..${sep}`) || isAbsolute(lexicalRelativePath)) return false;
 
-    const suffixSegments: string[] = [];
-    let current = resolvedPath;
     let canonicalPath: string;
-
-    while (true) {
-      try {
-        const canonicalAncestor = await realpath(current);
-        canonicalPath = suffixSegments.reduceRight((built, segment) => join(built, segment), canonicalAncestor);
-        break;
-      } catch (error) {
-        const code = getErrorCode(error);
-        if (code !== 'ENOENT' && code !== 'ENOTDIR') return false;
-      }
-
-      const parent = dirname(current);
-      if (parent === current) return false;
-
-      suffixSegments.push(basename(current));
-      current = parent;
+    try {
+      canonicalPath = await canonicalizeWithExistingAncestor(resolvedPath);
+    } catch {
+      return false;
     }
 
     const canonicalRelativePath = relative(canonicalRoot, canonicalPath);
@@ -107,7 +93,7 @@ export class PathPolicyService {
   }
 }
 
-async function canonicalizeWithExistingAncestor(resolvedPath: string): Promise<string> {
+export async function canonicalizeWithExistingAncestor(resolvedPath: string): Promise<string> {
   const suffixSegments: string[] = [];
   let current = resolvedPath;
 
@@ -117,13 +103,17 @@ async function canonicalizeWithExistingAncestor(resolvedPath: string): Promise<s
       return suffixSegments.reduceRight((built, segment) => join(built, segment), canonical);
     } catch (error) {
       const code = getErrorCode(error);
-      if (code !== 'ENOENT' && code !== 'ENOTDIR') {
-        return resolvedPath;
-      }
+      if (code !== 'ENOENT') throw new ForbiddenException('Cannot verify the resolved filesystem path');
+      // realpath also reports ENOENT for a dangling link. A future write could create its target.
+      const missing = await lstat(current).then(
+        () => false,
+        (cause: unknown) => getErrorCode(cause) === 'ENOENT',
+      );
+      if (!missing) throw new ForbiddenException('Cannot verify the resolved filesystem path');
     }
 
     const parent = dirname(current);
-    if (parent === current) return resolvedPath;
+    if (parent === current) throw new ForbiddenException('Cannot verify the resolved filesystem path');
 
     suffixSegments.push(basename(current));
     current = parent;

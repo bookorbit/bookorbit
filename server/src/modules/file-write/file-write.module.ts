@@ -1,3 +1,4 @@
+import { PathModule } from '../path/path.module';
 import { Module, forwardRef } from '@nestjs/common';
 
 import { CommonModule } from '../../common/common.module';
@@ -26,6 +27,7 @@ import { FORMAT_WRITERS } from './interfaces/format-writer.interface';
 
 @Module({
   imports: [
+    PathModule,
     CommonModule,
     AudiobookChaptersModule,
     forwardRef(() => NotificationModule),

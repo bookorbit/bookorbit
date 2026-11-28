@@ -45,6 +45,7 @@ export interface Library {
   icon?: string | null;
   displayOrder: number;
   coverAspectRatio: CoverAspectRatio;
+  readOnly?: boolean;
   watch: boolean;
   autoScanCronExpression?: string | null;
   metadataPrecedence: string[];

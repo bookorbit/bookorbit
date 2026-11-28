@@ -11,6 +11,6 @@ describe('PathModule', () => {
   it('registers the path controller, its services and the library folder repository', () => {
     expect(Reflect.getMetadata('controllers', PathModule)).toEqual([PathController]);
     expect(Reflect.getMetadata('providers', PathModule)).toEqual([PathPolicyService, PathService, PathRepository, FolderInsightService]);
-    expect(Reflect.getMetadata('exports', PathModule)).toEqual([PathPolicyService]);
+    expect(Reflect.getMetadata('exports', PathModule)).toEqual([PathPolicyService, PathService]);
   });
 });

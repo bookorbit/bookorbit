@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { isDeepStrictEqual } from 'node:util';
 import { RegexMetadataService } from '../metadata/regex/regex-metadata.service';
 import { RegexMetadataPreviewDto, RegexMetadataValidationDto } from './dto/regex-metadata.dto';
@@ -24,7 +25,7 @@ import { apiKeyCredentialOf, type RequestUser } from '../../common/types/request
 import type { LibraryFolder } from '../../db/schema/libraries';
 import { AchievementEventsService, ACHIEVEMENT_EVENT_LIBRARY_CATALOG_CHANGED } from '../achievement/achievement-events.service';
 import { FileWriteService } from '../file-write/file-write.service';
-import { PathPolicyService } from '../path/path-policy.service';
+import { canonicalizeWithExistingAncestor, PathPolicyService } from '../path/path-policy.service';
 import { isPrimaryFormat } from '../scanner/lib/classify';
 import { FileWatcherService } from '../scanner/file-watcher.service';
 import { ScannerService } from '../scanner/scanner.service';
@@ -166,11 +167,12 @@ export class LibraryService {
   }
 
   async create(dto: CreateLibraryDto) {
+    using roots = libraryFilePolicy.beginRootChange();
     const regexMetadata = resolveRegexMetadataConfig(dto.regexMetadata);
     await this.regexMetadata.validate(regexMetadata);
     await this.assertNameAvailable(dto.name);
     const folderPaths = await this.assertFolderPathsWithinBrowseRoot(dto.folders);
-    await this.assertFoldersDoNotOverlap(folderPaths);
+    await this.assertFoldersDoNotOverlap(folderPaths, undefined, dto.readOnly);
     const icon = normalizeIconValue(dto.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -180,6 +182,7 @@ export class LibraryService {
       name: dto.name,
       icon,
       displayOrder: dto.displayOrder ?? 0,
+      readOnly: dto.readOnly ?? false,
       watch: dto.watch ?? false,
       autoScanCronExpression: dto.autoScanCronExpression ?? null,
       regexMetadata,
@@ -220,6 +223,7 @@ export class LibraryService {
       await this.fileWatcherService.startWatcher(
         library.id,
         folders.map((folder) => folder.path),
+        library.readOnly,
       );
     }
 
@@ -230,6 +234,10 @@ export class LibraryService {
   }
 
   async update(id: number, dto: UpdateLibraryDto) {
+    using roots =
+      dto.folders !== undefined || dto.readOnly !== undefined || dto.watch !== undefined
+        ? libraryFilePolicy.beginRootChange(dto.folders !== undefined ? id : undefined)
+        : null;
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
 
@@ -258,7 +266,10 @@ export class LibraryService {
     if (!regexMetadataChanged) delete fields.regexMetadata;
     else fields.regexMetadata = incomingRegexMetadata;
     const folderPaths = rawFolderPaths === undefined ? undefined : await this.assertFolderPathsWithinBrowseRoot(rawFolderPaths);
-    if (folderPaths !== undefined) await this.assertFoldersDoNotOverlap(folderPaths, id);
+    if (folderPaths !== undefined || (dto.readOnly && !existing.readOnly)) {
+      const paths = folderPaths ?? (await this.libraryRepo.findFoldersByLibrary(id)).map((folder) => folder.path);
+      await this.assertFoldersDoNotOverlap(paths, id, dto.readOnly ?? existing.readOnly);
+    }
     const icon = fields.icon !== undefined ? normalizeIconValue(fields.icon) : normalizeIconValue(existing.icon);
     if (!icon) {
       throw new BadRequestException('Icon is required');
@@ -267,7 +278,10 @@ export class LibraryService {
       fields.icon = icon;
     }
 
-    const [updated] = await this.libraryRepo.update(id, fields);
+    const modeChanged = fields.readOnly !== undefined && fields.readOnly !== existing.readOnly;
+    if (!modeChanged) delete fields.readOnly;
+    const save = () => this.libraryRepo.update(id, fields);
+    const [updated] = modeChanged ? await this.changeFileMode(id, fields.readOnly!, save) : await save();
     if (dto.autoScanCronExpression !== undefined) this.scanScheduler.syncSchedule(id, dto.autoScanCronExpression);
 
     if (folderPaths !== undefined) {
@@ -294,19 +308,13 @@ export class LibraryService {
 
     const watchChanged = dto.watch !== undefined && dto.watch !== existing.watch;
     const nextWatch = dto.watch ?? existing.watch;
-    if (watchChanged) {
-      if (nextWatch) {
-        await this.fileWatcherService.startWatcher(
-          id,
-          folders.map((f) => f.path),
-        );
-      } else {
-        await this.fileWatcherService.stopWatcher(id);
-      }
-    } else if (nextWatch && folderPaths !== undefined) {
+    if (watchChanged && !nextWatch) {
+      await this.fileWatcherService.stopWatcher(id);
+    } else if (nextWatch && (watchChanged || folderPaths !== undefined || modeChanged)) {
       await this.fileWatcherService.startWatcher(
         id,
         folders.map((f) => f.path),
+        updated.readOnly,
       );
     }
 
@@ -317,7 +325,18 @@ export class LibraryService {
     return { ...normalizeLibraryOrganizationMode(updated), folders };
   }
 
+  private async changeFileMode<T>(id: number, readOnly: boolean, save: () => Promise<T>): Promise<T> {
+    const release = this.libraryGate.tryAcquire(id, 'file_mode_change');
+    if (!release) throw new ConflictException({ errorCode: 'LIBRARY_BUSY', message: 'Wait for the active library operation to finish.' });
+    try {
+      return await libraryFilePolicy.change(id, readOnly, save);
+    } finally {
+      release();
+    }
+  }
+
   async remove(id: number) {
+    using roots = libraryFilePolicy.beginRootChange(id);
     const [existing] = await this.libraryRepo.findById(id);
     if (!existing) throw new NotFoundException('Library not found');
     // Held for the whole delete, so a scan, move, rename or merge cannot start on rows and files
@@ -492,6 +511,7 @@ export class LibraryService {
     const [library] = await this.libraryRepo.findById(libraryId);
     if (!library) throw new NotFoundException('Library not found');
 
+    if (!dryRun) libraryFilePolicy.assertWritable(libraryId, library.readOnly);
     if (!dryRun && !library.fileWriteEnabled) {
       throw new BadRequestException('Metadata file write is not enabled for this library.');
     }
@@ -551,12 +571,32 @@ export class LibraryService {
    * library already has are not re-checked: a library saved before this rule keeps saving until an
    * admin moves its folders apart, and the scanner settles who owns what in the meantime.
    */
-  private async assertFoldersDoNotOverlap(paths: string[], libraryId?: number): Promise<void> {
+  private async assertFoldersDoNotOverlap(paths: string[], libraryId?: number, readOnly = false): Promise<void> {
     const existing = await this.libraryRepo.findAllFolderPaths();
     const current = new Set(existing.filter((folder) => folder.libraryId === libraryId).map((folder) => folder.path));
     const otherLibraries = existing.filter((folder) => folder.libraryId !== libraryId);
 
+    const protectedRoots = await Promise.all(
+      otherLibraries
+        .filter((folder) => readOnly || folder.readOnly)
+        .map(async (folder) => ({
+          ...folder,
+          canonical: await canonicalizeWithExistingAncestor(folder.path),
+        })),
+    );
     for (const path of paths) {
+      if (readOnly || protectedRoots.length) {
+        const canonical = await canonicalizeWithExistingAncestor(path);
+        if (
+          protectedRoots.some((folder) => pathsOverlap(canonical, folder.canonical)) ||
+          (readOnly && pathsOverlap(canonical, await canonicalizeWithExistingAncestor(this.appDataPath)))
+        ) {
+          throw new ConflictException({
+            message: 'Read-only library folders must be separate from application data and other libraries.',
+            errorCode: 'LIBRARY_FOLDER_OVERLAP',
+          });
+        }
+      }
       if (current.has(path)) continue;
       const inAnotherLibrary = otherLibraries.find((folder) => pathsOverlap(path, folder.path));
       const inThisLibrary = paths.find((other) => other !== path && pathsOverlap(path, other));
@@ -571,7 +611,7 @@ export class LibraryService {
         },
       });
     }
-    await this.lifecycle.assertFolderPathsAllowed(paths.filter((path) => !current.has(path)));
+    await this.lifecycle.assertFolderPathsAllowed(readOnly ? paths : paths.filter((path) => !current.has(path)));
   }
 
   private async cleanupCoverDirectories(bookIds: number[]): Promise<void> {

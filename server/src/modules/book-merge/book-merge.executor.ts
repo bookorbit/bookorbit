@@ -1,3 +1,5 @@
+import { libraryIdsOf } from './book-merge.planner';
+import { PathService } from '../path/path.service';
 import { Injectable, Logger } from '@nestjs/common';
 import { stat, unlink } from 'fs/promises';
 import { dirname } from 'path';
@@ -89,6 +91,7 @@ export class BookMergeExecutor {
   private readonly logger = new Logger(BookMergeExecutor.name);
 
   constructor(
+    private readonly paths: PathService,
     private readonly repository: BookMergeRepository,
     private readonly consolidation: BookConsolidationService,
     private readonly fileLocks: FileLockService,
@@ -100,6 +103,10 @@ export class BookMergeExecutor {
   async run(job: MergeJobRow, plan: MergeExecutionPlan, onProgress: (change: MergeProgress) => void): Promise<MergeRunResult> {
     const ids = [...new Set([plan.targetBookId, ...plan.steps.map((step) => step.sourceBookId)])].sort((a, b) => a - b);
     return this.withLocks(ids, async () => {
+      using _paths = await this.paths.beginFileWrites(
+        plan.steps.flatMap((step) => [...step.vacatedFolders, ...step.moves.flatMap((move) => [move.from, move.to])]),
+        libraryIdsOf(plan),
+      );
       for (const id of ids) this.fileRename.cancelPendingRename(id);
       const suppression = this.suppressionPaths(plan);
       this.selfWrites.begin(suppression);

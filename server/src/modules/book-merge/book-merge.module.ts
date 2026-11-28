@@ -1,3 +1,4 @@
+import { PathModule } from '../path/path.module';
 import { Module } from '@nestjs/common';
 
 import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
@@ -25,6 +26,7 @@ import { BookMergeService } from './book-merge.service';
 
 @Module({
   imports: [
+    PathModule,
     BookModule,
     BookConsolidationModule,
     BookCoverStoreModule,

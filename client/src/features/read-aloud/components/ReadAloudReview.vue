@@ -14,6 +14,7 @@ const props = defineProps<{
   action: ReadAloudAction | null
   /** The chapter table of a finished job: no choices to make, nothing to re-sync. */
   readonly?: boolean
+  libraryReadOnly?: boolean
 }>()
 const emit = defineEmits<{ resync: [decisions: ReadAloudDecisions]; publish: []; discard: [] }>()
 
@@ -281,7 +282,8 @@ function handleReload(): void {
           type="button"
           class="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           :class="changedCount > 0 ? 'border border-input text-foreground hover:bg-muted' : 'bg-primary text-primary-foreground hover:bg-primary/90'"
-          :disabled="busy"
+          :disabled="busy || libraryReadOnly"
+          :title="libraryReadOnly ? t('library.readOnly.reason') : undefined"
           @click="handlePublish"
         >
           <Loader2 v-if="action === 'publish'" class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -291,7 +293,8 @@ function handleReload(): void {
           type="button"
           class="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
           :class="changedCount > 0 ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'border border-input text-foreground hover:bg-muted'"
-          :disabled="changedCount === 0 || busy"
+          :disabled="changedCount === 0 || busy || libraryReadOnly"
+          :title="libraryReadOnly ? t('library.readOnly.reason') : undefined"
           @click="handleResync"
         >
           <Loader2 v-if="action === 'resync'" class="size-3.5 animate-spin motion-reduce:animate-none" aria-hidden="true" />

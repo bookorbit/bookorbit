@@ -554,6 +554,7 @@ const {
   handleImportPresetBackup,
   selectedIds,
   selectedCount,
+  readOnlySelection,
   canEditSelectionMetadata,
   mergeSelection,
   mergeOpen,
@@ -1134,6 +1135,7 @@ defineOptions({ name: 'HomeView' })
     </Transition>
 
     <SelectionActionBar
+      :read-only-selection="readOnlySelection"
       :metadata-editable="canEditSelectionMetadata"
       :visible="selectionMode"
       :count="querySelection ? querySelection.total : selectedCount"

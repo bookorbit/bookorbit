@@ -1,3 +1,6 @@
+import { isInsideRoot } from '../../common/utils/file-move.utils';
+import { PathService } from '../path/path.service';
+import { libraryFilePolicy, READ_ONLY_LIBRARY_MESSAGE } from '../../common/services/library-file-policy';
 import { ConflictException, Injectable, Logger, OnModuleDestroy, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { access, mkdir, readdir, rename as fsRename, rmdir } from 'fs/promises';
@@ -46,6 +49,7 @@ export class FileRenameService implements OnModuleDestroy {
   private readonly scheduledRenameRuns = new Set<Promise<unknown>>();
 
   constructor(
+    private readonly paths: PathService,
     private readonly renameRepo: FileRenameRepository,
     private readonly lockService: FileLockService,
     private readonly appSettings: AppSettingsService,
@@ -112,6 +116,10 @@ export class FileRenameService implements OnModuleDestroy {
       return this.logAndReturn(bookId, startedAt, { status: 'skipped', reason: 'book not found' });
     }
 
+    if (libraryFilePolicy.isReadOnly(data.libraryId, data.readOnly)) {
+      return this.logAndReturn(bookId, startedAt, { status: 'skipped', reason: READ_ONLY_LIBRARY_MESSAGE });
+    }
+    using _write = libraryFilePolicy.beginWrite(data.libraryId, data.readOnly);
     if (!data.fileRenameEnabled && !force) {
       return this.logAndReturn(bookId, startedAt, { status: 'skipped', reason: 'disabled' });
     }
@@ -256,6 +264,8 @@ export class FileRenameService implements OnModuleDestroy {
       }
     }
 
+    const participants = [currentFolderPath, newFolderPath, ...allFiles.map((file) => file.absolutePath), ...fileTargets.values()];
+    using _paths = await this.paths.beginFileWrites(participants, [data.libraryId], true);
     const suppressPaths = this.buildSuppressedRenamePaths(allFiles, fileTargets, currentFolderPath, newFolderPath, data.libraryFolderPath);
     this.selfWriteRegistry.begin(suppressPaths);
     try {
@@ -265,6 +275,7 @@ export class FileRenameService implements OnModuleDestroy {
         // the target's could deadlock against a merge that took the two in the other order.
         const merging = this.lockService.tryWithLock(bookOperationLockKey(targetBookId), () =>
           this.mergeBookIntoExistingFolder(
+            allFiles,
             bookId,
             userId,
             data,
@@ -279,12 +290,12 @@ export class FileRenameService implements OnModuleDestroy {
         await merging;
       } else if (bookHasOwnFolder && newFolderPath !== currentFolderPath) {
         if (moveIntoExistingFolder) {
-          await this.renameBookIntoExistingFolder(bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
+          await this.renameBookIntoExistingFolder(allFiles, bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
         } else {
-          await this.renameBookWithFolder(bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
+          await this.renameBookWithFolder(allFiles, bookId, data, currentFolderPath, newFolderPath, fileTargets, sanitizeForCrossPlatform);
         }
       } else {
-        await this.renameBookFilesOnly(bookId, data, fileTargets, newBookPath, sanitizeForCrossPlatform);
+        await this.renameBookFilesOnly(allFiles, bookId, data, fileTargets, newBookPath, sanitizeForCrossPlatform);
       }
     } catch (err) {
       const errorClass = err instanceof Error ? err.name : 'Error';
@@ -346,13 +357,13 @@ export class FileRenameService implements OnModuleDestroy {
   }
 
   private async renameBookFilesOnly(
+    allFiles: RenameBookFile[],
     bookId: number,
     data: BookRenameData,
     fileTargets: Map<number, string>,
     nextBookFolderPath: string,
     sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
-    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const updates: BookFilePathUpdate[] = allFiles.map((file) => {
       const newPath = fileTargets.get(file.id)!;
       return {
@@ -397,12 +408,13 @@ export class FileRenameService implements OnModuleDestroy {
       const oldDir = dirname(file.absolutePath);
       const newDir = dirname(fileTargets.get(file.id)!);
       if (oldDir !== newDir) {
-        await this.tryRemoveEmptyDir(oldDir);
+        await this.tryRemoveEmptyDir(oldDir, data.libraryFolderPath);
       }
     }
   }
 
   private async renameBookWithFolder(
+    allFiles: RenameBookFile[],
     bookId: number,
     data: BookRenameData,
     oldFolderPath: string,
@@ -410,7 +422,6 @@ export class FileRenameService implements OnModuleDestroy {
     fileTargets: Map<number, string>,
     sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
-    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const newUpdates = allFiles.map((file) => ({
       id: file.id,
       absolutePath: fileTargets.get(file.id)!,
@@ -473,11 +484,12 @@ export class FileRenameService implements OnModuleDestroy {
       }
     }
 
-    await this.tryRemoveEmptyDir(oldFolderPath);
-    await this.tryRemoveEmptyDir(dirname(oldFolderPath));
+    await this.tryRemoveEmptyDir(oldFolderPath, data.libraryFolderPath);
+    await this.tryRemoveEmptyDir(dirname(oldFolderPath), data.libraryFolderPath);
   }
 
   private async renameBookIntoExistingFolder(
+    allFiles: RenameBookFile[],
     bookId: number,
     data: BookRenameData,
     oldFolderPath: string,
@@ -485,7 +497,6 @@ export class FileRenameService implements OnModuleDestroy {
     fileTargets: Map<number, string>,
     sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
-    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const newUpdates = allFiles.map((file) => ({
       id: file.id,
       absolutePath: fileTargets.get(file.id)!,
@@ -505,11 +516,12 @@ export class FileRenameService implements OnModuleDestroy {
       sanitizeForCrossPlatform,
     );
 
-    await this.tryRemoveEmptyDir(oldFolderPath);
-    await this.tryRemoveEmptyDir(dirname(oldFolderPath));
+    await this.tryRemoveEmptyDir(oldFolderPath, data.libraryFolderPath);
+    await this.tryRemoveEmptyDir(dirname(oldFolderPath), data.libraryFolderPath);
   }
 
   private async mergeBookIntoExistingFolder(
+    allFiles: RenameBookFile[],
     bookId: number,
     userId: number,
     data: BookRenameData,
@@ -519,7 +531,6 @@ export class FileRenameService implements OnModuleDestroy {
     targetBookId: number,
     sanitizeForCrossPlatform: boolean,
   ): Promise<void> {
-    const allFiles = await this.renameRepo.findAllBookFiles(bookId);
     const updates = allFiles.map((file) => ({
       fileId: file.id,
       absolutePath: fileTargets.get(file.id)!,
@@ -571,8 +582,8 @@ export class FileRenameService implements OnModuleDestroy {
     }
 
     await this.handOverCovers(bookId, sourceSlots, targetBookId);
-    await this.tryRemoveEmptyDir(oldFolderPath);
-    await this.tryRemoveEmptyDir(dirname(oldFolderPath));
+    await this.tryRemoveEmptyDir(oldFolderPath, data.libraryFolderPath);
+    await this.tryRemoveEmptyDir(dirname(oldFolderPath), data.libraryFolderPath);
   }
 
   /** The target keeps its own art and takes the source's for any medium it had no cover for. */
@@ -729,7 +740,8 @@ export class FileRenameService implements OnModuleDestroy {
     return sanitizedSourcePath === sourcePath ? null : sanitizedSourcePath;
   }
 
-  private async tryRemoveEmptyDir(dirPath: string): Promise<void> {
+  private async tryRemoveEmptyDir(dirPath: string, root: string): Promise<void> {
+    if (!isInsideRoot(root, dirPath)) return;
     try {
       const entries = await readdir(dirPath);
       if (entries.length === 0) {

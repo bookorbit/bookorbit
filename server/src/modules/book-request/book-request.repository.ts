@@ -198,6 +198,7 @@ export interface BookRequestJoinedRow {
   decidedByUsername: string | null;
   decidedByName: string | null;
   targetLibraryName: string | null;
+  targetLibraryReadOnly?: boolean | null;
 }
 
 /** A book that shares a title with a search candidate, plus the authors that decide the match. */
@@ -521,6 +522,7 @@ export class BookRequestRepository {
         requesterUsername: users.username,
         requesterName: users.name,
         targetLibraryName: libraries.name,
+        targetLibraryReadOnly: libraries.readOnly,
       })
       .from(bookRequests)
       .innerJoin(users, eq(users.id, bookRequests.userId))

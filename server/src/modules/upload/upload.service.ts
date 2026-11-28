@@ -1,4 +1,6 @@
-import { BadRequestException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
+import { PathService } from '../path/path.service';
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
+import { BadRequestException, ConflictException, Inject, Injectable, Logger, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { access as fsAccess, stat } from 'fs/promises';
 import { basename, dirname, extname, join, relative } from 'path';
@@ -46,6 +48,7 @@ export class UploadService {
   private readonly logger = new Logger(UploadService.name);
 
   constructor(
+    private readonly paths: PathService,
     @Inject(DB) private readonly db: Db,
     private readonly appSettings: AppSettingsService,
     private readonly libraryService: LibraryService,
@@ -119,6 +122,7 @@ export class UploadService {
 
     const library = await this.findLibraryOrFail(libraryId);
     await this.libraryService.verifyAccess(user, libraryId);
+    using _write = libraryFilePolicy.beginWrite(libraryId, library.readOnly);
 
     const folder = await this.resolveFolder(libraryId, folderId);
 
@@ -131,11 +135,13 @@ export class UploadService {
       throw uploadError.empty();
     }
     let destinationPath: string | null = null;
+    using activePaths = new DisposableStack();
     let shouldCleanupDestination = false;
 
     try {
       await this.validator.validateContent(tempPath, format);
       const { absolutePath, bookFolderPath } = await this.resolveDestination(library, folder.path, tempPath, filename, format);
+      activePaths.use(await this.paths.beginFileWrites([absolutePath], [libraryId]));
       await this.pathPolicy.assertWithinRoot(absolutePath, folder.path);
       destinationPath = absolutePath;
 
@@ -206,6 +212,7 @@ export class UploadService {
         folderPath: books.folderPath,
         libraryId: books.libraryId,
         libraryFolderId: books.libraryFolderId,
+        readOnly: libraries.readOnly,
         allowedFormats: libraries.allowedFormats,
         organizationMode: libraries.organizationMode,
         libraryFolderPath: libraryFolders.path,
@@ -219,6 +226,7 @@ export class UploadService {
     if (!bookRow) throw new NotFoundException(`Book ${bookId} not found`);
 
     await this.libraryService.verifyAccess(user, bookRow.libraryId);
+    using _write = libraryFilePolicy.beginWrite(bookRow.libraryId, bookRow.readOnly);
 
     if (bookRow.organizationMode === 'book_per_file') {
       throw new BadRequestException('Cannot add files to a book in a single-file library. Upload a new book instead.');
@@ -235,6 +243,7 @@ export class UploadService {
     }
 
     let destination: string | null = null;
+    using activePaths = new DisposableStack();
     let shouldCleanupDestination = false;
 
     try {
@@ -251,6 +260,7 @@ export class UploadService {
           .where(eq(books.id, bookId))
           .limit(1);
         if (!current) throw new NotFoundException(`Book ${bookId} not found`);
+        if (current.libraryFolderId !== bookRow.libraryFolderId) throw new ConflictException('The book moved during upload. Try again.');
 
         const [existingWithHash] = await this.db
           .select({ id: bookFiles.id })
@@ -263,6 +273,8 @@ export class UploadService {
         }
 
         destination = join(current.folderPath, filename);
+        activePaths.use(await this.paths.beginFileWrites([destination], [bookRow.libraryId]));
+        await this.pathPolicy.assertWithinRoot(destination, current.libraryFolderPath);
         await this.pathPolicy.assertWithinRoot(destination, current.folderPath);
 
         if (await this.destinationExists(destination)) {

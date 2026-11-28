@@ -16,12 +16,13 @@ export function useBookDestination(options: BookDestinationOptions = {}) {
   const folders = computed(() => selectedLibrary.value?.folders ?? [])
   const selectedFolder = computed(() => folders.value.find((folder) => folder.id === folderId.value))
   const available = computed(() => source.loaded.value && !source.loading.value && !source.error.value)
-  const hasDestination = computed(() => available.value && !!selectedLibrary.value && !!selectedFolder.value)
+  const hasDestination = computed(() => available.value && !!selectedLibrary.value && !selectedLibrary.value.readOnly && !!selectedFolder.value)
 
   watchEffect(() => {
     if (!available.value) return
-    if (libraryId.value === null && (libraries.value.length === 1 || options.defaultToFirstLibrary)) {
-      libraryId.value = libraries.value[0]?.id ?? null
+    const writable = libraries.value.filter((library) => !library.readOnly)
+    if (libraryId.value === null && (writable.length === 1 || options.defaultToFirstLibrary)) {
+      libraryId.value = writable[0]?.id ?? null
     }
     if (folderId.value === null) folderId.value = folders.value[0]?.id ?? null
   })

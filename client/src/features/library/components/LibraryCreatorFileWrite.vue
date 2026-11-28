@@ -11,6 +11,7 @@ const { t } = useI18n()
 
 const props = withDefaults(
   defineProps<{
+    readOnly?: boolean
     fileRenameEnabled: boolean
     fileWriteEnabled: boolean
     fileWriteWriteCover: boolean
@@ -35,6 +36,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{
+  'update:readOnly': [value: boolean]
   'update:fileRenameEnabled': [value: boolean]
   'update:fileWriteEnabled': [value: boolean]
   'update:fileWriteWriteCover': [value: boolean]
@@ -134,6 +136,10 @@ function emitSize(key: FamilyKey, value: number) {
   else emit('update:fileWriteAudioMaxFileSizeMb', value)
 }
 
+function handleReadOnlyToggle(value: boolean) {
+  emit('update:readOnly', value)
+}
+
 function handleRenameToggle(value: boolean) {
   emit('update:fileRenameEnabled', value)
 }
@@ -162,13 +168,26 @@ function updateSize(row: FamilyRow, event: Event) {
 <template>
   <section class="divide-y divide-border rounded-xl border border-border bg-card">
     <div class="flex items-start gap-3.5 px-4 py-3.5">
+      <div class="min-w-0 flex-1">
+        <p class="text-sm font-semibold text-foreground">{{ t('library.readOnly.title') }}</p>
+        <p id="library-read-only-hint" class="mt-0.5 text-xs text-muted-foreground">{{ t('library.readOnly.hint') }}</p>
+      </div>
+      <ToggleSwitch
+        :model-value="!!readOnly"
+        :aria-label="t('library.readOnly.title')"
+        aria-describedby="library-read-only-hint"
+        @update:model-value="handleReadOnlyToggle"
+      />
+    </div>
+    <div class="flex items-start gap-3.5 px-4 py-3.5">
       <FilePenLine :size="17" class="mt-0.5 shrink-0 text-foreground" aria-hidden="true" />
       <div class="min-w-0 flex-1">
         <p class="text-sm font-semibold text-foreground">{{ t('library.creator.fileWrite.rename.title') }}</p>
         <p class="mt-0.5 text-xs text-muted-foreground">{{ t('library.creator.fileWrite.rename.hint') }}</p>
       </div>
       <ToggleSwitch
-        :model-value="fileRenameEnabled"
+        :model-value="!readOnly && fileRenameEnabled"
+        :disabled="readOnly"
         :aria-label="t('library.creator.fileWrite.rename.title')"
         @update:model-value="handleRenameToggle"
       />
@@ -181,13 +200,14 @@ function updateSize(row: FamilyRow, event: Event) {
         <p class="mt-0.5 text-xs text-muted-foreground">{{ t('library.creator.fileWrite.write.hint') }}</p>
       </div>
       <ToggleSwitch
-        :model-value="fileWriteEnabled"
+        :model-value="!readOnly && fileWriteEnabled"
+        :disabled="readOnly"
         :aria-label="t('library.creator.fileWrite.write.title')"
         @update:model-value="handleWriteToggle"
       />
     </div>
 
-    <div v-if="fileWriteEnabled" class="px-4 pb-4 pt-3.5">
+    <div v-if="fileWriteEnabled && !readOnly" class="px-4 pb-4 pt-3.5">
       <label class="mb-3 flex cursor-pointer items-start gap-2.5">
         <input type="checkbox" class="mt-0.5 size-4 shrink-0 accent-primary" :checked="fileWriteWriteCover" @change="handleCoverChange" />
         <span class="min-w-0">

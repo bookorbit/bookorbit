@@ -117,6 +117,7 @@ describe('LibraryRepository', () => {
       expect.objectContaining({
         organizationMode: libraries.organizationMode,
         autoScanCronExpression: libraries.autoScanCronExpression,
+        readOnly: libraries.readOnly,
         watch: libraries.watch,
         fileWriteEnabled: libraries.fileWriteEnabled,
         fileRenameEnabled: libraries.fileRenameEnabled,

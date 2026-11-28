@@ -3,6 +3,7 @@ import { tmpdir } from 'os';
 import { basename, join } from 'path';
 
 import type { BookRequestDownloadRow, BookRequestRow } from '../../../db/schema';
+import { PathService } from '../../path/path.service';
 import { PathMappingService } from '../download-clients/path-mapping.service';
 import { RequestImportService } from './request-import.service';
 
@@ -21,7 +22,7 @@ function download(contentPath: string, overrides: Partial<BookRequestDownloadRow
   return { id: 11, requestId: 7, downloadClientId: 1, contentPath, ...overrides } as BookRequestDownloadRow;
 }
 
-async function makeHarness(options: { useHardlinks?: boolean; stagesLocally?: boolean } = {}) {
+async function makeHarness(options: { useHardlinks?: boolean; stagesLocally?: boolean; readOnlySource?: boolean } = {}) {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'bookorbit-import-')));
   const bookDockPath = join(root, 'dock');
   const appDataPath = join(root, 'app-data');
@@ -71,12 +72,22 @@ async function makeHarness(options: { useHardlinks?: boolean; stagesLocally?: bo
   };
   // The real containment check over a stubbed mapping, so these tests exercise the boundary the
   // importer actually applies rather than a mock that always agrees with it.
-  const pathMappings = new PathMappingService({
-    findPathMappings: vi.fn().mockResolvedValue([{ remotePath: downloadsPath, localPath: downloadsPath }]),
-  } as never);
+  const paths = new PathService(
+    {} as never,
+    {
+      findWriteRoots: vi.fn().mockResolvedValue(options.readOnlySource ? [{ libraryId: 9, path: downloadsPath, readOnly: true }] : []),
+    } as never,
+  );
+  const pathMappings = new PathMappingService(
+    {
+      findPathMappings: vi.fn().mockResolvedValue([{ remotePath: downloadsPath, localPath: downloadsPath }]),
+    } as never,
+    paths,
+  );
   vi.spyOn(pathMappings, 'assertWithinRoot');
 
   const service = new RequestImportService(
+    paths,
     { getOrThrow: (key: string) => (key === 'storage.appDataPath' ? appDataPath : bookDockPath) } as never,
     downloads as never,
     requests as never,
@@ -163,6 +174,18 @@ async function makeFile(dir: string, name: string, contents = 'book'): Promise<s
 }
 
 describe('RequestImportService.importDownload', () => {
+  it('refuses an existing request after its destination becomes read-only', async () => {
+    const harness = await makeHarness();
+    harness.requests.findById.mockResolvedValue({ request: request(), targetLibraryReadOnly: true });
+    const source = await makeFile(harness.downloadsPath, 'source.epub');
+
+    await expect(harness.service.importDownload(download(source))).resolves.toBe(false);
+    expect(harness.fulfillment.failDownload).toHaveBeenCalledWith(expect.anything(), 'This library is read-only.');
+    expect(harness.dockRepo.createUnit).not.toHaveBeenCalled();
+    expect(await readdir(harness.bookDockPath)).toEqual([]);
+    expect(await readFile(source, 'utf8')).toBe('book');
+  });
+
   it('creates the dock row before linking, carrying the request destination and uploader', async () => {
     const harness = await makeHarness();
     const source = await makeFile(join(harness.bookDockPath, '..', 'downloads'), 'dune.epub');
@@ -196,6 +219,16 @@ describe('RequestImportService.importDownload', () => {
     const [sourceStat, destStat] = await Promise.all([stat(source), stat(dest)]);
     expect(destStat.ino).toBe(sourceStat.ino);
     expect(destStat.nlink).toBe(2);
+  });
+
+  it('copies a protected source without adding a hardlink to its inode', async () => {
+    const harness = await makeHarness({ readOnlySource: true, useHardlinks: true });
+    const source = await makeFile(harness.downloadsPath, 'dune.epub');
+    await expect(harness.service.importDownload(download(source))).resolves.toBe(true);
+    const dest = join(harness.bookDockPath, 'request-7-dune.epub');
+    expect((await stat(source)).nlink).toBe(1);
+    expect((await stat(dest)).ino).not.toBe((await stat(source)).ino);
+    expect(await readFile(dest, 'utf8')).toBe('book');
   });
 
   it('copies instead when the client has hardlinks turned off', async () => {

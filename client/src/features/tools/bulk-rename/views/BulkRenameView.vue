@@ -27,7 +27,7 @@ const showFullPaths = ref<boolean>(storage.get<boolean>(SHOW_FULL_PATHS_KEY, fal
 const mobileDetail = ref(false)
 const railRef = ref<InstanceType<typeof BulkRenameRail> | null>(null)
 
-const eligibleLibraries = computed(() => libraries.value.filter((library: Library) => library.fileRenameEnabled))
+const eligibleLibraries = computed(() => libraries.value.filter((library: Library) => !library.readOnly && library.fileRenameEnabled))
 const selectedLibrary = computed(() => eligibleLibraries.value.find((library: Library) => library.id === bulk.selectedLibraryId.value) ?? null)
 
 const libraryRoots = computed(() => selectedLibrary.value?.folders.map((folder) => folder.path) ?? [])

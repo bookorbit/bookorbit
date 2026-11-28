@@ -121,6 +121,23 @@ describe('FileWatcherService lifecycle and watcher controls', () => {
     expect(mockWatch).not.toHaveBeenCalled();
   });
 
+  it('uses polling for a read-only library', async () => {
+    mockWatch.mockReturnValue({ ...makeReadyWatcher(), options: { backendCapabilities: { polling: true } } } as never);
+    const { service } = makeService();
+    await service.startWatcher(8, ['/books'], true);
+    expect(mockWatch).toHaveBeenCalledWith('/books', expect.objectContaining({ backend: 'polling', ignoreInitial: true }));
+    await service.onModuleDestroy();
+  });
+
+  it('closes a native watcher if the environment overrides polling for a read-only library', async () => {
+    const watcher = { ...makeReadyWatcher(), options: { backendCapabilities: { polling: false } } };
+    mockWatch.mockReturnValue(watcher as never);
+    const { service } = makeService();
+    await service.startWatcher(8, ['/books'], true);
+    expect(watcher.close).toHaveBeenCalled();
+    expect(watcher.on).not.toHaveBeenCalled();
+  });
+
   it('subscribes to paths and normalizes create/update/delete events', async () => {
     const close = vi.fn().mockResolvedValue(undefined);
     const allHandlers: Array<(eventName: string, path: string) => void> = [];

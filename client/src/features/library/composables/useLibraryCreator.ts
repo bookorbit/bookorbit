@@ -37,6 +37,7 @@ function blankForm() {
     displayOrder: 0,
     coverAspectRatio: '2/3' as CoverAspectRatio,
     folders: [] as string[],
+    readOnly: false,
     watch: false,
     autoScanCronExpression: null as string | null,
     metadataPrecedence: [...DEFAULT_METADATA_PRECEDENCE],
@@ -178,6 +179,7 @@ export function useLibraryCreator() {
     form.displayOrder = library.displayOrder
     form.coverAspectRatio = library.coverAspectRatio
     form.folders = library.folders.map((f) => f.path)
+    form.readOnly = library.readOnly ?? false
     form.watch = library.watch
     form.autoScanCronExpression = library.autoScanCronExpression ?? null
     form.metadataPrecedence = [...library.metadataPrecedence]

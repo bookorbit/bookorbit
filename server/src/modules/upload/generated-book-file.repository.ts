@@ -19,6 +19,7 @@ export class GeneratedBookFileRepository {
         folderPath: books.folderPath,
         libraryId: books.libraryId,
         libraryFolderId: books.libraryFolderId,
+        readOnly: libraries.readOnly,
         allowedFormats: libraries.allowedFormats,
         organizationMode: libraries.organizationMode,
         libraryFolderPath: libraryFolders.path,

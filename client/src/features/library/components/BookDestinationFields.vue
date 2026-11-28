@@ -43,7 +43,9 @@ function onFolderChange(event: Event): void {
           @change="onLibraryChange"
         >
           <option value="" disabled>{{ t('library.upload.selectLibrary') }}</option>
-          <option v-for="library in destination.libraries.value" :key="library.id" :value="library.id">{{ library.name }}</option>
+          <option v-for="library in destination.libraries.value" :key="library.id" :value="library.id" :disabled="library.readOnly">
+            {{ library.readOnly ? t('library.readOnly.option', { name: library.name }) : library.name }}
+          </option>
         </select>
       </label>
       <dl v-else-if="destination.selectedLibrary.value" class="space-y-1">
@@ -52,7 +54,8 @@ function onFolderChange(event: Event): void {
       </dl>
       <p v-else class="text-sm text-destructive" role="alert">{{ t('library.destination.unavailable') }}</p>
 
-      <template v-if="destination.selectedLibrary.value">
+      <p v-if="destination.selectedLibrary.value?.readOnly" role="status" class="text-sm text-muted-foreground">{{ t('library.readOnly.reason') }}</p>
+      <template v-else-if="destination.selectedLibrary.value">
         <p v-if="!destination.folders.value.length" class="text-sm text-muted-foreground" role="status">
           {{ t('library.destination.noFolders') }}
         </p>

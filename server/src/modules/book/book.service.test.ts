@@ -148,6 +148,7 @@ function makeService(
     findDeletionAuditBooksByIds: vi.fn(),
     findPrimaryFilesByBookIds: vi.fn(),
     findAllFilesByBookIds: vi.fn(),
+    findDeletionFiles: vi.fn(),
     findCoverSourceFilesByBookIds: vi.fn().mockResolvedValue([]),
     findTagsByBookIds: vi.fn(),
     findAuthorsByBookIds: vi.fn(),
@@ -336,6 +337,7 @@ function makeService(
   const readingEvents = new ReadingAttemptEventsService();
 
   const service = new BookService(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     bookRepo as never,
     libraryService as never,
     queryBuilder as never,
@@ -2924,6 +2926,24 @@ describe('BookService', () => {
       });
     });
 
+    it('removes only writable files when a deletion spans libraries', async () => {
+      const { service, bookRepo } = makeService();
+      bookRepo.findLibraryIdsByBookIds.mockResolvedValue([
+        { id: 3, libraryId: 7 },
+        { id: 4, libraryId: 9 },
+      ]);
+      bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([]);
+      bookRepo.findDeletionFiles.mockResolvedValue([
+        { libraryId: 7, readOnly: true, absolutePath: '/path/to/library/protected.epub' },
+        { libraryId: 9, readOnly: false, absolutePath: '/path/to/library/writable.epub' },
+      ]);
+
+      await service.deleteBooks([3, 4], makeUser());
+      expect(mockRm).not.toHaveBeenCalledWith('/path/to/library/protected.epub', expect.anything());
+      expect(mockRm).toHaveBeenCalledWith('/path/to/library/writable.epub', { force: true });
+      expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([3, 4]);
+    });
+
     it('removes every content file before deleting records, then cleans up covers', async () => {
       const { service, bookRepo, libraryService } = makeService();
       const user = makeUser();
@@ -2932,7 +2952,7 @@ describe('BookService', () => {
         { id: 3, libraryId: 7 },
         { id: 4, libraryId: 9 },
       ]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+      bookRepo.findDeletionFiles.mockResolvedValue([
         { bookId: 3, absolutePath: '/tmp/library/book3.epub', format: 'epub' },
         { bookId: 4, absolutePath: '/tmp/library/book4.pdf', format: 'pdf' },
       ]);
@@ -2976,7 +2996,7 @@ describe('BookService', () => {
       const { service, bookRepo, selfWriteRegistry } = makeService();
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([{ bookId: 3, absolutePath: '/path/to/library/book.epub', format: 'epub' }]);
+      bookRepo.findDeletionFiles.mockResolvedValue([{ bookId: 3, absolutePath: '/path/to/library/book.epub', format: 'epub' }]);
       let suppressedDuringRemoval = false;
       mockRm.mockImplementation(() => {
         suppressedDuringRemoval = selfWriteRegistry.isSuppressed('/path/to/library/book.epub');
@@ -3010,7 +3030,7 @@ describe('BookService', () => {
         { id: 4, libraryId: 7 },
       ]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue(paths.map((absolutePath, i) => ({ bookId: i + 3, absolutePath })));
+      bookRepo.findDeletionFiles.mockResolvedValue(paths.map((absolutePath, i) => ({ bookId: i + 3, absolutePath })));
       let recordsExist = true;
       const processor = {
         handleUnlink: vi.fn(() => Promise.resolve(recordsExist ? { type: 'book-missing', libraryId: 7, bookIds: [3] } : { type: 'noop' })),
@@ -3086,7 +3106,7 @@ describe('BookService', () => {
       const { service, bookRepo, selfWriteRegistry } = makeService();
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+      bookRepo.findDeletionFiles.mockResolvedValue([
         { bookId: 3, absolutePath: '/path/to/library/blocked.epub' },
         { bookId: 3, absolutePath: '/path/to/library/slow.pdf' },
       ]);
@@ -3127,7 +3147,7 @@ describe('BookService', () => {
       const ids = Array.from({ length: 40 }, (_, i) => i + 1);
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue(ids.map((id) => ({ id, libraryId: 7 })));
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue(ids.map((bookId) => ({ bookId, absolutePath: `/path/to/library/${bookId}.epub` })));
+      bookRepo.findDeletionFiles.mockResolvedValue(ids.map((bookId) => ({ bookId, absolutePath: `/path/to/library/${bookId}.epub` })));
       let active = 0;
       let peak = 0;
       mockRm.mockImplementation(async () => {
@@ -3163,7 +3183,7 @@ describe('BookService', () => {
           { id: 3, title: 'First' },
           { id: 4, title: 'Second' },
         ]);
-        bookRepo.findAllFilesByBookIds.mockResolvedValue([
+        bookRepo.findDeletionFiles.mockResolvedValue([
           { bookId: 3, absolutePath: first },
           { bookId: 4, absolutePath: second },
         ]);
@@ -3196,7 +3216,7 @@ describe('BookService', () => {
       const { service, bookRepo } = makeService({ appDataPath: '/path/to/data' });
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([{ bookId: 3, absolutePath: '/path/to/library/book.epub' }]);
+      bookRepo.findDeletionFiles.mockResolvedValue([{ bookId: 3, absolutePath: '/path/to/library/book.epub' }]);
       mockRm.mockImplementation((_path, options) => {
         if (options?.recursive) {
           expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([3]);
@@ -3216,7 +3236,7 @@ describe('BookService', () => {
       ]);
       libraryService.verifyAccess.mockRejectedValue(new ForbiddenException());
       await expect(service.deleteBooks([3, 4], makeUser())).rejects.toBeInstanceOf(ForbiddenException);
-      expect(bookRepo.findAllFilesByBookIds).not.toHaveBeenCalled();
+      expect(bookRepo.findDeletionFiles).not.toHaveBeenCalled();
       expect(bookRepo.deleteByIdsAndInvalidateScanState).not.toHaveBeenCalled();
       expect(mockRm).not.toHaveBeenCalled();
     });
@@ -3225,7 +3245,7 @@ describe('BookService', () => {
       const { service, bookRepo } = makeService();
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       await expect(service.deleteBooks([3, 4], makeUser())).rejects.toBeInstanceOf(NotFoundException);
-      expect(bookRepo.findAllFilesByBookIds).not.toHaveBeenCalled();
+      expect(bookRepo.findDeletionFiles).not.toHaveBeenCalled();
       expect(bookRepo.deleteByIdsAndInvalidateScanState).not.toHaveBeenCalled();
       expect(mockRm).not.toHaveBeenCalled();
     });
@@ -3234,12 +3254,12 @@ describe('BookService', () => {
       const { service, bookRepo } = makeService();
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([
+      bookRepo.findDeletionFiles.mockResolvedValue([
         { bookId: 3, absolutePath: '/path/to/library/book.epub' },
         { bookId: 3, absolutePath: '/path/to/library/book.epub' },
       ]);
       await expect(service.deleteBooks([3, 3], makeUser())).resolves.toMatchObject({ total: 1 });
-      expect(bookRepo.findAllFilesByBookIds).toHaveBeenCalledWith([3]);
+      expect(bookRepo.findDeletionFiles).toHaveBeenCalledWith([3]);
       expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([3]);
       expect(mockRm).toHaveBeenCalledTimes(2);
     });
@@ -3261,7 +3281,7 @@ describe('BookService', () => {
       bookRepo.findDeletionAuditBooksByIds.mockImplementation((ids: number[]) =>
         Promise.resolve([...ids].reverse().map((id) => ({ id, title: `Book ${id}` }))),
       );
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.findDeletionFiles.mockResolvedValue([]);
       bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue(undefined);
 
       const result = await service.deleteBooks(bookIds, user);
@@ -3280,7 +3300,7 @@ describe('BookService', () => {
 
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.findDeletionFiles.mockResolvedValue([]);
       bookRepo.deleteByIdsAndInvalidateScanState.mockResolvedValue(undefined);
 
       const notify = vi.spyOn(readingEvents, 'notifyChanged');
@@ -3301,7 +3321,7 @@ describe('BookService', () => {
 
       bookRepo.findLibraryIdsByBookIds.mockResolvedValue([{ id: 3, libraryId: 7 }]);
       bookRepo.findDeletionAuditBooksByIds.mockResolvedValue([{ id: 3, title: 'Dune' }]);
-      bookRepo.findAllFilesByBookIds.mockResolvedValue([]);
+      bookRepo.findDeletionFiles.mockResolvedValue([]);
       bookRepo.deleteByIdsAndInvalidateScanState.mockRejectedValue(new Error('db down'));
 
       const notify = vi.spyOn(readingEvents, 'notifyChanged');
@@ -3329,7 +3349,7 @@ describe('BookService', () => {
         const result = await service.deleteMissingBookRecords([4, 3, 4], makeUser());
 
         expect(bookRepo.deleteByIdsAndInvalidateScanState).toHaveBeenCalledWith([4, 3], { onlyMissing: true });
-        expect(bookRepo.findAllFilesByBookIds).not.toHaveBeenCalled();
+        expect(bookRepo.findDeletionFiles).not.toHaveBeenCalled();
         expect(mockRm).toHaveBeenCalledTimes(2);
         expect(mockRm).toHaveBeenCalledWith('/path/to/data/covers/3', { recursive: true, force: true });
         expect(mockRm).toHaveBeenCalledWith('/path/to/data/covers/4', { recursive: true, force: true });
@@ -7224,6 +7244,7 @@ describe('BookService', () => {
       fileRenameService.performRename.mockResolvedValue({ status: 'skipped', durationMs: 0, reason: 'disabled' });
 
       const serviceWithoutFileWrite = new BookService(
+        { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
         bookRepo as never,
         libraryService as never,
         queryBuilder as never,
@@ -7279,6 +7300,7 @@ describe('BookService', () => {
       fileWriteService.writeToFile.mockResolvedValue({ status: 'success', fieldsWritten: [], durationMs: 0 });
 
       const serviceWithoutRename = new BookService(
+        { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
         bookRepo as never,
         libraryService as never,
         queryBuilder as never,

@@ -30,7 +30,7 @@ const router = useRouter()
 const { openInNewTab } = useOpenInNewTab()
 const { t } = useI18n()
 const { hasPermission } = usePermissions()
-const { hasLibraryPermission } = useLibraryPermissions()
+const { hasLibraryPermission, isReadOnlyLibrary } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const { refreshWithFeedback, refreshing } = useRefreshMetadata()
 const refreshFeedback = useBookRefreshFeedback()
@@ -200,6 +200,8 @@ onBeforeUnmount(() => {
       <button
         v-if="canEditMetadata"
         class="flex w-full items-center gap-2 rounded-xs px-2 py-1.5 text-left text-sm hover:bg-accent"
+        :disabled="isReadOnlyLibrary(book?.libraryId)"
+        :title="isReadOnlyLibrary(book?.libraryId) ? t('library.readOnly.reason') : undefined"
         @click="emitAction('move-to-library')"
       >
         <FolderInput :size="14" />

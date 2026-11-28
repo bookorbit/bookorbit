@@ -4,6 +4,7 @@ import { usePermissions } from '@/features/auth/composables/usePermissions'
 import { useLibraries } from './useLibraries'
 
 let libraryAccess: ComputedRef<Map<number, AccessLevel | null | undefined>> | undefined
+let readOnlyIds: ComputedRef<Set<number>> | undefined
 const accessRank: Record<AccessLevel, number> = { viewer: 1, editor: 2, owner: 3 }
 
 export function useLibraryPermissions() {
@@ -25,5 +26,12 @@ export function useLibraryPermissions() {
     return libraries.value.some((library) => hasLibraryPermission(permission, library.id, required))
   }
 
-  return { hasLibraryPermission, hasPermissionInAnyLibrary }
+  const protectedLibraries = (readOnlyIds ??= computed(
+    () => new Set(libraries.value.filter((library) => library.readOnly).map((library) => library.id)),
+  ))
+  function isReadOnlyLibrary(id: number | null | undefined) {
+    return id != null && protectedLibraries.value.has(id)
+  }
+
+  return { hasLibraryPermission, hasPermissionInAnyLibrary, isReadOnlyLibrary }
 }

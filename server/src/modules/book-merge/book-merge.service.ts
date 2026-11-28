@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 
 import type {
@@ -89,6 +90,7 @@ export class BookMergeService {
 
     let job: MergeJobRow;
     try {
+      for (const id of libraryIds) libraryFilePolicy.assertWritable(id, false);
       job = await this.repository.createJob({
         libraryId: plan.libraryId,
         libraryIds,

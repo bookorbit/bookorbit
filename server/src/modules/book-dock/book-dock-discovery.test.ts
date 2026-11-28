@@ -155,6 +155,7 @@ describe('Book Dock filesystem discovery', () => {
           provide: BookDockIngestService,
           useFactory: () =>
             new BookDockIngestService(
+              { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
               config as never,
               repo as never,
               new UploadValidatorService(),

@@ -4,6 +4,7 @@ import { realpath } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
 
+import { PathService } from '../../path/path.service';
 import { PathMappingService } from './path-mapping.service';
 
 function makeService(mappings: Array<{ remotePath: string; localPath: string }>) {
@@ -12,8 +13,32 @@ function makeService(mappings: Array<{ remotePath: string; localPath: string }>)
     // the same ordering it does in production.
     findPathMappings: vi.fn().mockResolvedValue([...mappings].sort((a, b) => b.remotePath.length - a.remotePath.length)),
   };
-  return { service: new PathMappingService(repo as never), repo };
+  return { service: new PathMappingService(repo as never, { beginPathWrite: () => Promise.resolve(new DisposableStack()) } as never), repo };
 }
+
+describe('destructive download client commands', () => {
+  it('requires a known mapped location outside protected folders before allowing remote deletion', async () => {
+    const rows = { findWriteRoots: vi.fn() };
+    const paths = new PathService({} as never, rows as never);
+    const repository = { findPathMappings: vi.fn().mockResolvedValue([{ remotePath: '/downloads', localPath: '/path/to/downloads' }]) };
+    const mappings = new PathMappingService(repository as never, paths);
+    const adapter = { status: vi.fn() };
+    const guard = (deleteFiles: boolean) => mappings.beginClientRemoval(adapter as never, { id: 1 } as never, 'job', deleteFiles);
+    rows.findWriteRoots.mockResolvedValue([{ libraryId: 9, path: '/path/to/downloads/archive', readOnly: true }]);
+    await expect(guard(false)).resolves.toBeNull();
+    expect(adapter.status).not.toHaveBeenCalled();
+    adapter.status.mockResolvedValue([{ clientKey: 'job', contentPath: '/downloads/archive/book.epub' }]);
+    await expect(guard(true)).rejects.toMatchObject({ status: 403 });
+    adapter.status.mockResolvedValue([]);
+    await expect(guard(true)).rejects.toMatchObject({ status: 400 });
+    adapter.status.mockResolvedValue([{ clientKey: 'job', contentPath: '/downloads/incoming' }]);
+    using allowed = await guard(true);
+    rows.findWriteRoots.mockResolvedValue([]);
+    adapter.status.mockClear();
+    using ordinary = await guard(true);
+    expect(adapter.status).not.toHaveBeenCalled();
+  });
+});
 
 describe('PathMappingService.toLocalPath', () => {
   it('translates a path under the mapped prefix', async () => {

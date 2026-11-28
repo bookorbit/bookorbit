@@ -66,6 +66,7 @@ describe('FileRenameService narrator-specific editions', () => {
     const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
     const config = { get: vi.fn() } as unknown as ConfigService;
     const service = new FileRenameService(
+      { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
       renameRepo as never,
       lockService as never,
       appSettings as never,

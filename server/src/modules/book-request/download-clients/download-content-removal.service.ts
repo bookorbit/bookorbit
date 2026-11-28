@@ -62,6 +62,7 @@ export class DownloadContentRemovalService {
   async plan(clientId: number, content: ClientContent): Promise<ContentRemovalPlan> {
     const { localPath: localRoot, containmentRoot } = await this.pathMappings.toLocalPath(clientId, content.root);
     assertNotMappedRoot(localRoot, containmentRoot);
+    using _write = await this.pathMappings.beginDownloadRemoval(localRoot);
 
     if (content.expectOnDisk && !(await exists(localRoot))) {
       throw new BadRequestException(
@@ -74,7 +75,7 @@ export class DownloadContentRemovalService {
       if (content.multiFile && !isInside(localRoot, file)) {
         throw new BadRequestException('The download client listed a file outside the download it belongs to');
       }
-      await this.pathMappings.assertWithinRoot(containmentRoot, file);
+      await this.pathMappings.assertWithinRoot(content.multiFile ? localRoot : containmentRoot, file);
     }
 
     const blocked = await firstUnwritableParent(files);
@@ -119,7 +120,13 @@ export class DownloadContentRemovalService {
     this.logger.log(
       `[download_client.delete_files] [start] clientId=${context.clientId} clientKey=${context.clientKey} files=${plan.files.length} - deleting the files ${context.label} left`,
     );
-    const outcome = await this.execute(plan);
+    const outcome = await this.execute(plan).catch((error: unknown) => {
+      this.logger.warn(
+        `[download_client.delete_files] [fail] clientId=${context.clientId} clientKey=${context.clientKey} durationMs=${Date.now() - started} errorClass=${error instanceof Error ? error.name : 'Error'} error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - the download was removed but local deletion could not start`,
+      );
+      return null;
+    });
+    if (!outcome) return;
     if (outcome.failures.length > 0) {
       const codes = [...new Set(outcome.failures.map((failure) => failure.code))].join(',');
       this.logger.warn(
@@ -133,6 +140,8 @@ export class DownloadContentRemovalService {
   }
 
   async execute(plan: ContentRemovalPlan): Promise<ContentRemovalOutcome> {
+    const root = plan.topDirectory ?? plan.files[0];
+    using _write = root ? await this.pathMappings.beginDownloadRemoval(root) : null;
     const failures: ContentRemovalOutcome['failures'] = [];
     let deleted = 0;
 
@@ -140,6 +149,7 @@ export class DownloadContentRemovalService {
       try {
         // lstat, never stat: a symlink inside the download is removed as a link, and whatever it
         // points at is left where it is.
+        if (plan.topDirectory) await this.pathMappings.assertWithinRoot(plan.topDirectory, dirname(file));
         const entry = await lstat(file);
         if (entry.isDirectory()) {
           failures.push({ path: file, code: 'EISDIR' });
@@ -153,7 +163,16 @@ export class DownloadContentRemovalService {
       }
     }
 
-    const topDirectoryRemoved = plan.topDirectory ? await pruneEmptyDirectories(plan.topDirectory, plan.files, plan.directories ?? []) : true;
+    if (!plan.topDirectory) return { deleted, failures, topDirectoryRemoved: true };
+    for (const directory of directoriesToPrune(plan.topDirectory, plan.files, plan.directories ?? [])) {
+      try {
+        await this.pathMappings.assertWithinRoot(plan.topDirectory, directory);
+        await removeIfEmpty(directory);
+      } catch (error) {
+        failures.push({ path: directory, code: errorCode(error) });
+      }
+    }
+    const topDirectoryRemoved = await removeIfEmpty(plan.topDirectory);
     return { deleted, failures, topDirectoryRemoved };
   }
 }
@@ -261,7 +280,7 @@ async function firstUnwritableParent(files: string[]): Promise<string | null> {
 }
 
 /** Deepest first, so a nested folder is gone before its parent is tried. */
-async function pruneEmptyDirectories(topDirectory: string, files: string[], extraDirectories: string[]): Promise<boolean> {
+function directoriesToPrune(topDirectory: string, files: string[], extraDirectories: string[]): string[] {
   const directories = new Set<string>(extraDirectories.filter((directory) => isInside(topDirectory, directory)));
   for (const file of files) {
     for (let current = dirname(file); isInside(topDirectory, current) && current !== topDirectory; current = dirname(current)) {
@@ -269,9 +288,7 @@ async function pruneEmptyDirectories(topDirectory: string, files: string[], extr
     }
   }
 
-  const ordered = [...directories].sort((a, b) => b.split(sep).length - a.split(sep).length);
-  for (const directory of ordered) await removeIfEmpty(directory);
-  return removeIfEmpty(topDirectory);
+  return [...directories].sort((a, b) => b.split(sep).length - a.split(sep).length);
 }
 
 async function removeIfEmpty(directory: string): Promise<boolean> {

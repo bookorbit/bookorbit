@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../../common/services/library-file-policy';
 import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import {
   ACTIVE_BOOK_REQUEST_DOWNLOAD_STATUSES,
@@ -265,6 +266,7 @@ export class RequestUploadService extends RequestUploadReceiver implements OnMod
     if (request.targetLibraryId === null) {
       throw new BadRequestException('Set a destination library on this request before uploading its files');
     }
+    libraryFilePolicy.assertWritable(request.targetLibraryId, joined.targetLibraryReadOnly ?? false);
     return request;
   }
 

@@ -61,9 +61,9 @@ const rows = computed(() => {
     {
       key: 'fileWrite',
       icon: FileEdit,
-      on: props.library.fileWriteEnabled,
+      on: !props.library.readOnly && props.library.fileWriteEnabled,
       label: t('settings.admin.libraries.capability.fileWrite'),
-      value: props.library.fileWriteEnabled ? on : off,
+      value: props.library.readOnly ? t('library.readOnly.title') : props.library.fileWriteEnabled ? on : off,
       title: '',
       setting: 'fileWriteEnabled' as AutomationToggle,
       aria: t('settings.admin.libraries.quick.fileWriteAria', { name: props.library.name }),
@@ -71,9 +71,9 @@ const rows = computed(() => {
     {
       key: 'fileRename',
       icon: Pencil,
-      on: props.library.fileRenameEnabled,
+      on: !props.library.readOnly && props.library.fileRenameEnabled,
       label: t('settings.admin.libraries.capability.fileRename'),
-      value: props.library.fileRenameEnabled ? on : off,
+      value: props.library.readOnly ? t('library.readOnly.title') : props.library.fileRenameEnabled ? on : off,
       title: '',
       setting: 'fileRenameEnabled' as AutomationToggle,
       aria: t('settings.admin.libraries.quick.renameAria', { name: props.library.name }),
@@ -110,7 +110,12 @@ function requestCustomSchedule() {
            so switching them on touches no file by itself; the bulk rewrite stays behind "Sync metadata to files". -->
       <span v-if="interactive && row.setting" class="ms-auto flex items-center gap-2">
         <span class="text-[11px] font-medium" :class="row.on ? 'text-primary' : 'text-muted-foreground'" aria-hidden="true">{{ row.value }}</span>
-        <ToggleSwitch :model-value="row.on" :disabled="saving" :aria-label="row.aria" @update:model-value="requestToggle(row.setting)" />
+        <ToggleSwitch
+          :model-value="row.on"
+          :disabled="saving || (library.readOnly && row.setting !== 'watch')"
+          :aria-label="row.aria"
+          @update:model-value="requestToggle(row.setting)"
+        />
       </span>
       <DropdownMenu v-else-if="interactive && row.key === 'schedule'">
         <DropdownMenuTrigger as-child>

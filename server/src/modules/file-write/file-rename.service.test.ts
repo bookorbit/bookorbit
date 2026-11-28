@@ -124,6 +124,7 @@ describe('FileRenameService', () => {
 
     const selfWriteRegistry = new SelfWriteRegistry();
     const service = new FileRenameService(
+      { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
       renameRepo as never,
       lockService as never,
       appSettings as never,
@@ -1081,7 +1082,7 @@ describe('FileRenameService', () => {
     expect(mockRename).toHaveBeenCalledWith('/library/same-folder/Old Title.epub', '/library/same-folder/Dune.epub');
   });
 
-  it('removes old empty directory after file-only rename moves to a new folder', async () => {
+  it('preserves the library root when its last loose file moves into a folder', async () => {
     const { service, renameRepo } = makeService();
     renameRepo.findBookRenameData.mockResolvedValue(
       makeRenameData({
@@ -1096,7 +1097,7 @@ describe('FileRenameService', () => {
 
     await service.performRename(5, 12);
 
-    expect(mockRmdir).toHaveBeenCalledWith('/library');
+    expect(mockRmdir).not.toHaveBeenCalledWith('/library');
   });
 
   it('clears all timers on module destroy', () => {
@@ -1698,6 +1699,13 @@ describe('FileRenameService', () => {
   });
 
   describe('force parameter', () => {
+    it('refuses even a forced rename in a read-only library', async () => {
+      const { service, renameRepo } = makeService();
+      renameRepo.findBookRenameData.mockResolvedValue(makeRenameData({ readOnly: true, fileRenameEnabled: true }));
+      await expect(service.performRename(5, 12, true)).resolves.toMatchObject({ status: 'skipped', reason: 'This library is read-only.' });
+      expect(fsRename).not.toHaveBeenCalled();
+    });
+
     it('bypasses fileRenameEnabled=false when force=true', async () => {
       const { service, renameRepo } = makeService();
       renameRepo.findBookRenameData.mockResolvedValue(

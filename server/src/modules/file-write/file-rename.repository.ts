@@ -24,6 +24,7 @@ export interface BookRenameData {
   libraryFolderId: number;
   libraryFolderPath: string;
   organizationMode: string;
+  readOnly?: boolean;
   fileRenameEnabled: boolean;
   fileNamingPattern: string | null;
   bookFolderPath: string;
@@ -64,6 +65,7 @@ export class FileRenameRepository {
         libraryId: books.libraryId,
         libraryName: libraries.name,
         organizationMode: libraries.organizationMode,
+        readOnly: libraries.readOnly,
         fileRenameEnabled: libraries.fileRenameEnabled,
         fileNamingPattern: libraries.fileNamingPattern,
         bookFolderPath: books.folderPath,
@@ -117,6 +119,7 @@ export class FileRenameRepository {
       libraryFolderId: row.libraryFolderId,
       libraryFolderPath: row.libraryFolderPath,
       organizationMode: row.organizationMode,
+      readOnly: row.readOnly,
       fileRenameEnabled: row.fileRenameEnabled,
       fileNamingPattern: row.fileNamingPattern,
       bookFolderPath: row.bookFolderPath,

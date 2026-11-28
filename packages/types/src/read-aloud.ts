@@ -62,6 +62,7 @@ export type ReadAloudQuartzNetLanguage = (typeof READ_ALOUD_QUARTZNET_LANGUAGES)
 export const READ_ALOUD_MAX_AUDIO_FILES = 2000;
 
 export type ReadAloudEligibilityReason =
+  | "library_read_only"
   | "worker_not_configured"
   | "worker_unavailable"
   | "worker_incompatible"

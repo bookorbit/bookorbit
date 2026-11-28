@@ -1821,6 +1821,7 @@ export class BookRepository {
         role: bookFiles.role,
         bookId: bookFiles.bookId,
         libraryId: books.libraryId,
+        readOnly: libraries.readOnly,
         libraryFolderPath: libraryFolders.path,
         fileHash: bookFiles.fileHash,
         updatedAt: bookFiles.updatedAt,
@@ -1831,6 +1832,7 @@ export class BookRepository {
       })
       .from(bookFiles)
       .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraries, eq(libraries.id, books.libraryId))
       .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
       .where(eq(bookFiles.id, fileId))
       .limit(1);
@@ -2249,6 +2251,21 @@ export class BookRepository {
   async findLibraryIdsByBookIds(bookIds: number[]): Promise<{ id: number; libraryId: number }[]> {
     if (bookIds.length === 0) return [];
     return this.db.select({ id: books.id, libraryId: books.libraryId }).from(books).where(inArray(books.id, bookIds));
+  }
+
+  async findDeletionFiles(bookIds: number[]) {
+    if (!bookIds.length) return [];
+    return this.db
+      .select({
+        absolutePath: bookFiles.absolutePath,
+        libraryId: libraries.id,
+        readOnly: sql<boolean>`${libraries.readOnly} OR ${books.libraryId} <> ${libraryFolders.libraryId}`,
+      })
+      .from(bookFiles)
+      .innerJoin(books, eq(books.id, bookFiles.bookId))
+      .innerJoin(libraryFolders, eq(libraryFolders.id, bookFiles.libraryFolderId))
+      .innerJoin(libraries, eq(libraries.id, libraryFolders.libraryId))
+      .where(inArray(bookFiles.bookId, bookIds));
   }
 
   async findDeletionAuditBooksByIds(bookIds: number[]): Promise<{ id: number; title: string | null }[]> {

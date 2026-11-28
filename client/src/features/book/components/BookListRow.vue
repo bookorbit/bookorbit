@@ -66,7 +66,7 @@ const emit = defineEmits<{
 }>()
 
 const { hasPermission } = usePermissions()
-const { hasLibraryPermission } = useLibraryPermissions()
+const { hasLibraryPermission, isReadOnlyLibrary } = useLibraryPermissions()
 const canEditMetadata = computed(() => hasLibraryPermission('library_edit_metadata', props.book?.libraryId, 'editor'))
 const showSendDialog = ref(false)
 
@@ -480,7 +480,12 @@ function handleRowAuxClick(event: MouseEvent) {
             <RefreshCw v-else class="size-4 mr-2" />
             {{ t('book.actions.refreshMetadata') }}
           </DropdownMenuItem>
-          <DropdownMenuItem v-if="allowMoveToLibrary && canEditMetadata" @click="emit('action', 'move-to-library')">
+          <DropdownMenuItem
+            v-if="allowMoveToLibrary && canEditMetadata"
+            :disabled="isReadOnlyLibrary(book?.libraryId)"
+            :title="isReadOnlyLibrary(book?.libraryId) ? t('library.readOnly.reason') : undefined"
+            @click="emit('action', 'move-to-library')"
+          >
             <FolderInput class="size-4 mr-2" />
             {{ t('book.move.action') }}
           </DropdownMenuItem>

@@ -60,6 +60,7 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
           await this.startWatcher(
             lib.id,
             folders.map((f) => f.path),
+            lib.readOnly,
           );
         } catch (err) {
           failedWatcherCount += 1;
@@ -167,7 +168,7 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
     }
   }
 
-  async startWatcher(libraryId: number, paths: string[]): Promise<void> {
+  async startWatcher(libraryId: number, paths: string[], polling = false): Promise<void> {
     const event = 'scanner.watcher.start';
     const startedAt = Date.now();
     this.logger.log(`[${event}] [start] libraryId=${libraryId} pathCount=${paths.length} - watcher start requested`);
@@ -183,7 +184,17 @@ export class FileWatcherService implements OnApplicationBootstrap, OnModuleDestr
 
       for (const path of paths) {
         currentPath = path;
-        const sub = watch(path, { ignoreInitial: true });
+        const sub = watch(path, {
+          ignoreInitial: true,
+          ...(polling && { backend: 'polling' as const, pollingInterval: 5000, pollingBinaryInterval: 5000 }),
+        });
+        if (polling && !sub.options.backendCapabilities.polling) {
+          await sub.close();
+          this.logger.warn(
+            `[${event}] [end] libraryId=${libraryId} durationMs=${Date.now() - startedAt} - polling disabled by the watcher environment; use scheduled scans`,
+          );
+          return;
+        }
         sub.on('all', (eventName, eventPath) => {
           const normalizedType = normalizeWatchEvent(eventName);
           if (!normalizedType) return;

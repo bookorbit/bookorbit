@@ -1,3 +1,4 @@
+import { PathService } from '../path/path.service';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 import type { BookMergeSourceOutcome } from '@bookorbit/types';
@@ -23,6 +24,7 @@ export class BookMergeRecoveryService implements OnModuleInit {
   private readonly logger = new Logger(BookMergeRecoveryService.name);
 
   constructor(
+    private readonly paths: PathService,
     private readonly repository: BookMergeRepository,
     private readonly executor: BookMergeExecutor,
     private readonly effects: BookMergeEffectsService,
@@ -46,7 +48,12 @@ export class BookMergeRecoveryService implements OnModuleInit {
   async recover(job: MergeJobRow): Promise<void> {
     const plan = job.plan as unknown as MergeExecutionPlan;
     // A job from before merges spanned libraries has no list: it touched its own library only.
-    const release = this.libraryGate.tryAcquireAll(job.libraryIds ?? libraryIdsOf(plan), 'book_merge');
+    const ids = [...new Set([...libraryIdsOf(plan), ...(job.libraryIds ?? [])])];
+    const release = this.libraryGate.tryAcquireAll(ids, 'book_merge');
+    if (!release) {
+      this.logger.warn(`[${MERGE_EVENT}] [fail] jobId=${job.id} phase=recovery - library busy, recovery deferred`);
+      return;
+    }
     try {
       // From the plan, not the stored outcomes: a job interrupted before its first commit may have none.
       const stored = new Map((job.outcomes as BookMergeSourceOutcome[]).map((outcome) => [outcome.sourceBookId, outcome]));
@@ -60,6 +67,10 @@ export class BookMergeRecoveryService implements OnModuleInit {
         return;
       }
 
+      using _paths = await this.paths.beginFileWrites(
+        job.moves.flatMap((move) => [move.from, move.to]),
+        ids,
+      );
       let unresolved: BookMergeJobMove[] = [];
       if (job.status === 'moving' || job.status === 'committing') {
         unresolved = await this.executor.rollback(job.id, job.moves);
@@ -103,7 +114,7 @@ export class BookMergeRecoveryService implements OnModuleInit {
           `error="${sanitizeLogValue(error instanceof Error ? error.message : String(error))}" - recovery failed`,
       );
     } finally {
-      release?.();
+      release();
     }
   }
 }

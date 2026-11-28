@@ -1,3 +1,6 @@
+import { PathService } from '../path/path.service';
+import { canonicalizeWithExistingAncestor } from '../path/path-policy.service';
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { BadRequestException, ConflictException, HttpException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { lstat, mkdir, readdir, realpath, rename, rmdir } from 'fs/promises';
@@ -82,6 +85,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
   private canonicalRoot: string | null = null;
 
   constructor(
+    private readonly paths: PathService,
     config: ConfigService,
     private readonly dockRepo: LibraryDockRepository,
     private readonly fileRepo: BookDockRepository,
@@ -150,6 +154,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
     if (!dock) throw uploadError.invalidTarget('This library has no Library Dock turned on');
     const library = await this.fileRepo.findLibraryFormats(libraryId);
     if (!library) throw uploadError.invalidTarget('Library not found');
+    libraryFilePolicy.assertWritable(libraryId, library.readOnly);
     this.validator.validateFormat(this.validator.sanitizeFilename(filename), library.allowedFormats);
     await this.assertLibrariesFolderUsable();
     return { dockId: dock.id, libraryId, folderId: dock.targetFolderId, folderName: dock.folderName };
@@ -171,8 +176,11 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
     const checks = await mapWithConcurrency(libraries, FILING_CHECK_CONCURRENCY, async (library): Promise<LibraryDockFilingCheck> => {
       const dock = docksByLibrary.get(library.id);
       const target = dock ? library.folders.find((folder) => folder.id === dock.targetFolderId) : library.folders[0];
-      if (!target) return { libraryId: library.id, filing: 'unknown' };
+      if (!target || libraryFilePolicy.isReadOnly(library.id, library.readOnly)) return { libraryId: library.id, filing: 'unknown' };
+      using _write = libraryFilePolicy.beginWrite(library.id, library.readOnly);
       const source = dock && librariesPath ? join(librariesPath, dock.folderName) : (librariesPath ?? root);
+      using _source = await this.paths.beginFileWrites([source]);
+      using _target = await this.paths.beginFileWrites([target.path], [library.id]);
       const placement = resolveDockSettings(dock ?? NEW_DOCK_SETTINGS, global).keepOriginal ? 'link' : 'rename';
       return { libraryId: library.id, ...(await probeFiling(source, target.path, placement)) };
     });
@@ -253,6 +261,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
     }
     const startedAt = Date.now();
     const folder = sanitizeLogValue(folderName);
+    using _paths = await this.paths.beginFileWrites([root, path], undefined, true);
     this.logger.log(`[library_dock.folder_move] [start] folder="${folder}" - moving folder contents to Unsorted`);
     let moved = 0;
     // The whole root, because a taken name sends an entry to `name (2)`: nothing the move does may
@@ -285,6 +294,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
   /** Removes a folder no dock owns, only when nothing but operating-system clutter is in it. */
   async removeFolder(folderName: string): Promise<void> {
     const path = await this.unownedFolderPath(folderName);
+    using _paths = await this.paths.beginFileWrites([path], undefined, true);
     const result = await removeFolderIfEmpty(path).catch((error: unknown) => {
       throw mapFsError(error);
     });
@@ -300,7 +310,8 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
   async assertFolderPathsAllowed(paths: string[]): Promise<void> {
     const root = await this.root();
     for (const path of paths) {
-      if (!isSameOrInside(path, root) && !isSameOrInside(root, path)) continue;
+      const canonical = await canonicalizeWithExistingAncestor(path);
+      if (!isSameOrInside(canonical, root) && !isSameOrInside(root, canonical)) continue;
       throw new ConflictException({
         message: 'Library folders cannot sit inside the Library Dock folder or contain it.',
         errorCode: 'LIBRARY_FOLDER_OVERLAPS_BOOK_DOCK',
@@ -402,6 +413,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
     const librariesPath = await this.ensureLibrariesDir();
     const from = join(librariesPath, dock.folderName);
     const to = join(librariesPath, folderName);
+    using _paths = await this.paths.beginFileWrites([from, to], undefined, true);
     const fromInfo = await lstat(from).catch(() => null);
     const toInfo = await lstat(to).catch(() => null);
     const sameFolder = fromInfo !== null && toInfo !== null && fromInfo.dev === toInfo.dev && fromInfo.ino === toInfo.ino;
@@ -512,6 +524,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
     const existing = await findLibrariesDir(root);
     if (existing) return existing;
     const path = join(root, LIBRARIES_DIR);
+    using _paths = await this.paths.beginFileWrites([path]);
     await makeFolder(path);
     return path;
   }
@@ -519,6 +532,7 @@ export class LibraryDockService implements OnModuleInit, LibraryLifecycleListene
   /** Creates the dock's folder when it is missing. Returns its path when this call created it. */
   private async ensureDockFolder(folderName: string): Promise<string | null> {
     const path = join(await this.ensureLibrariesDir(), folderName);
+    using _paths = await this.paths.beginFileWrites([path]);
     return (await makeFolder(path)) ? path : null;
   }
 

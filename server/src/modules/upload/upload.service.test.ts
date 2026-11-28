@@ -125,6 +125,7 @@ describe('UploadService', () => {
     vi.spyOn(Logger.prototype, 'debug').mockImplementation(() => undefined);
     vi.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
     service = new UploadService(
+      { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
       db as any,
       appSettings as any,
       libraryService as any,
@@ -1078,6 +1079,7 @@ describe('UploadService', () => {
     it('waits for the book lock and writes into the folder the book has by then', async () => {
       const locks = new FileLockService();
       service = new UploadService(
+        { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
         db as any,
         appSettings as any,
         libraryService as any,

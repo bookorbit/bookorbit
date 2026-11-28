@@ -1,3 +1,4 @@
+import { PathService } from '../path/path.service';
 import { BadRequestException, ForbiddenException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { rmdir, unlink } from 'fs/promises';
 import { eq, inArray } from 'drizzle-orm';
@@ -40,6 +41,7 @@ export class BookDockService {
   private resumeWorkPromise: Promise<void> | null = null;
 
   constructor(
+    private readonly paths: PathService,
     @Inject(DB) private readonly db: Db,
     private readonly repo: BookDockRepository,
     private readonly ingestService: BookDockIngestService,
@@ -527,7 +529,13 @@ export class BookDockService {
     if (keepOriginal) {
       await this.keptFiles.remember(row, { discarded: true });
     } else {
-      for (const file of await this.repo.findUnitFiles(row.id)) await safeUnlink(file.absolutePath);
+      const unitFiles = await this.repo.findUnitFiles(row.id);
+      using _paths = await this.paths.beginFileWrites([
+        row.absolutePath,
+        ...unitFiles.map((file) => file.absolutePath),
+        ...(row.unitDirectory ? [row.unitDirectory] : []),
+      ]);
+      for (const file of unitFiles) await safeUnlink(file.absolutePath);
       if (row.unitDirectory) {
         // Non-recursive: anything still in there is unaccounted for, and worth leaving for a human.
         await rmdir(row.unitDirectory).catch(() => {});

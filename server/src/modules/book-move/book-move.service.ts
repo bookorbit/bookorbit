@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { LibraryScopeService } from '../../common/library-scope/library-scope.service';
 import {
   BadRequestException,
@@ -328,8 +329,11 @@ export class BookMoveService implements OnApplicationBootstrap {
           .finishJob(jobId, 'failed', { succeeded: 0, merged: 0, failed: 0, skipped: 0 }, getErrorMessage(error))
           .catch(() => undefined);
       }
-      releaseGate();
-      await this.restartWatchers(stoppedWatchers);
+      try {
+        await this.restartWatchers(stoppedWatchers);
+      } finally {
+        releaseGate();
+      }
       throw error;
     }
   }
@@ -413,8 +417,11 @@ export class BookMoveService implements OnApplicationBootstrap {
       // The run's totals, so a move continued after a restart reports everything it moved.
       if (run.requestedBy !== null) await this.notifyCompletion(run.requestedBy, state.target, run.succeeded, run.failed);
     } finally {
-      state.releaseGate();
-      await this.restartWatchers(state.stoppedWatchers);
+      try {
+        await this.restartWatchers(state.stoppedWatchers);
+      } finally {
+        state.releaseGate();
+      }
     }
   }
 
@@ -451,15 +458,15 @@ export class BookMoveService implements OnApplicationBootstrap {
     if (libraryIds.length === 0) return;
 
     const folders = await this.moveRepo.findLibraryFolders(libraryIds);
-    const pathsByLibrary = new Map<number, string[]>();
+    const pathsByLibrary = new Map<number, { paths: string[]; readOnly: boolean }>();
     for (const folder of folders) {
       const list = pathsByLibrary.get(folder.libraryId);
-      if (list) list.push(folder.path);
-      else pathsByLibrary.set(folder.libraryId, [folder.path]);
+      if (list) list.paths.push(folder.path);
+      else pathsByLibrary.set(folder.libraryId, { paths: [folder.path], readOnly: folder.readOnly });
     }
 
-    for (const libraryId of libraryIds) {
-      await this.fileWatcherService.startWatcher(libraryId, pathsByLibrary.get(libraryId) ?? []).catch((error: Error) => {
+    for (const [libraryId, { paths, readOnly }] of pathsByLibrary) {
+      await this.fileWatcherService.startWatcher(libraryId, paths, readOnly).catch((error: Error) => {
         this.logger.error(
           `[${MOVE_EVENT}] [fail] libraryId=${libraryId} error="${sanitizeLogValue(error.message)}" - could not restart watcher after move`,
         );
@@ -494,6 +501,8 @@ export class BookMoveService implements OnApplicationBootstrap {
   }
 
   private async planBooks(target: MoveTargetLibrary, books: MoveBookData[]): Promise<BookMovePlanOutcome[]> {
+    libraryFilePolicy.assertWritable(target.libraryId, target.readOnly);
+    for (const book of books) libraryFilePolicy.assertWritable(book.libraryId, book.readOnly);
     if (books.length === 0) return [];
 
     const pattern =

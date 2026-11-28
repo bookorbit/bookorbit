@@ -80,7 +80,8 @@ const {
   searchFresh,
   cacheSummary,
 } = useMetadataSearch()
-const { libraries, fetchLibraries } = useLibraries()
+const { libraries: allLibraries, fetchLibraries } = useLibraries()
+const libraries = computed(() => allLibraries.value.filter((library) => !library.readOnly))
 const { hasPermission } = usePermissions()
 const { user } = useAuth()
 const router = useRouter()

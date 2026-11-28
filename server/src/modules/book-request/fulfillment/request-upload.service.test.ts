@@ -20,7 +20,7 @@ describe('RequestUploadService', () => {
   let service: RequestUploadService;
   let events: BookRequestEventsService;
   const requestsRepo = {
-    findById: vi.fn(() => ({ request })),
+    findById: vi.fn(() => ({ request, targetLibraryReadOnly: false })),
     claimForGrab: vi.fn(() => 'claimed'),
     updateIf: vi.fn((_id: number, _from: unknown, patch: Record<string, unknown>) => {
       Object.assign(request, patch);
@@ -141,6 +141,13 @@ describe('RequestUploadService', () => {
     expect(manifest.files.map((file) => file.path)).toEqual(['01.mp3', '02.mp3', 'cover.jpg']);
     expect(request.status).toBe('downloading');
     expect((await stat(download.contentPath)).isDirectory()).toBe(true);
+  });
+
+  it('refuses to stage an upload for a read-only destination', async () => {
+    requestsRepo.findById.mockReturnValueOnce({ request, targetLibraryReadOnly: true });
+    await expect(service.start(5, album, false, user)).rejects.toMatchObject({ response: { errorCode: 'LIBRARY_READ_ONLY' } });
+    expect(requestsRepo.claimForGrab).not.toHaveBeenCalled();
+    expect(downloads.size).toBe(0);
   });
 
   it('refuses to start with files the plan would leave out', async () => {

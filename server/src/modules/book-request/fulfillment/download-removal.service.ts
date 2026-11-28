@@ -1,3 +1,4 @@
+import { PathMappingService } from '../download-clients/path-mapping.service';
 import { rm } from 'node:fs/promises';
 
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
@@ -35,6 +36,7 @@ export class DownloadRemovalService {
   private readonly appDataPath: string;
 
   constructor(
+    private readonly pathMappings: PathMappingService,
     private readonly downloads: BookRequestDownloadRepository,
     private readonly clients: DownloadClientConfigService,
     private readonly registry: DownloadClientRegistry,
@@ -199,7 +201,9 @@ export class DownloadRemovalService {
         `[book_request.remove_completed] [start] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId} - removing the imported download from its client`,
       );
       const config = await this.clients.resolveConfig(download.downloadClientId);
-      await this.registry.require(config.adapterType).remove(download.clientKey, config, { deleteFiles: true });
+      const adapter = this.registry.require(config.adapterType);
+      using _paths = await this.pathMappings.beginClientRemoval(adapter, config, download.clientKey, true);
+      await adapter.remove(download.clientKey, config, { deleteFiles: true });
       this.logger.log(
         `[book_request.remove_completed] [end] requestId=${download.requestId} downloadId=${download.id} clientId=${download.downloadClientId} durationMs=${Date.now() - started} - imported download removed from its client`,
       );
@@ -236,7 +240,8 @@ export class DownloadRemovalService {
         await rm(stagedClientDir(this.appDataPath, config.adapterType, config.id, download.clientKey), { recursive: true, force: true });
         await rm(legacyStagedClientDir(this.appDataPath, config.adapterType, download.clientKey), { recursive: true, force: true });
       } else {
-        await adapter.remove(download.clientKey, config, { deleteFiles: deleteFiles });
+        using _paths = await this.pathMappings.beginClientRemoval(adapter, config, download.clientKey, deleteFiles);
+        await adapter.remove(download.clientKey, config, { deleteFiles });
       }
     }
 

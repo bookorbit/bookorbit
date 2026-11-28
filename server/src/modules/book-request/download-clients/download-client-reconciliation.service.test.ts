@@ -49,7 +49,13 @@ function makeService() {
     adoptFailedAttempt: vi.fn(),
   };
   const gateway = { emitChanged: vi.fn() };
-  const service = new DownloadClientReconciliationService(clients as never, registry as never, downloads as never, gateway as never);
+  const service = new DownloadClientReconciliationService(
+    { beginClientRemoval: vi.fn().mockResolvedValue(null) } as never,
+    clients as never,
+    registry as never,
+    downloads as never,
+    gateway as never,
+  );
 
   return { service, clients, adapter, registry, downloads, gateway };
 }

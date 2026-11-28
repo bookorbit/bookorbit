@@ -78,6 +78,7 @@ export interface FolderSearchResult {
 }
 
 export interface FolderPickerLibrary {
+  readOnly?: boolean;
   id: number;
   name: string;
   icon: string | null;

@@ -1,3 +1,4 @@
+import { PathModule } from '../path/path.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { SelfWriteRegistryModule } from '../../common/self-write-registry.module';
 
@@ -42,6 +43,7 @@ import { ReadingProgressService } from './reading-progress.service';
 
 @Module({
   imports: [
+    PathModule,
     forwardRef(() => LibraryModule),
     AudiobookChaptersModule,
     BookAliasModule,

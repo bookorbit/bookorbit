@@ -137,6 +137,7 @@ function createExecutor() {
   const coverStore = { slotsForAdoption: vi.fn().mockResolvedValue([]) };
   const fileRename = { cancelPendingRename: vi.fn() };
   const executor = new BookMergeExecutor(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     repository as unknown as BookMergeRepository,
     consolidation as unknown as BookConsolidationService,
     fileLocks,

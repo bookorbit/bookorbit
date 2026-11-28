@@ -172,6 +172,7 @@ export class BulkRenameRepository {
   }
 
   async findLibrarySettings(libraryId: number): Promise<{
+    readOnly: boolean;
     fileRenameEnabled: boolean;
     fileNamingPattern: string | null;
     organizationMode: string;
@@ -179,6 +180,7 @@ export class BulkRenameRepository {
   } | null> {
     const [row] = await this.db
       .select({
+        readOnly: libraries.readOnly,
         fileRenameEnabled: libraries.fileRenameEnabled,
         fileNamingPattern: libraries.fileNamingPattern,
         organizationMode: libraries.organizationMode,

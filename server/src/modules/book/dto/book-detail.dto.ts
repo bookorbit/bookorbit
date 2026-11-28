@@ -95,6 +95,7 @@ export class BookDetailDto {
   customMetadata: CustomMetadataBookValue[];
   lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
+  libraryReadOnly?: boolean;
   fileWriteStatus: BookFileWriteStatus;
   linkedBooks: LinkedBookSummary[];
   linkGroupId: number | null;

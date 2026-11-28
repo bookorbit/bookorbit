@@ -53,10 +53,10 @@ const {
   toggleSort,
 } = useBookFileTree(book)
 
-const canUpload = computed(() => hasPermission(Permission.LibraryUpload))
+const canUpload = computed(() => !props.book?.libraryReadOnly && hasPermission(Permission.LibraryUpload))
 const canDownload = computed(() => hasPermission('library_download'))
-const canEdit = canEditMetadata
-const canDelete = computed(() => hasPermission('library_delete_books'))
+const canEdit = computed(() => canEditMetadata.value && !props.book?.libraryReadOnly)
+const canDelete = computed(() => !props.book?.libraryReadOnly && hasPermission('library_delete_books'))
 /** Demo accounts are refused by every read-aloud route, so they never see the entry or probe for it. */
 const canGenerateReadAloud = computed(() => hasPermission(Permission.LibraryGenerateReadAloud) && !isDemoRestrictedAccount.value)
 const readAloudBookId = computed(() => props.book.id)
@@ -386,6 +386,7 @@ async function confirmDelete() {
 
 <template>
   <div ref="tabRoot" class="files-tab flex flex-col gap-3.5 lg:h-full lg:min-h-0">
+    <p v-if="book?.libraryReadOnly" class="text-sm text-muted-foreground">{{ t('library.readOnly.reason') }}</p>
     <FilesHeroBar
       :book="book"
       :file-count="files.length"
@@ -412,6 +413,7 @@ async function confirmDelete() {
       v-if="readAloudCardJob"
       :key="readAloudCardJob.id"
       :job="readAloudCardJob"
+      :library-read-only="book.libraryReadOnly"
       :action="readAloud.action.value"
       :error-key="readAloud.jobErrorKey.value"
       :can-start-over="readAloudEntry.kind === 'available'"
@@ -504,7 +506,7 @@ async function confirmDelete() {
             @copy-path="copyPath"
           />
 
-          <WriteBackCard :book="book" :can-edit="canEdit" @edit-metadata="goToMetadata" />
+          <WriteBackCard :book="book" :can-edit="canEditMetadata" @edit-metadata="goToMetadata" />
         </div>
       </Teleport>
     </div>

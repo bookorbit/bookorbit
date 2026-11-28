@@ -40,7 +40,7 @@ describe('PathService', () => {
     pathPolicy.resolveBrowsePath.mockImplementation((path?: string) => Promise.resolve(path || '/tmp/books'));
     pathPolicy.assertWithinBrowseRoot.mockImplementation((path: string) => Promise.resolve(path));
     vi.mocked(realpath).mockImplementation((path) => Promise.resolve(String(path)));
-    service = new PathService(pathPolicy as never);
+    service = new PathService(pathPolicy as never, { findWriteRoots: () => Promise.resolve([]) } as never);
   });
 
   it('returns the configured browse root in config', () => {

@@ -388,6 +388,7 @@ export type BookDetail = {
   customMetadata: CustomMetadataBookValue[];
   lockedFields: BookMetadataLockField[];
   collections: { id: number; name: string }[];
+  libraryReadOnly?: boolean;
   fileWriteStatus?: BookFileWriteStatus;
   /** Other books shown as this one, only those the viewer can see. Sent only by servers with `book-links`. */
   linkedBooks?: import("./book-link").LinkedBookSummary[];

@@ -130,6 +130,10 @@ export class CreateLibraryDto {
 
   @IsOptionalNotNull()
   @IsBoolean()
+  readOnly?: boolean;
+
+  @IsOptionalNotNull()
+  @IsBoolean()
   fileWriteEnabled?: boolean;
 
   @IsOptionalNotNull()

@@ -115,6 +115,7 @@ describe('FileWriteService', () => {
     };
     const selfWriteRegistry = new SelfWriteRegistry();
     const service = new FileWriteService(
+      { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
       fileWriteRepo as never,
       registry as never,
       lockService as never,
@@ -1215,6 +1216,17 @@ describe('FileWriteService', () => {
   });
 
   describe('force parameter', () => {
+    it.each([false, true])('keeps a read-only library out of the writer with force=%s', async (force) => {
+      const { service, fileWriteRepo, writer } = makeService();
+      fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({ id: 1, absolutePath: 'book.epub', format: 'epub', sizeBytes: 40, libraryId: 2 });
+      fileWriteRepo.findLibraryFileWriteConfig.mockResolvedValue({ ...DEFAULT_LIB_CONFIG, readOnly: true, fileWriteEnabled: true });
+      await expect(service.writeToFile(5, 'sync', 1, false, force)).resolves.toMatchObject({
+        status: 'skipped',
+        reason: 'This library is read-only.',
+      });
+      expect(writer.write).not.toHaveBeenCalled();
+    });
+
     it('bypasses fileWriteEnabled=false when force=true', async () => {
       const { service, fileWriteRepo, writer } = makeService();
       fileWriteRepo.findPrimaryFileForBook.mockResolvedValue({
@@ -1293,6 +1305,7 @@ describe('FileWriteService', () => {
       const { fileWriteRepo, writer } = makeService();
       const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
       const serviceWithNotif = new (FileWriteService as never)(
+        { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
         fileWriteRepo as never,
         { supports: vi.fn().mockReturnValue(true), get: vi.fn().mockReturnValue(writer) } as never,
         { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,
@@ -1323,6 +1336,7 @@ describe('FileWriteService', () => {
       const { fileWriteRepo, writer } = makeService();
       const notificationService = { notify: vi.fn().mockResolvedValue(undefined) };
       const serviceWithNotif = new (FileWriteService as never)(
+        { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
         fileWriteRepo as never,
         { supports: vi.fn().mockReturnValue(true), get: vi.fn().mockReturnValue(writer) } as never,
         { withLock: vi.fn().mockImplementation(async (_: string, fn: () => Promise<unknown>) => fn()) } as never,

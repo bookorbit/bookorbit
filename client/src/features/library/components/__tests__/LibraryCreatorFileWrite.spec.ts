@@ -57,18 +57,26 @@ describe('LibraryCreatorFileWrite', () => {
     return control
   }
 
-  it('emits the two switches and hides the per-format table while writing is off', async () => {
+  it('emits the library file settings and hides the per-format table while writing is off', async () => {
     const wrapper = mountComponent()
 
     expect(wrapper.text()).toContain('Rename files after metadata changes')
     expect(wrapper.text()).not.toContain('Include cover image')
     const switches = wrapper.findAll('[role="switch"]')
-    expect(switches).toHaveLength(2)
+    expect(switches).toHaveLength(3)
 
     await switches[0]!.trigger('click')
     await switches[1]!.trigger('click')
+    await switches[2]!.trigger('click')
+    expect(wrapper.emitted('update:readOnly')).toEqual([[true]])
     expect(wrapper.emitted('update:fileRenameEnabled')).toEqual([[true]])
     expect(wrapper.emitted('update:fileWriteEnabled')).toEqual([[true]])
+  })
+
+  it('disables both write switches in a read-only library even with saved write settings', () => {
+    const wrapper = mountComponent({ ...ALL_ENABLED, readOnly: true })
+    expect(wrapper.findAll('[role="switch"]:disabled')).toHaveLength(2)
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
   })
 
   it('emits an update for every format checkbox', async () => {

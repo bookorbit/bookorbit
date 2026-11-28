@@ -49,6 +49,8 @@ export const libraries = pgTable(
     readingThreshold: doublePrecision('reading_threshold').notNull().default(0.25),
     markAsFinishedPercentComplete: doublePrecision('mark_as_finished_percent_complete').notNull().default(98),
 
+    readOnly: boolean('read_only').notNull().default(false),
+
     // File write-back settings
     fileWriteEnabled: boolean('file_write_enabled').notNull().default(false),
     fileWriteWriteCover: boolean('file_write_write_cover').notNull().default(true),

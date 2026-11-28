@@ -1,3 +1,4 @@
+import { PathModule } from '../path/path.module';
 import { Module, forwardRef } from '@nestjs/common';
 
 import { AppSettingsModule } from '../app-settings/app-settings.module';
@@ -35,6 +36,7 @@ import { LibraryDockRepository } from './library-dock.repository';
 
 @Module({
   imports: [
+    PathModule,
     SetupOverviewModule,
     UploadModule,
     AuthModule,

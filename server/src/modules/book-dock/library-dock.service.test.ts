@@ -19,6 +19,7 @@ vi.mock('./library-dock-fs', async (importOriginal) => {
 });
 
 interface Library {
+  readOnly?: boolean;
   id: number;
   name: string;
   folders: { id: number; path: string }[];
@@ -210,6 +211,7 @@ describe('LibraryDockService', () => {
     registry = new LibraryDockRegistry(dockRepo as never);
     lifecycle = new LibraryLifecycleService();
     service = new LibraryDockService(
+      { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
       config as never,
       dockRepo as never,
       fileRepo as never,
@@ -601,6 +603,13 @@ describe('LibraryDockService', () => {
 
     afterEach(async () => {
       await rm(shelves, { recursive: true, force: true });
+    });
+
+    it('never places a probe file in a read-only library', async () => {
+      libraries[0]!.readOnly = true;
+      const { checks } = await service.checkFiling(user);
+      expect(checks[0]).toEqual({ libraryId: 10, filing: 'unknown' });
+      expect(vi.mocked(probeFiling).mock.calls.map((call) => call[1])).not.toContain(join(shelves, 'fiction'));
     });
 
     it('tries a rename from each dock, from _libraries for a library without one, and leaves nothing behind', async () => {

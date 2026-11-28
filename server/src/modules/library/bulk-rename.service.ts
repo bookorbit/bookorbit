@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import { BadRequestException, ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { dirname } from 'path';
 
@@ -103,6 +104,7 @@ export class BulkRenameService {
 
     const settings = await this.bulkRenameRepo.findLibrarySettings(libraryId);
     if (!settings) throw new NotFoundException('Library not found');
+    libraryFilePolicy.assertWritable(libraryId, settings.readOnly);
     if (!settings.fileRenameEnabled) {
       throw new BadRequestException('File rename is not enabled for this library.');
     }
@@ -230,6 +232,7 @@ export class BulkRenameService {
   private async computeFullPreview(libraryId: number): Promise<CachedPreview> {
     const settings = await this.bulkRenameRepo.findLibrarySettings(libraryId);
     if (!settings) throw new NotFoundException('Library not found');
+    libraryFilePolicy.assertWritable(libraryId, settings.readOnly);
 
     const books = await this.bulkRenameRepo.findAllBooksForLibrary(libraryId);
 

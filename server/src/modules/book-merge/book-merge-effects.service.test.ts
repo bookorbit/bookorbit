@@ -100,6 +100,7 @@ function createEffects() {
     rebuildDailyStatsForUser: vi.fn().mockResolvedValue({ deleted: 0, inserted: 0, libraries: 0 }),
   };
   const effects = new BookMergeEffectsService(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     { appDataPath: join(workDir, 'data') } as never,
     repository as unknown as BookMergeRepository,
     consolidation as unknown as BookConsolidationService,

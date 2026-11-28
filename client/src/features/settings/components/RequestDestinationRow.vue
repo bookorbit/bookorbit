@@ -74,7 +74,9 @@ function handleClear() {
         <option v-if="libraryIsHidden" :value="destination.libraryId" disabled>
           {{ t('settings.system.requests.automation.destinationHiddenLibrary') }}
         </option>
-        <option v-for="library in libraries" :key="library.id" :value="library.id">{{ library.name }}</option>
+        <option v-for="library in libraries" :key="library.id" :value="library.id" :disabled="library.readOnly">
+          {{ library.readOnly ? t('library.readOnly.option', { name: library.name }) : library.name }}
+        </option>
       </select>
     </label>
 
@@ -82,7 +84,12 @@ function handleClear() {
       <span class="sr-only">{{
         t('settings.system.requests.automation.destinationFolderFor', { medium: t(`bookRequests.mediaKind.${mediaKind}`) })
       }}</span>
-      <select class="select-field w-full" :value="destination.folderId ?? ''" :disabled="destination.libraryId === null" @change="handleFolderChange">
+      <select
+        class="select-field w-full"
+        :value="destination.folderId ?? ''"
+        :disabled="destination.libraryId === null || selectedLibrary?.readOnly"
+        @change="handleFolderChange"
+      >
         <option value="" disabled>{{ t('settings.system.requests.automation.selectFolder') }}</option>
         <option v-if="folderIsHidden" :value="destination.folderId" disabled>
           {{ t('settings.system.requests.automation.destinationHiddenFolder') }}

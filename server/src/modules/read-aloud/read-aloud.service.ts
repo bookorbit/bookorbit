@@ -1,3 +1,4 @@
+import { libraryFilePolicy } from '../../common/services/library-file-policy';
 import {
   BadRequestException,
   ConflictException,
@@ -101,6 +102,7 @@ export class ReadAloudService {
     const latest = active ?? (await this.jobs.findLatestFinishedForViewer(bookId, user));
     const mounted = health.state === 'ok' && placement ? await this.isMounted(placement.folderPath, health.health.libraryRoots) : false;
     const reason = this.eligibility({
+      readOnly: libraryFilePolicy.isReadOnly(book.libraryId, library.readOnly),
       health,
       mounted,
       bookMissing: book.status === 'missing',
@@ -141,6 +143,7 @@ export class ReadAloudService {
       this.jobs.findBookPlacement(bookId),
       this.worker.healthState(true),
     ]);
+    libraryFilePolicy.assertWritable(book.libraryId, library.readOnly);
     if (health.state !== 'ok') throw new ServiceUnavailableException('Read-aloud worker is unavailable');
     if (book.status === 'missing') throw new BadRequestException('Read-aloud generation requires files that are present');
     if (library.organizationMode === 'book_per_file')
@@ -464,6 +467,7 @@ export class ReadAloudService {
   }
 
   private eligibility(state: {
+    readOnly: boolean;
     health: WorkerHealthState;
     mounted: boolean;
     bookMissing: boolean;
@@ -477,6 +481,7 @@ export class ReadAloudService {
     if (state.health.state === 'not_configured') return 'worker_not_configured';
     if (state.singleFileLibrary) return 'single_file_library';
     if (!state.hasAudio) return 'no_audiobook';
+    if (state.readOnly) return 'library_read_only';
     if (state.tooManyAudioFiles) return 'too_many_audio_files';
     if (state.bookMissing) return 'book_missing';
     if (!state.epubAllowed) return 'epub_not_allowed';

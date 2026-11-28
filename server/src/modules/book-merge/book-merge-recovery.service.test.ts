@@ -80,14 +80,16 @@ function createRecovery() {
   const effects = { apply: vi.fn().mockResolvedValue(0) };
   const libraryGate = new LibraryOperationGate();
   const jobChanges = { notify: vi.fn() };
+  const paths = { beginFileWrites: vi.fn().mockResolvedValue(null) };
   const recovery = new BookMergeRecoveryService(
+    paths as never,
     repository as unknown as BookMergeRepository,
     executor as unknown as BookMergeExecutor,
     effects as unknown as BookMergeEffectsService,
     libraryGate,
     jobChanges as never,
   );
-  return { recovery, repository, executor, effects, libraryGate, jobChanges };
+  return { recovery, repository, executor, effects, libraryGate, jobChanges, paths };
 }
 
 beforeEach(() => {
@@ -101,6 +103,17 @@ afterEach(() => {
 });
 
 describe('BookMergeRecoveryService', () => {
+  it.each(['busy', 'read-only'])('preserves the journal and skips all disk effects when a library is %s', async (reason) => {
+    const { recovery, executor, effects, repository, libraryGate, paths } = createRecovery();
+    if (reason === 'busy') libraryGate.tryAcquire(2, 'scan');
+    else paths.beginFileWrites.mockRejectedValue(new Error('Library is read-only'));
+    await recovery.recover(jobRow({ status: 'committing', libraryIds: [1, 2], moves: JOURNAL }));
+    expect(executor.rollback).not.toHaveBeenCalled();
+    expect(effects.apply).not.toHaveBeenCalled();
+    expect(repository.updateJob).not.toHaveBeenCalled();
+    if (reason === 'read-only') expect(paths.beginFileWrites).toHaveBeenCalledWith([JOURNAL[0].from, JOURNAL[0].to], [1, 2]);
+  });
+
   it('fails a planned job as INTERRUPTED without touching files or effects', async () => {
     const { recovery, repository, executor, effects, libraryGate, jobChanges } = createRecovery();
 

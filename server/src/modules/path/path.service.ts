@@ -1,3 +1,4 @@
+import { libraryFilePolicy, readOnlyLibraryError } from '../../common/services/library-file-policy';
 import type {
   CreateFolderResult,
   DirectoryEntry,
@@ -19,7 +20,7 @@ import {
 } from '@nestjs/common';
 import type { Dirent } from 'fs';
 import { lstat, mkdir, readdir, realpath, stat } from 'fs/promises';
-import { basename, isAbsolute, join, relative, resolve, sep } from 'path';
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from 'path';
 
 import { sanitizeLogValue } from '../../common/utils/log-sanitize.utils';
 import {
@@ -33,7 +34,7 @@ import {
   stateForError,
   SYSTEM_FOLDERS,
 } from './folder-walk';
-import { PathPolicyService } from './path-policy.service';
+import { canonicalizeWithExistingAncestor, PathPolicyService } from './path-policy.service';
 import { PathRepository } from './path.repository';
 
 /** Past this many folders, children are not opened to learn whether they have their own. */
@@ -55,7 +56,7 @@ export class PathService {
 
   constructor(
     private readonly pathPolicy: PathPolicyService,
-    private readonly pathRepository?: PathRepository,
+    private readonly pathRepository: PathRepository,
   ) {}
 
   getConfig(): PathConfig {
@@ -89,6 +90,70 @@ export class PathService {
     }
   }
 
+  /** Folder creation, download cleanup and placement probes can start with a path instead of a library ID. */
+  async beginPathWrite(path: string, includeDescendants = false): Promise<DisposableStack> {
+    return this.beginFileWrites([path], undefined, includeDescendants);
+  }
+
+  /** Check all participants against one stable folder snapshot, including move sources and rollback destinations. */
+  async beginFileWrites(
+    paths: Iterable<string> | (() => Promise<string[]>),
+    libraryIds?: readonly number[],
+    includeDescendants = false,
+  ): Promise<DisposableStack> {
+    using writes = new DisposableStack();
+    using topology = new DisposableStack();
+    topology.use(libraryFilePolicy.beginPathLookup());
+    const rows = await this.pathRepository.findWriteRoots(libraryIds ?? []);
+    const owners = new Set(libraryIds);
+    const roots: { libraryId: number; path: string; canonical: string; protectedRoot: boolean }[] = [];
+    for (const row of rows) {
+      const protectedRoot = libraryFilePolicy.isReadOnly(row.libraryId, row.readOnly);
+      if (owners.has(row.libraryId) && protectedRoot) throw readOnlyLibraryError();
+      if (protectedRoot || owners.has(row.libraryId)) {
+        roots.push({
+          libraryId: row.libraryId,
+          path: resolve(row.path),
+          canonical: await canonicalizeWithExistingAncestor(resolve(row.path)),
+          protectedRoot,
+        });
+      }
+    }
+    if (libraryIds?.some((id) => !roots.some((root) => root.libraryId === id))) throw new ForbiddenException('Library folder is no longer available');
+    // Owned writes keep their roots registered via the library leases. An unowned path needs
+    // the full topology held until cleanup: a new library could claim it during the operation.
+    for (const id of owners) writes.use(libraryFilePolicy.beginWrite(id, false));
+    if (!owners.size) writes.use(topology.move());
+    if (!roots.length) return writes.move();
+    for (const raw of typeof paths === 'function' ? await paths() : paths) {
+      const path = resolve(raw);
+      const canonical = await canonicalizeWithExistingAncestor(path);
+      // unlink/rename modify the directory entry, while format writers may follow the final link.
+      const entry = join(await canonicalizeWithExistingAncestor(dirname(path)), basename(path));
+      if (
+        roots.some(
+          (root) =>
+            root.protectedRoot &&
+            [canonical, entry].some((target) => isInsideOrAt(target, root.canonical) || (includeDescendants && isInsideOrAt(root.canonical, target))),
+        )
+      )
+        throw readOnlyLibraryError();
+      if (
+        libraryIds &&
+        !roots.some(
+          (root) =>
+            owners.has(root.libraryId) &&
+            isInsideOrAt(path, root.path) &&
+            isInsideOrAt(canonical, root.canonical) &&
+            (path === root.path || isInsideOrAt(entry, root.canonical)),
+        )
+      ) {
+        throw new ForbiddenException('Resolved path is outside the authorized library');
+      }
+    }
+    return writes.move();
+  }
+
   async createDirectory(rawParent: string, rawName: string): Promise<CreateFolderResult> {
     const name = this.assertSafeName(rawName);
     const browseRoot = resolve(this.pathPolicy.getBrowseRoot());
@@ -117,6 +182,7 @@ export class PathService {
       }
       await this.pathPolicy.assertWithinBrowseRoot(resolvedTarget);
 
+      using _write = await this.beginPathWrite(resolvedTarget);
       await mkdir(resolvedTarget);
       this.logger.log(
         `[path.create_folder] [end] path="${sanitizeLogValue(resolvedTarget)}" durationMs=${Date.now() - startedAt} - create folder completed`,
@@ -234,10 +300,10 @@ export class PathService {
     const root = resolve(this.pathPolicy.getBrowseRoot());
     const appDataPath = await this.pathPolicy.getCanonicalAppDataPath();
     const mounts = await this.findMounts(root);
-    const rows = (await this.pathRepository?.findLibraryFolders()) ?? [];
+    const rows = await this.pathRepository.findLibraryFolders();
     const libraries = new Map<number, FolderPickerLibrary>();
     for (const row of rows) {
-      const library = libraries.get(row.libraryId) ?? { id: row.libraryId, name: row.name, icon: row.icon, folders: [] };
+      const library = libraries.get(row.libraryId) ?? { id: row.libraryId, name: row.name, icon: row.icon, readOnly: row.readOnly, folders: [] };
       library.folders.push(row.path);
       libraries.set(row.libraryId, library);
     }

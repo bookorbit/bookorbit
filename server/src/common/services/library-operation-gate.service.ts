@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 
-export const LIBRARY_OPERATION_KINDS = ['scan', 'book_move', 'bulk_rename', 'book_merge', 'library_delete'] as const;
+export const LIBRARY_OPERATION_KINDS = ['scan', 'book_move', 'bulk_rename', 'book_merge', 'library_delete', 'file_mode_change'] as const;
 export type LibraryOperationKind = (typeof LIBRARY_OPERATION_KINDS)[number];
 
 export type LibraryOperationRelease = () => void;

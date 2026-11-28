@@ -426,7 +426,9 @@ async function saveUnsorted() {
             @change="onUnsortedLibraryChange"
           >
             <option :value="null">{{ t('settings.reader.bookDock.noDefaultLibrary') }}</option>
-            <option v-for="lib in libraries" :key="lib.id" :value="lib.id">{{ lib.name }}</option>
+            <option v-for="lib in libraries" :key="lib.id" :value="lib.id" :disabled="lib.readOnly">
+              {{ lib.readOnly ? t('library.readOnly.option', { name: lib.name }) : lib.name }}
+            </option>
           </select>
           <span class="text-xs text-muted-foreground">{{ t('settings.reader.bookDock.defaultLibraryHint') }}</span>
         </label>

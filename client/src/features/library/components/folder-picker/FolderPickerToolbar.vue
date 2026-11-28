@@ -23,6 +23,10 @@ const target = computed(() => {
   return places?.mounts.find((mount) => !places.appDataPath || !isAtOrInside(mount, places.appDataPath)) ?? tree.root.value
 })
 
+const targetReadOnly = computed(() =>
+  picker.data.places.value?.libraries.some((library) => library.readOnly && library.folders.some((path) => isAtOrInside(target.value, path))),
+)
+
 const outline =
   'inline-flex h-9 items-center justify-center gap-2 rounded-md border border-border px-3 text-sm font-medium text-foreground transition-colors hover:bg-muted disabled:opacity-50'
 const iconButton = 'flex size-9 shrink-0 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted'
@@ -88,7 +92,8 @@ defineExpose({ focusField: (prefill?: string) => field.value?.focus(prefill) })
       type="button"
       :class="picker.phone.value ? iconButton : outline"
       :aria-label="t('library.folderBrowser.newFolder.label', { name: leafName(target) })"
-      :title="t('library.folderBrowser.newFolder.label', { name: target })"
+      :disabled="targetReadOnly"
+      :title="targetReadOnly ? t('library.readOnly.reason') : t('library.folderBrowser.newFolder.label', { name: target })"
       @click="onNewFolder"
     >
       <FolderPlus :size="15" aria-hidden="true" />

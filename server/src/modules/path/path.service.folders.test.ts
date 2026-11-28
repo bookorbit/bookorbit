@@ -15,7 +15,7 @@ describe('PathService folder picker routes', () => {
     getCanonicalAppDataPath: vi.fn(),
     resolveBrowsePath: vi.fn(),
   };
-  const pathRepository = { findLibraryFolders: vi.fn() };
+  const pathRepository = { findLibraryFolders: vi.fn(), findWriteRoots: vi.fn() };
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'path-folders-'));
@@ -31,6 +31,7 @@ describe('PathService folder picker routes', () => {
     pathPolicy.getCanonicalAppDataPath.mockResolvedValue(join(root, 'data'));
     pathPolicy.resolveBrowsePath.mockImplementation((path?: string) => Promise.resolve(path || root));
     pathRepository.findLibraryFolders.mockResolvedValue([]);
+    pathRepository.findWriteRoots.mockResolvedValue([]);
     service = new PathService(pathPolicy as never, pathRepository as never);
   });
 
@@ -155,6 +156,34 @@ describe('PathService folder picker routes', () => {
 
       await expect(service.searchFolders('deep find')).resolves.toEqual({ results: [], truncated: true });
     });
+  });
+
+  it('protects a read-only folder reached through an alias or from a recursive cleanup of its parent', async () => {
+    const protectedRoot = join(root, 'books', 'Ebooks');
+    const alias = join(root, 'alias');
+    await symlink(protectedRoot, alias);
+    pathRepository.findWriteRoots.mockResolvedValue([{ libraryId: 1, path: protectedRoot, readOnly: true }]);
+
+    await expect(service.beginPathWrite(join(alias, 'new'))).rejects.toMatchObject({ response: { errorCode: 'LIBRARY_READ_ONLY' } });
+    await expect(service.beginPathWrite(join(root, 'books'), true)).rejects.toMatchObject({ response: { errorCode: 'LIBRARY_READ_ONLY' } });
+    using writable = await service.beginPathWrite(join(root, 'books', 'Magazines'));
+  });
+
+  it('checks ownership of every file in a batch and refuses dangling or redirected locations', async () => {
+    const owned = join(root, 'books', 'Magazines');
+    const protectedRoot = join(root, 'books', 'Ebooks');
+    pathRepository.findWriteRoots.mockResolvedValue([
+      { libraryId: 1, path: owned, readOnly: false },
+      { libraryId: 2, path: protectedRoot, readOnly: true },
+    ]);
+    await symlink(protectedRoot, join(owned, 'alias'));
+    await symlink(join(protectedRoot, 'absent'), join(owned, 'dangling'));
+    await expect(service.beginFileWrites([join(owned, 'safe'), join(owned, 'alias', 'new')], [1])).rejects.toMatchObject({ status: 403 });
+    await expect(service.beginFileWrites([join(owned, 'dangling')], [1])).rejects.toMatchObject({ status: 403 });
+    await expect(service.beginFileWrites([join(root, 'outside')], [1])).rejects.toMatchObject({ status: 403 });
+    await expect(service.beginFileWrites([], [2])).rejects.toMatchObject({ status: 403 });
+    await expect(service.beginFileWrites([], [3])).rejects.toMatchObject({ status: 403 });
+    using allowed = await service.beginFileWrites([join(owned, 'new', 'book.epub')], [1]);
   });
 
   describe('getPlaces', () => {

@@ -1,3 +1,4 @@
+import { PathMappingService } from './path-mapping.service';
 import { BadRequestException, ConflictException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type {
   BookRequestDownloadStatus,
@@ -19,6 +20,7 @@ export class DownloadClientReconciliationService {
   private readonly logger = new Logger(DownloadClientReconciliationService.name);
 
   constructor(
+    private readonly pathMappings: PathMappingService,
     private readonly clients: DownloadClientConfigService,
     private readonly registry: DownloadClientRegistry,
     private readonly downloads: BookRequestDownloadRepository,
@@ -119,6 +121,7 @@ export class DownloadClientReconciliationService {
       throw reconciliationError('DOWNLOAD_CLIENT_RECONCILIATION_NOT_ORPHAN', 'That client item is still attached to a download attempt');
     }
 
+    using _paths = await this.pathMappings.beginClientRemoval(adapter, config, key, deleteFiles);
     await adapter.remove(key, config, { deleteFiles });
     this.logger.log(
       `[download_client.reconcile] [end] clientId=${clientId} key=${key} action=remove deleteFiles=${deleteFiles} - orphaned client item removed`,

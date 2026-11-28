@@ -7575,6 +7575,7 @@
     "deleteDialog": {
       "title": "Delete book?",
       "description": "This will permanently delete the book and all its metadata, files, reading progress, and bookmarks. This cannot be undone.",
+      "descriptionWithReadOnly": "This permanently deletes the book record, metadata, reading progress and bookmarks. Source files are deleted only in writable libraries. A scan can rediscover files in a read-only library.",
       "keepsHistory": "Finished reads stay in each reader's history, under the book's title and author.",
       "linkedNotAffected": "Books linked with this one are not affected.",
       "deleted": "Book deleted",
@@ -13793,6 +13794,12 @@
     }
   },
   "library": {
+    "readOnly": {
+      "title": "Read-only library",
+      "reason": "Files in this library are read-only.",
+      "hint": "Protect the files in this library. Metadata edits stay in BookOrbit, and deleting a book only removes its records. Folder watching uses polling.",
+      "option": "{name} (read-only)"
+    },
     "creator": {
       "createTitle": "Create Library",
       "editTitle": "Edit: {name}",

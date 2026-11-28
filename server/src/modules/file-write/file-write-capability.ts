@@ -21,6 +21,7 @@ import {
 } from './write-target-selector';
 
 export interface LibraryFileWriteConfig extends FileWriteFormatConfig {
+  readOnly?: boolean;
   fileWriteEnabled: boolean;
   fileWriteWriteCover: boolean;
   fileWriteAllFiles: boolean;
@@ -45,7 +46,7 @@ export function resolveBookFileWriteStatus(
   primaryFileId: number | null,
   supports: WriterSupport,
 ): BookFileWriteStatus {
-  if (!isCompleteLibraryFileWriteConfig(libraryConfig) || !libraryConfig.fileWriteEnabled) {
+  if (!isCompleteLibraryFileWriteConfig(libraryConfig) || libraryConfig.readOnly || !libraryConfig.fileWriteEnabled) {
     return disabledBookFileWriteStatus('library_disabled');
   }
 
@@ -82,7 +83,8 @@ export function resolveChapterWriteStatus(
 ): BookChapterWriteBack {
   const unavailable = (reason: BookFileWriteDisabledReason): BookChapterWriteBack => ({ available: false, reason, fileCount: files.length });
   if (files.length === 0) return unavailable('no_primary_file');
-  if (!isCompleteLibraryFileWriteConfig(libraryConfig) || !libraryConfig.fileWriteEnabled) return unavailable('library_disabled');
+  if (!isCompleteLibraryFileWriteConfig(libraryConfig) || libraryConfig.readOnly || !libraryConfig.fileWriteEnabled)
+    return unavailable('library_disabled');
 
   const reasons = files
     .map((file) => resolveWriteTargetSkip(file, libraryConfig, supports))

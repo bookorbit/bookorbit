@@ -73,6 +73,7 @@ beforeEach(async () => {
   const repo = { applyBookMove } as unknown as BookMoveRepository;
   coverStore = { removeCoverDirectory: vi.fn<(bookId: number) => Promise<void>>().mockResolvedValue(undefined) };
   executor = new BookMoveExecutorService(
+    { beginFileWrites: vi.fn().mockResolvedValue(null) } as never,
     repo,
     new FileLockService(),
     registry,

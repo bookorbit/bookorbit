@@ -63,8 +63,8 @@ describe('LibraryDockRepository', () => {
     expect(queries).toHaveLength(1);
     const sql = queries[0].text;
     expect(sql).toContain('"libraries"."allowed_formats"');
-    expect(sql).toContain('where ("library_docks"."enabled" = $1 and "library_docks"."library_id" in ($2, $3))');
-    expect(queries[0].values).toEqual([true, 4, 9]);
+    expect(sql).toContain('where ("library_docks"."enabled" = $1 and "libraries"."read_only" = $2 and "library_docks"."library_id" in ($3, $4))');
+    expect(queries[0].values).toEqual([true, false, 4, 9]);
     expect(sql).toMatch(/order by "libraries"\."name" asc, "libraries"\."id" asc/);
   });
 

@@ -1,3 +1,4 @@
+import { PathService } from '../path/path.service';
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import type { ConfigType } from '@nestjs/config';
 import { rm, stat, unlink } from 'fs/promises';
@@ -51,6 +52,7 @@ export class BookMergeEffectsService {
   private readonly kepubCachePath: string;
 
   constructor(
+    private readonly paths: PathService,
     @Inject(storageConfig.KEY) storage: ConfigType<typeof storageConfig>,
     private readonly repository: BookMergeRepository,
     private readonly consolidation: BookConsolidationService,
@@ -155,6 +157,7 @@ export class BookMergeEffectsService {
         await this.attempt(jobId, 'retire_copy', async () => {
           const path = await this.repository.findFilePath(pair.loserFileId, plan.targetBookId);
           if (!path) return;
+          using _paths = await this.paths.beginFileWrites([path], [plan.libraryId]);
           const survivorPath = await this.repository.findFilePath(pair.survivorFileId, plan.targetBookId);
           // The pair was proved identical at preview time, and the merge's own locks are gone since.
           const changed = survivorPath ? await this.copyChanged(path, survivorPath) : 'survivor_missing';

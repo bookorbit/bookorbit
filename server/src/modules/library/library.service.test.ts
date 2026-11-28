@@ -418,7 +418,7 @@ describe('LibraryService', () => {
 
     await service.create({ name: 'Watched', icon: 'BookOpen', folders: ['/watch-a', '/watch-b'], watch: true } as any);
 
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(6, ['/watch-a', '/watch-b']);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(6, ['/watch-a', '/watch-b'], undefined);
     expect(scannerService.startScanAsync).toHaveBeenCalledWith(6);
   });
 
@@ -571,7 +571,7 @@ describe('LibraryService', () => {
 
     await service.update(7, { watch: true } as any);
 
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(7, ['/watched']);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(7, ['/watched'], undefined);
     expect(fileWatcherService.stopWatcher).not.toHaveBeenCalled();
   });
 
@@ -601,7 +601,7 @@ describe('LibraryService', () => {
 
     await service.update(9, { folders: ['/keep', '/add'] } as any);
 
-    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(9, ['/keep', '/add']);
+    expect(fileWatcherService.startWatcher).toHaveBeenCalledWith(9, ['/keep', '/add'], undefined);
   });
 
   it('update triggers a background scan when format selection settings change', async () => {

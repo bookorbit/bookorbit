@@ -1,3 +1,4 @@
+import { PathModule } from '../path/path.module';
 import { Module, forwardRef } from '@nestjs/common';
 import { SetupOverviewModule } from '../setup-overview/setup-overview.module';
 
@@ -84,6 +85,7 @@ import { RequestWatchdogService } from './fulfillment/request-watchdog.service';
  */
 @Module({
   imports: [
+    PathModule,
     SetupOverviewModule,
     LibraryModule,
     AppSettingsModule,
